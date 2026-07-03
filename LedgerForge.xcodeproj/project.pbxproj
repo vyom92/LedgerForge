@@ -52,8 +52,12 @@
 		288EB0F02FF7B12700F09BC9 /* CSVAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVAnalyzer.swift; sourceTree = "<group>"; };
 		288EB0FB2FF7B81200F09BC9 /* DeveloperConsole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperConsole.swift; sourceTree = "<group>"; };
 		288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperConsoleView.swift; sourceTree = "<group>"; };
-		288EB1022FF7BFF600F09BC9 /* InstitutionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstitutionDetector.swift; sourceTree = "<group>"; };
+		288EB1022FF7BFF600F09BC9 /* StatementDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementDetector.swift; sourceTree = "<group>"; };
 		288EB1032FF7C0A600F09BC9 /* DocumentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentStore.swift; sourceTree = "<group>"; };
+		288EB1192FF7CFBC00F09BC9 /* StatementParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementParser.swift; sourceTree = "<group>"; };
+		288EB11A2FF7CFD500F09BC9 /* StatementParserRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementParserRegistry.swift; sourceTree = "<group>"; };
+		288EB11B2FF7CFF600F09BC9 /* AxisStatementParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisStatementParser.swift; sourceTree = "<group>"; };
+		288EB11C2FF7D00700F09BC9 /* UnknownStatementParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnknownStatementParser.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -157,6 +161,10 @@
 		288EB0DF2FF7A3D200F09BC9 /* Parsers */ = {
 			isa = PBXGroup;
 			children = (
+				288EB11C2FF7D00700F09BC9 /* UnknownStatementParser.swift */,
+				288EB11B2FF7CFF600F09BC9 /* AxisStatementParser.swift */,
+				288EB11A2FF7CFD500F09BC9 /* StatementParserRegistry.swift */,
+				288EB1192FF7CFBC00F09BC9 /* StatementParser.swift */,
 			);
 			path = Parsers;
 			sourceTree = "<group>";
@@ -217,7 +225,7 @@
 		288EB1012FF7BFD900F09BC9 /* Detectors */ = {
 			isa = PBXGroup;
 			children = (
-				288EB1022FF7BFF600F09BC9 /* InstitutionDetector.swift */,
+				288EB1022FF7BFF600F09BC9 /* StatementDetector.swift */,
 			);
 			path = Detectors;
 			sourceTree = "<group>";

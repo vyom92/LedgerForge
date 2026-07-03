@@ -16,13 +16,13 @@ struct Transaction: Identifiable {
 
     var description: String
 
-    var debit: Double?
+    var debit: Decimal?
 
-    var credit: Double?
+    var credit: Decimal?
 
-    var amount: Double
+    var amount: Decimal
 
-    var balance: Double?
+    var balance: Decimal?
 
     var currency: String
 
