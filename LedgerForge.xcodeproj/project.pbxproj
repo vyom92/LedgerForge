@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		288EB0DA2FF7A04700F09BC9 /* AGENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0D92FF7A04700F09BC9 /* AGENTS.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		288EB0BB2FF7955300F09BC9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,8 @@
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0BA2FF7955300F09BC9 /* LedgerForgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LedgerForgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LedgerForgeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		288EB0D82FF7997000F09BC9 /* Transaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transaction.swift; sourceTree = "<group>"; };
+		288EB0D92FF7A04700F09BC9 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = AGENTS.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -75,6 +81,8 @@
 		288EB0A42FF7955200F09BC9 = {
 			isa = PBXGroup;
 			children = (
+				288EB0D92FF7A04700F09BC9 /* AGENTS.md */,
+				288EB0D72FF7995800F09BC9 /* Models */,
 				288EB0AF2FF7955200F09BC9 /* LedgerForge */,
 				288EB0BD2FF7955300F09BC9 /* LedgerForgeTests */,
 				288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */,
@@ -90,6 +98,14 @@
 				288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		288EB0D72FF7995800F09BC9 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				288EB0D82FF7997000F09BC9 /* Transaction.swift */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -212,6 +228,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				288EB0DA2FF7A04700F09BC9 /* AGENTS.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
