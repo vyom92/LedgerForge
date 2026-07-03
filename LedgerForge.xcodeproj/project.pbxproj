@@ -104,7 +104,7 @@
 				288EB0AE2FF7955200F09BC9 /* Products */,
 				288EB0DD2FF7A3D000F09BC9 /* Core */,
 				288EB0DE2FF7A3D100F09BC9 /* Services */,
-				288EB0DF2FF7A3D200F09BC9 /* Importers */,
+				288EB0DF2FF7A3D200F09BC9 /* Parsers */,
 				288EB0E02FF7A3D200F09BC9 /* Documents */,
 				288EB0E12FF7A3D300F09BC9 /* Utilities */,
 				288EB0E22FF7A3D400F09BC9 /* ViewModels */,
@@ -154,11 +154,11 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
-		288EB0DF2FF7A3D200F09BC9 /* Importers */ = {
+		288EB0DF2FF7A3D200F09BC9 /* Parsers */ = {
 			isa = PBXGroup;
 			children = (
 			);
-			path = Importers;
+			path = Parsers;
 			sourceTree = "<group>";
 		};
 		288EB0E02FF7A3D200F09BC9 /* Documents */ = {
