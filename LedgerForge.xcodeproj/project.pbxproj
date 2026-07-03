@@ -18,6 +18,19 @@
 		288EB0FD2FF7BA1600F09BC9 /* DeveloperConsoleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */; };
 		288EB0FE2FF7BA2800F09BC9 /* DeveloperConsole.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0FB2FF7B81200F09BC9 /* DeveloperConsole.swift */; };
 		288EB1042FF7C0A600F09BC9 /* DocumentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB1032FF7C0A600F09BC9 /* DocumentStore.swift */; };
+		288EB11E2FF7D68200F09BC9 /* InstitutionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB1022FF7BFF600F09BC9 /* InstitutionDetector.swift */; };
+		288EB1202FF7D69000F09BC9 /* DocumentMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB11F2FF7D69000F09BC9 /* DocumentMetadata.swift */; };
+		288EB1212FF7D88200F09BC9 /* StatementParserRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB11A2FF7CFD500F09BC9 /* StatementParserRegistry.swift */; };
+		288EB1222FF7D89600F09BC9 /* UnknownStatementParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB11C2FF7D00700F09BC9 /* UnknownStatementParser.swift */; };
+		288EB1232FF7D89B00F09BC9 /* AxisBankAccountParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB11B2FF7CFF600F09BC9 /* AxisBankAccountParser.swift */; };
+		288EB1242FF7D8A000F09BC9 /* StatementParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB1192FF7CFBC00F09BC9 /* StatementParser.swift */; };
+		288EB1252FF7D8B500F09BC9 /* Transaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0D82FF7997000F09BC9 /* Transaction.swift */; };
+		288EB1272FF7D96A00F09BC9 /* DocumentPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */; };
+		288EB1292FF7DA3900F09BC9 /* ColumnMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB1282FF7DA3900F09BC9 /* ColumnMapping.swift */; };
+		288EB12B2FF7E08500F09BC9 /* NormalizedRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB12A2FF7E08500F09BC9 /* NormalizedRow.swift */; };
+		288EB12D2FF7E0C000F09BC9 /* NormalizedDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB12C2FF7E0C000F09BC9 /* NormalizedDocument.swift */; };
+		288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */; };
+		288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB1312FF7E3C600F09BC9 /* ColumnType.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,12 +65,19 @@
 		288EB0F02FF7B12700F09BC9 /* CSVAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVAnalyzer.swift; sourceTree = "<group>"; };
 		288EB0FB2FF7B81200F09BC9 /* DeveloperConsole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperConsole.swift; sourceTree = "<group>"; };
 		288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperConsoleView.swift; sourceTree = "<group>"; };
-		288EB1022FF7BFF600F09BC9 /* StatementDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementDetector.swift; sourceTree = "<group>"; };
+		288EB1022FF7BFF600F09BC9 /* InstitutionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstitutionDetector.swift; sourceTree = "<group>"; };
 		288EB1032FF7C0A600F09BC9 /* DocumentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentStore.swift; sourceTree = "<group>"; };
 		288EB1192FF7CFBC00F09BC9 /* StatementParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementParser.swift; sourceTree = "<group>"; };
 		288EB11A2FF7CFD500F09BC9 /* StatementParserRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementParserRegistry.swift; sourceTree = "<group>"; };
-		288EB11B2FF7CFF600F09BC9 /* AxisStatementParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisStatementParser.swift; sourceTree = "<group>"; };
+		288EB11B2FF7CFF600F09BC9 /* AxisBankAccountParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountParser.swift; sourceTree = "<group>"; };
 		288EB11C2FF7D00700F09BC9 /* UnknownStatementParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnknownStatementParser.swift; sourceTree = "<group>"; };
+		288EB11F2FF7D69000F09BC9 /* DocumentMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentMetadata.swift; sourceTree = "<group>"; };
+		288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPreviewView.swift; sourceTree = "<group>"; };
+		288EB1282FF7DA3900F09BC9 /* ColumnMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColumnMapping.swift; sourceTree = "<group>"; };
+		288EB12A2FF7E08500F09BC9 /* NormalizedRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NormalizedRow.swift; sourceTree = "<group>"; };
+		288EB12C2FF7E0C000F09BC9 /* NormalizedDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NormalizedDocument.swift; sourceTree = "<group>"; };
+		288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVNormalizer.swift; sourceTree = "<group>"; };
+		288EB1312FF7E3C600F09BC9 /* ColumnType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColumnType.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -101,6 +121,7 @@
 		288EB0A42FF7955200F09BC9 = {
 			isa = PBXGroup;
 			children = (
+				288EB12E2FF7E10200F09BC9 /* Normalizers */,
 				288EB1012FF7BFD900F09BC9 /* Detectors */,
 				288EB0D72FF7995800F09BC9 /* Models */,
 				288EB0BD2FF7955300F09BC9 /* LedgerForgeTests */,
@@ -135,6 +156,9 @@
 		288EB0D72FF7995800F09BC9 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				288EB1312FF7E3C600F09BC9 /* ColumnType.swift */,
+				288EB12C2FF7E0C000F09BC9 /* NormalizedDocument.swift */,
+				288EB12A2FF7E08500F09BC9 /* NormalizedRow.swift */,
 				288EB0D82FF7997000F09BC9 /* Transaction.swift */,
 				288EB0E82FF7AC9500F09BC9 /* Document.swift */,
 			);
@@ -162,7 +186,7 @@
 			isa = PBXGroup;
 			children = (
 				288EB11C2FF7D00700F09BC9 /* UnknownStatementParser.swift */,
-				288EB11B2FF7CFF600F09BC9 /* AxisStatementParser.swift */,
+				288EB11B2FF7CFF600F09BC9 /* AxisBankAccountParser.swift */,
 				288EB11A2FF7CFD500F09BC9 /* StatementParserRegistry.swift */,
 				288EB1192FF7CFBC00F09BC9 /* StatementParser.swift */,
 			);
@@ -193,6 +217,7 @@
 		288EB0E32FF7A3D500F09BC9 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */,
 				288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */,
 			);
 			path = Views;
@@ -225,9 +250,19 @@
 		288EB1012FF7BFD900F09BC9 /* Detectors */ = {
 			isa = PBXGroup;
 			children = (
-				288EB1022FF7BFF600F09BC9 /* StatementDetector.swift */,
+				288EB1282FF7DA3900F09BC9 /* ColumnMapping.swift */,
+				288EB11F2FF7D69000F09BC9 /* DocumentMetadata.swift */,
+				288EB1022FF7BFF600F09BC9 /* InstitutionDetector.swift */,
 			);
 			path = Detectors;
+			sourceTree = "<group>";
+		};
+		288EB12E2FF7E10200F09BC9 /* Normalizers */ = {
+			isa = PBXGroup;
+			children = (
+				288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */,
+			);
+			path = Normalizers;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -372,15 +407,28 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				288EB1292FF7DA3900F09BC9 /* ColumnMapping.swift in Sources */,
 				288EB0FE2FF7BA2800F09BC9 /* DeveloperConsole.swift in Sources */,
 				288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */,
+				288EB12B2FF7E08500F09BC9 /* NormalizedRow.swift in Sources */,
+				288EB1272FF7D96A00F09BC9 /* DocumentPreviewView.swift in Sources */,
+				288EB1242FF7D8A000F09BC9 /* StatementParser.swift in Sources */,
+				288EB1232FF7D89B00F09BC9 /* AxisBankAccountParser.swift in Sources */,
+				288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */,
+				288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */,
 				288EB0FD2FF7BA1600F09BC9 /* DeveloperConsoleView.swift in Sources */,
+				288EB1212FF7D88200F09BC9 /* StatementParserRegistry.swift in Sources */,
+				288EB1252FF7D8B500F09BC9 /* Transaction.swift in Sources */,
 				288EB0ED2FF7AE2500F09BC9 /* DocumentReader.swift in Sources */,
+				288EB12D2FF7E0C000F09BC9 /* NormalizedDocument.swift in Sources */,
+				288EB1202FF7D69000F09BC9 /* DocumentMetadata.swift in Sources */,
 				288EB1042FF7C0A600F09BC9 /* DocumentStore.swift in Sources */,
 				288EB0F12FF7B29300F09BC9 /* Document.swift in Sources */,
 				288EB0EE2FF7AE2C00F09BC9 /* CSVReader.swift in Sources */,
 				288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */,
 				288EB0F22FF7B2AB00F09BC9 /* CSVAnalyzer.swift in Sources */,
+				288EB1222FF7D89600F09BC9 /* UnknownStatementParser.swift in Sources */,
+				288EB11E2FF7D68200F09BC9 /* InstitutionDetector.swift in Sources */,
 				288EB0E62FF7A84F00F09BC9 /* ImportEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

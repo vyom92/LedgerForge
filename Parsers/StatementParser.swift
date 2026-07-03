@@ -1,9 +1,22 @@
+//
+// LedgerForge
+// StatementParser.swift
+// Version: 0.2.0
+//
+
+import Foundation
+
 protocol StatementParser {
 
-    var institution: String { get }
+    var name: String { get }
 
-    func canParse(_ document: Document) -> Bool
+    func canParse(
+        document: Document,
+        metadata: DocumentMetadata
+    ) -> Bool
 
-    func parse(_ document: Document) throws -> [Transaction]
+    func parse(
+        document: NormalizedDocument
+    ) throws -> [Transaction]
 
 }

@@ -1,3 +1,9 @@
+//
+// LedgerForge
+// ContentView.swift
+// Version: 0.0.7
+//
+
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -8,7 +14,9 @@ struct ContentView: View {
 
     var body: some View {
 
-        HStack(alignment: .top) {
+        HStack(spacing: 0) {
+
+            // MARK: Left Panel
 
             VStack(spacing: 25) {
 
@@ -34,9 +42,18 @@ struct ContentView: View {
 
             }
             .padding(30)
-            .frame(minWidth: 500, minHeight: 500)
+            .frame(minWidth: 260)
 
             Divider()
+
+            // MARK: Middle Panel
+
+            DocumentPreviewView()
+                .frame(minWidth: 500)
+
+            Divider()
+
+            // MARK: Right Panel
 
             DeveloperConsoleView()
                 .frame(width: 350)
@@ -55,12 +72,12 @@ struct ContentView: View {
             case .success(let url):
 
                 selectedFile = url.lastPathComponent
-
                 ImportEngine.shared.importFile(from: url)
 
             case .failure(let error):
 
                 selectedFile = error.localizedDescription
+
             }
 
         }
