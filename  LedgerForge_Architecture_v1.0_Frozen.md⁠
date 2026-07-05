@@ -1,0 +1,82 @@
+ LedgerForge_Architecture_v1.0_Frozen.md⁠
+
+# LedgerForge Architecture v1.0 (Frozen)
+
+**Status:** Frozen for Milestone B
+
+This document is the architectural baseline for LedgerForge until Milestone B is complete.
+
+## Vision
+
+LedgerForge is an offline-first financial document intelligence platform that transforms financial documents into structured financial knowledge.
+
+## Core Principles
+
+- Offline first.
+- Single source of truth.
+- Every imported value must be traceable.
+- Readers know file formats.
+- Parsers know institutions and document families.
+- Rules know business meaning.
+- Plugin parser architecture.
+- Every commit should build successfully.
+
+## Import Pipeline
+
+File → Reader → Document Analyzer → Document Classifier → Normalizer → NormalizedDocument → Parser → Rules Engine → SQLite → Dashboard
+
+## Core Domain
+
+- Account (central entity)
+- Transaction
+- Security
+- Holding
+- ImportSession
+- Rule
+- Category
+- DocumentMetadata
+- NormalizedDocument
+
+## Supported Document Families
+
+- Bank Accounts
+- Credit Cards
+- Brokerage
+- Salary
+- Tax
+- Mutual Funds
+- Government Records
+
+## Milestones
+
+- Milestone A: Foundation ✅
+- Milestone B: First successful Axis Bank Account import
+- Milestone C: Universal Readers (CSV, PDF, XLS, XLSX)
+- Milestone D: Multi-institution support
+- Milestone E: Rules Engine, Categorization and Reconciliation
+- Milestone F: Investments, Portfolio and Dashboard
+
+## Compatibility Review
+
+Every architectural decision should be reviewed against:
+
+- Axis Bank
+- Axis Credit Card
+- HDFC Bank
+- CBQ Bank
+- CBQ Credit Card
+- American Express
+- IBKR
+- Salary Slip
+- Mutual Fund CAS
+- AIS / Form 16
+
+## Architecture Freeze
+
+No major architectural changes until Milestone B is complete unless:
+
+1. A real financial document exposes a fundamental design flaw.
+2. The change benefits multiple document families.
+3. The change preserves the core architecture principles.
+
+Future enhancements will be tracked under Architecture v1.1.

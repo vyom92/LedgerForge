@@ -31,6 +31,7 @@
 		288EB12D2FF7E0C000F09BC9 /* NormalizedDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB12C2FF7E0C000F09BC9 /* NormalizedDocument.swift */; };
 		288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */; };
 		288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB1312FF7E3C600F09BC9 /* ColumnType.swift */; };
+		28B262A42FFAB09900052675 /*  LedgerForge_Architecture_v1.0_Frozen.md⁠ in Resources */ = {isa = PBXBuildFile; fileRef = 28B262A32FFAB09900052675 /*  LedgerForge_Architecture_v1.0_Frozen.md⁠ */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -78,6 +79,7 @@
 		288EB12C2FF7E0C000F09BC9 /* NormalizedDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NormalizedDocument.swift; sourceTree = "<group>"; };
 		288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVNormalizer.swift; sourceTree = "<group>"; };
 		288EB1312FF7E3C600F09BC9 /* ColumnType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColumnType.swift; sourceTree = "<group>"; };
+		28B262A32FFAB09900052675 /*  LedgerForge_Architecture_v1.0_Frozen.md⁠ */ = {isa = PBXFileReference; lastKnownFileType = text; path = " LedgerForge_Architecture_v1.0_Frozen.md⁠"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -121,6 +123,7 @@
 		288EB0A42FF7955200F09BC9 = {
 			isa = PBXGroup;
 			children = (
+				28B262A32FFAB09900052675 /*  LedgerForge_Architecture_v1.0_Frozen.md⁠ */,
 				288EB12E2FF7E10200F09BC9 /* Normalizers */,
 				288EB1012FF7BFD900F09BC9 /* Detectors */,
 				288EB0D72FF7995800F09BC9 /* Models */,
@@ -382,6 +385,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				28B262A42FFAB09900052675 /*  LedgerForge_Architecture_v1.0_Frozen.md⁠ in Resources */,
 				288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
