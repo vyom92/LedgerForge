@@ -41,16 +41,18 @@ final class CSVAnalyzer {
         document.delimiter = detectedDelimiter
 
         let keywords = [
-            "date",
-            "txn",
+            "tran date",
+            "transaction date",
+            "posting date",
+            "particulars",
             "description",
             "narration",
-            "withdrawal",
-            "deposit",
             "debit",
             "credit",
+            "dr",
+            "cr",
             "balance",
-            "amount"
+            "bal"
         ]
 
         for (index, row) in rows.enumerated() {
@@ -61,11 +63,16 @@ final class CSVAnalyzer {
                 lower.contains($0)
             }
 
-            if matches.count >= 3 {
+            let looksLikeAxisHeader =
+                lower.contains("tran date") &&
+                lower.contains("particulars") &&
+                (lower.contains("bal") || lower.contains("balance"))
+
+            if looksLikeAxisHeader || matches.count >= 4 {
 
                 document.headerRow = index + 1
 
-                let columns = row.split(separator: detectedDelimiter)
+                let columns = row.split(separator: detectedDelimiter, omittingEmptySubsequences: false)
 
                 document.columnCount = columns.count
 

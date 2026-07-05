@@ -30,6 +30,10 @@ final class CSVNormalizer {
 
         let lines = text.components(separatedBy: .newlines)
 
+        guard firstRow > 0, firstRow <= lines.count else {
+            return []
+        }
+
         var rows: [NormalizedRow] = []
 
         for index in (firstRow - 1)..<lines.count {
