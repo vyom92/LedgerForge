@@ -25,70 +25,77 @@ final class AxisBankAccountParser: StatementParser {
         document: NormalizedDocument
     ) throws -> [Transaction] {
 
-        guard let firstRow = document.rows.first else {
+        guard !document.rows.isEmpty else {
             return []
         }
 
-        print("========== FIRST NORMALIZED ROW ==========")
-        print(firstRow)
-        print("=========================================")
+        var transactions: [Transaction] = []
 
-        guard firstRow.values.count >= 6 else {
-            print("Axis parser: insufficient columns in first row")
-            return []
+        for firstRow in document.rows {
+
+            guard firstRow.values.count >= 6 else {
+                print("Axis parser: skipping row \(firstRow.rowNumber) (insufficient columns)")
+                continue
+            }
+
+            let dateString = firstRow.values[0].trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let formatter = DateFormatter()
+            formatter.dateFormat = "dd-MM-yyyy"
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+
+            guard let parsedDate = formatter.date(from: dateString) else {
+                print("Axis parser: skipping non-transaction row \(firstRow.rowNumber)")
+                continue
+            }
+
+            let description = firstRow.values[2].trimmingCharacters(in: .whitespacesAndNewlines)
+            let debitString = firstRow.values[3].trimmingCharacters(in: .whitespacesAndNewlines)
+            let creditString = firstRow.values[4].trimmingCharacters(in: .whitespacesAndNewlines)
+            let balanceString = firstRow.values[5].trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let amountString = debitString.isEmpty ? creditString : debitString
+            let transactionType = debitString.isEmpty ? "Credit" : "Debit"
+
+            var debit = Decimal(string: debitString)
+            var credit = Decimal(string: creditString)
+            let balance = Decimal(string: balanceString)
+
+            // Some Axis CSV exports place the transaction amount in the
+            // opposite DR/CR column. Infer the correct side from which
+            // column actually contains a value.
+            if debit == nil, let value = credit {
+                debit = value
+                credit = nil
+            }
+
+            let amount: Decimal
+
+            if let debit {
+                amount = -debit
+            } else {
+                amount = credit ?? 0
+            }
+
+            let transaction = Transaction(
+                date: parsedDate,
+                description: description,
+                debit: debit,
+                credit: credit,
+                amount: amount,
+                balance: balance,
+                currency: "INR",
+                account: "",
+                sourceBank: "Axis Bank",
+                sourceFile: document.document.filename
+            )
+
+            transactions.append(transaction)
         }
 
-        let dateString = firstRow.values[0].trimmingCharacters(in: .whitespacesAndNewlines)
-        let description = firstRow.values[2].trimmingCharacters(in: .whitespacesAndNewlines)
-        let debitString = firstRow.values[3].trimmingCharacters(in: .whitespacesAndNewlines)
-        let creditString = firstRow.values[4].trimmingCharacters(in: .whitespacesAndNewlines)
-        let balanceString = firstRow.values[5].trimmingCharacters(in: .whitespacesAndNewlines)
+        print("Normalized rows: \(document.rows.count)")
+        print("✓ Parsed \(transactions.count) transactions")
 
-        print("Date: \(dateString)")
-        print("Description: \(description)")
-        print("Debit: \(debitString)")
-        print("Credit: \(creditString)")
-        print("Balance: \(balanceString)")
-
-        let amountString = debitString.isEmpty ? creditString : debitString
-        let transactionType = debitString.isEmpty ? "Credit" : "Debit"
-
-        print("Amount: \(amountString)")
-        print("Transaction Type: \(transactionType)")
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd-MM-yyyy"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-
-        let parsedDate = formatter.date(from: dateString)
-
-        let debit = Decimal(string: debitString)
-        let credit = Decimal(string: creditString)
-        let balance = Decimal(string: balanceString)
-
-        let amount: Decimal
-
-        if let debit {
-            amount = -debit
-        } else {
-            amount = credit ?? 0
-        }
-
-        let transaction = Transaction(
-            date: parsedDate,
-            description: description,
-            debit: debit,
-            credit: credit,
-            amount: amount,
-            balance: balance,
-            currency: "INR",
-            account: "",
-            sourceBank: "Axis Bank",
-            sourceFile: document.document.filename
-        )
-
-        print("✓ First transaction created successfully")
-
-        return [transaction]
+        return transactions
     }
 }
