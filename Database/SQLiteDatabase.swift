@@ -23,8 +23,15 @@ public final class SQLiteDatabase {
             let msg = String(cString: sqlite3_errmsg(db))
             throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: msg])
         }
-        // Enable foreign keys
+        // Configure recommended PRAGMAs for production-safe defaults
+        // Enable write-ahead logging for concurrency
+        try execute(sql: "PRAGMA journal_mode = WAL;")
+        // Enable foreign keys enforcement
         try execute(sql: "PRAGMA foreign_keys = ON;")
+        // Set busy timeout (ms)
+        sqlite3_busy_timeout(db, 5000)
+        // Use NORMAL synchronous for balanced durability/performance
+        try execute(sql: "PRAGMA synchronous = NORMAL;")
     }
 
     public func close() {
@@ -41,6 +48,48 @@ public final class SQLiteDatabase {
             let message = errMsg.flatMap { String(cString: $0) } ?? "unknown"
             sqlite3_free(errMsg)
             throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+        }
+    }
+
+    // Execute a prepared statement with parameter bindings. Parameters are bound in order.
+    public func executePrepared(sql: String, params: [Any?] = []) throws {
+        guard let db = db else { throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: "DB not open"]) }
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) != SQLITE_OK {
+            let msg = String(cString: sqlite3_errmsg(db))
+            throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: msg])
+        }
+
+        // Bind parameters
+        for (i, p) in params.enumerated() {
+            let idx = Int32(i + 1)
+            if p == nil {
+                sqlite3_bind_null(stmt, idx)
+                continue
+            }
+            switch p {
+            case let s as String:
+                sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
+            case let i as Int:
+                sqlite3_bind_int64(stmt, idx, sqlite3_int64(i))
+            case let i as Int64:
+                sqlite3_bind_int64(stmt, idx, sqlite3_int64(i))
+            case let d as Double:
+                sqlite3_bind_double(stmt, idx, d)
+            case let b as Bool:
+                sqlite3_bind_int(stmt, idx, b ? 1 : 0)
+            default:
+                // Fallback: attempt String description
+                let s = String(describing: p!)
+                sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
+            }
+        }
+
+        let rc = sqlite3_step(stmt)
+        if rc != SQLITE_DONE && rc != SQLITE_ROW {
+            let msg = String(cString: sqlite3_errmsg(db))
+            throw NSError(domain: "SQLite", code: Int(rc), userInfo: [NSLocalizedDescriptionKey: msg])
         }
     }
 
@@ -89,6 +138,10 @@ public final class SQLiteDatabase {
             return Int(sqlite3_column_int64(stmt, 0))
         }
         return 0
+    }
+
+    public func queryInt(_ sql: String) throws -> Int {
+        return try querySingleInt(sql: sql)
     }
 
     private func iso8601Now() -> String {

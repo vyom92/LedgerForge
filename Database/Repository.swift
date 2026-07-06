@@ -4,20 +4,30 @@
 
 import Foundation
 
-/// Minimal repository protocols used by the application. Implementations
+/// Strongly-typed repository protocols used by the application. Implementations
 /// must be provided by a DatabaseProvider (in-memory or SQLite-backed).
 public protocol TransactionRepository {
-    func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [Any]) throws
+    func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws
     // Additional query methods will be added in later phases.
 }
 
 public protocol AccountRepository {
-    func upsertAccount(_ account: [String: Any]) throws -> String
+    func upsertAccount(_ account: AccountDTO) throws -> String
 }
 
 public protocol ImportSessionRepository {
-    func createImportSession(_ payload: [String: Any]) throws -> String
-    func updateImportSession(_ id: String, updates: [String: Any]) throws
+    func createImportSession(_ payload: ImportSessionDTO) throws -> String
+    func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws
+}
+
+public struct PartialImportSessionUpdate {
+    public var validationStatus: String?
+    public var completedAtISO: String?
+
+    public init(validationStatus: String? = nil, completedAtISO: String? = nil) {
+        self.validationStatus = validationStatus
+        self.completedAtISO = completedAtISO
+    }
 }
 
 /// DatabaseProvider exposes repository implementations. Set the shared
@@ -48,23 +58,23 @@ public final class DatabaseProvider {
 
 // MARK: - Placeholder repos
 struct PlaceholderTransactionRepo: TransactionRepository {
-    func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [Any]) throws {
+    func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws {
         // No-op placeholder; real implementation provided by SQLiteRepositoryProvider.
     }
 }
 
 struct PlaceholderAccountRepo: AccountRepository {
-    func upsertAccount(_ account: [String: Any]) throws -> String {
+    func upsertAccount(_ account: AccountDTO) throws -> String {
         // Return a generated UUID so callers can proceed.
         return UUID().uuidString
     }
 }
 
 struct PlaceholderImportSessionRepo: ImportSessionRepository {
-    func createImportSession(_ payload: [String: Any]) throws -> String {
+    func createImportSession(_ payload: ImportSessionDTO) throws -> String {
         return UUID().uuidString
     }
-    func updateImportSession(_ id: String, updates: [String: Any]) throws {
+    func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws {
         // No-op
     }
 }
