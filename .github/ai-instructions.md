@@ -1,269 +1,79 @@
-# LedgerForge – GitHub Copilot Instructions
+# LedgerForge – AI Instructions
 
-## Project Identity
+`Project documents/Project_Guide.md` is the canonical entry point for every AI assistant (Copilot, Codex, ChatGPT or future agents).
 
-LedgerForge is an offline-first personal financial operating system.
+Do not begin implementation until it has been read.
 
-The application exists to provide an accurate, explainable and trustworthy financial dashboard.
+## Mandatory Workflow
 
-Document import, parsing, OCR and automation exist only to keep the financial model accurate.
+Before writing code:
 
----
+1. Read `Project documents/Project_Guide.md`.
+2. Confirm the requested sprint and stop condition.
+3. Read `Project documents/Codex response.md`.
+4. Use the Task Routing Guide in `Project_Guide.md` to determine which additional documentation is required.
+5. Produce an implementation plan before making code changes.
 
-# Engineering Philosophy
+## Scope Rules
 
-Always prefer:
+- Work on one approved sprint only.
+- Do not implement future sprint work.
+- Do not redesign approved architecture.
+- Preserve existing user-visible behaviour unless explicitly requested.
+- If an architectural conflict is discovered, stop and document it in `Project documents/Codex response.md`.
 
-1. Financial correctness
-2. Trust
-3. Simplicity
-4. Maintainability
-5. Automation
-6. Visual polish
+## Architecture Rules
 
-Never sacrifice correctness for convenience.
+- Validation always precedes persistence.
+- Repository protocols are the only abstraction permitted to access persistence.
+- Repository implementations are the only components permitted to communicate with SQLite.
+- Views never access SQLite.
+- ViewModels never access SQLite.
+- Stores never access SQLite.
+- ImportCoordinator owns orchestration.
+- Readers understand file formats.
+- Parsers understand financial institutions.
+- Stores own runtime state.
+- Dashboard observes stores.
 
----
+## Implementation Rules
 
-# Before Writing Code
+Every new source file must:
 
-Read these project documents before making architectural changes:
+- Be added to the Xcode navigator.
+- Be added to the correct target membership.
+- Compile successfully.
 
-- ADR.md
-- Architecture.md
-- Product Vision.md
-- Engineering Standards.md
+Prefer extending existing architecture over creating parallel implementations.
 
-Treat these documents as the source of truth.
+Prefer migration over duplication.
 
----
+## Financial Rules
 
-# Architecture Rules
+- Never invent financial rules.
+- Never invent statement layouts.
+- Never invent document formats.
+- Never silently change financial behaviour.
+- Preserve imported financial truth.
+- Validation occurs before persistence.
 
-Use MVVM.
+## Testing
 
-Views:
-- Presentation only.
-- No business logic.
-- No parsing.
-- No persistence.
+Before completion:
 
-ViewModels:
-- Observe Stores.
-- Prepare presentation models.
+- Build successfully.
+- Run relevant tests.
+- Preserve parser behaviour.
+- Preserve repository behaviour.
+- Do not introduce regressions.
 
-Stores:
-- Own application state.
+## Documentation
 
-Ownership:
+At the end of every implementation:
 
-- DocumentStore owns imported documents and transactions.
-- AccountStore owns accounts.
-- ImportSession records imports.
-- Views never coordinate workflows.
+- Update `Project documents/Codex response.md`.
+- Update `Project documents/Project_Guide.md` if project status changed.
+- Record deferred work.
+- Stop exactly at the approved sprint boundary.
 
----
-
-# Financial Rules
-
-Always preserve imported financial truth.
-
-Never overwrite imported values.
-
-Native currency is always preserved.
-
-Currency conversion is presentation only.
-
-Every financial calculation should remain deterministic and explainable.
-
-Support multiple currencies.
-
-Do not assume INR is the only currency.
-
----
-
-# Import Pipeline
-
-Financial Document
-
-↓
-
-Reader (PDF / CSV / XLS / XLSX / TXT)
-
-↓
-
-FinancialDocument
-
-↓
-
-Institution Detection
-
-↓
-
-Document Classification
-
-↓
-
-Parser Selection
-
-↓
-
-Statement Parser
-
-↓
-
-Validation
-
-↓
-
-Import Session
-
-↓
-
-TransactionStore
-
-↓
-
-AccountStore
-
-↓
-
-DashboardViewModel
-
-↓
-
-Views
-
-Rules:
-
-- Readers extract data only.
-- Readers never perform business logic.
-- Parsers never know the original file format.
-- All supported formats must converge into the same FinancialDocument model.
-- Validation always occurs before stores are updated.
-- TransactionStore owns transactions.
-- AccountStore owns accounts.
-- Views consume ViewModels only.
-
-Do not bypass validation.
-
----
-
-# Reference First
-
-Never invent:
-
-- statement layouts
-- dashboard layouts
-- user workflows
-- financial reports
-- UI designs
-
-Always use existing project references.
-
-If sufficient references do not exist, stop and ask for them.
-
----
-
-# Coding Standards
-
-Keep functions small.
-
-Prefer composition over inheritance.
-
-Avoid duplicate logic.
-
-Use descriptive names.
-
-Avoid force unwraps.
-
-Do not introduce unnecessary abstractions.
-
----
-
-# Multi-file Changes
-
-Before editing:
-
-Understand the entire workflow.
-
-Minimize the number of edited files.
-
-Preserve existing behaviour unless explicitly requested.
-
----
-
-# Editing Existing Files
-
-Before modifying a file:
-
-Verify the filename in the header comment matches the intended file.
-
-If it does not match:
-
-Stop.
-
-Do not continue editing.
-
----
-
-# Financial Models
-
-Prefer domain models over primitive values.
-
-Future preferred types include:
-
-- Money
-- ExchangeRate
-- Account
-- ImportSession
-
-Avoid spreading Decimal calculations throughout the UI.
-
----
-
-# Dashboard
-
-The Dashboard is the product.
-
-Imports exist to support the Dashboard.
-
-Always optimise for a trustworthy financial overview.
-
----
-
-# Parser Rules
-
-Do not hardcode institution-specific logic unless inside that institution's parser.
-
-Generic logic belongs in shared components.
-
-Institution-specific behaviour belongs only inside the corresponding parser.
-
----
-
-# Testing
-
-Build after every logical change.
-
-Preserve existing parser behaviour.
-
-Do not introduce regressions.
-
-When possible, validate changes against known reference statements.
-
----
-
-# AI Behaviour
-
-Do not invent requirements.
-
-Do not invent financial rules.
-
-Do not invent document formats.
-
-Do not invent UI.
-
-If requirements are ambiguous, ask.
-
-Accuracy is more important than speed.
+When documentation conflicts with implementation, documentation is authoritative until explicitly updated.

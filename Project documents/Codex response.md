@@ -1,125 +1,178 @@
-# Codex Response
+# Repository Housekeeping (Post Sprint 11B Architecture Audit)
 
-## Summary
+The six-phase architecture audit identified several repository housekeeping improvements that are intentionally outside Sprint 11B implementation scope.
 
-Sprint 11B — Unified Import Framework Foundation is complete.
+## Completed
 
-This sprint added the orchestration foundation only. It introduced typed import models, typed import errors, protocol contracts, and a coordinator skeleton that can select a reader, resolve a password provider, read a raw document, and return an `ImportResult`.
+- Added `.gitignore` to prevent generated Xcode build artifacts from being committed.
+- Removed tracked build artifacts from Git history going forward.
+- Updated `Project_Guide.md` to become the canonical project operating manual.
+- Updated AI workflow documentation to use `Project_Guide.md` as the primary routing document.
+- Simplified AI onboarding documentation (`AI_WORKFLOW.md`, `AGENTS.md`, `PROJECT.md`, `.github/ai-instructions.md`, `.github/prompts.md`) so they reference `Project_Guide.md` instead of duplicating project policy.
+- Completed a six-phase architecture audit covering Repository, UI, Parser, Database, Testing and Documentation.
+- Optimised repository documentation for layered AI instructions to reduce context usage.
+- Simplified `AGENTS.md` into a lightweight bootstrap document.
+- Updated `Project_Guide.md` to become the canonical navigation and routing document.
+- Updated prompt templates to use the Task Routing Guide instead of loading all documentation.
 
-Existing import behaviour was not migrated or changed. `ImportEngine`, `ContentView`, stores, readers, parsers, validation, and repository writes were left untouched.
+## Outstanding Repository Cleanup
 
-## Files Created
+- Verify no `build/` directory remains inside the repository.
+- Verify no `DerivedData` artifacts remain inside the repository.
+- Verify no accidental editor backup directories remain (for example `ContentView.swift~refs`).
+- Verify there are no duplicate or malformed documentation filenames.
+- Consolidate historical implementation reports under `Project documents/Implementation Reports/`.
+- Remove obsolete or duplicated documentation where appropriate.
+- Keep `Project_Guide.md` synchronized with sprint completion after every approved sprint.
+- Move completed sprint reports into `Project documents/Implementation Reports/` if duplicates still exist.
+- Verify `Architecture_v1.0_Frozen.md` has no malformed or duplicate filename.
+- Continue reducing duplicated guidance across documentation so each document has a single responsibility.
 
-- `Import/ImportFramework.swift`
-- `Import/Models/ImportRequest.swift`
-- `Import/Models/ImportResult.swift`
-- `Import/Models/ImportProgress.swift`
-- `Import/Models/RawDocument.swift`
-- `Import/Errors/ImportError.swift`
-- `Import/Protocols/ImportDocumentReader.swift`
-- `Import/Protocols/ReaderRegistry.swift`
-- `Import/Protocols/PasswordProvider.swift`
-- `Import/Protocols/ImportInstitutionDetector.swift`
-- `Import/Protocols/StatementClassifier.swift`
-- `Import/Protocols/ImportCoordinator.swift`
-- `Import/Coordinator/DefaultImportCoordinator.swift`
-- `LedgerForgeTests/ImportFrameworkTests.swift`
+These items are repository maintenance only and do not change application behaviour.
 
-## Files Modified
+---
 
-- `Project documents/Codex response.md`
-- `LedgerForge.xcodeproj/project.pbxproj` through Xcode-managed navigator and target membership updates
+# Architecture Audit Summary (Phase 1–6)
 
-Existing Sprint 11A repository files remain modified in the working tree from the prior sprint; they were not part of the Sprint 11B import framework work.
+An independent architecture review was completed after Sprint 11B.
 
-## Build Result
+## Overall Assessment
 
-Xcode build completed successfully.
+| Area | Result |
+|-------|--------|
+| Repository Structure | ✅ Healthy |
+| Import Architecture | 🟢 Strong Foundation |
+| Database Layer | 🟢 Production Ready |
+| Repository Layer | 🟢 Stable |
+| UI Architecture | 🟡 Minor Orchestration Debt |
+| Parser Architecture | 🟡 Legacy Migration Pending |
+| Documentation | 🟢 Excellent |
+| Testing | 🟡 Good Foundation |
 
-Result: `The project built successfully.`
+## Highest Priority
 
-A command-line clean build was also attempted with:
+The next architectural milestone remains Sprint 11C.
 
-`xcodebuild -project LedgerForge.xcodeproj -scheme LedgerForge -destination 'platform=macOS' -derivedDataPath /tmp/LedgerForgeDerived clean build`
+Primary objective:
 
-The `clean` phase succeeded, and the command-line compile list confirmed the new `Import/` files are target-membered. The sandboxed command-line build then failed on the existing SwiftUI Preview macro toolchain issue:
+```text
+Existing CSV Import
 
-`external macro implementation type 'PreviewsMacros.SwiftUIView' could not be found`
+↓
 
-The project was rebuilt successfully through Xcode after that attempt.
+ImportCoordinator
 
-## Test Result
+↓
 
-All active scheme tests passed.
+Reader
 
-Result: `12 tests: 12 passed, 0 failed, 0 skipped, 0 expected failures, 0 not run`
+↓
 
-Sprint 11B tests added:
+FinancialDocument
 
-- `ImportFrameworkTests/importRequestCreationPreservesTypedFileInformation()`
-- `ImportFrameworkTests/importCoordinatorCanBeConstructed()`
-- `ImportFrameworkTests/importCoordinatorWiresRegistryPasswordProviderAndReader()`
-- `ImportFrameworkTests/importErrorProvidesTypedBehaviour()`
+↓
 
-## Architecture Decisions
+Existing Parser
 
-The new framework is isolated under `Import/` and does not alter the existing CSV import path.
+↓
 
-`ImportFramework` was added as a namespace because the existing codebase already has top-level `DocumentReader` and `InstitutionDetector` types. The new protocol contracts are therefore expressed as:
+Validation
 
-- `ImportFramework.DocumentReader`
-- `ImportFramework.ReaderRegistry`
-- `ImportFramework.PasswordProvider`
-- `ImportFramework.InstitutionDetector`
-- `ImportFramework.StatementClassifier`
-- `ImportFramework.ImportCoordinator`
+↓
 
-The protocol filenames for document reading and institution detection use unique names, `ImportDocumentReader.swift` and `ImportInstitutionDetector.swift`, to avoid Swift build artifact collisions with existing files.
+Repositories
 
-`DefaultImportCoordinator` is intentionally skeletal. It only accepts an `ImportRequest`, asks the `ReaderRegistry` for a reader, asks the optional `PasswordProvider` for a password, invokes the reader, and returns an `ImportResult`.
+↓
 
-The coordinator does not perform parsing, validation, repository writes, institution detection, statement classification, UI updates, or migration of existing imports.
+Stores
+```
 
-All new import framework data passed across boundaries is strongly typed. No `[String: Any]`, `NSDictionary`, or loose dictionary payloads were introduced.
+without changing any user-visible behaviour.
 
-## Documentation Updated
+## Recommended Additional Tests
 
-Updated this file only: `Project documents/Codex response.md`.
+Before or during Sprint 11C:
 
-No frozen architecture document was changed because Sprint 11B implements the already documented Unified Import Framework foundation without changing the architecture, import pipeline order, or database design.
+- Add CSV baseline regression tests.
+- Add repository rollback contract tests.
+- Add end-to-end import integration tests after CSV migration.
+- Execute the three Project Guide Verification Tests before beginning Sprint 11C.
+- Verify AI assistants load only the documents identified by the Task Routing Guide.
 
-## Remaining Technical Debt
+## Deferred Architectural Improvements
 
-- The new framework is not yet connected to the existing `ImportEngine` or UI import flow.
-- No concrete production readers exist in the new framework yet.
-- `ReaderRegistry`, password resolution, institution detection, and statement classification currently have contracts only.
-- The coordinator does not yet emit progress updates beyond the typed `ImportProgress` model.
-- Existing import pipeline technical debt remains outside this sprint.
+Future improvements identified during the audit include:
 
-## Deferred Items
+- Import progress reporting.
+- Import context object.
+- Repository mapper separation.
+- Multi-currency dashboard refinement.
+- Password provider implementation.
+- Institution detection framework.
+- PDF/XLS/XLSX import support.
+- Introduce `ImportViewModel` when the unified import flow reaches the UI.
+- Gradually retire legacy import orchestration after successful migration to `ImportCoordinator`.
+- Consider archiving historical sprint handoff reports into per-sprint files once the project grows further.
 
-Deferred by instruction:
+No architectural blockers were identified for Sprint 11C.
 
-- Sprint 11C
-- Migrating existing CSV import flow
-- Modifying `ImportEngine`
-- Modifying `ContentView` import behaviour
-- UI changes
-- Store changes
-- Parser pipeline changes
-- Reader pipeline changes
-- Institution detection implementation
-- Statement parsing implementation
-- Validation integration
-- Repository write integration
-- PDF reader
-- CSV reader migration
-- XLS reader
-- XLSX reader
-- TXT reader
+---
 
-## Next Recommended Sprint
+# Project Guide Verification Tests
 
-Next recommended sprint: Sprint 11C.
+These tests validate that AI assistants correctly follow `Project_Guide.md` before implementation.
 
-Recommended focus: add a concrete reader registry and begin controlled integration planning without changing existing import behaviour until the adapter path is tested.
+## Test 1 – Task Routing
+
+Expected behaviour:
+
+- Read `Project_Guide.md`.
+- Determine only the documentation required for Sprint 11C.
+- Explain why each document is required.
+- List documents intentionally skipped.
+- Do not generate code.
+
+## Test 2 – Sprint Boundary
+
+Expected behaviour:
+
+- Read `Project_Guide.md`.
+- Describe exactly what Sprint 11C is allowed to change.
+- List five things Sprint 11C must not change.
+- Reference the relevant sections of `Project_Guide.md`.
+- Do not generate code.
+
+## Test 3 – Workflow Compliance
+
+Expected behaviour:
+
+- Read `Project_Guide.md`.
+- Assume Sprint 11C has been requested.
+- Follow the Standard AI Workflow.
+- Produce only:
+  - Documents to read.
+  - Implementation plan.
+  - Risks.
+  - Files likely to change.
+  - Stop condition.
+- Do not generate code.
+
+---
+
+# Readiness Assessment
+
+## Repository
+
+✅ Ready for Sprint 11C.
+
+## Architecture
+
+No architectural blockers identified.
+
+## Documentation
+
+Layered documentation structure is established with `Project_Guide.md` as the canonical entry point.
+
+## Remaining Risk
+
+The primary implementation risk is preserving existing CSV import behaviour during migration into the unified import framework. Regression testing should remain the highest priority throughout Sprint 11C.

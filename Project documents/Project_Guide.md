@@ -1,6 +1,6 @@
 # LedgerForge Project Guide
 
-This is the mandatory first document every AI assistant and engineer must read before planning or implementation because it minimizes context loading and routes the reader to the correct documentation.
+This is the canonical project operating manual. Read this document first, then use the Task Routing Guide to determine which additional documents are required for the current task. Avoid loading unnecessary documentation.
 
 ## Current Project Snapshot
 
@@ -101,6 +101,8 @@ Stores
 
 ## Documentation Index
 
+Only consult the documents required by the Task Routing Guide. Do not load the complete documentation set unless performing a full architecture or repository review.
+
 | Document                          | Purpose                                             | Read When                          | Priority    |
 |----------------------------------|-----------------------------------------------------|-----------------------------------|-------------|
 | Architecture_v1.0_Frozen.md       | Definitive system design and constraints             | Architecture review, design tasks | Highest     |
@@ -127,6 +129,8 @@ The precedence for documentation is as follows:
 7. Codex response.md  
 
 Approved documentation always overrides any implicit or assumed implementation details.
+
+Project_Guide.md is the navigation document. It routes readers to the authoritative source rather than duplicating detailed guidance.
 
 ## Project Principles
 
@@ -223,6 +227,8 @@ Additionally:
 
 - Confirm the requested sprint and stop condition.
 - Read Project_Guide.md first.  
+- Use the Task Routing Guide before opening any other document.
+- Read only the minimum documentation required for the requested task.
 - Read only the documents required by the Task Routing Guide.  
 - Review Project documents/Codex response.md.  
 - Produce an implementation plan.  
@@ -281,6 +287,19 @@ Remove items as they are completed.
 - Search (FTS5)
 Mark completed items as appropriate over time.
 
+## Context Optimisation
+
+To minimise token consumption:
+
+- Read Project_Guide.md first.
+- Use the Task Routing Guide.
+- Open only the documents required for the requested task.
+- Do not reread unchanged reference documents.
+- Treat sprint reports as historical unless the current task requires them.
+- Prefer referencing documentation over repeating it.
+
+This layered documentation approach keeps AI context small while preserving deterministic behaviour.
+
 ## Instructions for AI Assistants
 
 - Read this guide first.  
@@ -296,6 +315,10 @@ Mark completed items as appropriate over time.
 - Never invent financial rules or statement layouts.  
 - Never silently change financial behaviour.  
 - If uncertain, stop and explain rather than guessing.
+
+- Prefer document references over duplicated instructions.
+- Avoid loading unrelated architecture documents.
+- Treat Project_Guide.md as the repository index.
 
 ## Project Philosophy
 
