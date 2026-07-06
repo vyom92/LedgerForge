@@ -9,9 +9,11 @@
 /* Begin PBXBuildFile section */
 		28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */; };
 		28171EE22FFBE2F0006115B7 /* TransactionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */; };
-		28171F682FFC1718006115B7 /* Database_v1_Architecture.md in Resources */ = {isa = PBXBuildFile; fileRef = 28171F672FFC1718006115B7 /* Database_v1_Architecture.md */; };
-		281BB1322FFC3C4C006E7424 /* AI_WORKFLOW.md in Resources */ = {isa = PBXBuildFile; fileRef = 281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */; };
-		281BB1342FFC3FB5006E7424 /* Codex response.md in Resources */ = {isa = PBXBuildFile; fileRef = 281BB1332FFC3FB5006E7424 /* Codex response.md */; };
+		281BB15A2FFC486C006E7424 /* Repository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1362FFC4160006E7424 /* Repository.swift */; };
+		281BB15B2FFC4872006E7424 /* SQLiteDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1372FFC4184006E7424 /* SQLiteDatabase.swift */; };
+		281BB15C2FFC4879006E7424 /* SQLiteRepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1382FFC41A3006E7424 /* SQLiteRepositoryProvider.swift */; };
+		281BB15D2FFC4881006E7424 /* Migrations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1392FFC41CB006E7424 /* Migrations.swift */; };
+		281BB15E2FFC4886006E7424 /* DTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB13A2FFC4260006E7424 /* DTOs.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
 		288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B22FF7955200F09BC9 /* ContentView.swift */; };
 		288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0B42FF7955300F09BC9 /* Assets.xcassets */; };
@@ -36,11 +38,7 @@
 		288EB12D2FF7E0C000F09BC9 /* NormalizedDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB12C2FF7E0C000F09BC9 /* NormalizedDocument.swift */; };
 		288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */; };
 		288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB1312FF7E3C600F09BC9 /* ColumnType.swift */; };
-		28B262A42FFAB09900052675 /* Architecture_v1.0_Frozen.md⁠ in Resources */ = {isa = PBXBuildFile; fileRef = 28B262A32FFAB09900052675 /* Architecture_v1.0_Frozen.md⁠ */; };
 		28B87B262FFB24CD009BEE8C /* TransactionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B252FFB24C3009BEE8C /* TransactionListView.swift */; };
-		28B87B2B2FFB2CBE009BEE8C /* Product Vision.md in Resources */ = {isa = PBXBuildFile; fileRef = 28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */; };
-		28B87B2D2FFB2CDA009BEE8C /* Engineering Standards.md in Resources */ = {isa = PBXBuildFile; fileRef = 28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */; };
-		28B87B2F2FFB2D25009BEE8C /* ADR.md in Resources */ = {isa = PBXBuildFile; fileRef = 28B87B2E2FFB2D25009BEE8C /* ADR.md */; };
 		28B87B312FFB2F22009BEE8C /* Services/DirectionResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B302FFB2F1B009BEE8C /* Services/DirectionResolver.swift */; };
 		28B87B332FFB31C9009BEE8C /* ImportValidationResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B322FFB31C4009BEE8C /* ImportValidationResult.swift */; };
 		28B87B352FFB31FD009BEE8C /* Services/ImportValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B342FFB31FC009BEE8C /* Services/ImportValidator.swift */; };
@@ -119,6 +117,18 @@
 		28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		281BB15F2FFC48C4006E7424 /* Exceptions for ".github" folder in "LedgerForge" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"ai-instructions.md",
+				context.md,
+				prompts.md,
+			);
+			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		288EB0BD2FF7955300F09BC9 /* LedgerForgeTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -132,6 +142,9 @@
 		};
 		28B87B3E2FFBD1DE009BEE8C /* .github */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				281BB15F2FFC48C4006E7424 /* Exceptions for ".github" folder in "LedgerForge" target */,
+			);
 			path = .github;
 			sourceTree = "<group>";
 		};
@@ -460,14 +473,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				28171F682FFC1718006115B7 /* Database_v1_Architecture.md in Resources */,
-				281BB1342FFC3FB5006E7424 /* Codex response.md in Resources */,
-				281BB1322FFC3C4C006E7424 /* AI_WORKFLOW.md in Resources */,
-				28B87B2F2FFB2D25009BEE8C /* ADR.md in Resources */,
-				28B262A42FFAB09900052675 /* Architecture_v1.0_Frozen.md⁠ in Resources */,
 				288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */,
-				28B87B2D2FFB2CDA009BEE8C /* Engineering Standards.md in Resources */,
-				28B87B2B2FFB2CBE009BEE8C /* Product Vision.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -513,18 +519,23 @@
 				288EB12D2FF7E0C000F09BC9 /* NormalizedDocument.swift in Sources */,
 				288EB1202FF7D69000F09BC9 /* DocumentMetadata.swift in Sources */,
 				288EB1042FF7C0A600F09BC9 /* DocumentStore.swift in Sources */,
+				281BB15D2FFC4881006E7424 /* Migrations.swift in Sources */,
 				288EB0F12FF7B29300F09BC9 /* Document.swift in Sources */,
+				281BB15E2FFC4886006E7424 /* DTOs.swift in Sources */,
 				28B87B262FFB24CD009BEE8C /* TransactionListView.swift in Sources */,
 				288EB0EE2FF7AE2C00F09BC9 /* CSVReader.swift in Sources */,
 				28B87B312FFB2F22009BEE8C /* Services/DirectionResolver.swift in Sources */,
 				28B87B372FFBB599009BEE8C /* ImportSession.swift in Sources */,
+				281BB15C2FFC4879006E7424 /* SQLiteRepositoryProvider.swift in Sources */,
 				28B87B352FFB31FD009BEE8C /* Services/ImportValidator.swift in Sources */,
 				288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */,
 				28171EE22FFBE2F0006115B7 /* TransactionListViewModel.swift in Sources */,
+				281BB15A2FFC486C006E7424 /* Repository.swift in Sources */,
 				288EB0F22FF7B2AB00F09BC9 /* CSVAnalyzer.swift in Sources */,
 				288EB1222FF7D89600F09BC9 /* Parsers/UnknownStatementParser.swift in Sources */,
 				288EB11E2FF7D68200F09BC9 /* InstitutionDetector.swift in Sources */,
 				288EB0E62FF7A84F00F09BC9 /* Services/ImportEngine.swift in Sources */,
+				281BB15B2FFC4872006E7424 /* SQLiteDatabase.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
