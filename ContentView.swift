@@ -37,7 +37,7 @@ struct ContentView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("₹ \(dashboardViewModel.snapshot.netWorth)")
+                            Text("₹ \(dashboardViewModel.snapshot.netWorth, format: .number)")
                                 .font(.headline.weight(.semibold))
                         }
                         Divider()
@@ -46,7 +46,7 @@ struct ContentView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("₹ \(dashboardViewModel.snapshot.income)")
+                            Text("₹ \(dashboardViewModel.snapshot.income, format: .number)")
                                 .font(.headline.weight(.semibold))
                         }
                         Divider()
@@ -55,7 +55,7 @@ struct ContentView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("₹ \(dashboardViewModel.snapshot.expenses)")
+                            Text("₹ \(dashboardViewModel.snapshot.expenses, format: .number)")
                                 .font(.headline.weight(.semibold))
                         }
                         Divider()
@@ -64,7 +64,7 @@ struct ContentView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("₹ \(dashboardViewModel.snapshot.cashFlow)")
+                            Text("₹ \(dashboardViewModel.snapshot.cashFlow, format: .number)")
                                 .font(.headline.weight(.semibold))
                         }
                     }
