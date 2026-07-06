@@ -25,9 +25,22 @@ LedgerForge is an offline-first personal financial operating system that automat
 - Every successful import should improve the system.
 - Preserve user trust through deterministic processing and full auditability.
 
+## Design Philosophy
+
+LedgerForge is a financial dashboard first.
+
+Importing documents is infrastructure, not the primary experience.
+
+Every subsystem should ultimately improve one of three things:
+
+- Understanding.
+- Confidence.
+- Automation.
+
+If a feature does not improve at least one of these, it should be reconsidered.
 ## Import Pipeline
 
-Financial Document → Reader → Analyzer → Institution Detection → Column Detection → Direction Strategy → Normalizer → Generic Transaction Parser → Rules Engine → SQLite → Financial Dashboard
+Financial Document → Reader → Analyzer → Institution Detection → Statement Fingerprint → Import Profile → Column Detection → Direction Strategy → Normalizer → Generic Transaction Parser → Rules Engine → SQLite → Financial Dashboard
 
 ## Core Domain
 
@@ -36,6 +49,8 @@ Financial Document → Reader → Analyzer → Institution Detection → Column 
 - Security
 - Holding
 - ImportSession
+- ImportProfile
+- StatementFingerprint
 - Rule
 - Category
 - DocumentMetadata
@@ -50,6 +65,9 @@ Financial Document → Reader → Analyzer → Institution Detection → Column 
 - Documents
 - Rules & Automation
 - Financial Intelligence
+- Financial Health
+- Goals
+- Universal Search
 - Import Studio
 - Financial Timeline
 
@@ -78,6 +96,12 @@ Financial Document → Reader → Analyzer → Institution Detection → Column 
 
 LedgerForge should become the trusted financial workspace that users open to understand their financial life. Imports, OCR, parsers and profile learning exist to keep financial information accurate and current with minimal manual effort. The dashboard and insights remain the primary experience.
 
+### Success Criteria
+
+LedgerForge succeeds when users spend less time maintaining financial records and more time making financial decisions.
+
+The application should quietly maintain an accurate financial model while presenting meaningful insights through a clean dashboard.
+
 ## Compatibility Review
 
 Every architectural decision should be reviewed against:
@@ -92,6 +116,21 @@ Every architectural decision should be reviewed against:
 - Salary Slip
 - Mutual Fund CAS
 - AIS / Form 16
+
+## Future Architecture (v1.1+)
+
+The following concepts are intentionally excluded from Architecture v1.0 but are planned for future milestones:
+
+- Universal Import Profiles
+- Statement Learning Mode
+- Profile Library
+- AI-assisted Column Detection
+- Generic Rules Engine v2
+- Financial Intelligence Engine
+- Financial Replay
+- Predictive Cash Flow
+
+These features must evolve without violating the core principles defined in this document.
 
 ## Architecture Freeze
 
