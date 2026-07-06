@@ -4,6 +4,17 @@
 
 import Foundation
 
+public enum RepositoryError: Error, LocalizedError {
+    case providerNotConfigured(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .providerNotConfigured(let repositoryName):
+            return "\(repositoryName) is not configured. Install a concrete DatabaseProvider before using repository APIs."
+        }
+    }
+}
+
 /// Strongly-typed repository protocols used by the application. Implementations
 /// must be provided by a DatabaseProvider (in-memory or SQLite-backed).
 public protocol TransactionRepository {
@@ -47,9 +58,9 @@ public final class DatabaseProvider {
 
     /// Convenience initializer for a statically tied in-memory provider when
     /// a concrete provider is not yet configured. The in-memory provider is
-    /// implemented in later sprints; placeholder errors are thrown for now.
+    /// implemented in later sprints. These placeholders fail fast so financial
+    /// data cannot be silently dropped or treated as persisted.
     public init(inMemory: Bool) {
-        // lightweight placeholder implementations to avoid nils until provider is wired.
         self.transactionRepo = PlaceholderTransactionRepo()
         self.accountRepo = PlaceholderAccountRepo()
         self.importSessionRepo = PlaceholderImportSessionRepo()
@@ -59,22 +70,21 @@ public final class DatabaseProvider {
 // MARK: - Placeholder repos
 struct PlaceholderTransactionRepo: TransactionRepository {
     func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws {
-        // No-op placeholder; real implementation provided by SQLiteRepositoryProvider.
+        throw RepositoryError.providerNotConfigured("TransactionRepository")
     }
 }
 
 struct PlaceholderAccountRepo: AccountRepository {
     func upsertAccount(_ account: AccountDTO) throws -> String {
-        // Return a generated UUID so callers can proceed.
-        return UUID().uuidString
+        throw RepositoryError.providerNotConfigured("AccountRepository")
     }
 }
 
 struct PlaceholderImportSessionRepo: ImportSessionRepository {
     func createImportSession(_ payload: ImportSessionDTO) throws -> String {
-        return UUID().uuidString
+        throw RepositoryError.providerNotConfigured("ImportSessionRepository")
     }
     func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws {
-        // No-op
+        throw RepositoryError.providerNotConfigured("ImportSessionRepository")
     }
 }

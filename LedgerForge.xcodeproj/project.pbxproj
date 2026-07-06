@@ -10,6 +10,8 @@
 		28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */; };
 		28171EE22FFBE2F0006115B7 /* TransactionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */; };
 		28171F682FFC1718006115B7 /* Database_v1_Architecture.md in Resources */ = {isa = PBXBuildFile; fileRef = 28171F672FFC1718006115B7 /* Database_v1_Architecture.md */; };
+		281BB1322FFC3C4C006E7424 /* AI_WORKFLOW.md in Resources */ = {isa = PBXBuildFile; fileRef = 281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */; };
+		281BB1342FFC3FB5006E7424 /* Codex response.md in Resources */ = {isa = PBXBuildFile; fileRef = 281BB1332FFC3FB5006E7424 /* Codex response.md */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
 		288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B22FF7955200F09BC9 /* ContentView.swift */; };
 		288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0B42FF7955300F09BC9 /* Assets.xcassets */; };
@@ -69,6 +71,13 @@
 		28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionStore.swift; sourceTree = "<group>"; };
 		28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionListViewModel.swift; sourceTree = "<group>"; };
 		28171F672FFC1718006115B7 /* Database_v1_Architecture.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Database_v1_Architecture.md; sourceTree = "<group>"; };
+		281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AI_WORKFLOW.md; sourceTree = "<group>"; };
+		281BB1332FFC3FB5006E7424 /* Codex response.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Codex response.md"; sourceTree = "<group>"; };
+		281BB1362FFC4160006E7424 /* Repository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Repository.swift; sourceTree = "<group>"; };
+		281BB1372FFC4184006E7424 /* SQLiteDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteDatabase.swift; sourceTree = "<group>"; };
+		281BB1382FFC41A3006E7424 /* SQLiteRepositoryProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteRepositoryProvider.swift; sourceTree = "<group>"; };
+		281BB1392FFC41CB006E7424 /* Migrations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Migrations.swift; sourceTree = "<group>"; };
+		281BB13A2FFC4260006E7424 /* DTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DTOs.swift; sourceTree = "<group>"; };
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerForgeApp.swift; sourceTree = "<group>"; };
 		288EB0B22FF7955200F09BC9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -273,6 +282,11 @@
 		288EB0E42FF7A3D500F09BC9 /* Database */ = {
 			isa = PBXGroup;
 			children = (
+				281BB1362FFC4160006E7424 /* Repository.swift */,
+				281BB1372FFC4184006E7424 /* SQLiteDatabase.swift */,
+				281BB1382FFC41A3006E7424 /* SQLiteRepositoryProvider.swift */,
+				281BB1392FFC41CB006E7424 /* Migrations.swift */,
+				281BB13A2FFC4260006E7424 /* DTOs.swift */,
 			);
 			path = Database;
 			sourceTree = "<group>";
@@ -315,11 +329,13 @@
 		28B87B272FFB2C90009BEE8C /* Project documents */ = {
 			isa = PBXGroup;
 			children = (
+				281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */,
 				28171F672FFC1718006115B7 /* Database_v1_Architecture.md */,
 				28B87B2E2FFB2D25009BEE8C /* ADR.md */,
 				28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */,
 				28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */,
 				28B262A32FFAB09900052675 /* Architecture_v1.0_Frozen.md⁠ */,
+				281BB1332FFC3FB5006E7424 /* Codex response.md */,
 			);
 			path = "Project documents";
 			sourceTree = "<group>";
@@ -445,6 +461,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				28171F682FFC1718006115B7 /* Database_v1_Architecture.md in Resources */,
+				281BB1342FFC3FB5006E7424 /* Codex response.md in Resources */,
+				281BB1322FFC3C4C006E7424 /* AI_WORKFLOW.md in Resources */,
 				28B87B2F2FFB2D25009BEE8C /* ADR.md in Resources */,
 				28B262A42FFAB09900052675 /* Architecture_v1.0_Frozen.md⁠ in Resources */,
 				288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */,

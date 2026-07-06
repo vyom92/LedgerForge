@@ -4,6 +4,20 @@
 import Foundation
 import SQLite3
 
+public enum SQLiteDatabaseError: Error, LocalizedError {
+    case databaseNotOpen
+    case prepareFailed(sql: String, message: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .databaseNotOpen:
+            return "SQLite database is not open."
+        case .prepareFailed(let sql, let message):
+            return "Failed to prepare SQLite statement: \(message). SQL: \(sql)"
+        }
+    }
+}
+
 public final class SQLiteDatabase {
     private let path: String
     private var db: OpaquePointer?
@@ -53,22 +67,22 @@ public final class SQLiteDatabase {
 
     // Execute a prepared statement with parameter bindings. Parameters are bound in order.
     public func executePrepared(sql: String, params: [Any?] = []) throws {
-        guard let db = db else { throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: "DB not open"]) }
+        guard let db = db else { throw SQLiteDatabaseError.databaseNotOpen }
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) != SQLITE_OK {
             let msg = String(cString: sqlite3_errmsg(db))
-            throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: msg])
+            throw SQLiteDatabaseError.prepareFailed(sql: sql, message: msg)
         }
 
         // Bind parameters
         for (i, p) in params.enumerated() {
             let idx = Int32(i + 1)
-            if p == nil {
+            guard let value = p, !(value is NSNull) else {
                 sqlite3_bind_null(stmt, idx)
                 continue
             }
-            switch p {
+            switch value {
             case let s as String:
                 sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
             case let i as Int:
@@ -81,7 +95,7 @@ public final class SQLiteDatabase {
                 sqlite3_bind_int(stmt, idx, b ? 1 : 0)
             default:
                 // Fallback: attempt String description
-                let s = String(describing: p!)
+                let s = String(describing: value)
                 sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
             }
         }
@@ -130,10 +144,13 @@ public final class SQLiteDatabase {
     }
 
     private func querySingleInt(sql: String) throws -> Int {
-        guard let db = db else { throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: "DB not open"]) }
+        guard let db = db else { throw SQLiteDatabaseError.databaseNotOpen }
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
-        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) != SQLITE_OK { return 0 }
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) != SQLITE_OK {
+            let msg = String(cString: sqlite3_errmsg(db))
+            throw SQLiteDatabaseError.prepareFailed(sql: sql, message: msg)
+        }
         if sqlite3_step(stmt) == SQLITE_ROW {
             return Int(sqlite3_column_int64(stmt, 0))
         }
