@@ -25,14 +25,24 @@ struct DashboardSnapshot {
 final class DashboardViewModel: ObservableObject {
 
     @Published private(set) var snapshot: DashboardSnapshot = .empty
+    @Published private(set) var accounts: [Account] = []
 
     private var cancellables = Set<AnyCancellable>()
 
     init() {
-        DocumentStore.shared.$transactions
+        // Observe transactions for income/expense/balance calculations
+        TransactionStore.shared.$transactions
             .receive(on: RunLoop.main)
             .sink { [weak self] transactions in
                 self?.refresh(from: transactions)
+            }
+            .store(in: &cancellables)
+
+        // Observe accounts for future multi-currency and per-account metrics
+        AccountStore.shared.$accounts
+            .receive(on: RunLoop.main)
+            .sink { [weak self] accounts in
+                self?.accounts = accounts
             }
             .store(in: &cancellables)
     }

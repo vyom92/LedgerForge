@@ -9,12 +9,9 @@ import SwiftUI
 
 struct TransactionListView: View {
 
-    let transactions: [Transaction]
+    @StateObject private var viewModel = TransactionListViewModel()
     @State private var sortOrder = [KeyPathComparator(\Transaction.date)]
-    @State private var searchText = ""
     @State private var selectedTransactionID: Transaction.ID?
-    @State private var showOnlyCredits = false
-    @State private var showOnlyDebits = false
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -35,33 +32,11 @@ struct TransactionListView: View {
         return Self.currencyFormatter.string(from: NSDecimalNumber(decimal: value)) ?? ""
     }
 
-    private var totalDebits: Decimal {
-        transactions.compactMap(\.debit).reduce(0, +)
-    }
-
-    private var totalCredits: Decimal {
-        transactions.compactMap(\.credit).reduce(0, +)
-    }
-
-    private var closingBalance: Decimal? {
-        transactions.last?.balance
-    }
-
-    private var validationPassed: Bool {
-        !transactions.isEmpty && totalDebits > 0 && totalCredits > 0
-    }
-
-    private var filteredTransactions: [Transaction] {
-        transactions.filter { transaction in
-            let matchesSearch = searchText.isEmpty ||
-                transaction.description.localizedCaseInsensitiveContains(searchText)
-
-            let matchesCredit = !showOnlyCredits || transaction.credit != nil
-            let matchesDebit = !showOnlyDebits || transaction.debit != nil
-
-            return matchesSearch && matchesCredit && matchesDebit
-        }
-    }
+    private var totalDebits: Decimal { viewModel.totalDebits }
+    private var totalCredits: Decimal { viewModel.totalCredits }
+    private var closingBalance: Decimal? { viewModel.closingBalance }
+    private var validationPassed: Bool { viewModel.validationPassed }
+    private var filteredTransactions: [Transaction] { viewModel.filteredTransactions }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -70,7 +45,7 @@ struct TransactionListView: View {
                 .font(.title2)
                 .bold()
 
-            Text("\(transactions.count) imported transaction(s)")
+            Text("\(viewModel.transactions.count) imported transaction(s)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -104,17 +79,17 @@ struct TransactionListView: View {
 
                     Spacer()
 
-                    Text("\(transactions.count) transaction(s)")
+                    Text("\(viewModel.transactions.count) transaction(s)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            TextField("Search description...", text: $searchText)
+            TextField("Search description...", text: $viewModel.searchText)
                 .textFieldStyle(.roundedBorder)
             HStack {
-                Toggle("Credits", isOn: $showOnlyCredits)
-                Toggle("Debits", isOn: $showOnlyDebits)
+                Toggle("Credits", isOn: $viewModel.showOnlyCredits)
+                Toggle("Debits", isOn: $viewModel.showOnlyDebits)
                 Spacer()
             }
             .toggleStyle(.checkbox)
@@ -171,7 +146,7 @@ struct TransactionListView: View {
             Divider()
 
             HStack {
-                Text("Showing \(filteredTransactions.count) of \(transactions.count) transaction(s)")
+                Text("Showing \(filteredTransactions.count) of \(viewModel.transactions.count) transaction(s)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -190,5 +165,5 @@ struct TransactionListView: View {
 }
 
 #Preview {
-    TransactionListView(transactions: [])
+    TransactionListView()
 }

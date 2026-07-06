@@ -87,7 +87,7 @@ final class AxisBankAccountParser: StatementParser {
                 amount: amount,
                 balance: balance,
                 currency: "INR",
-                account: "",
+                account: document.metadata.institution.rawValue,
                 sourceBank: "Axis Bank",
                 sourceFile: document.document.filename
             )

@@ -92,10 +92,10 @@ final class ImportEngine {
                     validation: validation
                 )
 
-                DocumentStore.shared.updateTransactions(transactions)
-                // Only update AccountStore for imports that pass validation.
-                // ADR-010 requires validation before persistence of trusted data.
+                // Replace transactions only for validated imports. TransactionStore is the single owner of imported transactions.
+                // ADR-010 requires validation before trusted state is updated.
                 if validation.passed {
+                    TransactionStore.shared.replaceTransactions(transactions, validation: validation)
                     AccountStore.shared.integrateImport(importSession: importSession, transactions: transactions)
                 }
 

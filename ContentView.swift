@@ -11,7 +11,6 @@ struct ContentView: View {
 
     @State private var showingImporter = false
     @State private var selectedFile = "No statement imported"
-    @ObservedObject private var documentStore = DocumentStore.shared
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @State private var selectedTab = 0
 
@@ -134,9 +133,7 @@ struct ContentView: View {
                     }
                     .tag(0)
 
-                TransactionListView(
-                    transactions: documentStore.transactions
-                )
+                TransactionListView()
                 .tabItem {
                     Label("Transactions", systemImage: "list.bullet.rectangle")
                 }
