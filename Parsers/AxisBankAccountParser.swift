@@ -50,8 +50,10 @@ final class AxisBankAccountParser: StatementParser {
             }
 
             let description = firstRow.values[2].trimmingCharacters(in: .whitespacesAndNewlines)
-            let debitString = firstRow.values[3].trimmingCharacters(in: .whitespacesAndNewlines)
-            let creditString = firstRow.values[4].trimmingCharacters(in: .whitespacesAndNewlines)
+            // Axis Bank account CSV exports use column 3 for credits and column 4 for debits.
+            // Normalize them into LedgerForge's canonical model.
+            let creditString = firstRow.values[3].trimmingCharacters(in: .whitespacesAndNewlines)
+            let debitString = firstRow.values[4].trimmingCharacters(in: .whitespacesAndNewlines)
             let balanceString = firstRow.values[5].trimmingCharacters(in: .whitespacesAndNewlines)
 
             var debit = Decimal(string: debitString)

@@ -49,7 +49,16 @@ final class ImportValidator {
         let debitTotal = transactions.reduce(.zero) { $0 + ($1.debit ?? .zero) }
         let creditTotal = transactions.reduce(.zero) { $0 + ($1.credit ?? .zero) }
 
-        let openingBalance = transactions.first?.balance
+        let firstTransaction = transactions.first
+        let openingBalance: Decimal? = {
+            guard let first = firstTransaction,
+                  let firstBalance = first.balance else {
+                return nil
+            }
+
+            return firstBalance + (first.debit ?? .zero) - (first.credit ?? .zero)
+        }()
+
         let closingBalance = transactions.last?.balance
 
         if transactions.count > 1 {
