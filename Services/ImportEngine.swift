@@ -93,6 +93,11 @@ final class ImportEngine {
                 )
 
                 DocumentStore.shared.updateTransactions(transactions)
+                // Only update AccountStore for imports that pass validation.
+                // ADR-010 requires validation before persistence of trusted data.
+                if validation.passed {
+                    AccountStore.shared.integrateImport(importSession: importSession, transactions: transactions)
+                }
 
                 DeveloperConsole.shared.log("Transactions Parsed: \(transactions.count)")
                 DeveloperConsole.shared.log("Import Session Created")

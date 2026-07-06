@@ -42,6 +42,7 @@
 		28B87B372FFBB599009BEE8C /* ImportSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B362FFBB591009BEE8C /* ImportSession.swift */; };
 		28B87B392FFBBE2D009BEE8C /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */; };
 		28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B3C2FFBBFC8009BEE8C /* Account.swift */; };
+		28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -100,6 +101,7 @@
 		28B87B362FFBB591009BEE8C /* ImportSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportSession.swift; sourceTree = "<group>"; };
 		28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		28B87B3C2FFBBFC8009BEE8C /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
+		28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -200,6 +202,7 @@
 		288EB0DD2FF7A3D000F09BC9 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */,
 				288EB1032FF7C0A600F09BC9 /* DocumentStore.swift */,
 				288EB0FB2FF7B81200F09BC9 /* DeveloperConsole.swift */,
 			);
@@ -464,6 +467,7 @@
 				288EB1292FF7DA3900F09BC9 /* ColumnMapping.swift in Sources */,
 				28B87B392FFBBE2D009BEE8C /* DashboardViewModel.swift in Sources */,
 				288EB0FE2FF7BA2800F09BC9 /* DeveloperConsole.swift in Sources */,
+				28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */,
 				288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */,
 				288EB12B2FF7E08500F09BC9 /* NormalizedRow.swift in Sources */,
 				28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */,
