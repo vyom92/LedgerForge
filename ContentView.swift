@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var showingImporter = false
     @State private var selectedFile = "No statement imported"
     @ObservedObject private var documentStore = DocumentStore.shared
+    @StateObject private var dashboardViewModel = DashboardViewModel()
     @State private var selectedTab = 0
 
     var body: some View {
@@ -36,7 +37,7 @@ struct ContentView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("₹ --")
+                            Text("₹ \(dashboardViewModel.snapshot.netWorth)")
                                 .font(.headline.weight(.semibold))
                         }
                         Divider()
@@ -45,7 +46,7 @@ struct ContentView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("₹ --")
+                            Text("₹ \(dashboardViewModel.snapshot.income)")
                                 .font(.headline.weight(.semibold))
                         }
                         Divider()
@@ -54,7 +55,7 @@ struct ContentView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("₹ --")
+                            Text("₹ \(dashboardViewModel.snapshot.expenses)")
                                 .font(.headline.weight(.semibold))
                         }
                         Divider()
@@ -63,7 +64,7 @@ struct ContentView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Spacer()
-                            Text("₹ --")
+                            Text("₹ \(dashboardViewModel.snapshot.cashFlow)")
                                 .font(.headline.weight(.semibold))
                         }
                     }

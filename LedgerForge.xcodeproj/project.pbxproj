@@ -40,6 +40,7 @@
 		28B87B332FFB31C9009BEE8C /* ImportValidationResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B322FFB31C4009BEE8C /* ImportValidationResult.swift */; };
 		28B87B352FFB31FD009BEE8C /* ImportValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B342FFB31FC009BEE8C /* ImportValidator.swift */; };
 		28B87B372FFBB599009BEE8C /* ImportSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B362FFBB591009BEE8C /* ImportSession.swift */; };
+		28B87B392FFBBE2D009BEE8C /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -449,6 +450,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				288EB1292FF7DA3900F09BC9 /* ColumnMapping.swift in Sources */,
+				28B87B392FFBBE2D009BEE8C /* DashboardViewModel.swift in Sources */,
 				288EB0FE2FF7BA2800F09BC9 /* DeveloperConsole.swift in Sources */,
 				288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */,
 				288EB12B2FF7E08500F09BC9 /* NormalizedRow.swift in Sources */,
