@@ -32,6 +32,10 @@
 		288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */; };
 		288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB1312FF7E3C600F09BC9 /* ColumnType.swift */; };
 		28B262A42FFAB09900052675 /*  LedgerForge_Architecture_v1.0_Frozen.md⁠ in Resources */ = {isa = PBXBuildFile; fileRef = 28B262A32FFAB09900052675 /*  LedgerForge_Architecture_v1.0_Frozen.md⁠ */; };
+		28B87B262FFB24CD009BEE8C /* TransactionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B252FFB24C3009BEE8C /* TransactionListView.swift */; };
+		28B87B2B2FFB2CBE009BEE8C /* Product Vision.md in Resources */ = {isa = PBXBuildFile; fileRef = 28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */; };
+		28B87B2D2FFB2CDA009BEE8C /* Engineering Standards.md in Resources */ = {isa = PBXBuildFile; fileRef = 28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */; };
+		28B87B2F2FFB2D25009BEE8C /* ADR.md in Resources */ = {isa = PBXBuildFile; fileRef = 28B87B2E2FFB2D25009BEE8C /* ADR.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -80,6 +84,10 @@
 		288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVNormalizer.swift; sourceTree = "<group>"; };
 		288EB1312FF7E3C600F09BC9 /* ColumnType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColumnType.swift; sourceTree = "<group>"; };
 		28B262A32FFAB09900052675 /*  LedgerForge_Architecture_v1.0_Frozen.md⁠ */ = {isa = PBXFileReference; lastKnownFileType = text; path = " LedgerForge_Architecture_v1.0_Frozen.md⁠"; sourceTree = "<group>"; };
+		28B87B252FFB24C3009BEE8C /* TransactionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionListView.swift; sourceTree = "<group>"; };
+		28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Product Vision.md"; sourceTree = "<group>"; };
+		28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Engineering Standards.md"; sourceTree = "<group>"; };
+		28B87B2E2FFB2D25009BEE8C /* ADR.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ADR.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -123,7 +131,7 @@
 		288EB0A42FF7955200F09BC9 = {
 			isa = PBXGroup;
 			children = (
-				28B262A32FFAB09900052675 /*  LedgerForge_Architecture_v1.0_Frozen.md⁠ */,
+				28B87B272FFB2C90009BEE8C /* Project documents */,
 				288EB12E2FF7E10200F09BC9 /* Normalizers */,
 				288EB1012FF7BFD900F09BC9 /* Detectors */,
 				288EB0D72FF7995800F09BC9 /* Models */,
@@ -220,6 +228,7 @@
 		288EB0E32FF7A3D500F09BC9 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				28B87B252FFB24C3009BEE8C /* TransactionListView.swift */,
 				288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */,
 				288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */,
 			);
@@ -266,6 +275,17 @@
 				288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */,
 			);
 			path = Normalizers;
+			sourceTree = "<group>";
+		};
+		28B87B272FFB2C90009BEE8C /* Project documents */ = {
+			isa = PBXGroup;
+			children = (
+				28B87B2E2FFB2D25009BEE8C /* ADR.md */,
+				28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */,
+				28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */,
+				28B262A32FFAB09900052675 /*  LedgerForge_Architecture_v1.0_Frozen.md⁠ */,
+			);
+			path = "Project documents";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -385,8 +405,11 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				28B87B2F2FFB2D25009BEE8C /* ADR.md in Resources */,
 				28B262A42FFAB09900052675 /*  LedgerForge_Architecture_v1.0_Frozen.md⁠ in Resources */,
 				288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */,
+				28B87B2D2FFB2CDA009BEE8C /* Engineering Standards.md in Resources */,
+				28B87B2B2FFB2CBE009BEE8C /* Product Vision.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -428,6 +451,7 @@
 				288EB1202FF7D69000F09BC9 /* DocumentMetadata.swift in Sources */,
 				288EB1042FF7C0A600F09BC9 /* DocumentStore.swift in Sources */,
 				288EB0F12FF7B29300F09BC9 /* Document.swift in Sources */,
+				28B87B262FFB24CD009BEE8C /* TransactionListView.swift in Sources */,
 				288EB0EE2FF7AE2C00F09BC9 /* CSVReader.swift in Sources */,
 				288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */,
 				288EB0F22FF7B2AB00F09BC9 /* CSVAnalyzer.swift in Sources */,

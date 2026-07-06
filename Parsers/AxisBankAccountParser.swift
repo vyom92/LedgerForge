@@ -29,6 +29,19 @@ final class AxisBankAccountParser: StatementParser {
             return []
         }
 
+        let mapping = ColumnMapping(
+            date: 0,
+            description: 2,
+            debit: 3,
+            credit: 4,
+            balance: 5
+        )
+
+        guard mapping.isValid else {
+            print("Axis parser: invalid column mapping: \(mapping.missingColumns.joined(separator: ", "))")
+            return []
+        }
+
         var transactions: [Transaction] = []
 
         for firstRow in document.rows {
@@ -38,7 +51,7 @@ final class AxisBankAccountParser: StatementParser {
                 continue
             }
 
-            let dateString = firstRow.values[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            let dateString = firstRow.values[mapping.date!].trimmingCharacters(in: .whitespacesAndNewlines)
 
             let formatter = DateFormatter()
             formatter.dateFormat = "dd-MM-yyyy"
@@ -49,10 +62,10 @@ final class AxisBankAccountParser: StatementParser {
                 continue
             }
 
-            let description = firstRow.values[2].trimmingCharacters(in: .whitespacesAndNewlines)
-            let debitString = firstRow.values[3].trimmingCharacters(in: .whitespacesAndNewlines)
-            let creditString = firstRow.values[4].trimmingCharacters(in: .whitespacesAndNewlines)
-            let balanceString = firstRow.values[5].trimmingCharacters(in: .whitespacesAndNewlines)
+            let description = firstRow.values[mapping.description!].trimmingCharacters(in: .whitespacesAndNewlines)
+            let debitString = firstRow.values[mapping.debit!].trimmingCharacters(in: .whitespacesAndNewlines)
+            let creditString = firstRow.values[mapping.credit!].trimmingCharacters(in: .whitespacesAndNewlines)
+            let balanceString = firstRow.values[mapping.balance!].trimmingCharacters(in: .whitespacesAndNewlines)
 
             let amountString = debitString.isEmpty ? creditString : debitString
             let transactionType = debitString.isEmpty ? "Credit" : "Debit"

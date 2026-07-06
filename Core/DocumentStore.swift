@@ -18,6 +18,7 @@ final class DocumentStore: ObservableObject {
     static let shared = DocumentStore()
 
     @Published private(set) var rows: [String] = []
+    @Published private(set) var transactions: [Transaction] = []
 
     private init() {}
 
@@ -29,10 +30,19 @@ final class DocumentStore: ObservableObject {
 
     }
 
+    func updateTransactions(_ transactions: [Transaction]) {
+
+        DispatchQueue.main.async {
+            self.transactions = transactions
+        }
+
+    }
+
     func clear() {
 
         DispatchQueue.main.async {
             self.rows.removeAll()
+            self.transactions.removeAll()
         }
 
     }

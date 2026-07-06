@@ -11,6 +11,8 @@ struct ContentView: View {
 
     @State private var showingImporter = false
     @State private var selectedFile = "No statement imported"
+    @ObservedObject private var documentStore = DocumentStore.shared
+    @State private var selectedTab = 0
 
     var body: some View {
 
@@ -48,15 +50,29 @@ struct ContentView: View {
 
             // MARK: Middle Panel
 
-            DocumentPreviewView()
-                .frame(minWidth: 500)
+            TabView(selection: $selectedTab) {
 
-            Divider()
+                DocumentPreviewView()
+                    .tabItem {
+                        Label("Preview", systemImage: "doc.text")
+                    }
+                    .tag(0)
 
-            // MARK: Right Panel
+                TransactionListView(
+                    transactions: documentStore.transactions
+                )
+                .tabItem {
+                    Label("Transactions", systemImage: "list.bullet.rectangle")
+                }
+                .tag(1)
 
-            DeveloperConsoleView()
-                .frame(width: 350)
+                DeveloperConsoleView()
+                    .tabItem {
+                        Label("Console", systemImage: "terminal")
+                    }
+                    .tag(2)
+            }
+            .frame(minWidth: 700)
 
         }
         .fileImporter(
@@ -73,6 +89,7 @@ struct ContentView: View {
 
                 selectedFile = url.lastPathComponent
                 ImportEngine.shared.importFile(from: url)
+                selectedTab = 1
 
             case .failure(let error):
 

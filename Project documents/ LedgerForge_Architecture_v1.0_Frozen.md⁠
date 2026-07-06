@@ -1,0 +1,104 @@
+# LedgerForge Architecture v1.0 (Frozen)
+
+**Status:** Frozen for Milestone B
+
+This document is the architectural baseline for LedgerForge until Milestone B is complete.
+
+## Vision
+
+LedgerForge is an offline-first personal financial operating system that automatically consolidates financial information into a single trustworthy dashboard. Document import is an enabling capability, not the primary product. Every feature should either reduce manual work, increase confidence, or surface meaningful financial insight.
+
+## Core Principles
+
+- Offline first.
+- Single source of truth.
+- Every imported value must be traceable.
+- Readers know file formats.
+- Parsers know institutions and document families.
+- Rules know business meaning.
+- Plugin parser architecture.
+- Every commit should build successfully.
+- Dashboard first. Import second.
+- Automation over manual maintenance.
+- Financial intelligence should always be explainable.
+- Learn statement formats instead of hardcoding institutions whenever practical.
+- Every successful import should improve the system.
+- Preserve user trust through deterministic processing and full auditability.
+
+## Import Pipeline
+
+Financial Document → Reader → Analyzer → Institution Detection → Column Detection → Direction Strategy → Normalizer → Generic Transaction Parser → Rules Engine → SQLite → Financial Dashboard
+
+## Core Domain
+
+- Account (central entity)
+- Transaction
+- Security
+- Holding
+- ImportSession
+- Rule
+- Category
+- DocumentMetadata
+- NormalizedDocument
+
+## Long-Term Product Modules
+
+- Dashboard
+- Accounts
+- Investments
+- Budget & Cash Flow
+- Documents
+- Rules & Automation
+- Financial Intelligence
+- Import Studio
+- Financial Timeline
+
+## Supported Document Families
+
+- Bank Accounts
+- Credit Cards
+- Brokerage
+- Salary
+- Tax
+- Mutual Funds
+- Government Records
+
+## Milestones
+
+- Milestone A: Foundation ✅
+- Milestone B: Import Foundation v1.0
+- Milestone C: Universal Import Profiles
+- Milestone D: Multi-Institution Support
+- Milestone E: Rules Engine, Categorization & Reconciliation
+- Milestone F: Dashboard & Financial Intelligence
+- Milestone G: Investments & Portfolio Analytics
+- Milestone H: Financial Operating System
+
+## North Star
+
+LedgerForge should become the trusted financial workspace that users open to understand their financial life. Imports, OCR, parsers and profile learning exist to keep financial information accurate and current with minimal manual effort. The dashboard and insights remain the primary experience.
+
+## Compatibility Review
+
+Every architectural decision should be reviewed against:
+
+- Axis Bank
+- Axis Credit Card
+- HDFC Bank
+- CBQ Bank
+- CBQ Credit Card
+- American Express
+- IBKR
+- Salary Slip
+- Mutual Fund CAS
+- AIS / Form 16
+
+## Architecture Freeze
+
+No major architectural changes until Milestone B is complete unless:
+
+1. A real financial document exposes a fundamental design flaw.
+2. The change benefits multiple document families.
+3. The change preserves the core architecture principles.
+
+Future enhancements will be tracked under Architecture v1.1.

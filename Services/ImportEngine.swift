@@ -79,6 +79,8 @@ final class ImportEngine {
                     document: normalizedDocument
                 )
 
+                DocumentStore.shared.updateTransactions(transactions)
+
                 DeveloperConsole.shared.log("Transactions Parsed: \(transactions.count)")
 
             } else {

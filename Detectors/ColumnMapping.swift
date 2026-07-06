@@ -22,6 +22,35 @@ struct ColumnMapping {
     var credit: Int?
     var balance: Int?
 
+    var isValid: Bool {
+        date != nil &&
+        description != nil &&
+        balance != nil &&
+        (debit != nil || credit != nil)
+    }
+
+    var missingColumns: [String] {
+        var missing: [String] = []
+
+        if date == nil {
+            missing.append("Date")
+        }
+
+        if description == nil {
+            missing.append("Description")
+        }
+
+        if debit == nil && credit == nil {
+            missing.append("Debit/Credit")
+        }
+
+        if balance == nil {
+            missing.append("Balance")
+        }
+
+        return missing
+    }
+
 }
 
 final class ColumnDetector {
