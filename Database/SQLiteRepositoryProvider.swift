@@ -7,6 +7,7 @@ import SQLite3
 /// SQLite-backed provider that runs migrations and exposes repository implementations.
 public final class SQLiteRepositoryProvider {
     public let database: SQLiteDatabase
+    public let workspaceRepo: WorkspaceRepository
     public let transactionRepo: TransactionRepository
     public let accountRepo: AccountRepository
     public let importSessionRepo: ImportSessionRepository
@@ -17,6 +18,7 @@ public final class SQLiteRepositoryProvider {
         try database.open()
         try database.runMigrations(allMigrations)
 
+        self.workspaceRepo = SQLiteWorkspaceRepo(db: database)
         self.transactionRepo = SQLiteTransactionRepo(db: database)
         self.accountRepo = SQLiteAccountRepo(db: database)
         self.importSessionRepo = SQLiteImportSessionRepo(db: database)
@@ -35,6 +37,29 @@ public final class SQLiteRepositoryProvider {
 }
 
 // MARK: - Repo implementations (minimal for Phase 2B)
+fileprivate final class SQLiteWorkspaceRepo: WorkspaceRepository {
+    private let db: SQLiteDatabase
+    init(db: SQLiteDatabase) { self.db = db }
+
+    func upsertWorkspace(_ workspace: WorkspaceDTO) throws -> String {
+        let sql = "INSERT OR REPLACE INTO workspaces (id, name, created_at, updated_at) VALUES (?,?,?,?);"
+        try db.executePrepared(sql: sql, params: [workspace.id, workspace.name, workspace.createdAtISO, workspace.updatedAtISO ?? NSNull()])
+        return workspace.id
+    }
+
+    func workspace(id: String) throws -> WorkspaceDTO? {
+        let sql = "SELECT id, name, created_at, updated_at FROM workspaces WHERE id = ?;"
+        return try db.query(sql: sql, params: [id]) { row in
+            WorkspaceDTO(
+                id: row.string(at: 0) ?? "",
+                name: row.string(at: 1) ?? "",
+                createdAtISO: row.string(at: 2) ?? "",
+                updatedAtISO: row.string(at: 3)
+            )
+        }.first
+    }
+}
+
 fileprivate final class SQLiteAccountRepo: AccountRepository {
     private let db: SQLiteDatabase
     init(db: SQLiteDatabase) { self.db = db }
@@ -44,6 +69,22 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
         let sql = "INSERT OR REPLACE INTO accounts (id, workspace_id, name, institution_id, account_type, native_currency, description, created_at, closed_at, created_from_import_session_id) VALUES (?,?,?,?,?,?,?,?,?,?);"
         try db.executePrepared(sql: sql, params: [account.id, account.workspaceId, account.name, account.institutionId ?? NSNull(), account.accountType ?? NSNull(), account.nativeCurrency, account.description ?? NSNull(), now, NSNull(), NSNull()])
         return account.id
+    }
+
+    func account(id: String) throws -> AccountDTO? {
+        let sql = "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at FROM accounts WHERE id = ?;"
+        return try db.query(sql: sql, params: [id]) { row in
+            AccountDTO(
+                id: row.string(at: 0) ?? "",
+                workspaceId: row.string(at: 1) ?? "",
+                name: row.string(at: 2) ?? "",
+                institutionId: row.string(at: 3),
+                accountType: row.string(at: 4),
+                nativeCurrency: row.string(at: 5) ?? "",
+                description: row.string(at: 6),
+                createdAtISO: row.string(at: 7) ?? ""
+            )
+        }.first
     }
 }
 
@@ -68,6 +109,23 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
         params.append(updatedAt)
         params.append(id)
         try db.executePrepared(sql: sql, params: params)
+    }
+
+    func importSession(id: String) throws -> ImportSessionRecordDTO? {
+        let sql = "SELECT id, workspace_id, user_visible_name, started_at, completed_at, validation_status, reader_version, parser_version, layout_version FROM import_sessions WHERE id = ?;"
+        return try db.query(sql: sql, params: [id]) { row in
+            ImportSessionRecordDTO(
+                id: row.string(at: 0) ?? "",
+                workspaceId: row.string(at: 1) ?? "",
+                userVisibleName: row.string(at: 2),
+                startedAtISO: row.string(at: 3) ?? "",
+                completedAtISO: row.string(at: 4),
+                validationStatus: row.string(at: 5) ?? "",
+                readerVersion: row.string(at: 6),
+                parserVersion: row.string(at: 7),
+                layoutVersion: row.string(at: 8)
+            )
+        }.first
     }
 }
 
@@ -103,6 +161,56 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
         } catch {
             try? db.execute(sql: "ROLLBACK;")
             throw error
+        }
+    }
+
+    func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO] {
+        var sql = "SELECT id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at FROM transactions WHERE workspace_id = ?"
+        var params: [Any?] = [workspaceId]
+        if let importSessionId {
+            sql += " AND import_session_id = ?"
+            params.append(importSessionId)
+        }
+        sql += " ORDER BY posted_date, id;"
+
+        return try db.query(sql: sql, params: params) { row in
+            let transactionId = row.string(at: 0) ?? ""
+            let rawRows = try rawRows(for: transactionId)
+            return TransactionDTO(
+                id: transactionId,
+                workspaceId: row.string(at: 1) ?? "",
+                accountId: row.string(at: 2),
+                importSessionId: row.string(at: 3),
+                documentId: row.string(at: 4),
+                originalRowId: row.string(at: 5),
+                postedDateISO: row.string(at: 6) ?? "",
+                valueDateISO: row.string(at: 7),
+                description: row.string(at: 8),
+                payee: row.string(at: 9),
+                reference: row.string(at: 10),
+                nativeCurrency: row.string(at: 11) ?? "",
+                amountMinor: row.int64(at: 12) ?? 0,
+                amountDecimal: row.string(at: 13) ?? "",
+                direction: row.string(at: 14) ?? "",
+                runningBalanceMinor: row.int64(at: 15),
+                isReconciled: row.bool(at: 16),
+                isTrusted: row.bool(at: 17),
+                trustedAtISO: row.string(at: 18),
+                createdAtISO: row.string(at: 19) ?? "",
+                updatedAtISO: row.string(at: 20),
+                rawRows: rawRows
+            )
+        }
+    }
+
+    private func rawRows(for transactionId: String) throws -> [TransactionRawRowDTO] {
+        let sql = "SELECT id, normalized_row_id, contribution_type FROM transaction_raw_rows WHERE transaction_id = ? ORDER BY id;"
+        return try db.query(sql: sql, params: [transactionId]) { row in
+            TransactionRawRowDTO(
+                id: row.string(at: 0) ?? "",
+                normalizedRowId: row.string(at: 1) ?? "",
+                contributionType: row.string(at: 2)
+            )
         }
     }
 }

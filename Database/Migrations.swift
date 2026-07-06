@@ -260,4 +260,10 @@ CREATE TABLE IF NOT EXISTS attachments (
 
 """)
 
-public let allMigrations: [Migration] = [migrationV1]
+public let migrationV2 = Migration(version: 2, name: "import_session_version_columns", sql: """
+ALTER TABLE import_sessions ADD COLUMN reader_version TEXT;
+ALTER TABLE import_sessions ADD COLUMN parser_version TEXT;
+ALTER TABLE import_sessions ADD COLUMN layout_version TEXT;
+""")
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2]

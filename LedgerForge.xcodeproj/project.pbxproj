@@ -14,6 +14,20 @@
 		281BB15C2FFC4879006E7424 /* SQLiteRepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1382FFC41A3006E7424 /* SQLiteRepositoryProvider.swift */; };
 		281BB15D2FFC4881006E7424 /* Migrations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1392FFC41CB006E7424 /* Migrations.swift */; };
 		281BB15E2FFC4886006E7424 /* DTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB13A2FFC4260006E7424 /* DTOs.swift */; };
+		281BB1612FFC4A84006E7424 /* InMemoryRepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */; };
+		281BB17C2FFC4D1C006E7424 /* ImportFramework.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB17B2FFC4D1C006E7424 /* ImportFramework.swift */; };
+		281BB17E2FFC4D26006E7424 /* ImportRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB17D2FFC4D26006E7424 /* ImportRequest.swift */; };
+		281BB1802FFC4D3F006E7424 /* RawDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB17F2FFC4D3F006E7424 /* RawDocument.swift */; };
+		281BB1822FFC4D40006E7424 /* ImportResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1812FFC4D40006E7424 /* ImportResult.swift */; };
+		281BB1842FFC4D40006E7424 /* ImportProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1832FFC4D40006E7424 /* ImportProgress.swift */; };
+		281BB1862FFC4D40006E7424 /* ImportError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1852FFC4D40006E7424 /* ImportError.swift */; };
+		281BB1882FFC4D53006E7424 /* ImportDocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1872FFC4D53006E7424 /* ImportDocumentReader.swift */; };
+		281BB18A2FFC4D54006E7424 /* ReaderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1892FFC4D54006E7424 /* ReaderRegistry.swift */; };
+		281BB18C2FFC4D55006E7424 /* PasswordProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB18B2FFC4D55006E7424 /* PasswordProvider.swift */; };
+		281BB18E2FFC4D56006E7424 /* ImportInstitutionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB18D2FFC4D56006E7424 /* ImportInstitutionDetector.swift */; };
+		281BB1902FFC4D6A006E7424 /* StatementClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB18F2FFC4D6A006E7424 /* StatementClassifier.swift */; };
+		281BB1922FFC4D6A006E7424 /* ImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1912FFC4D6A006E7424 /* ImportCoordinator.swift */; };
+		281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
 		288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B22FF7955200F09BC9 /* ContentView.swift */; };
 		288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0B42FF7955300F09BC9 /* Assets.xcassets */; };
@@ -76,6 +90,21 @@
 		281BB1382FFC41A3006E7424 /* SQLiteRepositoryProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteRepositoryProvider.swift; sourceTree = "<group>"; };
 		281BB1392FFC41CB006E7424 /* Migrations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Migrations.swift; sourceTree = "<group>"; };
 		281BB13A2FFC4260006E7424 /* DTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DTOs.swift; sourceTree = "<group>"; };
+		281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InMemoryRepositoryProvider.swift; sourceTree = "<group>"; };
+		281BB1782FFC4CDA006E7424 /* Project_Guide.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Project_Guide.md; sourceTree = "<group>"; };
+		281BB17B2FFC4D1C006E7424 /* ImportFramework.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFramework.swift; sourceTree = "<group>"; };
+		281BB17D2FFC4D26006E7424 /* ImportRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportRequest.swift; sourceTree = "<group>"; };
+		281BB17F2FFC4D3F006E7424 /* RawDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RawDocument.swift; sourceTree = "<group>"; };
+		281BB1812FFC4D40006E7424 /* ImportResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportResult.swift; sourceTree = "<group>"; };
+		281BB1832FFC4D40006E7424 /* ImportProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportProgress.swift; sourceTree = "<group>"; };
+		281BB1852FFC4D40006E7424 /* ImportError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportError.swift; sourceTree = "<group>"; };
+		281BB1872FFC4D53006E7424 /* ImportDocumentReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportDocumentReader.swift; sourceTree = "<group>"; };
+		281BB1892FFC4D54006E7424 /* ReaderRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderRegistry.swift; sourceTree = "<group>"; };
+		281BB18B2FFC4D55006E7424 /* PasswordProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordProvider.swift; sourceTree = "<group>"; };
+		281BB18D2FFC4D56006E7424 /* ImportInstitutionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportInstitutionDetector.swift; sourceTree = "<group>"; };
+		281BB18F2FFC4D6A006E7424 /* StatementClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementClassifier.swift; sourceTree = "<group>"; };
+		281BB1912FFC4D6A006E7424 /* ImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCoordinator.swift; sourceTree = "<group>"; };
+		281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultImportCoordinator.swift; sourceTree = "<group>"; };
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerForgeApp.swift; sourceTree = "<group>"; };
 		288EB0B22FF7955200F09BC9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -175,6 +204,58 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		281BB1642FFC4C73006E7424 /* Import */ = {
+			isa = PBXGroup;
+			children = (
+				281BB1662FFC4C88006E7424 /* Models */,
+				281BB16B2FFC4C9A006E7424 /* Errors */,
+				281BB16D2FFC4C9A006E7424 /* Protocols */,
+				281BB1742FFC4CAF006E7424 /* Coordinator */,
+				281BB17B2FFC4D1C006E7424 /* ImportFramework.swift */,
+			);
+			path = Import;
+			sourceTree = "<group>";
+		};
+		281BB1662FFC4C88006E7424 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				281BB17D2FFC4D26006E7424 /* ImportRequest.swift */,
+				281BB17F2FFC4D3F006E7424 /* RawDocument.swift */,
+				281BB1812FFC4D40006E7424 /* ImportResult.swift */,
+				281BB1832FFC4D40006E7424 /* ImportProgress.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		281BB16B2FFC4C9A006E7424 /* Errors */ = {
+			isa = PBXGroup;
+			children = (
+				281BB1852FFC4D40006E7424 /* ImportError.swift */,
+			);
+			path = Errors;
+			sourceTree = "<group>";
+		};
+		281BB16D2FFC4C9A006E7424 /* Protocols */ = {
+			isa = PBXGroup;
+			children = (
+				281BB1872FFC4D53006E7424 /* ImportDocumentReader.swift */,
+				281BB1892FFC4D54006E7424 /* ReaderRegistry.swift */,
+				281BB18B2FFC4D55006E7424 /* PasswordProvider.swift */,
+				281BB18D2FFC4D56006E7424 /* ImportInstitutionDetector.swift */,
+				281BB18F2FFC4D6A006E7424 /* StatementClassifier.swift */,
+				281BB1912FFC4D6A006E7424 /* ImportCoordinator.swift */,
+			);
+			path = Protocols;
+			sourceTree = "<group>";
+		};
+		281BB1742FFC4CAF006E7424 /* Coordinator */ = {
+			isa = PBXGroup;
+			children = (
+				281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */,
+			);
+			path = Coordinator;
+			sourceTree = "<group>";
+		};
 		288EB0A42FF7955200F09BC9 = {
 			isa = PBXGroup;
 			children = (
@@ -199,6 +280,7 @@
 				288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */,
 				288EB0E72FF7AC7100F09BC9 /* Readers */,
 				288EB0EF2FF7B12000F09BC9 /* Analyzers */,
+				281BB1642FFC4C73006E7424 /* Import */,
 			);
 			sourceTree = "<group>";
 		};
@@ -300,6 +382,7 @@
 				281BB1382FFC41A3006E7424 /* SQLiteRepositoryProvider.swift */,
 				281BB1392FFC41CB006E7424 /* Migrations.swift */,
 				281BB13A2FFC4260006E7424 /* DTOs.swift */,
+				281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */,
 			);
 			path = Database;
 			sourceTree = "<group>";
@@ -342,6 +425,7 @@
 		28B87B272FFB2C90009BEE8C /* Project documents */ = {
 			isa = PBXGroup;
 			children = (
+				281BB1782FFC4CDA006E7424 /* Project_Guide.md */,
 				281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */,
 				28171F672FFC1718006115B7 /* Database_v1_Architecture.md */,
 				28B87B2E2FFB2D25009BEE8C /* ADR.md */,
@@ -500,42 +584,56 @@
 			files = (
 				288EB1292FF7DA3900F09BC9 /* ColumnMapping.swift in Sources */,
 				28B87B392FFBBE2D009BEE8C /* DashboardViewModel.swift in Sources */,
+				281BB1902FFC4D6A006E7424 /* StatementClassifier.swift in Sources */,
 				288EB0FE2FF7BA2800F09BC9 /* DeveloperConsole.swift in Sources */,
+				281BB1802FFC4D3F006E7424 /* RawDocument.swift in Sources */,
 				28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */,
 				28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */,
+				281BB17E2FFC4D26006E7424 /* ImportRequest.swift in Sources */,
 				288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */,
+				281BB1612FFC4A84006E7424 /* InMemoryRepositoryProvider.swift in Sources */,
 				288EB12B2FF7E08500F09BC9 /* NormalizedRow.swift in Sources */,
 				28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */,
 				288EB1272FF7D96A00F09BC9 /* DocumentPreviewView.swift in Sources */,
 				288EB1242FF7D8A000F09BC9 /* Parsers/StatementParser.swift in Sources */,
 				28B87B332FFB31C9009BEE8C /* ImportValidationResult.swift in Sources */,
 				288EB1232FF7D89B00F09BC9 /* Parsers/AxisBankAccountParser.swift in Sources */,
+				281BB1842FFC4D40006E7424 /* ImportProgress.swift in Sources */,
+				281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */,
 				288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */,
 				288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */,
 				288EB0FD2FF7BA1600F09BC9 /* DeveloperConsoleView.swift in Sources */,
 				288EB1212FF7D88200F09BC9 /* Parsers/StatementParserRegistry.swift in Sources */,
+				281BB17C2FFC4D1C006E7424 /* ImportFramework.swift in Sources */,
 				288EB1252FF7D8B500F09BC9 /* Transaction.swift in Sources */,
 				288EB0ED2FF7AE2500F09BC9 /* DocumentReader.swift in Sources */,
 				288EB12D2FF7E0C000F09BC9 /* NormalizedDocument.swift in Sources */,
 				288EB1202FF7D69000F09BC9 /* DocumentMetadata.swift in Sources */,
 				288EB1042FF7C0A600F09BC9 /* DocumentStore.swift in Sources */,
 				281BB15D2FFC4881006E7424 /* Migrations.swift in Sources */,
+				281BB18A2FFC4D54006E7424 /* ReaderRegistry.swift in Sources */,
 				288EB0F12FF7B29300F09BC9 /* Document.swift in Sources */,
 				281BB15E2FFC4886006E7424 /* DTOs.swift in Sources */,
 				28B87B262FFB24CD009BEE8C /* TransactionListView.swift in Sources */,
+				281BB18C2FFC4D55006E7424 /* PasswordProvider.swift in Sources */,
 				288EB0EE2FF7AE2C00F09BC9 /* CSVReader.swift in Sources */,
 				28B87B312FFB2F22009BEE8C /* Services/DirectionResolver.swift in Sources */,
 				28B87B372FFBB599009BEE8C /* ImportSession.swift in Sources */,
 				281BB15C2FFC4879006E7424 /* SQLiteRepositoryProvider.swift in Sources */,
 				28B87B352FFB31FD009BEE8C /* Services/ImportValidator.swift in Sources */,
+				281BB1822FFC4D40006E7424 /* ImportResult.swift in Sources */,
 				288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */,
 				28171EE22FFBE2F0006115B7 /* TransactionListViewModel.swift in Sources */,
+				281BB1862FFC4D40006E7424 /* ImportError.swift in Sources */,
+				281BB1922FFC4D6A006E7424 /* ImportCoordinator.swift in Sources */,
 				281BB15A2FFC486C006E7424 /* Repository.swift in Sources */,
 				288EB0F22FF7B2AB00F09BC9 /* CSVAnalyzer.swift in Sources */,
+				281BB18E2FFC4D56006E7424 /* ImportInstitutionDetector.swift in Sources */,
 				288EB1222FF7D89600F09BC9 /* Parsers/UnknownStatementParser.swift in Sources */,
 				288EB11E2FF7D68200F09BC9 /* InstitutionDetector.swift in Sources */,
 				288EB0E62FF7A84F00F09BC9 /* Services/ImportEngine.swift in Sources */,
 				281BB15B2FFC4872006E7424 /* SQLiteDatabase.swift in Sources */,
+				281BB1882FFC4D53006E7424 /* ImportDocumentReader.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

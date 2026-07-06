@@ -4,6 +4,8 @@
 import Foundation
 import SQLite3
 
+private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
 public enum SQLiteDatabaseError: Error, LocalizedError {
     case databaseNotOpen
     case prepareFailed(sql: String, message: String)
@@ -15,6 +17,29 @@ public enum SQLiteDatabaseError: Error, LocalizedError {
         case .prepareFailed(let sql, let message):
             return "Failed to prepare SQLite statement: \(message). SQL: \(sql)"
         }
+    }
+}
+
+public struct SQLiteRow {
+    fileprivate let statement: OpaquePointer?
+
+    public func string(at index: Int32) -> String? {
+        guard sqlite3_column_type(statement, index) != SQLITE_NULL,
+              let text = sqlite3_column_text(statement, index) else {
+            return nil
+        }
+        return String(cString: text)
+    }
+
+    public func int64(at index: Int32) -> Int64? {
+        guard sqlite3_column_type(statement, index) != SQLITE_NULL else {
+            return nil
+        }
+        return sqlite3_column_int64(statement, index)
+    }
+
+    public func bool(at index: Int32) -> Bool {
+        return sqlite3_column_int(statement, index) != 0
     }
 }
 
@@ -75,35 +100,37 @@ public final class SQLiteDatabase {
             throw SQLiteDatabaseError.prepareFailed(sql: sql, message: msg)
         }
 
-        // Bind parameters
-        for (i, p) in params.enumerated() {
-            let idx = Int32(i + 1)
-            guard let value = p, !(value is NSNull) else {
-                sqlite3_bind_null(stmt, idx)
-                continue
-            }
-            switch value {
-            case let s as String:
-                sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
-            case let i as Int:
-                sqlite3_bind_int64(stmt, idx, sqlite3_int64(i))
-            case let i as Int64:
-                sqlite3_bind_int64(stmt, idx, sqlite3_int64(i))
-            case let d as Double:
-                sqlite3_bind_double(stmt, idx, d)
-            case let b as Bool:
-                sqlite3_bind_int(stmt, idx, b ? 1 : 0)
-            default:
-                // Fallback: attempt String description
-                let s = String(describing: value)
-                sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
-            }
-        }
+        bind(params, to: stmt)
 
         let rc = sqlite3_step(stmt)
         if rc != SQLITE_DONE && rc != SQLITE_ROW {
             let msg = String(cString: sqlite3_errmsg(db))
             throw NSError(domain: "SQLite", code: Int(rc), userInfo: [NSLocalizedDescriptionKey: msg])
+        }
+    }
+
+    public func query<T>(sql: String, params: [Any?] = [], map: (SQLiteRow) throws -> T) throws -> [T] {
+        guard let db = db else { throw SQLiteDatabaseError.databaseNotOpen }
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) != SQLITE_OK {
+            let msg = String(cString: sqlite3_errmsg(db))
+            throw SQLiteDatabaseError.prepareFailed(sql: sql, message: msg)
+        }
+
+        bind(params, to: stmt)
+
+        var rows: [T] = []
+        while true {
+            let rc = sqlite3_step(stmt)
+            if rc == SQLITE_ROW {
+                rows.append(try map(SQLiteRow(statement: stmt)))
+            } else if rc == SQLITE_DONE {
+                return rows
+            } else {
+                let msg = String(cString: sqlite3_errmsg(db))
+                throw NSError(domain: "SQLite", code: Int(rc), userInfo: [NSLocalizedDescriptionKey: msg])
+            }
         }
     }
 
@@ -159,6 +186,31 @@ public final class SQLiteDatabase {
 
     public func queryInt(_ sql: String) throws -> Int {
         return try querySingleInt(sql: sql)
+    }
+
+    private func bind(_ params: [Any?], to stmt: OpaquePointer?) {
+        for (i, p) in params.enumerated() {
+            let idx = Int32(i + 1)
+            guard let value = p, !(value is NSNull) else {
+                sqlite3_bind_null(stmt, idx)
+                continue
+            }
+            switch value {
+            case let s as String:
+                sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
+            case let i as Int:
+                sqlite3_bind_int64(stmt, idx, sqlite3_int64(i))
+            case let i as Int64:
+                sqlite3_bind_int64(stmt, idx, sqlite3_int64(i))
+            case let d as Double:
+                sqlite3_bind_double(stmt, idx, d)
+            case let b as Bool:
+                sqlite3_bind_int(stmt, idx, b ? 1 : 0)
+            default:
+                let s = String(describing: value)
+                sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
+            }
+        }
     }
 
     private func iso8601Now() -> String {
