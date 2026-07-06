@@ -27,6 +27,10 @@ If the answer to all five is "No", do not build it.
 5. Offline-first is the default.
 6. Every automatic decision must be explainable.
 7. Every imported value must be traceable back to its source.
+8. Every monetary value must retain its native currency.
+9. Currency conversion is a presentation concern, never a storage concern.
+10. Financial calculations must be deterministic and reproducible.
+11. Monetary values must be formatted using the correct regional numbering system.
 
 ---
 
@@ -65,6 +69,12 @@ Database/
 Core/
 - Shared application state and infrastructure.
 
+ViewModels/
+- Presentation logic only.
+- No persistence.
+- No parsing.
+- Observe application state and prepare data for Views.
+
 ---
 
 # Coding Principles
@@ -75,6 +85,9 @@ Core/
 - Use descriptive names rather than abbreviations.
 - Minimize force unwrapping.
 - Keep UI and business logic separated.
+- Prefer domain value types (for example, Money) over primitive values when representing financial concepts.
+- Every object should have a single owner.
+- Avoid mixing presentation formatting with business logic.
 
 # Error Handling Standards
 
@@ -88,12 +101,13 @@ Core/
 
 # Development Workflow
 
-1. Select one file.
-2. Implement one logical change.
-3. Build.
-4. Test.
-5. Commit.
-6. Move to the next file.
+1. Select exactly one file.
+2. Verify the filename in the header comment matches the intended file.
+3. Implement one logical change.
+4. Build.
+5. Test.
+6. Commit.
+7. Move to the next file.
 
 # Definition of Done
 
@@ -116,6 +130,10 @@ Normalizers create consistency.
 Parsers create business objects.
 Rules create intelligence.
 The Dashboard presents information.
+AccountStore owns accounts.
+DocumentStore owns imported transactions.
+ViewModels observe stores.
+Views never coordinate business workflows.
 
 ---
 
@@ -125,6 +143,9 @@ Every feature should:
 - Reduce manual work, or
 - Increase confidence, or
 - Surface meaningful financial insight.
+- Preserve financial truth.
+- Support future financial institutions without architectural changes.
+- Remain explainable to the end user.
 
 If it satisfies none of these goals, reconsider whether it belongs in LedgerForge.
 
@@ -137,6 +158,16 @@ Optimize for maintainability over cleverness.
 Build systems that learn instead of accumulating special cases.
 
 The code should make adding the next financial institution easier than adding the previous one.
+
+---
+
+# Currency Standards
+
+- Preserve native currency.
+- Store exchange rates separately from monetary values.
+- Never overwrite imported financial values after conversion.
+- Support multiple simultaneous display currencies.
+- Respect regional formatting conventions for each currency.
 
 ---
 

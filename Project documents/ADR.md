@@ -128,3 +128,59 @@ Trust is earned through transparency, especially in financial software.
 
 ## Consequences
 Rules, AI assistance and future learning systems must provide an audit trail explaining why decisions were made.
+
+---
+
+# ADR-008 — Multi-Currency Domain Model
+
+## Status
+Accepted
+
+## Decision
+Every monetary value in LedgerForge retains its native currency. Currency conversion is a derived presentation concern rather than a storage concern.
+
+## Rationale
+LedgerForge is designed to manage financial data across multiple countries, institutions and currencies. Preserving imported values prevents loss of financial accuracy and enables transparent historical reporting.
+
+## Consequences
+- Monetary values should ultimately be represented by a dedicated Money value type.
+- Exchange rates are stored separately from imported financial data.
+- Dashboards and reports may present multiple display currencies simultaneously.
+- Imported financial values are never overwritten after conversion.
+
+---
+
+# ADR-009 — Reactive Store Architecture
+
+## Status
+Accepted
+
+## Decision
+Application state is owned by stores. ViewModels observe stores and prepare presentation data. Views display state and do not coordinate business workflows.
+
+## Rationale
+Separating ownership, business logic and presentation improves maintainability and keeps SwiftUI views simple.
+
+## Consequences
+- DocumentStore owns imported transactions.
+- AccountStore owns accounts.
+- ViewModels observe published state.
+- Views contain presentation only.
+
+---
+
+# ADR-010 — Validation Before Persistence
+
+## Status
+Accepted
+
+## Decision
+Imported financial data must successfully pass structural and financial validation before becoming trusted application data.
+
+## Rationale
+Incorrect financial data is more damaging than delayed imports. Validation should detect inconsistencies as early as possible.
+
+## Consequences
+- Validation is a mandatory stage of the import pipeline.
+- Import sessions record validation outcomes.
+- Dashboard metrics should only be derived from validated financial data.

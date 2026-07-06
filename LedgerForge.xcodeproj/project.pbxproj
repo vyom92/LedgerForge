@@ -41,6 +41,7 @@
 		28B87B352FFB31FD009BEE8C /* ImportValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B342FFB31FC009BEE8C /* ImportValidator.swift */; };
 		28B87B372FFBB599009BEE8C /* ImportSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B362FFBB591009BEE8C /* ImportSession.swift */; };
 		28B87B392FFBBE2D009BEE8C /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */; };
+		28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B3C2FFBBFC8009BEE8C /* Account.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -98,6 +99,7 @@
 		28B87B342FFB31FC009BEE8C /* ImportValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportValidator.swift; sourceTree = "<group>"; };
 		28B87B362FFBB591009BEE8C /* ImportSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportSession.swift; sourceTree = "<group>"; };
 		28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
+		28B87B3C2FFBBFC8009BEE8C /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -109,6 +111,11 @@
 		288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = LedgerForgeUITests;
+			sourceTree = "<group>";
+		};
+		28B87B3E2FFBD1DE009BEE8C /* .github */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = .github;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -141,6 +148,7 @@
 		288EB0A42FF7955200F09BC9 = {
 			isa = PBXGroup;
 			children = (
+				28B87B3E2FFBD1DE009BEE8C /* .github */,
 				28B87B272FFB2C90009BEE8C /* Project documents */,
 				288EB12E2FF7E10200F09BC9 /* Normalizers */,
 				288EB1012FF7BFD900F09BC9 /* Detectors */,
@@ -177,6 +185,7 @@
 		288EB0D72FF7995800F09BC9 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				28B87B3C2FFBBFC8009BEE8C /* Account.swift */,
 				28B87B362FFBB591009BEE8C /* ImportSession.swift */,
 				28B87B322FFB31C4009BEE8C /* ImportValidationResult.swift */,
 				288EB1312FF7E3C600F09BC9 /* ColumnType.swift */,
@@ -318,6 +327,9 @@
 			);
 			dependencies = (
 			);
+			fileSystemSynchronizedGroups = (
+				28B87B3E2FFBD1DE009BEE8C /* .github */,
+			);
 			name = LedgerForge;
 			packageProductDependencies = (
 			);
@@ -454,6 +466,7 @@
 				288EB0FE2FF7BA2800F09BC9 /* DeveloperConsole.swift in Sources */,
 				288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */,
 				288EB12B2FF7E08500F09BC9 /* NormalizedRow.swift in Sources */,
+				28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */,
 				288EB1272FF7D96A00F09BC9 /* DocumentPreviewView.swift in Sources */,
 				288EB1242FF7D8A000F09BC9 /* StatementParser.swift in Sources */,
 				28B87B332FFB31C9009BEE8C /* ImportValidationResult.swift in Sources */,

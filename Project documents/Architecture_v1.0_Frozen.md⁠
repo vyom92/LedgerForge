@@ -12,6 +12,10 @@ LedgerForge is an offline-first personal financial operating system that automat
 
 - Offline first.
 - Single source of truth.
+- Every monetary value carries its currency.
+- Native currency is always preserved.
+- Currency conversion is derived, never destructive.
+- Financial values must be consistently formatted according to their locale.
 - Every imported value must be traceable.
 - Readers know file formats.
 - Parsers know institutions and document families.
@@ -40,7 +44,7 @@ Every subsystem should ultimately improve one of three things:
 If a feature does not improve at least one of these, it should be reconsidered.
 ## Import Pipeline
 
-Financial Document → Reader → Analyzer → Institution Detection → Statement Fingerprint → Import Profile → Column Detection → Direction Strategy → Normalizer → Generic Transaction Parser → Rules Engine → SQLite → Financial Dashboard
+Financial Document → Reader → Analyzer → Institution Detection → Statement Fingerprint → Import Profile → Column Detection → Direction Strategy → Normalizer → Generic Transaction Parser → Validation → Import Session → Account Store → Rules Engine → SQLite → Financial Dashboard
 
 ## Core Domain
 
@@ -55,6 +59,10 @@ Financial Document → Reader → Analyzer → Institution Detection → Stateme
 - Category
 - DocumentMetadata
 - NormalizedDocument
+- Money
+- ExchangeRate
+- WorkspaceSettings
+- AccountStore
 
 ## Long-Term Product Modules
 
@@ -70,6 +78,8 @@ Financial Document → Reader → Analyzer → Institution Detection → Stateme
 - Universal Search
 - Import Studio
 - Financial Timeline
+- Multi-Currency Dashboard
+- Exchange Rates
 
 ## Supported Document Families
 
@@ -102,6 +112,8 @@ LedgerForge succeeds when users spend less time maintaining financial records an
 
 The application should quietly maintain an accurate financial model while presenting meaningful insights through a clean dashboard.
 
+Financial calculations must remain deterministic, explainable and consistent across institutions, currencies and future investment modules.
+
 ## Compatibility Review
 
 Every architectural decision should be reviewed against:
@@ -116,6 +128,19 @@ Every architectural decision should be reviewed against:
 - Salary Slip
 - Mutual Fund CAS
 - AIS / Form 16
+
+## Currency Architecture
+
+LedgerForge is designed as a multi-currency financial operating system.
+
+Principles:
+
+- Every monetary value retains its native currency.
+- Exchange rates are versioned and auditable.
+- Historical reports may use historical exchange rates.
+- Users may configure a base currency plus additional display currencies.
+- Dashboard metrics should support simultaneous presentation in multiple currencies.
+- Currency formatting follows regional conventions (for example, Indian digit grouping for INR and international grouping for USD/QAR).
 
 ## Future Architecture (v1.1+)
 
