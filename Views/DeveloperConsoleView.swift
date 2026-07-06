@@ -21,7 +21,7 @@ struct DeveloperConsoleView: View {
 
                 LazyVStack(alignment: .leading, spacing: 6) {
 
-                    ForEach(console.messages, id: \.self) { message in
+                    ForEach(Array(console.messages.enumerated()), id: \.offset) { _, message in
 
                         Text(message)
                             .font(.system(.body, design: .monospaced))

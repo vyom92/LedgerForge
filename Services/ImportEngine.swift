@@ -79,9 +79,35 @@ final class ImportEngine {
                     document: normalizedDocument
                 )
 
+                let validation = ImportValidator.validate(
+                    transactions: transactions
+                )
+
+                let importSession = ImportSession(
+                    fileName: document.filename,
+                    institution: metadata.institution,
+                    documentType: metadata.documentType,
+                    parserName: parser.name,
+                    transactionCount: transactions.count,
+                    validation: validation
+                )
+
                 DocumentStore.shared.updateTransactions(transactions)
 
                 DeveloperConsole.shared.log("Transactions Parsed: \(transactions.count)")
+                DeveloperConsole.shared.log("Import Session Created")
+                DeveloperConsole.shared.log("Validation: \(validation.passed ? "PASSED" : "FAILED")")
+                DeveloperConsole.shared.log("Validation Issues: \(validation.issues.count)")
+                if !validation.issues.isEmpty {
+                    DeveloperConsole.shared.log("======== VALIDATION ISSUES ========")
+
+                    for issue in validation.issues {
+                        DeveloperConsole.shared.log(issue.message)
+                    }
+
+                    DeveloperConsole.shared.log("===================================")
+                }
+                DeveloperConsole.shared.log("File: \(importSession.fileName)")
 
             } else {
 

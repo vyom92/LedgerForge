@@ -47,6 +47,10 @@ struct TransactionListView: View {
         transactions.last?.balance
     }
 
+    private var validationPassed: Bool {
+        !transactions.isEmpty && totalDebits > 0 && totalCredits > 0
+    }
+
     private var filteredTransactions: [Transaction] {
         transactions.filter { transaction in
             let matchesSearch = searchText.isEmpty ||
@@ -89,6 +93,22 @@ struct TransactionListView: View {
             .font(.caption)
 
             Divider()
+
+            GroupBox("Import Validation") {
+                HStack {
+                    Label(
+                        validationPassed ? "Passed" : "Needs Review",
+                        systemImage: validationPassed ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+                    )
+                    .foregroundStyle(validationPassed ? .green : .orange)
+
+                    Spacer()
+
+                    Text("\(transactions.count) transaction(s)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             TextField("Search description...", text: $searchText)
                 .textFieldStyle(.roundedBorder)

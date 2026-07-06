@@ -8,6 +8,18 @@ This document defines the engineering principles used throughout LedgerForge. It
 
 # Core Rules
 
+## Decision Framework
+
+Before implementing any feature, ask:
+
+1. Does it reduce manual work?
+2. Does it increase confidence?
+3. Does it surface meaningful financial insight?
+4. Does it align with the Product Vision?
+5. Can it be explained to the user?
+
+If the answer to all five is "No", do not build it.
+
 1. The project must build successfully after every completed sprint.
 2. Prefer small, verifiable commits over large refactors.
 3. New features should integrate with the existing architecture rather than bypass it.
@@ -64,6 +76,14 @@ Core/
 - Minimize force unwrapping.
 - Keep UI and business logic separated.
 
+# Error Handling Standards
+
+- Fail early with meaningful errors.
+- Never silently discard financial data.
+- Prefer validation over assumptions.
+- Log unexpected conditions for later diagnosis.
+- Every parsing failure should explain what failed and why.
+
 ---
 
 # Development Workflow
@@ -74,6 +94,16 @@ Core/
 4. Test.
 5. Commit.
 6. Move to the next file.
+
+# Definition of Done
+
+A task is complete only when:
+
+- The project builds successfully.
+- Existing functionality still works.
+- The feature has been manually verified.
+- Documentation is updated if architecture changed.
+- The implementation follows Product Vision and Architecture.
 
 ---
 
@@ -107,3 +137,18 @@ Optimize for maintainability over cleverness.
 Build systems that learn instead of accumulating special cases.
 
 The code should make adding the next financial institution easier than adding the previous one.
+
+---
+
+# Technical Debt Policy
+
+Technical debt should be documented, not ignored.
+
+When shortcuts are necessary:
+
+- Record the reason.
+- Record the intended solution.
+- Record the expected impact.
+- Create a follow-up milestone.
+
+Temporary code should never become permanent architecture.
