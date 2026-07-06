@@ -1,0 +1,19 @@
+{
+  "" : {
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests-primary.dia",
+    "emit-module-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests-primary-emit-module.dia",
+    "pch" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests-primary.swiftdeps"
+  },
+  "/Users/vyom/Applications/LedgerForge/LedgerForgeTests/LedgerForgeTests.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForgeTests.build/Objects-normal/arm64/LedgerForgeTests~partial.swiftmodule"
+  }
+}

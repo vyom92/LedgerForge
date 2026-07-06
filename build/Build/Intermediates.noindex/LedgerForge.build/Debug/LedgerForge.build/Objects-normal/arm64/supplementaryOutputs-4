@@ -1,0 +1,30 @@
+{
+  "/Users/vyom/Applications/LedgerForge/Models/Transaction.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.dia",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.swiftdeps"
+  },
+  "/Users/vyom/Applications/LedgerForge/Parsers/StatementParserRegistry.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.dia",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.swiftdeps"
+  },
+  "/Users/vyom/Applications/LedgerForge/Readers/DocumentReader.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.dia",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.swiftdeps"
+  },
+  "/Users/vyom/Applications/LedgerForge/Views/DeveloperConsoleView.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.dia",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.swiftdeps"
+  }
+}
