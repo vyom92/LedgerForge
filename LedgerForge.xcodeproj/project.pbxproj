@@ -1,14 +1,16 @@
 // !$*UTF8*$!
 {
-	archiveVersion = 1;
-	classes = {
-	};
-	objectVersion = 77;
-	objects = {
+    archiveVersion = 1;
+    classes = {
+    };
+    objectVersion = 77;
+    objects = {
 
 /* Begin PBXBuildFile section */
 		28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */; };
 		28171EE22FFBE2F0006115B7 /* TransactionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */; };
+		29A111110000000000000001 /* Repository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29A111010000000000000001 /* Repository.swift */; };
+		29A111120000000000000002 /* InMemoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29A111020000000000000002 /* InMemoryRepository.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
 		288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B22FF7955200F09BC9 /* ContentView.swift */; };
 		288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0B42FF7955300F09BC9 /* Assets.xcassets */; };
@@ -45,23 +47,24 @@
 		28B87B392FFBBE2D009BEE8C /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */; };
 		28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B3C2FFBBFC8009BEE8C /* Account.swift */; };
 		28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */; };
+>>>>>>> ce58434 (Sprint 10 Phase 1)
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		288EB0BB2FF7955300F09BC9 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 288EB0A52FF7955200F09BC9 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 288EB0AC2FF7955200F09BC9;
-			remoteInfo = LedgerForge;
-		};
-		288EB0C52FF7955300F09BC9 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 288EB0A52FF7955200F09BC9 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 288EB0AC2FF7955200F09BC9;
-			remoteInfo = LedgerForge;
-		};
+        288EB0BB2FF7955300F09BC9 /* PBXContainerItemProxy */ = {
+            isa = PBXContainerItemProxy;
+            containerPortal = 288EB0A52FF7955200F09BC9 /* Project object */;
+            proxyType = 1;
+            remoteGlobalIDString = 288EB0AC2FF7955200F09BC9;
+            remoteInfo = LedgerForge;
+        };
+        288EB0C52FF7955300F09BC9 /* PBXContainerItemProxy */ = {
+            isa = PBXContainerItemProxy;
+            containerPortal = 288EB0A52FF7955200F09BC9 /* Project object */;
+            proxyType = 1;
+            remoteGlobalIDString = 288EB0AC2FF7955200F09BC9;
+            remoteInfo = LedgerForge;
+        };
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -106,774 +109,563 @@
 		28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		28B87B3C2FFBBFC8009BEE8C /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
 		28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountStore.swift; sourceTree = "<group>"; };
+>>>>>>> ce58434 (Sprint 10 Phase 1)
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		288EB0BD2FF7955300F09BC9 /* LedgerForgeTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = LedgerForgeTests;
-			sourceTree = "<group>";
-		};
-		288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = LedgerForgeUITests;
-			sourceTree = "<group>";
-		};
-		28B87B3E2FFBD1DE009BEE8C /* .github */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = .github;
-			sourceTree = "<group>";
-		};
+        288EB0BD2FF7955300F09BC9 /* LedgerForgeTests */ = {
+            isa = PBXFileSystemSynchronizedRootGroup;
+            path = LedgerForgeTests;
+            sourceTree = "<group>";
+        };
+        288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */ = {
+            isa = PBXFileSystemSynchronizedRootGroup;
+            path = LedgerForgeUITests;
+            sourceTree = "<group>";
+        };
+        28B87B3E2FFBD1DE009BEE8C /* .github */ = {
+            isa = PBXFileSystemSynchronizedRootGroup;
+            path = .github;
+            sourceTree = "<group>";
+        };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		288EB0AA2FF7955200F09BC9 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		288EB0B72FF7955300F09BC9 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		288EB0C12FF7955300F09BC9 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
+        288EB0AA2FF7955200F09BC9 /* Frameworks */ = {
+            isa = PBXFrameworksBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+        288EB0B72FF7955300F09BC9 /* Frameworks */ = {
+            isa = PBXFrameworksBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+        288EB0C12FF7955300F09BC9 /* Frameworks */ = {
+            isa = PBXFrameworksBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		288EB0A42FF7955200F09BC9 = {
-			isa = PBXGroup;
-			children = (
-				28B87B3E2FFBD1DE009BEE8C /* .github */,
-				28B87B272FFB2C90009BEE8C /* Project documents */,
-				288EB12E2FF7E10200F09BC9 /* Normalizers */,
-				288EB1012FF7BFD900F09BC9 /* Detectors */,
-				288EB0D72FF7995800F09BC9 /* Models */,
-				288EB0BD2FF7955300F09BC9 /* LedgerForgeTests */,
-				288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */,
-				288EB0AE2FF7955200F09BC9 /* Products */,
-				288EB0DD2FF7A3D000F09BC9 /* Core */,
-				288EB0DE2FF7A3D100F09BC9 /* Services */,
-				288EB0DF2FF7A3D200F09BC9 /* Parsers */,
-				288EB0E02FF7A3D200F09BC9 /* Documents */,
-				288EB0E12FF7A3D300F09BC9 /* Utilities */,
-				288EB0E22FF7A3D400F09BC9 /* ViewModels */,
-				288EB0E32FF7A3D500F09BC9 /* Views */,
-				288EB0E42FF7A3D500F09BC9 /* Database */,
-				288EB0B42FF7955300F09BC9 /* Assets.xcassets */,
-				288EB0B22FF7955200F09BC9 /* ContentView.swift */,
-				288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */,
-				288EB0E72FF7AC7100F09BC9 /* Readers */,
-				288EB0EF2FF7B12000F09BC9 /* Analyzers */,
-			);
-			sourceTree = "<group>";
-		};
-		288EB0AE2FF7955200F09BC9 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				288EB0AD2FF7955200F09BC9 /* LedgerForge.app */,
-				288EB0BA2FF7955300F09BC9 /* LedgerForgeTests.xctest */,
-				288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		288EB0D72FF7995800F09BC9 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				28B87B3C2FFBBFC8009BEE8C /* Account.swift */,
-				28B87B362FFBB591009BEE8C /* ImportSession.swift */,
-				28B87B322FFB31C4009BEE8C /* ImportValidationResult.swift */,
-				288EB1312FF7E3C600F09BC9 /* ColumnType.swift */,
-				288EB12C2FF7E0C000F09BC9 /* NormalizedDocument.swift */,
-				288EB12A2FF7E08500F09BC9 /* NormalizedRow.swift */,
-				288EB0D82FF7997000F09BC9 /* Transaction.swift */,
-				288EB0E82FF7AC9500F09BC9 /* Document.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		288EB0DD2FF7A3D000F09BC9 /* Core */ = {
-			isa = PBXGroup;
-			children = (
-				28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */,
-				288EB1032FF7C0A600F09BC9 /* DocumentStore.swift */,
-				288EB0FB2FF7B81200F09BC9 /* DeveloperConsole.swift */,
-				28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */,
-			);
-			path = Core;
-			sourceTree = "<group>";
-		};
-		288EB0DE2FF7A3D100F09BC9 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				28B87B342FFB31FC009BEE8C /* ImportValidator.swift */,
-				28B87B302FFB2F1B009BEE8C /* DirectionResolver.swift */,
-				288EB0E52FF7A6C000F09BC9 /* ImportEngine.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		288EB0DF2FF7A3D200F09BC9 /* Parsers */ = {
-			isa = PBXGroup;
-			children = (
-				288EB11C2FF7D00700F09BC9 /* UnknownStatementParser.swift */,
-				288EB11B2FF7CFF600F09BC9 /* AxisBankAccountParser.swift */,
-				288EB11A2FF7CFD500F09BC9 /* StatementParserRegistry.swift */,
-				288EB1192FF7CFBC00F09BC9 /* StatementParser.swift */,
-			);
-			path = Parsers;
-			sourceTree = "<group>";
-		};
-		288EB0E02FF7A3D200F09BC9 /* Documents */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Documents;
-			sourceTree = "<group>";
-		};
-		288EB0E12FF7A3D300F09BC9 /* Utilities */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Utilities;
-			sourceTree = "<group>";
-		};
-		288EB0E22FF7A3D400F09BC9 /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-				28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */,
-				28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */,
-			);
-			path = ViewModels;
-			sourceTree = "<group>";
-		};
-		288EB0E32FF7A3D500F09BC9 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				28B87B252FFB24C3009BEE8C /* TransactionListView.swift */,
-				288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */,
-				288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		288EB0E42FF7A3D500F09BC9 /* Database */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Database;
-			sourceTree = "<group>";
-		};
-		288EB0E72FF7AC7100F09BC9 /* Readers */ = {
-			isa = PBXGroup;
-			children = (
-				288EB0EB2FF7AD7100F09BC9 /* DocumentReader.swift */,
-				288EB0EC2FF7AD7200F09BC9 /* CSVReader.swift */,
-			);
-			path = Readers;
-			sourceTree = "<group>";
-		};
-		288EB0EF2FF7B12000F09BC9 /* Analyzers */ = {
-			isa = PBXGroup;
-			children = (
-				288EB0F02FF7B12700F09BC9 /* CSVAnalyzer.swift */,
-			);
-			path = Analyzers;
-			sourceTree = "<group>";
-		};
-		288EB1012FF7BFD900F09BC9 /* Detectors */ = {
-			isa = PBXGroup;
-			children = (
-				288EB1282FF7DA3900F09BC9 /* ColumnMapping.swift */,
-				288EB11F2FF7D69000F09BC9 /* DocumentMetadata.swift */,
-				288EB1022FF7BFF600F09BC9 /* InstitutionDetector.swift */,
-			);
-			path = Detectors;
-			sourceTree = "<group>";
-		};
-		288EB12E2FF7E10200F09BC9 /* Normalizers */ = {
-			isa = PBXGroup;
-			children = (
-				288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */,
-			);
-			path = Normalizers;
-			sourceTree = "<group>";
-		};
-		28B87B272FFB2C90009BEE8C /* Project documents */ = {
-			isa = PBXGroup;
-			children = (
-				28B87B2E2FFB2D25009BEE8C /* ADR.md */,
-				28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */,
-				28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */,
-				28B262A32FFAB09900052675 /* Architecture_v1.0_Frozen.md⁠ */,
-			);
-			path = "Project documents";
-			sourceTree = "<group>";
-		};
+			288EB0E42FF7A3D500F09BC9 /* Database */ = {
+				isa = PBXGroup;
+				children = (
+					29A111010000000000000001 /* Repository.swift */,
+					29A111020000000000000002 /* InMemoryRepository.swift */,
+				);
+				path = Database;
+				sourceTree = "<group>";
+			};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		288EB0AC2FF7955200F09BC9 /* LedgerForge */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 288EB0CE2FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForge" */;
-			buildPhases = (
-				288EB0A92FF7955200F09BC9 /* Sources */,
-				288EB0AA2FF7955200F09BC9 /* Frameworks */,
-				288EB0AB2FF7955200F09BC9 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				28B87B3E2FFBD1DE009BEE8C /* .github */,
-			);
-			name = LedgerForge;
-			packageProductDependencies = (
-			);
-			productName = LedgerForge;
-			productReference = 288EB0AD2FF7955200F09BC9 /* LedgerForge.app */;
-			productType = "com.apple.product-type.application";
-		};
-		288EB0B92FF7955300F09BC9 /* LedgerForgeTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 288EB0D12FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForgeTests" */;
-			buildPhases = (
-				288EB0B62FF7955300F09BC9 /* Sources */,
-				288EB0B72FF7955300F09BC9 /* Frameworks */,
-				288EB0B82FF7955300F09BC9 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				288EB0BC2FF7955300F09BC9 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				288EB0BD2FF7955300F09BC9 /* LedgerForgeTests */,
-			);
-			name = LedgerForgeTests;
-			packageProductDependencies = (
-			);
-			productName = LedgerForgeTests;
-			productReference = 288EB0BA2FF7955300F09BC9 /* LedgerForgeTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		288EB0C32FF7955300F09BC9 /* LedgerForgeUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 288EB0D42FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForgeUITests" */;
-			buildPhases = (
-				288EB0C02FF7955300F09BC9 /* Sources */,
-				288EB0C12FF7955300F09BC9 /* Frameworks */,
-				288EB0C22FF7955300F09BC9 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				288EB0C62FF7955300F09BC9 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */,
-			);
-			name = LedgerForgeUITests;
-			packageProductDependencies = (
-			);
-			productName = LedgerForgeUITests;
-			productReference = 288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
+        288EB0AC2FF7955200F09BC9 /* LedgerForge */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 288EB0CE2FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForge" */;
+            buildPhases = (
+                288EB0A92FF7955200F09BC9 /* Sources */,
+                288EB0AA2FF7955200F09BC9 /* Frameworks */,
+                288EB0AB2FF7955200F09BC9 /* Resources */,
+            );
+            buildRules = (
+            );
+            dependencies = (
+            );
+            fileSystemSynchronizedGroups = (
+                28B87B3E2FFBD1DE009BEE8C /* .github */,
+            );
+            name = LedgerForge;
+            packageProductDependencies = (
+            );
+            productName = LedgerForge;
+            productReference = 288EB0AD2FF7955200F09BC9 /* LedgerForge.app */;
+            productType = "com.apple.product-type.application";
+        };
+        288EB0B92FF7955300F09BC9 /* LedgerForgeTests */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 288EB0D12FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForgeTests" */;
+            buildPhases = (
+                288EB0B62FF7955300F09BC9 /* Sources */,
+                288EB0B72FF7955300F09BC9 /* Frameworks */,
+                288EB0B82FF7955300F09BC9 /* Resources */,
+            );
+            buildRules = (
+            );
+            dependencies = (
+                288EB0BC2FF7955300F09BC9 /* PBXTargetDependency */,
+            );
+            fileSystemSynchronizedGroups = (
+                288EB0BD2FF7955300F09BC9 /* LedgerForgeTests */,
+            );
+            name = LedgerForgeTests;
+            packageProductDependencies = (
+            );
+            productName = LedgerForgeTests;
+            productReference = 288EB0BA2FF7955300F09BC9 /* LedgerForgeTests.xctest */;
+            productType = "com.apple.product-type.bundle.unit-test";
+        };
+        288EB0C32FF7955300F09BC9 /* LedgerForgeUITests */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 288EB0D42FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForgeUITests" */;
+            buildPhases = (
+                288EB0C02FF7955300F09BC9 /* Sources */,
+                288EB0C12FF7955300F09BC9 /* Frameworks */,
+                288EB0C22FF7955300F09BC9 /* Resources */,
+            );
+            buildRules = (
+            );
+            dependencies = (
+                288EB0C62FF7955300F09BC9 /* PBXTargetDependency */,
+            );
+            fileSystemSynchronizedGroups = (
+                288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */,
+            );
+            name = LedgerForgeUITests;
+            packageProductDependencies = (
+            );
+            productName = LedgerForgeUITests;
+            productReference = 288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */;
+            productType = "com.apple.product-type.bundle.ui-testing";
+        };
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		288EB0A52FF7955200F09BC9 /* Project object */ = {
-			isa = PBXProject;
-			attributes = {
-				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2660;
-				LastUpgradeCheck = 2660;
-				TargetAttributes = {
-					288EB0AC2FF7955200F09BC9 = {
-						CreatedOnToolsVersion = 26.6;
-					};
-					288EB0B92FF7955300F09BC9 = {
-						CreatedOnToolsVersion = 26.6;
-						TestTargetID = 288EB0AC2FF7955200F09BC9;
-					};
-					288EB0C32FF7955300F09BC9 = {
-						CreatedOnToolsVersion = 26.6;
-						TestTargetID = 288EB0AC2FF7955200F09BC9;
-					};
-				};
-			};
-			buildConfigurationList = 288EB0A82FF7955200F09BC9 /* Build configuration list for PBXProject "LedgerForge" */;
-			developmentRegion = en;
-			hasScannedForEncodings = 0;
-			knownRegions = (
-				en,
-				Base,
-			);
-			mainGroup = 288EB0A42FF7955200F09BC9;
-			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = 288EB0AE2FF7955200F09BC9 /* Products */;
-			projectDirPath = "";
-			projectRoot = "";
-			targets = (
-				288EB0AC2FF7955200F09BC9 /* LedgerForge */,
-				288EB0B92FF7955300F09BC9 /* LedgerForgeTests */,
-				288EB0C32FF7955300F09BC9 /* LedgerForgeUITests */,
-			);
-		};
+        288EB0A52FF7955200F09BC9 /* Project object */ = {
+            isa = PBXProject;
+            attributes = {
+                BuildIndependentTargetsInParallel = 1;
+                LastSwiftUpdateCheck = 2660;
+                LastUpgradeCheck = 2660;
+                TargetAttributes = {
+                    288EB0AC2FF7955200F09BC9 = {
+                        CreatedOnToolsVersion = 26.6;
+                    };
+                    288EB0B92FF7955300F09BC9 = {
+                        CreatedOnToolsVersion = 26.6;
+                        TestTargetID = 288EB0AC2FF7955200F09BC9;
+                    };
+                    288EB0C32FF7955300F09BC9 = {
+                        CreatedOnToolsVersion = 26.6;
+                        TestTargetID = 288EB0AC2FF7955200F09BC9;
+                    };
+                };
+            };
+            buildConfigurationList = 288EB0A82FF7955200F09BC9 /* Build configuration list for PBXProject "LedgerForge" */;
+            developmentRegion = en;
+            hasScannedForEncodings = 0;
+            knownRegions = (
+                en,
+                Base,
+            );
+            mainGroup = 288EB0A42FF7955200F09BC9;
+            minimizedProjectReferenceProxies = 1;
+            preferredProjectObjectVersion = 77;
+            productRefGroup = 288EB0AE2FF7955200F09BC9 /* Products */;
+            projectDirPath = "";
+            projectRoot = "";
+            targets = (
+                288EB0AC2FF7955200F09BC9 /* LedgerForge */,
+                288EB0B92FF7955300F09BC9 /* LedgerForgeTests */,
+                288EB0C32FF7955300F09BC9 /* LedgerForgeUITests */,
+            );
+        };
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		288EB0AB2FF7955200F09BC9 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				28B87B2F2FFB2D25009BEE8C /* ADR.md in Resources */,
-				28B262A42FFAB09900052675 /* Architecture_v1.0_Frozen.md⁠ in Resources */,
-				288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */,
-				28B87B2D2FFB2CDA009BEE8C /* Engineering Standards.md in Resources */,
-				28B87B2B2FFB2CBE009BEE8C /* Product Vision.md in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		288EB0B82FF7955300F09BC9 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		288EB0C22FF7955300F09BC9 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
+        288EB0AB2FF7955200F09BC9 /* Resources */ = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                28B87B2F2FFB2D25009BEE8C /* ADR.md in Resources */,
+                28B262A42FFAB09900052675 /* Architecture_v1.0_Frozen.md⁠ in Resources */,
+                288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */,
+                28B87B2D2FFB2CDA009BEE8C /* Engineering Standards.md in Resources */,
+                28B87B2B2FFB2CBE009BEE8C /* Product Vision.md in Resources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+        288EB0B82FF7955300F09BC9 /* Resources */ = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+        288EB0C22FF7955300F09BC9 /* Resources */ = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		288EB0A92FF7955200F09BC9 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				288EB1292FF7DA3900F09BC9 /* ColumnMapping.swift in Sources */,
-				28B87B392FFBBE2D009BEE8C /* DashboardViewModel.swift in Sources */,
-				288EB0FE2FF7BA2800F09BC9 /* DeveloperConsole.swift in Sources */,
-				28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */,
-				28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */,
-				288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */,
-				288EB12B2FF7E08500F09BC9 /* NormalizedRow.swift in Sources */,
-				28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */,
-				288EB1272FF7D96A00F09BC9 /* DocumentPreviewView.swift in Sources */,
-				288EB1242FF7D8A000F09BC9 /* StatementParser.swift in Sources */,
-				28B87B332FFB31C9009BEE8C /* ImportValidationResult.swift in Sources */,
-				288EB1232FF7D89B00F09BC9 /* AxisBankAccountParser.swift in Sources */,
-				288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */,
-				288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */,
-				288EB0FD2FF7BA1600F09BC9 /* DeveloperConsoleView.swift in Sources */,
-				288EB1212FF7D88200F09BC9 /* StatementParserRegistry.swift in Sources */,
-				288EB1252FF7D8B500F09BC9 /* Transaction.swift in Sources */,
-				288EB0ED2FF7AE2500F09BC9 /* DocumentReader.swift in Sources */,
-				288EB12D2FF7E0C000F09BC9 /* NormalizedDocument.swift in Sources */,
-				288EB1202FF7D69000F09BC9 /* DocumentMetadata.swift in Sources */,
-				288EB1042FF7C0A600F09BC9 /* DocumentStore.swift in Sources */,
-				288EB0F12FF7B29300F09BC9 /* Document.swift in Sources */,
-				28B87B262FFB24CD009BEE8C /* TransactionListView.swift in Sources */,
-				288EB0EE2FF7AE2C00F09BC9 /* CSVReader.swift in Sources */,
-				28B87B312FFB2F22009BEE8C /* DirectionResolver.swift in Sources */,
-				28B87B372FFBB599009BEE8C /* ImportSession.swift in Sources */,
-				28B87B352FFB31FD009BEE8C /* ImportValidator.swift in Sources */,
-				288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */,
-				28171EE22FFBE2F0006115B7 /* TransactionListViewModel.swift in Sources */,
-				288EB0F22FF7B2AB00F09BC9 /* CSVAnalyzer.swift in Sources */,
-				288EB1222FF7D89600F09BC9 /* UnknownStatementParser.swift in Sources */,
-				288EB11E2FF7D68200F09BC9 /* InstitutionDetector.swift in Sources */,
-				288EB0E62FF7A84F00F09BC9 /* ImportEngine.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		288EB0B62FF7955300F09BC9 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		288EB0C02FF7955300F09BC9 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
+					288EB0E62FF7A84F00F09BC9 /* ImportEngine.swift in Sources */,
+					29A111110000000000000001 /* Repository.swift in Sources */,
+					29A111120000000000000002 /* InMemoryRepository.swift in Sources */,
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		288EB0BC2FF7955300F09BC9 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
-			targetProxy = 288EB0BB2FF7955300F09BC9 /* PBXContainerItemProxy */;
-		};
-		288EB0C62FF7955300F09BC9 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
-			targetProxy = 288EB0C52FF7955300F09BC9 /* PBXContainerItemProxy */;
-		};
+        288EB0BC2FF7955300F09BC9 /* PBXTargetDependency */ = {
+            isa = PBXTargetDependency;
+            target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
+            targetProxy = 288EB0BB2FF7955300F09BC9 /* PBXContainerItemProxy */;
+        };
+        288EB0C62FF7955300F09BC9 /* PBXTargetDependency */ = {
+            isa = PBXTargetDependency;
+            target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
+            targetProxy = 288EB0C52FF7955300F09BC9 /* PBXContainerItemProxy */;
+        };
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		288EB0CC2FF7955300F09BC9 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"DEBUG=1",
-					"$(inherited)",
-				);
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				MTL_FAST_MATH = YES;
-				ONLY_ACTIVE_ARCH = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-			};
-			name = Debug;
-		};
-		288EB0CD2FF7955300F09BC9 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				SWIFT_COMPILATION_MODE = wholemodule;
-			};
-			name = Release;
-		};
-		288EB0CF2FF7955300F09BC9 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
-				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForge;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.5;
-			};
-			name = Debug;
-		};
-		288EB0D02FF7955300F09BC9 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
-				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
-				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
-				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForge;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.5;
-			};
-			name = Release;
-		};
-		288EB0D22FF7955300F09BC9 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LedgerForge.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LedgerForge";
-				XROS_DEPLOYMENT_TARGET = 26.5;
-			};
-			name = Debug;
-		};
-		288EB0D32FF7955300F09BC9 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LedgerForge.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LedgerForge";
-				XROS_DEPLOYMENT_TARGET = 26.5;
-			};
-			name = Release;
-		};
-		288EB0D52FF7955300F09BC9 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = LedgerForge;
-				XROS_DEPLOYMENT_TARGET = 26.5;
-			};
-			name = Debug;
-		};
-		288EB0D62FF7955300F09BC9 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = LedgerForge;
-				XROS_DEPLOYMENT_TARGET = 26.5;
-			};
-			name = Release;
-		};
+        288EB0CC2FF7955300F09BC9 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+                CLANG_ANALYZER_NONNULL = YES;
+                CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+                CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+                CLANG_ENABLE_MODULES = YES;
+                CLANG_ENABLE_OBJC_ARC = YES;
+                CLANG_ENABLE_OBJC_WEAK = YES;
+                CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+                CLANG_WARN_BOOL_CONVERSION = YES;
+                CLANG_WARN_COMMA = YES;
+                CLANG_WARN_CONSTANT_CONVERSION = YES;
+                CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+                CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+                CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+                CLANG_WARN_EMPTY_BODY = YES;
+                CLANG_WARN_ENUM_CONVERSION = YES;
+                CLANG_WARN_INFINITE_RECURSION = YES;
+                CLANG_WARN_INT_CONVERSION = YES;
+                CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+                CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+                CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+                CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+                CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+                CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+                CLANG_WARN_STRICT_PROTOTYPES = YES;
+                CLANG_WARN_SUSPICIOUS_MOVE = YES;
+                CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+                CLANG_WARN_UNREACHABLE_CODE = YES;
+                CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+                COPY_PHASE_STRIP = NO;
+                DEBUG_INFORMATION_FORMAT = dwarf;
+                ENABLE_STRICT_OBJC_MSGSEND = YES;
+                ENABLE_TESTABILITY = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = YES;
+                GCC_C_LANGUAGE_STANDARD = gnu17;
+                GCC_DYNAMIC_NO_PIC = NO;
+                GCC_NO_COMMON_BLOCKS = YES;
+                GCC_OPTIMIZATION_LEVEL = 0;
+                GCC_PREPROCESSOR_DEFINITIONS = (
+                    "DEBUG=1",
+                    "$(inherited)",
+                );
+                GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+                GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+                GCC_WARN_UNDECLARED_SELECTOR = YES;
+                GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+                GCC_WARN_UNUSED_FUNCTION = YES;
+                GCC_WARN_UNUSED_VARIABLE = YES;
+                LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+                MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+                MTL_FAST_MATH = YES;
+                ONLY_ACTIVE_ARCH = YES;
+                SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+                SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+            };
+            name = Debug;
+        };
+        288EB0CD2FF7955300F09BC9 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+                CLANG_ANALYZER_NONNULL = YES;
+                CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+                CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+                CLANG_ENABLE_MODULES = YES;
+                CLANG_ENABLE_OBJC_ARC = YES;
+                CLANG_ENABLE_OBJC_WEAK = YES;
+                CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+                CLANG_WARN_BOOL_CONVERSION = YES;
+                CLANG_WARN_COMMA = YES;
+                CLANG_WARN_CONSTANT_CONVERSION = YES;
+                CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+                CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+                CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+                CLANG_WARN_EMPTY_BODY = YES;
+                CLANG_WARN_ENUM_CONVERSION = YES;
+                CLANG_WARN_INFINITE_RECURSION = YES;
+                CLANG_WARN_INT_CONVERSION = YES;
+                CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+                CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+                CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+                CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+                CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+                CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+                CLANG_WARN_STRICT_PROTOTYPES = YES;
+                CLANG_WARN_SUSPICIOUS_MOVE = YES;
+                CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+                CLANG_WARN_UNREACHABLE_CODE = YES;
+                CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+                COPY_PHASE_STRIP = NO;
+                DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+                ENABLE_NS_ASSERTIONS = NO;
+                ENABLE_STRICT_OBJC_MSGSEND = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = YES;
+                GCC_C_LANGUAGE_STANDARD = gnu17;
+                GCC_NO_COMMON_BLOCKS = YES;
+                GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+                GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+                GCC_WARN_UNDECLARED_SELECTOR = YES;
+                GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+                GCC_WARN_UNUSED_FUNCTION = YES;
+                GCC_WARN_UNUSED_VARIABLE = YES;
+                LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+                MTL_ENABLE_DEBUG_INFO = NO;
+                MTL_FAST_MATH = YES;
+                SWIFT_COMPILATION_MODE = wholemodule;
+            };
+            name = Release;
+        };
+        288EB0CF2FF7955300F09BC9 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                ENABLE_APP_SANDBOX = YES;
+                ENABLE_PREVIEWS = YES;
+                ENABLE_USER_SELECTED_FILES = readonly;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+                "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+                "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+                "INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+                "INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+                "INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+                "INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+                "INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+                "INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+                LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+                "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+                MACOSX_DEPLOYMENT_TARGET = 26.5;
+                MARKETING_VERSION = 1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForge;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                REGISTER_APP_GROUPS = YES;
+                SDKROOT = auto;
+                STRING_CATALOG_GENERATE_SYMBOLS = YES;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+                SWIFT_APPROACHABLE_CONCURRENCY = YES;
+                SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2,7";
+                XROS_DEPLOYMENT_TARGET = 26.5;
+            };
+            name = Debug;
+        };
+        288EB0D02FF7955300F09BC9 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+                ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                ENABLE_APP_SANDBOX = YES;
+                ENABLE_PREVIEWS = YES;
+                ENABLE_USER_SELECTED_FILES = readonly;
+                GENERATE_INFOPLIST_FILE = YES;
+                INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+                "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+                "INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+                "INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+                "INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+                "INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+                "INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+                "INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+                "INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+                IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+                LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+                "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+                MACOSX_DEPLOYMENT_TARGET = 26.5;
+                MARKETING_VERSION = 1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForge;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                REGISTER_APP_GROUPS = YES;
+                SDKROOT = auto;
+                STRING_CATALOG_GENERATE_SYMBOLS = YES;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+                SWIFT_APPROACHABLE_CONCURRENCY = YES;
+                SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2,7";
+                XROS_DEPLOYMENT_TARGET = 26.5;
+            };
+            name = Release;
+        };
+        288EB0D22FF7955300F09BC9 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                BUNDLE_LOADER = "$(TEST_HOST)";
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+                MACOSX_DEPLOYMENT_TARGET = 26.5;
+                MARKETING_VERSION = 1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeTests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = auto;
+                STRING_CATALOG_GENERATE_SYMBOLS = NO;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+                SWIFT_APPROACHABLE_CONCURRENCY = YES;
+                SWIFT_EMIT_LOC_STRINGS = NO;
+                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2,7";
+                TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LedgerForge.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LedgerForge";
+                XROS_DEPLOYMENT_TARGET = 26.5;
+            };
+            name = Debug;
+        };
+        288EB0D32FF7955300F09BC9 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                BUNDLE_LOADER = "$(TEST_HOST)";
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+                MACOSX_DEPLOYMENT_TARGET = 26.5;
+                MARKETING_VERSION = 1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeTests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = auto;
+                STRING_CATALOG_GENERATE_SYMBOLS = NO;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+                SWIFT_APPROACHABLE_CONCURRENCY = YES;
+                SWIFT_EMIT_LOC_STRINGS = NO;
+                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2,7";
+                TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LedgerForge.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LedgerForge";
+                XROS_DEPLOYMENT_TARGET = 26.5;
+            };
+            name = Release;
+        };
+        288EB0D52FF7955300F09BC9 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+                MACOSX_DEPLOYMENT_TARGET = 26.5;
+                MARKETING_VERSION = 1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeUITests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = auto;
+                STRING_CATALOG_GENERATE_SYMBOLS = NO;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+                SWIFT_APPROACHABLE_CONCURRENCY = YES;
+                SWIFT_EMIT_LOC_STRINGS = NO;
+                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2,7";
+                TEST_TARGET_NAME = LedgerForge;
+                XROS_DEPLOYMENT_TARGET = 26.5;
+            };
+            name = Debug;
+        };
+        288EB0D62FF7955300F09BC9 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                CODE_SIGN_STYLE = Automatic;
+                CURRENT_PROJECT_VERSION = 1;
+                GENERATE_INFOPLIST_FILE = YES;
+                IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+                MACOSX_DEPLOYMENT_TARGET = 26.5;
+                MARKETING_VERSION = 1.0;
+                PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeUITests;
+                PRODUCT_NAME = "$(TARGET_NAME)";
+                SDKROOT = auto;
+                STRING_CATALOG_GENERATE_SYMBOLS = NO;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+                SWIFT_APPROACHABLE_CONCURRENCY = YES;
+                SWIFT_EMIT_LOC_STRINGS = NO;
+                SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2,7";
+                TEST_TARGET_NAME = LedgerForge;
+                XROS_DEPLOYMENT_TARGET = 26.5;
+            };
+            name = Release;
+        };
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		288EB0A82FF7955200F09BC9 /* Build configuration list for PBXProject "LedgerForge" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				288EB0CC2FF7955300F09BC9 /* Debug */,
-				288EB0CD2FF7955300F09BC9 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		288EB0CE2FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForge" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				288EB0CF2FF7955300F09BC9 /* Debug */,
-				288EB0D02FF7955300F09BC9 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		288EB0D12FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForgeTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				288EB0D22FF7955300F09BC9 /* Debug */,
-				288EB0D32FF7955300F09BC9 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		288EB0D42FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForgeUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				288EB0D52FF7955300F09BC9 /* Debug */,
-				288EB0D62FF7955300F09BC9 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
+        288EB0A82FF7955200F09BC9 /* Build configuration list for PBXProject "LedgerForge" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                288EB0CC2FF7955300F09BC9 /* Debug */,
+                288EB0CD2FF7955300F09BC9 /* Release */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        288EB0CE2FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForge" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                288EB0CF2FF7955300F09BC9 /* Debug */,
+                288EB0D02FF7955300F09BC9 /* Release */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        288EB0D12FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForgeTests" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                288EB0D22FF7955300F09BC9 /* Debug */,
+                288EB0D32FF7955300F09BC9 /* Release */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        288EB0D42FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForgeUITests" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                288EB0D52FF7955300F09BC9 /* Debug */,
+                288EB0D62FF7955300F09BC9 /* Release */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
 /* End XCConfigurationList section */
-	};
-	rootObject = 288EB0A52FF7955200F09BC9 /* Project object */;
+    };
+    rootObject = 288EB0A52FF7955200F09BC9 /* Project object */;
 }
