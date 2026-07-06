@@ -20,7 +20,7 @@ struct ContentView: View {
 
             // MARK: Left Panel
 
-            VStack(spacing: 25) {
+            VStack(alignment: .leading, spacing: 18) {
 
                 Text("LedgerForge")
                     .font(.largeTitle)
@@ -29,22 +29,97 @@ struct ContentView: View {
                 Text("Personal Accounting & Reconciliation")
                     .foregroundStyle(.secondary)
 
+                GroupBox("Financial Snapshot") {
+                    VStack(spacing: 8) {
+                        HStack {
+                            Text("Net Worth")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("₹ --")
+                                .font(.headline.weight(.semibold))
+                        }
+                        Divider()
+                        HStack {
+                            Text("Income")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("₹ --")
+                                .font(.headline.weight(.semibold))
+                        }
+                        Divider()
+                        HStack {
+                            Text("Expenses")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("₹ --")
+                                .font(.headline.weight(.semibold))
+                        }
+                        Divider()
+                        HStack {
+                            Text("Cash Flow")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("₹ --")
+                                .font(.headline.weight(.semibold))
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recent Import")
+                        .font(.headline)
+
+                    Text(selectedFile)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+
+                    if selectedFile == "No statement imported" {
+                        Text("No recent imports")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Label("Last import completed", systemImage: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 Button("Import Statement") {
                     showingImporter = true
                 }
                 .buttonStyle(.borderedProminent)
-
+                
                 Divider()
 
-                Text(selectedFile)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Coming Soon")
+                        .font(.headline)
+
+                    Label("Accounts", systemImage: "building.columns")
+                        .foregroundStyle(.secondary)
+
+                    Label("Budgets", systemImage: "chart.pie")
+                        .foregroundStyle(.secondary)
+
+                    Label("Insights", systemImage: "sparkles")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Spacer()
 
             }
             .padding(30)
-            .frame(minWidth: 260)
+            .frame(minWidth: 300, idealWidth: 320)
 
             Divider()
 

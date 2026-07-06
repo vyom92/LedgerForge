@@ -96,6 +96,7 @@
 		28B87B322FFB31C4009BEE8C /* ImportValidationResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportValidationResult.swift; sourceTree = "<group>"; };
 		28B87B342FFB31FC009BEE8C /* ImportValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportValidator.swift; sourceTree = "<group>"; };
 		28B87B362FFBB591009BEE8C /* ImportSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportSession.swift; sourceTree = "<group>"; };
+		28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -233,6 +234,7 @@
 		288EB0E22FF7A3D400F09BC9 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
