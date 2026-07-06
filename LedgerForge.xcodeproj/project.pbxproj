@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */; };
 		28171EE22FFBE2F0006115B7 /* TransactionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */; };
+		28171F682FFC1718006115B7 /* Database_v1_Architecture.md in Resources */ = {isa = PBXBuildFile; fileRef = 28171F672FFC1718006115B7 /* Database_v1_Architecture.md */; };
+		281BB06A2FFC20C2006E7424 /* Sprint10_Phase2B_CodeAudit.md in Resources */ = {isa = PBXBuildFile; fileRef = 281BB0692FFC20C2006E7424 /* Sprint10_Phase2B_CodeAudit.md */; };
+		281BB06C2FFC2346006E7424 /* Database_Architecture_Update_Report.md in Resources */ = {isa = PBXBuildFile; fileRef = 281BB06B2FFC2346006E7424 /* Database_Architecture_Update_Report.md */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
 		288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B22FF7955200F09BC9 /* ContentView.swift */; };
 		288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0B42FF7955300F09BC9 /* Assets.xcassets */; };
@@ -67,6 +70,9 @@
 /* Begin PBXFileReference section */
 		28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionStore.swift; sourceTree = "<group>"; };
 		28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionListViewModel.swift; sourceTree = "<group>"; };
+		28171F672FFC1718006115B7 /* Database_v1_Architecture.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Database_v1_Architecture.md; sourceTree = "<group>"; };
+		281BB0692FFC20C2006E7424 /* Sprint10_Phase2B_CodeAudit.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Sprint10_Phase2B_CodeAudit.md; sourceTree = "<group>"; };
+		281BB06B2FFC2346006E7424 /* Database_Architecture_Update_Report.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Database_Architecture_Update_Report.md; sourceTree = "<group>"; };
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerForgeApp.swift; sourceTree = "<group>"; };
 		288EB0B22FF7955200F09BC9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -313,6 +319,9 @@
 		28B87B272FFB2C90009BEE8C /* Project documents */ = {
 			isa = PBXGroup;
 			children = (
+				281BB06B2FFC2346006E7424 /* Database_Architecture_Update_Report.md */,
+				281BB0692FFC20C2006E7424 /* Sprint10_Phase2B_CodeAudit.md */,
+				28171F672FFC1718006115B7 /* Database_v1_Architecture.md */,
 				28B87B2E2FFB2D25009BEE8C /* ADR.md */,
 				28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */,
 				28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */,
@@ -441,8 +450,11 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				281BB06A2FFC20C2006E7424 /* Sprint10_Phase2B_CodeAudit.md in Resources */,
+				28171F682FFC1718006115B7 /* Database_v1_Architecture.md in Resources */,
 				28B87B2F2FFB2D25009BEE8C /* ADR.md in Resources */,
 				28B262A42FFAB09900052675 /* Architecture_v1.0_Frozen.md⁠ in Resources */,
+				281BB06C2FFC2346006E7424 /* Database_Architecture_Update_Report.md in Resources */,
 				288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */,
 				28B87B2D2FFB2CDA009BEE8C /* Engineering Standards.md in Resources */,
 				28B87B2B2FFB2CBE009BEE8C /* Product Vision.md in Resources */,

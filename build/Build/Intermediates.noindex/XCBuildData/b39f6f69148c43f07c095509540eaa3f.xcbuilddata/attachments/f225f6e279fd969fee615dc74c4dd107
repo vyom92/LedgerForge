@@ -1,0 +1,349 @@
+{
+  "" : {
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForge-primary.dia",
+    "emit-module-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForge-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForge-primary-emit-module.dia",
+    "pch" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForge-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForge-primary.swiftdeps"
+  },
+  "/Users/vyom/Applications/LedgerForge/Analyzers/CSVAnalyzer.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVAnalyzer.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVAnalyzer.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVAnalyzer.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVAnalyzer.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVAnalyzer.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVAnalyzer.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVAnalyzer.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVAnalyzer~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/ContentView.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ContentView.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ContentView.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ContentView.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ContentView.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ContentView.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ContentView.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ContentView.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ContentView~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Core/AccountStore.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AccountStore.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AccountStore.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AccountStore.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AccountStore.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AccountStore.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AccountStore.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AccountStore.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AccountStore~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Core/DeveloperConsole.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsole.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsole.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsole.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsole.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsole.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsole.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsole.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsole~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Core/DocumentStore.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentStore.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentStore.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentStore.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentStore.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentStore.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentStore.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentStore.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentStore~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Core/TransactionStore.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionStore.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionStore.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionStore.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionStore.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionStore.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionStore.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionStore.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionStore~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Detectors/ColumnMapping.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnMapping.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnMapping.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnMapping.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnMapping.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnMapping.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnMapping.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnMapping.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnMapping~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Detectors/DocumentMetadata.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentMetadata.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentMetadata.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentMetadata.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentMetadata.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentMetadata.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentMetadata.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentMetadata.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentMetadata~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Detectors/InstitutionDetector.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/InstitutionDetector.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/InstitutionDetector.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/InstitutionDetector.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/InstitutionDetector.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/InstitutionDetector.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/InstitutionDetector.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/InstitutionDetector.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/InstitutionDetector~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/LedgerForgeApp.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForgeApp.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForgeApp.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForgeApp.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForgeApp.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForgeApp.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForgeApp.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForgeApp.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/LedgerForgeApp~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Models/Account.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Account.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Account.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Account.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Account.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Account.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Account.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Account.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Account~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Models/ColumnType.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnType.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnType.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnType.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnType.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnType.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnType.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnType.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ColumnType~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Models/Document.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Document.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Document.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Document.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Document.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Document.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Document.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Document.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Document~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Models/ImportSession.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportSession.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportSession.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportSession.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportSession.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportSession.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportSession.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportSession.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportSession~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Models/ImportValidationResult.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidationResult.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidationResult.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidationResult.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidationResult.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidationResult.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidationResult.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidationResult.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidationResult~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Models/NormalizedDocument.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedDocument.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedDocument.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedDocument.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedDocument.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedDocument.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedDocument.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedDocument.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedDocument~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Models/NormalizedRow.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedRow.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedRow.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedRow.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedRow.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedRow.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedRow.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedRow.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/NormalizedRow~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Models/Transaction.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/Transaction~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Normalizers/CSVNormalizer.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVNormalizer.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVNormalizer.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVNormalizer.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVNormalizer.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVNormalizer.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVNormalizer.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVNormalizer.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVNormalizer~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Parsers/AxisBankAccountParser.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AxisBankAccountParser.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AxisBankAccountParser.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AxisBankAccountParser.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AxisBankAccountParser.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AxisBankAccountParser.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AxisBankAccountParser.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AxisBankAccountParser.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/AxisBankAccountParser~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Parsers/StatementParser.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParser.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParser.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParser.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParser.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParser.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParser.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParser.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParser~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Parsers/StatementParserRegistry.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/StatementParserRegistry~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Parsers/UnknownStatementParser.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/UnknownStatementParser.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/UnknownStatementParser.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/UnknownStatementParser.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/UnknownStatementParser.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/UnknownStatementParser.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/UnknownStatementParser.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/UnknownStatementParser.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/UnknownStatementParser~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Readers/CSVReader.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVReader.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVReader.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVReader.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVReader.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVReader.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVReader.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVReader.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/CSVReader~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Readers/DocumentReader.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentReader~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Services/DirectionResolver.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DirectionResolver.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DirectionResolver.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DirectionResolver.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DirectionResolver.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DirectionResolver.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DirectionResolver.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DirectionResolver.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DirectionResolver~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Services/ImportEngine.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportEngine.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportEngine.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportEngine.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportEngine.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportEngine.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportEngine.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportEngine.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportEngine~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Services/ImportValidator.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidator.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidator.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidator.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidator.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidator.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidator.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidator.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/ImportValidator~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/ViewModels/DashboardViewModel.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DashboardViewModel.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DashboardViewModel.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DashboardViewModel.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DashboardViewModel.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DashboardViewModel.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DashboardViewModel.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DashboardViewModel.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DashboardViewModel~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/ViewModels/TransactionListViewModel.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListViewModel.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListViewModel.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListViewModel.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListViewModel.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListViewModel.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListViewModel.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListViewModel.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListViewModel~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Views/DeveloperConsoleView.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DeveloperConsoleView~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Views/DocumentPreviewView.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentPreviewView.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentPreviewView.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentPreviewView.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentPreviewView.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentPreviewView.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentPreviewView.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentPreviewView.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/DocumentPreviewView~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/Views/TransactionListView.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListView.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListView.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListView.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListView.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListView.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListView.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListView.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/TransactionListView~partial.swiftmodule"
+  },
+  "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/vyom/Applications/LedgerForge/build/Build/Intermediates.noindex/LedgerForge.build/Debug/LedgerForge.build/Objects-normal/arm64/GeneratedAssetSymbols~partial.swiftmodule"
+  }
+}

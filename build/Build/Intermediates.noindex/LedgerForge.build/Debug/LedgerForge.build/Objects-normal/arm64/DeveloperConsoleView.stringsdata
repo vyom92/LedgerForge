@@ -1,0 +1,16 @@
+{
+  "source": "/Users/vyom/Applications/LedgerForge/Views/DeveloperConsoleView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Developer Console",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 15
+        }
+      }
+    ]
+  },
+  "version": 1
+}

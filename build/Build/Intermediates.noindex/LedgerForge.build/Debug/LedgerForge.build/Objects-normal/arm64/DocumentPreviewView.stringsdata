@@ -1,0 +1,24 @@
+{
+  "source": "/Users/vyom/Applications/LedgerForge/Views/DocumentPreviewView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Document Preview",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 25
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 39
+        }
+      }
+    ]
+  },
+  "version": 1
+}
