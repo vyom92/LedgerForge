@@ -88,11 +88,11 @@ Financial Document
 
 ↓
 
-Reader
+Reader (PDF / CSV / XLS / XLSX / TXT)
 
 ↓
 
-Analyzer
+FinancialDocument
 
 ↓
 
@@ -100,27 +100,15 @@ Institution Detection
 
 ↓
 
-Statement Fingerprint
+Document Classification
 
 ↓
 
-Import Profile
+Parser Selection
 
 ↓
 
-Column Detection
-
-↓
-
-Direction Strategy
-
-↓
-
-Normalizer
-
-↓
-
-Parser
+Statement Parser
 
 ↓
 
@@ -132,11 +120,30 @@ Import Session
 
 ↓
 
-Account Store
+TransactionStore
 
 ↓
 
-Dashboard
+AccountStore
+
+↓
+
+DashboardViewModel
+
+↓
+
+Views
+
+Rules:
+
+- Readers extract data only.
+- Readers never perform business logic.
+- Parsers never know the original file format.
+- All supported formats must converge into the same FinancialDocument model.
+- Validation always occurs before stores are updated.
+- TransactionStore owns transactions.
+- AccountStore owns accounts.
+- Views consume ViewModels only.
 
 Do not bypass validation.
 

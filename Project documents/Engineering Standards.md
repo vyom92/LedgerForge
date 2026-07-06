@@ -50,15 +50,18 @@ Services/
 
 Readers/
 - Read file formats only.
-
-Analyzers/
-- Detect document structure.
+- Extract document contents.
+- Never perform business logic.
+- Never interpret financial meaning.
 
 Detectors/
-- Detect institutions, columns and document characteristics.
+- Detect financial institutions.
+- Classify document types.
+- Identify parser candidates.
 
 Normalizers/
-- Convert raw data into a consistent intermediate representation.
+- Produce the FinancialDocument domain model.
+- Ensure every supported file format converges into the same ingestion pipeline.
 
 Parsers/
 - Convert normalized data into LedgerForge models.
@@ -101,6 +104,18 @@ ViewModels/
 
 # Development Workflow
 
+Before implementation:
+
+1. Read Product Vision.
+2. Read Architecture.
+3. Read ADRs.
+4. Read Copilot Instructions.
+5. Verify required reference documents exist.
+6. Produce an implementation plan.
+7. Wait for approval.
+
+Implementation:
+
 1. Select exactly one file.
 2. Verify the filename in the header comment matches the intended file.
 3. Implement one logical change.
@@ -123,15 +138,15 @@ A task is complete only when:
 
 # Architecture Rules
 
-Readers know files.
-Analyzers know structure.
-Detectors know meaning.
-Normalizers create consistency.
-Parsers create business objects.
-Rules create intelligence.
-The Dashboard presents information.
+Readers extract data.
+FinancialDocument is the common ingestion model.
+Institution Detection identifies the source.
+Document Classification determines the document family.
+Parser Selection chooses the correct parser.
+Statement Parsers create business objects.
+Validation verifies financial correctness.
+TransactionStore owns transactions.
 AccountStore owns accounts.
-DocumentStore owns imported transactions.
 ViewModels observe stores.
 Views never coordinate business workflows.
 
@@ -168,6 +183,19 @@ The code should make adding the next financial institution easier than adding th
 - Never overwrite imported financial values after conversion.
 - Support multiple simultaneous display currencies.
 - Respect regional formatting conventions for each currency.
+
+---
+
+# AI Development Standards
+
+- Never assume statement layouts.
+- Always request reference documents when required.
+- Never invent financial rules.
+- Verify the filename in the header comment before editing.
+- Build after every significant change.
+- Resolve compile errors before continuing.
+- Run regression tests whenever parser or import code changes.
+- Summarize architectural decisions after every sprint.
 
 ---
 

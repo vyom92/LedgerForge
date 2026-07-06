@@ -1,88 +1,149 @@
-
-
 # LedgerForge Project Context
 
 ## Current Phase
 
-Phase 2 — Multi-Account Foundation
+Phase 3 — Financial Document Foundation
 
-The import pipeline, validation framework and first live dashboard are complete.
+LedgerForge has completed its core CSV import architecture and foundational data pipeline. The current objective is to evolve into an offline-first financial document ingestion platform capable of importing documents from multiple financial institutions while preserving financial correctness.
 
-Current engineering focus is evolving LedgerForge from an import engine into a financial operating system.
+---
+
+## Current Architecture
+
+Financial Document
+↓
+ImportCoordinator
+↓
+Reader (PDF / CSV / XLS / XLSX / TXT)
+↓
+FinancialDocument
+↓
+Institution Detection
+↓
+Document Classification
+↓
+Parser Selection
+↓
+Statement Parser
+↓
+Validation
+↓
+ImportSession
+↓
+TransactionStore
+↓
+AccountStore
+↓
+DashboardViewModel
+↓
+Views
+
+All supported document formats must converge into this single deterministic pipeline.
 
 ---
 
 ## Completed Milestones
 
-- Import pipeline
+- CSV import framework
 - Statement normalization
 - Institution detection
-- Axis Bank account parser
 - Direction resolution
-- Import validation
+- Validation framework
 - Import sessions
-- Reactive dashboard
+- TransactionStore
+- AccountStore
+- Reactive dashboard foundation
 - Financial Snapshot
-- Architecture documentation
 - Product Vision
+- Architecture documentation
 - Engineering Standards
-- ADRs
+- Architecture Decision Records (ADRs)
 - GitHub Copilot project instructions
+- Xcode MCP integration
 
 ---
 
 ## Current Priorities
 
-1. AccountStore
-2. Multi-account support
-3. Money value type
-4. Currency formatter
-5. Exchange rate service
-6. Import history
-7. Dashboard powered by accounts
+1. FinancialDocument domain model
+2. Password management for encrypted financial documents
+3. Generic document readers
+4. Institution detection from extracted document content
+5. Document classification (Bank, Credit Card, Brokerage, Insurance, Salary, etc.)
+6. Parser integration with the existing pipeline
+7. Regression suite expansion using real reference documents
 
 ---
 
 ## Financial Principles
 
 - Preserve imported financial truth.
-- Native currency is never overwritten.
-- Currency conversion is derived.
-- Dashboard may present multiple display currencies.
-- Every calculation must be deterministic and explainable.
+- Native currency is never modified.
+- Currency conversion is presentation only.
+- Support multiple currencies simultaneously.
+- Every financial calculation must remain deterministic, explainable and auditable.
+
+---
+
+## Product Principles
+
+LedgerForge is not a CSV importer.
+
+LedgerForge is a financial document ingestion platform.
+
+Readers extract data.
+
+Parsers interpret data.
+
+Validation verifies data.
+
+Stores own data.
+
+ViewModels present data.
+
+Views display data.
 
 ---
 
 ## Reference Assets
 
-Always prefer existing project references over assumptions.
+Always prefer approved project references over assumptions.
 
-Known references include:
+Current references include:
 
-- Budget workbook
+- Dashboard reference workbook
 - Approved dashboard sketches
-- Axis Bank account statement
-- Axis credit card statement
-- CBQ account statement
-- CBQ credit card statement
+- Axis Bank statements
+- Axis Credit Card statements
+- CBQ Bank statements
+- CBQ Credit Card statements
+- Amex statements
+- HDFC statements
+- IBKR statements
+- Zurich ISP statements
 
-If additional references are required, request them before implementation.
+If an implementation requires a reference that is unavailable, stop and request the appropriate document before continuing.
 
 ---
 
 ## Development Workflow
 
-1. Read project documentation.
-2. Read ADRs.
-3. Verify architecture.
-4. Verify references.
-5. Implement one sprint.
-6. Build.
-7. Test.
-8. Commit.
+1. Read Product Vision.
+2. Read Architecture documentation.
+3. Read Engineering Standards.
+4. Read ADRs.
+5. Read Copilot instructions.
+6. Verify required reference documents exist.
+7. Verify the filename in the first comment block before editing any file.
+8. Produce an implementation plan.
+9. Obtain approval.
+10. Implement one sprint.
+11. Build continuously.
+12. Run regression tests where applicable.
+13. Commit.
 
 ---
 
 ## Definition of Success
 
-LedgerForge should become the trusted financial operating system users open every day because it provides the clearest and most trustworthy understanding of their finances. Importing statements should become an invisible maintenance task supporting that goal.
+LedgerForge becomes the trusted offline financial operating system that ingests financial documents from multiple institutions, automatically identifies their origin and document type, securely unlocks encrypted statements, extracts accurate financial data, validates every result before persistence, and presents a trustworthy multi-currency financial dashboard.

@@ -84,6 +84,37 @@ Automation should quietly disappear into the background. The user should primari
 
 ---
 
+# Intelligent Document Processing
+
+LedgerForge treats every imported document as structured financial evidence rather than as a file.
+
+Supported sources include:
+
+- PDF statements
+- CSV exports
+- XLS/XLSX exports
+- TXT exports (where provided by institutions)
+
+Every import follows the same deterministic pipeline:
+
+1. Identify the financial institution.
+2. Determine the document type (bank account, credit card, investment, salary, etc.).
+3. Unlock encrypted documents automatically using the institution's stored password when available.
+4. Extract raw document contents into a normalized internal representation.
+5. Detect the document layout and version.
+6. Apply the appropriate parser.
+7. Validate the extracted financial data.
+8. Update LedgerForge stores only after validation succeeds.
+
+Institution detection should rely on document fingerprints, metadata, recurring keywords, visual structure, and previous successful imports rather than filenames.
+
+Statement layouts may evolve over time. LedgerForge should automatically recognize new layouts, preserve compatibility with older formats, and learn from successful imports without compromising deterministic parsing.
+
+The parsing engine should be format-independent. Whether data originates from PDF, CSV, XLS/XLSX or TXT, downstream components should receive the same normalized transaction model.
+
+Importing documents should require little or no user interaction beyond selecting the file.
+---
+
 # Explainable Intelligence
 
 Every automatic decision must be:

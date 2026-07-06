@@ -169,6 +169,7 @@ Separating ownership, business logic and presentation improves maintainability a
 
 ---
 
+
 # ADR-010 — Validation Before Persistence
 
 ## Status
@@ -184,3 +185,96 @@ Incorrect financial data is more damaging than delayed imports. Validation shoul
 - Validation is a mandatory stage of the import pipeline.
 - Import sessions record validation outcomes.
 - Dashboard metrics should only be derived from validated financial data.
+
+---
+
+# ADR-011 — Unified FinancialDocument Pipeline
+
+## Status
+Accepted
+
+## Decision
+All supported import formats (PDF, CSV, XLS, XLSX and TXT) must converge into a single `FinancialDocument` domain model before institution detection, parser selection or validation occurs.
+
+## Rationale
+Keeping downstream components independent of file formats dramatically simplifies parser development, testing and long-term maintenance.
+
+## Consequences
+- Readers understand file formats only.
+- Parsers never know the original file format.
+- New import formats require only a new Reader implementation.
+- Validation and stores remain format-independent.
+
+---
+
+# ADR-012 — Separation of Readers and Parsers
+
+## Status
+Accepted
+
+## Decision
+Readers extract document content. Parsers interpret financial meaning. These responsibilities must never overlap.
+
+## Rationale
+Extraction and interpretation change for different reasons. Separating them reduces coupling and allows new document formats without rewriting financial parsers.
+
+## Consequences
+- Readers contain no business logic.
+- Parsers never perform file I/O.
+- Institution Detection and Document Classification operate on extracted content.
+
+---
+
+# ADR-013 — Store Ownership
+
+## Status
+Accepted
+
+## Decision
+Application state is owned exclusively by dedicated stores.
+
+## Rationale
+Single ownership prevents duplicated state and inconsistent dashboard calculations.
+
+## Consequences
+- TransactionStore owns transactions.
+- AccountStore owns accounts.
+- Future stores (InvestmentStore, ExchangeRateStore, etc.) own their respective domains.
+- Views and ViewModels never duplicate store state.
+
+---
+
+# ADR-014 — Document-First Architecture
+
+## Status
+Accepted
+
+## Decision
+LedgerForge is a financial document ingestion platform rather than a CSV import application.
+
+## Rationale
+Every supported institution provides financial documents in one or more formats. The product should treat all supported formats as equivalent entry points into the same import pipeline.
+
+## Consequences
+- PDF becomes a first-class import source.
+- CSV, XLS, XLSX and TXT follow the same pipeline.
+- Institution-specific behaviour belongs in parsers rather than readers.
+
+---
+
+# ADR-015 — Automatic Password Management
+
+## Status
+Accepted
+
+## Decision
+Encrypted financial documents should be unlocked automatically using institution-specific credentials stored securely on the device whenever possible.
+
+## Rationale
+Most financial institutions consistently use the same password pattern for monthly statements. Requiring manual password entry for every import unnecessarily interrupts the workflow.
+
+## Consequences
+- Password management belongs to the import coordination layer.
+- Passwords are stored securely using the operating system's secure credential storage.
+- Readers receive decrypted document content rather than handling passwords directly.
+- Users are prompted only when no stored credential succeeds.

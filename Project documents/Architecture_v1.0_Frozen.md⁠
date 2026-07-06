@@ -44,7 +44,35 @@ Every subsystem should ultimately improve one of three things:
 If a feature does not improve at least one of these, it should be reconsidered.
 ## Import Pipeline
 
-Financial Document → Reader → Analyzer → Institution Detection → Statement Fingerprint → Import Profile → Column Detection → Direction Strategy → Normalizer → Generic Transaction Parser → Validation → Import Session → Account Store → Rules Engine → SQLite → Financial Dashboard
+Financial Document
+→ Reader (PDF / CSV / XLS / XLSX / TXT)
+→ FinancialDocument
+→ Institution Detection
+→ Document Classification
+→ Parser Selection
+→ Statement Parser
+→ Validation
+→ Import Session
+→ TransactionStore
+→ AccountStore
+→ Rules Engine
+→ SQLite
+→ DashboardViewModel
+→ Financial Dashboard
+
+### Pipeline Principles
+
+- Readers understand file formats only.
+- Readers never perform financial interpretation.
+- Institution Detection identifies the originating institution using extracted document content.
+- Document Classification determines the document family (Bank, Credit Card, Brokerage, Salary, Insurance, etc.).
+- Parser Selection chooses the correct parser implementation.
+- Statement Parsers transform FinancialDocument into normalized domain objects.
+- Validation is the only stage permitted to verify financial correctness.
+- TransactionStore is the single source of truth for transactions.
+- AccountStore is the single source of truth for accounts.
+- Rules Engine enriches validated financial data but never alters imported financial truth.
+- Every supported file format must converge into the same FinancialDocument model before parsing.
 
 ## Core Domain
 
@@ -54,11 +82,12 @@ Financial Document → Reader → Analyzer → Institution Detection → Stateme
 - Holding
 - ImportSession
 - ImportProfile
-- StatementFingerprint
 - Rule
 - Category
 - DocumentMetadata
-- NormalizedDocument
+- FinancialDocument
+- DocumentClassification
+- TransactionStore
 - Money
 - ExchangeRate
 - WorkspaceSettings
