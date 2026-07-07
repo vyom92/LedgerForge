@@ -221,7 +221,7 @@ Extraction and interpretation change for different reasons. Separating them redu
 ## Consequences
 - Readers contain no business logic.
 - Parsers never perform file I/O.
-- Institution Detection and Document Classification operate on extracted content.
+- Institution Detection and Statement Classification operate on extracted content.
 
 ---
 
@@ -518,7 +518,9 @@ Institution Detection is a dedicated architectural stage within the import pipel
 
 Detection operates exclusively on extracted document content and is independent of the original file format.
 
-Institution Detection executes after document extraction and before Statement Classification and Parser Selection.
+Institution Detection executes after document extraction and before Statement Classification.
+
+Parser Selection consumes the results of both Institution Detection and Statement Classification.
 
 Unknown documents must remain unknown unless deterministic evidence is sufficient to identify an institution.
 
@@ -603,6 +605,7 @@ Separating these responsibilities keeps parser selection deterministic while all
 - Institution Detection remains independent from document type.
 - Unknown classifications remain explicit rather than inferred.
 - Approved regression fixtures verify identical classification behaviour across supported formats.
+- Existing production behaviour remains unchanged until downstream pipeline stages explicitly adopt Statement Classification.
 
 ## Related ADRs
 

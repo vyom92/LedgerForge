@@ -71,7 +71,7 @@ Command-line `xcodebuild test` with writable DerivedData hit the known Xcode/Swi
 External macro implementation type 'PreviewsMacros.SwiftUIView' could not be found for macro 'Preview(_:body:)'
 ```
 
-Per project workflow, the equivalent Xcode regression suite was run through the active `TestPlan` and treated as authoritative.
+Per project workflow, the equivalent Xcode regression suite was run from Xcode and treated as authoritative.
 
 Xcode `RunSomeTests` result:
 
@@ -113,6 +113,18 @@ Implementation push result:
 origin/main updated to 29c50a9970e74396a7d9be4391efea59b77df4c9
 ```
 
+Final project-state/documentation commit:
+
+```text
+18c3b7a Update project state for sprint 15
+```
+
+Final repository state:
+
+```text
+origin/main includes Sprint 15 implementation and project-state updates.
+```
+
 ## Behavioural Impact
 
 No user-visible behaviour changed.
@@ -141,6 +153,7 @@ Approved Axis CSV financial truth remains unchanged:
 
 - `Project documents/PROJECT_STATE.md`
   - Updated after successful implementation commit and push to mark Sprint 15 complete and Sprint 16 active.
+  - Final project-state update committed separately after implementation validation.
 
 - `Project documents/Project_Guide.md`
   - Synchronized current sprint, phase, validation status and roadmap after Sprint 15 completion.
