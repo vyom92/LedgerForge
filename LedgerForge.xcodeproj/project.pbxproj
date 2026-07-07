@@ -70,6 +70,8 @@
 		28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */; };
 		28D8CB5F2FFD1E3C005B419A /* StatementClassificationDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D8CB5E2FFD1E3C005B419A /* StatementClassificationDetector.swift */; };
 		28D8CB632FFD21B7005B419A /* TestPlan.xctestplan in Resources */ = {isa = PBXBuildFile; fileRef = 28D8CB622FFD21B7005B419A /* TestPlan.xctestplan */; };
+		28E945452FFD672000FB69E4 /* ImportPersistenceMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E945442FFD671F00FB69E4 /* ImportPersistenceMapper.swift */; };
+		28E945472FFD673000FB69E4 /* ImportPersistenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E945462FFD673000FB69E4 /* ImportPersistenceCoordinator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -165,6 +167,8 @@
 		28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountStore.swift; sourceTree = "<group>"; };
 		28D8CB5E2FFD1E3C005B419A /* StatementClassificationDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementClassificationDetector.swift; sourceTree = "<group>"; };
 		28D8CB622FFD21B7005B419A /* TestPlan.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = TestPlan.xctestplan; sourceTree = "<group>"; };
+		28E945442FFD671F00FB69E4 /* ImportPersistenceMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPersistenceMapper.swift; sourceTree = "<group>"; };
+		28E945462FFD673000FB69E4 /* ImportPersistenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPersistenceCoordinator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -370,6 +374,8 @@
 				28B87B342FFB31FC009BEE8C /* Services/ImportValidator.swift */,
 				28B87B302FFB2F1B009BEE8C /* Services/DirectionResolver.swift */,
 				288EB0E52FF7A6C000F09BC9 /* Services/ImportEngine.swift */,
+				28E945442FFD671F00FB69E4 /* ImportPersistenceMapper.swift */,
+				28E945462FFD673000FB69E4 /* ImportPersistenceCoordinator.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -643,6 +649,7 @@
 				281BB17E2FFC4D26006E7424 /* ImportRequest.swift in Sources */,
 				288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */,
 				281BB1612FFC4A84006E7424 /* InMemoryRepositoryProvider.swift in Sources */,
+				28E945472FFD673000FB69E4 /* ImportPersistenceCoordinator.swift in Sources */,
 				286242592FFCE80D00B8AA66 /* DefaultReaderRegistry.swift in Sources */,
 				2862425F2FFCE80D00B8AA66 /* PDFDocumentReader.swift in Sources */,
 				286242612FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift in Sources */,
@@ -661,6 +668,7 @@
 				288EB0FD2FF7BA1600F09BC9 /* DeveloperConsoleView.swift in Sources */,
 				288EB1212FF7D88200F09BC9 /* Parsers/StatementParserRegistry.swift in Sources */,
 				281BB17C2FFC4D1C006E7424 /* ImportFramework.swift in Sources */,
+				28E945452FFD672000FB69E4 /* ImportPersistenceMapper.swift in Sources */,
 				288EB1252FF7D8B500F09BC9 /* Transaction.swift in Sources */,
 				288EB0ED2FF7AE2500F09BC9 /* DocumentReader.swift in Sources */,
 				288EB12D2FF7E0C000F09BC9 /* NormalizedDocument.swift in Sources */,

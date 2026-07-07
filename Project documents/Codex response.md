@@ -1,156 +1,103 @@
 # Codex Response
 
-## Sprint 17 Summary
+## Sprint 18 Summary
 
-Sprint 17 refined the validation pipeline by adding dedicated validation coverage around the existing `ImportValidator` behaviour while preserving the parser-produced `FinancialDocument` boundary introduced in Sprint 16.
+Sprint 18 Repository Integration Cleanup is implemented and validation has passed.
 
-No production validation internals were changed because the new tests did not expose a real implementation issue. The validator remains centralized and deterministic:
+Implemented:
 
-```text
-FinancialDocument
--> ImportValidator.validate(financialDocument:)
--> ImportValidationResult
-```
+- Added a narrow repository persistence boundary after `FinancialDocument` validation.
+- Added DTO mapping from already-validated import inputs to repository DTOs.
+- Wired `ImportEngine` to attempt repository persistence only after validation passes.
+- Preserved existing runtime `TransactionStore` and `AccountStore` updates.
+- Added repository integration coverage for valid persistence, failed-validation persistence skip, and unsupported currency mapping.
+- Converted SwiftUI preview declarations from `#Preview` to legacy `PreviewProvider` to unblock the Xcode test build without changing runtime UI behaviour.
+- Updated the persistence mapper to defer institution and document relationships until those rows are formally persisted.
 
-Existing parser, repository, store and UI behaviour were preserved.
+No parser behaviour, validation behaviour, repository protocol semantics, UI behaviour, financial truth, transaction extraction logic, transaction ordering, or trust-state policy was intentionally changed.
 
 ## Files Created
 
-- `LedgerForgeTests/ImportValidatorTests.swift`
-  - Adds focused validation tests for current validator behaviour.
+- `LedgerForge/Services/ImportPersistenceMapper.swift`
+- `LedgerForge/Services/ImportPersistenceCoordinator.swift`
+- `LedgerForgeTests/ImportRepositoryIntegrationTests.swift`
 
 ## Files Modified
-
+ 
+- `Services/ImportEngine.swift`
+- `Services/ImportPersistenceMapper.swift`
+- `LedgerForgeTests/ImportRepositoryIntegrationTests.swift`
+- `ContentView.swift`
+- `Views/DocumentPreviewView.swift`
+- `Views/DeveloperConsoleView.swift`
+- `Views/TransactionListView.swift`
+- `LedgerForge.xcodeproj/project.pbxproj`
+- `Project documents/ADR.md`
 - `Project documents/Codex response.md`
-  - Replaced Sprint 17 planning notes with Sprint 17 implementation results.
-
-## Production Files Modified
-
-None.
-
-`Services/ImportValidator.swift` was intentionally left unchanged. The dedicated validator tests passed against the existing implementation, so internal refactoring was not justified within Sprint 17 scope.
+- `Project documents/PROJECT_STATE.md`
+- `Project documents/Project_Guide.md`
 
 ## Build Result
 
-Passed.
+Build passed using Xcode `BuildProject`.
 
-- Baseline Xcode build before test work: passed.
-- Xcode build after adding `ImportValidatorTests`: passed.
-- Final Xcode build before full validation: passed.
-- No production source changes were required to satisfy Sprint 17 validation goals.
+```text
+The project built successfully.
+```
+
+No unresolved merge conflict markers were found.
 
 ## Test Result
 
-Passed.
+Required Sprint 18 validation passed through Xcode `RunSomeTests`.
 
-Focused validator suite:
+- `ImportRepositoryIntegrationTests`: 3 passed, 0 failed.
+- `RepositoryContractTests`, `ImportValidatorTests`, `FinancialDocumentTests`, `CSVImportRegressionTests`: 16 passed, 0 failed.
+- `StatementParserSelectionTests`, `StatementClassificationTests`, `InstitutionDetectionTests`, `PDFDocumentReaderTests`: 28 passed, 0 failed.
+- `ImportFrameworkTests`, `DefaultReaderRegistryTests`, `PasswordProviderTests`, `ImportRepositoryIntegrationTests`: 16 passed, 0 failed.
 
-- `ImportValidatorTests`: 7 passed, 0 failed.
-
-Required Sprint 17 regression suite:
-
-- 53 tests passed.
-- 0 tests failed.
-- 0 tests skipped.
-- Dedicated `ImportValidator` coverage increased without changing production validation behaviour.
-
-Required suites passed:
-
-- `ImportValidatorTests`
-- `FinancialDocumentTests`
-- `CSVImportRegressionTests`
-- `StatementParserSelectionTests`
-- `StatementClassificationTests`
-- `InstitutionDetectionTests`
-- `PDFDocumentReaderTests`
-- `ImportFrameworkTests`
-- `DefaultReaderRegistryTests`
-- `PasswordProviderTests`
-
-## Commit And Push Result
-
-- Implementation commit: `dcac92a0d8e5078a3014e7ef52af8917f130940d`
-- Branch push: `main -> main` completed successfully.
-- Local tracking-ref note: after the successful remote push, Git could not update local `refs/remotes/origin/main` because the sandbox could not create `.git/refs/remotes/origin/main.lock`.
-- Sprint tag: `sprint-17-complete`
-- Tag push: completed successfully.
-
-## Validation Coverage Added
-
-`ImportValidatorTests` now verifies:
-
-- empty import validation fails
-- transactions without debit or credit fail
-- transactions without running balance fail
-- running-balance mismatch fails
-- valid `FinancialDocument` remains valid
-- `validate(financialDocument:)` delegates consistently to the existing transaction validation path.
-- validation does not mutate `FinancialDocument` or its transactions
+Total required Sprint 18 validation: 60 passed, 0 failed.
 
 ## Behavioural Impact
 
-No intended user-visible behaviour change.This sprint increased validation confidence rather than changing validation policy.
+Production CSV import still follows the existing reader, parser, validation, runtime store, and UI behaviour.
 
-Approved Axis Bank financial truth remains protected by the existing regression baseline:
+Repository persistence is downstream of successful validation. Failed validation does not enter the repository persistence coordinator and does not persist trusted transactions or mark an import as trusted.
 
-- parser behaviour unchanged
-- transaction extraction unchanged
-- debit total unchanged
-- credit total unchanged
-- opening balance unchanged
-- closing balance unchanged
-- validation pass/fail unchanged
+Repository persistence errors are logged and do not interrupt existing runtime store updates, preserving current observable behaviour.
 
 ## Architecture Decisions
 
-- `FinancialDocument` remains the canonical parser output and validation input.
-- `StatementParser -> FinancialDocument` was preserved.
-- `ImportValidator.validate(financialDocument:)` remains the production validation entry point.
-- `ImportValidator.validate(transactions:)` remains available for compatibility and focused validation tests.
-- No validation result structure changes were introduced.
-- No new public validation abstraction was introduced.
-- Dedicated validation tests are now the primary protection against future validation regressions.
-- No persistence, repository, store or UI logic was added to validation.
-
-## Verification
-
-- Xcode build passed.
-- Required Xcode regression suite passed.
-- Dedicated `ImportValidatorTests` passed independently before the full regression suite.
-- Conflict marker scan found no unresolved merge conflict markers.
-- Only Sprint 17 implementation files were staged for commit:
-  - `LedgerForgeTests/ImportValidatorTests.swift`
-  - `Project documents/Codex response.md`
+- `DefaultImportPersistenceCoordinator` is the narrow persistence boundary after validation.
+- `ImportPersistenceMapper` converts already-validated runtime models into repository DTOs without recalculating financial data.
+- `AccountDTO.institutionId` is currently `nil` because Sprint 18 does not persist institution rows.
+- `TransactionDTO.documentId` is currently `nil` because Sprint 18 does not persist document rows.
+- Repository writes remain behind existing repository protocols.
+- Runtime stores remain the observable state owners.
+- SwiftUI preview declarations use `PreviewProvider` instead of `#Preview` where required to keep automated test builds working; this is documented in ADR-022 and does not change runtime UI behaviour.
+- Documents, normalized rows, validation issues, fingerprints, dashboard state, institution persistence, and document persistence remain out of Sprint 18 scope.
 
 ## Remaining Technical Debt
 
-- Validation issue messages remain plain strings without typed issue codes.
-- Validation diagnostics remain intentionally lightweight; richer contextual reporting can be considered in a future sprint without changing validation policy.
-- FinancialDocument-level structural validation remains intentionally deferred because no current test exposed a need.
+- Institution and document persistence should be introduced deliberately in a future sprint before foreign-key relationships are populated.
+- The persistence mapper currently supports the deterministic currency/minor-unit mappings required by the approved Sprint 18 fixtures only.
+- Validation issues, documents, normalized rows, fingerprints, and trusted policy details remain deferred.
+- Repository persistence errors are logged but not surfaced to UI, preserving current behaviour for now.
 
 ## Remaining Risks
 
-- Future validation refinements must avoid changing approved financial totals without explicit approval.
-- Future typed validation issue work should remain backward-compatible with `ImportValidationResult`.
-- Synthetic validation tests must continue to avoid inventing financial behaviour that does not exist in production rules.
+- Repository persistence is best-effort from `ImportEngine` to preserve existing user-visible behaviour.
+- Account identity is deterministic but conservative and may need refinement when account identity becomes a product-level concept.
+- Deferred institution/document relationships must be revisited before broadening persisted import metadata.
 
-## Deferred Items
+## Commit And Push Result
 
-- No repository redesign.
-- No UI changes.
-- No parser rewrites.
-- No parser contract changes.
-- No OCR, AI inference, XLS/XLSX, dashboard or investment work.
-- No Sprint 18 implementation work was started.
+No commit was created.
 
-## Documentation Updated
+No push was performed.
 
-- `Project documents/Codex response.md`
-  - Updated with Sprint 17 implementation, validation, commit, push and tag results.
-- `Project documents/PROJECT_STATE.md`
-  - Updated after successful build, required validation, commit, push and tag.
-  - Records Sprint 17 as complete and Sprint 18 as not started.
+Reason: current user instruction explicitly requires no commit or push until final review.
 
-## Next Recommended Sprint
+## Next Recommended Step
 
-Sprint 18 should focus on Repository Integration Cleanup only after confirming that validation remains stable at the `FinancialDocument` boundary.
+Perform final review of the Sprint 18 changes, including staged and unstaged files. After approval, stage all Sprint 18 implementation, validation-unblock and documentation files together, commit, push the tracked branch, then create and push the Sprint 18 completion tag if applicable.

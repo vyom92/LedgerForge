@@ -39,6 +39,8 @@ struct DeveloperConsoleView: View {
     }
 }
 
-#Preview {
-    DeveloperConsoleView()
+struct DeveloperConsoleView_Previews: PreviewProvider {
+    static var previews: some View {
+        DeveloperConsoleView()
+    }
 }

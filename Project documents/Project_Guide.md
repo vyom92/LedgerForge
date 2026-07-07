@@ -4,13 +4,13 @@ This is the canonical project operating manual. Read this document first, then u
 
 ## Current Project Snapshot
 
-- **Current Milestone:** M5 – Validation Pipeline Refinement
-- **Current Sprint:** Sprint 17
-- **Current Phase:** Validation Pipeline Refinement
+- **Current Milestone:** M6 – Repository & Data Platform
+- **Current Sprint:** Sprint 18
+- **Current Phase:** Repository Integration Cleanup
 - **Build Status:** Passing
-- **Validation Status:** Build passing; full regression baseline passing. Sprint 16 validation complete.
+- **Validation Status:** Build passing; full regression baseline passing. Sprint 17 validation complete.
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 16
+- **Current Codex Baseline:** Sprint 17
 
 ## Current Architecture Status
 
@@ -18,7 +18,7 @@ This is the canonical project operating manual. Read this document first, then u
 |-----------|--------------|
 | Product Vision | Current and authoritative |
 | Architecture | Frozen v1.0 baseline active |
-| ADRs | Current through ADR-021 |
+| ADRs | Current through ADR-022 |
 | Database | Production-ready foundation |
 | Repository Layer | Stable with contract tests |
 | Persistence | SQLite repository layer active |
@@ -31,11 +31,10 @@ This is the canonical project operating manual. Read this document first, then u
 | Password Management | Operational; DefaultPasswordProvider integrated |
 | Dashboard | Existing dashboard unchanged |
 | Investments | Future module |
-| Validation | Build passing; full regression baseline passing. Sprint 16 validation complete |
+| Validation | Build passing; full regression baseline passing. Sprint 17 validation complete |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
-
 
 ## Canonical Import Pipeline
 
@@ -257,10 +256,9 @@ Additionally:
 
 ## Sprint Roadmap
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16
-- **Current Sprint:** Sprint 17 – Validation Pipeline Refinement
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16, Sprint 17
+- **Current Sprint:** Sprint 18 – Repository Integration Cleanup
 - **Upcoming Sprints:**
-  - Sprint 18 – Repository Integration Cleanup
   - Sprint 19–21 – Dashboard Foundation
   - Sprint 22–24 – Insights & Analytics
   - Sprint 25+ – Multi-Currency, Investments & Ecosystem
@@ -288,12 +286,12 @@ Additionally:
 - Immutable parser output
 - Zero behavioural change
 
-### M5 – Validation Pipeline Refinement 🚧
-- Rule engine
-- Error categorisation
-- Confidence scoring
+### M5 – Validation Pipeline Refinement ✅
+- Dedicated ImportValidator tests
+- Stable FinancialDocument validation boundary
+- Regression protection for validation behaviour
 
-### M6 – Repository & Data Platform
+### M6 – Repository & Data Platform 🚧
 - Unified persistence
 - Deduplication
 - Audit trail
@@ -403,7 +401,7 @@ This layered documentation approach keeps AI context small while preserving dete
 - Never redesign approved architecture.  
 - If documentation and implementation conflict, stop and report the conflict.  
 - Maintain Project documents/Codex response.md during implementation.
-- Update Project documents/PROJECT_STATE.md only after the sprint has been successfully validated, committed and pushed.
+- Update Project documents/PROJECT_STATE.md only after the sprint has been successfully validated, committed, pushed and tagged if applicable.
 - Leave the repository in a buildable state.  
 - Never bypass repository abstractions.  
 - Never access SQLite directly from Views, ViewModels or Stores.  

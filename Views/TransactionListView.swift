@@ -164,6 +164,8 @@ struct TransactionListView: View {
     }
 }
 
-#Preview {
-    TransactionListView()
+struct TransactionListView_Previews: PreviewProvider {
+    static var previews: some View {
+        TransactionListView()
+    }
 }

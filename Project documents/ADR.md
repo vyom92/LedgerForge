@@ -619,3 +619,56 @@ Separating these responsibilities keeps parser selection deterministic while all
 - ADR-018 — Unified Import Framework Operational
 - ADR-019 — Reference Fixtures Define Financial Truth
 - ADR-020 — Deterministic Institution Detection
+---
+
+# ADR-022 — Preview Compatibility During Test Builds
+
+## Status
+
+Accepted
+
+## Implemented In
+
+Sprint 18 validation unblock
+
+## Decision
+
+LedgerForge may use legacy SwiftUI `PreviewProvider` declarations instead of the newer `#Preview` macro when the macro prevents command-line or automated test builds from compiling.
+
+This is a preview-only compatibility decision. It must not alter runtime UI behaviour, repository architecture, import behaviour, validation behaviour, persistence behaviour or test expectations.
+
+The preferred preview declaration for affected files is:
+
+```swift
+struct ExampleView_Previews: PreviewProvider {
+    static var previews: some View {
+        ExampleView()
+    }
+}
+```
+
+The `#Preview` macro may be reconsidered in a future sprint only after the active Xcode toolchain reliably supports command-line and automated test compilation without triggering `PreviewsMacros.SwiftUIView` failures.
+
+## Rationale
+
+Sprint 18 validation was blocked because `xcodebuild test` compiled production SwiftUI view files and failed while expanding the external `#Preview` macro before any Sprint 18 test assertions could run.
+
+Investigation showed that scheme-only, test-target-only and build-setting-only workarounds did not prevent preview macro expansion. A controlled single-file experiment converted `ContentView.swift` from `#Preview` to `PreviewProvider`; the failure moved to the remaining preview files, confirming the root cause.
+
+Using `PreviewProvider` preserves Xcode preview functionality while avoiding the failing macro expansion path during test builds.
+
+## Consequences
+
+- Preview compatibility is allowed as a production-source-affecting but runtime-neutral change.
+- This decision must not be used to justify UI, repository, import, validation or persistence changes.
+- Future use of `#Preview` should be avoided until the toolchain issue is verified as resolved.
+- If `#Preview` is reintroduced, required regression validation must pass through the standard project workflow.
+- The decision exists to unblock validation, not to change user-visible behaviour.
+
+## Related ADRs
+
+- ADR-010 — Validation Before Persistence
+- ADR-016 — Universal Import Pipeline
+- ADR-017 — Deterministic Before Intelligent
+- ADR-018 — Unified Import Framework Operational
+- ADR-019 — Reference Fixtures Define Financial Truth

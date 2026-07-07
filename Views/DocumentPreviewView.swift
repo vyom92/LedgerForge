@@ -62,6 +62,8 @@ struct DocumentPreviewView: View {
 
 }
 
-#Preview {
-    DocumentPreviewView()
+struct DocumentPreviewView_Previews: PreviewProvider {
+    static var previews: some View {
+        DocumentPreviewView()
+    }
 }

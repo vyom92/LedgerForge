@@ -174,7 +174,7 @@ Completed
 1. AGENTS.md
 2. Project_Guide.md
 3. PROJECT_STATE.md
-4. Latest ADR (currently ADR-021 — Deterministic Statement Classification)
+4. Latest ADR (currently ADR-022 — Preview Compatibility During Test Builds)
 5. Project documents/Codex response.md
 
 ## Current Pipeline
@@ -205,16 +205,16 @@ Dashboard
 Active Sprint: Sprint 18
 
 Objective:
-- Next recommended sprint: Repository Integration Cleanup.
+- Repository Integration Cleanup.
 
 Scope:
-- Not started.
-- Requires Sprint 18 planning before implementation.
-- Preserve validation-before-persistence behaviour from Sprint 17.
+- Implementation validation passed through Xcode.
+- Pending final review, staging, commit, push, and sprint tag if applicable.
+- Preserves validation-before-persistence behaviour from Sprint 17.
+- Preserves parser, validation, repository semantics, UI behaviour, financial truth, and transaction extraction.
 
 Out of Scope:
 - Transaction extraction changes
-- Repository changes
 - UI changes
 - OCR
 - AI inference

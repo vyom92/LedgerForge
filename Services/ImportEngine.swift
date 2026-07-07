@@ -11,14 +11,17 @@ final class ImportEngine {
     static let shared = ImportEngine()
 
     private let importCoordinator: any ImportFramework.ImportCoordinator
+    private let importPersistenceCoordinator: ImportPersistenceCoordinating
 
-    private init(
+    init(
         importCoordinator: any ImportFramework.ImportCoordinator = DefaultImportCoordinator(
             readerRegistry: DefaultReaderRegistry(),
             passwordProvider: DefaultPasswordProvider()
-        )
+        ),
+        importPersistenceCoordinator: ImportPersistenceCoordinating = DefaultImportPersistenceCoordinator()
     ) {
         self.importCoordinator = importCoordinator
+        self.importPersistenceCoordinator = importPersistenceCoordinator
     }
 
     func importFile(from url: URL) {
@@ -111,6 +114,20 @@ final class ImportEngine {
                 // Replace transactions only for validated imports. TransactionStore is the single owner of imported transactions.
                 // ADR-010 requires validation before trusted state is updated.
                 if validation.passed {
+                    do {
+                        let persistence = try importPersistenceCoordinator.persistValidatedImport(
+                            financialDocument: financialDocument,
+                            importSession: importSession,
+                            validation: validation
+                        )
+                        if persistence.persisted {
+                            DeveloperConsole.shared.log("Repository Persistence: COMPLETED")
+                        }
+                    } catch {
+                        DeveloperConsole.shared.log("Repository Persistence: FAILED")
+                        DeveloperConsole.shared.log(error.localizedDescription)
+                    }
+
                     TransactionStore.shared.replaceTransactions(financialDocument.transactions, validation: validation)
                     AccountStore.shared.integrateImport(importSession: importSession, transactions: financialDocument.transactions)
                 }
