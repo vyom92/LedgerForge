@@ -111,16 +111,39 @@ Completed
 
 ---
 
+# Sprint 16
+
+## Objective
+Migrate StatementParser so every production parser returns FinancialDocument directly instead of [Transaction].
+
+## Status
+Completed
+
+## Outcome
+- StatementParser now returns FinancialDocument directly.
+- AxisBankAccountParser now returns FinancialDocument while preserving existing transaction extraction behaviour.
+- ImportEngine now consumes parser-produced FinancialDocument directly.
+- FinancialDocumentBuilder was removed after all production and test references were migrated.
+- Approved Axis CSV financial truth remains unchanged.
+- Existing validation, repository, store and UI behaviour preserved.
+- 46 required Sprint 16 regression tests passed through Xcode.
+- Build passed.
+- Commit: `7013d99e55a5cdcf750cf5ad783a71168d59ee3e`
+- Git push to `origin/main` completed successfully.
+- Git tag: `sprint-16-complete`
+
+---
+
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `18c3b7a`
-- Latest Tag: `sprint-15-complete`
-- Architecture Baseline: Sprint 15
-- Latest Milestone: FinancialDocument Integration
+- Latest Commit: `7013d99e55a5cdcf750cf5ad783a71168d59ee3e`
+- Latest Tag: `sprint-16-complete`
+- Architecture Baseline: Sprint 16
+- Latest Milestone: FinancialDocument-native Parser Output
 - Build: Passing
-- Validation: Build passing; full regression baseline passing. Sprint 15 validation complete.
+- Validation: Build passing; required Sprint 16 regression suite passing through Xcode.
 
 ## Session Startup Order
 1. AGENTS.md
@@ -154,21 +177,17 @@ Dashboard
 
 ## Current Work
 
-Active Sprint: Sprint 16
+Active Sprint: Sprint 17
 
 Objective:
-- Migrate StatementParser to return FinancialDocument directly.
-- Preserve approved Axis CSV financial truth.
-- Preserve existing validation, repository persistence and UI behaviour.
+- Next recommended sprint: validation pipeline refinement.
 
 Scope:
-- Migrate parser return type to FinancialDocument.
-- Preserve approved Axis CSV financial truth.
-- Preserve existing validation, repository persistence and UI behaviour.
+- Not started.
+- Requires separate planning and approval before implementation.
 
 Out of Scope:
 - Transaction extraction changes
-- Validation changes
 - Repository changes
 - UI changes
 - OCR

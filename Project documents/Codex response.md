@@ -83,6 +83,14 @@ Required Sprint 16 validation suites passed:
 - `DefaultReaderRegistryTests`
 - `PasswordProviderTests`
 
+## Commit And Push Result
+
+- Implementation commit: `7013d99e55a5cdcf750cf5ad783a71168d59ee3e`
+- Branch push: `main -> main` completed successfully.
+- Local tracking-ref note: after the successful remote push, Git could not update local `refs/remotes/origin/main` because the sandbox could not create `.git/refs/remotes/origin/main.lock`.
+- Sprint tag: `sprint-16-complete`
+- Tag push: completed successfully.
+
 ## Behavioural Impact
 
 No intended user-visible behaviour change.
@@ -132,7 +140,14 @@ The approved Axis CSV baseline remains unchanged:
 - No OCR, AI inference, XLS/XLSX or dashboard work.
 - No Sprint 17 implementation work was started.
 
+## Documentation Updated
+
+- `Project documents/Codex response.md`
+  - Updated with Sprint 16 implementation, validation, commit, push and tag results.
+- `Project documents/PROJECT_STATE.md`
+  - Updated after successful build, required validation, commit, push and tag.
+  - Records Sprint 16 as complete and Sprint 17 as not started.
+
 ## Next Recommended Sprint
 
 Sprint 17 should focus on validation pipeline refinement only after confirming the new parser-to-`FinancialDocument` boundary remains stable.
-
