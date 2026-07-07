@@ -1,6 +1,6 @@
 # LedgerForge Project Guide
 
-This is the mandatory first document every AI assistant and engineer must read before planning or implementation because it minimizes context loading and routes the reader to the correct documentation.
+This is the canonical project operating manual. Read this document first, then use the Task Routing Guide to load only the documents required for the current task. Avoid loading unnecessary documentation.
 
 ## Current Project Snapshot
 
@@ -16,11 +16,8 @@ This is the mandatory first document every AI assistant and engineer must read b
 
 ## Current Architecture Status
 
-Update this table at the completion of every sprint. It provides the authoritative high-level status of each subsystem.
-
-| Component             | Status/Notes                      |
-|-----------------------|---------------------------------|
-
+| Component | Status/Notes |
+|-----------|--------------|
 | Product Vision | Current and authoritative |
 | Architecture | Frozen v1.0 baseline active |
 | ADRs | Current through ADR-018 |
@@ -29,20 +26,19 @@ Update this table at the completion of every sprint. It provides the authoritati
 | Persistence | SQLite repository layer active |
 | Import Framework | Operational; CSV and PDF reader foundation active |
 | Readers | CSV and PDF readers integrated into Unified Import Framework |
-| Testing | 17 active tests passing |
 | Institution Detection | Legacy detector active; framework planned |
 | Password Management | Operational; DefaultPasswordProvider integrated |
 | Dashboard | Existing dashboard unchanged |
 | Investments | Future module |
+| Testing | 17 active tests passing |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
 
 
-## Architecture Map
+## Canonical Import Pipeline
 
 ```text
-
 ImportCoordinator
 ↓
 PasswordProvider
@@ -73,60 +69,9 @@ SQLite
 ↓
 Stores
 ↓
-
 ViewModels
- │
- ▼
-Stores
- │
- ▼
-Repository Protocols
- │
- ▼
-Repository Implementations
- │
- ▼
-SQLite
-
-────────────────────────────
-
-Import Request
- │
- ▼
-ImportCoordinator
- │
- ▼
-Reader
- │
- ▼
-FinancialDocument
- │
- ▼
-Institution Detection
- │
- ▼
-Document Classification
- │
- ▼
-Parser Selection
- │
- ▼
-Statement Parser
- │
- ▼
-Validation
- │
- ▼
-Repository Protocols
- │
- ▼
-Repository Implementations
- │
- ▼
-SQLite
- │
- ▼
-Stores
+↓
+Dashboard
 ```
 
 ## Documentation Index
@@ -144,6 +89,8 @@ Stores
 | .github/prompts.md             | Prompt templates and examples for AI responses         | AI onboarding                    | Medium      |
 | Project documents/Codex response.md | Latest sprint summary, build/test results, decisions | Sprint reviews, bug fixes, testing | High        |
 
+Only consult the documents required by the Task Routing Guide. Do not load the complete documentation set unless performing a full architecture or repository review.
+
 ## Documentation Precedence
 
 The precedence for documentation is as follows:
@@ -158,6 +105,8 @@ The precedence for documentation is as follows:
 
 Approved documentation always overrides any implicit or assumed implementation details.
 
+Project_Guide.md is the navigation document. It routes readers to the authoritative source rather than duplicating detailed guidance.
+
 ## Project Principles
 
 - Offline First
@@ -166,6 +115,7 @@ Approved documentation always overrides any implicit or assumed implementation d
 - Protocol-Oriented Architecture
 - Deterministic Before Intelligent
 - Financial Truth Never Changes
+- Reference Fixtures Define Financial Truth
 - One Sprint Per Implementation
 - Documentation Before Implementation
 
@@ -193,6 +143,8 @@ Approved documentation always overrides any implicit or assumed implementation d
 | Parser Implementation | Architecture_v1.0_Frozen.md, ADR.md                               |
 | Institution Detection | Architecture_v1.0_Frozen.md, ADR.md                               |
 | Password Handling     | Architecture_v1.0_Frozen.md, ADR.md                               |
+| PDF Reader | Architecture_v1.0_Frozen.md, ADR.md, Engineering Standards.md |
+| Reference Fixtures | Project_Guide.md, Project documents/Codex response.md |
 | UI Work               | Architecture_v1.0_Frozen.md, Engineering Standards.md             |
 | Testing               | Project documents/Codex response.md, Engineering Standards.md     |
 | Bug Fixes             | Project documents/Codex response.md, Engineering Standards.md     |
@@ -202,12 +154,14 @@ Approved documentation always overrides any implicit or assumed implementation d
 ## Repository Structure
 
 - **Database:** Contains database schema definitions and migration scripts.  
-- **Import:** Modules and code for import pipeline and data ingestion.  
+- **Import:** Unified Import Framework including coordinators, registries, readers, password handling protocols and import models.  
 - **Models:** Domain models and business logic entities.  
-- **Stores:** Data persistence and repository layer implementations.  
+- **Core:** Runtime stores and shared application state.  
 - **ViewModels:** Presentation logic for UI components.  
 - **Views:** UI components, screens, and layouts.  
-- **Services:** Background services, helpers, and utilities.  
+- **Services:** Business services and legacy import support during migration.  
+- **LedgerForgeTests:** Unit, integration, fixture and contract tests.  
+- **LedgerForgeUITests:** UI automation tests.  
 - **Project documents:** Documentation, architecture records, sprint reports.  
 - **.github:** GitHub-specific configuration, AI instructions, prompts, and context.  
 - **Tests:** Automated tests including unit, integration, and UI tests.  
@@ -253,7 +207,8 @@ Additionally:
 
 - Confirm the requested sprint and stop condition.
 - Read Project_Guide.md first.  
-- Read only the documents required by the Task Routing Guide.  
+- Use the Task Routing Guide before opening any other document.
+- Read only the documents identified by the Task Routing Guide.  
 - Review Project documents/Codex response.md.  
 - Produce an implementation plan.  
 - Wait for approval before coding.  
@@ -290,33 +245,65 @@ Additionally:
 
 Maintain a concise list of active architectural and implementation debt.
 
-Typical entries include:
-
+Current items:
 
 - ImportEngine still owns analysis, normalization, parser selection, validation and store updates.
-- Axis PDF regression fixture still required for cross-format verification.
 - Institution Detection Framework not yet implemented.
 - Additional approved regression fixtures should be added for future institutions (CBQ, HDFC, SBI, etc.).
 - Additional import fixtures should compare equivalent financial truth across CSV and PDF where available.
 
-
 Remove items as they are completed.
+
+## Reference Fixtures
+
+The following fixtures define the approved financial baseline used throughout LedgerForge development.
+
+### Approved Baseline
+
+- Axis Bank NRE CSV
+- Axis Bank NRE PDF (same statement period)
+
+Both fixtures represent identical financial truth.
+
+Future readers, parsers and import pipelines must produce equivalent observable financial results unless an intentional behavioural change is explicitly approved.
+
+### Future Fixtures
+
+As new institutions are supported, each approved fixture should include:
+
+- Original source document
+- Expected financial results
+- Expected parser
+- Validation outcome
+
+Every supported import format should be validated against an approved baseline fixture whenever an equivalent statement exists.
 
 ## Future Modules
 
-
 - Institution Detection Framework
-
 - XLS/XLSX Reader
 - OCR
-- Institution Detection
 - Rules Engine
 - Multi-Currency Dashboard
 - Investments
 - Insurance
 - Salary Reconciliation
 - Search (FTS5)
+
 Mark completed items as appropriate over time.
+
+## Context Optimisation
+
+To minimise token consumption:
+
+- Read Project_Guide.md first.
+- Use the Task Routing Guide.
+- Open only the documents required for the requested task.
+- Do not reread unchanged reference documents.
+- Treat sprint reports as historical unless the current task requires them.
+- Prefer referencing documentation over repeating it.
+
+This layered documentation approach keeps AI context small while preserving deterministic behaviour.
 
 ## Instructions for AI Assistants
 
@@ -333,7 +320,10 @@ Mark completed items as appropriate over time.
 - Never invent financial rules or statement layouts.  
 - Never silently change financial behaviour.  
 - If uncertain, stop and explain rather than guessing.
-
+- Prefer document references over duplicated instructions.
+- Avoid loading unrelated architecture documents.
+- Treat Project_Guide.md as the repository index.
+  
 ## Project Philosophy
 
 LedgerForge evolves through small, fully reviewed, production-quality sprints.
