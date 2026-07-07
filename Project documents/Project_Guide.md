@@ -220,6 +220,14 @@ Additionally:
 - Do not redesign approved architecture.  
 - Build continuously.  
 - Run tests where applicable.  
+- If the project builds successfully and required sprint tests pass, prepare an automated Git commit.
+- Verify `git status` contains only sprint-related files.
+- Verify there are no unresolved merge conflict markers.
+- Generate a concise commit message describing the completed sprint work.
+- Commit the sprint changes.
+- Push to `origin/main`.
+- Record the commit hash and push result in `Project documents/Codex response.md`.
+- If the build or required tests fail, do not commit or push. Record the failure and stop.
 - Keep changes limited to the approved sprint.  
 - Keep commits logically grouped.
 - Prefer extending existing architecture over introducing parallel implementations.
@@ -227,7 +235,7 @@ Additionally:
 ### 3. Before stopping
 
 - Update Project documents/Codex response.md.  
-- Include summary, files created, files modified, build result, test result, documentation updated, remaining technical debt, deferred items and next recommended sprint.  
+- Include summary, files created, files modified, build result, test result, commit hash (if committed), push result, documentation updated, remaining technical debt, deferred items and next recommended sprint.  
 - Stop exactly at the approved sprint boundary.  
 - Confirm the repository builds successfully before considering the sprint complete.
 
@@ -320,6 +328,11 @@ This layered documentation approach keeps AI context small while preserving dete
 - Never invent financial rules or statement layouts.  
 - Never silently change financial behaviour.  
 - If uncertain, stop and explain rather than guessing.
+- Never commit if the project does not build successfully.
+- Never push if required sprint tests fail.
+- Verify only sprint-related files are staged before every commit.
+- Verify no unresolved merge conflict markers exist before every commit.
+- Generate commit messages from completed work rather than generic templates.
 - Prefer document references over duplicated instructions.
 - Avoid loading unrelated architecture documents.
 - Treat Project_Guide.md as the repository index.

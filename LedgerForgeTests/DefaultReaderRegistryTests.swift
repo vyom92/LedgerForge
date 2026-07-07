@@ -18,7 +18,7 @@ struct DefaultReaderRegistryTests {
 
     @Test func registryResolvesPDFDocumentReader() async throws {
         let registry = DefaultReaderRegistry()
-        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/statement.ofx"))
+        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/statement.pdf"))
 
         let reader = await registry.reader(for: request)
 
@@ -66,7 +66,7 @@ struct DefaultReaderRegistryTests {
     @Test func coordinatorReturnsTypedFailureForUnsupportedExtension() async throws {
         let registry = DefaultReaderRegistry()
         let coordinator = DefaultImportCoordinator(readerRegistry: registry)
-        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/statement.pdf"))
+        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/statement.ofx"))
 
         let result = await coordinator.importDocument(request)
 

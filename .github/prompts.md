@@ -44,19 +44,32 @@ Stop and wait for approval before implementation.
 - Preserve user-visible behaviour  
 - Build continuously  
 - Run relevant tests after every significant change  
+- If the project builds successfully and required sprint tests pass, verify `git status` contains only sprint-related files.
+- Verify there are no unresolved merge conflict markers.
+- Generate a concise commit message based on the completed sprint work.
+- Commit the sprint changes.
+- Push to `origin/main`.
+- Record the commit hash and push result in `Project documents/Codex response.md`.
+- If the build or required tests fail, do not commit or push. Record the failure in `Project documents/Codex response.md` and stop.
 - Add new files to the Xcode navigator  
 - Add new files to target membership  
 - Update `Project documents/Codex response.md`  
 - Update `Project documents/Project_Guide.md` if project status changes  
 - Stop exactly at the sprint boundary  
 
-At completion provide:  
-- Files changed  
-- Architectural decisions  
-- Risks  
-- Remaining technical debt  
-- Recommended next sprint  
-- Suggested commit message  
+At completion provide:
+- Files changed
+- Files created
+- Files removed
+- Build status
+- Test status
+- Commit hash (if committed)
+- Push result
+- Architectural decisions
+- Risks
+- Remaining technical debt
+- Deferred work
+- Recommended next sprint
 
 ---
 
@@ -148,6 +161,7 @@ Confirm:
 - Document type detected correctly  
 - Transaction count preserved  
 - Validation behaviour unchanged  
+- Approved CSV/PDF reference fixtures preserve identical financial truth
 - Dashboard unchanged unless expected  
 - No parser regressions  
 
@@ -158,18 +172,19 @@ Produce a PASS / FAIL summary.
 # Sprint Completion Report
 
 Provide:
-
-- Build status  
-- Test status  
-- Files modified  
-- Files created  
-- Files removed  
-- Architectural decisions  
-- Technical debt  
-- Known issues  
-- Risks  
-- Next sprint recommendation  
-- Commit message  
+- Build status
+- Test status
+- Commit hash
+- Push result
+- Files modified
+- Files created
+- Files removed
+- Architectural decisions
+- Technical debt
+- Known issues
+- Risks
+- Deferred work
+- Next sprint recommendation
 
 ---
 

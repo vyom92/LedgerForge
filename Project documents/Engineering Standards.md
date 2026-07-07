@@ -22,6 +22,9 @@ If the answer to all five is "No", do not build it.
 
 1. The project must build successfully after every completed sprint.
 2. Prefer small, verifiable commits over large refactors.
+2a. Only commit after the project builds successfully and required sprint tests pass.
+2b. Before committing, verify there are no unresolved merge conflict markers and only sprint-related files are staged.
+2c. Successful sprint work should be pushed to `origin/main` immediately after the commit.
 3. New features should integrate with the existing architecture rather than bypass it.
 4. Avoid duplicate business logic.
 5. Offline-first is the default.
@@ -123,15 +126,23 @@ Implementation:
 2. Verify the filename in the header comment matches the intended file.
 3. Implement one logical change.
 4. Build.
-5. Test.
-6. Commit.
-7. Move to the next file.
+5. Run the required sprint tests.
+6. Verify `git status` contains only sprint-related changes.
+7. Verify there are no unresolved merge conflict markers.
+8. Generate a concise commit message describing the completed work.
+9. Commit.
+10. Push to `origin/main`.
+11. Move to the next file.
 
 # Definition of Done
 
 A task is complete only when:
 
 - The project builds successfully.
+- Required sprint tests pass.
+- No unresolved merge conflict markers exist.
+- The completed sprint has been committed.
+- The completed sprint has been pushed to `origin/main`.
 - Existing functionality still works.
 - The feature has been manually verified.
 - Approved reference fixtures continue producing identical financial truth.
@@ -197,6 +208,10 @@ The code should make adding the next financial institution easier than adding th
 - Never invent financial rules.
 - Verify the filename in the header comment before editing.
 - Build after every significant change.
+- Never commit if the build or required tests fail.
+- Verify only sprint-related files are staged before committing.
+- Generate commit messages from completed work rather than generic templates.
+- Report the commit hash after every successful automated commit.
 - Resolve compile errors before continuing.
 - Run regression tests whenever parser or import code changes.
 - Verify approved CSV/PDF reference fixtures before merging reader or parser changes.

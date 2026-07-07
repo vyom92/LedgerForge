@@ -35,6 +35,13 @@ Every implementation must:
 - Never implement future sprint work.
 - Build continuously.
 - Run relevant tests where applicable.
+- If the project builds successfully and all required tests for the approved sprint pass, automatically prepare a Git commit.
+- Generate a concise commit message that accurately summarizes the completed work.
+- Stage only files related to the approved sprint.
+- Commit the changes.
+- Push to `origin/main`.
+- Report the commit hash in `Project documents/Codex response.md`.
+- If the build or required tests fail, do not commit or push. Record the failure in `Project documents/Codex response.md` and stop.
 - Leave zero compile errors introduced by the sprint.
 - Add every new file to the Xcode navigator.
 - Add every new source file to the correct target membership.
@@ -50,6 +57,8 @@ Update `Project documents/Codex response.md` with:
 - Files Created
 - Files Modified
 - Build Result
+- Commit Hash (if committed)
+- Push Result
 - Test Result
 - Architecture Decisions
 - Documentation Updated
@@ -80,6 +89,9 @@ Before considering a sprint complete, confirm:
 - Stop condition respected.
 - Project builds successfully.
 - Relevant tests pass or skipped tests are justified.
+- Successful builds have been committed.
+- Successful commits have been pushed to `origin/main`.
+- Commit message accurately reflects the completed sprint work.
 - Documentation updated.
 - Codex response updated.
 - No future sprint work included.

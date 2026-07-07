@@ -158,6 +158,7 @@
 		281BB15F2FFC48C4006E7424 /* Exceptions for ".github" folder in "LedgerForge" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				AGENTS.md,
 				"ai-instructions.md",
 				context.md,
 				prompts.md,
