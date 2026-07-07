@@ -1,8 +1,8 @@
 # LedgerForge Architecture v1.0 (Frozen)
 
-**Status:** Frozen for Milestone B
+**Status:** Frozen v1.0 baseline, current through Milestone C recovery
 
-This document is the architectural baseline for LedgerForge until Milestone B is complete.
+This document is the architectural baseline for LedgerForge v1.0. It remains frozen except for status-alignment updates required to reflect completed implementation milestones and approved ADRs.
 
 ## Vision
 
@@ -18,6 +18,8 @@ LedgerForge is an offline-first personal financial operating system that automat
 - Financial values must be consistently formatted according to their locale.
 - Every imported value must be traceable.
 - Readers know file formats.
+- Readers produce RawDocument and never perform financial interpretation.
+- Passwords are resolved by the import coordination layer and supplied to readers when required.
 - Parsers know institutions and document families.
 - Rules know business meaning.
 - Plugin parser architecture.
@@ -27,6 +29,7 @@ LedgerForge is an offline-first personal financial operating system that automat
 - Financial intelligence should always be explainable.
 - Learn statement formats instead of hardcoding institutions whenever practical.
 - Every successful import should improve the system.
+- Approved reference fixtures define financial truth across equivalent document formats.
 - Preserve user trust through deterministic processing and full auditability.
 
 ## Design Philosophy
@@ -44,8 +47,11 @@ Every subsystem should ultimately improve one of three things:
 If a feature does not improve at least one of these, it should be reconsidered.
 ## Import Pipeline
 
-Financial Document
+ImportCoordinator
+→ PasswordProvider
+→ ReaderRegistry
 → Reader (PDF / CSV / XLS / XLSX / TXT)
+→ RawDocument
 → FinancialDocument
 → Institution Detection
 → Document Classification
@@ -53,26 +59,32 @@ Financial Document
 → Statement Parser
 → Validation
 → Import Session
-→ TransactionStore
-→ AccountStore
-→ Rules Engine
+→ Repositories
 → SQLite
+→ Stores
 → DashboardViewModel
 → Financial Dashboard
 
 ### Pipeline Principles
 
+- ImportCoordinator owns import orchestration.
+- PasswordProvider resolves optional passwords before reader execution.
+- ReaderRegistry selects the appropriate reader for the requested file format.
 - Readers understand file formats only.
+- Readers produce RawDocument.
 - Readers never perform financial interpretation.
+- Readers never access Keychain, UI prompts or password policy directly.
 - Institution Detection identifies the originating institution using extracted document content.
 - Document Classification determines the document family (Bank, Credit Card, Brokerage, Salary, Insurance, etc.).
 - Parser Selection chooses the correct parser implementation.
+- Normalization converts RawDocument into FinancialDocument.
 - Statement Parsers transform FinancialDocument into normalized domain objects.
 - Validation is the only stage permitted to verify financial correctness.
-- TransactionStore is the single source of truth for transactions.
-- AccountStore is the single source of truth for accounts.
+- Repository protocols are the persistence boundary for transactions and accounts.
+- Stores expose validated runtime state to the UI.
 - Rules Engine enriches validated financial data but never alters imported financial truth.
-- Every supported file format must converge into the same FinancialDocument model before parsing.
+- Every supported file format must converge into the same RawDocument-to-FinancialDocument pipeline before parsing.
+- Equivalent reference fixtures across CSV, PDF and future formats must preserve the same observable financial truth.
 
 ## Core Domain
 
@@ -85,6 +97,7 @@ Financial Document
 - Rule
 - Category
 - DocumentMetadata
+- RawDocument
 - FinancialDocument
 - DocumentClassification
 - TransactionStore
@@ -123,8 +136,8 @@ Financial Document
 ## Milestones
 
 - Milestone A: Foundation ✅
-- Milestone B: Import Foundation v1.0
-- Milestone C: Universal Import Profiles
+- Milestone B: Import Foundation v1.0 ✅
+- Milestone C: Unified Import Framework Operational ✅
 - Milestone D: Multi-Institution Support
 - Milestone E: Rules Engine, Categorization & Reconciliation
 - Milestone F: Dashboard & Financial Intelligence
@@ -175,7 +188,9 @@ Principles:
 
 The following concepts are intentionally excluded from Architecture v1.0 but are planned for future milestones:
 
-- Universal Import Profiles
+- Institution Detection Framework
+- XLS/XLSX Reader
+- OCR fallback for scanned documents
 - Statement Learning Mode
 - Profile Library
 - AI-assisted Column Detection
@@ -188,7 +203,7 @@ These features must evolve without violating the core principles defined in this
 
 ## Architecture Freeze
 
-No major architectural changes until Milestone B is complete unless:
+No major architectural changes to the v1.0 baseline unless:
 
 1. A real financial document exposes a fundamental design flaw.
 2. The change benefits multiple document families.
