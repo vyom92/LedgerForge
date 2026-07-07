@@ -15,6 +15,7 @@ Before performing any planning, review, implementation or refactoring:
 
 - Work on one approved sprint only.
 - Stop exactly at the approved sprint boundary.
+- If the project builds successfully and required sprint tests pass, automatically prepare a Git commit.
 - Verify `git status` contains only sprint-related files before committing.
 - Verify there are no unresolved merge conflict markers before committing.
 - Generate a concise commit message based on the completed sprint work.
