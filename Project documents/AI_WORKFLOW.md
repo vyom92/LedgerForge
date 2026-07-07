@@ -36,7 +36,7 @@ Every implementation must:
 - Never implement future sprint work.
 - Build continuously.
 - Run relevant tests where applicable.
-- If the project builds successfully and all required tests for the approved sprint pass, automatically prepare a Git commit.
+- If the project builds successfully and all required tests for the approved sprint pass, automatically prepare a Git commit only after verifying that staged files belong exclusively to the approved sprint.
 - Generate a concise commit message that accurately summarizes the completed work.
 - Stage only files related to the approved sprint.
 - Commit the changes.
@@ -44,6 +44,7 @@ Every implementation must:
 - If a sprint tag is created, push the tag after the branch push succeeds.
 - Update `Project documents/PROJECT_STATE.md` only after a successful commit and push.
 - Record the commit hash, tag (if created) and push result in `Project documents/Codex response.md`.
+- Ensure `Project documents/Codex response.md`, `Project documents/PROJECT_STATE.md` and `Project documents/Project_Guide.md` are mutually consistent before closing the sprint.
 - If the build or required tests fail, do not commit or push. Record the failure in `Project documents/Codex response.md` and stop.
 - Leave zero compile errors introduced by the sprint.
 - Add every new file to the Xcode navigator.
@@ -51,6 +52,7 @@ Every implementation must:
 - Use strongly typed models across architectural boundaries.
 - Never bypass repository abstractions.
 - Never access SQLite directly from Views, ViewModels or Stores.
+- Repository-backed runtime store hydration is the only approved path from persistence into observable application state.
 
 ## Before Stopping
 
@@ -98,6 +100,7 @@ Before considering a sprint complete, confirm:
 - Successful commits have been pushed to the tracked branch.
 - Commit message accurately reflects the completed sprint work.
 - Documentation updated.
+- Documentation consistency verified across Project_Guide.md, PROJECT_STATE.md and Codex response.md.
 - Codex response updated.
 - No future sprint work included.
 - Repository remains in a buildable state.

@@ -2,7 +2,7 @@
 
 # LedgerForge — Database v1 Architecture (Design Baseline)
 
-Status: Database v1 design baseline, aligned through Sprint 18 / Milestone M6
+Status: Database v1 design baseline, aligned through Sprint 19 / Milestone M7
 ## Summary
 
 This document defines the LedgerForge Database v1 architecture. It is a vendor-neutral, SQLite-targeted design that fulfills the project's ADRs, Architecture_v1.0, Product Vision and Engineering Standards. The design prioritizes:
@@ -63,7 +63,7 @@ Presentation consists of dashboard calculations, currency conversion, reporting 
 
 Every architectural decision must preserve this separation.
 
-Checklist — what this proposal contains
+Checklist — what this design baseline contains
 
 - Every required table and a description of its purpose
 - Columns, primary keys, foreign keys and recommended types
@@ -78,7 +78,7 @@ Checklist — what this proposal contains
 - Detailed statement fingerprinting algorithm and schema
 - Security, operational and testing notes
 
-Important design conventions
+## Important design conventions
 
 - Use UUID (TEXT) primary keys for domain entities for offline-first portability and easier sync/merge later.
 - Preserve exact imported values: store amount_decimal (TEXT) for audit and amount_minor (INTEGER) for efficient numeric queries. The conversion uses currencies.minor_unit.
@@ -239,7 +239,7 @@ These traceability columns (`reader_version`, `parser_version`, `layout_version`
 - Notes: Fundamental for audit, fingerprinting, and row-level validation.
 
 9) accounts
-- Purpose: canonical ledger accounts (AccountStore ownership) (ADR-013)
+- Purpose: canonical ledger accounts persisted through repositories and exposed through runtime stores (ADR-013)
 - Columns:
   - id TEXT PRIMARY KEY -- UUID
   - workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE
@@ -267,7 +267,7 @@ These traceability columns (`reader_version`, `parser_version`, `layout_version`
 - Notes: Use to resolve accounts across imports.
 
 11) transactions
-- Purpose: canonical parsed transactions owned by TransactionStore (ADR-013). Transactions keep native currency and are flagged trusted only after validation.
+- Purpose: canonical parsed transactions persisted through repositories and exposed through runtime stores (ADR-013). Transactions keep native currency and are flagged trusted only after validation.
 - Columns:
   - id TEXT PRIMARY KEY -- UUID
   - workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE
@@ -426,7 +426,7 @@ III. How imported documents map into accounts & transactions (traceability)
 6. ImportValidator validates the FinancialDocument and produces deterministic validation results.
 7. Repository persistence is allowed only after validation passes.
 8. If validation passes: create/update the import session, create/match accounts through approved repository boundaries, persist trusted transactions, and update runtime stores after validated writes complete successfully.
-9. Dashboard and reports query only `transactions WHERE is_trusted=1` to guarantee ADR-010 compliance.
+9. Dashboard and report data must be loaded through repository-backed runtime state and include only trusted transactions to guarantee ADR-010 compliance.
 
 IV. Multi-currency support
 
@@ -658,7 +658,7 @@ XVIII. Next steps (recommended)
 2. Add migration tests whenever schema changes are introduced.
 3. Add approved fixtures for each newly supported institution before treating parser behaviour as stable.
 4. Preserve RawDocument and row-level traceability for every supported file format.
-5. Review database implications before implementing Dashboard Foundation, Insights & Analytics, Multi-Currency, Investments or document/institution persistence features.
+5. Review database implications before implementing Dashboard refinement, Insights & Analytics, Multi-Currency, Investments or document/institution persistence features.
 
 XIX. Appendix: canonical fields and conventions
 
@@ -680,4 +680,4 @@ End of design baseline
 
 
 --
-Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through Sprint 18 / Milestone M6. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.
+Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through Sprint 19 / Milestone M7. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.

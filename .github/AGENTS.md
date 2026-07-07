@@ -33,10 +33,14 @@ Before performing any planning, review, implementation or refactoring:
 - Preserve existing user-visible behaviour unless explicitly requested.
 - Preserve the approved import pipeline: Reader → RawDocument → Institution Detection → Statement Classification → Parser Selection → FinancialDocument → Validation → Repository Persistence → Runtime Stores → UI.
 - Prefer extending existing architecture over creating parallel implementations.
+- Reuse existing repository contracts where practical. Introduce new repository APIs only when existing contracts cannot express the required behaviour cleanly.
 - Never bypass repository abstractions.
+- Repository-backed runtime store hydration is the only approved path from persistence into observable application state.
 - Never access SQLite directly from Views, ViewModels or Stores.
 - Add new source files to the Xcode navigator and correct target membership.
+- Prefer Xcode-safe project updates over manual .pbxproj edits whenever project tooling is available.
 - Keep `Project documents/Codex response.md` as the current sprint working log.
+- Record significant architectural decisions, validation exceptions and implementation rationale in the current sprint log as work progresses.
 - Keep `Project documents/PROJECT_STATE.md` as the permanent verified handoff.
 
 These rules intentionally summarize the autonomous Git workflow. Detailed implementation workflow, validation rules and documentation precedence remain defined in `Project documents/Project_Guide.md`.

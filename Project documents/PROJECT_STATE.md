@@ -196,7 +196,7 @@ Completed
 ## Outcome
 - Repository-backed runtime store hydration implemented.
 - `RepositoryStoreHydrator` added.
-- Read-only dashboard repository APIs added for account lists and trusted transactions.
+- Repository read capabilities extended to support dashboard hydration while preserving existing repository semantics.
 - Dashboard startup hydrates runtime stores once per application launch unless explicitly refreshed.
 - Existing dashboard panel now shows repository-backed account overview and hydration status.
 - `RepositoryStoreHydratorTests` added.
@@ -218,7 +218,7 @@ Completed
 - Latest Tag: `sprint-19`
 - Latest ADR: ADR-022 — Preview Compatibility During Test Builds
 - Architecture Baseline: Sprint 19
-- Latest Milestone: Dashboard Foundation
+- Latest Milestone: Dashboard Foundation (Phase 1)
 - Build: Passing
 - Validation: Build passing; full regression baseline passing. Sprint 19 validation complete.
 
@@ -265,9 +265,11 @@ Scope:
 - Planning required before implementation.
 - Preserve validated import, persistence and repository boundaries from Sprint 19.
 - Dashboard work must consume repository-backed data rather than bypass repository boundaries.
+- Startup hydration must remain deterministic and execute exactly once per application launch unless an explicit refresh is requested.
 
 Out of Scope:
 - Transaction extraction changes
+- Import pipeline changes
 - UI changes
 - OCR
 - AI inference

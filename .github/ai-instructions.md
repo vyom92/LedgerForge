@@ -28,6 +28,7 @@ Before writing code:
 - Validation always precedes persistence.
 - Repository protocols are the only abstraction permitted to access persistence.
 - Repository implementations are the only components permitted to communicate with SQLite.
+- Repository-backed runtime store hydration is the only approved path from persistence into observable application state.
 - Views never access SQLite.
 - ViewModels never access SQLite.
 - Stores never access SQLite.
@@ -51,8 +52,10 @@ Every new source file must:
 - Compile successfully.
 
 Prefer extending existing architecture over creating parallel implementations.
+- Reuse existing repository contracts where practical. Introduce new repository APIs only when existing contracts cannot express the required behaviour cleanly.
 
 Prefer migration over duplication.
+- Prefer Xcode-safe project updates over manual .pbxproj edits whenever project tooling is available.
 
 ## Financial Rules
 
@@ -79,11 +82,13 @@ Before completion:
 At the end of every implementation:
 
 - Update `Project documents/Codex response.md`.
+- Maintain the sprint log throughout implementation by recording significant architectural decisions, validation exceptions and implementation rationale as they occur.
 - Record build result, validation result, commit hash, tag (if created) and push result.
 - Update `Project documents/PROJECT_STATE.md` after a successful commit, push and tag (if applicable).
 - Update `Project documents/Project_Guide.md` only if workflow, roadmap or engineering guidance changed.
 - Ensure Project_Guide.md, PROJECT_STATE.md and Codex response.md are mutually consistent before beginning the next sprint.
 - Record deferred work.
+- Before closing a sprint, verify that staged files contain only approved sprint work.
 - Stop exactly at the approved sprint boundary.
 
 If implementation exposes a genuine architectural inconsistency, stop, document it in Project documents/Codex response.md, and resolve the documentation before continuing implementation.

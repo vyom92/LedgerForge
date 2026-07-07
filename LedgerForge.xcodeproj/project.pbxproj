@@ -167,6 +167,7 @@
 		28B87B3C2FFBBFC8009BEE8C /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
 		28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountStore.swift; sourceTree = "<group>"; };
 		28D11EA92FFDA6CB00C12A68 /* RepositoryStoreHydrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryStoreHydrator.swift; sourceTree = "<group>"; };
+		28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BUILD_AND_PROJECT_CONVENTIONS.md; sourceTree = "<group>"; };
 		28D8CB5E2FFD1E3C005B419A /* StatementClassificationDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementClassificationDetector.swift; sourceTree = "<group>"; };
 		28D8CB622FFD21B7005B419A /* TestPlan.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = TestPlan.xctestplan; sourceTree = "<group>"; };
 		28E945442FFD671F00FB69E4 /* ImportPersistenceMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPersistenceMapper.swift; sourceTree = "<group>"; };
@@ -482,6 +483,7 @@
 		28B87B272FFB2C90009BEE8C /* Project documents */ = {
 			isa = PBXGroup;
 			children = (
+				28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */,
 				281BB1782FFC4CDA006E7424 /* Project_Guide.md */,
 				28B87B2E2FFB2D25009BEE8C /* ADR.md */,
 				286242762FFD168100B8AA66 /* PROJECT_STATE.md */,

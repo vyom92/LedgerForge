@@ -67,7 +67,7 @@ Repositories
 ↓
 SQLite
 ↓
-Stores
+Runtime Stores
 ↓
 ViewModels
 ↓
@@ -135,8 +135,9 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 - Parser Selection chooses the appropriate parser.
 - Statement Parsers produce FinancialDocument.
 - FinancialDocument is validated before persistence.
-- Stores own runtime state.
+- Runtime Stores own observable application state.
 - The dashboard observes stores rather than querying persistence.
+- Repository-backed startup hydration executes once per application launch unless an explicit user refresh is requested.
 
 ## Task Routing Guide
 
@@ -297,9 +298,10 @@ Additionally:
 - Audit trail
 
 ### M7 – Dashboard Experience 🚧
-- Accounts
-- Net Worth
-- Cash Flow
+- Repository-backed startup hydration ✅
+- Accounts overview ✅
+- Transaction browsing 🚧
+- Dashboard refinement
 - Search
 - Filters
 - Trends
@@ -361,9 +363,9 @@ Every supported import format should be validated against an approved baseline f
 - Rules Engine
 
 ### Dashboard
+- Dashboard refinement
 - Search (FTS5)
 - Multi-Currency Dashboard
-- Accounts Overview
 - Net Worth
 - Cash Flow
 

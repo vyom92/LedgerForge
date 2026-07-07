@@ -66,6 +66,8 @@ Stop and wait for approval before implementation.
 - Add new files to the Xcode navigator.
 - Add new files to target membership.
 - Stop exactly at the approved sprint boundary.
+- Prefer reusing existing repository contracts. Introduce new repository APIs only when existing contracts cannot express the required behaviour cleanly.
+- Record significant architectural decisions, implementation rationale and validation exceptions in `Project documents/Codex response.md` as they occur, not only at sprint completion.
 
 ### Completion Report
 
@@ -160,6 +162,8 @@ Improve maintainability without changing behaviour.
 - Validation remains centralized.
 - Repository persistence occurs only after successful validation.
 - Repository persistence completes before runtime stores are refreshed.
+- Repository-backed runtime store hydration remains the only approved persistence → UI path.
+- Startup hydration executes exactly once per application launch unless an explicit refresh is requested.
 - Runtime Stores own observable application state.
 - Views contain no business logic.
 - No duplicated financial calculations.
@@ -196,6 +200,7 @@ Provide:
 
 - Build status
 - Validation status
+- Authoritative validation path (Command-line or Xcode)
 - Commit hash
 - Tag (if created)
 - Push result
@@ -208,6 +213,7 @@ Provide:
 - Risks
 - Deferred work
 - Recommended next sprint
+- Documentation consistency verified (`Project_Guide.md`, `PROJECT_STATE.md`, `Codex response.md`)
 
 ---
 
