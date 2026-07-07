@@ -28,15 +28,14 @@ This document defines the LedgerForge Database v1 architecture. It is a vendor-n
 LedgerForge uses an ImportCoordinator as the orchestration layer for every financial document import.
 
 The ImportCoordinator is responsible for:
-
+- Receiving import requests.
+- Resolving optional passwords through PasswordProvider.
 - Selecting the appropriate Document Reader.
-- Performing initial institution detection when appropriate.
-- Resolving encrypted document passwords.
-- Invoking Document Readers.
+- Invoking the selected Document Reader.
 - Creating ImportSessions.
 - Coordinating Institution Detection.
 - Coordinating Document Classification.
-- Selecting the appropriate Parser Profile.
+- Selecting the appropriate Import Profile.
 - Coordinating Validation.
 - Persisting validated domain objects.
 - Reporting progress to the user interface.
@@ -216,12 +215,12 @@ Recommended `document_type` values:
 These traceability columns (`reader_version`, `parser_version`, `layout_version`) are intended for long-term parser traceability and debugging: they allow an import session to be associated with the exact reader/parser/layout versions used to produce the normalized output and parsed candidates.
 
 7) normalized_documents
-- Purpose: persistent canonical representation of Document Reader output (FinancialDocument) (ADR-011)
+- Purpose: persistent canonical representation of Document Reader output (RawDocument) (ADR-011)
 - Columns:
   - id TEXT PRIMARY KEY -- UUID
   - import_session_id TEXT NOT NULL REFERENCES import_sessions(id) ON DELETE CASCADE
   - document_id TEXT REFERENCES documents(id) ON DELETE SET NULL
-  - normalized_json JSON NOT NULL -- canonical FinancialDocument
+  - normalized_json JSON NOT NULL -- canonical RawDocument
   - schema_version TEXT
   - primary_language TEXT
   - created_at DATETIME
@@ -422,9 +421,9 @@ III. How imported documents map into accounts & transactions (traceability)
 
 1. User triggers import → create `import_sessions` row (validation_status='pending').
 2. For each uploaded file, create `documents` row with sha256 and storage_path.
-3. Document Reader normalizes file to `normalized_documents.normalized_json` and inserts `normalized_rows` for each row.
-4. InstitutionDetector/ParserSelection identify `import_profiles` and `institutions`.
-5. Statement Parser consumes `normalized_rows` and creates candidate `transactions` (is_trusted=0) and `transaction_raw_rows` linking transactions → normalized_rows.
+3. Document Reader extracts the file into RawDocument.
+4. Normalization produces FinancialDocument and persists normalized_documents and normalized_rows.
+5. Institution detection, classification and parser selection determine the Import Profile before parsing creates candidate transactions.
 6. ImportValidator runs, writes `validation_issues` and computes `validation_summary`.
 7. Update `import_sessions.validation_status` to 'passed' / 'failed' / 'warning'.
 8. If 'passed': mark associated transactions `is_trusted=1` and set `trusted_at`. Create/match `accounts` using `account_identifiers`; set `created_from_import_session_id` for provenance.
@@ -443,7 +442,7 @@ Password management is outside the responsibility of Document Readers.
 
 Encrypted financial documents are unlocked before extraction using institution-specific credentials stored securely within the operating system's secure credential storage.
 
-Document Readers always receive an accessible document stream.
+Document Readers always receive either an already-accessible document or the resolved password required to open it.
 
 Document Readers never perform decryption.
 
@@ -480,8 +479,9 @@ Downstream components remain unaware of whether OCR was required.
 
 V. Format-independence: PDF, CSV, XLS/XLSX, TXT mapping
 
-- Document Readers convert each file format into a canonical `FinancialDocument` (normalized JSON). The schema of `normalized_documents.normalized_json` is the canonical ingestion contract between Document Readers and Parsers.
-- `normalized_rows` persist the per-row canonical fields so downstream parsers, validators and stores operate on the same model regardless of file format.
+- Document Readers convert each supported file format into RawDocument.
+- Normalization converts RawDocument into the canonical FinancialDocument used by parsers.
+- normalized_rows persist the canonical row representation so downstream parsers, validators and stores operate identically regardless of file format.
 - `documents` preserves original file-level metadata for audit.
 
 VI. Validation metadata storage & workflow (ADR-010)
@@ -622,7 +622,7 @@ CREATE TABLE document_fingerprints (
 
 XV. Testing & verification recommendations
 
-- Build a regression fixture suite of real-world exported documents (Axis, HDFC, Amex, IBKR) and assert that: normalized_documents & normalized_rows accurately preserve reader extraction, parsers generate expected transactions, validation identifies known issues, and trusted transactions appear only after validation passes.
+- Maintain approved CSV and PDF reference fixtures for every supported institution. Verify identical financial truth across equivalent formats, ensure RawDocument extraction remains stable, FinancialDocument normalization is deterministic, parsers generate expected transactions, validation detects expected issues, and only trusted transactions reach dashboards.
 - Add unit tests for fingerprinting: identical normalized inputs must produce identical fingerprints; minor benign whitespace changes should not change fingerprint if normalization rules say so.
 - Add migration tests for every schema change using sample DBs representing previous versions.
 
