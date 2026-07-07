@@ -10,6 +10,10 @@ import Foundation
 /// Performs validation on imported transactions before they are trusted by the application.
 final class ImportValidator {
 
+    static func validate(financialDocument: FinancialDocument) -> ImportValidationResult {
+        validate(transactions: financialDocument.transactions)
+    }
+
     static func validate(transactions: [Transaction]) -> ImportValidationResult {
 
         var issues: [ValidationIssue] = []

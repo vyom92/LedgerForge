@@ -1,90 +1,91 @@
 # Codex Response
 
-# Sprint 14 - Implementation: Parser Selection Framework
+# Sprint 15 - Implementation: FinancialDocument Integration
 
 ## Summary
-Implemented the deterministic Parser Selection Framework for Sprint 14.
 
-The new parser-selection layer sits after Institution Detection and Statement Classification and before Statement Parser execution. It wraps the existing `StatementParserRegistry` instead of replacing or duplicating parser logic.
+Implemented Sprint 15 FinancialDocument Integration.
 
-Production import behaviour was not changed. Parser execution, transaction extraction, validation, repository persistence and UI behaviour remain unchanged.
+The production handoff now flows through an immutable `FinancialDocument` after parser execution and before validation:
+
+```text
+Statement Parser
+-> [Transaction]
+-> FinancialDocument
+-> ImportValidator.validate(financialDocument:)
+-> Stores
+```
+
+Existing parser extraction, validation calculations, repository behaviour, store behaviour and UI behaviour were preserved.
 
 ## Files Created
-- `Parsers/ParserSelection.swift`
-  - Adds the typed parser-selection result used by the selector.
-  - Captures the selected parser, parser name, match state, confidence, explainable reasons and legacy metadata.
 
-- `Parsers/StatementParserSelector.swift`
-  - Adds deterministic parser selection from `Document`, `ImportInstitutionCandidate` and `StatementClassification`.
-  - Bridges framework institution/classification results into legacy `DocumentMetadata`.
-  - Delegates parser lookup to `StatementParserRegistry`.
-  - Does not execute parsers.
+- `Models/FinancialDocument.swift`
+  - Adds immutable canonical parser-output handoff model.
+  - Contains no business logic and no financial calculations.
 
-- `LedgerForgeTests/StatementParserSelectionTests.swift`
-  - Adds parser-selection coverage for Axis CSV, Axis PDF, unknown institution, unknown statement type and unsupported institution code.
+- `Parsers/FinancialDocumentBuilder.swift`
+  - Adds deterministic construction from existing parser output.
+  - Does not recalculate financial data.
+  - Rejects unmatched parser selections explicitly.
+
+- `LedgerForgeTests/FinancialDocumentTests.swift`
+  - Adds regression coverage for FinancialDocument construction, validation delegation and unmatched parser selection.
 
 ## Files Modified
+
+- `Services/ImportValidator.swift`
+  - Added `validate(financialDocument:)`.
+  - The overload is a thin delegate to `validate(transactions:)` and contains no financial calculations.
+
+- `Services/ImportEngine.swift`
+  - Routes parsed transactions into `FinancialDocument` before validation.
+  - Store updates still receive the same parsed transactions and still occur only after validation passes.
+
 - `LedgerForge.xcodeproj/project.pbxproj`
-  - Updated by Xcode when adding the new Sprint 14 source and test files to the navigator and target membership.
+  - Updated by Xcode when new Sprint 15 source and test files were added to the project navigator and target membership.
 
 - `Project documents/Codex response.md`
-  - Replaced planning notes with this Sprint 14 implementation record.
+  - Updated with Sprint 15 implementation status and validation results.
 
 ## Build Result
+
 Passed.
 
-Validation performed:
-- Xcode `BuildProject`: passed.
+Build checkpoints completed:
 
-Command-line `xcodebuild test` with writable DerivedData reached compilation but failed on the known Xcode/SwiftUI `#Preview` macro tooling issue:
+- Baseline build before Sprint 15 code changes: passed.
+- Build after adding `FinancialDocument`: passed.
+- Build after adding `FinancialDocumentBuilder`: passed.
+- Build after adding `validate(financialDocument:)`: passed.
+- Build after adding `FinancialDocumentTests`: passed.
+- Build after `ImportEngine` handoff wiring: passed.
+
+## Validation Result
+
+Passed.
+
+Command-line `xcodebuild test` with writable DerivedData hit the known Xcode/SwiftUI `#Preview` macro tooling issue after successful Xcode builds:
 
 ```text
 External macro implementation type 'PreviewsMacros.SwiftUIView' could not be found for macro 'Preview(_:body:)'
 ```
 
-Per project workflow, the equivalent Xcode regression suite was run and treated as authoritative after the successful build.
-
-## Commit And Push Result
-Implementation commit:
-
-```text
-da117422d47ef9fe6f09fdfe110f88f54182b590
-```
-
-Implementation push result:
-
-```text
-origin/main updated to da117422d47ef9fe6f09fdfe110f88f54182b590
-```
-
-Note: `git push` reported that the remote branch was updated, then failed to update the local `refs/remotes/origin/main` tracking ref because sandbox permissions prevented creating the local lock file. Remote verification with `git ls-remote origin refs/heads/main` confirmed the pushed hash above.
-
-Project state handoff commit:
-
-```text
-beaf0c399e14d3a4ebd1ff23c42acf3124294a92
-```
-
-Project state push result:
-
-```text
-origin/main updated to beaf0c399e14d3a4ebd1ff23c42acf3124294a92
-```
-
-## Test Result
-Passed.
+Per project workflow, the equivalent Xcode regression suite was run through the active `TestPlan` and treated as authoritative.
 
 Xcode `RunSomeTests` result:
 
 ```text
-42 tests: 42 passed, 0 failed, 0 skipped, 0 expected failures, 0 not run
+46 tests: 46 passed, 0 failed, 0 skipped, 0 expected failures, 0 not run
 ```
 
 Suites covered:
+
+- `FinancialDocumentTests`
+- `CSVImportRegressionTests`
 - `StatementParserSelectionTests`
 - `StatementClassificationTests`
 - `InstitutionDetectionTests`
-- `CSVImportRegressionTests`
 - `PDFDocumentReaderTests`
 - `ImportFrameworkTests`
 - `DefaultReaderRegistryTests`
@@ -99,37 +100,63 @@ rg -n "^(<<<<<<<|=======|>>>>>>>)" .
 No unresolved merge conflict markers found.
 
 ## Behavioural Impact
+
 No user-visible behaviour changed.
 
-CSV import still uses the existing production path and existing parser execution. The new selector is framework-compatible infrastructure only.
+Approved Axis CSV financial truth remains unchanged:
+
+- Existing parser extraction logic is unchanged.
+- Existing validation calculations are unchanged.
+- Existing CSV regression baseline still passes.
+- Repository persistence was not modified.
+- UI was not modified.
 
 ## Architecture Decisions
-- Parser Selection is deterministic and explainable.
-- Parser Selection consumes Institution Detection and Statement Classification outputs.
-- Parser Selection maps framework context into legacy `DocumentMetadata` only as a compatibility bridge.
-- Parser Selection delegates to `StatementParserRegistry` so existing parser registration remains authoritative.
-- Parser Selection does not parse statements, create transactions, validate data, persist data or update UI.
 
-## Remaining Technical Debt
-- Production `ImportEngine` still calls `StatementParserRegistry` directly. Migrating production parser selection through `StatementParserSelector` belongs to a later sprint.
-- Parser selection currently has one registered production parser: Axis Bank account statements.
-- Parser selection result is internal to the app target and not yet surfaced through `ImportCoordinator`.
+- `FinancialDocument` is an immutable parser-output envelope.
+- `FinancialDocument` contains no calculations and no business logic.
+- `FinancialDocumentBuilder` packages existing parser output without recalculation.
+- `ImportValidator.validate(financialDocument:)` delegates to existing transaction validation.
+- `StatementParser.parse(document:) -> [Transaction]` remains unchanged for Sprint 15.
+- Changing parser protocols to return `FinancialDocument` is deferred to Sprint 16.
 
 ## Documentation Updated
-- `Project documents/Codex response.md`
-  - Updated with Sprint 14 implementation, validation and push results.
-- `Project documents/PROJECT_STATE.md`
-  - Updated after successful commit and push to mark Sprint 14 complete and Sprint 15 active.
-- `Project documents/Project_Guide.md`
-  - Synchronized current sprint and project snapshot after Sprint 14 completion.
 
-## Remaining Risks
-- Future parser support must avoid broad metadata matches that could create false positives.
-- PDF parser selection currently verifies context selection only; PDF transaction parsing remains explicitly out of scope.
-- Additional institutions will need deterministic signatures, classifications and parser-selection tests before parser registration.
+- `Project documents/Codex response.md`
+  - Updated with implementation, build and validation results.
+
+Pending after implementation commit and push:
+
+- `Project documents/PROJECT_STATE.md`
+  - Must be updated only after successful commit and push.
+
+- `Project documents/Project_Guide.md`
+  - Must be synchronized after Sprint 15 completion.
+
+## Remaining Technical Debt
+
+- `StatementParser` still returns `[Transaction]`; Sprint 16 is planned to migrate parser return type to `FinancialDocument`.
+- `ImportEngine` still owns analysis, normalization, parser selection, validation and store update orchestration.
+- Production parser selection still uses the legacy registry path directly.
+
+## Deferred Items
+
+- Validation redesign.
+- Repository redesign.
+- Parser rewrites.
+- Transaction extraction changes.
+- UI changes.
+- OCR.
+- AI inference.
+- XLS/XLSX support.
+- Dashboard work.
+- Investment module work.
 
 ## Next Recommended Sprint
-Sprint 15 - FinancialDocument Integration.
+
+Sprint 16 - StatementParser returns FinancialDocument.
 
 Recommended objective:
-- Integrate the deterministic import stages into a `FinancialDocument` handoff without changing parser extraction rules, validation behaviour, repository persistence or UI behaviour.
+
+- Migrate the parser protocol so statement parsers return `FinancialDocument` directly while preserving the approved Axis CSV financial baseline and existing validation behaviour.
+

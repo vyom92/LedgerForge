@@ -95,8 +95,14 @@ final class ImportEngine {
                     document: normalizedDocument
                 )
 
-                let validation = ImportValidator.validate(
+                let financialDocument = FinancialDocumentBuilder.build(
+                    normalizedDocument: normalizedDocument,
+                    parserName: parser.name,
                     transactions: transactions
+                )
+
+                let validation = ImportValidator.validate(
+                    financialDocument: financialDocument
                 )
 
                 let importSession = ImportSession(
@@ -104,18 +110,18 @@ final class ImportEngine {
                     institution: metadata.institution,
                     documentType: metadata.documentType,
                     parserName: parser.name,
-                    transactionCount: transactions.count,
+                    transactionCount: financialDocument.transactions.count,
                     validation: validation
                 )
 
                 // Replace transactions only for validated imports. TransactionStore is the single owner of imported transactions.
                 // ADR-010 requires validation before trusted state is updated.
                 if validation.passed {
-                    TransactionStore.shared.replaceTransactions(transactions, validation: validation)
-                    AccountStore.shared.integrateImport(importSession: importSession, transactions: transactions)
+                    TransactionStore.shared.replaceTransactions(financialDocument.transactions, validation: validation)
+                    AccountStore.shared.integrateImport(importSession: importSession, transactions: financialDocument.transactions)
                 }
 
-                DeveloperConsole.shared.log("Transactions Parsed: \(transactions.count)")
+                DeveloperConsole.shared.log("Transactions Parsed: \(financialDocument.transactions.count)")
                 DeveloperConsole.shared.log("Import Session Created")
                 DeveloperConsole.shared.log("Validation: \(validation.passed ? "PASSED" : "FAILED")")
                 DeveloperConsole.shared.log("Validation Issues: \(validation.issues.count)")
