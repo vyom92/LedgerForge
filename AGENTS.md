@@ -1,50 +1,28 @@
-# LedgerForge
+# LedgerForge Agent Bootstrap
 
-## Purpose
+This file is intentionally minimal to reduce context usage for autonomous coding agents.
 
-LedgerForge is an offline-first macOS desktop application for personal financial management.
+## Mandatory Entry Point
 
-It consolidates financial data from multiple sources into a unified local database.
+Before performing any planning, review, implementation or refactoring:
 
----
+1. Read `Project documents/Project_Guide.md`.
+2. Follow the **Task Routing Guide** to determine which additional documents are required.
+3. Read **only** the documents required for the requested task.
+4. Read `Project documents/Codex response.md` for the current sprint baseline.
 
-## Core Principles
+## Operating Rules
 
-1. Offline first.
-2. Privacy first.
-3. Plugin-based importers.
-4. Single source of truth.
-5. Strong typing.
-6. Small focused classes.
-7. No duplicated logic.
-8. Every feature must compile before moving forward.
+- Work on one approved sprint only.
+- Stop exactly at the approved sprint boundary.
+- Do not load unnecessary documentation.
+- Do not redesign approved architecture.
+- Preserve existing user-visible behaviour unless explicitly requested.
+- Prefer extending existing architecture over creating parallel implementations.
+- Never bypass repository abstractions.
+- Never access SQLite directly from Views, ViewModels or Stores.
+- Add new source files to the Xcode navigator and correct target membership.
+- Update `Project documents/Codex response.md` after implementation.
+- Update `Project documents/Project_Guide.md` if project status changes.
 
----
-
-## Supported Import Types
-
-- CSV
-- XLS
-- XLSX
-- Password-protected PDF
-
-Future:
-
-- Salary slips
-- Mutual Funds
-- IBKR
-- EPF
-- AIS
-- Tax documents
-
----
-
-## Coding Standards
-
-- SwiftUI
-- Swift Concurrency
-- Async/Await
-- MVVM
-- SQLite
-- One responsibility per class
-- Clear documentation
+`Project_Guide.md` is the single source of truth for project workflow, architecture routing, documentation precedence and sprint execution. Avoid duplicating those rules here.

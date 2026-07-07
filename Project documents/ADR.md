@@ -373,3 +373,77 @@ Structured documents should be processed using deterministic rules. AI should on
 - OCR integrates before parser selection rather than replacing parsers.
 - AI outputs remain advisory until validated by deterministic business rules.
 - AI never becomes the financial source of truth.
+---
+
+# ADR-018 — Unified Import Framework Operational
+
+## Status
+
+Accepted
+
+## Decision
+
+Production CSV imports now execute through the Unified Import Framework.
+
+The canonical production import flow is:
+
+Financial Document
+↓
+ImportCoordinator
+↓
+ReaderRegistry
+↓
+Document Reader
+↓
+FinancialDocument
+↓
+Institution Detection
+↓
+Document Classification
+↓
+Parser Selection
+↓
+Statement Parser
+↓
+Validation
+↓
+Fingerprinting & Duplicate Detection
+↓
+Repositories
+↓
+SQLite
+↓
+Stores
+↓
+ViewModels
+↓
+Dashboard
+
+The migration preserved existing CSV business logic. Only orchestration changed.
+
+## Rationale
+
+The Unified Import Framework was introduced incrementally across earlier sprints to minimise migration risk.
+
+Sprint 11C completed the production migration by routing CSV imports through the framework while preserving identical observable behaviour, verified by regression tests.
+
+This establishes a single extensible architecture for every supported import format.
+
+## Consequences
+
+- CSV becomes the reference implementation for the Unified Import Framework.
+- Future readers (PDF, XLS, XLSX and TXT) integrate through `ReaderRegistry` without changing downstream business logic.
+- `ImportCoordinator` owns orchestration responsibilities.
+- Readers remain responsible only for document extraction.
+- Parsers remain responsible only for financial interpretation.
+- Existing regression fixtures define the approved observable financial behaviour across future import formats.
+- Future architectural work should extend the framework rather than introduce parallel import pipelines.
+
+## Related ADRs
+
+- ADR-003 — Generic Import Engine
+- ADR-011 — Unified FinancialDocument Pipeline
+- ADR-012 — Separation of Readers and Parsers
+- ADR-015 — Automatic Password Management
+- ADR-016 — Universal Import Pipeline
+- ADR-017 — Deterministic Before Intelligent

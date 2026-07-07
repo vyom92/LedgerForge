@@ -1,129 +1,8 @@
+# Prompt Template Library
 
-
-# LedgerForge Prompt Templates
-
-These templates are intended for GitHub Copilot Agent. Copy the appropriate template into Copilot Chat, fill in the placeholders, and execute.
-
----
-
-# New Sprint
-
-## Objective
-
-<Describe the feature or milestone>
-
-## References
-
-Read before coding:
-- ADR.md
-- Architecture.md
-- Engineering Standards.md
-- Product Vision.md
-
-Use any previously approved UI sketches, dashboard screenshots, Excel workbooks or financial statement samples. If a required reference is unavailable, stop and request it.
-
-## Files Expected
-
-- <file>
-- <file>
-- <file>
-
-## Acceptance Criteria
-
-- Project builds successfully.
-- Existing functionality remains intact.
-- No parser regressions.
-- Architecture rules are followed.
-- No warnings introduced unless unavoidable.
-
-## Do Not
-
-- Invent financial workflows.
-- Invent statement layouts.
-- Modify unrelated files.
-- Bypass validation.
-
----
-
-# Bug Fix
-
-## Problem
-
-<Describe the observed behaviour>
-
-## Expected Behaviour
-
-<Describe the correct behaviour>
-
-## Constraints
-
-- Change the smallest number of files.
-- Preserve existing behaviour.
-- Add temporary diagnostics only if required.
-- Remove temporary diagnostics before completion.
-
----
-
-# Refactor
-
-## Goal
-
-Improve maintainability without changing behaviour.
-
-Requirements:
-
-- Preserve public behaviour.
-- Reduce duplication.
-- Improve naming where appropriate.
-- Keep build green throughout.
-
----
-
-# New Financial Institution
-
-## Institution
-
-<Name>
-
-## Reference Documents
-
-Use only supplied statement samples.
-Do not infer layouts.
-
-## Requirements
-
-- Add institution-specific parser.
-- Reuse generic infrastructure.
-- Preserve existing parser behaviour.
-- Validate using supplied reference statements.
-
----
-
-# Code Review
-
-Review the implementation against:
-
-- ADR.md
-- Architecture.md
-- Engineering Standards.md
-- Product Vision.md
-
-Confirm:
-
-- Correct architecture.
-- Financial correctness.
-- No duplicated logic.
-- Appropriate ownership.
-- UI contains no business logic.
-- No unnecessary complexity.
-
-# LedgerForge Prompt Templates
-
-These templates are intended for GitHub Copilot Agent.
-
-Every implementation begins with a planning phase.
-
-Never implement before producing an implementation plan and receiving approval.
+**Note:**  
+The mandatory first document for every prompt is always:  
+`Project documents/Project_Guide.md`
 
 ---
 
@@ -133,61 +12,51 @@ Never implement before producing an implementation plan and receiving approval.
 
 <Describe the sprint objective>
 
+## Confirm
+
+- Sprint scope and stop condition
+
 ## Before Doing Anything
 
-Read:
-
-- Product Vision.md
-- Architecture.md (or current Architecture document)
-- Engineering Standards.md
-- ADR.md
-- context.md
-- copilot-instructions.md
-
-Use previously approved dashboard references, financial statement samples, Excel workbooks and UI references.
-
-If any required reference is unavailable, stop and request it.
-
-Verify the filename in the first comment block before editing any file.
+- Read `Project documents/Project_Guide.md`  
+- Read `Project documents/Codex response.md`  
+- Use the Task Routing Guide to determine any additional documents to read
 
 ## Produce
 
-- Architecture review
-- Files to modify
-- Files to create
-- Risks
-- Dependencies
-- Estimated complexity
-- Build impact
+- Architecture review  
+- Files to modify  
+- Files to create  
+- Risks  
+- Dependencies  
+- Complexity  
+- Build impact  
 
-Stop and wait for approval.
+Stop and wait for approval before implementation.
 
 ---
 
 # Sprint Implementation
 
-## Approved Plan
+## Mandatory Rules
 
-Implement only the approved plan.
+- Implement only the approved sprint  
+- Preserve user-visible behaviour  
+- Build continuously  
+- Run relevant tests after every significant change  
+- Add new files to the Xcode navigator  
+- Add new files to target membership  
+- Update `Project documents/Codex response.md`  
+- Update `Project documents/Project_Guide.md` if project status changes  
+- Stop exactly at the sprint boundary  
 
-Requirements:
-
-- Edit only approved files.
-- Build after every significant change.
-- Resolve compile errors before continuing.
-- Run regression tests whenever parser or import code changes.
-- Do not modify unrelated files.
-- Preserve existing parser behaviour.
-- Preserve financial correctness.
-
-At completion provide:
-
-- Files changed
-- Architectural decisions
-- Risks
-- Remaining technical debt
-- Recommended next sprint
-- Suggested Git commit message
+At completion provide:  
+- Files changed  
+- Architectural decisions  
+- Risks  
+- Remaining technical debt  
+- Recommended next sprint  
+- Suggested commit message  
 
 ---
 
@@ -201,86 +70,86 @@ At completion provide:
 
 <Describe the correct behaviour>
 
-Requirements:
+## Requirements
 
-- Smallest possible change.
-- Preserve existing behaviour.
-- Build continuously.
-- Remove temporary diagnostics before completion.
+- Make the smallest possible change  
+- Preserve existing behaviour  
+- Build continuously  
+- Remove temporary diagnostics before completion  
 
 ---
 
 # Refactor
 
-Goal:
+## Goal
 
 Improve maintainability without changing behaviour.
 
-Requirements:
+## Requirements
 
-- Preserve behaviour.
-- Reduce duplication.
-- Improve naming.
-- Preserve architecture.
-- Do not change financial logic.
+- Preserve behaviour  
+- Reduce duplication  
+- Improve naming  
+- Preserve architecture  
+- Do not change financial logic  
 
 ---
 
 # New Financial Institution
 
-Institution:
+## Institution
 
 <Name>
 
-Requirements:
+## Requirements
 
-- Use only supplied reference documents.
-- Never infer statement layouts.
-- Detect institution before parser selection.
-- Detect document type.
-- Reuse FinancialDocument pipeline.
-- Preserve existing parser behaviour.
-- Validate using supplied reference documents.
+- Use only supplied reference documents  
+- Never infer statement layouts  
+- Detect institution before parser selection  
+- Detect document type  
+- Reuse FinancialDocument pipeline  
+- Preserve existing parser behaviour  
+- Validate using supplied reference documents  
 
 ---
 
 # Architecture Review
 
-Review against:
+## Review against
 
-- Product Vision
-- Architecture
-- Engineering Standards
-- ADRs
+- Product Vision  
+- Project_Guide.md  
+- Engineering Standards  
+- ADRs  
 
-Verify:
+## Verify
 
-- Readers only extract.
-- Parsers never know file format.
-- Validation remains centralized.
-- TransactionStore owns transactions.
-- AccountStore owns accounts.
-- Views contain no business logic.
-- No duplicated financial calculations.
-- No unnecessary coupling.
+- Readers only extract data  
+- Parsers never know file format  
+- Validation remains centralized  
+- TransactionStore owns transactions  
+- AccountStore owns accounts  
+- Views contain no business logic  
+- No duplicated financial calculations  
+- No unnecessary coupling  
 
-Do not modify code.
+Do not modify code during review.
 
 ---
 
 # Regression Review
 
-Validate against all available reference documents.
+## Validate against all available reference documents
 
 Confirm:
 
-- Correct parser selected.
-- Institution detected correctly.
-- Document type detected correctly.
-- Transaction count preserved.
-- Validation behaviour unchanged.
-- Dashboard unchanged unless expected.
-- No parser regressions.
+- Correct parser selected  
+- Institution detected correctly  
+- Document type detected correctly  
+- Transaction count preserved  
+- Validation behaviour unchanged  
+- Dashboard unchanged unless expected  
+- No parser regressions  
 
 Produce a PASS / FAIL summary.
 
@@ -290,14 +159,47 @@ Produce a PASS / FAIL summary.
 
 Provide:
 
-- Build status
-- Test status
-- Files modified
-- Files created
-- Files removed
-- Architectural decisions
-- Technical debt
-- Known issues
-- Risks
-- Next sprint recommendation
-- Git commit message
+- Build status  
+- Test status  
+- Files modified  
+- Files created  
+- Files removed  
+- Architectural decisions  
+- Technical debt  
+- Known issues  
+- Risks  
+- Next sprint recommendation  
+- Commit message  
+
+---
+
+# Project Guide Verification
+
+### Test 1
+
+- Read `Project documents/Project_Guide.md`  
+- List only the documents required for Sprint 11C  
+- Explain why each document is required  
+- List which documents are intentionally skipped  
+- Do not write code  
+
+### Test 2
+
+- Read `Project documents/Project_Guide.md`  
+- Describe exactly what Sprint 11C is allowed to change  
+- List five things Sprint 11C must not change  
+- Quote the relevant `Project documents/Project_Guide.md` sections  
+- Do not write code  
+
+### Test 3
+
+- Read `Project documents/Project_Guide.md`  
+- Assume Sprint 11C has been requested  
+- Follow the Standard AI Workflow  
+- Produce only:  
+  - Documents to read  
+  - Implementation plan  
+  - Risks  
+  - Files likely to change  
+  - Stop condition  
+- Do not write code

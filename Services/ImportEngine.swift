@@ -10,7 +10,16 @@ final class ImportEngine {
 
     static let shared = ImportEngine()
 
-    private init() { }
+    private let importCoordinator: any ImportFramework.ImportCoordinator
+
+    private init(
+        importCoordinator: any ImportFramework.ImportCoordinator = DefaultImportCoordinator(
+            readerRegistry: DefaultReaderRegistry(),
+            passwordProvider: DefaultPasswordProvider()
+        )
+    ) {
+        self.importCoordinator = importCoordinator
+    }
 
     func importFile(from url: URL) {
 
@@ -20,10 +29,17 @@ final class ImportEngine {
         DeveloperConsole.shared.log(url.path)
         DeveloperConsole.shared.log("")
 
+        Task {
+            await processImport(from: url)
+        }
+
+    }
+
+    private func processImport(from url: URL) async {
+
         do {
 
-            let reader = CSVReader()
-            let contents = try reader.read(from: url)
+            let contents = try await readTextDocument(from: url)
 
             DocumentStore.shared.update(with: contents)
 
@@ -128,4 +144,18 @@ final class ImportEngine {
 
     }
 
+    private func readTextDocument(from url: URL) async throws -> String {
+        let request = ImportRequest(fileURL: url)
+        let result = await importCoordinator.importDocument(request)
+
+        guard result.status == .succeeded, let rawDocument = result.rawDocument else {
+            throw result.error ?? ImportError.unknown(message: "Import coordinator returned no document.")
+        }
+
+        guard case .text(let contents) = rawDocument.content else {
+            throw ImportError.invalidDocument(message: "CSV import expected text document content.")
+        }
+
+        return contents
+    }
 }

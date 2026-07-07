@@ -1,6 +1,0 @@
-Target dependency graph (3 targets)
-Target 'LedgerForgeUITests' in project 'LedgerForge'
-➜ Explicit dependency on target 'LedgerForge' in project 'LedgerForge'
-Target 'LedgerForgeTests' in project 'LedgerForge'
-➜ Explicit dependency on target 'LedgerForge' in project 'LedgerForge'
-Target 'LedgerForge' in project 'LedgerForge' (no dependencies)

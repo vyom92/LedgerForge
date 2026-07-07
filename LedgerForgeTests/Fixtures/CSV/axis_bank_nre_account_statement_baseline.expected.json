@@ -1,0 +1,22 @@
+{
+  "institution": "Axis Bank",
+  "account_type": "NRE savings account",
+  "currency": "INR",
+  "expected_parser": "AxisBankAccountParser",
+  "transaction_count": 81,
+  "debit_total": "2821794.53",
+  "credit_total": "2797798.00",
+  "raw_dr_column_total": "2797798.00",
+  "raw_cr_column_total": "2821794.53",
+  "opening_balance": "23996.69",
+  "closing_balance": "0.16",
+  "first_transaction_date": "09-01-2026",
+  "last_transaction_date": "02-07-2026",
+  "validation_result": "expected valid",
+  "notes": [
+    "This fixture is anonymized from a real Axis Bank NRE CSV statement supplied by the project owner.",
+    "The original Axis CSV uses columns DR and CR, but observed balance movement indicates values in CR reduce balance and values in DR increase balance for this file.",
+    "Amounts, dates, row count, column structure, balances, and SOL are preserved for regression testing.",
+    "Names, account number, customer ID, contact details, PAN, CKYC, transaction references and counterparties are anonymized."
+  ]
+}
