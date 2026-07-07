@@ -51,13 +51,25 @@ Implementation commit:
 da117422d47ef9fe6f09fdfe110f88f54182b590
 ```
 
-Push result:
+Implementation push result:
 
 ```text
 origin/main updated to da117422d47ef9fe6f09fdfe110f88f54182b590
 ```
 
 Note: `git push` reported that the remote branch was updated, then failed to update the local `refs/remotes/origin/main` tracking ref because sandbox permissions prevented creating the local lock file. Remote verification with `git ls-remote origin refs/heads/main` confirmed the pushed hash above.
+
+Project state handoff commit:
+
+```text
+beaf0c399e14d3a4ebd1ff23c42acf3124294a92
+```
+
+Project state push result:
+
+```text
+origin/main updated to beaf0c399e14d3a4ebd1ff23c42acf3124294a92
+```
 
 ## Test Result
 Passed.
@@ -102,6 +114,14 @@ CSV import still uses the existing production path and existing parser execution
 - Production `ImportEngine` still calls `StatementParserRegistry` directly. Migrating production parser selection through `StatementParserSelector` belongs to a later sprint.
 - Parser selection currently has one registered production parser: Axis Bank account statements.
 - Parser selection result is internal to the app target and not yet surfaced through `ImportCoordinator`.
+
+## Documentation Updated
+- `Project documents/Codex response.md`
+  - Updated with Sprint 14 implementation, validation and push results.
+- `Project documents/PROJECT_STATE.md`
+  - Updated after successful commit and push to mark Sprint 14 complete and Sprint 15 active.
+- `Project documents/Project_Guide.md`
+  - Synchronized current sprint and project snapshot after Sprint 14 completion.
 
 ## Remaining Risks
 - Future parser support must avoid broad metadata matches that could create false positives.

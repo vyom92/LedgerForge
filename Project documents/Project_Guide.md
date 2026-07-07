@@ -6,12 +6,12 @@ This is the canonical project operating manual. Read this document first, then u
 
 
 - **Current Milestone:** Milestone C
-- **Current Sprint:** Sprint 14
-- **Current Phase:** Statement Classification Framework Complete
+- **Current Sprint:** Sprint 15
+- **Current Phase:** Parser Selection Framework Complete
 - **Build Status:** Passing
-- **Test Status:** 46 tests passing
+- **Test Status:** 42 required Sprint 14 regression tests passing
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 13
+- **Current Codex Baseline:** Sprint 14
 
 
 ## Current Architecture Status
@@ -28,10 +28,11 @@ This is the canonical project operating manual. Read this document first, then u
 | Readers | CSV and PDF readers integrated into Unified Import Framework |
 | Institution Detection | Framework implemented; legacy behaviour preserved |
 | Statement Classification | Framework implemented; deterministic classification active |
+| Parser Selection | Framework implemented; deterministic selector active |
 | Password Management | Operational; DefaultPasswordProvider integrated |
 | Dashboard | Existing dashboard unchanged |
 | Investments | Future module |
-| Testing | 46 active tests passing |
+| Testing | 42 required Sprint 14 regression tests passing |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -252,10 +253,10 @@ Additionally:
 ## Sprint Roadmap
 
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13
-- **Current Sprint:** Sprint 14 – Parser Selection Framework
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14
+- **Current Sprint:** Sprint 15 – FinancialDocument Integration
 - **Upcoming Sprints:**
-  - Sprint 15 – FinancialDocument Integration
+  - Sprint 16 – To be defined
 
 ## Known Technical Debt
 
