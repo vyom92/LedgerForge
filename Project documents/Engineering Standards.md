@@ -46,11 +46,15 @@ Models/
 
 Services/
 - Application workflows.
-- Import orchestration.
+- Legacy application workflows.
+- Legacy import orchestration during migration to the Unified Import Framework.
 
 Readers/
 - Read file formats only.
+- Receive optional passwords from the ImportCoordinator.
+- Produce RawDocument.
 - Extract document contents.
+- Never access Keychain.
 - Never perform business logic.
 - Never interpret financial meaning.
 
@@ -60,7 +64,7 @@ Detectors/
 - Identify parser candidates.
 
 Normalizers/
-- Produce the FinancialDocument domain model.
+- Convert RawDocument into the FinancialDocument domain model.
 - Ensure every supported file format converges into the same ingestion pipeline.
 
 Parsers/
@@ -106,13 +110,12 @@ ViewModels/
 
 Before implementation:
 
-1. Read Product Vision.
-2. Read Architecture.
-3. Read ADRs.
-4. Read Copilot Instructions.
-5. Verify required reference documents exist.
-6. Produce an implementation plan.
-7. Wait for approval.
+1. Read Project_Guide.md.
+2. Use the Task Routing Guide.
+3. Open only the required reference documents.
+4. Verify required reference documents exist.
+5. Produce an implementation plan.
+6. Wait for approval.
 
 Implementation:
 
@@ -131,6 +134,7 @@ A task is complete only when:
 - The project builds successfully.
 - Existing functionality still works.
 - The feature has been manually verified.
+- Approved reference fixtures continue producing identical financial truth.
 - Documentation is updated if architecture changed.
 - The implementation follows Product Vision and Architecture.
 
@@ -195,6 +199,7 @@ The code should make adding the next financial institution easier than adding th
 - Build after every significant change.
 - Resolve compile errors before continuing.
 - Run regression tests whenever parser or import code changes.
+- Verify approved CSV/PDF reference fixtures before merging reader or parser changes.
 - Summarize architectural decisions after every sprint.
 
 ---
