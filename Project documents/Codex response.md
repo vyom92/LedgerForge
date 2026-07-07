@@ -37,6 +37,7 @@ Passed.
 - Baseline Xcode build before test work: passed.
 - Xcode build after adding `ImportValidatorTests`: passed.
 - Final Xcode build before full validation: passed.
+- No production source changes were required to satisfy Sprint 17 validation goals.
 
 ## Test Result
 
@@ -51,6 +52,7 @@ Required Sprint 17 regression suite:
 - 53 tests passed.
 - 0 tests failed.
 - 0 tests skipped.
+- Dedicated `ImportValidator` coverage increased without changing production validation behaviour.
 
 Required suites passed:
 
@@ -82,12 +84,12 @@ Required suites passed:
 - transactions without running balance fail
 - running-balance mismatch fails
 - valid `FinancialDocument` remains valid
-- `validate(financialDocument:)` is observably equivalent to `validate(transactions:)`
+- `validate(financialDocument:)` delegates consistently to the existing transaction validation path.
 - validation does not mutate `FinancialDocument` or its transactions
 
 ## Behavioural Impact
 
-No intended user-visible behaviour change.
+No intended user-visible behaviour change.This sprint increased validation confidence rather than changing validation policy.
 
 Approved Axis Bank financial truth remains protected by the existing regression baseline:
 
@@ -107,12 +109,14 @@ Approved Axis Bank financial truth remains protected by the existing regression 
 - `ImportValidator.validate(transactions:)` remains available for compatibility and focused validation tests.
 - No validation result structure changes were introduced.
 - No new public validation abstraction was introduced.
+- Dedicated validation tests are now the primary protection against future validation regressions.
 - No persistence, repository, store or UI logic was added to validation.
 
 ## Verification
 
 - Xcode build passed.
 - Required Xcode regression suite passed.
+- Dedicated `ImportValidatorTests` passed independently before the full regression suite.
 - Conflict marker scan found no unresolved merge conflict markers.
 - Only Sprint 17 implementation files were staged for commit:
   - `LedgerForgeTests/ImportValidatorTests.swift`
@@ -121,7 +125,7 @@ Approved Axis Bank financial truth remains protected by the existing regression 
 ## Remaining Technical Debt
 
 - Validation issue messages remain plain strings without typed issue codes.
-- Validation row-number coverage remains limited to existing behaviour.
+- Validation diagnostics remain intentionally lightweight; richer contextual reporting can be considered in a future sprint without changing validation policy.
 - FinancialDocument-level structural validation remains intentionally deferred because no current test exposed a need.
 
 ## Remaining Risks

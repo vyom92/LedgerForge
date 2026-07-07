@@ -4,14 +4,13 @@ This is the canonical project operating manual. Read this document first, then u
 
 ## Current Project Snapshot
 
-- **Current Milestone:** M4 – StatementParser returns FinancialDocument
-- **Current Sprint:** Sprint 16
-- **Current Phase:** FinancialDocument Integration Complete
+- **Current Milestone:** M5 – Validation Pipeline Refinement
+- **Current Sprint:** Sprint 17
+- **Current Phase:** Validation Pipeline Refinement
 - **Build Status:** Passing
-- **Validation Status:** Build passing; full regression baseline passing. Sprint 15 validation complete.
+- **Validation Status:** Build passing; full regression baseline passing. Sprint 16 validation complete.
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 15
-
+- **Current Codex Baseline:** Sprint 16
 
 ## Current Architecture Status
 
@@ -32,7 +31,7 @@ This is the canonical project operating manual. Read this document first, then u
 | Password Management | Operational; DefaultPasswordProvider integrated |
 | Dashboard | Existing dashboard unchanged |
 | Investments | Future module |
-| Validation | Build passing; full regression baseline passing. Sprint 15 validation complete |
+| Validation | Build passing; full regression baseline passing. Sprint 16 validation complete |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -233,7 +232,7 @@ Additionally:
 - Build continuously.  
 - Run the required sprint validation.
 - If command-line tests fail solely because of the known SwiftUI Preview tooling issue after a successful build, execute the equivalent Xcode regression suite and treat that result as authoritative.
-- If the project builds successfully and required sprint tests pass, prepare an automated Git commit.
+- If the project builds successfully and required sprint validation passes, prepare an automated Git commit.
 - Verify `git status` contains only sprint-related files.
 - Verify there are no unresolved merge conflict markers.
 - Generate a concise commit message describing the completed sprint work.
@@ -243,7 +242,7 @@ Additionally:
 - Maintain Project documents/Codex response.md during implementation.
 - After a successful build, required validation, commit, push and tag (if applicable), update `Project documents/PROJECT_STATE.md` with the verified repository state.
 - Record the commit hash, tag and push result in Project documents/Codex response.md.
-- If the build or required tests fail, do not commit or push. Record the failure and stop.
+- If the build or required sprint validation fails, do not commit or push. Record the failure and stop.
 - Keep changes limited to the approved sprint.  
 - Keep commits logically grouped.
 - Prefer extending existing architecture over introducing parallel implementations.
@@ -258,10 +257,9 @@ Additionally:
 
 ## Sprint Roadmap
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15
-- **Current Sprint:** Sprint 16 – StatementParser returns FinancialDocument
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16
+- **Current Sprint:** Sprint 17 – Validation Pipeline Refinement
 - **Upcoming Sprints:**
-  - Sprint 17 – Validation Pipeline Refinement
   - Sprint 18 – Repository Integration Cleanup
   - Sprint 19–21 – Dashboard Foundation
   - Sprint 22–24 – Insights & Analytics
@@ -285,12 +283,12 @@ Additionally:
 - Validation bridge
 - Regression safety
 
-### M4 – FinancialDocument-native Parsing 🚧
+### M4 – FinancialDocument-native Parsing ✅
 - StatementParser returns FinancialDocument
 - Immutable parser output
 - Zero behavioural change
 
-### M5 – Validation Intelligence
+### M5 – Validation Pipeline Refinement 🚧
 - Rule engine
 - Error categorisation
 - Confidence scoring
@@ -326,7 +324,6 @@ Maintain a concise list of active architectural and implementation debt.
 Current items:
 
 - ImportEngine still owns orchestration responsibilities that will gradually move into dedicated pipeline components as later milestones are completed.
-- StatementParser still returns [Transaction]; FinancialDocumentBuilder provides the temporary compatibility bridge until Sprint 16 completes.
 - Additional approved regression fixtures should be added for future institutions (CBQ, HDFC, SBI, etc.).
 - Additional import fixtures should compare equivalent financial truth across CSV and PDF where available.
 
@@ -414,7 +411,7 @@ This layered documentation approach keeps AI context small while preserving dete
 - Never silently change financial behaviour.  
 - If uncertain, stop and explain rather than guessing.
 - Never commit if the project does not build successfully.
-- Never push if required sprint tests fail.
+- Never push if required sprint validation fails.
 - Verify only sprint-related files are staged before every commit.
 - Verify no unresolved merge conflict markers exist before every commit.
 - Generate commit messages from completed work rather than generic templates.
@@ -426,9 +423,9 @@ This layered documentation approach keeps AI context small while preserving dete
 
 LedgerForge evolves through small, fully reviewed, production-quality sprints.
 
-Architecture is designed first.
-Implementation follows architecture.
-Documentation follows implementation.
+Architecture guides implementation.
+Implementation validates architecture.
+Documentation records the verified repository state.
 
 Every completed sprint should leave the project in a healthier state than it was found.
 

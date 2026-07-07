@@ -22,8 +22,8 @@
 
 - Read `Project documents/Project_Guide.md`
 - Read `Project documents/PROJECT_STATE.md`
-- Read `Project documents/Codex response.md`
-- Use the Task Routing Guide to determine any additional documents required
+- Read `Project documents/Codex response.md` for the current sprint context.
+- Use the Task Routing Guide in `Project documents/Project_Guide.md` to determine any additional documents required.
 
 ## Produce
 
@@ -59,7 +59,7 @@ Stop and wait for approval before implementation.
 - Push to the tracked branch (normally `origin/main`).
 - Push the sprint tag (if created).
 - Record build result, validation result, commit hash, tag and push result in `Project documents/Codex response.md`.
-- Update `Project documents/PROJECT_STATE.md` only after successful commit, push and tag (if applicable).
+- Update `Project documents/PROJECT_STATE.md` only after a successful build, required validation, commit, push and tag (if applicable).
 - Update `Project documents/Project_Guide.md` only if workflow, roadmap or engineering guidance changed.
 - If validation fails, do not commit or push. Record the failure and stop.
 - Add new files to the Xcode navigator.
@@ -178,6 +178,8 @@ Confirm:
 - Transaction count preserved.
 - Financial truth preserved.
 - Validation behaviour unchanged.
+- Validation results unchanged unless explicitly expected.
+- Parser-to-FinancialDocument boundary preserved.
 - Dashboard unchanged unless expected.
 - No parser regressions.
 
