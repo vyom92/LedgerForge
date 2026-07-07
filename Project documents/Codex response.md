@@ -1,40 +1,83 @@
 # Codex Response
 
-## Sprint 19 Completion Report — Dashboard Foundation
+## Sprint 20 Implementation Report - Dashboard Foundation Continuation
 
-Sprint 19 Dashboard Foundation is implemented and validation has passed.
+Sprint 20 refined the repository-backed dashboard foundation built in Sprint 19 while preserving the approved presentation pipeline:
+
+```text
+Repository Persistence
+↓
+RepositoryStoreHydrator
+↓
+Runtime Stores
+↓
+ViewModels
+↓
+Views
+```
 
 ## Summary
 
-- Added repository-backed runtime store hydration for dashboard startup.
-- Added read-only repository APIs for dashboard account and trusted transaction retrieval.
-- Hydration runs once per application launch unless explicitly refreshed.
-- Added a small repository-backed accounts overview to the existing dashboard panel.
-- Added dashboard hydration loading/empty/error status messaging.
-- Preserved the existing import workflow, transaction list, document preview and developer console behaviour.
+- Added explicit dashboard presentation state for loading, empty, loaded and failed hydration outcomes.
+- Added store-derived dashboard account summaries.
+- Added store-derived recent transaction summaries.
+- Moved dashboard hydration message state out of `ContentView` and into `DashboardViewModel`.
+- Kept `ContentView` as the startup hydration trigger only.
+- Added a lightweight recent transactions section to the dashboard panel.
+- Preserved existing transaction search and credit/debit toggle behaviour.
+- Preserved import, parser, validation, repository and persistence semantics.
 
-No parser behaviour, validation behaviour, repository write semantics, persistence schema, financial truth, transaction extraction, analytics, charts, categories, budgets, AI, OCR, XLS/XLSX, multi-currency or investment work was introduced.
+No analytics, charts, categories, budgets, AI, OCR, XLS/XLSX, multi-currency or investments work was introduced.
 
 ## Files Created
 
-- `Services/RepositoryStoreHydrator.swift`
-- `LedgerForgeTests/RepositoryStoreHydratorTests.swift`
+- `LedgerForgeTests/DashboardViewModelTests.swift`
 
 ## Files Modified
 
 - `ContentView.swift`
-- `Core/AccountStore.swift`
-- `Core/TransactionStore.swift`
-- `Database/Repository.swift`
-- `Database/InMemoryRepositoryProvider.swift`
-- `Database/SQLiteRepositoryProvider.swift`
-- `LedgerForgeTests/RepositoryContractTests.swift`
-- `LedgerForge.xcodeproj/project.pbxproj`
+- `ViewModels/DashboardViewModel.swift`
 - `Project documents/Codex response.md`
+
+## Implementation Details
+
+### DashboardViewModel
+
+- Added `DashboardPresentationState`.
+- Added `DashboardAccountSummary`.
+- Added `DashboardTransactionSummary`.
+- Added `accountSummaries`, `recentTransactionSummaries` and `transactionCount`.
+- Added hydration state methods:
+  - `markHydrationStarted()`
+  - `markHydrationCompleted(_:)`
+  - `markHydrationFailed(_:)`
+- Kept all dashboard data derived from `AccountStore` and `TransactionStore`.
+- Did not add repository or SQLite access to the ViewModel.
+
+### ContentView
+
+- Removed local dashboard hydration message state.
+- Bound account and transaction dashboard presentation to `DashboardViewModel`.
+- Kept startup hydration execution in `hydrateDashboardOnce()`.
+- Continued using `RepositoryStoreHydrator` as the only persistence-to-runtime-store boundary.
+
+### Tests
+
+Added `DashboardViewModelTests` covering:
+
+- Empty hydration state.
+- Account summary from runtime-store accounts.
+- Transaction summary from runtime-store transactions.
+- Snapshot values derived from runtime-store transactions.
+- Loading, loaded and failed presentation states.
+
+Existing `RepositoryStoreHydratorTests` already covered no-duplicate hydration, so no hydrator test changes were required.
 
 ## Build Result
 
-Build passed using Xcode `BuildProject`.
+Baseline build before implementation passed using Xcode `BuildProject`.
+
+Post-implementation build passed using Xcode `BuildProject`.
 
 ```text
 The project built successfully.
@@ -42,50 +85,51 @@ The project built successfully.
 
 ## Validation Result
 
-Required Sprint 19 validation passed through Xcode `RunSomeTests`.
+Focused Sprint 20 validation passed through Xcode `RunSomeTests`.
 
-- `RepositoryStoreHydratorTests`, `RepositoryContractTests`, `ImportRepositoryIntegrationTests`, `ImportValidatorTests`, `FinancialDocumentTests`, `CSVImportRegressionTests`: 24 passed, 0 failed.
-- `StatementParserSelectionTests`, `StatementClassificationTests`, `InstitutionDetectionTests`, `PDFDocumentReaderTests`: 28 passed, 0 failed.
-- `ImportFrameworkTests`, `DefaultReaderRegistryTests`, `PasswordProviderTests`: 13 passed, 0 failed.
+- `DashboardViewModelTests`: 4 passed, 0 failed.
+- `RepositoryStoreHydratorTests`: 3 passed, 0 failed.
 
-Total required Sprint 19 validation: 65 tests passed, 0 failed.
+Full active test-plan validation passed through Xcode `RunAllTests`.
+
+```text
+77 tests passed, 0 failed.
+```
+
+The full test plan includes the required Sprint 20 dashboard, hydration, import, parser, validation, repository, reader, registry, password provider and UI regression coverage.
 
 No unresolved merge conflict markers were found.
 
 ## Behavioural Impact
 
-Dashboard startup now hydrates runtime stores from trusted repository data.
-
-Only trusted validated transactions are loaded into runtime stores for dashboard display.
-
-Existing import flow still persists validated imports before updating runtime stores.
-
-Views and ViewModels do not access SQLite directly.
+- Dashboard startup still hydrates runtime stores from repository-backed trusted data.
+- Runtime stores remain the only source consumed by dashboard ViewModels.
+- Views and ViewModels still do not access SQLite.
+- `RepositoryStoreHydrator` remains the only persistence-to-runtime-store boundary.
+- Existing transaction search and credit/debit toggle behaviour remains unchanged.
+- Import, parser, validation, repository write semantics, financial truth and transaction extraction remain unchanged.
 
 ## Architecture Decisions
 
-- Added `RepositoryStoreHydrator` as the dedicated repository-to-runtime-store boundary for dashboard startup.
-- Added read-only `AccountRepository.accounts(workspaceId:)`.
-- Added read-only `TransactionRepository.trustedTransactions(workspaceId:)`.
-- Kept repository writes unchanged.
-- Kept dashboard calculations store-driven through `DashboardViewModel`.
-- Kept hydration mapping out of Views and ViewModels.
+- Presentation state now lives in `DashboardViewModel` instead of `ContentView`.
+- Account and recent transaction dashboard rows are summary projections derived from runtime stores, not duplicate financial state.
+- No repository API expansion was needed.
+- No persistence, schema or repository write changes were needed.
 
 ## Remaining Technical Debt
 
-- Dashboard account identity still uses runtime `Account` IDs during hydration because repository account IDs are string DTO identifiers.
-- Dashboard hydration currently supports the deterministic INR minor-unit mapping required by the approved persisted baseline.
-- Repository persistence errors remain logged rather than surfaced through user-facing dashboard UI.
-- Full dashboard design, analytics, charts, search, filters, categories, budgets, multi-currency and investments remain future work.
+- Dashboard formatting remains basic and INR-first; multi-currency display is out of scope.
+- Recent transaction display is intentionally lightweight and not a full browsing redesign.
+- Search, filters, charts, analytics, budgets, categories and insights remain future work.
+- Dashboard state is still initialized from shared runtime stores; broader dependency-injection cleanup can be considered only if future tests require it.
 
 ## Commit And Push Result
 
-- Commit: `65b18f7 Sprint 19: implement dashboard foundation hydration`
-- Push result: `origin/main` updated successfully.
-- Tag: `sprint-19`
-- Tag push result: `sprint-19` pushed successfully.
-- Local tracking note: remote push succeeded, but the sandbox could not update local `refs/remotes/origin/main` because `.git/refs/remotes/origin/main.lock` could not be created.
+- Commit: pending final git step.
+- Push result: pending final git step.
+- Tag: pending final git step.
+- Tag push result: pending final git step.
 
 ## Next Recommended Sprint
 
-Sprint 20 — Dashboard Foundation continuation.
+Sprint 21 - Dashboard Foundation continuation.

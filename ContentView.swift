@@ -14,7 +14,6 @@ struct ContentView: View {
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @State private var selectedTab = 0
     @State private var didStartRepositoryHydration = false
-    @State private var repositoryHydrationMessage = "Loading persisted dashboard..."
 
     var body: some View {
 
@@ -74,15 +73,22 @@ struct ContentView: View {
 
                 GroupBox("Accounts") {
                     VStack(alignment: .leading, spacing: 8) {
-                        if dashboardViewModel.accounts.isEmpty {
+                        HStack {
+                            Text("\(dashboardViewModel.accounts.count) account(s)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+
+                        if dashboardViewModel.accountSummaries.isEmpty {
                             Text("No repository-backed accounts")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else {
-                            ForEach(dashboardViewModel.accounts.prefix(3)) { account in
+                            ForEach(dashboardViewModel.accountSummaries) { account in
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(account.nickname ?? account.name)
+                                        Text(account.displayName)
                                             .font(.caption.weight(.semibold))
                                             .lineLimit(1)
                                         Text(account.institution)
@@ -100,7 +106,47 @@ struct ContentView: View {
 
                         Divider()
 
-                        Text(repositoryHydrationMessage)
+                        Label(
+                            dashboardViewModel.presentationState.message,
+                            systemImage: dashboardStatusIcon
+                        )
+                            .font(.caption2)
+                            .foregroundStyle(dashboardStatusColor)
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                GroupBox("Recent Transactions") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if dashboardViewModel.recentTransactionSummaries.isEmpty {
+                            Text("No repository-backed transactions")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(dashboardViewModel.recentTransactionSummaries) { transaction in
+                                HStack(spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(transaction.description)
+                                            .font(.caption.weight(.semibold))
+                                            .lineLimit(1)
+                                        Text(transaction.currency)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    Text("\(transaction.amount, format: .number)")
+                                        .font(.caption)
+                                        .foregroundStyle(transaction.isCredit ? .green : .red)
+                                        .monospacedDigit()
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        Text("\(dashboardViewModel.transactionCount) trusted transaction(s)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -217,18 +263,39 @@ struct ContentView: View {
     private func hydrateDashboardOnce() {
         guard !didStartRepositoryHydration else { return }
         didStartRepositoryHydration = true
+        dashboardViewModel.markHydrationStarted()
 
         do {
             let result = try RepositoryStoreHydrator().hydrateIfNeeded()
-            if result.accountCount == 0 && result.transactionCount == 0 {
-                repositoryHydrationMessage = "No persisted dashboard data"
-            } else {
-                repositoryHydrationMessage = "Loaded \(result.accountCount) account(s), \(result.transactionCount) transaction(s)"
-            }
+            dashboardViewModel.markHydrationCompleted(result)
         } catch {
-            repositoryHydrationMessage = "Dashboard load failed"
+            dashboardViewModel.markHydrationFailed(error)
             DeveloperConsole.shared.log("Dashboard Hydration: FAILED")
             DeveloperConsole.shared.log(error.localizedDescription)
+        }
+    }
+
+    private var dashboardStatusIcon: String {
+        switch dashboardViewModel.presentationState {
+        case .loading:
+            return "hourglass"
+        case .empty:
+            return "tray"
+        case .loaded:
+            return "checkmark.circle.fill"
+        case .failed:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var dashboardStatusColor: Color {
+        switch dashboardViewModel.presentationState {
+        case .loading, .empty:
+            return .secondary
+        case .loaded:
+            return .green
+        case .failed:
+            return .orange
         }
     }
 }

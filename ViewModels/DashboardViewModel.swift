@@ -22,16 +22,59 @@ struct DashboardSnapshot {
     )
 }
 
+enum DashboardPresentationState: Equatable {
+    case loading(String)
+    case empty(String)
+    case loaded(String)
+    case failed(String)
+
+    var message: String {
+        switch self {
+        case .loading(let message), .empty(let message), .loaded(let message), .failed(let message):
+            return message
+        }
+    }
+}
+
+struct DashboardAccountSummary: Identifiable, Equatable {
+    let id: UUID
+    let displayName: String
+    let institution: String
+    let currencyCode: String
+    let currentBalance: Decimal
+}
+
+struct DashboardTransactionSummary: Identifiable, Equatable {
+    let id: UUID
+    let date: Date?
+    let description: String
+    let amount: Decimal
+    let currency: String
+    let isCredit: Bool
+}
+
 final class DashboardViewModel: ObservableObject {
 
     @Published private(set) var snapshot: DashboardSnapshot = .empty
     @Published private(set) var accounts: [Account] = []
+    @Published private(set) var presentationState: DashboardPresentationState = .loading("Loading persisted dashboard...")
+    @Published private(set) var accountSummaries: [DashboardAccountSummary] = []
+    @Published private(set) var recentTransactionSummaries: [DashboardTransactionSummary] = []
+    @Published private(set) var transactionCount: Int = 0
 
     private var cancellables = Set<AnyCancellable>()
+    private let accountLimit = 3
+    private let recentTransactionLimit = 3
 
-    init() {
+    init(
+        accountStore: AccountStore = .shared,
+        transactionStore: TransactionStore = .shared
+    ) {
+        refresh(accounts: accountStore.accounts)
+        refresh(from: transactionStore.transactions)
+
         // Observe transactions for income/expense/balance calculations
-        TransactionStore.shared.$transactions
+        transactionStore.$transactions
             .receive(on: RunLoop.main)
             .sink { [weak self] transactions in
                 self?.refresh(from: transactions)
@@ -39,15 +82,37 @@ final class DashboardViewModel: ObservableObject {
             .store(in: &cancellables)
 
         // Observe accounts for future multi-currency and per-account metrics
-        AccountStore.shared.$accounts
+        accountStore.$accounts
             .receive(on: RunLoop.main)
             .sink { [weak self] accounts in
-                self?.accounts = accounts
+                self?.refresh(accounts: accounts)
             }
             .store(in: &cancellables)
     }
 
+    func markHydrationStarted() {
+        presentationState = .loading("Loading persisted dashboard...")
+    }
+
+    func markHydrationCompleted(_ result: RepositoryStoreHydrationResult) {
+        if result.accountCount == 0 && result.transactionCount == 0 {
+            presentationState = .empty("No persisted dashboard data")
+        } else {
+            presentationState = .loaded("Loaded \(result.accountCount) account(s), \(result.transactionCount) transaction(s)")
+        }
+    }
+
+    func markHydrationFailed(_ error: Error) {
+        presentationState = .failed("Dashboard load failed")
+    }
+
     func refresh(from transactions: [Transaction]) {
+
+        transactionCount = transactions.count
+        recentTransactionSummaries = Self.recentTransactionSummaries(
+            from: transactions,
+            limit: recentTransactionLimit
+        )
 
         let income = transactions.reduce(Decimal.zero) {
             $0 + ($1.credit ?? .zero)
@@ -65,5 +130,49 @@ final class DashboardViewModel: ObservableObject {
             expenses: expenses,
             cashFlow: income - expenses
         )
+    }
+
+    private func refresh(accounts: [Account]) {
+        self.accounts = accounts
+        accountSummaries = accounts.prefix(accountLimit).map {
+            DashboardAccountSummary(
+                id: $0.id,
+                displayName: $0.nickname ?? $0.name,
+                institution: $0.institution,
+                currencyCode: $0.currencyCode,
+                currentBalance: $0.currentBalance
+            )
+        }
+    }
+
+    private static func recentTransactionSummaries(
+        from transactions: [Transaction],
+        limit: Int
+    ) -> [DashboardTransactionSummary] {
+        transactions
+            .enumerated()
+            .sorted { lhs, rhs in
+                switch (lhs.element.date, rhs.element.date) {
+                case let (left?, right?) where left != right:
+                    return left > right
+                case (.some, nil):
+                    return true
+                case (nil, .some):
+                    return false
+                default:
+                    return lhs.offset > rhs.offset
+                }
+            }
+            .prefix(limit)
+            .map { _, transaction in
+                DashboardTransactionSummary(
+                    id: transaction.id,
+                    date: transaction.date,
+                    description: transaction.description,
+                    amount: transaction.amount,
+                    currency: transaction.currency,
+                    isCredit: transaction.credit != nil
+                )
+            }
     }
 }
