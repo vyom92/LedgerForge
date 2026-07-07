@@ -62,6 +62,7 @@
 		28B87B392FFBBE2D009BEE8C /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */; };
 		28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B3C2FFBBFC8009BEE8C /* Account.swift */; };
 		28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */; };
+		28D4BACD2FFCC85500756551 /* DefaultPasswordProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D4BACC2FFCC85500756551 /* DefaultPasswordProvider.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -150,6 +151,7 @@
 		28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		28B87B3C2FFBBFC8009BEE8C /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
 		28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountStore.swift; sourceTree = "<group>"; };
+		28D4BACC2FFCC85500756551 /* DefaultPasswordProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultPasswordProvider.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -219,6 +221,7 @@
 				281BB1742FFC4CAF006E7424 /* Coordinator */,
 				281BB17B2FFC4D1C006E7424 /* ImportFramework.swift */,
 				281BB1C22FFCBF13006E7424 /* Readers */,
+				28D4BACB2FFCC85500756551 /* Password */,
 			);
 			path = Import;
 			sourceTree = "<group>";
@@ -455,6 +458,14 @@
 			path = "Project documents";
 			sourceTree = "<group>";
 		};
+		28D4BACB2FFCC85500756551 /* Password */ = {
+			isa = PBXGroup;
+			children = (
+				28D4BACC2FFCC85500756551 /* DefaultPasswordProvider.swift */,
+			);
+			path = Password;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -624,6 +635,7 @@
 				281BB1C82FFCC035006E7424 /* DefaultReaderRegistry.swift in Sources */,
 				288EB1212FF7D88200F09BC9 /* Parsers/StatementParserRegistry.swift in Sources */,
 				281BB17C2FFC4D1C006E7424 /* ImportFramework.swift in Sources */,
+				28D4BACD2FFCC85500756551 /* DefaultPasswordProvider.swift in Sources */,
 				288EB1252FF7D8B500F09BC9 /* Transaction.swift in Sources */,
 				288EB0ED2FF7AE2500F09BC9 /* DocumentReader.swift in Sources */,
 				288EB12D2FF7E0C000F09BC9 /* NormalizedDocument.swift in Sources */,

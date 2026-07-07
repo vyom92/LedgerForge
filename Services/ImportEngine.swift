@@ -14,7 +14,8 @@ final class ImportEngine {
 
     private init(
         importCoordinator: any ImportFramework.ImportCoordinator = DefaultImportCoordinator(
-            readerRegistry: DefaultReaderRegistry()
+            readerRegistry: DefaultReaderRegistry(),
+            passwordProvider: DefaultPasswordProvider()
         )
     ) {
         self.importCoordinator = importCoordinator
