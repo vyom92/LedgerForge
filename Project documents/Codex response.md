@@ -10,10 +10,16 @@ The production handoff now flows through an immutable `FinancialDocument` after 
 
 ```text
 Statement Parser
--> [Transaction]
--> FinancialDocument
--> ImportValidator.validate(financialDocument:)
--> Stores
+↓
+[Transaction]
+↓
+FinancialDocumentBuilder
+↓
+FinancialDocument
+↓
+ImportValidator.validate(financialDocument:)
+↓
+Stores
 ```
 
 Existing parser extraction, validation calculations, repository behaviour, store behaviour and UI behaviour were preserved.
@@ -72,6 +78,7 @@ External macro implementation type 'PreviewsMacros.SwiftUIView' could not be fou
 ```
 
 Per project workflow, the equivalent Xcode regression suite was run from Xcode and treated as authoritative.
+This is the approved validation path whenever the known SwiftUI #Preview command-line tooling issue occurs after a successful production build.
 
 Xcode `RunSomeTests` result:
 
@@ -143,7 +150,7 @@ Approved Axis CSV financial truth remains unchanged:
 - `FinancialDocument` contains no calculations and no business logic.
 - `FinancialDocumentBuilder` packages existing parser output without recalculation.
 - `ImportValidator.validate(financialDocument:)` delegates to existing transaction validation.
-- `StatementParser.parse(document:) -> [Transaction]` remains unchanged for Sprint 15.
+- `    StatementParser.parse(document:) -> [Transaction] remains unchanged during Sprint 15. FinancialDocumentBuilder provides the temporary compatibility bridge until Sprint 16 migrates parser outputs directly.
 - Changing parser protocols to return `FinancialDocument` is deferred to Sprint 16.
 
 ## Documentation Updated
@@ -162,7 +169,7 @@ Approved Axis CSV financial truth remains unchanged:
 
 - `StatementParser` still returns `[Transaction]`; Sprint 16 is planned to migrate parser return type to `FinancialDocument`.
 - `ImportEngine` still owns analysis, normalization, parser selection, validation and store update orchestration.
-- Production parser selection still uses the legacy registry path directly.
+-     Production parser selection still uses the legacy registry path. Repository orchestration remains within ImportEngine until later architectural cleanup.
 
 ## Deferred Items
 
@@ -183,4 +190,4 @@ Sprint 16 - StatementParser returns FinancialDocument.
 
 Recommended objective:
 
-- Migrate the parser protocol so statement parsers return `FinancialDocument` directly while preserving the approved Axis CSV financial baseline and existing validation behaviour.
+-     Migrate StatementParser to return FinancialDocument directly, remove the temporary compatibility bridge provided by FinancialDocumentBuilder, and preserve the approved financial baseline, validation behaviour and repository behaviour.

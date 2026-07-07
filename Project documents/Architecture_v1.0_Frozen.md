@@ -1,6 +1,6 @@
 # LedgerForge Architecture v1.0 (Frozen)
 
-**Status:** Frozen v1.0 baseline, current through Milestone C recovery
+**Status:** Frozen v1.0 baseline, aligned through Sprint 15 / Milestone M4
 
 This document is the architectural baseline for LedgerForge v1.0. It remains frozen except for status-alignment updates required to reflect completed implementation milestones and approved ADRs.
 
@@ -52,11 +52,11 @@ ImportCoordinator
 → ReaderRegistry
 → Reader (PDF / CSV / XLS / XLSX / TXT)
 → RawDocument
-→ FinancialDocument
 → Institution Detection
-→ Document Classification
+→ Statement Classification
 → Parser Selection
 → Statement Parser
+→ FinancialDocument
 → Validation
 → Import Session
 → Repositories
@@ -75,15 +75,15 @@ ImportCoordinator
 - Readers never perform financial interpretation.
 - Readers never access Keychain, UI prompts or password policy directly.
 - Institution Detection identifies the originating institution using extracted document content.
-- Document Classification determines the document family (Bank, Credit Card, Brokerage, Salary, Insurance, etc.).
+- Statement Classification determines the document family (Bank, Credit Card, Brokerage, Salary, Insurance, etc.).
 - Parser Selection chooses the correct parser implementation.
-- Normalization converts RawDocument into FinancialDocument.
-- Statement Parsers transform FinancialDocument into normalized domain objects.
+- Statement Parsers construct FinancialDocument after parser selection.
+- Statement Parsers produce FinancialDocument as the canonical parser output.
 - Validation is the only stage permitted to verify financial correctness.
 - Repository protocols are the persistence boundary for transactions and accounts.
 - Stores expose validated runtime state to the UI.
 - Rules Engine enriches validated financial data but never alters imported financial truth.
-- Every supported file format must converge into the same RawDocument-to-FinancialDocument pipeline before parsing.
+- Every supported file format must converge into the same deterministic pipeline before parser execution.
 - Equivalent reference fixtures across CSV, PDF and future formats must preserve the same observable financial truth.
 
 ## Core Domain
@@ -99,7 +99,7 @@ ImportCoordinator
 - DocumentMetadata
 - RawDocument
 - FinancialDocument
-- DocumentClassification
+- StatementClassification
 - TransactionStore
 - Money
 - ExchangeRate
@@ -135,14 +135,15 @@ ImportCoordinator
 
 ## Milestones
 
-- Milestone A: Foundation ✅
-- Milestone B: Import Foundation v1.0 ✅
-- Milestone C: Unified Import Framework Operational ✅
-- Milestone D: Multi-Institution Support
-- Milestone E: Rules Engine, Categorization & Reconciliation
-- Milestone F: Dashboard & Financial Intelligence
-- Milestone G: Investments & Portfolio Analytics
-- Milestone H: Financial Operating System
+- Milestone M1: Robust Statement Import ✅
+- Milestone M2: Statement Understanding ✅
+- Milestone M3: Canonical Financial Handoff ✅
+- Milestone M4: FinancialDocument-native Parsing 🚧
+- Milestone M5: Validation Intelligence
+- Milestone M6: Repository & Data Platform
+- Milestone M7: Dashboard Experience
+- Milestone M8: Insights
+- Milestone M9: Ecosystem
 
 ## North Star
 
@@ -188,7 +189,6 @@ Principles:
 
 The following concepts are intentionally excluded from Architecture v1.0 but are planned for future milestones:
 
-- Institution Detection Framework
 - XLS/XLSX Reader
 - OCR fallback for scanned documents
 - Statement Learning Mode

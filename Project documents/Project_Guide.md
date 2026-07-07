@@ -4,12 +4,11 @@ This is the canonical project operating manual. Read this document first, then u
 
 ## Current Project Snapshot
 
-
-- **Current Milestone:** Milestone C
+- **Current Milestone:** M4 – StatementParser returns FinancialDocument
 - **Current Sprint:** Sprint 16
 - **Current Phase:** FinancialDocument Integration Complete
 - **Build Status:** Passing
-- **Validation Status:** Build passing; required Sprint 15 regression suite passing (46 selected tests).
+- **Validation Status:** Build passing; full regression baseline passing. Sprint 15 validation complete.
 - **Last Architecture Review:** 2026-07-07
 - **Current Codex Baseline:** Sprint 15
 
@@ -33,7 +32,7 @@ This is the canonical project operating manual. Read this document first, then u
 | Password Management | Operational; DefaultPasswordProvider integrated |
 | Dashboard | Existing dashboard unchanged |
 | Investments | Future module |
-| Validation | Build passing; required Sprint 15 regression suite passing (46 selected tests) |
+| Validation | Build passing; full regression baseline passing. Sprint 15 validation complete |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -89,7 +88,7 @@ Dashboard
 | Product Vision.md               | High-level goals, target users, and product impact    | New feature planning              | High        |
 | Engineering Standards.md        | Coding standards and engineering guidelines           | All engineering tasks             | Medium      |
 | AI_WORKFLOW.md                 | Workflow instructions for AI assistants                | All AI-related tasks              | Medium      |
-| .github/context.md             | Project environment and constraints for AI assistants | AI onboarding and context refresh | Medium      |
+.github/Project_Context.md
 | .github/ai-instructions.md     | AI behavior and interaction policies                   | AI onboarding                    | Medium      |
 | .github/prompts.md             | Prompt templates and examples for AI responses         | AI onboarding                    | Medium      |
 | Project documents/Codex response.md | Current sprint working log, implementation notes, build/test progress | Sprint reviews, bug fixes, testing | High        |
@@ -133,7 +132,11 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 - Views, ViewModels and Stores never access SQLite directly.
 - ImportCoordinator owns orchestration only.
 - Readers understand file formats.
-- Parsers understand financial institutions and document families.
+- Institution Detection identifies the financial institution.
+Statement Classification identifies the document family.
+Parser Selection chooses the appropriate parser.
+Statement Parsers produce FinancialDocument.
+FinancialDocument is validated before persistence.
 - Stores own runtime state.
 - The dashboard observes stores rather than querying persistence.
 
@@ -228,13 +231,14 @@ Additionally:
 - Do not implement future sprints.  
 - Do not redesign approved architecture.  
 - Build continuously.  
-- Run tests where applicable.  
+- Run the required sprint validation.
+If command-line tests fail solely because of the known SwiftUI Preview tooling issue after a successful build, execute the equivalent Xcode regression suite and treat that result as authoritative.  
 - If the project builds successfully and required sprint tests pass, prepare an automated Git commit.
 - Verify `git status` contains only sprint-related files.
 - Verify there are no unresolved merge conflict markers.
 - Generate a concise commit message describing the completed sprint work.
 - Commit the sprint changes.
-- Push to the tracked branch (normally `origin/main`).
+- Push to the tracked branch (normally `origin/main`).Push the sprint tag if one was created.
 - Maintain Project documents/Codex response.md during implementation.
 - After a successful build, required tests, commit and push, update Project documents/PROJECT_STATE.md with the verified repository state.
 - Record the commit hash, tag and push result in Project documents/Codex response.md.
@@ -246,18 +250,73 @@ Additionally:
 ### 3. Before stopping
 
 - Update Project documents/Codex response.md throughout the sprint.
-- After a successful build, required tests, commit and push, update Project documents/PROJECT_STATE.md with the verified repository state.
+- After a successful build, required validation, commit, push and tag (if applicable), update Project documents/PROJECT_STATE.md...
 - Include summary, files created, files modified, build result, validation result, commit hash (if committed), tag (if created), push result, documentation updated, remaining technical debt, deferred items and next recommended sprint.  
 - Stop exactly at the approved sprint boundary.  
 - Confirm the repository builds successfully before considering the sprint complete.
 
 ## Sprint Roadmap
 
-
 - **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15
 - **Current Sprint:** Sprint 16 – StatementParser returns FinancialDocument
 - **Upcoming Sprints:**
-  - Sprint 17 – To be defined
+  - Sprint 17 – Validation Pipeline Refinement
+  - Sprint 18 – Repository Integration Cleanup
+  - Sprint 19–21 – Dashboard Foundation
+  - Sprint 22–24 – Insights & Analytics
+  - Sprint 25+ – Multi-Currency, Investments & Ecosystem
+
+## Product Milestones
+
+### M1 – Robust Statement Import ✅
+- CSV/PDF readers
+- Password handling
+- Raw document extraction
+- Unified import framework
+
+### M2 – Statement Understanding ✅
+- Institution Detection
+- Statement Classification
+- Parser Selection
+
+### M3 – Canonical Financial Handoff ✅
+- FinancialDocument
+- Validation bridge
+- Regression safety
+
+### M4 – FinancialDocument-native Parsing 🚧
+- StatementParser returns FinancialDocument
+- Immutable parser output
+- Zero behavioural change
+
+### M5 – Validation Intelligence
+- Rule engine
+- Error categorisation
+- Confidence scoring
+
+### M6 – Repository & Data Platform
+- Unified persistence
+- Deduplication
+- Audit trail
+
+### M7 – Dashboard Experience
+- Accounts
+- Net Worth
+- Cash Flow
+- Search
+- Filters
+- Trends
+
+### M8 – Insights
+- Spending analytics
+- Budgets
+- Smart alerts
+
+### M9 – Ecosystem
+- Multi-currency
+- Investments
+- Public API
+- Plugin architecture
 
 ## Known Technical Debt
 
@@ -265,8 +324,8 @@ Maintain a concise list of active architectural and implementation debt.
 
 Current items:
 
-- ImportEngine still owns analysis, normalization, parser selection, validation and store updates.
-- StatementParser still returns `[Transaction]`; Sprint 16 is planned to migrate parser return type to `FinancialDocument`.
+- ImportEngine still owns orchestration responsibilities that will gradually move into dedicated pipeline components as later milestones are completed.
+- StatementParser still returns [Transaction]; FinancialDocumentBuilder provides the temporary compatibility bridge until Sprint 16 completes.
 - Additional approved regression fixtures should be added for future institutions (CBQ, HDFC, SBI, etc.).
 - Additional import fixtures should compare equivalent financial truth across CSV and PDF where available.
 
@@ -298,14 +357,29 @@ Every supported import format should be validated against an approved baseline f
 
 ## Future Modules
 
+### Import
 - XLS/XLSX Reader
 - OCR
+
+### Intelligence
 - Rules Engine
+
+### Dashboard
+- Search (FTS5)
 - Multi-Currency Dashboard
+- Accounts Overview
+- Net Worth
+- Cash Flow
+
+### Wealth
 - Investments
 - Insurance
 - Salary Reconciliation
-- Search (FTS5)
+
+### Ecosystem
+- Public API
+- Backup & Restore
+- Plugin Architecture
 
 Mark completed items as appropriate over time.
 
@@ -356,3 +430,5 @@ Implementation follows architecture.
 Documentation follows implementation.
 
 Every completed sprint should leave the project in a healthier state than it was found.
+
+Documentation should evolve only when architecture, workflow or verified repository state changes.

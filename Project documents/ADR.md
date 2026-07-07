@@ -194,14 +194,14 @@ Incorrect financial data is more damaging than delayed imports. Validation shoul
 Accepted
 
 ## Decision
-All supported import formats (PDF, CSV, XLS, XLSX and TXT) must converge into a single `FinancialDocument` domain model before institution detection, parser selection or validation occurs.
+All supported import formats (PDF, CSV, XLS, XLSX and TXT) must converge into a common deterministic import pipeline. The precise ordering of downstream architectural stages is defined by ADR-016 and subsequent ADRs.
 
 ## Rationale
 Keeping downstream components independent of file formats dramatically simplifies parser development, testing and long-term maintenance.
 
 ## Consequences
 - Readers understand file formats only.
-- Parsers never know the original file format.
+- Downstream processing remains independent of the original file format.
 - New import formats require only a new Reader implementation.
 - Validation and stores remain format-independent.
 
@@ -343,6 +343,7 @@ Everything after `RawDocument` is format-independent.
 - Stores receive only validated domain objects.
 
 This ADR extends ADR-011 by defining the complete document ingestion workflow.
+ADR-011 introduced the concept of a unified downstream pipeline. ADR-016 defines the canonical ordering of that pipeline and supersedes any earlier ordering assumptions.
 ---
 
 # ADR-017 — Deterministic Before Intelligent
@@ -606,6 +607,7 @@ Separating these responsibilities keeps parser selection deterministic while all
 - Unknown classifications remain explicit rather than inferred.
 - Approved regression fixtures verify identical classification behaviour across supported formats.
 - Existing production behaviour remains unchanged until downstream pipeline stages explicitly adopt Statement Classification.
+- Statement Classification provides a stable architectural input to Parser Selection without changing parser behaviour.
 
 ## Related ADRs
 

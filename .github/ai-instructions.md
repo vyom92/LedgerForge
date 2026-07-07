@@ -9,10 +9,11 @@ Do not begin implementation until it has been read.
 Before writing code:
 
 1. Read `Project documents/Project_Guide.md`.
-2. Confirm the requested sprint and stop condition.
-3. Read `Project documents/Codex response.md`.
-4. Use the Task Routing Guide in `Project_Guide.md` to determine which additional documentation is required.
-5. Produce an implementation plan before making code changes.
+2. Read `Project documents/PROJECT_STATE.md`.
+3. Confirm the approved sprint and stop condition.
+4. Read `Project documents/Codex response.md`.
+5. Use the Task Routing Guide in `Project_Guide.md` to determine which additional documentation is required.
+6. Produce an implementation plan in `Project documents/Codex response.md` before making code changes.
 
 ## Scope Rules
 
@@ -32,7 +33,11 @@ Before writing code:
 - Stores never access SQLite.
 - ImportCoordinator owns orchestration.
 - Readers understand file formats.
-- Parsers understand financial institutions.
+- Institution Detection identifies the financial institution.
+- Statement Classification determines the statement type.
+- Parser Selection chooses the appropriate parser.
+- Statement Parsers produce FinancialDocument.
+- FinancialDocument is validated before persistence.
 - Stores own runtime state.
 - Dashboard observes stores.
 
@@ -62,7 +67,7 @@ Prefer migration over duplication.
 Before completion:
 
 - Build successfully.
-- Run relevant tests.
+- Run the required sprint validation. If command-line tests fail solely because of the known SwiftUI Preview tooling issue after a successful build, run the equivalent Xcode regression suite and treat that result as authoritative.
 - Preserve parser behaviour.
 - Preserve repository behaviour.
 - Do not introduce regressions.
@@ -72,8 +77,10 @@ Before completion:
 At the end of every implementation:
 
 - Update `Project documents/Codex response.md`.
-- Update `Project documents/Project_Guide.md` if project status changed.
+- Record build result, validation result, commit hash, tag (if created) and push result.
+- Update `Project documents/PROJECT_STATE.md` after a successful commit and push.
+- Update `Project documents/Project_Guide.md` only if workflow, roadmap or engineering guidance changed.
 - Record deferred work.
 - Stop exactly at the approved sprint boundary.
 
-When documentation conflicts with implementation, documentation is authoritative until explicitly updated.
+If implementation exposes a genuine architectural inconsistency, stop, document it in Project documents/Codex response.md, and resolve the documentation before continuing implementation.

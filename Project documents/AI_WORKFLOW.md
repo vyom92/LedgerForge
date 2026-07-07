@@ -9,6 +9,7 @@ This workflow applies to every AI-assisted implementation in LedgerForge.
 1. Confirm the requested sprint, scope and stop condition.
 2. Read:
    - Project documents/Project_Guide.md
+   - Project documents/PROJECT_STATE.md
    - Project documents/Codex response.md
 3. Use the Task Routing Guide in `Project_Guide.md` to determine which additional documents are required. Depending on the task these may include:
    - .github/context.md
@@ -39,8 +40,10 @@ Every implementation must:
 - Generate a concise commit message that accurately summarizes the completed work.
 - Stage only files related to the approved sprint.
 - Commit the changes.
-- Push to `origin/main`.
-- Report the commit hash in `Project documents/Codex response.md`.
+- Push to the tracked branch (normally `origin/main`).
+- If a sprint tag is created, push the tag after the branch push succeeds.
+- Update `Project documents/PROJECT_STATE.md` only after a successful commit and push.
+- Record the commit hash, tag (if created) and push result in `Project documents/Codex response.md`.
 - If the build or required tests fail, do not commit or push. Record the failure in `Project documents/Codex response.md` and stop.
 - Leave zero compile errors introduced by the sprint.
 - Add every new file to the Xcode navigator.
@@ -57,7 +60,9 @@ Update `Project documents/Codex response.md` with:
 - Files Created
 - Files Modified
 - Build Result
+- Validation Result
 - Commit Hash (if committed)
+- Tag (if created)
 - Push Result
 - Test Result
 - Architecture Decisions
@@ -66,7 +71,7 @@ Update `Project documents/Codex response.md` with:
 - Deferred Items
 - Next Recommended Sprint
 
-If project status changed, also update `Project documents/Project_Guide.md`.
+If project status changed, update `Project documents/PROJECT_STATE.md`. Update `Project documents/Project_Guide.md` only if workflow, roadmap or guidance changed.
 
 ## Documentation Rules
 
@@ -90,7 +95,7 @@ Before considering a sprint complete, confirm:
 - Project builds successfully.
 - Relevant tests pass or skipped tests are justified.
 - Successful builds have been committed.
-- Successful commits have been pushed to `origin/main`.
+- Successful commits have been pushed to the tracked branch.
 - Commit message accurately reflects the completed sprint work.
 - Documentation updated.
 - Codex response updated.

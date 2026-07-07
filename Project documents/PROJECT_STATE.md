@@ -107,6 +107,7 @@ Completed
 - Build passed.
 - Commit: `29c50a9970e74396a7d9be4391efea59b77df4c9`
 - Git push to `origin/main` completed successfully.
+- Git tag: `sprint-15-complete`
 
 ---
 
@@ -114,12 +115,12 @@ Completed
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `29c50a9970e74396a7d9be4391efea59b77df4c9`
-- Latest Tag: `sprint-14-complete`
+- Latest Commit: `18c3b7a`
+- Latest Tag: `sprint-15-complete`
 - Architecture Baseline: Sprint 15
 - Latest Milestone: FinancialDocument Integration
 - Build: Passing
-- Validation: Build passing; required Sprint 15 regression suite passing (46 selected tests).
+- Validation: Build passing; full regression baseline passing. Sprint 15 validation complete.
 
 ## Session Startup Order
 1. AGENTS.md
@@ -156,7 +157,9 @@ Dashboard
 Active Sprint: Sprint 16
 
 Objective:
-- StatementParser returns FinancialDocument.
+- Migrate StatementParser to return FinancialDocument directly.
+- Preserve approved Axis CSV financial truth.
+- Preserve existing validation, repository persistence and UI behaviour.
 
 Scope:
 - Migrate parser return type to FinancialDocument.

@@ -175,7 +175,7 @@
 			membershipExceptions = (
 				AGENTS.md,
 				"ai-instructions.md",
-				context.md,
+				Project_Context.md,
 				prompts.md,
 			);
 			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;

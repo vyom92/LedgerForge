@@ -99,24 +99,25 @@ Supported sources include:
 - TXT exports (where provided by institutions)
 
 Every import follows the same deterministic pipeline:
+Every stage preserves explainability and traceability so identical financial evidence always produces identical financial results.
 
 1. Coordinate the import through the Unified Import Framework.
 2. Resolve an optional password through the import coordination layer when required.
 3. Select the appropriate reader for the file format.
 4. Extract raw document contents into RawDocument.
-5. Convert raw contents into FinancialDocument.
-6. Identify the financial institution.
-7. Determine the document type (bank account, credit card, investment, salary, etc.).
-8. Detect the document layout and version.
-9. Apply the appropriate parser.
+5. Identify the financial institution.
+6. Determine the statement type (bank account, credit card, investment, salary, etc.).
+7. Select the appropriate parser using deterministic rules.
+8. Execute the Statement Parser.
+9. Produce an immutable FinancialDocument.
 10. Validate the extracted financial data.
 11. Update LedgerForge stores only after validation succeeds.
 
 Institution detection should rely on document fingerprints, metadata, recurring keywords, visual structure, and previous successful imports rather than filenames.
 
-Statement layouts may evolve over time. LedgerForge should automatically recognize new layouts, preserve compatibility with older formats, and learn from successful imports without compromising deterministic parsing.
+Statement layouts and institution formats may evolve over time. LedgerForge should automatically recognize new layouts, preserve compatibility with older formats, and improve recognition without compromising deterministic parsing or financial truth.
 
-The parsing engine should be format-independent. Whether data originates from PDF, CSV, XLS/XLSX or TXT, downstream components should receive the same normalized financial model after the reader-specific extraction stage.
+The import pipeline should be format-independent. Whether data originates from PDF, CSV, XLS/XLSX or TXT, downstream processing should produce identical financial truth after reader-specific extraction and deterministic parser execution.
 
 Importing documents should require little or no user interaction beyond selecting the file.
 

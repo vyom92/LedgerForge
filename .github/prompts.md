@@ -1,7 +1,7 @@
 # Prompt Template Library
 
-**Note:**  
-The mandatory first document for every prompt is always:  
+**Mandatory first document for every prompt**
+
 `Project documents/Project_Guide.md`
 
 ---
@@ -14,23 +14,29 @@ The mandatory first document for every prompt is always:
 
 ## Confirm
 
-- Sprint scope and stop condition
+- Approved sprint
+- Sprint scope
+- Stop condition
 
 ## Before Doing Anything
 
-- Read `Project documents/Project_Guide.md`  
-- Read `Project documents/Codex response.md`  
-- Use the Task Routing Guide to determine any additional documents to read
+- Read `Project documents/Project_Guide.md`
+- Read `Project documents/PROJECT_STATE.md`
+- Read `Project documents/Codex response.md`
+- Use the Task Routing Guide to determine any additional documents required
 
 ## Produce
 
-- Architecture review  
-- Files to modify  
-- Files to create  
-- Risks  
-- Dependencies  
-- Complexity  
-- Build impact  
+- Architecture review
+- Files to modify
+- Files to create
+- Risks
+- Dependencies
+- Complexity
+- Build impact
+
+Produce the implementation plan in
+`Project documents/Codex response.md`.
 
 Stop and wait for approval before implementation.
 
@@ -40,30 +46,37 @@ Stop and wait for approval before implementation.
 
 ## Mandatory Rules
 
-- Implement only the approved sprint  
-- Preserve user-visible behaviour  
-- Build continuously  
-- Run relevant tests after every significant change  
-- If the project builds successfully and required sprint tests pass, verify `git status` contains only sprint-related files.
+- Implement only the approved sprint.
+- Preserve user-visible behaviour.
+- Preserve approved financial truth.
+- Build continuously.
+- Run the required sprint validation after significant changes.
+- If command-line tests fail solely because of the known SwiftUI Preview tooling issue after a successful build, execute the equivalent Xcode regression suite and treat that result as authoritative.
+- Verify `git status` contains only sprint-related files.
 - Verify there are no unresolved merge conflict markers.
-- Generate a concise commit message based on the completed sprint work.
-- Commit the sprint changes.
-- Push to `origin/main`.
-- Record the commit hash and push result in `Project documents/Codex response.md`.
-- If the build or required tests fail, do not commit or push. Record the failure in `Project documents/Codex response.md` and stop.
-- Add new files to the Xcode navigator  
-- Add new files to target membership  
-- Update `Project documents/Codex response.md`  
-- Update `Project documents/Project_Guide.md` if project status changes  
-- Stop exactly at the sprint boundary  
+- Generate a concise commit message from completed work.
+- Commit.
+- Push to the tracked branch (normally `origin/main`).
+- Push the sprint tag (if created).
+- Record build result, validation result, commit hash, tag and push result in `Project documents/Codex response.md`.
+- Update `Project documents/PROJECT_STATE.md` only after successful commit, push and tag (if applicable).
+- Update `Project documents/Project_Guide.md` only if workflow, roadmap or engineering guidance changed.
+- If validation fails, do not commit or push. Record the failure and stop.
+- Add new files to the Xcode navigator.
+- Add new files to target membership.
+- Stop exactly at the approved sprint boundary.
 
-At completion provide:
+### Completion Report
+
+Provide:
+
 - Files changed
 - Files created
 - Files removed
 - Build status
-- Test status
-- Commit hash (if committed)
+- Validation status
+- Commit hash
+- Tag (if created)
 - Push result
 - Architectural decisions
 - Risks
@@ -85,10 +98,11 @@ At completion provide:
 
 ## Requirements
 
-- Make the smallest possible change  
-- Preserve existing behaviour  
-- Build continuously  
-- Remove temporary diagnostics before completion  
+- Make the smallest possible change.
+- Preserve existing behaviour.
+- Build continuously.
+- Run the required validation.
+- Remove temporary diagnostics before completion.
 
 ---
 
@@ -100,11 +114,11 @@ Improve maintainability without changing behaviour.
 
 ## Requirements
 
-- Preserve behaviour  
-- Reduce duplication  
-- Improve naming  
-- Preserve architecture  
-- Do not change financial logic  
+- Preserve behaviour.
+- Reduce duplication.
+- Improve naming.
+- Preserve architecture.
+- Do not change financial logic.
 
 ---
 
@@ -116,13 +130,13 @@ Improve maintainability without changing behaviour.
 
 ## Requirements
 
-- Use only supplied reference documents  
-- Never infer statement layouts  
-- Detect institution before parser selection  
-- Detect document type  
-- Reuse FinancialDocument pipeline  
-- Preserve existing parser behaviour  
-- Validate using supplied reference documents  
+- Use only supplied reference documents.
+- Never infer statement layouts.
+- Institution Detection before Statement Classification.
+- Parser Selection before Statement Parser.
+- Produce FinancialDocument.
+- Preserve parser behaviour.
+- Validate using approved reference fixtures.
 
 ---
 
@@ -130,21 +144,23 @@ Improve maintainability without changing behaviour.
 
 ## Review against
 
-- Product Vision  
-- Project_Guide.md  
-- Engineering Standards  
-- ADRs  
+- Product Vision
+- Project_Guide.md
+- Engineering Standards
+- ADRs
 
 ## Verify
 
-- Readers only extract data  
-- Parsers never know file format  
-- Validation remains centralized  
-- TransactionStore owns transactions  
-- AccountStore owns accounts  
-- Views contain no business logic  
-- No duplicated financial calculations  
-- No unnecessary coupling  
+- Readers only extract RawDocument.
+- Institution Detection identifies the source.
+- Statement Classification identifies the statement type.
+- Parser Selection chooses the parser.
+- Statement Parsers produce FinancialDocument.
+- Validation remains centralized.
+- Stores own runtime state.
+- Views contain no business logic.
+- No duplicated financial calculations.
+- No unnecessary coupling.
 
 Do not modify code during review.
 
@@ -152,29 +168,31 @@ Do not modify code during review.
 
 # Regression Review
 
-## Validate against all available reference documents
+Validate against every approved reference fixture.
 
 Confirm:
 
-- Correct parser selected  
-- Institution detected correctly  
-- Document type detected correctly  
-- Transaction count preserved  
-- Validation behaviour unchanged  
-- Approved CSV/PDF reference fixtures preserve identical financial truth
-- Dashboard unchanged unless expected  
-- No parser regressions  
+- Correct parser selected.
+- Institution detected correctly.
+- Statement type detected correctly.
+- Transaction count preserved.
+- Financial truth preserved.
+- Validation behaviour unchanged.
+- Dashboard unchanged unless expected.
+- No parser regressions.
 
-Produce a PASS / FAIL summary.
+Produce PASS / FAIL.
 
 ---
 
 # Sprint Completion Report
 
 Provide:
+
 - Build status
-- Test status
+- Validation status
 - Commit hash
+- Tag (if created)
 - Push result
 - Files modified
 - Files created
@@ -184,37 +202,37 @@ Provide:
 - Known issues
 - Risks
 - Deferred work
-- Next sprint recommendation
+- Recommended next sprint
 
 ---
 
 # Project Guide Verification
 
-### Test 1
+## Test 1
 
-- Read `Project documents/Project_Guide.md`  
-- List only the documents required for Sprint 11C  
-- Explain why each document is required  
-- List which documents are intentionally skipped  
-- Do not write code  
+- Read `Project documents/Project_Guide.md`.
+- List only the documents required for the requested sprint.
+- Explain why each document is required.
+- List intentionally skipped documents.
+- Do not write code.
 
-### Test 2
+## Test 2
 
-- Read `Project documents/Project_Guide.md`  
-- Describe exactly what Sprint 11C is allowed to change  
-- List five things Sprint 11C must not change  
-- Quote the relevant `Project documents/Project_Guide.md` sections  
-- Do not write code  
+- Read `Project documents/Project_Guide.md`.
+- Describe exactly what the requested sprint may change.
+- List five things it must not change.
+- Quote the relevant sections.
+- Do not write code.
 
-### Test 3
+## Test 3
 
-- Read `Project documents/Project_Guide.md`  
-- Assume Sprint 11C has been requested  
-- Follow the Standard AI Workflow  
-- Produce only:  
-  - Documents to read  
-  - Implementation plan  
-  - Risks  
-  - Files likely to change  
-  - Stop condition  
-- Do not write code
+- Read `Project documents/Project_Guide.md`.
+- Read `Project documents/PROJECT_STATE.md`.
+- Follow the Standard AI Workflow.
+- Produce only:
+  - Documents to read
+  - Implementation plan
+  - Risks
+  - Files likely to change
+  - Stop condition
+- Do not write code.

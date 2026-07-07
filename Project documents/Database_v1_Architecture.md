@@ -2,8 +2,7 @@
 
 # LedgerForge — Database v1 Architecture (Design Proposal)
 
-Status: Proposal for Sprint 10 Phase 2A (architecture-only)
-
+Status: Database v1 design baseline, aligned through Sprint 15 / Milestone M4
 Summary
 
 This document defines the LedgerForge Database v1 architecture. It is a vendor-neutral, SQLite-targeted design that fulfills the project's ADRs, Architecture_v1.0, Product Vision and Engineering Standards. The design prioritizes:
@@ -16,7 +15,7 @@ This document defines the LedgerForge Database v1 architecture. It is a vendor-n
 
 -Top-level goals
 
-- Provide a schema that maps Document Reader outputs (PDF, CSV, XLS/XLSX, TXT) into a single canonical ingestion model (normalized_documents + normalized_rows).
+- Provide a schema that maps Document Reader outputs (PDF, CSV, XLS/XLSX, TXT) into persisted RawDocument/row-level ingestion records (normalized_documents + normalized_rows).
 - Enable deterministic statement fingerprinting and deduplication.
 - Persist validation metadata so only validated imports become trusted application data (transactions marked trusted).
 - Preserve native currency at every level and store exchange rates separately and versioned.
@@ -34,8 +33,8 @@ The ImportCoordinator is responsible for:
 - Invoking the selected Document Reader.
 - Creating ImportSessions.
 - Coordinating Institution Detection.
-- Coordinating Document Classification.
-- Selecting the appropriate Import Profile.
+- Coordinating Statement Classification.
+- Coordinating Parser Selection.
 - Coordinating Validation.
 - Persisting validated domain objects.
 - Reporting progress to the user interface.
@@ -111,7 +110,7 @@ For each table below: I show the purpose, columns (with recommended types), prim
 - Indexes: UNIQUE(code)
 
 3) import_profiles
-- Purpose: represent Import Profiles (layouts/versioned parsers) (ADR-005)
+- Purpose: represent parser profiles/layout versions used after Parser Selection (ADR-005)
 - Columns:
   - id TEXT PRIMARY KEY -- UUID
   - institution_id TEXT REFERENCES institutions(id) ON DELETE SET NULL
@@ -215,7 +214,7 @@ Recommended `document_type` values:
 These traceability columns (`reader_version`, `parser_version`, `layout_version`) are intended for long-term parser traceability and debugging: they allow an import session to be associated with the exact reader/parser/layout versions used to produce the normalized output and parsed candidates.
 
 7) normalized_documents
-- Purpose: persistent canonical representation of Document Reader output (RawDocument) (ADR-011)
+- Purpose: persistent representation of Document Reader output (RawDocument) used for traceability and reprocessing (ADR-011, ADR-016)
 - Columns:
   - id TEXT PRIMARY KEY -- UUID
   - import_session_id TEXT NOT NULL REFERENCES import_sessions(id) ON DELETE CASCADE
@@ -422,8 +421,8 @@ III. How imported documents map into accounts & transactions (traceability)
 1. User triggers import → create `import_sessions` row (validation_status='pending').
 2. For each uploaded file, create `documents` row with sha256 and storage_path.
 3. Document Reader extracts the file into RawDocument.
-4. Normalization produces FinancialDocument and persists normalized_documents and normalized_rows.
-5. Institution detection, classification and parser selection determine the Import Profile before parsing creates candidate transactions.
+4. Persist RawDocument and row-level extraction output in normalized_documents and normalized_rows.
+5. Institution Detection, Statement Classification and Parser Selection determine the parser/profile before Statement Parser execution produces FinancialDocument and transaction candidates.
 6. ImportValidator runs, writes `validation_issues` and computes `validation_summary`.
 7. Update `import_sessions.validation_status` to 'passed' / 'failed' / 'warning'.
 8. If 'passed': mark associated transactions `is_trusted=1` and set `trusted_at`. Create/match `accounts` using `account_identifiers`; set `created_from_import_session_id` for provenance.
@@ -467,7 +466,7 @@ Extractable text?
 
 ↓
 
-FinancialDocument
+RawDocument
 
 ↓
 
@@ -480,8 +479,9 @@ Downstream components remain unaware of whether OCR was required.
 V. Format-independence: PDF, CSV, XLS/XLSX, TXT mapping
 
 - Document Readers convert each supported file format into RawDocument.
-- Normalization converts RawDocument into the canonical FinancialDocument used by parsers.
-- normalized_rows persist the canonical row representation so downstream parsers, validators and stores operate identically regardless of file format.
+- Institution Detection, Statement Classification and Parser Selection operate on extracted content independent of the original file format.
+- Statement Parsers produce FinancialDocument after parser selection.
+- normalized_rows persist row-level extracted content so downstream parsers, validators and stores can trace results regardless of file format.
 - `documents` preserves original file-level metadata for audit.
 
 VI. Validation metadata storage & workflow (ADR-010)
@@ -622,7 +622,7 @@ CREATE TABLE document_fingerprints (
 
 XV. Testing & verification recommendations
 
-- Maintain approved CSV and PDF reference fixtures for every supported institution. Verify identical financial truth across equivalent formats, ensure RawDocument extraction remains stable, FinancialDocument normalization is deterministic, parsers generate expected transactions, validation detects expected issues, and only trusted transactions reach dashboards.
+- Maintain approved CSV and PDF reference fixtures for every supported institution. Verify identical financial truth across equivalent formats, ensure RawDocument extraction remains stable, Institution Detection/Statement Classification/Parser Selection remain deterministic, parsers generate FinancialDocument and expected transactions, validation detects expected issues, and only trusted transactions reach dashboards.
 - Add unit tests for fingerprinting: identical normalized inputs must produce identical fingerprints; minor benign whitespace changes should not change fingerprint if normalization rules say so.
 - Add migration tests for every schema change using sample DBs representing previous versions.
 
@@ -631,7 +631,7 @@ XVI. Rationale: explanation of key design decisions
 1. Preserve native values and store amount_decimal (TEXT) + amount_minor (INTEGER)
    - Why: To fully preserve imported financial truth (no rounding or conversion loss) and to enable efficient numeric queries.
 2. Normalized_documents + normalized_rows
-   - Why: Document Readers vary by format; normalizing early into a canonical model makes parsers and validators format-agnostic and increases maintainability (ADR-011).
+   - Why: Document Readers vary by format; persisting RawDocument and row-level extraction output makes downstream detection, classification, parser selection, validation and audit workflows format-independent and maintainable (ADR-011, ADR-016).
 3. Fingerprinting based on normalized rows
    - Why: Identifies duplicates independent of file format and minor layout differences; fingerprint_data supports fuzzy matching later.
 4. Transactions can exist pre-validation but are not trusted until validation passes
@@ -680,4 +680,4 @@ End of proposal
 
 
 --
-Created for Sprint 10 Phase 2A (architecture-only). This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md and Product Vision.md as the authoritative design inputs.
+Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through Sprint 15 / Milestone M4. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.

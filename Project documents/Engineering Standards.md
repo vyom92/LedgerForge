@@ -66,12 +66,15 @@ Detectors/
 - Classify document types.
 - Identify parser candidates.
 
-Normalizers/
-- Convert RawDocument into the FinancialDocument domain model.
-- Ensure every supported file format converges into the same ingestion pipeline.
+Builders/
+- Construct immutable FinancialDocument objects.
+- Preserve deterministic financial truth.
+- Never perform validation.
 
 Parsers/
-- Convert normalized data into LedgerForge models.
+- Produce FinancialDocument.
+- Never perform validation.
+- Never persist data.
 
 Database/
 - Persistence only.
@@ -113,7 +116,7 @@ ViewModels/
 
 Before implementation:
 
-1. Read Project_Guide.md.
+1. Read Project_Guide.md and PROJECT_STATE.md.
 2. Use the Task Routing Guide.
 3. Open only the required reference documents.
 4. Verify required reference documents exist.
@@ -131,8 +134,9 @@ Implementation:
 7. Verify there are no unresolved merge conflict markers.
 8. Generate a concise commit message describing the completed work.
 9. Commit.
-10. Push to `origin/main`.
-11. Move to the next file.
+10. Push to the tracked branch (normally `origin/main`).
+11. Push the sprint tag if one was created.
+12. Move to the next file.
 
 # Definition of Done
 
@@ -142,7 +146,8 @@ A task is complete only when:
 - Required sprint tests pass.
 - No unresolved merge conflict markers exist.
 - The completed sprint has been committed.
-- The completed sprint has been pushed to `origin/main`.
+- The completed sprint has been pushed to the tracked branch.
+- Sprint tag has been created and pushed (if applicable).
 - Existing functionality still works.
 - The feature has been manually verified.
 - Approved reference fixtures continue producing identical financial truth.
@@ -154,11 +159,11 @@ A task is complete only when:
 # Architecture Rules
 
 Readers extract data.
-FinancialDocument is the common ingestion model.
 Institution Detection identifies the source.
-Document Classification determines the document family.
+Statement Classification determines the document family.
 Parser Selection chooses the correct parser.
-Statement Parsers create business objects.
+Statement Parsers produce FinancialDocument.
+FinancialDocument is the canonical parser output.
 Validation verifies financial correctness.
 TransactionStore owns transactions.
 AccountStore owns accounts.
@@ -211,7 +216,7 @@ The code should make adding the next financial institution easier than adding th
 - Never commit if the build or required tests fail.
 - Verify only sprint-related files are staged before committing.
 - Generate commit messages from completed work rather than generic templates.
-- Report the commit hash after every successful automated commit.
+- Report the commit hash, tag (if created) and push result after every successful automated commit.
 - Resolve compile errors before continuing.
 - Run regression tests whenever parser or import code changes.
 - Verify approved CSV/PDF reference fixtures before merging reader or parser changes.
