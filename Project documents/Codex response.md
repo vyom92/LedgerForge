@@ -1,29 +1,29 @@
 # Codex Response
 
-## Sprint 18 Summary
+## Sprint 18 Completion Report
 
-Sprint 18 Repository Integration Cleanup is implemented and validation has passed.
+Sprint 18 Repository Integration Cleanup is complete.
 
-Implemented:
+## Summary
 
 - Added a narrow repository persistence boundary after `FinancialDocument` validation.
 - Added DTO mapping from already-validated import inputs to repository DTOs.
 - Wired `ImportEngine` to attempt repository persistence only after validation passes.
 - Preserved existing runtime `TransactionStore` and `AccountStore` updates.
 - Added repository integration coverage for valid persistence, failed-validation persistence skip, and unsupported currency mapping.
-- Converted SwiftUI preview declarations from `#Preview` to legacy `PreviewProvider` to unblock the Xcode test build without changing runtime UI behaviour.
-- Updated the persistence mapper to defer institution and document relationships until those rows are formally persisted.
+- Resolved the SwiftUI Preview macro test-build blocker using `PreviewProvider` compatibility.
+- Documented preview compatibility in ADR-022.
 
-No parser behaviour, validation behaviour, repository protocol semantics, UI behaviour, financial truth, transaction extraction logic, transaction ordering, or trust-state policy was intentionally changed.
+Parser behaviour, validation behaviour, repository semantics, UI behaviour, financial truth and transaction extraction were preserved.
 
 ## Files Created
 
-- `LedgerForge/Services/ImportPersistenceMapper.swift`
-- `LedgerForge/Services/ImportPersistenceCoordinator.swift`
+- `Services/ImportPersistenceMapper.swift`
+- `Services/ImportPersistenceCoordinator.swift`
 - `LedgerForgeTests/ImportRepositoryIntegrationTests.swift`
 
 ## Files Modified
- 
+
 - `Services/ImportEngine.swift`
 - `Services/ImportPersistenceMapper.swift`
 - `LedgerForgeTests/ImportRepositoryIntegrationTests.swift`
@@ -39,65 +39,53 @@ No parser behaviour, validation behaviour, repository protocol semantics, UI beh
 
 ## Build Result
 
-Build passed using Xcode `BuildProject`.
+App build passed.
 
 ```text
 The project built successfully.
 ```
 
-No unresolved merge conflict markers were found.
+## Validation Result
 
-## Test Result
-
-Required Sprint 18 validation passed through Xcode `RunSomeTests`.
+Required Sprint 18 validation passed.
 
 - `ImportRepositoryIntegrationTests`: 3 passed, 0 failed.
 - `RepositoryContractTests`, `ImportValidatorTests`, `FinancialDocumentTests`, `CSVImportRegressionTests`: 16 passed, 0 failed.
 - `StatementParserSelectionTests`, `StatementClassificationTests`, `InstitutionDetectionTests`, `PDFDocumentReaderTests`: 28 passed, 0 failed.
-- `ImportFrameworkTests`, `DefaultReaderRegistryTests`, `PasswordProviderTests`, `ImportRepositoryIntegrationTests`: 16 passed, 0 failed.
+- `ImportFrameworkTests`, `DefaultReaderRegistryTests`, `PasswordProviderTests`: 13 passed, 0 failed.
 
-Total required Sprint 18 validation: 60 passed, 0 failed.
+Total required Sprint 18 validation: 60 tests passed.
+
+## Commit And Push
+
+- Commit: `9773b72 Sprint 18: implement repository integration cleanup`
+- Push result: `origin/main` updated successfully.
+- Tag: `sprint-18`
+- Tag push result: `sprint-18` pushed successfully.
 
 ## Behavioural Impact
 
-Production CSV import still follows the existing reader, parser, validation, runtime store, and UI behaviour.
+Production CSV import continues to follow the existing reader, parser, validation, runtime store and UI behaviour.
 
-Repository persistence is downstream of successful validation. Failed validation does not enter the repository persistence coordinator and does not persist trusted transactions or mark an import as trusted.
+Repository persistence occurs only after validation passes. Failed validation does not persist trusted transactions or mark an import as trusted.
 
-Repository persistence errors are logged and do not interrupt existing runtime store updates, preserving current observable behaviour.
+Repository persistence errors are logged and do not interrupt existing runtime store updates.
 
 ## Architecture Decisions
 
 - `DefaultImportPersistenceCoordinator` is the narrow persistence boundary after validation.
 - `ImportPersistenceMapper` converts already-validated runtime models into repository DTOs without recalculating financial data.
-- `AccountDTO.institutionId` is currently `nil` because Sprint 18 does not persist institution rows.
-- `TransactionDTO.documentId` is currently `nil` because Sprint 18 does not persist document rows.
-- Repository writes remain behind existing repository protocols.
-- Runtime stores remain the observable state owners.
-- SwiftUI preview declarations use `PreviewProvider` instead of `#Preview` where required to keep automated test builds working; this is documented in ADR-022 and does not change runtime UI behaviour.
-- Documents, normalized rows, validation issues, fingerprints, dashboard state, institution persistence, and document persistence remain out of Sprint 18 scope.
+- `AccountDTO.institutionId` remains `nil` until institution persistence is introduced deliberately.
+- `TransactionDTO.documentId` remains `nil` until document persistence is introduced deliberately.
+- SwiftUI preview declarations use `PreviewProvider` where required to keep automated test builds working; ADR-022 records this runtime-neutral compatibility decision.
 
 ## Remaining Technical Debt
 
 - Institution and document persistence should be introduced deliberately in a future sprint before foreign-key relationships are populated.
-- The persistence mapper currently supports the deterministic currency/minor-unit mappings required by the approved Sprint 18 fixtures only.
-- Validation issues, documents, normalized rows, fingerprints, and trusted policy details remain deferred.
-- Repository persistence errors are logged but not surfaced to UI, preserving current behaviour for now.
+- The persistence mapper currently supports deterministic currency/minor-unit mappings required by approved Sprint 18 fixtures.
+- Validation issues, documents, normalized rows, fingerprints and trusted policy details remain deferred.
+- Repository persistence errors are logged but not surfaced to UI.
 
-## Remaining Risks
+## Next Recommended Sprint
 
-- Repository persistence is best-effort from `ImportEngine` to preserve existing user-visible behaviour.
-- Account identity is deterministic but conservative and may need refinement when account identity becomes a product-level concept.
-- Deferred institution/document relationships must be revisited before broadening persisted import metadata.
-
-## Commit And Push Result
-
-No commit was created.
-
-No push was performed.
-
-Reason: current user instruction explicitly requires no commit or push until final review.
-
-## Next Recommended Step
-
-Perform final review of the Sprint 18 changes, including staged and unstaged files. After approval, stage all Sprint 18 implementation, validation-unblock and documentation files together, commit, push the tracked branch, then create and push the Sprint 18 completion tag if applicable.
+Sprint 19 — Dashboard Foundation.

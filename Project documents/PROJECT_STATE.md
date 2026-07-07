@@ -159,16 +159,43 @@ Completed
 
 ---
 
+# Sprint 18
+
+## Objective
+Clean up repository integration while preserving the parser -> FinancialDocument -> ImportValidator pipeline.
+
+## Status
+Completed
+
+## Outcome
+- Repository integration cleanup implemented.
+- `ImportPersistenceCoordinator` added.
+- `ImportPersistenceMapper` added.
+- `ImportRepositoryIntegrationTests` added.
+- Validation-before-persistence preserved.
+- Repository persistence now flows through the approved repository boundary before updating runtime stores.
+- Parser, validation, repository semantics, UI behaviour, financial truth and transaction extraction preserved.
+- SwiftUI Preview macro blocker resolved using `PreviewProvider` compatibility.
+- ADR-022 documents preview compatibility during test builds.
+- 60 required Sprint 18 regression tests passed through Xcode.
+- Build passed.
+- Commit: `9773b72`
+- Git push to `origin/main` completed successfully.
+- Git tag: `sprint-18`
+
+---
+
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `dcac92a0d8e5078a3014e7ef52af8917f130940d`
-- Latest Tag: `sprint-17-complete`
-- Architecture Baseline: Sprint 17
-- Latest Milestone: Validation Pipeline Regression Coverage
+- Latest Commit: `9773b72`
+- Latest Tag: `sprint-18`
+- Latest ADR: ADR-022 — Preview Compatibility During Test Builds
+- Architecture Baseline: Sprint 18
+- Latest Milestone: Repository Integration Cleanup
 - Build: Passing
-- Validation: Build passing; required Sprint 17 regression suite passing through Xcode.
+- Validation: Build passing; full regression baseline passing. Sprint 18 validation complete.
 
 ## Session Startup Order
 1. AGENTS.md
@@ -198,23 +225,28 @@ Validation
 ↓
 Repositories
 ↓
+Runtime Stores
+↓
 Dashboard
 
 ## Current Work
 
-Active Sprint: Sprint 18
+Active Sprint: Sprint 19
 
 Objective:
-- Repository Integration Cleanup.
+- Dashboard Foundation.
 
 Scope:
-- Implementation validation passed through Xcode.
-- Pending final review, staging, commit, push, and sprint tag if applicable.
-- Preserves validation-before-persistence behaviour from Sprint 17.
-- Preserves parser, validation, repository semantics, UI behaviour, financial truth, and transaction extraction.
+- Planning required before implementation.
+- Preserve validated import, persistence and repository boundaries from Sprint 18.
+- Dashboard work must consume repository-backed data rather than bypass repository boundaries.
 
 Out of Scope:
 - Transaction extraction changes
 - UI changes
 - OCR
 - AI inference
+- Validation redesign
+- Repository redesign
+- Multi-currency
+- Investments

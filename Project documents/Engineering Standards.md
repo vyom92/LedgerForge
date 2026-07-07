@@ -48,9 +48,9 @@ Models/
 - No UI code.
 
 Services/
-- Application workflows.
-- Legacy application workflows.
-- Legacy import orchestration during migration to the Unified Import Framework.
+- Application workflow orchestration.
+- Import coordination, validation and repository persistence.
+- Legacy import orchestration only where migration is still in progress.
 
 Readers/
 - Read file formats only.
@@ -77,7 +77,7 @@ Parsers/
 - Never persist data.
 
 Database/
-- Persistence only.
+- Repository implementations and persistence only.
 
 Core/
 - Shared application state and infrastructure.
@@ -152,6 +152,7 @@ A task is complete only when:
 - The feature has been manually verified.
 - Approved reference fixtures continue producing identical financial truth.
 - Documentation is updated if architecture changed.
+- PROJECT_STATE.md, Project_Guide.md and Codex response.md reflect the completed sprint state before the next sprint begins.
 - The implementation follows Product Vision and Architecture.
 
 ---
@@ -165,8 +166,8 @@ Parser Selection chooses the correct parser.
 Statement Parsers produce FinancialDocument.
 FinancialDocument is the canonical parser output.
 Validation verifies financial correctness.
-TransactionStore owns transactions.
-AccountStore owns accounts.
+Repositories persist validated financial data.
+Runtime Stores own observable application state.
 ViewModels observe stores.
 Views never coordinate business workflows.
 

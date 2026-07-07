@@ -16,13 +16,14 @@ Before performing any planning, review, implementation or refactoring:
 
 - Work on one approved sprint only.
 - Stop exactly at the approved sprint boundary.
-- If the project builds successfully and required sprint tests pass, automatically prepare a Git commit.
+- If the project builds successfully and required sprint tests pass, automatically prepare a Git commit after confirming only sprint-related files are included.
 - Verify `git status` contains only sprint-related files before committing.
 - Verify there are no unresolved merge conflict markers before committing.
 - Generate a concise commit message based on the completed sprint work.
 - Commit and push to the tracked branch (normally `origin/main`).
 - If a sprint tag is created, push the tag after the branch push succeeds.
 - Maintain `Project documents/Codex response.md` throughout implementation.
+- Before closing a completed sprint, ensure Project documents/Codex response.md, Project documents/PROJECT_STATE.md and Project documents/Project_Guide.md are mutually consistent.
 - After a successful build, required tests, commit, push and tag (if applicable), update `Project documents/PROJECT_STATE.md` with the verified repository state.
 - Update `Project documents/Project_Guide.md` only when workflow, roadmap or engineering guidance changes.
 - If the build or required tests fail, do not commit or push. Record the failure and stop.
@@ -30,6 +31,7 @@ Before performing any planning, review, implementation or refactoring:
 - Do not load unnecessary documentation.
 - Do not redesign approved architecture.
 - Preserve existing user-visible behaviour unless explicitly requested.
+- Preserve the approved import pipeline: Reader → RawDocument → Institution Detection → Statement Classification → Parser Selection → FinancialDocument → Validation → Repository Persistence → Runtime Stores → UI.
 - Prefer extending existing architecture over creating parallel implementations.
 - Never bypass repository abstractions.
 - Never access SQLite directly from Views, ViewModels or Stores.

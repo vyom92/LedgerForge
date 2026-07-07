@@ -629,13 +629,15 @@ Accepted
 
 ## Implemented In
 
-Sprint 18 validation unblock
+Sprint 18
 
 ## Decision
 
 LedgerForge may use legacy SwiftUI `PreviewProvider` declarations instead of the newer `#Preview` macro when the macro prevents command-line or automated test builds from compiling.
 
 This is a preview-only compatibility decision. It must not alter runtime UI behaviour, repository architecture, import behaviour, validation behaviour, persistence behaviour or test expectations.
+
+This decision is intentionally conservative and exists solely to preserve deterministic automated validation while the current Xcode toolchain exhibits Preview macro compilation issues.
 
 The preferred preview declaration for affected files is:
 
@@ -662,6 +664,7 @@ Using `PreviewProvider` preserves Xcode preview functionality while avoiding the
 - Preview compatibility is allowed as a production-source-affecting but runtime-neutral change.
 - This decision must not be used to justify UI, repository, import, validation or persistence changes.
 - Future use of `#Preview` should be avoided until the toolchain issue is verified as resolved.
+- Once the toolchain issue is resolved, `#Preview` may be reintroduced through a dedicated architectural review and regression validation.
 - If `#Preview` is reintroduced, required regression validation must pass through the standard project workflow.
 - The decision exists to unblock validation, not to change user-visible behaviour.
 
@@ -672,3 +675,4 @@ Using `PreviewProvider` preserves Xcode preview functionality while avoiding the
 - ADR-017 — Deterministic Before Intelligent
 - ADR-018 — Unified Import Framework Operational
 - ADR-019 — Reference Fixtures Define Financial Truth
+- ADR-021 — Deterministic Statement Classification

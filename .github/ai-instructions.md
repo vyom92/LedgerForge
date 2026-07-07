@@ -38,8 +38,9 @@ Before writing code:
 - Parser Selection chooses the appropriate parser.
 - Statement Parsers produce FinancialDocument.
 - FinancialDocument is validated before persistence.
-- Stores own runtime state.
-- Dashboard observes stores.
+- Repository persistence completes before runtime stores are refreshed.
+- Runtime Stores own observable application state.
+- Dashboard and ViewModels observe runtime stores.
 
 ## Implementation Rules
 
@@ -68,6 +69,7 @@ Before completion:
 
 - Build successfully.
 - Run the required sprint validation. If command-line tests fail solely because of the known SwiftUI Preview tooling issue after a successful build, run the equivalent Xcode regression suite and treat that result as authoritative.
+- Record the authoritative validation path used if the command-line and Xcode validation paths differ.
 - Preserve parser behaviour.
 - Preserve repository behaviour.
 - Do not introduce regressions.
@@ -78,8 +80,9 @@ At the end of every implementation:
 
 - Update `Project documents/Codex response.md`.
 - Record build result, validation result, commit hash, tag (if created) and push result.
-- Update `Project documents/PROJECT_STATE.md` after a successful commit and push.
+- Update `Project documents/PROJECT_STATE.md` after a successful commit, push and tag (if applicable).
 - Update `Project documents/Project_Guide.md` only if workflow, roadmap or engineering guidance changed.
+- Ensure Project_Guide.md, PROJECT_STATE.md and Codex response.md are mutually consistent before beginning the next sprint.
 - Record deferred work.
 - Stop exactly at the approved sprint boundary.
 

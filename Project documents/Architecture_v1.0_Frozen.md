@@ -1,6 +1,6 @@
 # LedgerForge Architecture v1.0 (Frozen)
 
-**Status:** Frozen v1.0 baseline, aligned through Sprint 15 / Milestone M4
+**Status:** Frozen v1.0 baseline, aligned through Sprint 18 / Milestone M6
 
 This document is the architectural baseline for LedgerForge v1.0. It remains frozen except for status-alignment updates required to reflect completed implementation milestones and approved ADRs.
 
@@ -58,10 +58,10 @@ ImportCoordinator
 → Statement Parser
 → FinancialDocument
 → Validation
-→ Import Session
+→ Repository Persistence Boundary
 → Repositories
+→ Runtime Stores
 → SQLite
-→ Stores
 → DashboardViewModel
 → Financial Dashboard
 
@@ -81,6 +81,7 @@ ImportCoordinator
 - Statement Parsers produce FinancialDocument as the canonical parser output.
 - Validation is the only stage permitted to verify financial correctness.
 - Repository protocols are the persistence boundary for transactions and accounts.
+- Repository persistence updates runtime stores only after validated writes complete successfully.
 - Stores expose validated runtime state to the UI.
 - Rules Engine enriches validated financial data but never alters imported financial truth.
 - Every supported file format must converge into the same deterministic pipeline before parser execution.
@@ -138,12 +139,12 @@ ImportCoordinator
 - Milestone M1: Robust Statement Import ✅
 - Milestone M2: Statement Understanding ✅
 - Milestone M3: Canonical Financial Handoff ✅
-- Milestone M4: FinancialDocument-native Parsing 🚧
-- Milestone M5: Validation Intelligence
-- Milestone M6: Repository & Data Platform
-- Milestone M7: Dashboard Experience
-- Milestone M8: Insights
-- Milestone M9: Ecosystem
+- Milestone M4: FinancialDocument-native Parsing ✅
+- Milestone M5: Validation Pipeline Refinement ✅
+- Milestone M6: Repository & Data Platform ✅
+- Milestone M7: Dashboard Experience 🚧
+- Milestone M8: Insights & Analytics
+- Milestone M9: Financial Ecosystem
 
 ## North Star
 

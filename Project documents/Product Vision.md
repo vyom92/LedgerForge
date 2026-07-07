@@ -53,15 +53,15 @@ LedgerForge should feel like a financial command center rather than an importer.
 Primary modules:
 
 - Dashboard
-- Multi-Currency Dashboard
 - Accounts
-- Investments
-- Budget & Cash Flow
 - Documents
 - Import History
-- Rules & Automation
-- Financial Intelligence
+- Investments
+- Budget & Cash Flow
+- Multi-Currency Dashboard
 - Financial Timeline
+- Financial Intelligence
+- Rules & Automation
 - Settings
 
 ---
@@ -111,13 +111,16 @@ Every stage preserves explainability and traceability so identical financial evi
 8. Execute the Statement Parser.
 9. Produce an immutable FinancialDocument.
 10. Validate the extracted financial data.
-11. Update LedgerForge stores only after validation succeeds.
+11. Persist validated financial data through repository protocols.
+12. Refresh runtime stores from the validated repository state.
 
 Institution detection should rely on document fingerprints, metadata, recurring keywords, visual structure, and previous successful imports rather than filenames.
 
 Statement layouts and institution formats may evolve over time. LedgerForge should automatically recognize new layouts, preserve compatibility with older formats, and improve recognition without compromising deterministic parsing or financial truth.
 
 The import pipeline should be format-independent. Whether data originates from PDF, CSV, XLS/XLSX or TXT, downstream processing should produce identical financial truth after reader-specific extraction and deterministic parser execution.
+
+Repository persistence must never bypass validation. Dashboards, accounts and future analytics consume repository-backed runtime state rather than parser output directly.
 
 Importing documents should require little or no user interaction beyond selecting the file.
 
@@ -141,4 +144,4 @@ Every automated financial calculation should identify the data source, exchange 
 
 # Long-Term Goal
 
-LedgerForge should become the trusted financial operating system that users open every day because it provides the clearest, most accurate understanding of their financial life. Importing documents becomes an invisible maintenance task while the dashboard evolves into a living representation of accounts, investments, budgets, cash flow and long-term financial progress.
+LedgerForge should become the trusted financial operating system that users open every day because it provides the clearest, most accurate understanding of their financial life. Importing documents becomes an invisible maintenance task while repository-backed dashboards evolve into a living representation of accounts, investments, budgets, cash flow and long-term financial progress.

@@ -2,9 +2,9 @@
 
 ## Current Phase
 
-Phase 3 — Canonical Financial Pipeline (Sprint 16)
+M7 — Dashboard Experience (Sprint 19)
 
-LedgerForge has completed its foundational multi-format import architecture and deterministic document ingestion pipeline. The current objective is to complete the FinancialDocument-native pipeline while preserving financial correctness and preparing the platform for dashboard, analytics and future financial modules.
+LedgerForge has completed its foundational multi-format import architecture, deterministic document ingestion pipeline and repository integration cleanup. The current objective is Dashboard Foundation while preserving validated import, persistence and repository boundaries from Sprint 18.
 
 ---
 
@@ -28,7 +28,9 @@ FinancialDocument
 ↓
 Validation
 ↓
-ImportSession
+Repositories
+↓
+SQLite
 ↓
 TransactionStore
 ↓
@@ -50,8 +52,9 @@ This pipeline is the canonical production architecture defined by the current AD
 - Institution Detection
 - Statement Classification
 - Parser Selection
-- FinancialDocument integration (builder-based compatibility)
+- FinancialDocument-native parsing
 - Validation framework
+- Repository integration cleanup
 - Import sessions
 - TransactionStore
 - AccountStore
@@ -68,14 +71,11 @@ This pipeline is the canonical production architecture defined by the current AD
 
 ## Current Priorities
 
-1. Migrate StatementParser to return FinancialDocument directly.
-2. Remove the temporary FinancialDocumentBuilder compatibility bridge.
-3. Validation Pipeline refinement.
-4. Repository integration cleanup.
-5. Expand regression fixtures.
-6. Generic PDF reader improvements.
-7. Password handling for encrypted financial documents.
-8. Dashboard foundation.
+1. Dashboard foundation.
+2. Expand regression fixtures.
+3. Generic PDF reader improvements.
+4. Password handling for encrypted financial documents.
+5. Insights and analytics.
 
 ---
 

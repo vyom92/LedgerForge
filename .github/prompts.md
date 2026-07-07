@@ -51,6 +51,7 @@ Stop and wait for approval before implementation.
 - Preserve approved financial truth.
 - Build continuously.
 - Run the required sprint validation after significant changes.
+- Record which validation path (command-line or Xcode) is authoritative whenever they differ.
 - If command-line tests fail solely because of the known SwiftUI Preview tooling issue after a successful build, execute the equivalent Xcode regression suite and treat that result as authoritative.
 - Verify `git status` contains only sprint-related files.
 - Verify there are no unresolved merge conflict markers.
@@ -59,7 +60,7 @@ Stop and wait for approval before implementation.
 - Push to the tracked branch (normally `origin/main`).
 - Push the sprint tag (if created).
 - Record build result, validation result, commit hash, tag and push result in `Project documents/Codex response.md`.
-- Update `Project documents/PROJECT_STATE.md` only after a successful build, required validation, commit, push and tag (if applicable).
+- Update `Project documents/PROJECT_STATE.md` only after a successful build, required validation, commit, push, tag (if applicable), and verification that Project_Guide.md and Codex response.md are consistent.
 - Update `Project documents/Project_Guide.md` only if workflow, roadmap or engineering guidance changed.
 - If validation fails, do not commit or push. Record the failure and stop.
 - Add new files to the Xcode navigator.
@@ -157,7 +158,9 @@ Improve maintainability without changing behaviour.
 - Parser Selection chooses the parser.
 - Statement Parsers produce FinancialDocument.
 - Validation remains centralized.
-- Stores own runtime state.
+- Repository persistence occurs only after successful validation.
+- Repository persistence completes before runtime stores are refreshed.
+- Runtime Stores own observable application state.
 - Views contain no business logic.
 - No duplicated financial calculations.
 - No unnecessary coupling.

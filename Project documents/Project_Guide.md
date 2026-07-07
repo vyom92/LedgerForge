@@ -4,13 +4,13 @@ This is the canonical project operating manual. Read this document first, then u
 
 ## Current Project Snapshot
 
-- **Current Milestone:** M6 – Repository & Data Platform
-- **Current Sprint:** Sprint 18
-- **Current Phase:** Repository Integration Cleanup
+- **Current Milestone:** M7 – Dashboard Experience
+- **Current Sprint:** Sprint 19
+- **Current Phase:** Dashboard Foundation
 - **Build Status:** Passing
-- **Validation Status:** Build passing; full regression baseline passing. Sprint 17 validation complete.
+- **Validation Status:** Build passing; full regression baseline passing. Sprint 18 validation complete.
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 17
+- **Current Codex Baseline:** Sprint 18
 
 ## Current Architecture Status
 
@@ -31,7 +31,7 @@ This is the canonical project operating manual. Read this document first, then u
 | Password Management | Operational; DefaultPasswordProvider integrated |
 | Dashboard | Existing dashboard unchanged |
 | Investments | Future module |
-| Validation | Build passing; full regression baseline passing. Sprint 17 validation complete |
+| Validation | Build passing; full regression baseline passing. Sprint 18 validation complete |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -256,10 +256,10 @@ Additionally:
 
 ## Sprint Roadmap
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16, Sprint 17
-- **Current Sprint:** Sprint 18 – Repository Integration Cleanup
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16, Sprint 17, Sprint 18
+- **Current Sprint:** Sprint 19 – Dashboard Foundation
 - **Upcoming Sprints:**
-  - Sprint 19–21 – Dashboard Foundation
+  - Sprint 20–21 – Dashboard Foundation
   - Sprint 22–24 – Insights & Analytics
   - Sprint 25+ – Multi-Currency, Investments & Ecosystem
 
@@ -291,12 +291,12 @@ Additionally:
 - Stable FinancialDocument validation boundary
 - Regression protection for validation behaviour
 
-### M6 – Repository & Data Platform 🚧
+### M6 – Repository & Data Platform ✅
 - Unified persistence
 - Deduplication
 - Audit trail
 
-### M7 – Dashboard Experience
+### M7 – Dashboard Experience 🚧
 - Accounts
 - Net Worth
 - Cash Flow

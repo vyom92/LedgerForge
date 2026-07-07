@@ -1,9 +1,9 @@
 <!-- Project documents/Database_v1_Architecture.md -->
 
-# LedgerForge — Database v1 Architecture (Design Proposal)
+# LedgerForge — Database v1 Architecture (Design Baseline)
 
-Status: Database v1 design baseline, aligned through Sprint 15 / Milestone M4
-Summary
+Status: Database v1 design baseline, aligned through Sprint 18 / Milestone M6
+## Summary
 
 This document defines the LedgerForge Database v1 architecture. It is a vendor-neutral, SQLite-targeted design that fulfills the project's ADRs, Architecture_v1.0, Product Vision and Engineering Standards. The design prioritizes:
 
@@ -13,7 +13,7 @@ This document defines the LedgerForge Database v1 architecture. It is a vendor-n
 - Traceability and auditability for every imported value (ADR-004, ADR-007)
 - Extensibility for future features (ExchangeRateStore, Money type, synchronization)
 
--Top-level goals
+## Top-level goals
 
 - Provide a schema that maps Document Reader outputs (PDF, CSV, XLS/XLSX, TXT) into persisted RawDocument/row-level ingestion records (normalized_documents + normalized_rows).
 - Enable deterministic statement fingerprinting and deduplication.
@@ -36,7 +36,7 @@ The ImportCoordinator is responsible for:
 - Coordinating Statement Classification.
 - Coordinating Parser Selection.
 - Coordinating Validation.
-- Persisting validated domain objects.
+- Coordinating repository persistence for validated domain objects.
 - Reporting progress to the user interface.
 
 The ImportCoordinator never performs parsing, validation or business logic itself. It coordinates independent architectural components.
@@ -73,7 +73,7 @@ Checklist — what this proposal contains
 - Migration strategy and schema_migrations guidance
 - How imported documents map to accounts and transactions
 - Multi-currency support details
-- Canonical mapping for PDF, CSV, XLS/XLSX, TXT → normalized model
+- Canonical mapping for PDF, CSV, XLS/XLSX, TXT → RawDocument and row-level ingestion records
 - Validation metadata storage and workflow mapping
 - Detailed statement fingerprinting algorithm and schema
 - Security, operational and testing notes
@@ -423,9 +423,9 @@ III. How imported documents map into accounts & transactions (traceability)
 3. Document Reader extracts the file into RawDocument.
 4. Persist RawDocument and row-level extraction output in normalized_documents and normalized_rows.
 5. Institution Detection, Statement Classification and Parser Selection determine the parser/profile before Statement Parser execution produces FinancialDocument and transaction candidates.
-6. ImportValidator runs, writes `validation_issues` and computes `validation_summary`.
-7. Update `import_sessions.validation_status` to 'passed' / 'failed' / 'warning'.
-8. If 'passed': mark associated transactions `is_trusted=1` and set `trusted_at`. Create/match `accounts` using `account_identifiers`; set `created_from_import_session_id` for provenance.
+6. ImportValidator validates the FinancialDocument and produces deterministic validation results.
+7. Repository persistence is allowed only after validation passes.
+8. If validation passes: create/update the import session, create/match accounts through approved repository boundaries, persist trusted transactions, and update runtime stores after validated writes complete successfully.
 9. Dashboard and reports query only `transactions WHERE is_trusted=1` to guarantee ADR-010 compliance.
 
 IV. Multi-currency support
@@ -489,7 +489,7 @@ VI. Validation metadata storage & workflow (ADR-010)
 - `import_sessions.validation_status` — authoritative import outcome (pending/passed/failed/warning).
 - `validation_issues` — fine-grained issues linked to rows or transaction candidates.
 - `import_sessions.validation_summary` — aggregated counts and totals by currency for quick UI summary.
-- Transactions created before validation remain `is_trusted=0`. When an import passes validation, the ImportEngine (or persistence coordinator) atomically marks relevant transactions `is_trusted=1` and records `trusted_at`.
+- Transactions derived from FinancialDocument remain untrusted until validation passes. When an import passes validation, the persistence coordinator writes trusted transactions through repository protocols and records `trusted_at` where supported.
 
 VII. Statement fingerprinting to avoid duplicates
 
@@ -654,11 +654,11 @@ XVII. Risks and mitigations
 
 XVIII. Next steps (recommended)
 
-1. Produce exact SQL DDL (SQLite-ready) for the schema described here. Ensure types/constraints are compatible with SQLite semantics (not all RDBMS constraints are equal in SQLite).
-2. Implement unit tests for fingerprint generation and validation issue storage.
-3. Design repository adapter interfaces (already provided in Sprint 10 Phase 1) and a SQLite-backed provider in Phase 2B.
-4. Prototype migration scripts for migrating existing in-memory data (transactions, accounts) into the new schema.
-5. Create sample import fixtures and run full import → validate → persistence integration tests.
+1. Keep the schema aligned with the canonical import pipeline as ADRs evolve.
+2. Add migration tests whenever schema changes are introduced.
+3. Add approved fixtures for each newly supported institution before treating parser behaviour as stable.
+4. Preserve RawDocument and row-level traceability for every supported file format.
+5. Review database implications before implementing Dashboard Foundation, Insights & Analytics, Multi-Currency, Investments or document/institution persistence features.
 
 XIX. Appendix: canonical fields and conventions
 
@@ -668,16 +668,16 @@ XIX. Appendix: canonical fields and conventions
 - Amount sign convention: amount_minor positive for credit into account, negative for debit (application must choose and document a consistent convention). Store explicit `direction` for clarity.
 - Validation policy: only `is_trusted=1` transactions are included in dashboard calculations. `is_trusted` is set in one atomic step after import validation completes successfully.
 
-XX. Deliverables checklist (for maintainers / reviewers)
+XX. Maintenance checklist (for maintainers / reviewers)
 
-- [ ] Approve schema intent and primary entities
-- [ ] Request any additional domain fields required by institution-specific profiles
-- [ ] Approve fingerprint algorithm or propose variations
-- [ ] Approve migration strategy and testing plan
-- [ ] Request DDL generation (SQLite-compatible)
+- [ ] Schema intent and primary entities remain aligned with current ADRs.
+- [ ] New import pipeline stages preserve RawDocument and row-level traceability.
+- [ ] Parser, validation and persistence changes preserve trusted-transaction rules.
+- [ ] New institution support includes approved reference fixtures.
+- [ ] Migration scripts and tests are added for every schema change.
 
-End of proposal
+End of design baseline
 
 
 --
-Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through Sprint 15 / Milestone M4. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.
+Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through Sprint 18 / Milestone M6. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.
