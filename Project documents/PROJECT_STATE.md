@@ -185,17 +185,42 @@ Completed
 
 ---
 
+# Sprint 19
+
+## Objective
+Build the dashboard foundation using repository-backed runtime store hydration.
+
+## Status
+Completed
+
+## Outcome
+- Repository-backed runtime store hydration implemented.
+- `RepositoryStoreHydrator` added.
+- Read-only dashboard repository APIs added for account lists and trusted transactions.
+- Dashboard startup hydrates runtime stores once per application launch unless explicitly refreshed.
+- Existing dashboard panel now shows repository-backed account overview and hydration status.
+- `RepositoryStoreHydratorTests` added.
+- Repository contract coverage expanded for dashboard reads.
+- Parser, validation, repository write semantics, UI flow, financial truth and transaction extraction preserved.
+- 65 required Sprint 19 regression tests passed through Xcode.
+- Build passed.
+- Commit: `65b18f7`
+- Git push to `origin/main` completed successfully.
+- Git tag: `sprint-19`
+
+---
+
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `9773b72`
-- Latest Tag: `sprint-18`
+- Latest Commit: `65b18f7`
+- Latest Tag: `sprint-19`
 - Latest ADR: ADR-022 — Preview Compatibility During Test Builds
-- Architecture Baseline: Sprint 18
-- Latest Milestone: Repository Integration Cleanup
+- Architecture Baseline: Sprint 19
+- Latest Milestone: Dashboard Foundation
 - Build: Passing
-- Validation: Build passing; full regression baseline passing. Sprint 18 validation complete.
+- Validation: Build passing; full regression baseline passing. Sprint 19 validation complete.
 
 ## Session Startup Order
 1. AGENTS.md
@@ -231,14 +256,14 @@ Dashboard
 
 ## Current Work
 
-Active Sprint: Sprint 19
+Active Sprint: Sprint 20
 
 Objective:
-- Dashboard Foundation.
+- Dashboard Foundation continuation.
 
 Scope:
 - Planning required before implementation.
-- Preserve validated import, persistence and repository boundaries from Sprint 18.
+- Preserve validated import, persistence and repository boundaries from Sprint 19.
 - Dashboard work must consume repository-backed data rather than bypass repository boundaries.
 
 Out of Scope:

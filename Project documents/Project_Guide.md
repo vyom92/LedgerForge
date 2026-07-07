@@ -5,12 +5,12 @@ This is the canonical project operating manual. Read this document first, then u
 ## Current Project Snapshot
 
 - **Current Milestone:** M7 – Dashboard Experience
-- **Current Sprint:** Sprint 19
-- **Current Phase:** Dashboard Foundation
+- **Current Sprint:** Sprint 20
+- **Current Phase:** Dashboard Foundation continuation
 - **Build Status:** Passing
-- **Validation Status:** Build passing; full regression baseline passing. Sprint 18 validation complete.
+- **Validation Status:** Build passing; full regression baseline passing. Sprint 19 validation complete.
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 18
+- **Current Codex Baseline:** Sprint 19
 
 ## Current Architecture Status
 
@@ -29,9 +29,9 @@ This is the canonical project operating manual. Read this document first, then u
 | Parser Selection | Framework implemented; deterministic selector active |
 | FinancialDocument | Immutable handoff model integrated after Statement Parser and before Validation |
 | Password Management | Operational; DefaultPasswordProvider integrated |
-| Dashboard | Existing dashboard unchanged |
+| Dashboard | Foundation active; repository-backed runtime store hydration implemented |
 | Investments | Future module |
-| Validation | Build passing; full regression baseline passing. Sprint 18 validation complete |
+| Validation | Build passing; full regression baseline passing. Sprint 19 validation complete |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -256,10 +256,10 @@ Additionally:
 
 ## Sprint Roadmap
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16, Sprint 17, Sprint 18
-- **Current Sprint:** Sprint 19 – Dashboard Foundation
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16, Sprint 17, Sprint 18, Sprint 19
+- **Current Sprint:** Sprint 20 – Dashboard Foundation continuation
 - **Upcoming Sprints:**
-  - Sprint 20–21 – Dashboard Foundation
+  - Sprint 21 – Dashboard Foundation
   - Sprint 22–24 – Insights & Analytics
   - Sprint 25+ – Multi-Currency, Investments & Ecosystem
 
