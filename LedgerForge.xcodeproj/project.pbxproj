@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		28166D772FFCD27400A8BD63 /* PDFDocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28166D762FFCD27400A8BD63 /* PDFDocumentReader.swift */; };
 		28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */; };
 		28171EE22FFBE2F0006115B7 /* TransactionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */; };
 		281BB15A2FFC486C006E7424 /* Repository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1362FFC4160006E7424 /* Repository.swift */; };
@@ -80,6 +81,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		28166D762FFCD27400A8BD63 /* PDFDocumentReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFDocumentReader.swift; sourceTree = "<group>"; };
 		28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionStore.swift; sourceTree = "<group>"; };
 		28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionListViewModel.swift; sourceTree = "<group>"; };
 		28171F672FFC1718006115B7 /* Database_v1_Architecture.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Database_v1_Architecture.md; sourceTree = "<group>"; };
@@ -256,6 +258,19 @@
 			path = Coordinator;
 			sourceTree = "<group>";
 		};
+<<<<<<< Updated upstream
+=======
+		281BB1C22FFCBF13006E7424 /* Readers */ = {
+			isa = PBXGroup;
+			children = (
+				281BB1C32FFCBF14006E7424 /* CSVDocumentReaderAdapter.swift */,
+				281BB1C72FFCC035006E7424 /* DefaultReaderRegistry.swift */,
+				28166D762FFCD27400A8BD63 /* PDFDocumentReader.swift */,
+			);
+			path = Readers;
+			sourceTree = "<group>";
+		};
+>>>>>>> Stashed changes
 		288EB0A42FF7955200F09BC9 = {
 			isa = PBXGroup;
 			children = (
@@ -596,6 +611,7 @@
 				28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */,
 				288EB1272FF7D96A00F09BC9 /* DocumentPreviewView.swift in Sources */,
 				288EB1242FF7D8A000F09BC9 /* Parsers/StatementParser.swift in Sources */,
+				28166D772FFCD27400A8BD63 /* PDFDocumentReader.swift in Sources */,
 				28B87B332FFB31C9009BEE8C /* ImportValidationResult.swift in Sources */,
 				288EB1232FF7D89B00F09BC9 /* Parsers/AxisBankAccountParser.swift in Sources */,
 				281BB1842FFC4D40006E7424 /* ImportProgress.swift in Sources */,
