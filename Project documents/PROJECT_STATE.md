@@ -1,4 +1,3 @@
-
 # PROJECT STATE
 
 This document is the permanent, authoritative handoff between development sessions.
@@ -50,22 +49,42 @@ Completed
 
 ---
 
+# Sprint 13
+
+## Objective
+Introduce the deterministic Statement Classification Framework while preserving Institution Detection behaviour and preparing for Parser Selection.
+
+## Status
+Completed
+
+## Outcome
+- Deterministic Statement Classification Framework implemented.
+- Legacy-compatible statement classification mapping preserved.
+- Explainable classification reasons added.
+- Unknown and non-text document classification validated.
+- Statement Classification regression suite added.
+- 46 tests passed across 10 suites.
+- Build passed.
+- Git tag: `sprint-13-complete`
+
+---
+
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `e3c557c`
-- Latest Tag: `sprint-12c-complete`
-- Architecture Baseline: Sprint 12C
-- Latest Milestone: Institution Detection Framework
+- Latest Commit: (update after each sprint)
+- Latest Tag: `sprint-13-complete`
+- Architecture Baseline: Sprint 13
+- Latest Milestone: Statement Classification Framework
 - Build: Passing
-- Tests: 37 passing across 9 suites
+- Tests: 46 passing across 10 suites
 
 ## Session Startup Order
 1. AGENTS.md
 2. Project_Guide.md
 3. PROJECT_STATE.md
-4. ADR-020 — Deterministic Institution Detection
+4. Latest ADR (currently ADR-021 — Deterministic Statement Classification)
 5. Project documents/Codex response.md
 
 ## Current Pipeline
@@ -77,9 +96,11 @@ RawDocument
 ↓
 Institution Detection
 ↓
-Statement Classification (planned)
+Statement Classification
 ↓
 Parser Selection
+↓
+Statement Parser
 ↓
 FinancialDocument
 ↓
@@ -91,19 +112,20 @@ Dashboard
 
 ## Current Work
 
-Active Sprint: Sprint 13
+Active Sprint: Sprint 14
 
 Objective:
-- Statement Classification Framework.
+- Parser Selection Framework.
 
 Scope:
-- Deterministic statement classification.
-- Preserve institution detection behaviour.
-- Maintain parser selection independence.
+- Deterministic parser selection.
+- Preserve Statement Classification behaviour.
+- Keep parser selection independent from readers.
 
 Out of Scope:
-- Parser rewrites
+- Transaction extraction changes
+- Validation changes
+- Repository changes
+- UI changes
 - OCR
 - AI inference
-- UI changes
-- Repository changes

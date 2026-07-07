@@ -55,7 +55,7 @@ All new features should improve the dashboard, reduce manual work or increase co
 Accepted
 
 ## Decision
-The import pipeline should rely on reusable architectural components (ImportCoordinator, Document Reader, Institution Detection, Document Classification, Parser Selection, Statement Parser and Validation) instead of institution-specific workflows.
+The import pipeline should rely on reusable architectural components (ImportCoordinator, Document Reader, Institution Detection, Statement Classification, Parser Selection, Statement Parser and Validation) instead of institution-specific workflows.
 
 ## Rationale
 Supporting new financial institutions should primarily require new parser profiles and document mappings rather than new import pipelines.
@@ -302,15 +302,15 @@ Document Reader
 ↓
 RawDocument
 ↓
-FinancialDocument
-↓
 Institution Detection
 ↓
-Document Classification
+Statement Classification
 ↓
 Parser Selection
 ↓
 Statement Parser
+↓
+FinancialDocument
 ↓
 Validation
 ↓
@@ -332,7 +332,7 @@ A single deterministic pipeline keeps business logic independent of file formats
 
 Readers are responsible only for extracting document content.
 
-Everything after `FinancialDocument` is format-independent.
+Everything after `RawDocument` is format-independent.
 
 ## Consequences
 
@@ -404,15 +404,15 @@ Document Reader
 ↓
 RawDocument
 ↓
-FinancialDocument
-↓
 Institution Detection
 ↓
-Document Classification
+Statement Classification
 ↓
 Parser Selection
 ↓
 Statement Parser
+↓
+FinancialDocument
 ↓
 Validation
 ↓
@@ -558,3 +558,59 @@ Deterministic rules preserve reproducibility, simplify regression testing and en
 - ADR-017 — Deterministic Before Intelligent
 - ADR-018 — Unified Import Framework Operational
 - ADR-019 — Reference Fixtures Define Financial Truth
+---
+
+# ADR-021 — Deterministic Statement Classification
+
+## Status
+
+Accepted
+
+## Implemented In
+
+Sprint 13
+
+## Decision
+
+Statement Classification is a dedicated architectural stage that executes after Institution Detection and before Parser Selection.
+
+Statement Classification determines the document type (for example, bank statement, credit card statement or unknown) using deterministic rules derived from extracted document content.
+
+Classification must remain:
+
+- Deterministic
+- Explainable
+- Repeatable
+- Independent of file format
+
+Unknown documents must remain classified as unknown until sufficient deterministic evidence exists.
+
+Artificial intelligence must not participate in statement classification.
+
+## Rationale
+
+Institution Detection identifies who produced the document.
+
+Statement Classification identifies what type of financial document it is.
+
+Separating these responsibilities keeps parser selection deterministic while allowing future document types to be introduced without changing reader implementations.
+
+## Consequences
+
+- Statement Classification becomes a permanent architectural stage.
+- Parser Selection consumes both Institution Detection and Statement Classification.
+- Readers remain responsible only for document extraction.
+- Institution Detection remains independent from document type.
+- Unknown classifications remain explicit rather than inferred.
+- Approved regression fixtures verify identical classification behaviour across supported formats.
+
+## Related ADRs
+
+- ADR-003 — Generic Import Engine
+- ADR-011 — Unified FinancialDocument Pipeline
+- ADR-012 — Separation of Readers and Parsers
+- ADR-016 — Universal Import Pipeline
+- ADR-017 — Deterministic Before Intelligent
+- ADR-018 — Unified Import Framework Operational
+- ADR-019 — Reference Fixtures Define Financial Truth
+- ADR-020 — Deterministic Institution Detection

@@ -6,12 +6,12 @@ This is the canonical project operating manual. Read this document first, then u
 
 
 - **Current Milestone:** Milestone C
-- **Current Sprint:** Sprint 13
-- **Current Phase:** Institution Detection Framework Complete
+- **Current Sprint:** Sprint 14
+- **Current Phase:** Statement Classification Framework Complete
 - **Build Status:** Passing
-- **Test Status:** 37 tests passing
+- **Test Status:** 46 tests passing
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 12C
+- **Current Codex Baseline:** Sprint 13
 
 
 ## Current Architecture Status
@@ -20,17 +20,18 @@ This is the canonical project operating manual. Read this document first, then u
 |-----------|--------------|
 | Product Vision | Current and authoritative |
 | Architecture | Frozen v1.0 baseline active |
-| ADRs | Current through ADR-018 |
+| ADRs | Current through ADR-021 |
 | Database | Production-ready foundation |
 | Repository Layer | Stable with contract tests |
 | Persistence | SQLite repository layer active |
 | Import Framework | Operational; CSV and PDF reader foundation active |
 | Readers | CSV and PDF readers integrated into Unified Import Framework |
 | Institution Detection | Framework implemented; legacy behaviour preserved |
+| Statement Classification | Framework implemented; deterministic classification active |
 | Password Management | Operational; DefaultPasswordProvider integrated |
 | Dashboard | Existing dashboard unchanged |
 | Investments | Future module |
-| Testing | 37 active tests passing |
+| Testing | 46 active tests passing |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -49,15 +50,15 @@ Reader (CSV/PDF)
 ↓
 RawDocument
 ↓
-FinancialDocument
-↓
 Institution Detection
 ↓
-Document Classification
+Statement Classification
 ↓
 Parser Selection
 ↓
 Statement Parser
+↓
+FinancialDocument
 ↓
 Validation
 ↓
@@ -73,6 +74,7 @@ ViewModels
 ↓
 Dashboard
 ```
+
 
 ## Documentation Index
 
@@ -103,7 +105,7 @@ The precedence for documentation is as follows:
 5. Database_v1_Architecture.md  
 6. Product Vision.md  
 7. AI_WORKFLOW.md  
-8. Codex response.md  
+8. Project documents/Codex response.md  
 
 Approved documentation always overrides any implicit or assumed implementation details.
 
@@ -139,19 +141,21 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 |-----------------------|-------------------------------------------------------------------|
 | New Feature           | Product Vision.md, Architecture_v1.0_Frozen.md, ADR.md            |
 | Database Work         | Database_v1_Architecture.md, ADR.md, Engineering Standards.md     |
-| Repository Changes    | Database_v1_Architecture.md, Project documents/Codex response.md  |
+| Repository Changes    | Project documents/PROJECT_STATE.md, Project documents/Codex response.md  |
 | Import Framework      | Architecture_v1.0_Frozen.md, ADR.md, Engineering Standards.md     |
 | Reader Implementation | Architecture_v1.0_Frozen.md, ADR.md                               |
 | Parser Implementation | Architecture_v1.0_Frozen.md, ADR.md                               |
 | Institution Detection | Architecture_v1.0_Frozen.md, ADR.md                               |
 | Password Handling     | Architecture_v1.0_Frozen.md, ADR.md                               |
 | PDF Reader | Architecture_v1.0_Frozen.md, ADR.md, Engineering Standards.md |
-| Reference Fixtures | Project_Guide.md, Project documents/Codex response.md |
+| Reference Fixtures | Project documents/PROJECT_STATE.md, Project documents/Codex response.md |
 | UI Work               | Architecture_v1.0_Frozen.md, Engineering Standards.md             |
-| Testing               | Project documents/Codex response.md, Engineering Standards.md     |
-| Bug Fixes             | Project documents/Codex response.md, Engineering Standards.md     |
+| Testing               | Project documents/PROJECT_STATE.md, Project documents/Codex response.md, Engineering Standards.md     |
+| Bug Fixes             | Project documents/PROJECT_STATE.md, Project documents/Codex response.md, Engineering Standards.md     |
 | Documentation Updates | Project_Guide.md, Engineering Standards.md                        |
 | Architecture Review   | Architecture_v1.0_Frozen.md, ADR.md                               |
+| Statement Classification | Architecture_v1.0_Frozen.md, ADR.md |
+
 
 ## Repository Structure
 
@@ -229,7 +233,9 @@ Additionally:
 - Generate a concise commit message describing the completed sprint work.
 - Commit the sprint changes.
 - Push to `origin/main`.
-- Record the commit hash and push result in `Project documents/Codex response.md`.
+- Maintain Project documents/Codex response.md during implementation.
+- After a successful build, required tests, commit and push, update Project documents/PROJECT_STATE.md with the verified repository state.
+- Record the commit hash, tag and push result in Project documents/Codex response.md.
 - If the build or required tests fail, do not commit or push. Record the failure and stop.
 - Keep changes limited to the approved sprint.  
 - Keep commits logically grouped.
@@ -246,11 +252,10 @@ Additionally:
 ## Sprint Roadmap
 
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C
-- **Current Sprint:** Sprint 13 – Statement Classification Framework
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13
+- **Current Sprint:** Sprint 14 – Parser Selection Framework
 - **Upcoming Sprints:**
-  - Sprint 14 – Parser Selection Framework
-  - Sprint 15 – FinancialDocument Convergence
+  - Sprint 15 – FinancialDocument Integration
 
 ## Known Technical Debt
 
@@ -290,7 +295,6 @@ Every supported import format should be validated against an approved baseline f
 
 ## Future Modules
 
-- Institution Detection Framework
 - XLS/XLSX Reader
 - OCR
 - Rules Engine
