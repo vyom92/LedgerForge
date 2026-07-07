@@ -95,16 +95,29 @@ Sprint 11C achieved its objective: production CSV import now executes through th
 
 ## Recommendation For Sprint 11D
 
-Recommended next sprint: Sprint 11D should focus on the next approved import-framework boundary only.
+Recommended next sprint: **Sprint 11D – Password Provider Abstraction**
 
-Suggested Sprint 11D options:
+### Objective
 
-- Add end-to-end production import regression tests around `ImportEngine` using the approved CSV fixture.
-- Introduce explicit import progress/status reporting for the async `ImportEngine` boundary.
-- Move additional orchestration into framework components only if explicitly approved and covered by baseline tests.
+Introduce a framework-level password abstraction to support encrypted document formats while preserving the existing Unified Import Framework architecture.
 
-Do not add PDF, XLS, XLSX or TXT support until a sprint explicitly approves those formats.
+### Scope
 
+- Introduce the `PasswordProvider` implementation.
+- Wire `DefaultImportCoordinator` to obtain passwords through dependency injection.
+- Keep password handling independent of individual readers.
+- Add unit tests covering password retrieval and coordinator wiring.
+
+### Explicitly Out of Scope
+
+- PDF import
+- PDF parsing
+- Keychain integration
+- UI password prompts
+- Repository persistence changes
+- Institution Detection Framework
+
+Sprint 11D should establish the final framework abstraction required before PDF reader development begins.
 ## Stop Condition
 
 Stopped after Sprint 11C Stage 5.

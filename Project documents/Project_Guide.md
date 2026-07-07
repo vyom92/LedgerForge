@@ -4,13 +4,13 @@ This is the canonical project operating manual. Read this document first, then u
 
 ## Current Project Snapshot
 
-- **Current Milestone:** Milestone B
-- **Current Sprint:** Sprint 11C Ready
-- **Current Phase:** Post Sprint 11B Architecture Audit
+- **Current Milestone:** Milestone C
+- **Current Sprint:** Sprint 11D
+- **Current Phase:** Unified Import Framework Operational
 - **Build Status:** Passing
-- **Test Status:** 12 tests passed
+- **Test Status:** 13 tests passing
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 11B
+- **Current Codex Baseline:** Sprint 11C
 
 ## Current Architecture Status
 
@@ -20,19 +20,19 @@ Update this table at the completion of every sprint. It provides the authoritati
 |-----------------------|---------------------------------|
 | Product Vision        | Current and authoritative |
 | Architecture         | Frozen v1.0 baseline active |
-| ADRs                 | Current through ADR-017 |
+| ADRs                 | Current through ADR-018 |
 | Database             | Production-ready foundation |
 | Repository Layer     | Stable with contract tests |
 | Persistence          | SQLite repository layer active |
-| Import Framework     | Sprint 11B foundation complete |
-| Readers              | Legacy CSV reader active; unified readers deferred |
-| Institution Detection| Legacy detector active; framework implementation deferred |
-| Password Management  | Protocol foundation only |
+| Import Framework     | Operational; production CSV import uses ImportCoordinator |
+| Readers              | CSV integrated into Unified Import Framework |
+| Institution Detection| Legacy detector active; framework planned |
+| Password Management  | Sprint 11D focus |
 | Dashboard            | Existing dashboard unchanged |
 | Investments          | Future module |
-| Testing              | 12 active tests passing |
+| Testing              | 13 active tests passing |
 | Documentation        | Project_Guide.md is canonical routing document |
-| Import Pipeline      | Existing CSV flow active; Sprint 11C migration pending |
+| Import Pipeline      | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
 
 ## Architecture Map
@@ -254,37 +254,53 @@ Additionally:
 
 ## Sprint Roadmap
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B
-- **Current Sprint:** Sprint 11C Ready
-- **Upcoming Sprints:** Sprint 11C, then follow-up import framework integration work
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C
+- **Current Sprint:** Sprint 11D – Password Provider Abstraction
+- **Upcoming Sprints:**
+  - Sprint 12A – PDF Reader Foundation
+  - Sprint 12B – Institution Detection Framework
+  - Sprint 12C – Axis PDF Parser
 
 ## Known Technical Debt
 
 Maintain a concise list of active architectural and implementation debt.
 
-Typical entries include:
+Current items:
 
-- Repository improvements.
-- Import framework work in progress.
-- Deferred parser support.
-- Testing gaps.
-- Performance improvements.
+- ImportEngine still owns analysis, normalization, parser selection, validation and store updates.
+- Additional approved regression fixtures should be added for future institutions and formats.
+- Password Provider implementation pending.
+- PDF Reader not yet implemented.
+- Institution Detection Framework not yet implemented.
+- Additional import fixtures should compare equivalent financial truth across CSV and PDF where available.
 
 Remove items as they are completed.
 
+## Reference Fixtures
+
+The following fixtures define the approved financial baseline used throughout LedgerForge development.
+
+- Axis Bank NRE CSV
+- Axis Bank NRE PDF (same statement period)
+
+Both fixtures represent identical financial truth.
+
+Future readers, parsers and import pipelines must produce equivalent observable financial results unless an intentional behavioural change is explicitly approved.
+
 ## Future Modules
 
-- Universal Import Framework
+- Password Provider
 - PDF Reader
+- Institution Detection Framework
 - XLS/XLSX Reader
 - OCR
-- Institution Detection
 - Rules Engine
 - Multi-Currency Dashboard
 - Investments
 - Insurance
 - Salary Reconciliation
 - Search (FTS5)
+
 Mark completed items as appropriate over time.
 
 ## Context Optimisation
