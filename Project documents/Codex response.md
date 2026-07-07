@@ -1,78 +1,60 @@
 # Codex Response
 
-## Sprint 16 Summary
+## Sprint 17 Summary
 
-Sprint 16 migrated the parser handoff so production statement parsers return `FinancialDocument` directly instead of `[Transaction]`.
+Sprint 17 refined the validation pipeline by adding dedicated validation coverage around the existing `ImportValidator` behaviour while preserving the parser-produced `FinancialDocument` boundary introduced in Sprint 16.
 
-The approved pipeline is now preserved as:
+No production validation internals were changed because the new tests did not expose a real implementation issue. The validator remains centralized and deterministic:
 
 ```text
-Reader
--> RawDocument
--> Institution Detection
--> Statement Classification
--> Parser Selection
--> Statement Parser
--> FinancialDocument
--> Validation
+FinancialDocument
+-> ImportValidator.validate(financialDocument:)
+-> ImportValidationResult
 ```
 
-`ImportEngine` now receives `FinancialDocument` directly from the selected parser and passes that document to `ImportValidator.validate(financialDocument:)`. Existing validation, repository, store and UI behaviour were not changed.
+Existing parser, repository, store and UI behaviour were preserved.
 
 ## Files Created
 
-None.
+- `LedgerForgeTests/ImportValidatorTests.swift`
+  - Adds focused validation tests for current validator behaviour.
 
 ## Files Modified
 
-- `Parsers/StatementParser.swift`
-  - Changed the parser contract from returning `[Transaction]` to returning `FinancialDocument`.
+- `Project documents/Codex response.md`
+  - Replaced Sprint 17 planning notes with Sprint 17 implementation results.
 
-- `Parsers/Parsers/AxisBankAccountParser.swift`
-  - Preserved existing Axis transaction extraction logic.
-  - Wrapped extracted transactions into immutable `FinancialDocument` at the parser boundary.
+## Production Files Modified
 
-- `Services/Services/ImportEngine.swift`
-  - Removed production reconstruction of `FinancialDocument`.
-  - Uses the `FinancialDocument` returned by the parser directly.
+None.
 
-- `LedgerForgeTests/FinancialDocumentTests.swift`
-  - Replaced builder-focused tests with parser-native `FinancialDocument` regression tests.
-  - Verified parser name, source document, metadata, transaction count, ordering, values and validation result against the approved Axis expected JSON fixture.
-
-- `LedgerForgeTests/CSVImportRegressionTests.swift`
-  - Updated the baseline regression path to validate the `FinancialDocument` returned by the parser.
-  - Preserved approved Axis CSV financial truth checks.
-
-- `LedgerForge.xcodeproj/project.pbxproj`
-  - Updated by Xcode tooling when the obsolete builder source file was removed from the project.
-
-## Files Removed
-
-- `Parsers/FinancialDocumentBuilder.swift`
-  - Removed after verifying there were no remaining production or test references.
+`Services/ImportValidator.swift` was intentionally left unchanged. The dedicated validator tests passed against the existing implementation, so internal refactoring was not justified within Sprint 17 scope.
 
 ## Build Result
 
 Passed.
 
-- Xcode `BuildProject`: passed.
-- Command-line `xcodebuild test`: hit the known SwiftUI `#Preview` macro tooling issue after a successful build:
-  - `External macro implementation type 'PreviewsMacros.SwiftUIView' could not be found`
-- Per the project workflow, the equivalent Xcode regression suite was executed and is the authoritative validation result for this known SwiftUI `#Preview` tooling limitation.
+- Baseline Xcode build before test work: passed.
+- Xcode build after adding `ImportValidatorTests`: passed.
+- Final Xcode build before full validation: passed.
 
 ## Test Result
 
 Passed.
 
-Xcode `RunSomeTests` completed successfully:
+Focused validator suite:
 
-- 46 tests passed.
+- `ImportValidatorTests`: 7 passed, 0 failed.
+
+Required Sprint 17 regression suite:
+
+- 53 tests passed.
 - 0 tests failed.
 - 0 tests skipped.
 
-Required Sprint 16 validation suites passed:
+Required suites passed:
 
+- `ImportValidatorTests`
 - `FinancialDocumentTests`
 - `CSVImportRegressionTests`
 - `StatementParserSelectionTests`
@@ -83,72 +65,73 @@ Required Sprint 16 validation suites passed:
 - `DefaultReaderRegistryTests`
 - `PasswordProviderTests`
 
-## Commit And Push Result
+## Validation Coverage Added
 
-- Implementation commit: `7013d99e55a5cdcf750cf5ad783a71168d59ee3e`
-- Branch push: `main -> main` completed successfully.
-- Local tracking-ref note: after the successful remote push, Git could not update local `refs/remotes/origin/main` because the sandbox could not create `.git/refs/remotes/origin/main.lock`.
-- Sprint tag: `sprint-16-complete`
-- Tag push: completed successfully.
+`ImportValidatorTests` now verifies:
+
+- empty import validation fails
+- transactions without debit or credit fail
+- transactions without running balance fail
+- running-balance mismatch fails
+- valid `FinancialDocument` remains valid
+- `validate(financialDocument:)` is observably equivalent to `validate(transactions:)`
+- validation does not mutate `FinancialDocument` or its transactions
 
 ## Behavioural Impact
 
 No intended user-visible behaviour change.
 
-The approved Axis CSV baseline remains unchanged:
+Approved Axis Bank financial truth remains protected by the existing regression baseline:
 
-- transaction count preserved
-- debit total preserved
-- credit total preserved
-- opening balance preserved
-- closing balance preserved
-- parser selection preserved
-- validation result preserved
+- parser behaviour unchanged
+- transaction extraction unchanged
+- debit total unchanged
+- credit total unchanged
+- opening balance unchanged
+- closing balance unchanged
+- validation pass/fail unchanged
 
 ## Architecture Decisions
 
-- `StatementParser` now returns the canonical parser output type, `FinancialDocument`.
-- `FinancialDocumentBuilder` was removed instead of deprecated because all production and test call sites were migrated.
-- `FinancialDocument` remains immutable and data-only.
-- Validation remains unchanged; `validate(financialDocument:)` continues to delegate to transaction validation.
-- `ImportEngine` remains the production orchestration entry point and no repository, store or UI behaviour was changed.
+- `FinancialDocument` remains the canonical parser output and validation input.
+- `StatementParser -> FinancialDocument` was preserved.
+- `ImportValidator.validate(financialDocument:)` remains the production validation entry point.
+- `ImportValidator.validate(transactions:)` remains available for compatibility and focused validation tests.
+- No validation result structure changes were introduced.
+- No new public validation abstraction was introduced.
+- No persistence, repository, store or UI logic was added to validation.
 
 ## Verification
 
-- `rg FinancialDocumentBuilder` found no remaining Swift source references after removal.
-- `FinancialDocumentBuilder.swift` was removed from the Xcode project and target membership.
-- `rg` found no remaining production parser contract returning `[Transaction]`.
-- Conflict marker scan found no unresolved merge conflict markers.
-- Xcode build passed after migration.
+- Xcode build passed.
 - Required Xcode regression suite passed.
+- Conflict marker scan found no unresolved merge conflict markers.
+- Only Sprint 17 files will be staged for commit:
+  - `LedgerForgeTests/ImportValidatorTests.swift`
+  - `Project documents/Codex response.md`
 
 ## Remaining Technical Debt
 
-- `UnknownStatementParser.swift` remains an empty placeholder file and was not given behaviour in Sprint 16.
-- Parser selection reasons remain intentionally empty for parser-produced `FinancialDocument`. This remains approved unless a future ADR requires explainable parser-selection metadata.
-- Command-line `xcodebuild test` remains affected by the known SwiftUI `#Preview` macro issue; Xcode test execution remains the current authoritative validation path for the affected suite.
+- Validation issue messages remain plain strings without typed issue codes.
+- Validation row-number coverage remains limited to existing behaviour.
+- FinancialDocument-level structural validation remains intentionally deferred because no current test exposed a need.
 
 ## Remaining Risks
 
-- Future parser additions must return `FinancialDocument` directly and must not reintroduce transaction-array handoff patterns.
-- Future parser work must avoid placing financial calculations inside `FinancialDocument` or parser handoff wrappers.
+- Future validation refinements must avoid changing approved financial totals without explicit approval.
+- Future typed validation issue work should remain backward-compatible with `ImportValidationResult`.
+- Synthetic validation tests must continue to avoid inventing financial behaviour that does not exist in production rules.
 
 ## Deferred Items
 
-- No validation redesign.
 - No repository redesign.
 - No UI changes.
-- No OCR, AI inference, XLS/XLSX or dashboard work.
-- No Sprint 17 implementation work was started.
-
-## Documentation Updated
-
-- `Project documents/Codex response.md`
-  - Updated with Sprint 16 implementation, validation, commit, push and tag results.
-- `Project documents/PROJECT_STATE.md`
-  - Updated after successful build, required validation, commit, push and tag.
-  - Records Sprint 16 as complete and Sprint 17 as not started.
+- No parser rewrites.
+- No parser contract changes.
+- No OCR, AI inference, XLS/XLSX, dashboard or investment work.
+- No Sprint 18 implementation work was started.
 
 ## Next Recommended Sprint
 
-Sprint 17 should focus on Validation Pipeline Refinement while preserving the parser-to-`FinancialDocument` boundary introduced in Sprint 16. No parser contract changes should be required.
+Sprint 18 should focus on Repository Integration Cleanup only after confirming that validation remains stable at the `FinancialDocument` boundary.
+
