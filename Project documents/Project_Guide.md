@@ -5,12 +5,12 @@ This is the canonical project operating manual. Read this document first, then u
 ## Current Project Snapshot
 
 - **Current Milestone:** Milestone B
-- **Current Sprint:** <Update after every sprint>
-- **Current Phase:** <Update after every sprint>
-- **Build Status:** <Passing / Failing>
-- **Test Status:** <Summary>
-- **Last Architecture Review:** <YYYY-MM-DD>
-- **Current Codex Baseline:** <Sprint tag>
+- **Current Sprint:** Sprint 11C Ready
+- **Current Phase:** Post Sprint 11B Architecture Audit
+- **Build Status:** Passing
+- **Test Status:** 12 tests passed
+- **Last Architecture Review:** 2026-07-07
+- **Current Codex Baseline:** Sprint 11B
 
 ## Current Architecture Status
 
@@ -18,22 +18,22 @@ Update this table at the completion of every sprint. It provides the authoritati
 
 | Component             | Status/Notes                      |
 |-----------------------|---------------------------------|
-| Product Vision        |                                 |
-| Architecture         |                                 |
-| ADRs                 |                                 |
-| Database             |                                 |
-| Repository Layer     |                                 |
-| Persistence          |                                 |
-| Import Framework     |                                 |
-| Readers              |                                 |
-| Institution Detection|                                 |
-| Password Management  |                                 |
-| Dashboard            |                                 |
-| Investments          |                                 |
-| Testing              |                                 |
-| Documentation        |                                 |
-| Import Pipeline      |                                 |
-| Repository Contract Tests |                             |
+| Product Vision        | Current and authoritative |
+| Architecture         | Frozen v1.0 baseline active |
+| ADRs                 | Current through ADR-017 |
+| Database             | Production-ready foundation |
+| Repository Layer     | Stable with contract tests |
+| Persistence          | SQLite repository layer active |
+| Import Framework     | Sprint 11B foundation complete |
+| Readers              | Legacy CSV reader active; unified readers deferred |
+| Institution Detection| Legacy detector active; framework implementation deferred |
+| Password Management  | Protocol foundation only |
+| Dashboard            | Existing dashboard unchanged |
+| Investments          | Future module |
+| Testing              | 12 active tests passing |
+| Documentation        | Project_Guide.md is canonical routing document |
+| Import Pipeline      | Existing CSV flow active; Sprint 11C migration pending |
+| Repository Contract Tests | Active for InMemory and SQLite providers |
 
 ## Architecture Map
 
@@ -254,9 +254,9 @@ Additionally:
 
 ## Sprint Roadmap
 
-- **Completed Sprints:**  
-- **Current Sprint:**  
-- **Upcoming Sprints:**  
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B
+- **Current Sprint:** Sprint 11C Ready
+- **Upcoming Sprints:** Sprint 11C, then follow-up import framework integration work
 
 ## Known Technical Debt
 

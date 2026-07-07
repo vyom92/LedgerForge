@@ -1,178 +1,211 @@
-# Repository Housekeeping (Post Sprint 11B Architecture Audit)
+# Codex Response
 
-The six-phase architecture audit identified several repository housekeeping improvements that are intentionally outside Sprint 11B implementation scope.
+## Summary
 
-## Completed
+Repository housekeeping from the post Sprint 11B architecture audit is complete.
 
-- Added `.gitignore` to prevent generated Xcode build artifacts from being committed.
-- Removed tracked build artifacts from Git history going forward.
-- Updated `Project_Guide.md` to become the canonical project operating manual.
-- Updated AI workflow documentation to use `Project_Guide.md` as the primary routing document.
-- Simplified AI onboarding documentation (`AI_WORKFLOW.md`, `AGENTS.md`, `PROJECT.md`, `.github/ai-instructions.md`, `.github/prompts.md`) so they reference `Project_Guide.md` instead of duplicating project policy.
-- Completed a six-phase architecture audit covering Repository, UI, Parser, Database, Testing and Documentation.
-- Optimised repository documentation for layered AI instructions to reduce context usage.
-- Simplified `AGENTS.md` into a lightweight bootstrap document.
-- Updated `Project_Guide.md` to become the canonical navigation and routing document.
-- Updated prompt templates to use the Task Routing Guide instead of loading all documentation.
+Completed in series:
 
-## Outstanding Repository Cleanup
+1. Read `Project documents/Codex response.md` for next steps.
+2. Read `Project documents/Project_Guide.md` as the canonical routing document.
+3. Verified generated build artifacts and editor backup directories are absent.
+4. Verified generated artifacts are not tracked by Git.
+5. Consolidated duplicate historical implementation reports under `Project documents/Implementation Reports/`.
+6. Removed obsolete duplicate report copies from `Project documents/` root.
+7. Normalized the malformed `Architecture_v1.0_Frozen.md` filename.
+8. Updated `Project_Guide.md` current status fields after Sprint 11B.
+9. Executed the three Project Guide Verification Tests before Sprint 11C implementation.
+10. Built and tested the project.
 
-- Verify no `build/` directory remains inside the repository.
-- Verify no `DerivedData` artifacts remain inside the repository.
-- Verify no accidental editor backup directories remain (for example `ContentView.swift~refs`).
-- Verify there are no duplicate or malformed documentation filenames.
-- Consolidate historical implementation reports under `Project documents/Implementation Reports/`.
-- Remove obsolete or duplicated documentation where appropriate.
-- Keep `Project_Guide.md` synchronized with sprint completion after every approved sprint.
-- Move completed sprint reports into `Project documents/Implementation Reports/` if duplicates still exist.
-- Verify `Architecture_v1.0_Frozen.md` has no malformed or duplicate filename.
-- Continue reducing duplicated guidance across documentation so each document has a single responsibility.
+No application behaviour was changed.
 
-These items are repository maintenance only and do not change application behaviour.
+## Files Created
 
----
+None.
 
-# Architecture Audit Summary (Phase 1–6)
+## Files Modified
 
-An independent architecture review was completed after Sprint 11B.
+- `Project documents/Project_Guide.md`
+- `Project documents/Codex response.md`
+- `LedgerForge.xcodeproj/project.pbxproj` through Xcode-managed documentation filename update
 
-## Overall Assessment
+## Files Removed
 
-| Area | Result |
-|-------|--------|
-| Repository Structure | ✅ Healthy |
-| Import Architecture | 🟢 Strong Foundation |
-| Database Layer | 🟢 Production Ready |
-| Repository Layer | 🟢 Stable |
-| UI Architecture | 🟡 Minor Orchestration Debt |
-| Parser Architecture | 🟡 Legacy Migration Pending |
-| Documentation | 🟢 Excellent |
-| Testing | 🟡 Good Foundation |
+Removed duplicate root-level historical reports after verifying byte-for-byte identical copies already existed under `Project documents/Implementation Reports/`:
 
-## Highest Priority
+- `Project documents/Database_Architecture_Update_Report.md`
+- `Project documents/Sprint10_Phase2B_CodeAudit.md`
+- `Project documents/Sprint10_Phase2B_Report.md`
+- `Project documents/Sprint10_Phase2C_Plan.md`
+- `Project documents/Sprint10_Phase2C_Report.md`
 
-The next architectural milestone remains Sprint 11C.
+Removed generated local metadata:
 
-Primary objective:
+- `Project documents/.DS_Store`
 
-```text
-Existing CSV Import
+## Files Renamed
 
-↓
+- `Project documents/Architecture_v1.0_Frozen.md⁠` -> `Project documents/Architecture_v1.0_Frozen.md`
 
-ImportCoordinator
+## Build Result
 
-↓
+Xcode build completed successfully.
 
-Reader
+Result: `The project built successfully.`
 
-↓
+## Test Result
 
-FinancialDocument
+All active scheme tests passed.
 
-↓
+Result: `12 tests: 12 passed, 0 failed, 0 skipped, 0 expected failures, 0 not run`
 
-Existing Parser
+## Project Guide Verification Tests
 
-↓
+### Test 1 - Task Routing
 
-Validation
+For Sprint 11C, `Project_Guide.md` routes the task through these categories:
 
-↓
+- Import Framework
+- Reader Implementation
+- Parser Implementation
+- Repository Changes
+- Testing
 
-Repositories
+Documents to read before Sprint 11C implementation:
 
-↓
+- `Project documents/Project_Guide.md` - required first by Standard AI Workflow.
+- `Project documents/Architecture_v1.0_Frozen.md` - required for Import Framework, Reader Implementation and Parser Implementation.
+- `Project documents/ADR.md` - required for Import Framework, Reader Implementation and Parser Implementation.
+- `Project documents/Engineering Standards.md` - required for Import Framework and Testing.
+- `Project documents/Database_v1_Architecture.md` - required for Repository Changes.
+- `Project documents/Codex response.md` - required for Repository Changes, Testing and Standard AI Workflow review.
 
-Stores
-```
+Documents intentionally not read for Sprint 11C implementation unless the task expands:
 
-without changing any user-visible behaviour.
+- `Project documents/Product Vision.md` - routed for New Feature planning, not specifically for Import Framework, Reader Implementation, Parser Implementation, Repository Changes or Testing.
+- `Project documents/AI_WORKFLOW.md` - Project_Guide.md is the canonical routing document and already contains the Standard AI Workflow.
+- `.github/context.md` - routed for AI onboarding and context refresh, not Sprint 11C implementation.
+- `.github/ai-instructions.md` - routed for AI onboarding, not Sprint 11C implementation.
+- `.github/prompts.md` - routed for AI onboarding, not Sprint 11C implementation.
+- Historical implementation reports - not listed by the Task Routing Guide for Sprint 11C.
 
-## Recommended Additional Tests
+### Test 2 - Sprint Boundary
 
-Before or during Sprint 11C:
+Sprint 11C is allowed to work on the documented next milestone:
 
-- Add CSV baseline regression tests.
-- Add repository rollback contract tests.
-- Add end-to-end import integration tests after CSV migration.
-- Execute the three Project Guide Verification Tests before beginning Sprint 11C.
-- Verify AI assistants load only the documents identified by the Task Routing Guide.
+`Existing CSV Import -> ImportCoordinator -> Reader -> FinancialDocument -> Existing Parser -> Validation -> Repositories -> Stores`
 
-## Deferred Architectural Improvements
+Allowed scope from the documented next step:
 
-Future improvements identified during the audit include:
+- Preserve existing CSV import user-visible behaviour.
+- Route existing CSV import through the unified import framework path.
+- Use `ImportCoordinator` as orchestration.
+- Keep validation before repository persistence.
+- Keep repositories as the persistence boundary.
+- Add regression coverage needed to preserve existing behaviour.
 
-- Import progress reporting.
-- Import context object.
-- Repository mapper separation.
-- Multi-currency dashboard refinement.
+Sprint 11C must not change:
+
+- User-visible import behaviour.
+- PDF import support.
+- XLS import support.
+- XLSX import support.
+- TXT import support.
+- Dashboard behaviour.
+- Financial calculations.
+- Parser financial interpretation unless required only as an adapter with unchanged behaviour.
+- Architecture rules in `Project_Guide.md`.
+
+Relevant `Project_Guide.md` sections:
+
+- `Task Routing Guide`
+- `Sprint Scope Contract`
+- `Standard AI Workflow`
+- `Non-Negotiable Architecture Rules`
+
+### Test 3 - Workflow Compliance
+
+Assuming Sprint 11C is requested, the Standard AI Workflow output before coding is:
+
+Documents to read:
+
+- `Project documents/Project_Guide.md`
+- `Project documents/Architecture_v1.0_Frozen.md`
+- `Project documents/ADR.md`
+- `Project documents/Engineering Standards.md`
+- `Project documents/Database_v1_Architecture.md`
+- `Project documents/Codex response.md`
+
+Implementation plan:
+
+1. Add CSV baseline regression tests around current observable import behaviour.
+2. Add repository rollback contract tests if the Sprint 11C persistence path writes through repositories.
+3. Introduce adapter code that lets existing CSV import pass through `ImportCoordinator` without changing UI behaviour.
+4. Reuse existing CSV reader/parser/validator behaviour rather than replacing financial interpretation.
+5. Persist only after validation succeeds.
+6. Keep stores as runtime state owners.
+7. Run build and full tests after each significant step.
+
+Risks:
+
+- Accidentally changing CSV import behaviour during migration.
+- Duplicating logic between legacy `ImportEngine` and `ImportCoordinator`.
+- Bypassing validation before repository writes.
+- Introducing persistence writes before regression coverage is in place.
+- Expanding into reader/parser support outside Sprint 11C.
+
+Files likely to change:
+
+- `Import/Coordinator/DefaultImportCoordinator.swift`
+- `Import/Protocols/ReaderRegistry.swift`
+- `Import/Models/*`
+- `Services/Services/ImportEngine.swift`
+- `Readers/CSVReader.swift` or a CSV adapter file if approved
+- `LedgerForgeTests/ImportFrameworkTests.swift`
+- `LedgerForgeTests/RepositoryContractTests.swift`
+- New CSV regression test file if approved
+- `Project documents/Codex response.md`
+
+Stop condition:
+
+Stop after Sprint 11C migration foundation is complete, existing CSV behaviour is preserved, build passes, tests pass, and no PDF/XLS/XLSX/TXT support has been added.
+
+## Architecture Decisions
+
+No application architecture changed during this housekeeping pass.
+
+The documentation cleanup preserves the established architecture: `Project_Guide.md` remains the canonical routing document, historical sprint reports live under `Project documents/Implementation Reports/`, and `Architecture_v1.0_Frozen.md` now has a normalized filename.
+
+## Documentation Updated
+
+- Updated `Project documents/Project_Guide.md` current project snapshot, architecture status table and sprint roadmap.
+- Updated `Project documents/Codex response.md` with this housekeeping report and Sprint 11C readiness verification.
+
+## Remaining Technical Debt
+
+- Sprint 11C has not been implemented.
+- Existing CSV import still needs controlled migration into `ImportCoordinator`.
+- CSV baseline regression tests still need implementation before or during Sprint 11C.
+- Repository rollback contract tests remain recommended before Sprint 11C persistence integration.
+- End-to-end import integration tests remain deferred until after CSV migration.
+
+## Deferred Items
+
+Deferred intentionally:
+
+- Sprint 11C implementation.
+- PDF reader.
+- XLS reader.
+- XLSX reader.
+- TXT reader.
 - Password provider implementation.
-- Institution detection framework.
-- PDF/XLS/XLSX import support.
-- Introduce `ImportViewModel` when the unified import flow reaches the UI.
-- Gradually retire legacy import orchestration after successful migration to `ImportCoordinator`.
-- Consider archiving historical sprint handoff reports into per-sprint files once the project grows further.
+- Institution detection framework implementation.
+- Parser migration beyond existing CSV behaviour preservation.
+- UI changes.
+- Dashboard changes.
 
-No architectural blockers were identified for Sprint 11C.
+## Next Recommended Sprint
 
----
+Next recommended sprint: Sprint 11C.
 
-# Project Guide Verification Tests
-
-These tests validate that AI assistants correctly follow `Project_Guide.md` before implementation.
-
-## Test 1 – Task Routing
-
-Expected behaviour:
-
-- Read `Project_Guide.md`.
-- Determine only the documentation required for Sprint 11C.
-- Explain why each document is required.
-- List documents intentionally skipped.
-- Do not generate code.
-
-## Test 2 – Sprint Boundary
-
-Expected behaviour:
-
-- Read `Project_Guide.md`.
-- Describe exactly what Sprint 11C is allowed to change.
-- List five things Sprint 11C must not change.
-- Reference the relevant sections of `Project_Guide.md`.
-- Do not generate code.
-
-## Test 3 – Workflow Compliance
-
-Expected behaviour:
-
-- Read `Project_Guide.md`.
-- Assume Sprint 11C has been requested.
-- Follow the Standard AI Workflow.
-- Produce only:
-  - Documents to read.
-  - Implementation plan.
-  - Risks.
-  - Files likely to change.
-  - Stop condition.
-- Do not generate code.
-
----
-
-# Readiness Assessment
-
-## Repository
-
-✅ Ready for Sprint 11C.
-
-## Architecture
-
-No architectural blockers identified.
-
-## Documentation
-
-Layered documentation structure is established with `Project_Guide.md` as the canonical entry point.
-
-## Remaining Risk
-
-The primary implementation risk is preserving existing CSV import behaviour during migration into the unified import framework. Regression testing should remain the highest priority throughout Sprint 11C.
+Recommended first step: add CSV baseline regression tests before migrating existing CSV import through `ImportCoordinator`.
