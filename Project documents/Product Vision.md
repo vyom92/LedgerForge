@@ -39,7 +39,10 @@ Every feature should satisfy at least one of these goals:
 3. Surface meaningful financial insight.
 4. Preserve financial truth.
 
+
 LedgerForge should never sacrifice accuracy for convenience. Every calculation must remain deterministic, explainable and reproducible.
+
+Approved reference fixtures define financial truth for supported institutions and formats. When the same statement is available in multiple formats, such as CSV and PDF, LedgerForge must preserve equivalent observable financial results across those formats.
 
 ---
 
@@ -97,22 +100,27 @@ Supported sources include:
 
 Every import follows the same deterministic pipeline:
 
-1. Identify the financial institution.
-2. Determine the document type (bank account, credit card, investment, salary, etc.).
-3. Unlock encrypted documents automatically using the institution's stored password when available.
-4. Extract raw document contents into a normalized internal representation.
-5. Detect the document layout and version.
-6. Apply the appropriate parser.
-7. Validate the extracted financial data.
-8. Update LedgerForge stores only after validation succeeds.
+1. Coordinate the import through the Unified Import Framework.
+2. Resolve an optional password through the import coordination layer when required.
+3. Select the appropriate reader for the file format.
+4. Extract raw document contents into RawDocument.
+5. Convert raw contents into FinancialDocument.
+6. Identify the financial institution.
+7. Determine the document type (bank account, credit card, investment, salary, etc.).
+8. Detect the document layout and version.
+9. Apply the appropriate parser.
+10. Validate the extracted financial data.
+11. Update LedgerForge stores only after validation succeeds.
 
 Institution detection should rely on document fingerprints, metadata, recurring keywords, visual structure, and previous successful imports rather than filenames.
 
 Statement layouts may evolve over time. LedgerForge should automatically recognize new layouts, preserve compatibility with older formats, and learn from successful imports without compromising deterministic parsing.
 
-The parsing engine should be format-independent. Whether data originates from PDF, CSV, XLS/XLSX or TXT, downstream components should receive the same normalized transaction model.
+The parsing engine should be format-independent. Whether data originates from PDF, CSV, XLS/XLSX or TXT, downstream components should receive the same normalized financial model after the reader-specific extraction stage.
 
 Importing documents should require little or no user interaction beyond selecting the file.
+
+The statement, not the file format, is the source of financial truth. Equivalent CSV, PDF and future spreadsheet representations of the same statement should reconcile to the same approved expected results.
 ---
 
 # Explainable Intelligence
