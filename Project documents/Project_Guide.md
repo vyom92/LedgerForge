@@ -5,98 +5,55 @@ This is the canonical project operating manual. Read this document first, then u
 ## Current Project Snapshot
 
 - **Current Milestone:** Milestone C
-- **Current Sprint:** Sprint 11D
+- **Current Sprint:** Sprint 12A
 - **Current Phase:** Unified Import Framework Operational
 - **Build Status:** Passing
-- **Test Status:** 13 tests passing
+- **Test Status:** 17 tests passing
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 11C
+- **Current Codex Baseline:** Sprint 11D
 
 ## Current Architecture Status
 
 Update this table at the completion of every sprint. It provides the authoritative high-level status of each subsystem.
 
-| Component             | Status/Notes                      |
+| Component | Status/Notes |
 |-----------------------|---------------------------------|
-| Product Vision        | Current and authoritative |
-| Architecture         | Frozen v1.0 baseline active |
-| ADRs                 | Current through ADR-018 |
-| Database             | Production-ready foundation |
-| Repository Layer     | Stable with contract tests |
-| Persistence          | SQLite repository layer active |
-| Import Framework     | Operational; production CSV import uses ImportCoordinator |
-| Readers              | CSV integrated into Unified Import Framework |
-| Institution Detection| Legacy detector active; framework planned |
-| Password Management  | Sprint 11D focus |
-| Dashboard            | Existing dashboard unchanged |
-| Investments          | Future module |
-| Testing              | 13 active tests passing |
-| Documentation        | Project_Guide.md is canonical routing document |
-| Import Pipeline      | Production CSV routed through ImportCoordinator |
+| Product Vision | Current and authoritative |
+| Architecture | Frozen v1.0 baseline active |
+| ADRs | Current through ADR-018 |
+| Database | Production-ready foundation |
+| Repository Layer | Stable with contract tests |
+| Persistence | SQLite repository layer active |
+| Import Framework | Operational; production CSV import uses ImportCoordinator |
+| Readers | CSV integrated into Unified Import Framework |
+| Institution Detection | Legacy detector active; framework planned |
+| Password Management | Operational; DefaultPasswordProvider integrated |
+| Dashboard | Existing dashboard unchanged |
+| Investments | Future module |
+| Testing | 17 active tests passing |
+| Documentation | Project_Guide.md is canonical routing document |
+| Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
 
-## Architecture Map
-
-```text
-User
- │
- ▼
-Views
- │
- ▼
-ViewModels
- │
- ▼
-Stores
- │
- ▼
-Repository Protocols
- │
- ▼
-Repository Implementations
- │
- ▼
-SQLite
-
-────────────────────────────
-
-Import Request
- │
- ▼
 ImportCoordinator
- │
- ▼
+↓
+PasswordProvider
+↓
+ReaderRegistry
+↓
 Reader
- │
- ▼
+↓
 FinancialDocument
- │
- ▼
+↓
 Institution Detection
- │
- ▼
+↓
 Document Classification
- │
- ▼
+↓
 Parser Selection
- │
- ▼
+↓
 Statement Parser
- │
- ▼
+↓
 Validation
- │
- ▼
-Repository Protocols
- │
- ▼
-Repository Implementations
- │
- ▼
-SQLite
- │
- ▼
-Stores
 ```
 
 ## Documentation Index
@@ -142,6 +99,7 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 - Financial Truth Never Changes
 - One Sprint Per Implementation
 - Documentation Before Implementation
+- Reference Fixtures Define Financial Truth
 
 ## Non-Negotiable Architecture Rules
 
@@ -254,13 +212,12 @@ Additionally:
 
 ## Sprint Roadmap
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C
-- **Current Sprint:** Sprint 11D – Password Provider Abstraction
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D
+- **Current Sprint:** Sprint 12A – PDF Reader Foundation
 - **Upcoming Sprints:**
-  - Sprint 12A – PDF Reader Foundation
-  - Sprint 12B – Institution Detection Framework
-  - Sprint 12C – Axis PDF Parser
-
+  - Sprint 12B – Axis PDF Reader Integration
+  - Sprint 12C – Institution Detection Framework
+  
 ## Known Technical Debt
 
 Maintain a concise list of active architectural and implementation debt.
@@ -268,10 +225,9 @@ Maintain a concise list of active architectural and implementation debt.
 Current items:
 
 - ImportEngine still owns analysis, normalization, parser selection, validation and store updates.
-- Additional approved regression fixtures should be added for future institutions and formats.
-- Password Provider implementation pending.
-- PDF Reader not yet implemented.
+- PDF Reader foundation not yet implemented.
 - Institution Detection Framework not yet implemented.
+- Additional approved regression fixtures should be added for future institutions (CBQ, HDFC, SBI, etc.).
 - Additional import fixtures should compare equivalent financial truth across CSV and PDF where available.
 
 Remove items as they are completed.
@@ -280,6 +236,8 @@ Remove items as they are completed.
 
 The following fixtures define the approved financial baseline used throughout LedgerForge development.
 
+### Approved Baseline
+
 - Axis Bank NRE CSV
 - Axis Bank NRE PDF (same statement period)
 
@@ -287,9 +245,19 @@ Both fixtures represent identical financial truth.
 
 Future readers, parsers and import pipelines must produce equivalent observable financial results unless an intentional behavioural change is explicitly approved.
 
+### Future Fixtures
+
+As new institutions are supported, each approved fixture should include:
+
+- Original source document
+- Expected financial results
+- Expected parser
+- Validation outcome
+
+Every supported import format should be validated against an approved baseline fixture whenever an equivalent statement exists.
+
 ## Future Modules
 
-- Password Provider
 - PDF Reader
 - Institution Detection Framework
 - XLS/XLSX Reader
