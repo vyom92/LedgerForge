@@ -134,16 +134,41 @@ Completed
 
 ---
 
+# Sprint 17
+
+## Objective
+Refine the validation pipeline while preserving the parser-produced FinancialDocument boundary introduced in Sprint 16.
+
+## Status
+Completed
+
+## Outcome
+- Dedicated ImportValidator regression tests added.
+- Empty import validation behaviour verified.
+- FinancialDocument validation equivalence to transaction validation verified.
+- Valid FinancialDocument validation verified.
+- Validation immutability verified.
+- ImportValidator production implementation left unchanged because tests exposed no real implementation issue.
+- Approved Axis CSV financial truth remains unchanged.
+- Existing parser, repository, store and UI behaviour preserved.
+- 53 required Sprint 17 regression tests passed through Xcode.
+- Build passed.
+- Commit: `dcac92a0d8e5078a3014e7ef52af8917f130940d`
+- Git push to `origin/main` completed successfully.
+- Git tag: `sprint-17-complete`
+
+---
+
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `7013d99e55a5cdcf750cf5ad783a71168d59ee3e`
-- Latest Tag: `sprint-16-complete`
-- Architecture Baseline: Sprint 16
-- Latest Milestone: FinancialDocument-native Parser Output
+- Latest Commit: `dcac92a0d8e5078a3014e7ef52af8917f130940d`
+- Latest Tag: `sprint-17-complete`
+- Architecture Baseline: Sprint 17
+- Latest Milestone: Validation Pipeline Regression Coverage
 - Build: Passing
-- Validation: Build passing; required Sprint 16 regression suite passing through Xcode.
+- Validation: Build passing; required Sprint 17 regression suite passing through Xcode.
 
 ## Session Startup Order
 1. AGENTS.md
@@ -177,15 +202,15 @@ Dashboard
 
 ## Current Work
 
-Active Sprint: Sprint 17
+Active Sprint: Sprint 18
 
 Objective:
-- Validation Pipeline Refinement.
+- Next recommended sprint: Repository Integration Cleanup.
 
 Scope:
 - Not started.
-- Requires Sprint 17 planning before implementation.
-- Preserve parser-produced FinancialDocument behaviour from Sprint 16.
+- Requires Sprint 18 planning before implementation.
+- Preserve validation-before-persistence behaviour from Sprint 17.
 
 Out of Scope:
 - Transaction extraction changes

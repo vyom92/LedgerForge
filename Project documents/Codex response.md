@@ -65,6 +65,14 @@ Required suites passed:
 - `DefaultReaderRegistryTests`
 - `PasswordProviderTests`
 
+## Commit And Push Result
+
+- Implementation commit: `dcac92a0d8e5078a3014e7ef52af8917f130940d`
+- Branch push: `main -> main` completed successfully.
+- Local tracking-ref note: after the successful remote push, Git could not update local `refs/remotes/origin/main` because the sandbox could not create `.git/refs/remotes/origin/main.lock`.
+- Sprint tag: `sprint-17-complete`
+- Tag push: completed successfully.
+
 ## Validation Coverage Added
 
 `ImportValidatorTests` now verifies:
@@ -106,7 +114,7 @@ Approved Axis Bank financial truth remains protected by the existing regression 
 - Xcode build passed.
 - Required Xcode regression suite passed.
 - Conflict marker scan found no unresolved merge conflict markers.
-- Only Sprint 17 files will be staged for commit:
+- Only Sprint 17 implementation files were staged for commit:
   - `LedgerForgeTests/ImportValidatorTests.swift`
   - `Project documents/Codex response.md`
 
@@ -131,7 +139,14 @@ Approved Axis Bank financial truth remains protected by the existing regression 
 - No OCR, AI inference, XLS/XLSX, dashboard or investment work.
 - No Sprint 18 implementation work was started.
 
+## Documentation Updated
+
+- `Project documents/Codex response.md`
+  - Updated with Sprint 17 implementation, validation, commit, push and tag results.
+- `Project documents/PROJECT_STATE.md`
+  - Updated after successful build, required validation, commit, push and tag.
+  - Records Sprint 17 as complete and Sprint 18 as not started.
+
 ## Next Recommended Sprint
 
 Sprint 18 should focus on Repository Integration Cleanup only after confirming that validation remains stable at the `FinancialDocument` boundary.
-
