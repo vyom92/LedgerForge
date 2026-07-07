@@ -453,8 +453,8 @@
 		28B87B272FFB2C90009BEE8C /* Project documents */ = {
 			isa = PBXGroup;
 			children = (
-				286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */,
 				281BB1782FFC4CDA006E7424 /* Project_Guide.md */,
+				286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */,
 				281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */,
 				28171F672FFC1718006115B7 /* Database_v1_Architecture.md */,
 				28B87B2E2FFB2D25009BEE8C /* ADR.md */,
