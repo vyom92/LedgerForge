@@ -69,16 +69,35 @@ Completed
 
 ---
 
+# Sprint 14
+
+## Objective
+Introduce the deterministic Parser Selection Framework while preserving Statement Classification behaviour and preparing for FinancialDocument Integration.
+
+## Status
+Completed
+
+## Outcome
+- Deterministic Parser Selection Framework implemented.
+- Legacy `StatementParserRegistry` compatibility preserved.
+- Axis CSV and PDF parser-selection context validated.
+- Unknown institution and unknown statement type handling validated.
+- 42 required Sprint 14 regression tests passed through Xcode.
+- Build passed.
+- Commit: `da117422d47ef9fe6f09fdfe110f88f54182b590`
+
+---
+
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: (update after each sprint)
+- Latest Commit: `da117422d47ef9fe6f09fdfe110f88f54182b590`
 - Latest Tag: `sprint-13-complete`
-- Architecture Baseline: Sprint 13
-- Latest Milestone: Statement Classification Framework
+- Architecture Baseline: Sprint 14
+- Latest Milestone: Parser Selection Framework
 - Build: Passing
-- Tests: 46 passing across 10 suites
+- Tests: 42 required Sprint 14 regression tests passing
 
 ## Session Startup Order
 1. AGENTS.md
@@ -112,15 +131,15 @@ Dashboard
 
 ## Current Work
 
-Active Sprint: Sprint 14
+Active Sprint: Sprint 15
 
 Objective:
-- Parser Selection Framework.
+- FinancialDocument Integration.
 
 Scope:
-- Deterministic parser selection.
-- Preserve Statement Classification behaviour.
-- Keep parser selection independent from readers.
+- Integrate deterministic import stages into a FinancialDocument handoff.
+- Preserve parser extraction rules.
+- Preserve validation, repository persistence and UI behaviour.
 
 Out of Scope:
 - Transaction extraction changes
