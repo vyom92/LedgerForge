@@ -28,6 +28,8 @@
 		281BB1902FFC4D6A006E7424 /* StatementClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB18F2FFC4D6A006E7424 /* StatementClassifier.swift */; };
 		281BB1922FFC4D6A006E7424 /* ImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1912FFC4D6A006E7424 /* ImportCoordinator.swift */; };
 		281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */; };
+		281BB1C42FFCBF14006E7424 /* CSVDocumentReaderAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1C32FFCBF14006E7424 /* CSVDocumentReaderAdapter.swift */; };
+		281BB1C82FFCC035006E7424 /* DefaultReaderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1C72FFCC035006E7424 /* DefaultReaderRegistry.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
 		288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B22FF7955200F09BC9 /* ContentView.swift */; };
 		288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0B42FF7955300F09BC9 /* Assets.xcassets */; };
@@ -107,6 +109,8 @@
 		281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultImportCoordinator.swift; sourceTree = "<group>"; };
 		281BB1A92FFC5FBB006E7424 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
 		281BB1AA2FFC6024006E7424 /* PROJECT.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PROJECT.md; sourceTree = "<group>"; };
+		281BB1C32FFCBF14006E7424 /* CSVDocumentReaderAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVDocumentReaderAdapter.swift; sourceTree = "<group>"; };
+		281BB1C72FFCC035006E7424 /* DefaultReaderRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultReaderRegistry.swift; sourceTree = "<group>"; };
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerForgeApp.swift; sourceTree = "<group>"; };
 		288EB0B22FF7955200F09BC9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -214,6 +218,7 @@
 				281BB16D2FFC4C9A006E7424 /* Protocols */,
 				281BB1742FFC4CAF006E7424 /* Coordinator */,
 				281BB17B2FFC4D1C006E7424 /* ImportFramework.swift */,
+				281BB1C22FFCBF13006E7424 /* Readers */,
 			);
 			path = Import;
 			sourceTree = "<group>";
@@ -256,6 +261,15 @@
 				281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */,
 			);
 			path = Coordinator;
+			sourceTree = "<group>";
+		};
+		281BB1C22FFCBF13006E7424 /* Readers */ = {
+			isa = PBXGroup;
+			children = (
+				281BB1C32FFCBF14006E7424 /* CSVDocumentReaderAdapter.swift */,
+				281BB1C72FFCC035006E7424 /* DefaultReaderRegistry.swift */,
+			);
+			path = Readers;
 			sourceTree = "<group>";
 		};
 		288EB0A42FF7955200F09BC9 = {
@@ -607,6 +621,7 @@
 				288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */,
 				288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */,
 				288EB0FD2FF7BA1600F09BC9 /* DeveloperConsoleView.swift in Sources */,
+				281BB1C82FFCC035006E7424 /* DefaultReaderRegistry.swift in Sources */,
 				288EB1212FF7D88200F09BC9 /* Parsers/StatementParserRegistry.swift in Sources */,
 				281BB17C2FFC4D1C006E7424 /* ImportFramework.swift in Sources */,
 				288EB1252FF7D8B500F09BC9 /* Transaction.swift in Sources */,
@@ -623,6 +638,7 @@
 				288EB0EE2FF7AE2C00F09BC9 /* CSVReader.swift in Sources */,
 				28B87B312FFB2F22009BEE8C /* Services/DirectionResolver.swift in Sources */,
 				28B87B372FFBB599009BEE8C /* ImportSession.swift in Sources */,
+				281BB1C42FFCBF14006E7424 /* CSVDocumentReaderAdapter.swift in Sources */,
 				281BB15C2FFC4879006E7424 /* SQLiteRepositoryProvider.swift in Sources */,
 				28B87B352FFB31FD009BEE8C /* Services/ImportValidator.swift in Sources */,
 				281BB1822FFC4D40006E7424 /* ImportResult.swift in Sources */,
