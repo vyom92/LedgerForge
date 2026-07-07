@@ -32,6 +32,7 @@
 		2862425F2FFCE80D00B8AA66 /* PDFDocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242552FFCE80D00B8AA66 /* PDFDocumentReader.swift */; };
 		286242612FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */; };
 		286242632FFCE80D00B8AA66 /* DefaultPasswordProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2862424A2FFCE80D00B8AA66 /* DefaultPasswordProvider.swift */; };
+		2862426F2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
 		288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B22FF7955200F09BC9 /* ContentView.swift */; };
 		288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0B42FF7955300F09BC9 /* Assets.xcassets */; };
@@ -114,6 +115,8 @@
 		286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVDocumentReaderAdapter.swift; sourceTree = "<group>"; };
 		286242542FFCE80D00B8AA66 /* DefaultReaderRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultReaderRegistry.swift; sourceTree = "<group>"; };
 		286242552FFCE80D00B8AA66 /* PDFDocumentReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFDocumentReader.swift; sourceTree = "<group>"; };
+		2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureInstitutionDetector.swift; sourceTree = "<group>"; };
+		286242762FFD168100B8AA66 /* PROJECT_STATE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PROJECT_STATE.md; sourceTree = "<group>"; };
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerForgeApp.swift; sourceTree = "<group>"; };
 		288EB0B22FF7955200F09BC9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -439,6 +442,7 @@
 				288EB1282FF7DA3900F09BC9 /* ColumnMapping.swift */,
 				288EB11F2FF7D69000F09BC9 /* DocumentMetadata.swift */,
 				288EB1022FF7BFF600F09BC9 /* InstitutionDetector.swift */,
+				2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */,
 			);
 			path = Detectors;
 			sourceTree = "<group>";
@@ -454,6 +458,7 @@
 		28B87B272FFB2C90009BEE8C /* Project documents */ = {
 			isa = PBXGroup;
 			children = (
+				286242762FFD168100B8AA66 /* PROJECT_STATE.md */,
 				281BB1782FFC4CDA006E7424 /* Project_Guide.md */,
 				286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */,
 				281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */,
@@ -649,6 +654,7 @@
 				281BB15E2FFC4886006E7424 /* DTOs.swift in Sources */,
 				28B87B262FFB24CD009BEE8C /* TransactionListView.swift in Sources */,
 				281BB18C2FFC4D55006E7424 /* PasswordProvider.swift in Sources */,
+				2862426F2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift in Sources */,
 				288EB0EE2FF7AE2C00F09BC9 /* CSVReader.swift in Sources */,
 				28B87B312FFB2F22009BEE8C /* Services/DirectionResolver.swift in Sources */,
 				28B87B372FFBB599009BEE8C /* ImportSession.swift in Sources */,

@@ -6,12 +6,12 @@ This is the canonical project operating manual. Read this document first, then u
 
 
 - **Current Milestone:** Milestone C
-- **Current Sprint:** Sprint 12B
-- **Current Phase:** PDF Reader Foundation Complete
+- **Current Sprint:** Sprint 13
+- **Current Phase:** Institution Detection Framework Complete
 - **Build Status:** Passing
-- **Test Status:** 17 tests passing
+- **Test Status:** 37 tests passing
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 12A
+- **Current Codex Baseline:** Sprint 12C
 
 
 ## Current Architecture Status
@@ -26,11 +26,11 @@ This is the canonical project operating manual. Read this document first, then u
 | Persistence | SQLite repository layer active |
 | Import Framework | Operational; CSV and PDF reader foundation active |
 | Readers | CSV and PDF readers integrated into Unified Import Framework |
-| Institution Detection | Legacy detector active; framework planned |
+| Institution Detection | Framework implemented; legacy behaviour preserved |
 | Password Management | Operational; DefaultPasswordProvider integrated |
 | Dashboard | Existing dashboard unchanged |
 | Investments | Future module |
-| Testing | 17 active tests passing |
+| Testing | 37 active tests passing |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -80,6 +80,7 @@ Dashboard
 |----------------------------------|-----------------------------------------------------|-----------------------------------|-------------|
 | Architecture_v1.0_Frozen.md       | Definitive system design and constraints             | Architecture review, design tasks | Highest     |
 | ADR.md                          | Architecture Decision Records documenting key decisions | Architecture review, design tasks | High        |
+| Project documents/PROJECT_STATE.md | Permanent verified repository state and AI handoff | Every implementation session | Highest |
 | Database_v1_Architecture.md       | Database schema and component design                  | Database changes, design tasks    | High        |
 | Product Vision.md               | High-level goals, target users, and product impact    | New feature planning              | High        |
 | Engineering Standards.md        | Coding standards and engineering guidelines           | All engineering tasks             | Medium      |
@@ -87,7 +88,7 @@ Dashboard
 | .github/context.md             | Project environment and constraints for AI assistants | AI onboarding and context refresh | Medium      |
 | .github/ai-instructions.md     | AI behavior and interaction policies                   | AI onboarding                    | Medium      |
 | .github/prompts.md             | Prompt templates and examples for AI responses         | AI onboarding                    | Medium      |
-| Project documents/Codex response.md | Latest sprint summary, build/test results, decisions | Sprint reviews, bug fixes, testing | High        |
+| Project documents/Codex response.md | Current sprint working log, implementation notes, build/test progress | Sprint reviews, bug fixes, testing | High        |
 
 Only consult the documents required by the Task Routing Guide. Do not load the complete documentation set unless performing a full architecture or repository review.
 
@@ -97,11 +98,12 @@ The precedence for documentation is as follows:
 
 1. Architecture_v1.0_Frozen.md  
 2. ADR.md  
-3. Engineering Standards.md  
-4. Database_v1_Architecture.md  
-5. Product Vision.md  
-6. AI_WORKFLOW.md  
-7. Codex response.md  
+3. Project documents/PROJECT_STATE.md  
+4. Engineering Standards.md  
+5. Database_v1_Architecture.md  
+6. Product Vision.md  
+7. AI_WORKFLOW.md  
+8. Codex response.md  
 
 Approved documentation always overrides any implicit or assumed implementation details.
 
@@ -209,7 +211,8 @@ Additionally:
 - Read Project_Guide.md first.  
 - Use the Task Routing Guide before opening any other document.
 - Read only the documents identified by the Task Routing Guide.  
-- Review Project documents/Codex response.md.  
+- Review Project documents/PROJECT_STATE.md.
+- Review Project documents/Codex response.md for the current sprint context.
 - Produce an implementation plan.  
 - Wait for approval before coding.  
 
@@ -234,7 +237,8 @@ Additionally:
 
 ### 3. Before stopping
 
-- Update Project documents/Codex response.md.  
+- Update Project documents/Codex response.md throughout the sprint.
+- After a successful build, required tests, commit and push, update Project documents/PROJECT_STATE.md with the verified repository state.
 - Include summary, files created, files modified, build result, test result, commit hash (if committed), push result, documentation updated, remaining technical debt, deferred items and next recommended sprint.  
 - Stop exactly at the approved sprint boundary.  
 - Confirm the repository builds successfully before considering the sprint complete.
@@ -242,12 +246,11 @@ Additionally:
 ## Sprint Roadmap
 
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A
-- **Current Sprint:** Sprint 12B – Axis PDF Baseline Verification
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C
+- **Current Sprint:** Sprint 13 – Statement Classification Framework
 - **Upcoming Sprints:**
-  - Sprint 12C – Institution Detection Framework
-  - Sprint 13 – ImportViewModel & Import Diagnostics
-  
+  - Sprint 14 – Parser Selection Framework
+  - Sprint 15 – FinancialDocument Convergence
 
 ## Known Technical Debt
 
@@ -256,7 +259,6 @@ Maintain a concise list of active architectural and implementation debt.
 Current items:
 
 - ImportEngine still owns analysis, normalization, parser selection, validation and store updates.
-- Institution Detection Framework not yet implemented.
 - Additional approved regression fixtures should be added for future institutions (CBQ, HDFC, SBI, etc.).
 - Additional import fixtures should compare equivalent financial truth across CSV and PDF where available.
 
@@ -321,7 +323,8 @@ This layered documentation approach keeps AI context small while preserving dete
 - Never continue into the next sprint unless explicitly instructed.  
 - Never redesign approved architecture.  
 - If documentation and implementation conflict, stop and report the conflict.  
-- Update Project documents/Codex response.md after every implementation.  
+- Maintain Project documents/Codex response.md during implementation.
+- Update Project documents/PROJECT_STATE.md only after the sprint has been successfully validated, committed and pushed.
 - Leave the repository in a buildable state.  
 - Never bypass repository abstractions.  
 - Never access SQLite directly from Views, ViewModels or Stores.  

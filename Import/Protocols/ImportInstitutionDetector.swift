@@ -12,9 +12,11 @@ public extension ImportFramework {
 public struct ImportInstitutionCandidate: Equatable, Sendable {
     public let institutionCode: String?
     public let confidence: Double
+    public let reasons: [String]
 
-    public init(institutionCode: String?, confidence: Double) {
+    public init(institutionCode: String?, confidence: Double, reasons: [String] = []) {
         self.institutionCode = institutionCode
         self.confidence = confidence
+        self.reasons = reasons
     }
 }
