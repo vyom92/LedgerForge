@@ -35,3 +35,6 @@ xcuserdata/
 # Temporary files
 *.tmp
 *.orig
+
+# Finder metadata
+**/.DS_Store
