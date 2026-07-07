@@ -35,26 +35,9 @@ Update this table at the completion of every sprint. It provides the authoritati
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
 
-ImportCoordinator
-↓
-PasswordProvider
-↓
-ReaderRegistry
-↓
-Reader
-↓
-FinancialDocument
-↓
-Institution Detection
-↓
-Document Classification
-↓
-Parser Selection
-↓
-Statement Parser
-↓
-Validation
-↓
+## Canonical Import Pipeline
+
+```text
 ImportCoordinator
 ↓
 PasswordProvider
@@ -86,7 +69,6 @@ Stores
 ViewModels
 ↓
 Dashboard
-```
 ```
 
 ## Documentation Index
