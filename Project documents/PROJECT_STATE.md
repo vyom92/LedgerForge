@@ -210,17 +210,40 @@ Completed
 
 ---
 
+# Sprint 20
+
+## Objective
+Refine the repository-backed dashboard foundation built in Sprint 19 without changing import, parser, validation or repository semantics.
+
+## Status
+Completed
+
+## Outcome
+- Dashboard presentation state refined for loading, empty, loaded and failed hydration outcomes.
+- `DashboardViewModel` now exposes store-derived account summaries and recent transaction summaries.
+- `ContentView` now consumes dashboard presentation state from `DashboardViewModel` while remaining the startup hydration trigger.
+- `DashboardViewModelTests` added.
+- Existing transaction search and credit/debit toggle behaviour preserved.
+- Import, parser, validation, repository semantics, financial truth and transaction extraction preserved.
+- 77 active tests passed through Xcode.
+- Build passed.
+- Commit: `d327576`
+- Git push to `origin/main` completed successfully.
+- Git tag: `sprint-20`
+
+---
+
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `65b18f7`
-- Latest Tag: `sprint-19`
+- Latest Commit: `d327576`
+- Latest Tag: `sprint-20`
 - Latest ADR: ADR-022 — Preview Compatibility During Test Builds
-- Architecture Baseline: Sprint 19
-- Latest Milestone: Dashboard Foundation (Phase 1)
+- Architecture Baseline: Sprint 20
+- Latest Milestone: Dashboard Foundation continuation
 - Build: Passing
-- Validation: Build passing; full regression baseline passing. Sprint 19 validation complete.
+- Validation: Build passing; full regression baseline passing. Sprint 20 validation complete.
 
 ## Session Startup Order
 1. AGENTS.md
@@ -256,14 +279,14 @@ Dashboard
 
 ## Current Work
 
-Active Sprint: Sprint 20
+Active Sprint: Sprint 21
 
 Objective:
 - Dashboard Foundation continuation.
 
 Scope:
 - Planning required before implementation.
-- Preserve validated import, persistence and repository boundaries from Sprint 19.
+- Preserve validated import, persistence and repository boundaries from Sprint 20.
 - Dashboard work must consume repository-backed data rather than bypass repository boundaries.
 - Startup hydration must remain deterministic and execute exactly once per application launch unless an explicit refresh is requested.
 

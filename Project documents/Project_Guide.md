@@ -5,12 +5,12 @@ This is the canonical project operating manual. Read this document first, then u
 ## Current Project Snapshot
 
 - **Current Milestone:** M7 – Dashboard Experience
-- **Current Sprint:** Sprint 20
+- **Current Sprint:** Sprint 21
 - **Current Phase:** Dashboard Foundation continuation
 - **Build Status:** Passing
-- **Validation Status:** Build passing; full regression baseline passing. Sprint 19 validation complete.
+- **Validation Status:** Build passing; full regression baseline passing. Sprint 20 validation complete.
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 19
+- **Current Codex Baseline:** Sprint 20
 
 ## Current Architecture Status
 
@@ -29,9 +29,9 @@ This is the canonical project operating manual. Read this document first, then u
 | Parser Selection | Framework implemented; deterministic selector active |
 | FinancialDocument | Immutable handoff model integrated after Statement Parser and before Validation |
 | Password Management | Operational; DefaultPasswordProvider integrated |
-| Dashboard | Foundation active; repository-backed runtime store hydration implemented |
+| Dashboard | Foundation Phase 2 complete; repository-backed runtime store hydration, accounts overview and recent transaction summaries implemented. |
 | Investments | Future module |
-| Validation | Build passing; full regression baseline passing. Sprint 19 validation complete |
+| Validation | Build passing; full regression baseline passing. Sprint 20 validation complete |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -209,6 +209,8 @@ Additionally:
 - Add new files to the correct Xcode target.
 - Add new files to the Xcode navigator.
 - Preserve existing behaviour unless the sprint explicitly changes it.
+- Preserve the approved presentation pipeline:
+  Repository Persistence → RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
 - If an architectural conflict is discovered, stop implementation and document it in Project documents/Codex response.md.
 
 ## Standard AI Workflow
@@ -240,12 +242,15 @@ Additionally:
 - Push to the tracked branch (normally `origin/main`).
 - Push the sprint tag if one was created.
 - Maintain Project documents/Codex response.md during implementation.
+- Record significant architectural decisions, implementation rationale and validation exceptions as they occur rather than reconstructing them at sprint completion.
 - After a successful build, required validation, commit, push and tag (if applicable), update `Project documents/PROJECT_STATE.md` with the verified repository state.
 - Record the commit hash, tag and push result in Project documents/Codex response.md.
 - If the build or required sprint validation fails, do not commit or push. Record the failure and stop.
 - Keep changes limited to the approved sprint.  
 - Keep commits logically grouped.
 - Prefer extending existing architecture over introducing parallel implementations.
+- Reuse existing repository contracts where practical. Introduce new repository APIs only when existing contracts cannot express the required behaviour cleanly.
+- Repository-backed runtime store hydration remains the only approved persistence → presentation boundary.
 
 ### 3. Before stopping
 
@@ -254,13 +259,13 @@ Additionally:
 - Include summary, files created, files modified, build result, validation result, commit hash (if committed), tag (if created), push result, documentation updated, remaining technical debt, deferred items and next recommended sprint.  
 - Stop exactly at the approved sprint boundary.  
 - Confirm the repository builds successfully before considering the sprint complete.
+- Verify Project_Guide.md, PROJECT_STATE.md and Codex response.md are mutually consistent before closing the sprint.
 
 ## Sprint Roadmap
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16, Sprint 17, Sprint 18, Sprint 19
-- **Current Sprint:** Sprint 20 – Dashboard Foundation continuation
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16, Sprint 17, Sprint 18, Sprint 19, Sprint 20
+- **Current Sprint:** Sprint 21 – Dashboard Foundation continuation
 - **Upcoming Sprints:**
-  - Sprint 21 – Dashboard Foundation
   - Sprint 22–24 – Insights & Analytics
   - Sprint 25+ – Multi-Currency, Investments & Ecosystem
 
@@ -300,18 +305,18 @@ Additionally:
 ### M7 – Dashboard Experience 🚧
 - Repository-backed startup hydration ✅
 - Accounts overview ✅
-- Transaction browsing 🚧
-- Dashboard refinement
+- Transaction browsing ✅
+- Dashboard refinement 🚧
 - Search
 - Filters
 - Trends
 
-### M8 – Insights
+### M8 – Insights & Analytics
 - Spending analytics
 - Budgets
 - Smart alerts
 
-### M9 – Ecosystem
+### M9 – Financial Ecosystem
 - Multi-currency
 - Investments
 - Public API
