@@ -258,8 +258,7 @@
 			path = Coordinator;
 			sourceTree = "<group>";
 		};
-<<<<<<< Updated upstream
-=======
+
 		281BB1C22FFCBF13006E7424 /* Readers */ = {
 			isa = PBXGroup;
 			children = (
@@ -270,7 +269,7 @@
 			path = Readers;
 			sourceTree = "<group>";
 		};
->>>>>>> Stashed changes
+
 		288EB0A42FF7955200F09BC9 = {
 			isa = PBXGroup;
 			children = (

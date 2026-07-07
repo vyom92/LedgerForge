@@ -4,15 +4,7 @@ This is the mandatory first document every AI assistant and engineer must read b
 
 ## Current Project Snapshot
 
-<<<<<<< Updated upstream
-- **Current Milestone:** Milestone B
-- **Current Sprint:** <Update after every sprint>
-- **Current Phase:** <Update after every sprint>
-- **Build Status:** <Passing / Failing>
-- **Test Status:** <Summary>
-- **Last Architecture Review:** <YYYY-MM-DD>
-- **Current Codex Baseline:** <Sprint tag>
-=======
+
 - **Current Milestone:** Milestone C
 - **Current Sprint:** Sprint 12B
 - **Current Phase:** PDF Reader Foundation Complete
@@ -20,7 +12,7 @@ This is the mandatory first document every AI assistant and engineer must read b
 - **Test Status:** 17 tests passing
 - **Last Architecture Review:** 2026-07-07
 - **Current Codex Baseline:** Sprint 12A
->>>>>>> Stashed changes
+
 
 ## Current Architecture Status
 
@@ -28,24 +20,7 @@ Update this table at the completion of every sprint. It provides the authoritati
 
 | Component             | Status/Notes                      |
 |-----------------------|---------------------------------|
-<<<<<<< Updated upstream
-| Product Vision        |                                 |
-| Architecture         |                                 |
-| ADRs                 |                                 |
-| Database             |                                 |
-| Repository Layer     |                                 |
-| Persistence          |                                 |
-| Import Framework     |                                 |
-| Readers              |                                 |
-| Institution Detection|                                 |
-| Password Management  |                                 |
-| Dashboard            |                                 |
-| Investments          |                                 |
-| Testing              |                                 |
-| Documentation        |                                 |
-| Import Pipeline      |                                 |
-| Repository Contract Tests |                             |
-=======
+
 | Product Vision | Current and authoritative |
 | Architecture | Frozen v1.0 baseline active |
 | ADRs | Current through ADR-018 |
@@ -62,19 +37,12 @@ Update this table at the completion of every sprint. It provides the authoritati
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
->>>>>>> Stashed changes
+
 
 ## Architecture Map
 
 ```text
-<<<<<<< Updated upstream
-User
- │
- ▼
-Views
- │
- ▼
-=======
+
 ImportCoordinator
 ↓
 PasswordProvider
@@ -105,7 +73,7 @@ SQLite
 ↓
 Stores
 ↓
->>>>>>> Stashed changes
+
 ViewModels
  │
  ▼
@@ -310,49 +278,35 @@ Additionally:
 
 ## Sprint Roadmap
 
-<<<<<<< Updated upstream
-- **Completed Sprints:**  
-- **Current Sprint:**  
-- **Upcoming Sprints:**  
 
-=======
 - **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A
 - **Current Sprint:** Sprint 12B – Axis PDF Baseline Verification
 - **Upcoming Sprints:**
   - Sprint 12C – Institution Detection Framework
   - Sprint 13 – ImportViewModel & Import Diagnostics
   
->>>>>>> Stashed changes
+
 ## Known Technical Debt
 
 Maintain a concise list of active architectural and implementation debt.
 
 Typical entries include:
 
-<<<<<<< Updated upstream
-- Repository improvements.
-- Import framework work in progress.
-- Deferred parser support.
-- Testing gaps.
-- Performance improvements.
-=======
+
 - ImportEngine still owns analysis, normalization, parser selection, validation and store updates.
 - Axis PDF regression fixture still required for cross-format verification.
 - Institution Detection Framework not yet implemented.
 - Additional approved regression fixtures should be added for future institutions (CBQ, HDFC, SBI, etc.).
 - Additional import fixtures should compare equivalent financial truth across CSV and PDF where available.
->>>>>>> Stashed changes
+
 
 Remove items as they are completed.
 
 ## Future Modules
 
-<<<<<<< Updated upstream
-- Universal Import Framework
-- PDF Reader
-=======
+
 - Institution Detection Framework
->>>>>>> Stashed changes
+
 - XLS/XLSX Reader
 - OCR
 - Institution Detection
