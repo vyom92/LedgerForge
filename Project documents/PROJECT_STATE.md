@@ -1,25 +1,15 @@
-//
-//  Untitled.swift
-//  LedgerForge
-//
-//  Created by Vyom on 07/07/26.
-//
 
+# PROJECT STATE
 
-# Sprint History
+This document is the permanent, authoritative handoff between development sessions.
 
-This document is the authoritative handoff record between development sessions. It provides a deterministic snapshot of the project state for both humans and AI assistants.
+It records only verified project state. Temporary planning, implementation notes, build logs and reasoning belong in `Project documents/Codex response.md`.
 
----
-
-# How to Use
-
-At the completion of every sprint:
-
-1. Add a new sprint entry.
-2. Update the AI Handoff section.
-3. Commit the document with the sprint.
-4. Never rewrite previous sprint history except to correct factual errors.
+Principles:
+- Facts only.
+- Repository-verifiable information only.
+- Minimal manual editing.
+- Updated only after successful build, required tests, commit and push.
 
 ---
 
@@ -60,22 +50,25 @@ Completed
 
 ---
 
-# AI Handoff
+# Current Project State
 
-## Repository State
-- Branch: `main`
-- Latest Architecture Baseline: Sprint 12C
-- Build Status: Passing
-- Test Status: 37 tests passing
+## Repository
+- Primary Branch: `main`
+- Latest Commit: `e3c557c`
+- Latest Tag: `sprint-12c-complete`
+- Architecture Baseline: Sprint 12C
+- Latest Milestone: Institution Detection Framework
+- Build: Passing
+- Tests: 37 passing across 9 suites
 
-## Required Reading
+## Session Startup Order
 1. AGENTS.md
 2. Project_Guide.md
-3. Latest ADR
-4. Project documents/Codex response.md
-5. Sprint History.md
+3. PROJECT_STATE.md
+4. ADR-020 — Deterministic Institution Detection
+5. Project documents/Codex response.md
 
-## Current Architecture
+## Current Pipeline
 Import Pipeline:
 
 Reader
@@ -96,18 +89,17 @@ Repositories
 ↓
 Dashboard
 
-## Active Technical Debt
-- ImportEngine still owns too many responsibilities.
-- Additional approved fixtures required for future institutions.
-- Swift 6 concurrency warnings remain in RepositoryContractTests.
+## Current Work
 
-## Next Sprint
-Sprint 13 — Statement Classification Framework.
+Active Sprint: Sprint 13
+
+Objective:
+- Statement Classification Framework.
 
 Scope:
-- Introduce deterministic statement classification.
+- Deterministic statement classification.
 - Preserve institution detection behaviour.
-- Keep parser selection independent from file format.
+- Maintain parser selection independence.
 
 Out of Scope:
 - Parser rewrites
