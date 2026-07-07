@@ -1,132 +1,144 @@
 # Codex Response
 
-# Sprint 12B - Implementation: Axis PDF Baseline Verification
+## Sprint 12C Summary
 
-## Summary
+Sprint 12C implementation added a deterministic, framework-compatible Institution Detection foundation scoped to approved Axis CSV/PDF fixtures.
 
-Implemented Sprint 12B as a test-only verification sprint.
+Implemented:
 
-The approved Axis Bank PDF fixture is now verified through `PDFDocumentReader` at the `RawDocument.text` boundary. The test asserts fixture presence, PDF reader extraction, statement identifiers, expected statement dates, opening balance, transaction totals and closing balance using deterministic text normalization.
+- Added a signature/rule-based detector for institution detection.
+- Preserved the existing legacy `InstitutionDetector().detect(from:)` API and observable Axis/unknown behavior.
+- Added framework-compatible detection through `ImportFramework.InstitutionDetector` using `RawDocument`.
+- Added explainable detection reasons through `ImportInstitutionCandidate.reasons` without breaking existing initializer call sites.
+- Added focused tests for Axis CSV detection, Axis PDF detection, unknown documents, detection reasons, confidence behavior and non-text `RawDocument` handling.
 
-No PDF parsing, production pipeline changes, repository changes, UI changes, institution detection framework, OCR, XLS/XLSX support, Keychain work, password prompt UI or Sprint 12C work was implemented.
+Not implemented:
 
-## Files Modified
-
-- `LedgerForgeTests/PDFDocumentReaderTests.swift`
-  - Required to make the approved Axis PDF fixture mandatory instead of optional.
-  - Added RawDocument text extraction verification for the approved Axis PDF.
-  - Added normalized text assertions for statement identifiers, expected dates, opening balance, transaction totals and closing balance.
-  - Kept encrypted PDF tests fixture-conditional because no approved encrypted fixture was part of Sprint 12B.
-
-- `LedgerForgeTests/DefaultReaderRegistryTests.swift`
-  - Required to preserve existing reader registry behavior after PDF became a supported format.
-  - Fixed the PDF resolution test to use `.pdf`.
-  - Fixed the unsupported-extension coordinator test to use `.ofx`.
-
-- `Project documents/Codex response.md`
-  - Updated with Sprint 12B implementation results.
+- No parser rewrites.
+- No transaction extraction changes.
+- No validation changes.
+- No repository changes.
+- No UI changes.
+- No OCR.
+- No AI inference.
+- No Keychain changes.
+- No XLS/XLSX support.
+- No Sprint 13 work.
+- No PDF transaction parsing.
+- No fixture movement or fixture content changes.
+- No production `ImportEngine` routing change to the new detector.
 
 ## Files Created
 
-- `LedgerForgeTests/TestSupport/AxisBaselineExpectation.swift`
-  - Required so PDF baseline tests decode approved expected values from `axis_bank_nre_account_statement_baseline.expected.json` instead of duplicating financial constants in test code.
+- `Detectors/SignatureInstitutionDetector.swift`
+  - Adds `SignatureInstitutionDetector`, `InstitutionDetectionRule`, `InstitutionSignature` and `InstitutionDetectionResult`.
+  - Provides deterministic Axis Bank detection from extracted text.
+  - Conforms to `ImportFramework.InstitutionDetector` and detects from `RawDocument`.
 
-## Tests Added Or Updated
+- `LedgerForgeTests/InstitutionDetectionTests.swift`
+  - Adds Axis CSV detection coverage.
+  - Adds Axis PDF detection coverage.
+  - Adds unknown document coverage.
+  - Adds detection reason and confidence checks.
+  - Adds legacy detector parity checks.
+  - Adds non-text `RawDocument` handling coverage.
 
-Updated `PDFDocumentReaderTests` to cover:
+## Files Modified
 
-- Approved Axis PDF fixture exists.
-- `PDFDocumentReader` returns `RawDocument` for the approved Axis PDF fixture.
-- `RawDocument.content` is text and is non-empty after normalization.
-- Extracted PDF text contains the expected Axis Bank identifier.
-- Extracted PDF text contains the expected NRE savings account identifier.
-- Extracted PDF text contains expected currency text.
-- Extracted PDF text contains expected first and last transaction dates from the approved JSON baseline.
-- Extracted PDF text contains expected opening balance from the approved JSON baseline.
-- Extracted PDF text contains expected debit and credit transaction totals from the approved JSON baseline.
-- Extracted PDF text contains expected closing balance from the approved JSON baseline, including PDFKit's observed leading-zero omission for `.16`.
+- `Detectors/DocumentMetadata.swift`
+  - Added `Equatable` and `Sendable` conformance to metadata enums and `DocumentMetadata` so detector results can be compared safely in tests and used by sendable framework-facing detection code.
 
-Updated `DefaultReaderRegistryTests` to keep existing framework expectations aligned:
+- `Detectors/InstitutionDetector.swift`
+  - Preserved the legacy detector API.
+  - Delegates matching to `SignatureInstitutionDetector` so legacy and framework detection use the same deterministic signature rules.
+  - Added `detectWithReasons(from:)` for explainable detection without changing existing call sites.
 
-- `.pdf` resolves to `PDFDocumentReader`.
-- `.ofx` remains unsupported and returns `ImportError.readerUnavailable(extension: "ofx")`.
+- `Import/Protocols/ImportInstitutionDetector.swift`
+  - Extended `ImportInstitutionCandidate` with `reasons: [String]`.
+  - Kept the existing initializer source-compatible by defaulting `reasons` to an empty array.
+
+- `LedgerForge.xcodeproj/project.pbxproj`
+  - Updated automatically by Xcode tooling when adding new Sprint 12C files to the navigator and target membership.
+  - This file was not manually edited.
+
+- `Project documents/Codex response.md`
+  - Updated with this Sprint 12C implementation status and validation result.
 
 ## Build Result
 
-A command-line build was run with workspace-local DerivedData:
-
-```text
-xcodebuild -project LedgerForge.xcodeproj -scheme LedgerForge -configuration Debug -derivedDataPath ./DerivedData-Local build
-```
-
-Result: failed before useful Sprint 12B validation due existing SwiftUI preview macro plugin errors in unrelated UI files:
-
-```text
-ContentView.swift:178:1: error: external macro implementation type 'PreviewsMacros.SwiftUIView' could not be found for macro 'Preview(_:body:)'; '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server' produced malformed response
-DocumentPreviewView.swift:65:1: error: external macro implementation type 'PreviewsMacros.SwiftUIView' could not be found for macro 'Preview(_:body:)'; '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server' produced malformed response
-DeveloperConsoleView.swift:42:1: error: external macro implementation type 'PreviewsMacros.SwiftUIView' could not be found for macro 'Preview(_:body:)'; '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server' produced malformed response
-TransactionListView.swift:167:1: error: external macro implementation type 'PreviewsMacros.SwiftUIView' could not be found for macro 'Preview(_:body:)'; '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server' produced malformed response
-```
-
-The Xcode MCP `BuildProject` tool also reported a successful build result but still surfaced stale diagnostics for a root-level `PDFDocumentReader.swift` build input. A direct `xcodebuild` compile showed the actual source paths now compile from:
-
-```text
-Import/Readers/DefaultReaderRegistry.swift
-Import/Readers/PDFDocumentReader.swift
-Import/Readers/CSVDocumentReaderAdapter.swift
-Import/Password/DefaultPasswordProvider.swift
-```
+- Xcode MCP `BuildProject`: Passed.
+- Result: `The project built successfully.`
+- Errors: none reported by `BuildProject` after Sprint 12C changes.
 
 ## Test Result
 
-The requested test selection was run with workspace-local DerivedData:
+Required test command attempted:
 
 ```text
-xcodebuild test -project LedgerForge.xcodeproj -scheme LedgerForge -destination 'platform=macOS,arch=arm64' -derivedDataPath ./DerivedData-Local -only-testing:LedgerForgeTests/PDFDocumentReaderTests -only-testing:LedgerForgeTests/CSVImportRegressionTests -only-testing:LedgerForgeTests/CSVDocumentReaderAdapterTests -only-testing:LedgerForgeTests/DefaultReaderRegistryTests -only-testing:LedgerForgeTests/PasswordProviderTests -only-testing:LedgerForgeTests/ImportFrameworkTests
+xcodebuild -project LedgerForge.xcodeproj -scheme LedgerForge -configuration Debug -destination 'platform=macOS' -derivedDataPath /tmp/LedgerForgeDerivedData test -only-testing:LedgerForgeTests/InstitutionDetectionTests -only-testing:LedgerForgeTests/CSVImportRegressionTests -only-testing:LedgerForgeTests/PDFDocumentReaderTests -only-testing:LedgerForgeTests/ImportFrameworkTests -only-testing:LedgerForgeTests/DefaultReaderRegistryTests -only-testing:LedgerForgeTests/PasswordProviderTests
 ```
 
-Result: failed before tests executed due the same existing SwiftUI preview macro plugin errors. No Sprint 12B test assertion failures were observed because the test runner did not reach test execution.
+Result: Failed before tests completed.
 
-Manual PDFKit extraction verification was performed outside the project test runner using the approved PDF fixture. The extracted text contains the approved baseline values needed by the new assertions:
+Failure:
 
-- Axis/NRE/currency identifiers are observable.
-- Expected dates from the approved JSON baseline are observable.
-- Opening balance is observable.
-- Debit and credit transaction totals are observable.
-- Closing balance is observable as `.16`, matching PDFKit's extracted text form for approved `0.16`.
+```text
+External macro implementation type 'PreviewsMacros.SwiftUIView' could not be found for macro 'Preview(_:body:)'; '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server' produced malformed response
+```
+
+Additional note:
+
+- An earlier test attempt without an isolated DerivedData path failed because `xcodebuild` could not write to the default DerivedData/log folders under the sandbox.
+- Retrying with `/tmp/LedgerForgeDerivedData` progressed further but failed at Swift module emission due to the SwiftUI preview macro plugin error above.
+- Because required tests did not pass, no commit or push was performed.
 
 ## Behavioural Impact
 
-No production financial behavior changed.
-
-Sprint 12B changed only test coverage and test support. The PDF reader remains a reader-only component that extracts text into `RawDocument`. No parser, validator, repository, store, dashboard or UI behavior was changed.
+- Existing production `ImportEngine` still calls `InstitutionDetector().detect(from:)`.
+- The legacy detector still returns Axis Bank / Bank Account / confidence `0.98` when text contains Axis signatures.
+- Unknown text still returns unknown institution, unknown document type and confidence `0.0`.
+- CSV, PDF, parser, validation, repository and UI behavior were not intentionally changed.
 
 ## Architecture Decisions
 
-- PDF baseline verification remains at the `RawDocument.text` boundary.
-- Expected financial values are loaded from the approved JSON fixture through `AxisBaselineExpectation` instead of duplicated as constants in PDF tests.
-- PDF text comparisons normalize whitespace and commas, but do not infer layout, parse transactions or alter financial meaning.
-- Transaction count was not asserted from PDF text because it is not directly represented as a transaction-count field in the extracted PDF text.
+- Institution detection now has a framework-compatible `RawDocument` entry point while preserving the legacy synchronous text detector.
+- Detection remains deterministic and rule/signature-based.
+- Detection reasons are included as lightweight strings on `ImportInstitutionCandidate` so automated detection remains explainable.
+- Axis signatures currently include:
+  - `AXIS BANK`
+  - `UTIB`
+  - `STATEMENT OF AXIS ACCOUNT`
+- PDF and CSV are treated identically after reader extraction because detection operates on normalized text, not file layout or parser output.
+
+## Merge Marker Check
+
+- Strict conflict-marker scan completed.
+- No unresolved conflict markers were found.
+
+## Commit Result
+
+- Not committed.
+- Not pushed.
+- Reason: required tests failed during Swift module emission because the SwiftUI preview macro plugin failed.
 
 ## Remaining Technical Debt
 
-- The command-line build and test runner are currently blocked in this environment by SwiftUI `#Preview` macro plugin failures in existing UI files.
-- Xcode MCP `BuildProject` still reports stale diagnostics for a root-level `PDFDocumentReader.swift` input even though command-line build output shows the Import reader files compiling from their correct paths.
-- Approved encrypted PDF fixture coverage remains deferred; existing encrypted PDF tests stay conditional.
-- PDF parsing remains intentionally unimplemented.
-- Institution Detection Framework remains intentionally unimplemented.
+- Production `ImportEngine` still performs institution detection after `RawDocument` extraction and before CSV analysis/parser selection.
+- `FinancialDocument` convergence remains future architecture work.
+- Detection currently has only Axis rules; future institutions require approved fixtures and deterministic signatures.
+- The test runner is currently blocked by the SwiftUI preview macro plugin failure when using command-line `xcodebuild test`.
 
 ## Remaining Risks
 
-- PDFKit text extraction can remain sensitive to Apple PDFKit behavior changes, especially whitespace and amount formatting.
-- Future PDF fixtures may require additional normalization rules if text extraction differs materially.
-- Since tests could not execute in this sandbox, final pass/fail confirmation should be performed in Xcode or a non-sandboxed `xcodebuild test` environment.
+- The new detector has not been validated by a successful required test run because `xcodebuild test` failed before tests completed.
+- Future PDF extraction text changes may affect signature matching if Axis identifiers change or disappear from extracted text.
+- Adding more institutions will require careful rule ordering and confidence policy to avoid false positives.
 
-## Recommended Sprint 12C Objective
+## Next Recommended Sprint
 
-Sprint 12C should implement the Institution Detection Framework foundation only:
+Do not begin Sprint 13 until Sprint 12C test validation is unblocked.
 
-- Keep reader/parsing boundaries intact.
-- Do not parse PDF transactions unless explicitly approved.
-- Route detection through framework abstractions without changing existing financial behavior.
-- Preserve the Axis CSV and PDF reference fixture baselines.
+Recommended next action:
+
+- Resolve the command-line SwiftUI preview macro plugin test failure or run the required tests successfully inside Xcode.
+- After tests pass, commit and push the Sprint 12C changes per the project workflow.

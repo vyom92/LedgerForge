@@ -499,3 +499,62 @@ Using approved reference fixtures creates a deterministic financial baseline tha
 - ADR-012 — Separation of Readers and Parsers
 - ADR-017 — Deterministic Before Intelligent
 - ADR-018 — Unified Import Framework Operational
+
+---
+
+# ADR-020 — Deterministic Institution Detection
+
+## Status
+
+Accepted
+
+## Implemented In
+
+Sprint 12C
+
+## Decision
+
+Institution Detection is a dedicated architectural stage within the import pipeline.
+
+Detection operates exclusively on extracted document content and is independent of the original file format.
+
+Institution Detection executes after document extraction and before Statement Classification and Parser Selection.
+
+Unknown documents must remain unknown unless deterministic evidence is sufficient to identify an institution.
+
+Institution Detection must remain:
+
+- Deterministic
+- Explainable
+- Repeatable
+- Format-independent
+
+Artificial intelligence must not participate in institution identification.
+
+## Rationale
+
+The same financial institution may provide statements in multiple formats, including CSV, PDF and future XLS/XLSX documents. Identifying the institution should therefore depend on document content rather than the transport format.
+
+Separating Institution Detection from parser selection keeps responsibilities independent, allows new readers without architectural changes, and prevents parser-specific assumptions from leaking into document extraction.
+
+Deterministic rules preserve reproducibility, simplify regression testing and ensure users can understand why a document was attributed to a particular institution.
+
+## Consequences
+
+- Institution Detection becomes a permanent architectural stage.
+- Readers remain responsible only for document extraction.
+- Statement Classification and Parser Selection remain downstream consumers of the detected institution.
+- Unknown documents remain explicitly unknown rather than guessed.
+- Detection decisions should expose sufficient reasoning for debugging and future inspection.
+- Approved CSV and PDF reference fixtures verify identical institution detection behaviour across supported formats.
+- Legacy institution detection behaviour must be preserved during framework evolution.
+
+## Related ADRs
+
+- ADR-003 — Generic Import Engine
+- ADR-011 — Unified FinancialDocument Pipeline
+- ADR-012 — Separation of Readers and Parsers
+- ADR-016 — Universal Import Pipeline
+- ADR-017 — Deterministic Before Intelligent
+- ADR-018 — Unified Import Framework Operational
+- ADR-019 — Reference Fixtures Define Financial Truth
