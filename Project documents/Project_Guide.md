@@ -167,7 +167,7 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 ## Repository Structure
 
 - **Database:** Contains database schema definitions and migration scripts.  
-- **Import:** MUnified Import Framework including coordinators, registries, readers, protocols and import models.  
+- **Import:** Unified Import Framework including coordinators, registries, readers, protocols and import models.  
 - **Models:** Domain models and business logic entities.  
 - **Stores:** Data persistence and repository layer implementations.  
 - **ViewModels:** Presentation logic for UI components.  
