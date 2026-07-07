@@ -99,6 +99,20 @@ rg -n "^(<<<<<<<|=======|>>>>>>>)" .
 
 No unresolved merge conflict markers found.
 
+## Commit And Push Result
+
+Implementation commit:
+
+```text
+29c50a9970e74396a7d9be4391efea59b77df4c9
+```
+
+Implementation push result:
+
+```text
+origin/main updated to 29c50a9970e74396a7d9be4391efea59b77df4c9
+```
+
 ## Behavioural Impact
 
 No user-visible behaviour changed.
@@ -125,13 +139,11 @@ Approved Axis CSV financial truth remains unchanged:
 - `Project documents/Codex response.md`
   - Updated with implementation, build and validation results.
 
-Pending after implementation commit and push:
-
 - `Project documents/PROJECT_STATE.md`
-  - Must be updated only after successful commit and push.
+  - Updated after successful implementation commit and push to mark Sprint 15 complete and Sprint 16 active.
 
 - `Project documents/Project_Guide.md`
-  - Must be synchronized after Sprint 15 completion.
+  - Synchronized current sprint, phase, validation status and roadmap after Sprint 15 completion.
 
 ## Remaining Technical Debt
 
@@ -159,4 +171,3 @@ Sprint 16 - StatementParser returns FinancialDocument.
 Recommended objective:
 
 - Migrate the parser protocol so statement parsers return `FinancialDocument` directly while preserving the approved Axis CSV financial baseline and existing validation behaviour.
-

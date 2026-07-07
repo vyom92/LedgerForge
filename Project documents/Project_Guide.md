@@ -6,12 +6,12 @@ This is the canonical project operating manual. Read this document first, then u
 
 
 - **Current Milestone:** Milestone C
-- **Current Sprint:** Sprint 15
-- **Current Phase:** Parser Selection Framework Complete
+- **Current Sprint:** Sprint 16
+- **Current Phase:** FinancialDocument Integration Complete
 - **Build Status:** Passing
-- **Test Status:** 42 required Sprint 14 regression tests passing
+- **Validation Status:** Build passing; required Sprint 15 regression suite passing (46 selected tests).
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 14
+- **Current Codex Baseline:** Sprint 15
 
 
 ## Current Architecture Status
@@ -29,10 +29,11 @@ This is the canonical project operating manual. Read this document first, then u
 | Institution Detection | Framework implemented; legacy behaviour preserved |
 | Statement Classification | Framework implemented; deterministic classification active |
 | Parser Selection | Framework implemented; deterministic selector active |
+| FinancialDocument | Immutable handoff model integrated after Statement Parser and before Validation |
 | Password Management | Operational; DefaultPasswordProvider integrated |
 | Dashboard | Existing dashboard unchanged |
 | Investments | Future module |
-| Testing | 42 required Sprint 14 regression tests passing |
+| Validation | Build passing; required Sprint 15 regression suite passing (46 selected tests) |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -233,7 +234,7 @@ Additionally:
 - Verify there are no unresolved merge conflict markers.
 - Generate a concise commit message describing the completed sprint work.
 - Commit the sprint changes.
-- Push to `origin/main`.
+- Push to the tracked branch (normally `origin/main`).
 - Maintain Project documents/Codex response.md during implementation.
 - After a successful build, required tests, commit and push, update Project documents/PROJECT_STATE.md with the verified repository state.
 - Record the commit hash, tag and push result in Project documents/Codex response.md.
@@ -246,17 +247,17 @@ Additionally:
 
 - Update Project documents/Codex response.md throughout the sprint.
 - After a successful build, required tests, commit and push, update Project documents/PROJECT_STATE.md with the verified repository state.
-- Include summary, files created, files modified, build result, test result, commit hash (if committed), push result, documentation updated, remaining technical debt, deferred items and next recommended sprint.  
+- Include summary, files created, files modified, build result, validation result, commit hash (if committed), tag (if created), push result, documentation updated, remaining technical debt, deferred items and next recommended sprint.  
 - Stop exactly at the approved sprint boundary.  
 - Confirm the repository builds successfully before considering the sprint complete.
 
 ## Sprint Roadmap
 
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14
-- **Current Sprint:** Sprint 15 – FinancialDocument Integration
+- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15
+- **Current Sprint:** Sprint 16 – StatementParser returns FinancialDocument
 - **Upcoming Sprints:**
-  - Sprint 16 – To be defined
+  - Sprint 17 – To be defined
 
 ## Known Technical Debt
 
@@ -265,6 +266,7 @@ Maintain a concise list of active architectural and implementation debt.
 Current items:
 
 - ImportEngine still owns analysis, normalization, parser selection, validation and store updates.
+- StatementParser still returns `[Transaction]`; Sprint 16 is planned to migrate parser return type to `FinancialDocument`.
 - Additional approved regression fixtures should be added for future institutions (CBQ, HDFC, SBI, etc.).
 - Additional import fixtures should compare equivalent financial truth across CSV and PDF where available.
 

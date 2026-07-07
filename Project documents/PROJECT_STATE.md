@@ -85,6 +85,28 @@ Completed
 - 42 required Sprint 14 regression tests passed through Xcode.
 - Build passed.
 - Commit: `da117422d47ef9fe6f09fdfe110f88f54182b590`
+- Git push to `origin/main` completed successfully.
+
+---
+
+# Sprint 15
+
+## Objective
+Introduce FinancialDocument as the canonical immutable handoff after Statement Parser and before Validation.
+
+## Status
+Completed
+
+## Outcome
+- Immutable FinancialDocument model implemented.
+- FinancialDocumentBuilder implemented without financial recalculation.
+- ImportValidator gained a FinancialDocument validation entry point that delegates to transaction validation.
+- ImportEngine now validates through FinancialDocument after parser execution.
+- Existing parser extraction, validation, repository, store and UI behaviour preserved.
+- 46 required Sprint 15 regression tests passed through Xcode.
+- Build passed.
+- Commit: `29c50a9970e74396a7d9be4391efea59b77df4c9`
+- Git push to `origin/main` completed successfully.
 
 ---
 
@@ -92,12 +114,12 @@ Completed
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `da117422d47ef9fe6f09fdfe110f88f54182b590`
-- Latest Tag: `sprint-13-complete`
-- Architecture Baseline: Sprint 14
-- Latest Milestone: Parser Selection Framework
+- Latest Commit: `29c50a9970e74396a7d9be4391efea59b77df4c9`
+- Latest Tag: `sprint-14-complete`
+- Architecture Baseline: Sprint 15
+- Latest Milestone: FinancialDocument Integration
 - Build: Passing
-- Tests: 42 required Sprint 14 regression tests passing
+- Validation: Build passing; required Sprint 15 regression suite passing (46 selected tests).
 
 ## Session Startup Order
 1. AGENTS.md
@@ -131,15 +153,15 @@ Dashboard
 
 ## Current Work
 
-Active Sprint: Sprint 15
+Active Sprint: Sprint 16
 
 Objective:
-- FinancialDocument Integration.
+- StatementParser returns FinancialDocument.
 
 Scope:
-- Integrate deterministic import stages into a FinancialDocument handoff.
-- Preserve parser extraction rules.
-- Preserve validation, repository persistence and UI behaviour.
+- Migrate parser return type to FinancialDocument.
+- Preserve approved Axis CSV financial truth.
+- Preserve existing validation, repository persistence and UI behaviour.
 
 Out of Scope:
 - Transaction extraction changes
