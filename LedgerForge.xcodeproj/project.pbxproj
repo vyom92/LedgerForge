@@ -34,7 +34,6 @@
 		286242632FFCE80D00B8AA66 /* DefaultPasswordProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2862424A2FFCE80D00B8AA66 /* DefaultPasswordProvider.swift */; };
 		2862426F2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */; };
 		286D63F02FFD3057000CEC65 /* FinancialDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D63EF2FFD3057000CEC65 /* FinancialDocument.swift */; };
-		286D63F22FFD3065000CEC65 /* FinancialDocumentBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D63F12FFD3065000CEC65 /* FinancialDocumentBuilder.swift */; };
 		2872790D2FFD286100468973 /* ParserSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790C2FFD286100468973 /* ParserSelection.swift */; };
 		2872790F2FFD287300468973 /* StatementParserSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790E2FFD287300468973 /* StatementParserSelector.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
@@ -124,7 +123,6 @@
 		2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureInstitutionDetector.swift; sourceTree = "<group>"; };
 		286242762FFD168100B8AA66 /* PROJECT_STATE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PROJECT_STATE.md; sourceTree = "<group>"; };
 		286D63EF2FFD3057000CEC65 /* FinancialDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialDocument.swift; sourceTree = "<group>"; };
-		286D63F12FFD3065000CEC65 /* FinancialDocumentBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialDocumentBuilder.swift; sourceTree = "<group>"; };
 		2872790C2FFD286100468973 /* ParserSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserSelection.swift; sourceTree = "<group>"; };
 		2872790E2FFD287300468973 /* StatementParserSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementParserSelector.swift; sourceTree = "<group>"; };
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -385,7 +383,6 @@
 				288EB1192FF7CFBC00F09BC9 /* Parsers/StatementParser.swift */,
 				2872790C2FFD286100468973 /* ParserSelection.swift */,
 				2872790E2FFD287300468973 /* StatementParserSelector.swift */,
-				286D63F12FFD3065000CEC65 /* FinancialDocumentBuilder.swift */,
 			);
 			path = Parsers;
 			sourceTree = "<group>";
@@ -695,7 +692,6 @@
 				288EB11E2FF7D68200F09BC9 /* InstitutionDetector.swift in Sources */,
 				288EB0E62FF7A84F00F09BC9 /* Services/ImportEngine.swift in Sources */,
 				281BB15B2FFC4872006E7424 /* SQLiteDatabase.swift in Sources */,
-				286D63F22FFD3065000CEC65 /* FinancialDocumentBuilder.swift in Sources */,
 				281BB1882FFC4D53006E7424 /* ImportDocumentReader.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

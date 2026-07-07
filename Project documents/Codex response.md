@@ -1,92 +1,77 @@
 # Codex Response
 
-# Sprint 15 - Implementation: FinancialDocument Integration
+## Sprint 16 Summary
 
-## Summary
+Sprint 16 migrated the parser handoff so production statement parsers return `FinancialDocument` directly instead of `[Transaction]`.
 
-Implemented Sprint 15 FinancialDocument Integration.
-
-The production handoff now flows through an immutable `FinancialDocument` after parser execution and before validation:
+The approved pipeline is now preserved as:
 
 ```text
-Statement Parser
-↓
-[Transaction]
-↓
-FinancialDocumentBuilder
-↓
-FinancialDocument
-↓
-ImportValidator.validate(financialDocument:)
-↓
-Stores
+Reader
+-> RawDocument
+-> Institution Detection
+-> Statement Classification
+-> Parser Selection
+-> Statement Parser
+-> FinancialDocument
+-> Validation
 ```
 
-Existing parser extraction, validation calculations, repository behaviour, store behaviour and UI behaviour were preserved.
+`ImportEngine` now receives `FinancialDocument` directly from the selected parser and passes that document to `ImportValidator.validate(financialDocument:)`. Existing validation, repository, store and UI behaviour were not changed.
 
 ## Files Created
 
-- `Models/FinancialDocument.swift`
-  - Adds immutable canonical parser-output handoff model.
-  - Contains no business logic and no financial calculations.
-
-- `Parsers/FinancialDocumentBuilder.swift`
-  - Adds deterministic construction from existing parser output.
-  - Does not recalculate financial data.
-  - Rejects unmatched parser selections explicitly.
-
-- `LedgerForgeTests/FinancialDocumentTests.swift`
-  - Adds regression coverage for FinancialDocument construction, validation delegation and unmatched parser selection.
+None.
 
 ## Files Modified
 
-- `Services/ImportValidator.swift`
-  - Added `validate(financialDocument:)`.
-  - The overload is a thin delegate to `validate(transactions:)` and contains no financial calculations.
+- `Parsers/StatementParser.swift`
+  - Changed the parser contract from returning `[Transaction]` to returning `FinancialDocument`.
 
-- `Services/ImportEngine.swift`
-  - Routes parsed transactions into `FinancialDocument` before validation.
-  - Store updates still receive the same parsed transactions and still occur only after validation passes.
+- `Parsers/Parsers/AxisBankAccountParser.swift`
+  - Preserved existing Axis transaction extraction logic.
+  - Wrapped extracted transactions into immutable `FinancialDocument` at the parser boundary.
+
+- `Services/Services/ImportEngine.swift`
+  - Removed production reconstruction of `FinancialDocument`.
+  - Uses the `FinancialDocument` returned by the parser directly.
+
+- `LedgerForgeTests/FinancialDocumentTests.swift`
+  - Replaced builder-focused tests with parser-native `FinancialDocument` regression tests.
+  - Verified parser name, source document, metadata, transaction count, ordering, values and validation result against the approved Axis expected JSON fixture.
+
+- `LedgerForgeTests/CSVImportRegressionTests.swift`
+  - Updated the baseline regression path to validate the `FinancialDocument` returned by the parser.
+  - Preserved approved Axis CSV financial truth checks.
 
 - `LedgerForge.xcodeproj/project.pbxproj`
-  - Updated by Xcode when new Sprint 15 source and test files were added to the project navigator and target membership.
+  - Updated by Xcode tooling when the obsolete builder source file was removed from the project.
 
-- `Project documents/Codex response.md`
-  - Updated with Sprint 15 implementation status and validation results.
+## Files Removed
+
+- `Parsers/FinancialDocumentBuilder.swift`
+  - Removed after verifying there were no remaining production or test references.
 
 ## Build Result
 
 Passed.
 
-Build checkpoints completed:
+- Xcode `BuildProject`: passed.
+- Command-line `xcodebuild test`: hit the known SwiftUI `#Preview` macro tooling issue after a successful build:
+  - `External macro implementation type 'PreviewsMacros.SwiftUIView' could not be found`
+- Per project guidance for this known tooling issue, the equivalent Xcode regression suite was run and treated as authoritative.
 
-- Baseline build before Sprint 15 code changes: passed.
-- Build after adding `FinancialDocument`: passed.
-- Build after adding `FinancialDocumentBuilder`: passed.
-- Build after adding `validate(financialDocument:)`: passed.
-- Build after adding `FinancialDocumentTests`: passed.
-- Build after `ImportEngine` handoff wiring: passed.
-
-## Validation Result
+## Test Result
 
 Passed.
 
-Command-line `xcodebuild test` with writable DerivedData hit the known Xcode/SwiftUI `#Preview` macro tooling issue after successful Xcode builds:
+Xcode `RunSomeTests` completed successfully:
 
-```text
-External macro implementation type 'PreviewsMacros.SwiftUIView' could not be found for macro 'Preview(_:body:)'
-```
+- 46 tests passed.
+- 0 tests failed.
+- 0 tests skipped.
 
-Per project workflow, the equivalent Xcode regression suite was run from Xcode and treated as authoritative.
-This is the approved validation path whenever the known SwiftUI #Preview command-line tooling issue occurs after a successful production build.
-
-Xcode `RunSomeTests` result:
-
-```text
-46 tests: 46 passed, 0 failed, 0 skipped, 0 expected failures, 0 not run
-```
-
-Suites covered:
+Required Sprint 16 validation suites passed:
 
 - `FinancialDocumentTests`
 - `CSVImportRegressionTests`
@@ -98,96 +83,56 @@ Suites covered:
 - `DefaultReaderRegistryTests`
 - `PasswordProviderTests`
 
-Conflict-marker scan:
-
-```text
-rg -n "^(<<<<<<<|=======|>>>>>>>)" .
-```
-
-No unresolved merge conflict markers found.
-
-## Commit And Push Result
-
-Implementation commit:
-
-```text
-29c50a9970e74396a7d9be4391efea59b77df4c9
-```
-
-Implementation push result:
-
-```text
-origin/main updated to 29c50a9970e74396a7d9be4391efea59b77df4c9
-```
-
-Final project-state/documentation commit:
-
-```text
-18c3b7a Update project state for sprint 15
-```
-
-Final repository state:
-
-```text
-origin/main includes Sprint 15 implementation and project-state updates.
-```
-
 ## Behavioural Impact
 
-No user-visible behaviour changed.
+No intended user-visible behaviour change.
 
-Approved Axis CSV financial truth remains unchanged:
+The approved Axis CSV baseline remains unchanged:
 
-- Existing parser extraction logic is unchanged.
-- Existing validation calculations are unchanged.
-- Existing CSV regression baseline still passes.
-- Repository persistence was not modified.
-- UI was not modified.
+- transaction count preserved
+- debit total preserved
+- credit total preserved
+- opening balance preserved
+- closing balance preserved
+- parser selection preserved
+- validation result preserved
 
 ## Architecture Decisions
 
-- `FinancialDocument` is an immutable parser-output envelope.
-- `FinancialDocument` contains no calculations and no business logic.
-- `FinancialDocumentBuilder` packages existing parser output without recalculation.
-- `ImportValidator.validate(financialDocument:)` delegates to existing transaction validation.
-- `    StatementParser.parse(document:) -> [Transaction] remains unchanged during Sprint 15. FinancialDocumentBuilder provides the temporary compatibility bridge until Sprint 16 migrates parser outputs directly.
-- Changing parser protocols to return `FinancialDocument` is deferred to Sprint 16.
+- `StatementParser` now returns the canonical parser output type, `FinancialDocument`.
+- `FinancialDocumentBuilder` was removed instead of deprecated because all production and test call sites were migrated.
+- `FinancialDocument` remains immutable and data-only.
+- Validation remains unchanged; `validate(financialDocument:)` continues to delegate to transaction validation.
+- `ImportEngine` remains the production orchestration entry point and no repository, store or UI behaviour was changed.
 
-## Documentation Updated
+## Verification
 
-- `Project documents/Codex response.md`
-  - Updated with implementation, build and validation results.
-
-- `Project documents/PROJECT_STATE.md`
-  - Updated after successful implementation commit and push to mark Sprint 15 complete and Sprint 16 active.
-  - Final project-state update committed separately after implementation validation.
-
-- `Project documents/Project_Guide.md`
-  - Synchronized current sprint, phase, validation status and roadmap after Sprint 15 completion.
+- `rg FinancialDocumentBuilder` found no remaining Swift source references after removal.
+- `rg` found no remaining production parser contract returning `[Transaction]`.
+- Conflict marker scan found no unresolved merge conflict markers.
+- Xcode build passed after migration.
+- Required Xcode regression suite passed.
 
 ## Remaining Technical Debt
 
-- `StatementParser` still returns `[Transaction]`; Sprint 16 is planned to migrate parser return type to `FinancialDocument`.
-- `ImportEngine` still owns analysis, normalization, parser selection, validation and store update orchestration.
--     Production parser selection still uses the legacy registry path. Repository orchestration remains within ImportEngine until later architectural cleanup.
+- `UnknownStatementParser.swift` remains an empty placeholder file and was not given behaviour in Sprint 16.
+- Parser selection reasons are not yet carried into parser-produced `FinancialDocument`; that can be considered later only if the approved architecture requires it.
+- Command-line `xcodebuild test` remains affected by the known SwiftUI `#Preview` macro issue; Xcode test execution remains the current authoritative validation path for the affected suite.
+
+## Remaining Risks
+
+- Future parser additions must return `FinancialDocument` directly and must not reintroduce transaction-array handoff patterns.
+- Future parser work must avoid placing financial calculations inside `FinancialDocument` or parser handoff wrappers.
 
 ## Deferred Items
 
-- Validation redesign.
-- Repository redesign.
-- Parser rewrites.
-- Transaction extraction changes.
-- UI changes.
-- OCR.
-- AI inference.
-- XLS/XLSX support.
-- Dashboard work.
-- Investment module work.
+- No validation redesign.
+- No repository redesign.
+- No UI changes.
+- No OCR, AI inference, XLS/XLSX or dashboard work.
+- No Sprint 17 implementation work was started.
 
 ## Next Recommended Sprint
 
-Sprint 16 - StatementParser returns FinancialDocument.
+Sprint 17 should focus on validation pipeline refinement only after confirming the new parser-to-`FinancialDocument` boundary remains stable.
 
-Recommended objective:
-
--     Migrate StatementParser to return FinancialDocument directly, remove the temporary compatibility bridge provided by FinancialDocumentBuilder, and preserve the approved financial baseline, validation behaviour and repository behaviour.

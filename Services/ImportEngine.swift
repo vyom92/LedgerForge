@@ -91,14 +91,8 @@ final class ImportEngine {
                     rows: normalizedRows
                 )
 
-                let transactions = try parser.parse(
+                let financialDocument = try parser.parse(
                     document: normalizedDocument
-                )
-
-                let financialDocument = FinancialDocumentBuilder.build(
-                    normalizedDocument: normalizedDocument,
-                    parserName: parser.name,
-                    transactions: transactions
                 )
 
                 let validation = ImportValidator.validate(

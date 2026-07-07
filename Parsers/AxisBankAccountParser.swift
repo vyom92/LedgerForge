@@ -23,10 +23,15 @@ final class AxisBankAccountParser: StatementParser {
 
     func parse(
         document: NormalizedDocument
-    ) throws -> [Transaction] {
+    ) throws -> FinancialDocument {
 
         guard !document.rows.isEmpty else {
-            return []
+            return FinancialDocument(
+                sourceDocument: document.document,
+                metadata: document.metadata,
+                parserName: name,
+                transactions: []
+            )
         }
 
         var transactions: [Transaction] = []
@@ -98,6 +103,11 @@ final class AxisBankAccountParser: StatementParser {
         print("Normalized rows: \(document.rows.count)")
         print("✓ Parsed \(transactions.count) transactions")
 
-        return transactions
+        return FinancialDocument(
+            sourceDocument: document.document,
+            metadata: document.metadata,
+            parserName: name,
+            transactions: transactions
+        )
     }
 }

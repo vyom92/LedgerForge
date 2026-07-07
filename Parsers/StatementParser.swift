@@ -17,6 +17,6 @@ protocol StatementParser {
 
     func parse(
         document: NormalizedDocument
-    ) throws -> [Transaction]
+    ) throws -> FinancialDocument
 
 }
