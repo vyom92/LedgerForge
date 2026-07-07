@@ -19,6 +19,23 @@ struct RepositoryContractTests {
         }
     }
 
+    @Test func accountRepositoryCanListAccountsForWorkspace() async throws {
+        try runForEachProvider { provider in
+            let fixture = try seedWorkspace(provider)
+            let first = account(id: "account-b", workspaceId: fixture.workspaceId, name: "Beta Account", currency: "INR")
+            let second = account(id: "account-a", workspaceId: fixture.workspaceId, name: "Alpha Account", currency: "INR")
+            let otherWorkspace = WorkspaceDTO(id: "workspace-other", name: "Other Workspace", createdAtISO: "2026-07-06T12:00:00Z")
+            let other = account(id: "account-other", workspaceId: otherWorkspace.id, name: "Other Account", currency: "INR")
+
+            #expect(try provider.accountRepo.upsertAccount(first) == first.id)
+            #expect(try provider.accountRepo.upsertAccount(second) == second.id)
+            #expect(try provider.workspaceRepo.upsertWorkspace(otherWorkspace) == otherWorkspace.id)
+            #expect(try provider.accountRepo.upsertAccount(other) == other.id)
+
+            #expect(try provider.accountRepo.accounts(workspaceId: fixture.workspaceId) == [second, first])
+        }
+    }
+
     @Test func importSessionRepositoryCanCreateUpdateAndRetrieveSessionData() async throws {
         try runForEachProvider { provider in
             let fixture = try seedWorkspace(provider)
@@ -133,6 +150,42 @@ struct RepositoryContractTests {
                 )
                 #expect(afterFailedReplace == [replacement])
             }
+        }
+    }
+
+    @Test func transactionRepositoryCanListTrustedTransactionsForDashboard() async throws {
+        try runForEachProvider { provider in
+            let fixture = try seedWorkspaceAccountAndSession(provider)
+            let trusted = transaction(
+                id: "transaction-trusted",
+                workspaceId: fixture.workspaceId,
+                accountId: fixture.accountId,
+                importSessionId: fixture.importSessionId,
+                documentId: "document-1",
+                amountMinor: 1250,
+                amountDecimal: "12.50",
+                direction: "credit",
+                isTrusted: true
+            )
+            let untrusted = transaction(
+                id: "transaction-untrusted",
+                workspaceId: fixture.workspaceId,
+                accountId: fixture.accountId,
+                importSessionId: fixture.importSessionId,
+                documentId: "document-1",
+                amountMinor: -500,
+                amountDecimal: "-5.00",
+                direction: "debit",
+                isTrusted: false
+            )
+
+            try provider.transactionRepo.replaceTransactions(
+                workspaceId: fixture.workspaceId,
+                importSessionId: fixture.importSessionId,
+                transactions: [trusted, untrusted]
+            )
+
+            #expect(try provider.transactionRepo.trustedTransactions(workspaceId: fixture.workspaceId) == [trusted])
         }
     }
 
@@ -288,7 +341,8 @@ private func transaction(id: String,
                          documentId: String,
                          amountMinor: Int64,
                          amountDecimal: String,
-                         direction: String) -> TransactionDTO {
+                         direction: String,
+                         isTrusted: Bool = false) -> TransactionDTO {
     TransactionDTO(
         id: id,
         workspaceId: workspaceId,
@@ -307,8 +361,8 @@ private func transaction(id: String,
         direction: direction,
         runningBalanceMinor: nil,
         isReconciled: false,
-        isTrusted: false,
-        trustedAtISO: nil,
+        isTrusted: isTrusted,
+        trustedAtISO: isTrusted ? "2026-07-06T12:04:00Z" : nil,
         createdAtISO: "2026-07-06T12:03:00Z",
         updatedAtISO: nil,
         rawRows: []

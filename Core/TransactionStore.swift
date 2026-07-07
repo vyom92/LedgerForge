@@ -25,6 +25,12 @@ final class TransactionStore: ObservableObject {
 
     // Replace all transactions after a successful import and store validation result.
     func replaceTransactions(_ transactions: [Transaction], validation: ImportValidationResult? = nil) {
+        if Thread.isMainThread {
+            self.transactions = transactions
+            self.lastValidation = validation
+            return
+        }
+
         DispatchQueue.main.async {
             self.transactions = transactions
             self.lastValidation = validation

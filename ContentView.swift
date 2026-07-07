@@ -13,6 +13,8 @@ struct ContentView: View {
     @State private var selectedFile = "No statement imported"
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @State private var selectedTab = 0
+    @State private var didStartRepositoryHydration = false
+    @State private var repositoryHydrationMessage = "Loading persisted dashboard..."
 
     var body: some View {
 
@@ -66,6 +68,41 @@ struct ContentView: View {
                             Text("₹ \(dashboardViewModel.snapshot.cashFlow, format: .number)")
                                 .font(.headline.weight(.semibold))
                         }
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                GroupBox("Accounts") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if dashboardViewModel.accounts.isEmpty {
+                            Text("No repository-backed accounts")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(dashboardViewModel.accounts.prefix(3)) { account in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(account.nickname ?? account.name)
+                                            .font(.caption.weight(.semibold))
+                                            .lineLimit(1)
+                                        Text(account.institution)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                    Spacer()
+                                    Text("\(account.currencyCode) \(account.currentBalance, format: .number)")
+                                        .font(.caption)
+                                        .monospacedDigit()
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        Text(repositoryHydrationMessage)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
                 }
@@ -171,7 +208,28 @@ struct ContentView: View {
             }
 
         }
+        .task {
+            hydrateDashboardOnce()
+        }
 
+    }
+
+    private func hydrateDashboardOnce() {
+        guard !didStartRepositoryHydration else { return }
+        didStartRepositoryHydration = true
+
+        do {
+            let result = try RepositoryStoreHydrator().hydrateIfNeeded()
+            if result.accountCount == 0 && result.transactionCount == 0 {
+                repositoryHydrationMessage = "No persisted dashboard data"
+            } else {
+                repositoryHydrationMessage = "Loaded \(result.accountCount) account(s), \(result.transactionCount) transaction(s)"
+            }
+        } catch {
+            repositoryHydrationMessage = "Dashboard load failed"
+            DeveloperConsole.shared.log("Dashboard Hydration: FAILED")
+            DeveloperConsole.shared.log(error.localizedDescription)
+        }
     }
 }
 

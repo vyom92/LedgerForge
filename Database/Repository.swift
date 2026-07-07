@@ -31,11 +31,13 @@ public protocol WorkspaceRepository {
 public protocol TransactionRepository {
     func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws
     func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO]
+    func trustedTransactions(workspaceId: String) throws -> [TransactionDTO]
 }
 
 public protocol AccountRepository {
     func upsertAccount(_ account: AccountDTO) throws -> String
     func account(id: String) throws -> AccountDTO?
+    func accounts(workspaceId: String) throws -> [AccountDTO]
 }
 
 public protocol ImportSessionRepository {
@@ -101,6 +103,10 @@ struct PlaceholderTransactionRepo: TransactionRepository {
     func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO] {
         throw RepositoryError.providerNotConfigured("TransactionRepository")
     }
+
+    func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] {
+        throw RepositoryError.providerNotConfigured("TransactionRepository")
+    }
 }
 
 struct PlaceholderAccountRepo: AccountRepository {
@@ -109,6 +115,10 @@ struct PlaceholderAccountRepo: AccountRepository {
     }
 
     func account(id: String) throws -> AccountDTO? {
+        throw RepositoryError.providerNotConfigured("AccountRepository")
+    }
+
+    func accounts(workspaceId: String) throws -> [AccountDTO] {
         throw RepositoryError.providerNotConfigured("AccountRepository")
     }
 }

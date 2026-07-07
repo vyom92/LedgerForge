@@ -18,6 +18,17 @@ final class AccountStore: ObservableObject {
 
     private init() {}
 
+    func replaceAccounts(_ accounts: [Account]) {
+        if Thread.isMainThread {
+            self.accounts = accounts
+            return
+        }
+
+        DispatchQueue.main.async {
+            self.accounts = accounts
+        }
+    }
+
     // MARK: - Querying
 
     /// Find an account by institution and name.

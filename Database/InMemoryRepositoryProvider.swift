@@ -61,6 +61,17 @@ private final class InMemoryAccountRepo: AccountRepository {
     func account(id: String) throws -> AccountDTO? {
         state.accounts[id]
     }
+
+    func accounts(workspaceId: String) throws -> [AccountDTO] {
+        state.accounts.values
+            .filter { $0.workspaceId == workspaceId }
+            .sorted { lhs, rhs in
+                if lhs.name == rhs.name {
+                    return lhs.id < rhs.id
+                }
+                return lhs.name < rhs.name
+            }
+    }
 }
 
 private final class InMemoryImportSessionRepo: ImportSessionRepository {
@@ -147,6 +158,11 @@ private final class InMemoryTransactionRepo: TransactionRepository {
                 }
                 return lhs.postedDateISO < rhs.postedDateISO
             }
+    }
+
+    func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] {
+        try transactions(workspaceId: workspaceId, importSessionId: nil)
+            .filter(\.isTrusted)
     }
 
     private func validate(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws {

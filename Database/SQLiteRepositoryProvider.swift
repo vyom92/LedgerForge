@@ -86,6 +86,22 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
             )
         }.first
     }
+
+    func accounts(workspaceId: String) throws -> [AccountDTO] {
+        let sql = "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at FROM accounts WHERE workspace_id = ? ORDER BY name, id;"
+        return try db.query(sql: sql, params: [workspaceId]) { row in
+            AccountDTO(
+                id: row.string(at: 0) ?? "",
+                workspaceId: row.string(at: 1) ?? "",
+                name: row.string(at: 2) ?? "",
+                institutionId: row.string(at: 3),
+                accountType: row.string(at: 4),
+                nativeCurrency: row.string(at: 5) ?? "",
+                description: row.string(at: 6),
+                createdAtISO: row.string(at: 7) ?? ""
+            )
+        }
+    }
 }
 
 fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
@@ -174,6 +190,38 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
         sql += " ORDER BY posted_date, id;"
 
         return try db.query(sql: sql, params: params) { row in
+            let transactionId = row.string(at: 0) ?? ""
+            let rawRows = try rawRows(for: transactionId)
+            return TransactionDTO(
+                id: transactionId,
+                workspaceId: row.string(at: 1) ?? "",
+                accountId: row.string(at: 2),
+                importSessionId: row.string(at: 3),
+                documentId: row.string(at: 4),
+                originalRowId: row.string(at: 5),
+                postedDateISO: row.string(at: 6) ?? "",
+                valueDateISO: row.string(at: 7),
+                description: row.string(at: 8),
+                payee: row.string(at: 9),
+                reference: row.string(at: 10),
+                nativeCurrency: row.string(at: 11) ?? "",
+                amountMinor: row.int64(at: 12) ?? 0,
+                amountDecimal: row.string(at: 13) ?? "",
+                direction: row.string(at: 14) ?? "",
+                runningBalanceMinor: row.int64(at: 15),
+                isReconciled: row.bool(at: 16),
+                isTrusted: row.bool(at: 17),
+                trustedAtISO: row.string(at: 18),
+                createdAtISO: row.string(at: 19) ?? "",
+                updatedAtISO: row.string(at: 20),
+                rawRows: rawRows
+            )
+        }
+    }
+
+    func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] {
+        let sql = "SELECT id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at FROM transactions WHERE workspace_id = ? AND is_trusted = 1 ORDER BY posted_date, id;"
+        return try db.query(sql: sql, params: [workspaceId]) { row in
             let transactionId = row.string(at: 0) ?? ""
             let rawRows = try rawRows(for: transactionId)
             return TransactionDTO(
