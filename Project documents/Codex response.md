@@ -1,134 +1,80 @@
 # Codex Response
 
+## Project Repair Summary
 
-## Sprint 12A Summary
+Repository repair was attempted for Xcode navigator and target membership only.
 
-Implemented the PDF Reader Foundation for the Unified Import Framework only.
+Objective was to make these existing files visible in Xcode and included in the `LedgerForge` app target Sources build phase:
 
-Sprint 12A added a PDF reader that conforms to the existing import framework reader boundary, registered it with the default reader registry, reorganized approved Axis CSV fixtures into the standard fixture structure, and added test support for fixture lookup.
-
-No PDF statement parsing, institution detection, transaction extraction, validation changes, persistence changes, UI changes, Keychain integration, password prompt flow, password retry flow, OCR, XLS/XLSX/TXT support, or Sprint 12B work was implemented.
-
-## Files Created
-
-- `Import/Readers/PDFDocumentReader.swift`
-- `LedgerForgeTests/TestSupport/FixtureLocator.swift`
-- `LedgerForgeTests/PDFDocumentReaderTests.swift`
-
-## Files Modified
-
+- `Import/Readers/CSVDocumentReaderAdapter.swift`
 - `Import/Readers/DefaultReaderRegistry.swift`
-- `LedgerForgeTests/CSVImportRegressionTests.swift`
-- `LedgerForgeTests/CSVDocumentReaderAdapterTests.swift`
-- `LedgerForgeTests/DefaultReaderRegistryTests.swift`
-- `LedgerForge.xcodeproj/project.pbxproj`
-- `Project documents/Codex response.md`
+- `Import/Readers/PDFDocumentReader.swift`
+- `Import/Password/DefaultPasswordProvider.swift`
 
-## Fixtures Moved
+The files are present on disk, but `Import/Readers` and `Import/Password` were not visible under the `Import` group in the Xcode navigator.
 
-Moved without modifying fixture contents:
+I did not directly edit `LedgerForge.xcodeproj/project.pbxproj`. Because this session is running from inside Xcode, direct `.pbxproj` editing is unsafe. I used Xcode project tools only.
 
-- From `LedgerForgeTests/Fixtures/CSV/axis_bank_nre_account_statement_baseline.csv`
-- To `LedgerForgeTests/Fixtures/Axis/CSV/axis_bank_nre_account_statement_baseline.csv`
+## Files Added To Xcode Project
 
-- From `LedgerForgeTests/Fixtures/CSV/axis_bank_nre_account_statement_baseline.expected.json`
-- To `LedgerForgeTests/Fixtures/Axis/Expected/axis_bank_nre_account_statement_baseline.expected.json`
+None completed.
 
-Created fixture structure:
+The available Xcode project tool could not add the existing files because the parent navigator groups were missing:
 
-- `LedgerForgeTests/Fixtures/Axis/CSV/`
-- `LedgerForgeTests/Fixtures/Axis/PDF/`
-- `LedgerForgeTests/Fixtures/Axis/Expected/`
-- `LedgerForgeTests/Fixtures/Shared/`
+```text
+Parent group not found for path: 'LedgerForge/Import/Readers'
+Parent group not found for path: 'LedgerForge/Import/Password'
+```
+
+A temporary add-and-move approach was also attempted, but Xcode's move tool required the destination group to already exist:
+
+```text
+Could not find destination directory: '/LedgerForge/Import/Readers'. Destination path must be a directory, not a file.
+```
+
+Temporary duplicate folders created by the failed add attempts were removed. The real source files under `Import/Readers` and `Import/Password` were left in place.
 
 ## Build Result
 
-Build checkpoints completed successfully:
+`xcodebuild -list -project LedgerForge.xcodeproj` completed successfully and reported:
 
-- Pre-change Xcode build: passed.
-- Build after fixture restructuring and fixture locator updates: passed.
-- Build after adding `PDFDocumentReader`: passed.
-- Build after registering PDF reader in `DefaultReaderRegistry`: passed.
-- Build after adding `PDFDocumentReaderTests`: passed.
-- Final Xcode build after cleanup: passed.
+- Targets: `LedgerForge`, `LedgerForgeTests`, `LedgerForgeUITests`
+- Scheme: `LedgerForge`
 
-## Test Result
-
-Requested tests were attempted with:
-
-- `PDFDocumentReaderTests`
-- `CSVImportRegressionTests`
-- `CSVDocumentReaderAdapterTests`
-- `DefaultReaderRegistryTests`
-- `PasswordProviderTests`
-- `ImportFrameworkTests`
-
-The first `xcodebuild test` attempt failed before tests executed because Xcode attempted to write test artifacts under `~/Library/Developer/Xcode/DerivedData`, which is outside the sandbox.
-
-The second attempt used a workspace-local `-derivedDataPath`, but `xcodebuild test` still failed before tests executed because Xcode's external preview macro plugin service failed under sandboxed execution:
+The requested build command was run exactly:
 
 ```text
-External macro implementation type 'PreviewsMacros.SwiftUIView' could not be found for macro 'Preview(_:body:)'; '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server' produced malformed response
+xcodebuild -project LedgerForge.xcodeproj -scheme LedgerForge -configuration Debug build
 ```
 
-No test assertion failures were observed because the test runner did not reach execution. The final Xcode build still passed after this failure.
+It failed before compilation because `xcodebuild` could not write to the default DerivedData location from this sandbox:
 
-## Behavioural Impact
+```text
+Couldn't create workspace arena folder '/Users/vyom/Library/Developer/Xcode/DerivedData/LedgerForge-hlbriyscpzhcfqgeamnvbedcwmlq': Unable to write to info file '<DVTFilePath:0x8a9734f60:'/Users/vyom/Library/Developer/Xcode/DerivedData/LedgerForge-hlbriyscpzhcfqgeamnvbedcwmlq/info.plist'>'.
+```
 
-Production CSV import behavior is intended to remain unchanged.
+Build status: failed before compile due DerivedData permission failure.
 
-Changes are limited to:
+## Remaining Issues
 
-- Fixture path lookup in tests.
-- Reader registry adding PDF reader resolution for `.pdf` files.
-- PDF reader foundation producing `RawDocument.text` only.
+- `Import/Readers` group is still missing from the Xcode navigator.
+- `Import/Password` group is still missing from the Xcode navigator.
+- The four Import Framework files listed above still need to be added to the Xcode project and the `LedgerForge` app target Sources build phase.
+- The exact requested `xcodebuild` build command cannot complete in this sandbox because it writes to `~/Library/Developer/Xcode/DerivedData`.
+- Direct `.pbxproj` repair was intentionally not performed from this Xcode-hosted session.
 
-No UI flow was changed. No parser, validator, repository, store, or persistence behavior was changed.
+## Recommended Manual Repair In Xcode
 
-## Architecture Decisions
+Use Xcode's Project Navigator:
 
-- `PDFDocumentReader` lives in `Import/Readers/`, matching the reader layer used by `CSVDocumentReaderAdapter`.
-- `PDFDocumentReader` conforms to `ImportFramework.DocumentReader`.
-- `PDFDocumentReader` supports only `pdf`.
-- Unsupported file extensions return `ImportError.unsupportedFile`.
-- Locked PDFs use only the password supplied by `DefaultImportCoordinator` through the existing `PasswordProvider` path.
-- Missing password returns `ImportError.passwordRequired`.
-- Failed password unlock returns `ImportError.incorrectPassword`.
-- PDF text extraction uses PDFKit and outputs `RawDocument(content: .text(...))`.
-- `DefaultReaderRegistry` now registers `CSVDocumentReaderAdapter` and `PDFDocumentReader`.
-- Tests now use `FixtureLocator` instead of fragile hardcoded fixture paths.
-
-## Missing Fixtures
-
-No approved Axis PDF fixture exists in the workspace at this time.
-
-Because no approved PDF fixture is available, Sprint 12A did not add mandatory PDF text baseline assertions against real financial statement content. `PDFDocumentReaderTests` includes fixture-conditional tests that will exercise approved Axis PDF extraction and encrypted PDF password behavior only when those fixtures are added.
-
-No synthetic PDF statement or placeholder PDF fixture was created.
-
-## Remaining Technical Debt
-
-- Approved Axis PDF fixture is still needed for real PDF text extraction regression coverage.
-- Approved encrypted PDF fixture is still needed for password-required and incorrect-password regression coverage.
-- `xcodebuild test` is currently blocked in this sandbox by Xcode preview macro plugin execution before tests run.
-- The legacy empty `LedgerForgeTests/Fixtures/CSV/` directory still exists on disk only because it contains `.DS_Store`; no approved fixture remains there.
-
-
-## Deferred Items
-
-
-- PDFKit text extraction quality is unverified against an approved real bank PDF fixture.
-- Encrypted PDF behavior is unverified against an approved encrypted fixture.
-- CSV behavior compiles after fixture migration, but requested regression tests could not execute because of the sandboxed Xcode test runner failure.
-- Registering `.pdf` changes framework reader resolution, but production PDF import still has no parser path by design for Sprint 12A.
-
-## Next Recommended Sprint
-
-Sprint 12B should proceed only after an approved Axis PDF fixture is added.
-
-Recommended Sprint 12B focus:
-
-- Add approved Axis PDF fixture coverage.
-- Verify PDFKit extraction output against approved expected text-level assertions.
-- Keep PDF parsing, institution detection, transaction extraction, validation, persistence, and UI changes out of scope unless explicitly approved for that sprint.
-
+1. Right-click the `Import` group.
+2. Add existing folder references or create groups for:
+   - `Readers`
+   - `Password`
+3. Add existing files:
+   - `Import/Readers/CSVDocumentReaderAdapter.swift`
+   - `Import/Readers/DefaultReaderRegistry.swift`
+   - `Import/Readers/PDFDocumentReader.swift`
+   - `Import/Password/DefaultPasswordProvider.swift`
+4. Ensure all four files have `LedgerForge` target membership checked.
+5. Build the `LedgerForge` scheme from Xcode.
