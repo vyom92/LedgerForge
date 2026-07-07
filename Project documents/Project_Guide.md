@@ -54,6 +54,39 @@ Parser Selection
 Statement Parser
 ↓
 Validation
+↓
+ImportCoordinator
+↓
+PasswordProvider
+↓
+ReaderRegistry
+↓
+Reader
+↓
+FinancialDocument
+↓
+Institution Detection
+↓
+Document Classification
+↓
+Parser Selection
+↓
+Statement Parser
+↓
+Validation
+↓
+Fingerprinting & Duplicate Detection
+↓
+Repositories
+↓
+SQLite
+↓
+Stores
+↓
+ViewModels
+↓
+Dashboard
+```
 ```
 
 ## Documentation Index
@@ -134,7 +167,7 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 ## Repository Structure
 
 - **Database:** Contains database schema definitions and migration scripts.  
-- **Import:** Modules and code for import pipeline and data ingestion.  
+- **Import:** MUnified Import Framework including coordinators, registries, readers, protocols and import models.  
 - **Models:** Domain models and business logic entities.  
 - **Stores:** Data persistence and repository layer implementations.  
 - **ViewModels:** Presentation logic for UI components.  
@@ -186,7 +219,6 @@ Additionally:
 - Confirm the requested sprint and stop condition.
 - Read Project_Guide.md first.  
 - Use the Task Routing Guide before opening any other document.
-- Read only the minimum documentation required for the requested task.
 - Read only the documents required by the Task Routing Guide.  
 - Review Project documents/Codex response.md.  
 - Produce an implementation plan.  
