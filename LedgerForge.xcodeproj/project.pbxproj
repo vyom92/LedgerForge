@@ -33,6 +33,8 @@
 		286242612FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */; };
 		286242632FFCE80D00B8AA66 /* DefaultPasswordProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2862424A2FFCE80D00B8AA66 /* DefaultPasswordProvider.swift */; };
 		2862426F2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */; };
+		2872790D2FFD286100468973 /* ParserSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790C2FFD286100468973 /* ParserSelection.swift */; };
+		2872790F2FFD287300468973 /* StatementParserSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790E2FFD287300468973 /* StatementParserSelector.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
 		288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B22FF7955200F09BC9 /* ContentView.swift */; };
 		288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0B42FF7955300F09BC9 /* Assets.xcassets */; };
@@ -119,6 +121,8 @@
 		286242552FFCE80D00B8AA66 /* PDFDocumentReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFDocumentReader.swift; sourceTree = "<group>"; };
 		2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureInstitutionDetector.swift; sourceTree = "<group>"; };
 		286242762FFD168100B8AA66 /* PROJECT_STATE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PROJECT_STATE.md; sourceTree = "<group>"; };
+		2872790C2FFD286100468973 /* ParserSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserSelection.swift; sourceTree = "<group>"; };
+		2872790E2FFD287300468973 /* StatementParserSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementParserSelector.swift; sourceTree = "<group>"; };
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerForgeApp.swift; sourceTree = "<group>"; };
 		288EB0B22FF7955200F09BC9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -374,6 +378,8 @@
 				288EB11B2FF7CFF600F09BC9 /* Parsers/AxisBankAccountParser.swift */,
 				288EB11A2FF7CFD500F09BC9 /* Parsers/StatementParserRegistry.swift */,
 				288EB1192FF7CFBC00F09BC9 /* Parsers/StatementParser.swift */,
+				2872790C2FFD286100468973 /* ParserSelection.swift */,
+				2872790E2FFD287300468973 /* StatementParserSelector.swift */,
 			);
 			path = Parsers;
 			sourceTree = "<group>";
@@ -643,6 +649,7 @@
 				288EB1272FF7D96A00F09BC9 /* DocumentPreviewView.swift in Sources */,
 				288EB1242FF7D8A000F09BC9 /* Parsers/StatementParser.swift in Sources */,
 				28B87B332FFB31C9009BEE8C /* ImportValidationResult.swift in Sources */,
+				2872790D2FFD286100468973 /* ParserSelection.swift in Sources */,
 				288EB1232FF7D89B00F09BC9 /* Parsers/AxisBankAccountParser.swift in Sources */,
 				281BB1842FFC4D40006E7424 /* ImportProgress.swift in Sources */,
 				281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */,
@@ -677,6 +684,7 @@
 				288EB0F22FF7B2AB00F09BC9 /* CSVAnalyzer.swift in Sources */,
 				281BB18E2FFC4D56006E7424 /* ImportInstitutionDetector.swift in Sources */,
 				288EB1222FF7D89600F09BC9 /* Parsers/UnknownStatementParser.swift in Sources */,
+				2872790F2FFD287300468973 /* StatementParserSelector.swift in Sources */,
 				288EB11E2FF7D68200F09BC9 /* InstitutionDetector.swift in Sources */,
 				288EB0E62FF7A84F00F09BC9 /* Services/ImportEngine.swift in Sources */,
 				281BB15B2FFC4872006E7424 /* SQLiteDatabase.swift in Sources */,
