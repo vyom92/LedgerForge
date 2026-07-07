@@ -8,7 +8,7 @@ Principles:
 - Facts only.
 - Repository-verifiable information only.
 - Minimal manual editing.
-- Updated only after successful build, required tests, commit and push.
+- Updated only after successful build, required validation, commit, push and tag when applicable.
 
 ---
 
@@ -180,11 +180,12 @@ Dashboard
 Active Sprint: Sprint 17
 
 Objective:
-- Next recommended sprint: validation pipeline refinement.
+- Validation Pipeline Refinement.
 
 Scope:
 - Not started.
-- Requires separate planning and approval before implementation.
+- Requires Sprint 17 planning before implementation.
+- Preserve parser-produced FinancialDocument behaviour from Sprint 16.
 
 Out of Scope:
 - Transaction extraction changes

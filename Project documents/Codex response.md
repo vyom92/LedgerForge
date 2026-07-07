@@ -59,7 +59,7 @@ Passed.
 - Xcode `BuildProject`: passed.
 - Command-line `xcodebuild test`: hit the known SwiftUI `#Preview` macro tooling issue after a successful build:
   - `External macro implementation type 'PreviewsMacros.SwiftUIView' could not be found`
-- Per project guidance for this known tooling issue, the equivalent Xcode regression suite was run and treated as authoritative.
+- Per the project workflow, the equivalent Xcode regression suite was executed and is the authoritative validation result for this known SwiftUI `#Preview` tooling limitation.
 
 ## Test Result
 
@@ -116,6 +116,7 @@ The approved Axis CSV baseline remains unchanged:
 ## Verification
 
 - `rg FinancialDocumentBuilder` found no remaining Swift source references after removal.
+- `FinancialDocumentBuilder.swift` was removed from the Xcode project and target membership.
 - `rg` found no remaining production parser contract returning `[Transaction]`.
 - Conflict marker scan found no unresolved merge conflict markers.
 - Xcode build passed after migration.
@@ -124,7 +125,7 @@ The approved Axis CSV baseline remains unchanged:
 ## Remaining Technical Debt
 
 - `UnknownStatementParser.swift` remains an empty placeholder file and was not given behaviour in Sprint 16.
-- Parser selection reasons are not yet carried into parser-produced `FinancialDocument`; that can be considered later only if the approved architecture requires it.
+- Parser selection reasons remain intentionally empty for parser-produced `FinancialDocument`. This remains approved unless a future ADR requires explainable parser-selection metadata.
 - Command-line `xcodebuild test` remains affected by the known SwiftUI `#Preview` macro issue; Xcode test execution remains the current authoritative validation path for the affected suite.
 
 ## Remaining Risks
@@ -150,4 +151,4 @@ The approved Axis CSV baseline remains unchanged:
 
 ## Next Recommended Sprint
 
-Sprint 17 should focus on validation pipeline refinement only after confirming the new parser-to-`FinancialDocument` boundary remains stable.
+Sprint 17 should focus on Validation Pipeline Refinement while preserving the parser-to-`FinancialDocument` boundary introduced in Sprint 16. No parser contract changes should be required.

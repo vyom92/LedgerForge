@@ -88,7 +88,7 @@ Dashboard
 | Product Vision.md               | High-level goals, target users, and product impact    | New feature planning              | High        |
 | Engineering Standards.md        | Coding standards and engineering guidelines           | All engineering tasks             | Medium      |
 | AI_WORKFLOW.md                 | Workflow instructions for AI assistants                | All AI-related tasks              | Medium      |
-.github/Project_Context.md
+| .github/Project_Context.md      | AI bootstrap context and current project state summary | AI onboarding | Medium |
 | .github/ai-instructions.md     | AI behavior and interaction policies                   | AI onboarding                    | Medium      |
 | .github/prompts.md             | Prompt templates and examples for AI responses         | AI onboarding                    | Medium      |
 | Project documents/Codex response.md | Current sprint working log, implementation notes, build/test progress | Sprint reviews, bug fixes, testing | High        |
@@ -133,10 +133,10 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 - ImportCoordinator owns orchestration only.
 - Readers understand file formats.
 - Institution Detection identifies the financial institution.
-Statement Classification identifies the document family.
-Parser Selection chooses the appropriate parser.
-Statement Parsers produce FinancialDocument.
-FinancialDocument is validated before persistence.
+- Statement Classification identifies the document family.
+- Parser Selection chooses the appropriate parser.
+- Statement Parsers produce FinancialDocument.
+- FinancialDocument is validated before persistence.
 - Stores own runtime state.
 - The dashboard observes stores rather than querying persistence.
 
@@ -222,7 +222,7 @@ Additionally:
 - Read only the documents identified by the Task Routing Guide.  
 - Review Project documents/PROJECT_STATE.md.
 - Review Project documents/Codex response.md for the current sprint context.
-- Produce an implementation plan.  
+- Produce an implementation plan in `Project documents/Codex response.md`.
 - Wait for approval before coding.  
 
 ### 2. During implementation
@@ -232,15 +232,16 @@ Additionally:
 - Do not redesign approved architecture.  
 - Build continuously.  
 - Run the required sprint validation.
-If command-line tests fail solely because of the known SwiftUI Preview tooling issue after a successful build, execute the equivalent Xcode regression suite and treat that result as authoritative.  
+- If command-line tests fail solely because of the known SwiftUI Preview tooling issue after a successful build, execute the equivalent Xcode regression suite and treat that result as authoritative.
 - If the project builds successfully and required sprint tests pass, prepare an automated Git commit.
 - Verify `git status` contains only sprint-related files.
 - Verify there are no unresolved merge conflict markers.
 - Generate a concise commit message describing the completed sprint work.
 - Commit the sprint changes.
-- Push to the tracked branch (normally `origin/main`).Push the sprint tag if one was created.
+- Push to the tracked branch (normally `origin/main`).
+- Push the sprint tag if one was created.
 - Maintain Project documents/Codex response.md during implementation.
-- After a successful build, required tests, commit and push, update Project documents/PROJECT_STATE.md with the verified repository state.
+- After a successful build, required validation, commit, push and tag (if applicable), update `Project documents/PROJECT_STATE.md` with the verified repository state.
 - Record the commit hash, tag and push result in Project documents/Codex response.md.
 - If the build or required tests fail, do not commit or push. Record the failure and stop.
 - Keep changes limited to the approved sprint.  
@@ -250,7 +251,7 @@ If command-line tests fail solely because of the known SwiftUI Preview tooling i
 ### 3. Before stopping
 
 - Update Project documents/Codex response.md throughout the sprint.
-- After a successful build, required validation, commit, push and tag (if applicable), update Project documents/PROJECT_STATE.md...
+- After a successful build, required validation, commit, push and tag (if applicable), update `Project documents/PROJECT_STATE.md`.
 - Include summary, files created, files modified, build result, validation result, commit hash (if committed), tag (if created), push result, documentation updated, remaining technical debt, deferred items and next recommended sprint.  
 - Stop exactly at the approved sprint boundary.  
 - Confirm the repository builds successfully before considering the sprint complete.
