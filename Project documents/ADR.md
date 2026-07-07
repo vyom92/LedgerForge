@@ -276,7 +276,7 @@ Most financial institutions consistently use the same password pattern for month
 ## Consequences
 - Password management belongs to the import coordination layer.
 - Passwords are stored securely using the operating system's secure credential storage.
-- Readers receive decrypted document content rather than handling passwords directly.
+- Readers receive an optional password supplied by the import coordination layer and never access Keychain, UI prompts or password policy directly.
 - Users are prompted only when no stored credential succeeds.
 
 ---
@@ -292,13 +292,15 @@ Every imported financial document must follow the same deterministic processing 
 
 The canonical import flow is:
 
-Financial Document
+ImportCoordinator
 ↓
-Initial Institution Detection (when possible)
+PasswordProvider
 ↓
-Password Resolution (if required)
+ReaderRegistry
 ↓
 Document Reader
+↓
+RawDocument
 ↓
 FinancialDocument
 ↓
@@ -335,10 +337,11 @@ Everything after `FinancialDocument` is format-independent.
 ## Consequences
 
 - CSV, PDF, XLS, XLSX and TXT share the same downstream pipeline.
-- Password resolution occurs before document extraction when required.
+- Password resolution is coordinated before document extraction and supplied to readers through the import framework.
 - Duplicate detection works across different file formats representing the same financial statement.
 - Validation remains centralized.
 - Stores receive only validated domain objects.
+
 This ADR extends ADR-011 by defining the complete document ingestion workflow.
 ---
 
@@ -381,19 +384,25 @@ Structured documents should be processed using deterministic rules. AI should on
 
 Accepted
 
+## Implemented In
+
+Sprint 11C
+
 ## Decision
 
 Production CSV imports now execute through the Unified Import Framework.
 
 The canonical production import flow is:
 
-Financial Document
-↓
 ImportCoordinator
+↓
+PasswordProvider
 ↓
 ReaderRegistry
 ↓
 Document Reader
+↓
+RawDocument
 ↓
 FinancialDocument
 ↓
@@ -447,3 +456,46 @@ This establishes a single extensible architecture for every supported import for
 - ADR-015 — Automatic Password Management
 - ADR-016 — Universal Import Pipeline
 - ADR-017 — Deterministic Before Intelligent
+
+---
+
+# ADR-019 — Reference Fixtures Define Financial Truth
+
+## Status
+
+Accepted
+
+## Implemented In
+
+Sprint 12A
+
+## Decision
+
+Approved regression fixtures define LedgerForge's observable financial truth.
+
+The Axis Bank NRE CSV fixture, matching Axis Bank NRE PDF fixture and shared expected JSON baseline represent the same financial statement and must remain financially equivalent.
+
+Future readers, parsers and import pipelines must produce equivalent observable results from equivalent source documents unless an intentional behavioural change is explicitly approved.
+
+## Rationale
+
+LedgerForge supports multiple document formats for the same financial data. CSV, PDF and future XLS/XLSX inputs may represent the same statement, but extraction details differ by format.
+
+Using approved reference fixtures creates a deterministic financial baseline that protects against silent parser, reader or validation regressions.
+
+## Consequences
+
+- The statement, not the file format, is the unit of financial truth.
+- Equivalent CSV and PDF fixtures should share the same expected financial baseline when they represent the same statement.
+- Reader implementations must not introduce financial interpretation differences.
+- Parser and validation changes must be checked against approved fixtures.
+- New institutions should add approved source documents and expected outputs before parser behaviour is treated as stable.
+- Test fixtures are part of the architecture, not disposable test data.
+
+## Related ADRs
+
+- ADR-010 — Validation Before Persistence
+- ADR-011 — Unified FinancialDocument Pipeline
+- ADR-012 — Separation of Readers and Parsers
+- ADR-017 — Deterministic Before Intelligent
+- ADR-018 — Unified Import Framework Operational
