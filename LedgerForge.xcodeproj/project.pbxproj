@@ -65,6 +65,8 @@
 		28B87B392FFBBE2D009BEE8C /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */; };
 		28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B3C2FFBBFC8009BEE8C /* Account.swift */; };
 		28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */; };
+		28D8CB5F2FFD1E3C005B419A /* StatementClassificationDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D8CB5E2FFD1E3C005B419A /* StatementClassificationDetector.swift */; };
+		28D8CB632FFD21B7005B419A /* TestPlan.xctestplan in Resources */ = {isa = PBXBuildFile; fileRef = 28D8CB622FFD21B7005B419A /* TestPlan.xctestplan */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -155,6 +157,8 @@
 		28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		28B87B3C2FFBBFC8009BEE8C /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
 		28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountStore.swift; sourceTree = "<group>"; };
+		28D8CB5E2FFD1E3C005B419A /* StatementClassificationDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementClassificationDetector.swift; sourceTree = "<group>"; };
+		28D8CB622FFD21B7005B419A /* TestPlan.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = TestPlan.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -291,6 +295,7 @@
 		288EB0A42FF7955200F09BC9 = {
 			isa = PBXGroup;
 			children = (
+				28D8CB622FFD21B7005B419A /* TestPlan.xctestplan */,
 				28B87B3E2FFBD1DE009BEE8C /* .github */,
 				28B87B272FFB2C90009BEE8C /* Project documents */,
 				288EB12E2FF7E10200F09BC9 /* Normalizers */,
@@ -443,6 +448,7 @@
 				288EB11F2FF7D69000F09BC9 /* DocumentMetadata.swift */,
 				288EB1022FF7BFF600F09BC9 /* InstitutionDetector.swift */,
 				2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */,
+				28D8CB5E2FFD1E3C005B419A /* StatementClassificationDetector.swift */,
 			);
 			path = Detectors;
 			sourceTree = "<group>";
@@ -591,6 +597,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				28D8CB632FFD21B7005B419A /* TestPlan.xctestplan in Resources */,
 				288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -621,6 +628,7 @@
 				281BB1902FFC4D6A006E7424 /* StatementClassifier.swift in Sources */,
 				288EB0FE2FF7BA2800F09BC9 /* DeveloperConsole.swift in Sources */,
 				281BB1802FFC4D3F006E7424 /* RawDocument.swift in Sources */,
+				28D8CB5F2FFD1E3C005B419A /* StatementClassificationDetector.swift in Sources */,
 				28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */,
 				28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */,
 				281BB17E2FFC4D26006E7424 /* ImportRequest.swift in Sources */,

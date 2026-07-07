@@ -1,0 +1,31 @@
+{
+  "configurations" : [
+    {
+      "id" : "F81BB55C-860F-4FA4-B718-25D6751C8C78",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:LedgerForge.xcodeproj",
+        "identifier" : "288EB0B92FF7955300F09BC9",
+        "name" : "LedgerForgeTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:LedgerForge.xcodeproj",
+        "identifier" : "288EB0C32FF7955300F09BC9",
+        "name" : "LedgerForgeUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

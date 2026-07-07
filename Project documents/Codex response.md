@@ -1,152 +1,153 @@
 # Codex Response
 
-## Sprint 12C Summary
+# Sprint 13 - Continuation: Scheme Test Configuration Repair
 
-Sprint 12C implementation added a deterministic, framework-compatible Institution Detection foundation scoped to approved Axis CSV/PDF fixtures.
+## Summary
 
-Implemented:
+This continuation repaired the Sprint 13 command-line validation blocker caused by a stale shared scheme reference to the deleted manual test plan.
 
-- Added a signature/rule-based detector for institution detection.
-- Preserved the existing legacy `InstitutionDetector().detect(from:)` API and observable Axis/unknown behavior.
-- Added framework-compatible detection through `ImportFramework.InstitutionDetector` using `RawDocument`.
-- Added explainable detection reasons through `ImportInstitutionCandidate.reasons` without breaking existing initializer call sites.
-- Added focused tests for Axis CSV detection, Axis PDF detection, unknown documents, detection reasons, confidence behavior and non-text `RawDocument` handling.
+Completed:
 
-Not implemented:
-
-- No parser rewrites.
-- No transaction extraction changes.
-- No validation changes.
-- No repository changes.
-- No UI changes.
-- No OCR.
-- No AI inference.
-- No Keychain changes.
-- No XLS/XLSX support.
-- No Sprint 13 work.
-- No PDF transaction parsing.
-- No fixture movement or fixture content changes.
-- No production `ImportEngine` routing change to the new detector.
+- Inspected the shared `LedgerForge` Xcode scheme.
+- Removed the stale `<TestPlans>` block referencing `Sprint 12C manual test.xctestplan`.
+- Verified the scheme no longer references `Sprint 12C manual test.xctestplan`, `TestPlanReference`, `TestPlans`, or any `.xctestplan` file.
+- Preserved normal `LedgerForgeTests.xctest` scheme testable configuration.
+- Did not recreate the deleted test plan.
+- Did not add a new test plan.
+- Did not modify production behavior.
+- Did not modify fixtures.
+- Did not start Sprint 14.
 
 ## Files Created
 
-- `Detectors/SignatureInstitutionDetector.swift`
-  - Adds `SignatureInstitutionDetector`, `InstitutionDetectionRule`, `InstitutionSignature` and `InstitutionDetectionResult`.
-  - Provides deterministic Axis Bank detection from extracted text.
-  - Conforms to `ImportFramework.InstitutionDetector` and detects from `RawDocument`.
-
-- `LedgerForgeTests/InstitutionDetectionTests.swift`
-  - Adds Axis CSV detection coverage.
-  - Adds Axis PDF detection coverage.
-  - Adds unknown document coverage.
-  - Adds detection reason and confidence checks.
-  - Adds legacy detector parity checks.
-  - Adds non-text `RawDocument` handling coverage.
+None in this continuation.
 
 ## Files Modified
 
-- `Detectors/DocumentMetadata.swift`
-  - Added `Equatable` and `Sendable` conformance to metadata enums and `DocumentMetadata` so detector results can be compared safely in tests and used by sendable framework-facing detection code.
-
-- `Detectors/InstitutionDetector.swift`
-  - Preserved the legacy detector API.
-  - Delegates matching to `SignatureInstitutionDetector` so legacy and framework detection use the same deterministic signature rules.
-  - Added `detectWithReasons(from:)` for explainable detection without changing existing call sites.
-
-- `Import/Protocols/ImportInstitutionDetector.swift`
-  - Extended `ImportInstitutionCandidate` with `reasons: [String]`.
-  - Kept the existing initializer source-compatible by defaulting `reasons` to an empty array.
-
-- `LedgerForge.xcodeproj/project.pbxproj`
-  - Updated automatically by Xcode tooling when adding new Sprint 12C files to the navigator and target membership.
-  - This file was not manually edited.
+- `LedgerForge.xcodeproj/xcshareddata/xcschemes/LedgerForge.xcscheme`
+  - Removed the stale test-plan reference block:
+    - `Sprint 12C manual test.xctestplan`
+  - Left the existing `LedgerForgeTests.xctest` and `LedgerForgeUITests.xctest` testables intact.
 
 - `Project documents/Codex response.md`
-  - Updated with this Sprint 12C implementation status and validation result.
+  - Updated with continuation validation results.
+
+Existing Sprint 13 implementation files remain from the previous implementation attempt:
+
+- `Detectors/StatementClassificationDetector.swift`
+- `Import/Protocols/StatementClassifier.swift`
+- `LedgerForgeTests/StatementClassificationTests.swift`
+- `LedgerForge.xcodeproj/project.pbxproj`
+
+## Scheme Repair Result
+
+Verification command:
+
+```text
+rg -n "Sprint 12C manual test|xctestplan|TestPlanReference|TestPlans" LedgerForge.xcodeproj/xcshareddata/xcschemes/LedgerForge.xcscheme
+```
+
+Result: no matches.
+
+The shared scheme no longer references the deleted manual test plan.
 
 ## Build Result
 
-- Xcode Build: Passed.
-- Production target builds successfully.
-- No Sprint 12C build errors remain.
+Previous Sprint 13 build checkpoint remains valid:
+
+```text
+Xcode MCP BuildProject: The project built successfully.
+```
+
+No production source changes were made during this continuation.
 
 ## Test Result
 
-All required Sprint 12C validation completed successfully inside Xcode.
+### Required Command
 
-Summary:
+The requested command was run after removing the stale scheme test-plan reference:
 
-- 37 tests executed.
-- 37 tests passed.
-- 0 failures.
-- 9 test suites passed.
+```text
+xcodebuild -project LedgerForge.xcodeproj -scheme LedgerForge -configuration Debug -destination 'platform=macOS' test -only-testing:LedgerForgeTests/StatementClassificationTests -only-testing:LedgerForgeTests/InstitutionDetectionTests -only-testing:LedgerForgeTests/CSVImportRegressionTests -only-testing:LedgerForgeTests/PDFDocumentReaderTests -only-testing:LedgerForgeTests/ImportFrameworkTests -only-testing:LedgerForgeTests/DefaultReaderRegistryTests -only-testing:LedgerForgeTests/PasswordProviderTests
+```
 
-Validated suites:
+Result: failed before test execution because the sandbox could not write to the default DerivedData folder.
 
-- InstitutionDetectionTests
-- CSVImportRegressionTests
-- PDFDocumentReaderTests
-- ImportFrameworkTests
-- DefaultReaderRegistryTests
-- PasswordProviderTests
-- RepositoryContractTests
-- CSVDocumentReaderAdapterTests
-- LedgerForgeTests
+Failure:
 
-Notes:
+```text
+Couldn't create workspace arena folder '/Users/vyom/Library/Developer/Xcode/DerivedData/LedgerForge-hlbriyscpzhcfqgeamnvbedcwmlq': Unable to write to info file '<DVTFilePath:.../info.plist>'.
+```
 
-- Command-line `xcodebuild test` remained affected by a SwiftUI Preview macro tooling issue.
-- Xcode successfully executed the required regression suite.
-- Sprint 12C validation is therefore considered complete.
+### Isolated DerivedData Retry
+
+The same filtered test set was retried with a writable DerivedData path:
+
+```text
+xcodebuild -project LedgerForge.xcodeproj -scheme LedgerForge -configuration Debug -destination 'platform=macOS' -derivedDataPath /tmp/LedgerForgeSprint13Validation test -only-testing:LedgerForgeTests/StatementClassificationTests -only-testing:LedgerForgeTests/InstitutionDetectionTests -only-testing:LedgerForgeTests/CSVImportRegressionTests -only-testing:LedgerForgeTests/PDFDocumentReaderTests -only-testing:LedgerForgeTests/ImportFrameworkTests -only-testing:LedgerForgeTests/DefaultReaderRegistryTests -only-testing:LedgerForgeTests/PasswordProviderTests
+```
+
+Result: failed during app module emission before tests ran.
+
+First real build failure after scheme repair:
+
+```text
+External macro implementation type 'PreviewsMacros.SwiftUIView' could not be found for macro 'Preview(_:body:)'; '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/bin/swift-plugin-server' produced malformed response
+```
+
+Conclusion:
+
+- The stale test-plan blocker is repaired.
+- Required tests still did not pass because command-line `xcodebuild test` is now blocked by the SwiftUI preview macro plugin failure.
+- Per sprint rules, no commit or push was performed.
 
 ## Behavioural Impact
 
-- Existing production `ImportEngine` still calls `InstitutionDetector().detect(from:)`.
-- The legacy detector still returns Axis Bank / Bank Account / confidence `0.98` when text contains Axis signatures.
-- Unknown text still returns unknown institution, unknown document type and confidence `0.0`.
-- CSV, PDF, parser, validation, repository and UI behavior were not intentionally changed.
-
-## Architecture Decisions
-
-- Institution detection now has a framework-compatible `RawDocument` entry point while preserving the legacy synchronous text detector.
-- Detection remains deterministic and rule/signature-based.
-- Detection reasons are included as lightweight strings on `ImportInstitutionCandidate` so automated detection remains explainable.
-- Axis signatures currently include:
-  - `AXIS BANK`
-  - `UTIB`
-  - `STATEMENT OF AXIS ACCOUNT`
-- PDF and CSV are treated identically after reader extraction because detection operates on normalized text, not file layout or parser output.
+- No production behavior changed.
+- No import routing changed.
+- No parser, validation, repository, UI behavior or fixture content changed.
+- The scheme now uses its testables directly instead of referencing a deleted manual test plan.
 
 ## Merge Marker Check
 
-- Strict conflict-marker scan completed.
-- No unresolved conflict markers were found.
+Strict conflict-marker scan completed:
 
-## Commit Result
+```text
+rg -n "^<<<<<<<|^=======$|^>>>>>>>" --glob '*.swift' --glob '*.md' --glob '*.xcscheme'
+```
 
-- Sprint 12C committed.
-- Changes pushed to `origin/main`.
-- `sprint-12c-complete` Git tag created and pushed.
+Result: no unresolved conflict markers found.
+
+## Git Status
+
+Current changes are unstaged:
+
+```text
+A  Detectors/StatementClassificationDetector.swift
+ M Import/Protocols/StatementClassifier.swift
+ M LedgerForge.xcodeproj/project.pbxproj
+ M LedgerForge.xcodeproj/xcshareddata/xcschemes/LedgerForge.xcscheme
+A  LedgerForgeTests/StatementClassificationTests.swift
+M  "Project documents/Codex response.md"
+```
+
+No commit was created.
+No push was performed.
+`PROJECT_STATE.md` was not updated because required tests did not pass and no commit/push occurred.
 
 ## Remaining Technical Debt
 
-- Production `ImportEngine` still performs institution detection after `RawDocument` extraction and before CSV analysis/parser selection.
-- `FinancialDocument` convergence remains future architecture work.
-- Detection currently has only Axis rules; future institutions require approved fixtures and deterministic signatures.
+- Command-line test execution is blocked by the SwiftUI preview macro plugin failure.
+- Sprint 13 implementation remains uncommitted until required tests pass.
+- Parser selection migration remains Sprint 14 work.
+- `FinancialDocument` convergence remains future work.
 
-## Remaining Risks
+## Next Required Action
 
-- Institution detection currently contains only approved Axis signatures.
-- Future institutions should be added only alongside approved reference fixtures.
-- PDF text extraction may evolve across macOS releases and should continue to be protected by regression fixtures.
+Resolve the SwiftUI preview macro plugin failure that occurs during command-line `xcodebuild test`, or run the required filtered tests successfully inside Xcode.
 
-## Next Recommended Sprint
+After required tests pass:
 
-Sprint 13 — Statement Classification Framework.
-
-Objectives:
-
-- Introduce deterministic statement classification.
-- Preserve institution detection behaviour.
-- Keep parser selection independent of file format.
-- Continue extending the unified import pipeline without modifying validated reader behaviour.
+1. Commit and push Sprint 13 changes to `origin/main`.
+2. Update `Project documents/Codex response.md` with commit hash and push result.
+3. Update `Project documents/PROJECT_STATE.md` only after successful commit and push.

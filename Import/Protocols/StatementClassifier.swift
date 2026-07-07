@@ -12,10 +12,12 @@ public extension ImportFramework {
 public struct StatementClassification: Equatable, Sendable {
     public let documentType: StatementDocumentType
     public let confidence: Double
+    public let reasons: [String]
 
-    public init(documentType: StatementDocumentType, confidence: Double) {
+    public init(documentType: StatementDocumentType, confidence: Double, reasons: [String] = []) {
         self.documentType = documentType
         self.confidence = confidence
+        self.reasons = reasons
     }
 }
 

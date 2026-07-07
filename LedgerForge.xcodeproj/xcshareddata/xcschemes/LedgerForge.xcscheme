@@ -30,7 +30,7 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:Sprint 12C manual test.xctestplan"
+            reference = "container:TestPlan.xctestplan"
             default = "YES">
          </TestPlanReference>
       </TestPlans>
