@@ -676,3 +676,46 @@ Using `PreviewProvider` preserves Xcode preview functionality while avoiding the
 - ADR-018 — Unified Import Framework Operational
 - ADR-019 — Reference Fixtures Define Financial Truth
 - ADR-021 — Deterministic Statement Classification
+
+---
+
+# ADR-023 — Frozen UI/UX Architecture
+
+## Status
+
+Accepted
+
+## Implemented In
+
+Sprint 20
+
+## Decision
+
+LedgerForge adopts a frozen UI/UX architecture in the same manner as the frozen backend architecture.
+
+Visual structure, navigation, interaction patterns and primary layouts are defined by `UI_UX_v1.0_Frozen.md` together with approved assets stored under `Project documents/UI Assets/`.
+
+Implementation sprints must implement the approved UI specification rather than redesigning the application during development.
+
+## Rationale
+
+Repeated visual redesign during implementation creates inconsistent navigation, duplicated components and architectural drift.
+
+Separating visual design from implementation allows UI decisions to be reviewed, approved and versioned independently from SwiftUI implementation.
+
+This mirrors the successful approach used for `Architecture_v1.0_Frozen.md`.
+
+## Consequences
+
+- UI/UX becomes an architectural concern rather than an implementation concern.
+- Approved UI assets become part of the project's architectural documentation.
+- Implementation sprints focus on translating approved designs into SwiftUI components.
+- Significant UI changes require design review before implementation.
+- New screens extend the approved application shell rather than replacing it.
+
+## Related ADRs
+
+- ADR-002 — Dashboard-First Product
+- ADR-009 — Reactive Store Architecture
+- ADR-013 — Store Ownership
+- ADR-016 — Universal Import Pipeline

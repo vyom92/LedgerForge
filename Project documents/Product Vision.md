@@ -54,6 +54,7 @@ Primary modules:
 
 - Dashboard
 - Accounts
+- Transactions
 - Documents
 - Import History
 - Investments
@@ -66,6 +67,24 @@ Primary modules:
 
 ---
 
+# User Experience Philosophy
+
+LedgerForge should feel like a native macOS application rather than an import utility.
+
+The application shell, navigation and interaction model are defined by `UI_UX_v1.0_Frozen.md`.
+
+Implementation should consistently reinforce the following principles:
+
+- Dashboard-first experience.
+- Persistent sidebar navigation.
+- Context-sensitive toolbar.
+- Information density without visual clutter.
+- Developer tooling separated from normal user workflows.
+- Import workflows presented as temporary tasks rather than permanent application modules.
+
+The user should primarily experience financial insight. Importing statements should feel like maintenance rather than the purpose of the application.
+
+# Automation Philosophy
 # Automation Philosophy
 
 LedgerForge should never ask the user for information it can determine automatically.
@@ -120,6 +139,8 @@ Statement layouts and institution formats may evolve over time. LedgerForge shou
 
 The import pipeline should be format-independent. Whether data originates from PDF, CSV, XLS/XLSX or TXT, downstream processing should produce identical financial truth after reader-specific extraction and deterministic parser execution.
 
+Reader-specific adapters (CSV, PDF, XLS/XLSX and future formats) are responsible only for producing equivalent financial evidence. Once a FinancialDocument has been produced, downstream validation, persistence and presentation must remain independent of the original file format.
+
 Repository persistence must never bypass validation. Dashboards, accounts and future analytics consume repository-backed runtime state rather than parser output directly.
 
 Importing documents should require little or no user interaction beyond selecting the file.
@@ -144,4 +165,4 @@ Every automated financial calculation should identify the data source, exchange 
 
 # Long-Term Goal
 
-LedgerForge should become the trusted financial operating system that users open every day because it provides the clearest, most accurate understanding of their financial life. Importing documents becomes an invisible maintenance task while repository-backed dashboards evolve into a living representation of accounts, investments, budgets, cash flow and long-term financial progress.
+LedgerForge should become the trusted financial operating system that users open every day because it provides the clearest, most accurate understanding of their financial life. Importing documents becomes an almost invisible maintenance activity while repository-backed dashboards evolve into a living financial operating system that users trust and return to every day.

@@ -155,6 +155,7 @@
 		288EB12C2FF7E0C000F09BC9 /* NormalizedDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NormalizedDocument.swift; sourceTree = "<group>"; };
 		288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVNormalizer.swift; sourceTree = "<group>"; };
 		288EB1312FF7E3C600F09BC9 /* ColumnType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColumnType.swift; sourceTree = "<group>"; };
+		28A3A4C12FFE1DBA00DD5727 /* UI_UX_v1.0_Frozen.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = UI_UX_v1.0_Frozen.md; sourceTree = "<group>"; };
 		28B87B252FFB24C3009BEE8C /* TransactionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionListView.swift; sourceTree = "<group>"; };
 		28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Product Vision.md"; sourceTree = "<group>"; };
 		28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Engineering Standards.md"; sourceTree = "<group>"; };
@@ -196,6 +197,11 @@
 		288EB0C72FF7955300F09BC9 /* LedgerForgeUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = LedgerForgeUITests;
+			sourceTree = "<group>";
+		};
+		28A3A4C22FFE1E3900DD5727 /* UI Assets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "UI Assets";
 			sourceTree = "<group>";
 		};
 		28B87B3E2FFBD1DE009BEE8C /* .github */ = {
@@ -483,6 +489,8 @@
 		28B87B272FFB2C90009BEE8C /* Project documents */ = {
 			isa = PBXGroup;
 			children = (
+				28A3A4C22FFE1E3900DD5727 /* UI Assets */,
+				28A3A4C12FFE1DBA00DD5727 /* UI_UX_v1.0_Frozen.md */,
 				28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */,
 				281BB1782FFC4CDA006E7424 /* Project_Guide.md */,
 				28B87B2E2FFB2D25009BEE8C /* ADR.md */,

@@ -282,21 +282,33 @@ Dashboard
 Active Sprint: Sprint 21
 
 Objective:
-- Dashboard Foundation continuation.
+- Implement the frozen Application Shell defined in `UI_UX_v1.0_Frozen.md`.
 
 Scope:
-- Planning required before implementation.
-- Preserve validated import, persistence and repository boundaries from Sprint 20.
-- Dashboard work must consume repository-backed data rather than bypass repository boundaries.
-- Startup hydration must remain deterministic and execute exactly once per application launch unless an explicit refresh is requested.
+- Replace the current tab-based layout with the approved application shell.
+- Implement the permanent sidebar navigation.
+- Implement the application toolbar.
+- Make Dashboard the default landing page.
+- Move Preview out of primary navigation in preparation for the future Import Wizard.
+- Move the Developer Console into the Developer section.
+- Preserve validated import, parser, validation, repository and runtime-store behaviour.
+- Preserve the approved presentation pipeline:
+  Repository Persistence → RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
 
 Out of Scope:
-- Transaction extraction changes
-- Import pipeline changes
-- UI changes
+- PDF support
 - OCR
-- AI inference
+- Parser changes
 - Validation redesign
 - Repository redesign
+- Database schema changes
+- Transaction extraction changes
+- Analytics
+- Budgets
+- Insights
+- Reports
 - Multi-currency
 - Investments
+
+Next Major Milestone:
+- Complete the Application Shell and freeze the visual foundation before introducing additional input adapters such as PDF support.

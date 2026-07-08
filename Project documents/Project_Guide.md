@@ -6,7 +6,7 @@ This is the canonical project operating manual. Read this document first, then u
 
 - **Current Milestone:** M7 – Dashboard Experience
 - **Current Sprint:** Sprint 21
-- **Current Phase:** Dashboard Foundation continuation
+- **Current Phase:** Application Shell implementation (UI/UX v1.0)
 - **Build Status:** Passing
 - **Validation Status:** Build passing; full regression baseline passing. Sprint 20 validation complete.
 - **Last Architecture Review:** 2026-07-07
@@ -153,7 +153,7 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 | Password Handling     | Architecture_v1.0_Frozen.md, ADR.md                               |
 | PDF Reader | Architecture_v1.0_Frozen.md, ADR.md, Engineering Standards.md |
 | Reference Fixtures | Project documents/PROJECT_STATE.md, Project documents/Codex response.md |
-| UI Work               | Architecture_v1.0_Frozen.md, Engineering Standards.md             |
+| UI Work               | UI_UX_v1.0_Frozen.md, Architecture_v1.0_Frozen.md, Engineering Standards.md |
 | Testing               | Project documents/PROJECT_STATE.md, Project documents/Codex response.md, Engineering Standards.md     |
 | Bug Fixes             | Project documents/PROJECT_STATE.md, Project documents/Codex response.md, Engineering Standards.md     |
 | Documentation Updates | Project_Guide.md, Engineering Standards.md                        |
@@ -264,10 +264,11 @@ Additionally:
 ## Sprint Roadmap
 
 - **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16, Sprint 17, Sprint 18, Sprint 19, Sprint 20
-- **Current Sprint:** Sprint 21 – Dashboard Foundation continuation
+- **Current Sprint:** Sprint 21 – Application Shell
 - **Upcoming Sprints:**
-  - Sprint 22–24 – Insights & Analytics
-  - Sprint 25+ – Multi-Currency, Investments & Ecosystem
+  - Sprint 22 – Import Workflow & UI Completion
+  - Sprint 23 – PDF Input Adapter Integration
+  - Sprint 24+ – Insights & Analytics
 
 ## Product Milestones
 
@@ -305,11 +306,11 @@ Additionally:
 ### M7 – Dashboard Experience 🚧
 - Repository-backed startup hydration ✅
 - Accounts overview ✅
-- Transaction browsing ✅
-- Dashboard refinement 🚧
-- Search
-- Filters
-- Trends
+- Recent transaction summaries ✅
+- Application Shell 🚧
+- Sidebar navigation 🚧
+- Dashboard implementation from frozen UI 🚧
+- Import workflow integration ⏳
 
 ### M8 – Insights & Analytics
 - Spending analytics
@@ -368,8 +369,10 @@ Every supported import format should be validated against an approved baseline f
 - Rules Engine
 
 ### Dashboard
-- Dashboard refinement
-- Search (FTS5)
+- Insights
+- Charts & Analytics
+- Budgets
+- Advanced Transaction Browsing
 - Multi-Currency Dashboard
 - Net Worth
 - Cash Flow
