@@ -73,6 +73,8 @@ LedgerForge should feel like a native macOS application rather than an import ut
 
 The application shell, navigation and interaction model are defined by `UI_UX_v1.0_Frozen.md`.
 
+The approved visual system is frozen around the Deep Indigo dark mode theme. `Project documents/UI Assets/Approved/DesignBoard_v2.0.png` is the master UI reference, individual approved assets define screen-level implementation details, and `AppIcon_v1.0.png` is the approved app icon reference.
+
 Implementation should consistently reinforce the following principles:
 
 - Dashboard-first experience.

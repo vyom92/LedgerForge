@@ -1,148 +1,100 @@
 # Codex Response
 
-## Sprint 21 Implementation Report - Application Shell
+## Documentation Sync Report - UI/UX v1.0 Asset Freeze
 
-Sprint 21 implemented the frozen application shell defined by `Project documents/UI_UX_v1.0_Frozen.md`.
+This documentation-only update aligns the project documents with the approved UI/UX v1.0 asset freeze and the relocation of AI workflow files under `Project documents/.github/`.
+
+No source code, tests, project settings, architecture redesign, PDF support, iPhone companion app work, or future feature implementation was performed.
 
 ## Summary
 
-- Replaced the tab-based layout with a permanent sidebar and top toolbar shell.
-- Made Dashboard the default content view.
-- Added the frozen sidebar navigation order:
-  - Dashboard
-  - Accounts
-  - Transactions
-  - Imports
-  - Insights
-  - Budgets
-  - Reports
-  - Settings
-  - Developer, visible only when Developer Mode is enabled.
-- Added a top toolbar placeholder with date-range, filters and import controls.
-- Moved the existing Preview out of normal navigation without deleting or redesigning `DocumentPreviewView`.
-- Moved Developer Console out of primary navigation and into the Developer section.
-- Preserved CSV import entry points through the toolbar, dashboard quick actions and Imports page.
-- Preserved repository hydration, runtime stores, dashboard data and transaction viewer behavior.
+- Confirmed the approved UI assets under `Project documents/UI Assets/Approved/`.
+- Documented `DesignBoard_v2.0.png` as the master UI reference.
+- Documented individual approved assets as screen-level implementation references.
+- Documented `AppIcon_v1.0.png` as the approved app icon reference.
+- Confirmed Deep Indigo dark mode as the approved theme.
+- Reaffirmed that Preview belongs only inside the Import Wizard flow.
+- Reaffirmed that Developer Console is hidden from normal user flow.
+- Updated workflow documentation to use `Project documents/.github/` as the canonical AI prompt/context location.
+- Removed stale references to the old dashboard sketch and old approved dashboard filename.
 
-No parser, validation, repository, database, import-pipeline, analytics, budgets, insights, reports, OCR, AI, PDF or XLS/XLSX work was introduced.
+## Asset Inventory Result
 
-## Reference Visual
+Approved assets found:
 
-The requested reference path `Project documents/UI Assets/Dashboard Sketch V3.png` was not present in the workspace.
+- `DesignBoard_v2.0.png`
+- `Dashboard_v1.0.png`
+- `Accounts_v1.0.png`
+- `Transactions_v1.0.png`
+- `ImportWizard_v1.0.png`
+- `Settings_v1.0.png`
+- `DeveloperConsole_v1.0.png`
+- `DesignSystem_v1.0.png`
+- `UserJourney_v1.0.png`
+- `ComponentLibrary_v1.0.png`
+- `AppIcon_v1.0.png`
 
-Available approved reference used for shell alignment:
+Folder review:
 
-- `Project documents/UI Assets/Dashboard_v1.0_Approved.png`
-
-## Files Created
-
-- None.
+- `Project documents/.github/` exists and contains AI workflow prompt/context files.
+- `Project documents/UI Assets/Approved/` exists and contains all approved assets listed above.
+- `Project documents/Branding/` exists.
+- `Project documents/UI Assets/Archive/` was requested for review but is not currently present.
 
 ## Files Modified
 
-- `ContentView.swift`
+- `Project documents/UI_UX_v1.0_Frozen.md`
+- `Project documents/Project_Guide.md`
+- `Project documents/PROJECT_STATE.md`
+- `Project documents/Product Vision.md`
+- `Project documents/BUILD_AND_PROJECT_CONVENTIONS.md`
+- `Project documents/AI_WORKFLOW.md`
+- `Project documents/.github/Project_Context.md`
 - `Project documents/Codex response.md`
 
-## Implementation Details
+## Files Not Modified
 
-### Application Shell
+- Source code
+- Tests
+- `LedgerForge.xcodeproj/project.pbxproj`
+- `Project documents/ADR.md`
+- `Project documents/.github/AGENTS.md`
+- `Project documents/.github/ai-instructions.md`
+- `Project documents/.github/prompts.md`
 
-- `ContentView` now owns the application shell.
-- The shell uses a permanent sidebar and main content region.
-- The toolbar sits above the main content region.
-- Dashboard remains the default selected section.
-- The shell preserves startup hydration through `RepositoryStoreHydrator`.
+## Stale References Fixed
 
-### Navigation
+- Replaced old dashboard visual references with `Project documents/UI Assets/Approved/DesignBoard_v2.0.png` and `Dashboard_v1.0.png`.
+- Replaced canonical AI workflow path references from root `.github` to `Project documents/.github`.
+- Replaced active Sprint 21 implementation wording with documentation-sync / UI asset freeze wording.
+- Updated latest ADR references to ADR-023 where documentation describes current project state.
+- Updated current dashboard state to reflect the application shell and approved asset freeze.
 
-- Primary navigation now includes Dashboard, Accounts, Transactions and Imports.
-- Future navigation rows for Insights, Budgets and Reports are visible as disabled/future placeholders.
-- Settings is part of permanent navigation.
-- Developer navigation is hidden by default and appears only when Developer Mode is enabled from Settings.
+## Stale References Intentionally Left
 
-### Preview And Developer Console
+- Historical Sprint 18 references to SwiftUI Preview compatibility remain because they document ADR-022 and past validation history.
+- Future module names such as Insights, Budgets, Reports, multi-currency and investments remain where they are explicitly listed as future work.
 
-- `DocumentPreviewView` was not deleted or redesigned.
-- Preview is no longer part of normal navigation.
-- `DeveloperConsoleView` was not deleted or redesigned.
-- Developer Console is accessible only through the Developer section when Developer Mode is enabled.
+## Validation / Documentation Checks
 
-### Preservation
+- Documentation-only update.
+- No build was required because no source code, tests or project settings were modified.
+- Stale phrase search was run after edits.
 
-- CSV import still uses the existing file importer and `ImportEngine.shared.importFile(from:)`.
-- Successful imports still navigate to the Transactions page.
-- Dashboard hydration still runs once through `RepositoryStoreHydrator().hydrateIfNeeded()`.
-- Dashboard data still comes from runtime stores through `DashboardViewModel`.
-- Transaction search and credit/debit toggle behavior remains inside `TransactionListView` and was not changed.
+## Remaining Notes
 
-## Build Result
-
-Baseline build before source changes passed using Xcode `BuildProject`.
-
-Post-implementation build passed using Xcode `BuildProject`.
-
-```text
-The project built successfully.
-```
-
-## Validation Result
-
-Full active test-plan validation passed through Xcode `RunAllTests`.
-
-```text
-77 tests passed, 0 failed.
-```
-
-Validation coverage included:
-
-- Existing regression suite.
-- Existing UI launch tests.
-- CSV import regression tests.
-- Dashboard hydration tests.
-- Repository integration and repository contract tests.
-- Parser, validation, reader, registry and password provider tests.
-
-## Behavioural Impact
-
-- The primary app structure now matches the frozen shell specification.
-- Dashboard is now the first content view.
-- Preview and Developer Console no longer occupy primary navigation.
-- Existing import, persistence, hydration, runtime-store and transaction-viewer behavior is preserved.
-- Views and ViewModels still do not access SQLite.
-- Repository semantics and repository APIs were not changed.
-
-## Architecture Decisions
-
-- Kept the shell implementation in `ContentView` because Sprint 21 is limited to the application shell.
-- Reused existing child views instead of replacing them.
-- Reused `DashboardViewModel`, `RepositoryStoreHydrator`, `TransactionListView`, `DocumentPreviewView` and `DeveloperConsoleView`.
-- Did not introduce new ViewModels, stores, repositories or persistence paths.
-
-## Remaining Technical Debt
-
-### Engineering
-
-- The shell is currently implemented in `ContentView`; future UI sprints may extract reusable shell components only if the frozen UI grows enough to justify it.
-- Settings currently exposes only the Developer Mode control needed to keep Developer Console out of normal navigation.
-
-### Future Product Work
-
-- Import Wizard flow for Preview.
-- Dedicated Imports history page.
-- Full Accounts page.
-- Dashboard visual polish against future approved UI slices.
-- Analytics, charts, budgets, insights, reports, multi-currency and investments remain future work.
-
-## Commit And Push Result
-
-- Commit: `539e4a5 Sprint 21: implement application shell`
-- Push result: `origin/main` updated successfully.
-- Tag: not created.
-- Tag push result: not performed.
-- Local tracking note: remote push succeeded, but the sandbox could not update local `refs/remotes/origin/main` because `.git/refs/remotes/origin/main.lock` could not be created.
+- `Project documents/UI Assets/Archive/` is not present in the current workspace. This is acceptable for the current asset freeze because all current approved implementation references live under `Project documents/UI Assets/Approved/`.
 
 ## Next Recommended Sprint
 
-Sprint 22 - Import Workflow & UI Completion.
+Sprint 22 — Translate Frozen UI Assets into SwiftUI.
 
-Sprint 22 should build on the frozen application shell by moving Preview into the import workflow, keeping Developer Console out of normal navigation, and preserving the existing import, parser, validation, repository, hydration and runtime-store behaviour.
+Sprint 22 should implement the approved UI/UX v1.0 assets without redesigning them.
+
+Authoritative references:
+
+- `Project documents/UI Assets/Approved/DesignBoard_v2.0.png` is the master UI specification.
+- Individual approved screen assets define implementation details for their respective screens.
+- `Project documents/UI_UX_v1.0_Frozen.md` defines the visual and interaction governance.
+
+Implementation must translate the approved assets into reusable SwiftUI components, preserve existing import/parser/validation/repository/hydration behaviour, and document any intentional visual deviations.

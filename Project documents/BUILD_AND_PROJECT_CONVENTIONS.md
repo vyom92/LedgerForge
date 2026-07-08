@@ -65,6 +65,25 @@ No component may bypass this pipeline.
 
 ---
 
+## UI Asset References
+
+Approved UI references live under `Project documents/UI Assets/Approved/`.
+
+- `DesignBoard_v2.0.png` is the master UI reference.
+- Individual approved assets define screen-level implementation details.
+- `AppIcon_v1.0.png` is the approved app icon reference.
+- Implementation sprints must translate approved assets into SwiftUI rather than redesigning the UI.
+
+---
+
+## AI Workflow Document Location
+
+AI workflow prompt and context files live under `Project documents/.github/`.
+
+Root-level `.github` documentation files were intentionally moved under `Project documents/.github/` so project workflow documentation remains with the rest of the project documents.
+
+---
+
 # Xcode Project Conventions
 
 ## Adding Source Files

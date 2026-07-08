@@ -2,9 +2,9 @@
 
 ## Current Phase
 
-M7 — Dashboard Experience (Sprint 19)
+M7 — Dashboard Experience (UI/UX v1.0 asset freeze)
 
-LedgerForge has completed its foundational multi-format import architecture, deterministic document ingestion pipeline and repository integration cleanup. The current objective is Dashboard Foundation while preserving validated import, persistence and repository boundaries from Sprint 18.
+LedgerForge has completed its foundational multi-format import architecture, deterministic document ingestion pipeline, repository integration cleanup, repository-backed dashboard hydration, and the Sprint 21 application shell. The current documentation baseline is the approved UI/UX v1.0 visual asset freeze.
 
 ---
 
@@ -60,6 +60,8 @@ This pipeline is the canonical production architecture defined by the current AD
 - AccountStore
 - Reactive dashboard foundation
 - Financial Snapshot
+- Application Shell
+- Approved UI/UX v1.0 visual assets
 - Product Vision
 - Architecture documentation
 - Engineering Standards
@@ -71,9 +73,9 @@ This pipeline is the canonical production architecture defined by the current AD
 
 ## Current Priorities
 
-1. Dashboard foundation.
-2. Expand regression fixtures.
-3. Generic PDF reader improvements.
+1. Implement future UI work from approved assets without redesign.
+2. Preserve repository-backed dashboard presentation boundaries.
+3. Expand regression fixtures.
 4. Password handling for encrypted financial documents.
 5. Insights and analytics.
 
@@ -121,8 +123,9 @@ Always prefer approved project references over assumptions.
 
 Current references include:
 
-- Dashboard reference workbook
-- Approved dashboard sketches
+- `Project documents/UI Assets/Approved/DesignBoard_v2.0.png`
+- Approved screen-level UI assets
+- `Project documents/UI Assets/Approved/AppIcon_v1.0.png`
 - Axis Bank statements
 - Axis Credit Card statements
 - CBQ Bank statements

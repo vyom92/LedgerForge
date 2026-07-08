@@ -12,9 +12,9 @@ This workflow applies to every AI-assisted implementation in LedgerForge.
    - Project documents/PROJECT_STATE.md
    - Project documents/Codex response.md
 3. Use the Task Routing Guide in `Project_Guide.md` to determine which additional documents are required. Depending on the task these may include:
-   - .github/Project_Context.md
-   - .github/ai-instructions.md
-   - .github/prompts.md
+   - Project documents/.github/Project_Context.md
+   - Project documents/.github/ai-instructions.md
+   - Project documents/.github/prompts.md
    - Project documents/ADR.md
    - Project documents/Engineering Standards.md
    - Project documents/Product Vision.md

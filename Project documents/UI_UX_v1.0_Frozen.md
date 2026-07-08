@@ -22,6 +22,17 @@ Like Architecture_v1.0_Frozen.md, this document is intended to minimise design d
 The objective is that implementation sprints translate this specification into SwiftUI components rather than redesigning the application.
 
 ---
+## Design Authority
+
+The UI specification is governed by the following hierarchy:
+
+1. UI_UX_v1.0_Frozen.md
+2. Approved UI Assets
+3. SwiftUI Implementation
+
+If a conflict exists, items higher in the hierarchy take precedence.
+
+SwiftUI implementation is considered a translation of this specification rather than the source of truth.
 
 # Core Principles
 
@@ -76,6 +87,26 @@ Examples:
 "What imported successfully?"
 
 ---
+# Approved Visual Direction
+
+LedgerForge adopts a Deep Indigo desktop design language.
+
+Visual characteristics:
+
+- Dark Mode first
+- Deep indigo gradient workspace
+- Slate glass-style cards
+- Purple / blue primary accents
+- High-contrast white typography
+- Green for positive financial values
+- Red / orange for negative financial values
+- Amber for warnings
+- Dense financial dashboards
+- Native macOS interaction patterns
+
+Implementation sprints must not redesign this visual language.
+
+All future screens inherit these visual tokens unless a newer frozen specification supersedes them.
 
 # Application Shell
 
@@ -160,9 +191,24 @@ The toolbar changes based on the active page.
 
 # Dashboard
 
-Dashboard Sketch V3 is the visual reference.
+DesignBoard_v2.0 is the master visual reference for LedgerForge.
 
-The approved Dashboard Sketch V3 image should be stored under `Project documents/UI Assets/` and treated as the canonical visual reference for implementation.
+DesignBoard_v2.0 defines:
+
+- application shell
+- visual language
+- spacing
+- navigation
+- information hierarchy
+- component relationships
+
+Individual screen assets inherit from this master reference.
+
+The approved master visual specification is:
+
+Project documents/UI Assets/Approved/DesignBoard_v2.0.png
+
+Individual approved assets within the same folder define the implementation details for each screen while remaining consistent with the master DesignBoard.
 
 Major sections:
 
@@ -330,23 +376,26 @@ Dashboard Refresh
 
 # Design System
 
-Rounded cards.
+The Design System is defined by:
 
-Consistent spacing.
+Project documents/UI Assets/Approved/DesignSystem_v1.0.png
 
-Consistent typography.
+Design principles:
 
-Single accent colour.
+- 8pt spacing grid
+- SF Pro typography
+- Glass-like slate cards
+- Deep Indigo theme
+- Consistent elevation
+- Native macOS controls
+- Thin separators
+- Rounded corners
+- Minimal shadows
+- Financial-first information hierarchy
 
-Minimal borders.
+All new components inherit this design system.
 
-Information hierarchy over decoration.
-
-Animations should be subtle.
-
-Spacing should follow a consistent scale.
-Typography should use native macOS text styles wherever practical.
-Cards, buttons and tables should share a unified visual language.
+No component should introduce new visual styles independently.
 
 ---
 
@@ -365,40 +414,41 @@ Future screens:
 - Insights
 - Budgets
 - Reports
+- Investments
+- Financial Timeline
+- Financial Intelligence
+- Rules & Automation
 
 ---
 
 # Component Library
 
-Reusable components only.
+## Navigation
 
-Navigation Sidebar
+- Navigation Sidebar
+- Toolbar
 
-Toolbar
+## Financial Components
 
-Financial KPI Card
+- Financial KPI Card
+- Account Card
+- Transaction Table
+- Import Activity Card
 
-Account Card
+## Input Components
 
-Transaction Table
+- Search Bar
+- Filter Chips
+- Import Wizard
 
-Import Activity Card
+## Status Components
 
-Quick Action Card
+- Status Badge
+- Validation Banner
 
-Status Badge
+## Developer
 
-Validation Banner
-
-Search Bar
-
-Filter Chips
-
-Developer Console
-
-Import Wizard
-
-No duplicate implementations.
+- Developer Console
 
 ---
 
@@ -432,6 +482,10 @@ Light Mode supported.
 
 VoiceOver compatible.
 
+Accessibility is considered a release requirement rather than a post-release enhancement.
+
+Every primary interaction should be fully keyboard accessible.
+
 ---
 
 # Future Modules
@@ -457,6 +511,77 @@ OCR
 These will extend the frozen shell rather than redesign it.
 
 ---
+# Design Tokens
+
+The following visual tokens are considered globally consistent.
+
+Theme
+
+- Deep Indigo
+
+Typography
+
+- SF Pro
+
+Corner Radius
+
+- Standard
+- Large
+
+Spacing
+
+- 8pt base grid
+
+Animation
+
+- Fast
+- Subtle
+
+Elevation
+
+- Four defined surface levels
+
+Icons
+
+- SF Symbols style
+- Outline preferred
+
+Charts
+
+- Smooth lines
+- Minimal gradients
+
+Tables
+
+- Compact
+- Financial-first
+
+Numbers
+
+- Right aligned
+- Tabular figures
+
+# Approved UI Assets
+
+The following assets form the approved UI specification.
+
+Project documents/UI Assets/Approved/
+
+- DesignBoard_v2.0.png (Master reference)
+- Dashboard_v1.0.png
+- Accounts_v1.0.png
+- Transactions_v1.0.png
+- ImportWizard_v1.0.png
+- Settings_v1.0.png
+- DeveloperConsole_v1.0.png
+- DesignSystem_v1.0.png
+- UserJourney_v1.0.png
+- ComponentLibrary_v1.0.png
+- AppIcon_v1.0.png (Approved app icon reference)
+
+DesignBoard_v2.0 defines the overall application and is the master UI reference.
+
+The remaining assets define individual screens and supporting systems. Implementation sprints must translate these approved assets into SwiftUI rather than redesigning the UI during implementation.
 
 # Acceptance Criteria
 
@@ -464,7 +589,7 @@ Implementation is complete when:
 
 ✓ Navigation matches this specification.
 
-✓ Dashboard follows Dashboard Sketch V3.
+✓ Dashboard matches Dashboard_v1.0.png and remains consistent with DesignBoard_v2.0.png.
 
 ✓ Preview exists only during import.
 
@@ -478,6 +603,11 @@ Implementation is complete when:
 
 ✓ New screens extend this architecture rather than replacing it.
 
+✓ All approved UI assets exist under Project documents/UI Assets/Approved/.
+
+✓ DesignBoard_v2.0 remains the master reference.
+
+✓ Every implemented screen has a corresponding approved asset.
 ---
 
 # Change Policy
@@ -498,3 +628,11 @@ Major UI changes require:
 7. Update any affected UI assets.
 
 Implementation sprints translate the approved UI specification into SwiftUI components. Design decisions belong in this document, not in implementation sprints.
+
+The approved UI assets are the authoritative visual specification.
+
+If implementation differs from the approved assets, the assets take precedence unless a newer frozen design revision has been approved.
+
+DesignBoard_v2.0 should be revised before individual screen assets whenever a change affects the overall application structure or visual language.
+
+Minor refinements may update individual assets without requiring a new DesignBoard revision, provided the master design language remains unchanged.

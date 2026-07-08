@@ -189,6 +189,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		283E97932FFE3A470034CA98 /* Branding */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Branding;
+			sourceTree = "<group>";
+		};
 		288EB0BD2FF7955300F09BC9 /* LedgerForgeTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = LedgerForgeTests;
@@ -315,7 +320,6 @@
 			isa = PBXGroup;
 			children = (
 				28D8CB622FFD21B7005B419A /* TestPlan.xctestplan */,
-				28B87B3E2FFBD1DE009BEE8C /* .github */,
 				28B87B272FFB2C90009BEE8C /* Project documents */,
 				288EB12E2FF7E10200F09BC9 /* Normalizers */,
 				288EB1012FF7BFD900F09BC9 /* Detectors */,
@@ -489,17 +493,19 @@
 		28B87B272FFB2C90009BEE8C /* Project documents */ = {
 			isa = PBXGroup;
 			children = (
+				28B87B3E2FFBD1DE009BEE8C /* .github */,
+				283E97932FFE3A470034CA98 /* Branding */,
 				28A3A4C22FFE1E3900DD5727 /* UI Assets */,
-				28A3A4C12FFE1DBA00DD5727 /* UI_UX_v1.0_Frozen.md */,
-				28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */,
+				28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */,
 				281BB1782FFC4CDA006E7424 /* Project_Guide.md */,
 				28B87B2E2FFB2D25009BEE8C /* ADR.md */,
-				286242762FFD168100B8AA66 /* PROJECT_STATE.md */,
-				286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */,
-				281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */,
-				28171F672FFC1718006115B7 /* Database_v1_Architecture.md */,
 				28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */,
-				28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */,
+				28A3A4C12FFE1DBA00DD5727 /* UI_UX_v1.0_Frozen.md */,
+				286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */,
+				28171F672FFC1718006115B7 /* Database_v1_Architecture.md */,
+				28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */,
+				286242762FFD168100B8AA66 /* PROJECT_STATE.md */,
+				281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */,
 				281BB1332FFC3FB5006E7424 /* Codex response.md */,
 			);
 			path = "Project documents";
@@ -521,6 +527,8 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				283E97932FFE3A470034CA98 /* Branding */,
+				28A3A4C22FFE1E3900DD5727 /* UI Assets */,
 				28B87B3E2FFBD1DE009BEE8C /* .github */,
 			);
 			name = LedgerForge;

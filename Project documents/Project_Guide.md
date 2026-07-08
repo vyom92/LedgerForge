@@ -5,12 +5,12 @@ This is the canonical project operating manual. Read this document first, then u
 ## Current Project Snapshot
 
 - **Current Milestone:** M7 – Dashboard Experience
-- **Current Sprint:** Sprint 21
-- **Current Phase:** Application Shell implementation (UI/UX v1.0)
+- **Current Sprint:** Documentation sync after Sprint 21
+- **Current Phase:** UI/UX v1.0 visual asset freeze
 - **Build Status:** Passing
-- **Validation Status:** Build passing; full regression baseline passing. Sprint 20 validation complete.
+- **Validation Status:** Build passing; full regression baseline passing. Sprint 21 validation complete.
 - **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 20
+- **Current Codex Baseline:** Sprint 21
 
 ## Current Architecture Status
 
@@ -18,7 +18,7 @@ This is the canonical project operating manual. Read this document first, then u
 |-----------|--------------|
 | Product Vision | Current and authoritative |
 | Architecture | Frozen v1.0 baseline active |
-| ADRs | Current through ADR-022 |
+| ADRs | Current through ADR-023 |
 | Database | Production-ready foundation |
 | Repository Layer | Stable with contract tests |
 | Persistence | SQLite repository layer active |
@@ -29,9 +29,9 @@ This is the canonical project operating manual. Read this document first, then u
 | Parser Selection | Framework implemented; deterministic selector active |
 | FinancialDocument | Immutable handoff model integrated after Statement Parser and before Validation |
 | Password Management | Operational; DefaultPasswordProvider integrated |
-| Dashboard | Foundation Phase 2 complete; repository-backed runtime store hydration, accounts overview and recent transaction summaries implemented. |
+| Dashboard | Application shell implemented; UI/UX v1.0 visual system frozen with approved Deep Indigo assets. |
 | Investments | Future module |
-| Validation | Build passing; full regression baseline passing. Sprint 20 validation complete |
+| Validation | Build passing; full regression baseline passing. Sprint 21 validation complete |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -86,9 +86,9 @@ Dashboard
 | Product Vision.md               | High-level goals, target users, and product impact    | New feature planning              | High        |
 | Engineering Standards.md        | Coding standards and engineering guidelines           | All engineering tasks             | Medium      |
 | AI_WORKFLOW.md                 | Workflow instructions for AI assistants                | All AI-related tasks              | Medium      |
-| .github/Project_Context.md      | AI bootstrap context and current project state summary | AI onboarding | Medium |
-| .github/ai-instructions.md     | AI behavior and interaction policies                   | AI onboarding                    | Medium      |
-| .github/prompts.md             | Prompt templates and examples for AI responses         | AI onboarding                    | Medium      |
+| Project documents/.github/Project_Context.md      | AI bootstrap context and current project state summary | AI onboarding | Medium |
+| Project documents/.github/ai-instructions.md     | AI behavior and interaction policies                   | AI onboarding                    | Medium      |
+| Project documents/.github/prompts.md             | Prompt templates and examples for AI responses         | AI onboarding                    | Medium      |
 | Project documents/Codex response.md | Current sprint working log, implementation notes, build/test progress | Sprint reviews, bug fixes, testing | High        |
 
 Only consult the documents required by the Task Routing Guide. Do not load the complete documentation set unless performing a full architecture or repository review.
@@ -173,7 +173,7 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 - **LedgerForgeTests:** Unit, integration, fixture and contract tests.  
 - **LedgerForgeUITests:** UI automation tests.  
 - **Project documents:** Documentation, architecture records, sprint reports.  
-- **.github:** GitHub-specific configuration, AI instructions, prompts, and context.  
+- **Project documents/.github:** Canonical AI instructions, prompts, and context. Root-level `.github` documentation files were intentionally moved here.  
 - **Tests:** Automated tests including unit, integration, and UI tests.  
 
 ## Folder Ownership
@@ -264,7 +264,7 @@ Additionally:
 ## Sprint Roadmap
 
 - **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16, Sprint 17, Sprint 18, Sprint 19, Sprint 20
-- **Current Sprint:** Sprint 21 – Application Shell
+- **Current Sprint:** Documentation sync after Sprint 21 – UI/UX visual asset freeze
 - **Upcoming Sprints:**
   - Sprint 22 – Import Workflow & UI Completion
   - Sprint 23 – PDF Input Adapter Integration
@@ -307,8 +307,9 @@ Additionally:
 - Repository-backed startup hydration ✅
 - Accounts overview ✅
 - Recent transaction summaries ✅
-- Application Shell 🚧
-- Sidebar navigation 🚧
+- Application Shell ✅
+- Sidebar navigation ✅
+- Approved UI asset freeze ✅
 - Dashboard implementation from frozen UI 🚧
 - Import workflow integration ⏳
 

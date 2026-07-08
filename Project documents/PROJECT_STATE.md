@@ -233,23 +233,47 @@ Completed
 
 ---
 
+# Sprint 21
+
+## Objective
+Implement the frozen Application Shell defined in `UI_UX_v1.0_Frozen.md`.
+
+## Status
+Completed
+
+## Outcome
+- Tab-based layout replaced with the approved permanent sidebar and top toolbar shell.
+- Dashboard remains the default content view.
+- Preview moved out of normal navigation and reserved for the future Import Wizard.
+- Developer Console moved out of primary navigation and into the Developer section.
+- Existing CSV import, repository hydration, runtime stores, dashboard data and transaction viewer behaviour preserved.
+- Import, parser, validation, repository write semantics, financial truth and transaction extraction preserved.
+- 77 active tests passed through Xcode.
+- Build passed.
+- Implementation commit: `539e4a5`
+- Documentation report commit: `7430224`
+- Git push to `origin/main` completed successfully.
+
+---
+
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `d327576`
+- Latest Commit: `7430224`
+- Latest Implementation Commit: `539e4a5`
 - Latest Tag: `sprint-20`
-- Latest ADR: ADR-022 — Preview Compatibility During Test Builds
-- Architecture Baseline: Sprint 20
-- Latest Milestone: Dashboard Foundation continuation
+- Latest ADR: ADR-023 — Frozen UI/UX Architecture
+- Architecture Baseline: Sprint 20 plus UI/UX v1.0 Frozen
+- Latest Milestone: Application Shell and UI/UX Asset Freeze
 - Build: Passing
-- Validation: Build passing; full regression baseline passing. Sprint 20 validation complete.
+- Validation: Build passing; full regression baseline passing. Sprint 21 validation complete.
 
 ## Session Startup Order
-1. AGENTS.md
+1. Project documents/.github/AGENTS.md
 2. Project_Guide.md
 3. PROJECT_STATE.md
-4. Latest ADR (currently ADR-022 — Preview Compatibility During Test Builds)
+4. Latest ADR (currently ADR-023 — Frozen UI/UX Architecture)
 5. Project documents/Codex response.md
 
 ## Current Pipeline
@@ -279,21 +303,21 @@ Dashboard
 
 ## Current Work
 
-Active Sprint: Sprint 21
+Active Work: Documentation sync after approved UI/UX asset freeze
 
 Objective:
-- Implement the frozen Application Shell defined in `UI_UX_v1.0_Frozen.md`.
+- Align project documentation with the approved UI/UX v1.0 asset freeze and relocated AI workflow documentation.
 
 Scope:
-- Replace the current tab-based layout with the approved application shell.
-- Implement the permanent sidebar navigation.
-- Implement the application toolbar.
-- Make Dashboard the default landing page.
-- Move Preview out of primary navigation in preparation for the future Import Wizard.
-- Move the Developer Console into the Developer section.
-- Preserve validated import, parser, validation, repository and runtime-store behaviour.
-- Preserve the approved presentation pipeline:
-  Repository Persistence → RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
+- Planning required before the next implementation sprint.
+- Approved UI assets live under `Project documents/UI Assets/Approved/`.
+- `DesignBoard_v2.0.png` is the master UI reference.
+- Individual approved assets define screen-level implementation details.
+- `AppIcon_v1.0.png` is the approved app icon reference.
+- Project documents/.github is the canonical location for AI workflow prompt and context files.
+- Preserve RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
+- Preserve import, parser, validation and repository semantics.
+- Preserve transaction search and credit/debit toggle behaviour.
 
 Out of Scope:
 - PDF support
@@ -311,4 +335,4 @@ Out of Scope:
 - Investments
 
 Next Major Milestone:
-- Complete the Application Shell and freeze the visual foundation before introducing additional input adapters such as PDF support.
+- Continue UI implementation from approved assets without redesigning the frozen visual system.
