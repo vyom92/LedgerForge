@@ -1,81 +1,83 @@
 # Codex Response
 
-## Sprint 20 Implementation Report - Dashboard Foundation Continuation
+## Sprint 21 Implementation Report - Application Shell
 
-Sprint 20 refined the repository-backed dashboard foundation built in Sprint 19 while preserving the approved presentation pipeline:
-
-```text
-Repository Persistence
-↓
-RepositoryStoreHydrator
-↓
-Runtime Stores
-↓
-ViewModels
-↓
-Views
-```
+Sprint 21 implemented the frozen application shell defined by `Project documents/UI_UX_v1.0_Frozen.md`.
 
 ## Summary
 
-- Added explicit dashboard presentation state for loading, empty, loaded and failed hydration outcomes.
-- Added store-derived dashboard account summaries.
-- Added store-derived recent transaction summaries.
-- Moved dashboard hydration message state out of `ContentView` and into `DashboardViewModel`.
-- Kept `ContentView` as the startup hydration trigger only.
-- Added a lightweight recent transactions section to the dashboard panel.
-- Preserved existing transaction search and credit/debit toggle behaviour.
-- Preserved import, parser, validation, repository and persistence semantics.
+- Replaced the tab-based layout with a permanent sidebar and top toolbar shell.
+- Made Dashboard the default content view.
+- Added the frozen sidebar navigation order:
+  - Dashboard
+  - Accounts
+  - Transactions
+  - Imports
+  - Insights
+  - Budgets
+  - Reports
+  - Settings
+  - Developer, visible only when Developer Mode is enabled.
+- Added a top toolbar placeholder with date-range, filters and import controls.
+- Moved the existing Preview out of normal navigation without deleting or redesigning `DocumentPreviewView`.
+- Moved Developer Console out of primary navigation and into the Developer section.
+- Preserved CSV import entry points through the toolbar, dashboard quick actions and Imports page.
+- Preserved repository hydration, runtime stores, dashboard data and transaction viewer behavior.
 
-No analytics, charts, categories, budgets, AI, OCR, XLS/XLSX, multi-currency or investments work was introduced.
+No parser, validation, repository, database, import-pipeline, analytics, budgets, insights, reports, OCR, AI, PDF or XLS/XLSX work was introduced.
+
+## Reference Visual
+
+The requested reference path `Project documents/UI Assets/Dashboard Sketch V3.png` was not present in the workspace.
+
+Available approved reference used for shell alignment:
+
+- `Project documents/UI Assets/Dashboard_v1.0_Approved.png`
 
 ## Files Created
 
-- `LedgerForgeTests/DashboardViewModelTests.swift`
+- None.
 
 ## Files Modified
 
 - `ContentView.swift`
-- `ViewModels/DashboardViewModel.swift`
 - `Project documents/Codex response.md`
 
 ## Implementation Details
 
-### DashboardViewModel
+### Application Shell
 
-- Added `DashboardPresentationState`.
-- Added `DashboardAccountSummary`.
-- Added `DashboardTransactionSummary`.
-- Added `accountSummaries`, `recentTransactionSummaries` and `transactionCount`.
-- Added hydration state methods:
-  - `markHydrationStarted()`
-  - `markHydrationCompleted(_:)`
-  - `markHydrationFailed(_:)`
-- Kept all dashboard data derived from `AccountStore` and `TransactionStore`.
-- Did not add repository or SQLite access to the ViewModel.
+- `ContentView` now owns the application shell.
+- The shell uses a permanent sidebar and main content region.
+- The toolbar sits above the main content region.
+- Dashboard remains the default selected section.
+- The shell preserves startup hydration through `RepositoryStoreHydrator`.
 
-### ContentView
+### Navigation
 
-- Removed local dashboard hydration message state.
-- Bound account and transaction dashboard presentation to `DashboardViewModel`.
-- Kept startup hydration execution in `hydrateDashboardOnce()`.
-- Continued using `RepositoryStoreHydrator` as the only persistence-to-runtime-store boundary.
+- Primary navigation now includes Dashboard, Accounts, Transactions and Imports.
+- Future navigation rows for Insights, Budgets and Reports are visible as disabled/future placeholders.
+- Settings is part of permanent navigation.
+- Developer navigation is hidden by default and appears only when Developer Mode is enabled from Settings.
 
-### Tests
+### Preview And Developer Console
 
-Added `DashboardViewModelTests` covering:
+- `DocumentPreviewView` was not deleted or redesigned.
+- Preview is no longer part of normal navigation.
+- `DeveloperConsoleView` was not deleted or redesigned.
+- Developer Console is accessible only through the Developer section when Developer Mode is enabled.
 
-- Empty hydration state.
-- Account summary from runtime-store accounts.
-- Transaction summary from runtime-store transactions.
-- Snapshot values derived from runtime-store transactions.
-- Loading, loaded and failed presentation states.
+### Preservation
 
-Existing `RepositoryStoreHydratorTests` already covered no-duplicate hydration, so no hydrator test changes were required.
+- CSV import still uses the existing file importer and `ImportEngine.shared.importFile(from:)`.
+- Successful imports still navigate to the Transactions page.
+- Dashboard hydration still runs once through `RepositoryStoreHydrator().hydrateIfNeeded()`.
+- Dashboard data still comes from runtime stores through `DashboardViewModel`.
+- Transaction search and credit/debit toggle behavior remains inside `TransactionListView` and was not changed.
 
 ## Build Result
 
-Baseline build before implementation passed using Xcode `BuildProject`.
+Baseline build before source changes passed using Xcode `BuildProject`.
 
 Post-implementation build passed using Xcode `BuildProject`.
 
@@ -85,77 +87,59 @@ The project built successfully.
 
 ## Validation Result
 
-Focused Sprint 20 validation passed through Xcode `RunSomeTests`.
-
-- `DashboardViewModelTests`: 4 passed, 0 failed.
-- `RepositoryStoreHydratorTests`: 3 passed, 0 failed.
-
 Full active test-plan validation passed through Xcode `RunAllTests`.
 
 ```text
 77 tests passed, 0 failed.
 ```
 
-The full test plan includes the required Sprint 20 dashboard, hydration, import, parser, validation, repository, reader, registry, password provider and UI regression coverage.
+Validation coverage included:
 
-No unresolved merge conflict markers were found.
+- Existing regression suite.
+- Existing UI launch tests.
+- CSV import regression tests.
+- Dashboard hydration tests.
+- Repository integration and repository contract tests.
+- Parser, validation, reader, registry and password provider tests.
 
 ## Behavioural Impact
 
-- Dashboard startup still hydrates runtime stores from repository-backed trusted data.
-- Runtime stores remain the only source consumed by dashboard ViewModels.
+- The primary app structure now matches the frozen shell specification.
+- Dashboard is now the first content view.
+- Preview and Developer Console no longer occupy primary navigation.
+- Existing import, persistence, hydration, runtime-store and transaction-viewer behavior is preserved.
 - Views and ViewModels still do not access SQLite.
-- `RepositoryStoreHydrator` remains the only persistence-to-runtime-store boundary.
-- Existing transaction search and credit/debit toggle behaviour remains unchanged.
-- Import, parser, validation, repository write semantics, financial truth and transaction extraction remain unchanged.
-- Runtime stores remain the single source of truth consumed by dashboard presentation.
+- Repository semantics and repository APIs were not changed.
 
 ## Architecture Decisions
 
-- Presentation state now lives in `DashboardViewModel` instead of `ContentView`.
-- Account and recent transaction dashboard rows are summary projections derived from runtime stores, not duplicate financial state.
-- No repository API expansion was needed.
-- No persistence, schema or repository write changes were needed.
-
-## Architecture Reuse
-
-Sprint 20 intentionally reused the existing architecture rather than introducing new layers.
-
-Reused components:
-
-- RepositoryStoreHydrator
-- AccountStore
-- TransactionStore
-- DashboardViewModel
-- Existing repository read contracts
-
-No additional repository layer, coordinator, persistence surface or database abstraction was introduced.
+- Kept the shell implementation in `ContentView` because Sprint 21 is limited to the application shell.
+- Reused existing child views instead of replacing them.
+- Reused `DashboardViewModel`, `RepositoryStoreHydrator`, `TransactionListView`, `DocumentPreviewView` and `DeveloperConsoleView`.
+- Did not introduce new ViewModels, stores, repositories or persistence paths.
 
 ## Remaining Technical Debt
 
 ### Engineering
 
-- Dashboard state is still initialized from shared runtime stores.
-- Dependency injection could be refined in future if broader testing requirements justify it.
+- The shell is currently implemented in `ContentView`; future UI sprints may extract reusable shell components only if the frozen UI grows enough to justify it.
+- Settings currently exposes only the Developer Mode control needed to keep Developer Console out of normal navigation.
 
 ### Future Product Work
 
-- Advanced transaction browsing
-- Additional dashboard presentation polish
-- Charts and analytics
-- Categories
-- Budgets
-- Insights
-- Multi-currency
+- Import Wizard flow for Preview.
+- Dedicated Imports history page.
+- Full Accounts page.
+- Dashboard visual polish against future approved UI slices.
+- Analytics, charts, budgets, insights, reports, multi-currency and investments remain future work.
 
 ## Commit And Push Result
 
-- Commit: `d327576 Sprint 20: refine dashboard foundation`
-- Push result: `origin/main` updated successfully.
-- Tag: `sprint-20`
-- Tag push result: `sprint-20` pushed successfully.
-- Local tracking note: remote push succeeded, but the sandbox could not update local `refs/remotes/origin/main` because `.git/refs/remotes/origin/main.lock` could not be created.
+- Commit: not created in this documentation update step.
+- Push result: not performed in this documentation update step.
+- Tag: not created.
+- Tag push result: not performed.
 
 ## Next Recommended Sprint
 
-Sprint 21 - Dashboard Foundation continuation.
+Sprint 22 - Dashboard Foundation continuation.
