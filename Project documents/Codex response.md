@@ -1,100 +1,124 @@
 # Codex Response
 
-## Documentation Sync Report - UI/UX v1.0 Asset Freeze
+## Sprint 22 Completion Report - Translate Frozen UI Assets into SwiftUI
 
-This documentation-only update aligns the project documents with the approved UI/UX v1.0 asset freeze and the relocation of AI workflow files under `Project documents/.github/`.
-
-No source code, tests, project settings, architecture redesign, PDF support, iPhone companion app work, or future feature implementation was performed.
+Sprint 22 translated the approved UI/UX v1.0 assets into the existing SwiftUI application shell without changing import, parser, validation, repository, hydration or financial-truth behavior.
 
 ## Summary
 
-- Confirmed the approved UI assets under `Project documents/UI Assets/Approved/`.
-- Documented `DesignBoard_v2.0.png` as the master UI reference.
-- Documented individual approved assets as screen-level implementation references.
-- Documented `AppIcon_v1.0.png` as the approved app icon reference.
-- Confirmed Deep Indigo dark mode as the approved theme.
-- Reaffirmed that Preview belongs only inside the Import Wizard flow.
-- Reaffirmed that Developer Console is hidden from normal user flow.
-- Updated workflow documentation to use `Project documents/.github/` as the canonical AI prompt/context location.
-- Removed stale references to the old dashboard sketch and old approved dashboard filename.
+- Created a Deep Indigo dark-mode SwiftUI theme matching the frozen visual system.
+- Translated the approved permanent sidebar hierarchy and contextual toolbar into the app shell.
+- Made Dashboard the default content screen inside the approved shell.
+- Translated Dashboard, Accounts, Transactions, Import Wizard shell, Settings and Developer Console screens into reusable card/table/badge/sidebar/toolbar patterns.
+- Preserved Preview as import-workflow-only by keeping it outside normal navigation.
+- Kept Developer Console outside normal user flow and under the Developer section.
+- Preserved CSV import entry points, repository hydration, runtime stores, dashboard data and transaction viewer behavior.
+- Preserved existing transaction search and credit/debit toggle behavior.
 
-## Asset Inventory Result
+## Files Changed
 
-Approved assets found:
-
-- `DesignBoard_v2.0.png`
-- `Dashboard_v1.0.png`
-- `Accounts_v1.0.png`
-- `Transactions_v1.0.png`
-- `ImportWizard_v1.0.png`
-- `Settings_v1.0.png`
-- `DeveloperConsole_v1.0.png`
-- `DesignSystem_v1.0.png`
-- `UserJourney_v1.0.png`
-- `ComponentLibrary_v1.0.png`
-- `AppIcon_v1.0.png`
-
-Folder review:
-
-- `Project documents/.github/` exists and contains AI workflow prompt/context files.
-- `Project documents/UI Assets/Approved/` exists and contains all approved assets listed above.
-- `Project documents/Branding/` exists.
-- `Project documents/UI Assets/Archive/` was requested for review but is not currently present.
-
-## Files Modified
-
-- `Project documents/UI_UX_v1.0_Frozen.md`
-- `Project documents/Project_Guide.md`
-- `Project documents/PROJECT_STATE.md`
-- `Project documents/Product Vision.md`
-- `Project documents/BUILD_AND_PROJECT_CONVENTIONS.md`
-- `Project documents/AI_WORKFLOW.md`
-- `Project documents/.github/Project_Context.md`
+- `ContentView.swift`
+- `Views/TransactionListView.swift`
+- `Views/DeveloperConsoleView.swift`
 - `Project documents/Codex response.md`
+- `Project documents/Implementation Reports/Sprint22_UI_Implementation_Report.md`
 
-## Files Not Modified
+## Components Created
 
-- Source code
-- Tests
-- `LedgerForge.xcodeproj/project.pbxproj`
-- `Project documents/ADR.md`
-- `Project documents/.github/AGENTS.md`
-- `Project documents/.github/ai-instructions.md`
-- `Project documents/.github/prompts.md`
+- `LFTheme`
+- `LFPanel`
+- `LFSearchField`
+- Deep Indigo sidebar navigation pattern
+- Contextual toolbar pattern
+- KPI metric cards
+- Account summary cards and account rows
+- Transaction summary cards and transaction rows
+- Status badges
+- Import wizard stepper shell
+- Settings category and setting-row components
+- Developer console tabs, filters, log rows and overview cards
 
-## Stale References Fixed
+## Assets Implemented
 
-- Replaced old dashboard visual references with `Project documents/UI Assets/Approved/DesignBoard_v2.0.png` and `Dashboard_v1.0.png`.
-- Replaced canonical AI workflow path references from root `.github` to `Project documents/.github`.
-- Replaced active Sprint 21 implementation wording with documentation-sync / UI asset freeze wording.
-- Updated latest ADR references to ADR-023 where documentation describes current project state.
-- Updated current dashboard state to reflect the application shell and approved asset freeze.
+- `DesignBoard_v2.0.png`: implemented as the master application shell, sidebar, toolbar, spacing, cards, badges and dense table direction.
+- `Dashboard_v1.0.png`: implemented as dashboard KPIs, accounts, spending overview, import activity, quick actions, recent transactions and cash-flow trend structure.
+- `Accounts_v1.0.png`: implemented as account metrics, account table, search/filter shell and account detail panel.
+- `Transactions_v1.0.png`: implemented as transaction summary cards, range selector, filter/search row, transaction table and detail panel.
+- `ImportWizard_v1.0.png`: implemented as the import wizard shell with stepper, upload panel and import options panel.
+- `Settings_v1.0.png`: implemented as settings category sidebar, application/default settings cards, system information and danger-zone shell.
+- `DeveloperConsole_v1.0.png`: implemented as diagnostics tabs, filters, log stream, command bar and system/database/tool panels.
+- `DesignSystem_v1.0.png` and `ComponentLibrary_v1.0.png`: implemented through shared Deep Indigo theme tokens, cards, badges, buttons, tables and chips.
+- `AppIcon_v1.0.png`: reflected in the sidebar mark direction; the app icon asset itself was not modified.
 
-## Stale References Intentionally Left
+## Build Result
 
-- Historical Sprint 18 references to SwiftUI Preview compatibility remain because they document ADR-022 and past validation history.
-- Future module names such as Insights, Budgets, Reports, multi-currency and investments remain where they are explicitly listed as future work.
+- Baseline build before implementation: passed.
+- Post-implementation build: passed.
 
-## Validation / Documentation Checks
+## Tests Executed
 
-- Documentation-only update.
-- No build was required because no source code, tests or project settings were modified.
-- Stale phrase search was run after edits.
+- Focused dashboard and hydration validation:
+  - `DashboardViewModelTests`
+  - `RepositoryStoreHydratorTests`
+  - Result: 7 tests passed, 0 failed.
+- Full active test plan:
+  - Result: 77 tests passed, 0 failed.
 
-## Remaining Notes
+## Validation Result
 
-- `Project documents/UI Assets/Archive/` is not present in the current workspace. This is acceptable for the current asset freeze because all current approved implementation references live under `Project documents/UI Assets/Approved/`.
+- Build passed.
+- Full active regression suite passed.
+- Existing UI launch tests passed.
+- CSV import regression tests passed.
+- Repository hydration tests passed.
+- Transaction viewer search/filter behavior preserved through existing `TransactionListViewModel` flow.
+- No unresolved merge conflict markers found.
+
+## Visual Validation Notes
+
+- Sidebar hierarchy matches `DesignBoard_v2.0.png`, including Dashboard, Accounts, Transactions, Import, future modules, Settings and Developer Console.
+- Toolbar placement matches `DesignBoard_v2.0.png` with contextual controls and import action.
+- Dashboard matches the approved structure: KPI cards, accounts, spending overview, import activity, quick actions, recent transactions and cash-flow trend.
+- Accounts screen matches the approved structure: summary cards, search/filter row, account table and detail panel.
+- Transactions screen matches the approved structure: summary cards, range selector, filter/search row, table and detail panel.
+- Import Wizard matches the approved shell and workflow structure while preserving current CSV/spreadsheet import capability only.
+- Settings screen matches the approved card/sidebar layout and keeps Developer Mode as the existing toggle.
+- Developer Console matches the approved diagnostics layout while continuing to read existing console messages.
+
+## Architecture Compliance
+
+- Views and ViewModels do not access SQLite.
+- Dashboard still consumes runtime-store-backed `DashboardViewModel` state.
+- Transaction viewer still consumes `TransactionListViewModel`.
+- RepositoryStoreHydrator remains the persistence-to-runtime-store boundary.
+- No repository, database, validation, parser, import pipeline, transaction extraction or financial truth changes were made.
+
+## Intentional Deviations From Approved Assets
+
+- Charts are static structural approximations only; analytics/chart implementation remains out of Sprint 22 scope.
+- Import Wizard copy limits supported formats to the current CSV/spreadsheet implementation and does not activate PDF/OCR support.
+- App icon implementation was not changed; `AppIcon_v1.0.png` remains the visual reference for a future asset pipeline task.
+- Some mock data labels from the approved assets were replaced with live runtime-store values or explicit future-module placeholders.
+
+## Remaining Differences From Approved Assets
+
+- Screen-perfect spacing, chart rendering and advanced table interactions can be refined in a later UI polish sprint.
+- Accounts detail and transaction detail panels are presentation shells backed by currently available runtime-store data.
+- Settings and Developer Console action controls are visual shells where behavior belongs to later feature sprints.
+
+## Checkpoint Commit
+
+- `b7013c6` - `Checkpoint: UI asset freeze`
+- Push result: remote `main` updated successfully. Local remote-tracking ref update was blocked by sandboxed `.git` lock-file permissions.
+
+## Sprint 22 Implementation Commit
+
+- Pending final commit.
+
+## Push Result
+
+- Pending final push.
 
 ## Next Recommended Sprint
 
-Sprint 22 — Translate Frozen UI Assets into SwiftUI.
-
-Sprint 22 should implement the approved UI/UX v1.0 assets without redesigning them.
-
-Authoritative references:
-
-- `Project documents/UI Assets/Approved/DesignBoard_v2.0.png` is the master UI specification.
-- Individual approved screen assets define implementation details for their respective screens.
-- `Project documents/UI_UX_v1.0_Frozen.md` defines the visual and interaction governance.
-
-Implementation must translate the approved assets into reusable SwiftUI components, preserve existing import/parser/validation/repository/hydration behaviour, and document any intentional visual deviations.
+Sprint 23 — UI polish and interaction refinement against the approved UI/UX v1.0 assets.
