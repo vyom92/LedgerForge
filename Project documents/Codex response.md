@@ -108,6 +108,7 @@ No unresolved merge conflict markers were found.
 - `RepositoryStoreHydrator` remains the only persistence-to-runtime-store boundary.
 - Existing transaction search and credit/debit toggle behaviour remains unchanged.
 - Import, parser, validation, repository write semantics, financial truth and transaction extraction remain unchanged.
+- Runtime stores remain the single source of truth consumed by dashboard presentation.
 
 ## Architecture Decisions
 
@@ -116,12 +117,36 @@ No unresolved merge conflict markers were found.
 - No repository API expansion was needed.
 - No persistence, schema or repository write changes were needed.
 
+## Architecture Reuse
+
+Sprint 20 intentionally reused the existing architecture rather than introducing new layers.
+
+Reused components:
+
+- RepositoryStoreHydrator
+- AccountStore
+- TransactionStore
+- DashboardViewModel
+- Existing repository read contracts
+
+No additional repository layer, coordinator, persistence surface or database abstraction was introduced.
+
 ## Remaining Technical Debt
 
-- Dashboard formatting remains basic and INR-first; multi-currency display is out of scope.
-- Recent transaction display is intentionally lightweight and not a full browsing redesign.
-- Search, filters, charts, analytics, budgets, categories and insights remain future work.
-- Dashboard state is still initialized from shared runtime stores; broader dependency-injection cleanup can be considered only if future tests require it.
+### Engineering
+
+- Dashboard state is still initialized from shared runtime stores.
+- Dependency injection could be refined in future if broader testing requirements justify it.
+
+### Future Product Work
+
+- Advanced transaction browsing
+- Additional dashboard presentation polish
+- Charts and analytics
+- Categories
+- Budgets
+- Insights
+- Multi-currency
 
 ## Commit And Push Result
 
