@@ -16,8 +16,8 @@ struct DeveloperConsoleView: View {
 
                 Spacer()
 
-                toolbarBadge("Environment: Local", color: LFTheme.success)
-                toolbarBadge(Self.timeFormatter.string(from: Date()), color: LFTheme.textSecondary)
+                LFInlineBadge(title: "Environment: Local", color: LFTheme.success)
+                LFInlineBadge(title: Self.timeFormatter.string(from: Date()), color: LFTheme.textSecondary)
 
                 Button {
                     // Console mutation is out of Sprint 22 scope; this is a visual shell control.
@@ -76,8 +76,8 @@ struct DeveloperConsoleView: View {
 
     private var consoleFilters: some View {
         HStack(spacing: 12) {
-            filterMenu("Log Level", value: "All")
-            filterMenu("Source", value: "All")
+            LFFilterChip(title: "Log Level", value: "All", width: 180, surface: LFTheme.surfaceRaised)
+            LFFilterChip(title: "Source", value: "All", width: 180, surface: LFTheme.surfaceRaised)
             LFSearchField(placeholder: "Search logs...")
             Button {
                 // Visual-only pause control for the shell.
@@ -89,7 +89,7 @@ struct DeveloperConsoleView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 7))
             }
             .buttonStyle(.plain)
-            toolbarBadge("Live", color: LFTheme.success)
+            LFInlineBadge(title: "Live", color: LFTheme.success)
         }
     }
 
@@ -117,7 +117,7 @@ struct DeveloperConsoleView: View {
                                 .foregroundStyle(LFTheme.textSecondary)
                                 .frame(width: 86, alignment: .leading)
 
-                            statusBadge(level(for: message), color: color(for: message))
+                            LFStatusBadge(title: level(for: message), color: color(for: message))
                                 .frame(width: 72, alignment: .leading)
 
                             Text(source(for: message))
@@ -187,9 +187,9 @@ struct DeveloperConsoleView: View {
 
     private var databasePanel: some View {
         LFPanel(title: "Database") {
-            infoRow("Engine", value: "SQLite")
-            infoRow("Path", value: "~/Application Support/LedgerForge")
-            infoRow("Boundary", value: "Repository protocols")
+            LFInfoRow(title: "Engine", value: "SQLite", verticalPadding: 5)
+            LFInfoRow(title: "Path", value: "~/Application Support/LedgerForge", verticalPadding: 5)
+            LFInfoRow(title: "Boundary", value: "Repository protocols", verticalPadding: 5)
             Button {
                 // Opening external database tools is out of Sprint 22 scope.
             } label: {
@@ -227,36 +227,6 @@ struct DeveloperConsoleView: View {
             .padding(.vertical, 10)
     }
 
-    private func filterMenu(_ title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-                .foregroundStyle(LFTheme.textSecondary)
-            Text(value)
-            Image(systemName: "chevron.down")
-                .font(.caption2)
-        }
-        .font(.caption)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(width: 180)
-        .background(LFTheme.surfaceRaised)
-        .clipShape(RoundedRectangle(cornerRadius: 7))
-    }
-
-    private func toolbarBadge(_ title: String, color: Color) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
-            Text(title)
-        }
-        .font(.caption)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(LFTheme.surfaceRaised)
-        .clipShape(RoundedRectangle(cornerRadius: 7))
-    }
-
     private func overviewMetric(_ title: String, value: String, color: Color = LFTheme.text) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -270,18 +240,6 @@ struct DeveloperConsoleView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(LFTheme.surfaceRaised)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func infoRow(_ title: String, value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(title)
-                .foregroundStyle(LFTheme.textSecondary)
-            Spacer()
-            Text(value)
-                .multilineTextAlignment(.trailing)
-        }
-        .font(.caption)
-        .padding(.vertical, 5)
     }
 
     private func toolRow(_ title: String, color: Color = LFTheme.text) -> some View {
@@ -311,16 +269,6 @@ struct DeveloperConsoleView: View {
         }
         .font(.caption)
         .padding(.vertical, 6)
-    }
-
-    private func statusBadge(_ title: String, color: Color) -> some View {
-        Text(title)
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(color.opacity(0.14))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     private func level(for message: String) -> String {

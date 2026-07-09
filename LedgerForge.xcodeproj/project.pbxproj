@@ -35,6 +35,16 @@
 		2862426F2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */; };
 		286D63F02FFD3057000CEC65 /* FinancialDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D63EF2FFD3057000CEC65 /* FinancialDocument.swift */; };
 		286D68F02FFFE6440078AAC5 /* AGENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 286D68EF2FFFE6440078AAC5 /* AGENTS.md */; };
+		286D68F32FFFF60E0078AAC5 /* LFTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68F22FFFF60E0078AAC5 /* LFTheme.swift */; };
+		286D68F52FFFF6300078AAC5 /* LFPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68F42FFFF6300078AAC5 /* LFPanel.swift */; };
+		286D68F72FFFF6560078AAC5 /* LFSearchField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68F62FFFF6560078AAC5 /* LFSearchField.swift */; };
+		286D68F92FFFF67D0078AAC5 /* LFStatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68F82FFFF67D0078AAC5 /* LFStatusBadge.swift */; };
+		286D68FB2FFFF6A60078AAC5 /* LFFilterChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68FA2FFFF6A60078AAC5 /* LFFilterChip.swift */; };
+		286D68FD2FFFF6C20078AAC5 /* LFInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68FC2FFFF6C20078AAC5 /* LFInfoRow.swift */; };
+		286D68FF2FFFF6E60078AAC5 /* LFEmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68FE2FFFF6E60078AAC5 /* LFEmptyState.swift */; };
+		286D69012FFFF7030078AAC5 /* LFIconTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D69002FFFF7030078AAC5 /* LFIconTile.swift */; };
+		286D69032FFFF7210078AAC5 /* LFActionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D69022FFFF7210078AAC5 /* LFActionRow.swift */; };
+		286D69052FFFF87B0078AAC5 /* LFInlineBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D69042FFFF87B0078AAC5 /* LFInlineBadge.swift */; };
 		2872790D2FFD286100468973 /* ParserSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790C2FFD286100468973 /* ParserSelection.swift */; };
 		2872790F2FFD287300468973 /* StatementParserSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790E2FFD287300468973 /* StatementParserSelector.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
@@ -128,6 +138,16 @@
 		286242762FFD168100B8AA66 /* PROJECT_STATE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PROJECT_STATE.md; sourceTree = "<group>"; };
 		286D63EF2FFD3057000CEC65 /* FinancialDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialDocument.swift; sourceTree = "<group>"; };
 		286D68EF2FFFE6440078AAC5 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
+		286D68F22FFFF60E0078AAC5 /* LFTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFTheme.swift; sourceTree = "<group>"; };
+		286D68F42FFFF6300078AAC5 /* LFPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFPanel.swift; sourceTree = "<group>"; };
+		286D68F62FFFF6560078AAC5 /* LFSearchField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFSearchField.swift; sourceTree = "<group>"; };
+		286D68F82FFFF67D0078AAC5 /* LFStatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFStatusBadge.swift; sourceTree = "<group>"; };
+		286D68FA2FFFF6A60078AAC5 /* LFFilterChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFFilterChip.swift; sourceTree = "<group>"; };
+		286D68FC2FFFF6C20078AAC5 /* LFInfoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFInfoRow.swift; sourceTree = "<group>"; };
+		286D68FE2FFFF6E60078AAC5 /* LFEmptyState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFEmptyState.swift; sourceTree = "<group>"; };
+		286D69002FFFF7030078AAC5 /* LFIconTile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFIconTile.swift; sourceTree = "<group>"; };
+		286D69022FFFF7210078AAC5 /* LFActionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFActionRow.swift; sourceTree = "<group>"; };
+		286D69042FFFF87B0078AAC5 /* LFInlineBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFInlineBadge.swift; sourceTree = "<group>"; };
 		2872790C2FFD286100468973 /* ParserSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserSelection.swift; sourceTree = "<group>"; };
 		2872790E2FFD287300468973 /* StatementParserSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementParserSelector.swift; sourceTree = "<group>"; };
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -315,6 +335,23 @@
 			path = Readers;
 			sourceTree = "<group>";
 		};
+		286D68F12FFFF60E0078AAC5 /* Common */ = {
+			isa = PBXGroup;
+			children = (
+				286D68F22FFFF60E0078AAC5 /* LFTheme.swift */,
+				286D68F42FFFF6300078AAC5 /* LFPanel.swift */,
+				286D68F62FFFF6560078AAC5 /* LFSearchField.swift */,
+				286D68F82FFFF67D0078AAC5 /* LFStatusBadge.swift */,
+				286D68FA2FFFF6A60078AAC5 /* LFFilterChip.swift */,
+				286D68FC2FFFF6C20078AAC5 /* LFInfoRow.swift */,
+				286D68FE2FFFF6E60078AAC5 /* LFEmptyState.swift */,
+				286D69002FFFF7030078AAC5 /* LFIconTile.swift */,
+				286D69022FFFF7210078AAC5 /* LFActionRow.swift */,
+				286D69042FFFF87B0078AAC5 /* LFInlineBadge.swift */,
+			);
+			path = Common;
+			sourceTree = "<group>";
+		};
 		288EB0A42FF7955200F09BC9 = {
 			isa = PBXGroup;
 			children = (
@@ -435,6 +472,7 @@
 				28B87B252FFB24C3009BEE8C /* TransactionListView.swift */,
 				288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */,
 				288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */,
+				286D68F12FFFF60E0078AAC5 /* Common */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -503,9 +541,9 @@
 				286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */,
 				28171F672FFC1718006115B7 /* Database_v1_Architecture.md */,
 				28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */,
-				2857FA502FFEA28B00948892 /* Implementation.md */,
 				286242762FFD168100B8AA66 /* PROJECT_STATE.md */,
 				281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */,
+				2857FA502FFEA28B00948892 /* Implementation.md */,
 				281BB1332FFC3FB5006E7424 /* Codex response.md */,
 			);
 			path = "Project documents";
@@ -675,15 +713,21 @@
 				2862425F2FFCE80D00B8AA66 /* PDFDocumentReader.swift in Sources */,
 				286242612FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift in Sources */,
 				286242632FFCE80D00B8AA66 /* DefaultPasswordProvider.swift in Sources */,
+				286D68FD2FFFF6C20078AAC5 /* LFInfoRow.swift in Sources */,
 				288EB12B2FF7E08500F09BC9 /* NormalizedRow.swift in Sources */,
+				286D68FF2FFFF6E60078AAC5 /* LFEmptyState.swift in Sources */,
 				28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */,
+				286D69012FFFF7030078AAC5 /* LFIconTile.swift in Sources */,
 				28D11EAA2FFDA6CB00C12A68 /* RepositoryStoreHydrator.swift in Sources */,
 				288EB1272FF7D96A00F09BC9 /* DocumentPreviewView.swift in Sources */,
 				288EB1242FF7D8A000F09BC9 /* Parsers/StatementParser.swift in Sources */,
+				286D68F72FFFF6560078AAC5 /* LFSearchField.swift in Sources */,
 				28B87B332FFB31C9009BEE8C /* ImportValidationResult.swift in Sources */,
+				286D68F92FFFF67D0078AAC5 /* LFStatusBadge.swift in Sources */,
 				2872790D2FFD286100468973 /* ParserSelection.swift in Sources */,
 				288EB1232FF7D89B00F09BC9 /* Parsers/AxisBankAccountParser.swift in Sources */,
 				281BB1842FFC4D40006E7424 /* ImportProgress.swift in Sources */,
+				286D68FB2FFFF6A60078AAC5 /* LFFilterChip.swift in Sources */,
 				281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */,
 				288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */,
 				288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */,
@@ -694,6 +738,7 @@
 				288EB1252FF7D8B500F09BC9 /* Transaction.swift in Sources */,
 				288EB0ED2FF7AE2500F09BC9 /* DocumentReader.swift in Sources */,
 				288EB12D2FF7E0C000F09BC9 /* NormalizedDocument.swift in Sources */,
+				286D69032FFFF7210078AAC5 /* LFActionRow.swift in Sources */,
 				288EB1202FF7D69000F09BC9 /* DocumentMetadata.swift in Sources */,
 				288EB1042FF7C0A600F09BC9 /* DocumentStore.swift in Sources */,
 				281BB15D2FFC4881006E7424 /* Migrations.swift in Sources */,
@@ -706,6 +751,7 @@
 				288EB0EE2FF7AE2C00F09BC9 /* CSVReader.swift in Sources */,
 				28B87B312FFB2F22009BEE8C /* Services/DirectionResolver.swift in Sources */,
 				28B87B372FFBB599009BEE8C /* ImportSession.swift in Sources */,
+				286D68F32FFFF60E0078AAC5 /* LFTheme.swift in Sources */,
 				281BB15C2FFC4879006E7424 /* SQLiteRepositoryProvider.swift in Sources */,
 				286D63F02FFD3057000CEC65 /* FinancialDocument.swift in Sources */,
 				28B87B352FFB31FD009BEE8C /* Services/ImportValidator.swift in Sources */,
@@ -714,6 +760,7 @@
 				28171EE22FFBE2F0006115B7 /* TransactionListViewModel.swift in Sources */,
 				281BB1862FFC4D40006E7424 /* ImportError.swift in Sources */,
 				281BB1922FFC4D6A006E7424 /* ImportCoordinator.swift in Sources */,
+				286D68F52FFFF6300078AAC5 /* LFPanel.swift in Sources */,
 				281BB15A2FFC486C006E7424 /* Repository.swift in Sources */,
 				288EB0F22FF7B2AB00F09BC9 /* CSVAnalyzer.swift in Sources */,
 				281BB18E2FFC4D56006E7424 /* ImportInstitutionDetector.swift in Sources */,
@@ -722,6 +769,7 @@
 				288EB11E2FF7D68200F09BC9 /* InstitutionDetector.swift in Sources */,
 				288EB0E62FF7A84F00F09BC9 /* Services/ImportEngine.swift in Sources */,
 				281BB15B2FFC4872006E7424 /* SQLiteDatabase.swift in Sources */,
+				286D69052FFFF87B0078AAC5 /* LFInlineBadge.swift in Sources */,
 				281BB1882FFC4D53006E7424 /* ImportDocumentReader.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

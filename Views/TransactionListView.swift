@@ -56,10 +56,10 @@ struct TransactionListView: View {
     private var transactionFilterBar: some View {
         LFPanel {
             HStack(spacing: 12) {
-                filterMenu("All Accounts")
-                filterMenu("All Categories")
-                filterMenu("All Types")
-                filterMenu("All Status")
+                LFFilterChip(title: "All Accounts", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65))
+                LFFilterChip(title: "All Categories", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65))
+                LFFilterChip(title: "All Types", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65))
+                LFFilterChip(title: "All Status", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65))
 
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
@@ -131,17 +131,12 @@ struct TransactionListView: View {
                 .padding(.vertical, 10)
 
                 if filteredTransactions.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 36))
-                            .foregroundStyle(LFTheme.primaryHover)
-                        Text("No transactions found")
-                            .font(.headline)
-                        Text("Try changing search text or clearing the credit/debit toggles.")
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 260)
+                    LFEmptyState(
+                        title: "No transactions found",
+                        message: "Try changing search text or clearing the credit/debit toggles.",
+                        systemImage: "tray"
+                    )
+                    .frame(minHeight: 260)
                 } else {
                     ForEach(filteredTransactions) { transaction in
                         transactionRow(transaction)
@@ -198,17 +193,17 @@ struct TransactionListView: View {
                             .foregroundStyle(LFTheme.textSecondary)
                     }
 
-                    statusBadge(viewModel.validationPassed ? "Cleared" : "Needs Review", color: viewModel.validationPassed ? LFTheme.success : LFTheme.warning)
+                    LFStatusBadge(title: viewModel.validationPassed ? "Cleared" : "Needs Review", color: viewModel.validationPassed ? LFTheme.success : LFTheme.warning)
 
                     Divider().overlay(LFTheme.divider)
 
-                    detailRow("Date", value: formatDate(selected.date))
-                    detailRow("Account", value: selected.account)
-                    detailRow("Category", value: "Imported")
-                    detailRow("Type", value: selected.credit != nil ? "Credit" : "Debit")
-                    detailRow("Description", value: selected.description)
-                    detailRow("Source", value: selected.sourceBank)
-                    detailRow("Balance After", value: selected.balance.map(format) ?? "—")
+                    LFInfoRow(title: "Date", value: formatDate(selected.date), titleWidth: 86, verticalPadding: 0)
+                    LFInfoRow(title: "Account", value: selected.account, titleWidth: 86, verticalPadding: 0)
+                    LFInfoRow(title: "Category", value: "Imported", titleWidth: 86, verticalPadding: 0)
+                    LFInfoRow(title: "Type", value: selected.credit != nil ? "Credit" : "Debit", titleWidth: 86, verticalPadding: 0)
+                    LFInfoRow(title: "Description", value: selected.description, titleWidth: 86, verticalPadding: 0)
+                    LFInfoRow(title: "Source", value: selected.sourceBank, titleWidth: 86, verticalPadding: 0)
+                    LFInfoRow(title: "Balance After", value: selected.balance.map(format) ?? "—", titleWidth: 86, verticalPadding: 0)
 
                     Divider().overlay(LFTheme.divider)
 
@@ -271,7 +266,7 @@ struct TransactionListView: View {
                     .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
                     .monospacedDigit()
                     .frame(width: 120, alignment: .trailing)
-                statusBadge(viewModel.validationPassed ? "Cleared" : "Review", color: viewModel.validationPassed ? LFTheme.success : LFTheme.warning)
+                LFStatusBadge(title: viewModel.validationPassed ? "Cleared" : "Review", color: viewModel.validationPassed ? LFTheme.success : LFTheme.warning)
                     .frame(width: 96, alignment: .leading)
                 Text(transaction.balance.map(format) ?? "—")
                     .monospacedDigit()
@@ -307,21 +302,6 @@ struct TransactionListView: View {
         .overlay(Rectangle().stroke(LFTheme.divider, lineWidth: 1))
     }
 
-    private func filterMenu(_ title: String) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Image(systemName: "chevron.down")
-                .font(.caption2)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(width: 146)
-        .background(LFTheme.backgroundDeep.opacity(0.65))
-        .overlay(RoundedRectangle(cornerRadius: 7).stroke(LFTheme.border, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
-    }
-
     private func transactionSummaryCard(_ title: String, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
@@ -351,28 +331,6 @@ struct TransactionListView: View {
         .frame(width: 30, height: 30)
         .background(LFTheme.surfaceRaised)
         .clipShape(RoundedRectangle(cornerRadius: 7))
-    }
-
-    private func statusBadge(_ title: String, color: Color) -> some View {
-        Text(title)
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(color.opacity(0.14))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-
-    private func detailRow(_ title: String, value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(title)
-                .foregroundStyle(LFTheme.textSecondary)
-                .frame(width: 86, alignment: .leading)
-            Spacer()
-            Text(value)
-                .multilineTextAlignment(.trailing)
-        }
-        .font(.caption)
     }
 
     private func formatDate(_ date: Date?) -> String {

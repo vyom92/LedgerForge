@@ -63,39 +63,6 @@ private enum AppShellSection: String, CaseIterable {
     }
 }
 
-enum LFTheme {
-    static let background = Color(hex: 0x0B0F19)
-    static let backgroundDeep = Color(hex: 0x07101E)
-    static let surface = Color(hex: 0x111827).opacity(0.78)
-    static let surfaceRaised = Color(hex: 0x1A2233).opacity(0.72)
-    static let border = Color.white.opacity(0.11)
-    static let divider = Color.white.opacity(0.08)
-    static let primary = Color(hex: 0x7C4DFF)
-    static let primaryHover = Color(hex: 0x9A68FF)
-    static let success = Color(hex: 0x22C55E)
-    static let danger = Color(hex: 0xEF4444)
-    static let warning = Color(hex: 0xF59E0B)
-    static let info = Color(hex: 0x38BDF8)
-    static let text = Color(hex: 0xF3F6FF)
-    static let textSecondary = Color(hex: 0x9AA4B2)
-
-    static let backgroundGradient = LinearGradient(
-        colors: [
-            Color(hex: 0x07101E),
-            Color(hex: 0x0B1326),
-            Color(hex: 0x0B0F19)
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-
-    static let primaryGradient = LinearGradient(
-        colors: [primary, Color(hex: 0x4338CA)],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-}
-
 struct ContentView: View {
 
     @State private var showingImporter = false
@@ -103,7 +70,7 @@ struct ContentView: View {
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @State private var selectedSection: AppShellSection = .dashboard
     @State private var didStartRepositoryHydration = false
-    @State private var developerModeEnabled = true
+    @State private var developerModeEnabled = false
 
     var body: some View {
         HStack(spacing: 0) {
@@ -358,18 +325,18 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             HStack(spacing: 14) {
                                 LFSearchField(placeholder: "Search accounts...")
-                                filterChip("All Types")
-                                filterChip("All Institutions")
-                                filterChip("All Status")
+                                LFFilterChip(title: "All Types")
+                                LFFilterChip(title: "All Institutions")
+                                LFFilterChip(title: "All Status")
                             }
 
                             accountTableHeader
 
                             if dashboardViewModel.accountSummaries.isEmpty {
-                                emptyState(
+                                LFEmptyState(
                                     title: "No accounts found",
                                     message: "Trusted repository-backed accounts appear here after import.",
-                                    action: "Import Statement",
+                                    actionTitle: "Import Statement",
                                     systemImage: "wallet.pass"
                                 ) {
                                     showingImporter = true
@@ -553,16 +520,16 @@ struct ContentView: View {
 
                 VStack(spacing: 18) {
                     LFPanel(title: "System Information") {
-                        infoRow("Version", value: "1.0.0")
-                        infoRow("Environment", value: "Local")
-                        infoRow("Database", value: "SQLite")
-                        infoRow("Runtime State", value: dashboardViewModel.presentationState.message)
+                        LFInfoRow(title: "Version", value: "1.0.0")
+                        LFInfoRow(title: "Environment", value: "Local")
+                        LFInfoRow(title: "Database", value: "SQLite")
+                        LFInfoRow(title: "Runtime State", value: dashboardViewModel.presentationState.message)
                     }
 
                     LFPanel(title: "Data Summary") {
-                        infoRow("Accounts", value: "\(dashboardViewModel.accounts.count)")
-                        infoRow("Transactions", value: "\(dashboardViewModel.transactionCount)")
-                        infoRow("Imported Files", value: selectedFile == "No statement imported" ? "0" : "1")
+                        LFInfoRow(title: "Accounts", value: "\(dashboardViewModel.accounts.count)")
+                        LFInfoRow(title: "Transactions", value: "\(dashboardViewModel.transactionCount)")
+                        LFInfoRow(title: "Imported Files", value: selectedFile == "No statement imported" ? "0" : "1")
                     }
 
                     LFPanel(title: "Danger Zone") {
@@ -581,10 +548,10 @@ struct ContentView: View {
     private func futureModuleContent(_ section: AppShellSection) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             LFPanel {
-                emptyState(
+                LFEmptyState(
                     title: "\(section.rawValue) is planned",
                     message: "This approved shell reserves navigation for \(section.rawValue), but implementation belongs to a future sprint.",
-                    action: "Return to Dashboard",
+                    actionTitle: "Return to Dashboard",
                     systemImage: section.systemImage
                 ) {
                     selectedSection = .dashboard
@@ -603,7 +570,7 @@ struct ContentView: View {
         LFPanel(title: "Accounts", trailing: AnyView(linkButton("View all") { selectedSection = .accounts })) {
             VStack(spacing: 0) {
                 if dashboardViewModel.accountSummaries.isEmpty {
-                    compactEmptyState("No repository-backed accounts")
+                    LFCompactEmptyState(message: "No repository-backed accounts")
                 } else {
                     ForEach(dashboardViewModel.accountSummaries) { account in
                         HStack(spacing: 12) {
@@ -687,17 +654,17 @@ struct ContentView: View {
     private var quickActionsCard: some View {
         LFPanel(title: "Quick Actions") {
             VStack(spacing: 4) {
-                quickAction("Import Statement", icon: "square.and.arrow.down") {
+                LFActionRow(title: "Import Statement", systemImage: "square.and.arrow.down") {
                     showingImporter = true
                     selectedSection = .imports
                 }
-                quickAction("Add Account", icon: "plus") {
+                LFActionRow(title: "Add Account", systemImage: "plus") {
                     selectedSection = .accounts
                 }
-                quickAction("View All Transactions", icon: "list.bullet") {
+                LFActionRow(title: "View All Transactions", systemImage: "list.bullet") {
                     selectedSection = .transactions
                 }
-                quickAction("Open Settings", icon: "gearshape") {
+                LFActionRow(title: "Open Settings", systemImage: "gearshape") {
                     selectedSection = .settings
                 }
             }
@@ -710,7 +677,7 @@ struct ContentView: View {
                 tableHeader(["Date", "Description", "Account", "Type", "Amount", "Balance"])
 
                 if dashboardViewModel.recentTransactionSummaries.isEmpty {
-                    compactEmptyState("No repository-backed transactions")
+                    LFCompactEmptyState(message: "No repository-backed transactions")
                 } else {
                     ForEach(dashboardViewModel.recentTransactionSummaries) { transaction in
                         HStack(spacing: 14) {
@@ -798,10 +765,10 @@ struct ContentView: View {
                             .monospacedDigit()
                     }
 
-                    infoRow("Institution", value: account.institution)
-                    infoRow("Account Type", value: "Repository account")
-                    infoRow("Currency", value: account.currencyCode)
-                    infoRow("Status", value: "Active")
+                    LFInfoRow(title: "Institution", value: account.institution)
+                    LFInfoRow(title: "Account Type", value: "Repository account")
+                    LFInfoRow(title: "Currency", value: account.currencyCode)
+                    LFInfoRow(title: "Status", value: "Active")
 
                     Divider().overlay(LFTheme.divider)
 
@@ -825,7 +792,7 @@ struct ContentView: View {
                         .font(.caption)
                     }
                 } else {
-                    compactEmptyState("Select an account after importing trusted data")
+                    LFCompactEmptyState(message: "Select an account after importing trusted data")
                 }
             }
         }
@@ -1045,7 +1012,7 @@ struct ContentView: View {
             Text(account.institution)
                 .frame(width: 160, alignment: .leading)
 
-            statusBadge("Bank", color: LFTheme.primary)
+            LFStatusBadge(title: "Bank", color: LFTheme.primary)
                 .frame(width: 100, alignment: .leading)
 
             Text(formatCurrency(account.currentBalance, currencyCode: account.currencyCode))
@@ -1053,7 +1020,7 @@ struct ContentView: View {
                 .monospacedDigit()
                 .frame(width: 140, alignment: .trailing)
 
-            statusBadge("Active", color: LFTheme.success)
+            LFStatusBadge(title: "Active", color: LFTheme.success)
                 .frame(width: 92, alignment: .leading)
         }
         .font(.caption)
@@ -1158,42 +1125,6 @@ struct ContentView: View {
         .padding(.vertical, 8)
     }
 
-    private func infoRow(_ title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-                .foregroundStyle(LFTheme.textSecondary)
-            Spacer()
-            Text(value)
-                .multilineTextAlignment(.trailing)
-        }
-        .font(.caption)
-        .padding(.vertical, 6)
-    }
-
-    private func filterChip(_ title: String) -> some View {
-        HStack(spacing: 8) {
-            Text(title)
-            Image(systemName: "chevron.down")
-                .font(.caption2)
-        }
-        .font(.caption)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(LFTheme.surface)
-        .overlay(RoundedRectangle(cornerRadius: 7).stroke(LFTheme.border, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
-    }
-
-    private func statusBadge(_ title: String, color: Color) -> some View {
-        Text(title)
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(color.opacity(0.14))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-
     private func tableHeader(_ titles: [String]) -> some View {
         HStack(spacing: 14) {
             ForEach(Array(titles.enumerated()), id: \.offset) { index, title in
@@ -1227,36 +1158,6 @@ struct ContentView: View {
         }
     }
 
-    private func compactEmptyState(_ message: String) -> some View {
-        Text(message)
-            .font(.caption)
-            .foregroundStyle(LFTheme.textSecondary)
-            .frame(maxWidth: .infinity, minHeight: 80, alignment: .center)
-    }
-
-    private func emptyState(title: String, message: String, action: String, systemImage: String, perform: @escaping () -> Void) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.system(size: 34))
-                .foregroundStyle(LFTheme.primaryHover)
-            Text(title)
-                .font(.headline)
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(LFTheme.textSecondary)
-                .multilineTextAlignment(.center)
-            Button(action) {
-                perform()
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 9)
-            .background(LFTheme.primaryGradient)
-            .clipShape(RoundedRectangle(cornerRadius: 7))
-        }
-        .frame(maxWidth: .infinity, minHeight: 220)
-    }
-
     private func linkButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
             .buttonStyle(.plain)
@@ -1281,25 +1182,8 @@ struct ContentView: View {
                     .lineLimit(1)
             }
             Spacer()
-            statusBadge(status, color: status == "Success" || status == "Loaded" ? LFTheme.success : LFTheme.textSecondary)
+            LFStatusBadge(title: status, color: status == "Success" || status == "Loaded" ? LFTheme.success : LFTheme.textSecondary)
         }
-    }
-
-    private func quickAction(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .frame(width: 20)
-                Text(title)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(LFTheme.textSecondary)
-            }
-            .font(.subheadline)
-            .padding(.vertical, 9)
-        }
-        .buttonStyle(.plain)
     }
 
     private func legendRow(_ title: String, value: String, color: Color) -> some View {
@@ -1452,81 +1336,6 @@ struct ContentView: View {
         formatter.maximumFractionDigits = 2
         return formatter
     }()
-}
-
-struct LFPanel<Content: View>: View {
-    let title: String?
-    let trailing: AnyView?
-    @ViewBuilder let content: Content
-
-    init(title: String? = nil, trailing: AnyView? = nil, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.trailing = trailing
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if title != nil || trailing != nil {
-                HStack {
-                    if let title {
-                        Text(title)
-                            .font(.headline)
-                    }
-                    Spacer()
-                    trailing
-                }
-            }
-
-            content
-        }
-        .padding(16)
-        .background(LFTheme.surface)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(LFTheme.border, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-struct LFSearchField: View {
-    let placeholder: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(LFTheme.textSecondary)
-            Text(placeholder)
-                .font(.subheadline)
-                .foregroundStyle(LFTheme.textSecondary)
-            Spacer()
-            Text("⌘K")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(LFTheme.textSecondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(Color.white.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 5))
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(LFTheme.surface)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(LFTheme.border, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-extension Color {
-    init(hex: UInt32, opacity: Double = 1.0) {
-        let red = Double((hex >> 16) & 0xFF) / 255.0
-        let green = Double((hex >> 8) & 0xFF) / 255.0
-        let blue = Double(hex & 0xFF) / 255.0
-        self.init(.sRGB, red: red, green: green, blue: blue, opacity: opacity)
-    }
 }
 
 struct ContentView_Previews: PreviewProvider {

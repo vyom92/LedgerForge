@@ -1,129 +1,112 @@
 # Codex Response
 
-## Sprint 22 Completion Report - Translate Frozen UI Assets into SwiftUI
+## Sprint 23 Completion Report - UI Component Extraction
 
-Sprint 22 translated the approved UI/UX v1.0 assets into the existing SwiftUI application shell without changing import, parser, validation, repository, hydration or financial-truth behavior.
+Sprint 23 extracted reusable SwiftUI presentation components from the Sprint 22 interface while preserving the approved UI/UX v1.0 appearance, existing navigation, import pipeline, repository hydration, runtime stores, ViewModels and validation behavior.
 
 ## Summary
 
-- Created a Deep Indigo dark-mode SwiftUI theme matching the frozen visual system.
-- Translated the approved permanent sidebar hierarchy and contextual toolbar into the app shell.
-- Made Dashboard the default content screen inside the approved shell.
-- Translated Dashboard, Accounts, Transactions, Import Wizard shell, Settings and Developer Console screens into reusable card/table/badge/sidebar/toolbar patterns.
-- Preserved Preview as import-workflow-only by keeping it outside normal navigation.
-- Kept Developer Console outside normal user flow and under the Developer section.
-- Preserved CSV import entry points, repository hydration, runtime stores, dashboard data and transaction viewer behavior.
-- Preserved existing transaction search and credit/debit toggle behavior.
+- Extracted shared Deep Indigo presentation primitives into `Views/Common`.
+- Kept `ContentView` as the application composition root and startup hydration coordinator.
+- Removed generic reusable component definitions from `ContentView.swift`.
+- Replaced duplicated status badge, filter chip, info row and empty-state helpers in `TransactionListView` and `DeveloperConsoleView`.
+- Preserved transaction search and credit/debit toggle behavior.
+- Preserved `DeveloperConsole.shared` as the Developer Console data source.
+- Applied the approved minor UI-spec fix so Developer Console is hidden by default until Developer Mode is enabled.
+- Made no repository, database, validation, parser, import pipeline, runtime store, ViewModel, financial truth or transaction extraction changes.
 
-## Files Changed
+## Files Created
+
+- `Views/Common/LFActionRow.swift`
+- `Views/Common/LFEmptyState.swift`
+- `Views/Common/LFFilterChip.swift`
+- `Views/Common/LFIconTile.swift`
+- `Views/Common/LFInfoRow.swift`
+- `Views/Common/LFInlineBadge.swift`
+- `Views/Common/LFPanel.swift`
+- `Views/Common/LFSearchField.swift`
+- `Views/Common/LFStatusBadge.swift`
+- `Views/Common/LFTheme.swift`
+
+## Files Modified
 
 - `ContentView.swift`
 - `Views/TransactionListView.swift`
 - `Views/DeveloperConsoleView.swift`
+- `LedgerForge.xcodeproj/project.pbxproj`
 - `Project documents/Codex response.md`
-- `Project documents/Implementation Reports/Sprint22_UI_Implementation_Report.md`
 
-## Components Created
+`Project documents/Implementation.md` was not modified by Codex and remains excluded from Sprint 23 staging.
+
+## Components Extracted
 
 - `LFTheme`
+  - Deep Indigo colors, status colors, typography helpers and `Color(hex:)`.
 - `LFPanel`
+  - Shared glass/card panel primitive.
 - `LFSearchField`
-- Deep Indigo sidebar navigation pattern
-- Contextual toolbar pattern
-- KPI metric cards
-- Account summary cards and account rows
-- Transaction summary cards and transaction rows
-- Status badges
-- Import wizard stepper shell
-- Settings category and setting-row components
-- Developer console tabs, filters, log rows and overview cards
-
-## Assets Implemented
-
-- `DesignBoard_v2.0.png`: implemented as the master application shell, sidebar, toolbar, spacing, cards, badges and dense table direction.
-- `Dashboard_v1.0.png`: implemented as dashboard KPIs, accounts, spending overview, import activity, quick actions, recent transactions and cash-flow trend structure.
-- `Accounts_v1.0.png`: implemented as account metrics, account table, search/filter shell and account detail panel.
-- `Transactions_v1.0.png`: implemented as transaction summary cards, range selector, filter/search row, transaction table and detail panel.
-- `ImportWizard_v1.0.png`: implemented as the import wizard shell with stepper, upload panel and import options panel.
-- `Settings_v1.0.png`: implemented as settings category sidebar, application/default settings cards, system information and danger-zone shell.
-- `DeveloperConsole_v1.0.png`: implemented as diagnostics tabs, filters, log stream, command bar and system/database/tool panels.
-- `DesignSystem_v1.0.png` and `ComponentLibrary_v1.0.png`: implemented through shared Deep Indigo theme tokens, cards, badges, buttons, tables and chips.
-- `AppIcon_v1.0.png`: reflected in the sidebar mark direction; the app icon asset itself was not modified.
+  - Shared search field used by table/list presentation.
+- `LFStatusBadge`
+  - Shared status pill component.
+- `LFFilterChip`
+  - Shared menu-backed filter chip component.
+- `LFInfoRow`
+  - Shared title/value detail row.
+- `LFEmptyState` and `LFCompactEmptyState`
+  - Shared empty-state views.
+- `LFIconTile`
+  - Shared icon tile primitive.
+- `LFActionRow`
+  - Shared action-row component.
+- `LFInlineBadge`
+  - Shared compact toolbar badge.
 
 ## Build Result
 
-- Baseline build before implementation: passed.
-- Post-implementation build: passed.
-
-## Tests Executed
-
-- Focused dashboard and hydration validation:
-  - `DashboardViewModelTests`
-  - `RepositoryStoreHydratorTests`
-  - Result: 7 tests passed, 0 failed.
-- Full active test plan:
-  - Result: 77 tests passed, 0 failed.
+- Xcode build passed after component extraction.
 
 ## Validation Result
 
-- Build passed.
-- Full active regression suite passed.
-- Existing UI launch tests passed.
-- CSV import regression tests passed.
-- Repository hydration tests passed.
-- Transaction viewer search/filter behavior preserved through existing `TransactionListViewModel` flow.
-- No unresolved merge conflict markers found.
+- Focused dashboard and hydration validation passed:
+  - `DashboardViewModelTests`
+  - `RepositoryStoreHydratorTests`
+  - 7 tests passed, 0 failed.
+- Full active test plan passed:
+  - 77 tests passed, 0 failed, 0 skipped.
+- UI launch tests passed as part of the active test plan.
+- No unresolved merge conflict markers were found.
 
-## Visual Validation Notes
+## Behavior Preserved
 
-- Sidebar hierarchy matches `DesignBoard_v2.0.png`, including Dashboard, Accounts, Transactions, Import, future modules, Settings and Developer Console.
-- Toolbar placement matches `DesignBoard_v2.0.png` with contextual controls and import action.
-- Dashboard matches the approved structure: KPI cards, accounts, spending overview, import activity, quick actions, recent transactions and cash-flow trend.
-- Accounts screen matches the approved structure: summary cards, search/filter row, account table and detail panel.
-- Transactions screen matches the approved structure: summary cards, range selector, filter/search row, table and detail panel.
-- Import Wizard matches the approved shell and workflow structure while preserving current CSV/spreadsheet import capability only.
-- Settings screen matches the approved card/sidebar layout and keeps Developer Mode as the existing toggle.
-- Developer Console matches the approved diagnostics layout while continuing to read existing console messages.
+- Startup still reaches the Dashboard.
+- `ContentView` still triggers repository-backed runtime store hydration.
+- Dashboard still consumes runtime stores through `DashboardViewModel`.
+- Transaction viewer still uses `TransactionListViewModel`.
+- Transaction search behavior is unchanged.
+- Credit/debit toggle behavior is unchanged.
+- CSV import entry point remains available.
+- Developer Console remains in the Developer section and still reads from `DeveloperConsole.shared`.
 
 ## Architecture Compliance
 
-- Views and ViewModels do not access SQLite.
-- Dashboard still consumes runtime-store-backed `DashboardViewModel` state.
-- Transaction viewer still consumes `TransactionListViewModel`.
-- RepositoryStoreHydrator remains the persistence-to-runtime-store boundary.
-- No repository, database, validation, parser, import pipeline, transaction extraction or financial truth changes were made.
+- Views and ViewModels do not access SQLite directly.
+- RepositoryStoreHydrator remains the only persistence-to-runtime-store boundary.
+- No repository contracts were changed.
+- No import, parser, validation, database or persistence behavior was changed.
+- New Swift files were added through Xcode-safe project tooling, not by manual `.pbxproj` editing.
 
-## Intentional Deviations From Approved Assets
+## Remaining Technical Debt
 
-- Charts are static structural approximations only; analytics/chart implementation remains out of Sprint 22 scope.
-- Import Wizard copy limits supported formats to the current CSV/spreadsheet implementation and does not activate PDF/OCR support.
-- App icon implementation was not changed; `AppIcon_v1.0.png` remains the visual reference for a future asset pipeline task.
-- Some mock data labels from the approved assets were replaced with live runtime-store values or explicit future-module placeholders.
+- Some larger screen-specific dashboard, import and settings sections remain in `ContentView.swift`; they should stay local until a future sprint has an approved screen-level extraction scope.
+- `LFIconTile` is available as a reusable primitive but not yet broadly adopted across all eligible call sites.
+- No additional UI automation coverage was added; existing UI launch coverage remains the current validation baseline.
 
-## Remaining Differences From Approved Assets
+## Commit And Push
 
-- Screen-perfect spacing, chart rendering and advanced table interactions can be refined in a later UI polish sprint.
-- Accounts detail and transaction detail panels are presentation shells backed by currently available runtime-store data.
-- Settings and Developer Console action controls are visual shells where behavior belongs to later feature sprints.
-
-## Checkpoint Commit
-
-- `b7013c6` - `Checkpoint: UI asset freeze`
-- Push result: remote `main` updated successfully. Local remote-tracking ref update was blocked by sandboxed `.git` lock-file permissions.
-
-## Sprint 22 Implementation Commit
-
-- `eb5e5ee` - `Sprint 22: translate frozen UI assets into SwiftUI`
-
-## Push Result
-
-- Remote `main` updated successfully with Sprint 22 implementation.
-- Local remote-tracking ref update was blocked by sandboxed `.git` lock-file permissions after the remote push completed.
-
-## Sprint Tag
-
-- No Sprint 22 tag was created in this run.
+- Implementation commit: pending.
+- Push result: pending.
+- Sprint tag: not created yet.
 
 ## Next Recommended Sprint
 
-Sprint 23 — UI polish and interaction refinement against the approved UI/UX v1.0 assets.
+Sprint 24 should continue only from the ACTIVE sprint in `Project documents/Implementation.md`. Recommended follow-up, if approved there, is a focused screen-level decomposition pass for `ContentView` without changing presentation behavior or architecture.
