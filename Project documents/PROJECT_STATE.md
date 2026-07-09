@@ -280,20 +280,46 @@ Completed
 - Checkpoint commit: `b7013c6`
 - Implementation commit: `eb5e5ee`
 - Git push to `origin/main` completed successfully.
+
+---
+
+# Sprint 23
+
+## Objective
+Extract reusable SwiftUI presentation components from the Sprint 22 interface while preserving the approved UI/UX v1.0 appearance, existing behavior and architecture.
+
+## Status
+Completed
+
+## Outcome
+- Shared SwiftUI presentation primitives extracted under `Views/Common`.
+- `LFTheme`, `LFPanel`, `LFSearchField`, `LFStatusBadge`, `LFFilterChip`, `LFInfoRow`, `LFEmptyState`, `LFCompactEmptyState`, `LFIconTile`, `LFActionRow` and `LFInlineBadge` introduced as reusable components.
+- Generic reusable component definitions removed from `ContentView.swift`.
+- Duplicated filter, status badge, info row and empty-state helpers removed from `TransactionListView.swift` and `DeveloperConsoleView.swift` where exact visual equivalence was safe.
+- `ContentView` remains the application composition root and startup hydration coordinator.
+- Developer Console default visibility corrected so it is hidden until Developer Mode is enabled.
+- Existing transaction search and credit/debit toggle behavior preserved.
+- Import, parser, validation, repository, database, runtime store, ViewModel, financial truth and transaction extraction behavior preserved.
+- Xcode-safe project tooling used for new Swift file target membership.
+- Focused dashboard/hydrator validation passed: 7 tests, 0 failures.
+- Full active validation passed: 77 tests, 0 failures.
+- Build passed.
+- Implementation commit: `8090de4`
+- Git push to `origin/main` completed successfully.
 ---
 
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `eb5e5ee`
-- Latest Implementation Commit: `eb5e5ee`
+- Latest Commit: `8090de4`
+- Latest Implementation Commit: `8090de4`
 - Latest Tag: `sprint-21`
 - Latest ADR: ADR-023 — Frozen UI/UX Architecture
-- Architecture Baseline: Sprint 22 plus UI/UX v1.0 Frozen
-- Latest Milestone: Approved UI/UX v1.0 translated into SwiftUI foundation screens
+- Architecture Baseline: Sprint 23 plus UI/UX v1.0 Frozen
+- Latest Milestone: UI Component Extraction
 - Build: Passing
-- Validation: Build passing; full active validation passing. Sprint 22 validation complete.
+- Validation: Build passing; full active validation passing. Sprint 23 validation complete.
 
 ## Session Startup Order
 1. Project documents/.github/AGENTS.md
@@ -330,10 +356,10 @@ Dashboard
 
 ## Current Work
 
-Active Work: Workflow v2.1 documentation audit and housekeeping
+Active Work: Sprint 23 complete; next work must be taken from the ACTIVE sprint in `Project documents/Implementation.md`.
 
 Objective:
-- Align project documentation and folder structure with the frozen Workflow v2.1 process before starting Sprint 23.
+- Stop at the approved Sprint 23 boundary after reusable UI component extraction.
 
 Scope:
 - `Implementation.md` is the ChatGPT-owned sprint planning and workflow document.
@@ -349,6 +375,7 @@ Scope:
 - Preserve RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
 - Preserve import, parser, validation and repository semantics.
 - Preserve transaction search and credit/debit toggle behaviour.
+- Preserve the approved UI/UX v1.0 appearance.
 
 Out of Scope:
 - Source code changes
@@ -368,4 +395,4 @@ Out of Scope:
 - Investments
 
 Next Major Milestone:
-- Sprint 23 — UI Component Extraction, planned through `Implementation.md` using Workflow v2.1.
+- Next ACTIVE sprint in `Project documents/Implementation.md`.
