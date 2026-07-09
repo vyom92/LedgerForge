@@ -116,27 +116,31 @@ ViewModels/
 
 Before implementation:
 
-1. Read Project_Guide.md and PROJECT_STATE.md.
-2. Use the Task Routing Guide.
-3. Open only the required reference documents.
-4. Verify required reference documents exist.
-5. Produce an implementation plan.
-6. Wait for approval.
+1. Read `Project_Guide.md`.
+2. Read `PROJECT_STATE.md`.
+3. Read only the ACTIVE sprint in `Implementation.md`.
+4. Use the Task Routing Guide to identify additional required reference documents.
+5. Produce an implementation plan in `Codex response.md`.
+6. Wait for ChatGPT approval before implementation.
+
 
 Implementation:
 
-1. Select exactly one file.
-2. Verify the filename in the header comment matches the intended file.
-3. Implement one logical change.
-4. Build.
-5. Run the required sprint tests.
-6. Verify `git status` contains only sprint-related changes.
-7. Verify there are no unresolved merge conflict markers.
-8. Generate a concise commit message describing the completed work.
-9. Commit.
-10. Push to the tracked branch (normally `origin/main`).
-11. Push the sprint tag if one was created.
-12. Move to the next file.
+1. Read only the approved Implementation Prompt from the ACTIVE sprint.
+2. Select exactly one file at a time.
+3. Verify the filename before editing.
+4. Implement one logical change.
+5. Build.
+6. Run the required sprint tests.
+7. Verify `git status` contains only sprint-related changes.
+8. Verify there are no unresolved merge conflict markers.
+9. Generate a concise commit message describing the completed work.
+10. Commit.
+11. Push to the tracked branch (normally `origin/main`).
+12. Push the sprint tag if one was created.
+13. Update `PROJECT_STATE.md` if required.
+14. Update `Codex response.md`.
+15. Continue to the next file only after successful validation.
 
 # Definition of Done
 
@@ -152,7 +156,8 @@ A task is complete only when:
 - The feature has been manually verified.
 - Approved reference fixtures continue producing identical financial truth.
 - Documentation is updated if architecture changed.
-- PROJECT_STATE.md, Project_Guide.md and Codex response.md reflect the completed sprint state before the next sprint begins.
+- `PROJECT_STATE.md` reflects the current repository state.
+- `Codex response.md` records the completed planning or implementation cycle.
 - The implementation follows Product Vision and Architecture.
 
 ---
@@ -211,6 +216,9 @@ The code should make adding the next financial institution easier than adding th
 
 - Never assume statement layouts.
 - Always request reference documents when required.
+- Read only the ACTIVE sprint in `Implementation.md`.
+- Never modify `Implementation.md`.
+- Archived sprint sections are historical reference only.
 - Never invent financial rules.
 - Verify the filename in the header comment before editing.
 - Build after every significant change.

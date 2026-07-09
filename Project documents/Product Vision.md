@@ -65,6 +65,8 @@ Primary modules:
 - Rules & Automation
 - Settings
 
+The Dashboard remains the primary destination. All other modules exist to support accurate, explainable and actionable financial insight.
+
 ---
 
 # User Experience Philosophy
@@ -73,7 +75,15 @@ LedgerForge should feel like a native macOS application rather than an import ut
 
 The application shell, navigation and interaction model are defined by `UI_UX_v1.0_Frozen.md`.
 
-The approved visual system is frozen around the Deep Indigo dark mode theme. `Project documents/UI Assets/Approved/DesignBoard_v2.0.png` is the master UI reference, individual approved assets define screen-level implementation details, and `AppIcon_v1.0.png` is the approved app icon reference.
+The approved visual system is frozen around the Deep Indigo dark mode theme.
+
+`Project documents/UI Assets/Approved/DesignBoard_v2.0.png` is the master UI reference.
+
+Individual approved assets define screen-level implementation details.
+
+`AppIcon_v1.0.png` is the approved application icon.
+
+Implementation sprints translate approved UI assets into SwiftUI. They must not redesign the approved visual language during implementation.
 
 Implementation should consistently reinforce the following principles:
 
@@ -86,7 +96,6 @@ Implementation should consistently reinforce the following principles:
 
 The user should primarily experience financial insight. Importing statements should feel like maintenance rather than the purpose of the application.
 
-# Automation Philosophy
 # Automation Philosophy
 
 LedgerForge should never ask the user for information it can determine automatically.
@@ -167,4 +176,8 @@ Every automated financial calculation should identify the data source, exchange 
 
 # Long-Term Goal
 
-LedgerForge should become the trusted financial operating system that users open every day because it provides the clearest, most accurate understanding of their financial life. Importing documents becomes an almost invisible maintenance activity while repository-backed dashboards evolve into a living financial operating system that users trust and return to every day.
+LedgerForge should become the trusted personal financial operating system that users open every day because it provides the clearest, most accurate understanding of their financial life.
+
+Importing documents becomes an almost invisible maintenance activity while repository-backed dashboards evolve into a living financial operating system that continuously reflects a user's complete financial position.
+
+Every future feature should reinforce this vision by reducing manual work, increasing confidence and preserving financial truth.

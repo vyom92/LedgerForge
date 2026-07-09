@@ -34,6 +34,7 @@
 		286242632FFCE80D00B8AA66 /* DefaultPasswordProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2862424A2FFCE80D00B8AA66 /* DefaultPasswordProvider.swift */; };
 		2862426F2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */; };
 		286D63F02FFD3057000CEC65 /* FinancialDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D63EF2FFD3057000CEC65 /* FinancialDocument.swift */; };
+		286D68F02FFFE6440078AAC5 /* AGENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 286D68EF2FFFE6440078AAC5 /* AGENTS.md */; };
 		2872790D2FFD286100468973 /* ParserSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790C2FFD286100468973 /* ParserSelection.swift */; };
 		2872790F2FFD287300468973 /* StatementParserSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790E2FFD287300468973 /* StatementParserSelector.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
@@ -70,7 +71,6 @@
 		28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */; };
 		28D11EAA2FFDA6CB00C12A68 /* RepositoryStoreHydrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D11EA92FFDA6CB00C12A68 /* RepositoryStoreHydrator.swift */; };
 		28D8CB5F2FFD1E3C005B419A /* StatementClassificationDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28D8CB5E2FFD1E3C005B419A /* StatementClassificationDetector.swift */; };
-		28D8CB632FFD21B7005B419A /* TestPlan.xctestplan in Resources */ = {isa = PBXBuildFile; fileRef = 28D8CB622FFD21B7005B419A /* TestPlan.xctestplan */; };
 		28E945452FFD672000FB69E4 /* ImportPersistenceMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E945442FFD671F00FB69E4 /* ImportPersistenceMapper.swift */; };
 		28E945472FFD673000FB69E4 /* ImportPersistenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28E945462FFD673000FB69E4 /* ImportPersistenceCoordinator.swift */; };
 /* End PBXBuildFile section */
@@ -118,6 +118,7 @@
 		281BB18F2FFC4D6A006E7424 /* StatementClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementClassifier.swift; sourceTree = "<group>"; };
 		281BB1912FFC4D6A006E7424 /* ImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCoordinator.swift; sourceTree = "<group>"; };
 		281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultImportCoordinator.swift; sourceTree = "<group>"; };
+		2857FA502FFEA28B00948892 /* Implementation.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Implementation.md; sourceTree = "<group>"; };
 		286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Architecture_v1.0_Frozen.md; sourceTree = "<group>"; };
 		2862424A2FFCE80D00B8AA66 /* DefaultPasswordProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultPasswordProvider.swift; sourceTree = "<group>"; };
 		286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVDocumentReaderAdapter.swift; sourceTree = "<group>"; };
@@ -126,6 +127,7 @@
 		2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureInstitutionDetector.swift; sourceTree = "<group>"; };
 		286242762FFD168100B8AA66 /* PROJECT_STATE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PROJECT_STATE.md; sourceTree = "<group>"; };
 		286D63EF2FFD3057000CEC65 /* FinancialDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialDocument.swift; sourceTree = "<group>"; };
+		286D68EF2FFFE6440078AAC5 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
 		2872790C2FFD286100468973 /* ParserSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserSelection.swift; sourceTree = "<group>"; };
 		2872790E2FFD287300468973 /* StatementParserSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementParserSelector.swift; sourceTree = "<group>"; };
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -170,7 +172,6 @@
 		28D11EA92FFDA6CB00C12A68 /* RepositoryStoreHydrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryStoreHydrator.swift; sourceTree = "<group>"; };
 		28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BUILD_AND_PROJECT_CONVENTIONS.md; sourceTree = "<group>"; };
 		28D8CB5E2FFD1E3C005B419A /* StatementClassificationDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementClassificationDetector.swift; sourceTree = "<group>"; };
-		28D8CB622FFD21B7005B419A /* TestPlan.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = TestPlan.xctestplan; sourceTree = "<group>"; };
 		28E945442FFD671F00FB69E4 /* ImportPersistenceMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPersistenceMapper.swift; sourceTree = "<group>"; };
 		28E945462FFD673000FB69E4 /* ImportPersistenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPersistenceCoordinator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -179,8 +180,6 @@
 		281BB15F2FFC48C4006E7424 /* Exceptions for ".github" folder in "LedgerForge" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				AGENTS.md,
-				"ai-instructions.md",
 				Project_Context.md,
 				prompts.md,
 			);
@@ -319,7 +318,7 @@
 		288EB0A42FF7955200F09BC9 = {
 			isa = PBXGroup;
 			children = (
-				28D8CB622FFD21B7005B419A /* TestPlan.xctestplan */,
+				286D68EF2FFFE6440078AAC5 /* AGENTS.md */,
 				28B87B272FFB2C90009BEE8C /* Project documents */,
 				288EB12E2FF7E10200F09BC9 /* Normalizers */,
 				288EB1012FF7BFD900F09BC9 /* Detectors */,
@@ -504,6 +503,7 @@
 				286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */,
 				28171F672FFC1718006115B7 /* Database_v1_Architecture.md */,
 				28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */,
+				2857FA502FFEA28B00948892 /* Implementation.md */,
 				286242762FFD168100B8AA66 /* PROJECT_STATE.md */,
 				281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */,
 				281BB1332FFC3FB5006E7424 /* Codex response.md */,
@@ -633,7 +633,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				28D8CB632FFD21B7005B419A /* TestPlan.xctestplan in Resources */,
+				286D68F02FFFE6440078AAC5 /* AGENTS.md in Resources */,
 				288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

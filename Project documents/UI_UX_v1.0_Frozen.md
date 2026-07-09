@@ -27,8 +27,9 @@ The objective is that implementation sprints translate this specification into S
 The UI specification is governed by the following hierarchy:
 
 1. UI_UX_v1.0_Frozen.md
-2. Approved UI Assets
-3. SwiftUI Implementation
+2. Project documents/UI Assets/Approved/DesignBoard_v2.0.png
+3. Remaining Approved UI Assets
+4. SwiftUI Implementation
 
 If a conflict exists, items higher in the hierarchy take precedence.
 
@@ -105,6 +106,12 @@ Visual characteristics:
 - Native macOS interaction patterns
 
 Implementation sprints must not redesign this visual language.
+
+Implementation sprints translate this approved visual language into SwiftUI.
+
+Visual refinements require updates to the approved assets before implementation.
+
+Implementation must never become the source of truth for design.
 
 All future screens inherit these visual tokens unless a newer frozen specification supersedes them.
 
@@ -191,7 +198,7 @@ The toolbar changes based on the active page.
 
 # Dashboard
 
-DesignBoard_v2.0 is the master visual reference for LedgerForge.
+`Project documents/UI Assets/Approved/DesignBoard_v2.0.png` is the master visual reference for LedgerForge.
 
 DesignBoard_v2.0 defines:
 
@@ -380,6 +387,10 @@ The Design System is defined by:
 
 Project documents/UI Assets/Approved/DesignSystem_v1.0.png
 
+The Design System derives from DesignBoard_v2.0 and defines reusable implementation tokens.
+
+Individual screen assets inherit from the DesignBoard and consume this shared design system.
+
 Design principles:
 
 - 8pt spacing grid
@@ -401,7 +412,7 @@ No component should introduce new visual styles independently.
 
 # Screen Inventory
 
-Version 1.0 defines the following primary screens:
+Version 1.0 defines the approved implementation targets:
 
 - Dashboard
 - Accounts
@@ -454,7 +465,7 @@ Future screens:
 
 # Visual Rules
 
-Large whitespace.
+Comfortable but information-dense spacing.
 
 Readable tables.
 
@@ -478,7 +489,9 @@ Resizable layouts.
 
 Dark Mode first.
 
-Light Mode supported.
+Dark Mode is the primary design target.
+
+Light Mode may be supported in a future design revision but is not part of the current frozen implementation target.
 
 VoiceOver compatible.
 
@@ -581,7 +594,7 @@ Project documents/UI Assets/Approved/
 
 DesignBoard_v2.0 defines the overall application and is the master UI reference.
 
-The remaining assets define individual screens and supporting systems. Implementation sprints must translate these approved assets into SwiftUI rather than redesigning the UI during implementation.
+The remaining assets define approved screen implementations and supporting design systems. Implementation sprints must translate these approved assets into SwiftUI rather than redesigning the UI during implementation.
 
 # Acceptance Criteria
 
@@ -608,6 +621,9 @@ Implementation is complete when:
 ✓ DesignBoard_v2.0 remains the master reference.
 
 ✓ Every implemented screen has a corresponding approved asset.
+✓ Implementation matches the approved assets without introducing unapproved visual language.
+
+✓ DesignBoard_v2.0 remains the master visual authority throughout implementation.
 ---
 
 # Change Policy
@@ -636,3 +652,7 @@ If implementation differs from the approved assets, the assets take precedence u
 DesignBoard_v2.0 should be revised before individual screen assets whenever a change affects the overall application structure or visual language.
 
 Minor refinements may update individual assets without requiring a new DesignBoard revision, provided the master design language remains unchanged.
+
+Workflow v2.1 requires implementation planning to reference this document and the approved UI assets before UI changes are made.
+
+Architecture, Product Vision and this document together define the approved implementation boundary for all future UI work.

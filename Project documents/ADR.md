@@ -687,13 +687,15 @@ Accepted
 
 ## Implemented In
 
-Sprint 20
+Sprint 20, refined through Sprint 22 UI/UX asset freeze
 
 ## Decision
 
 LedgerForge adopts a frozen UI/UX architecture in the same manner as the frozen backend architecture.
 
-Visual structure, navigation, interaction patterns and primary layouts are defined by `UI_UX_v1.0_Frozen.md` together with approved assets stored under `Project documents/UI Assets/`.
+Visual structure, navigation, interaction patterns and primary layouts are defined by `UI_UX_v1.0_Frozen.md` together with approved assets stored under `Project documents/UI Assets/Approved/`.
+
+`DesignBoard_v2.0.png` is the master UI reference. Individual approved assets define screen-level implementation details.
 
 Implementation sprints must implement the approved UI specification rather than redesigning the application during development.
 
@@ -709,6 +711,8 @@ This mirrors the successful approach used for `Architecture_v1.0_Frozen.md`.
 
 - UI/UX becomes an architectural concern rather than an implementation concern.
 - Approved UI assets become part of the project's architectural documentation.
+- `Project documents/UI Assets/Approved/DesignBoard_v2.0.png` is the authoritative visual reference for future UI implementation.
+- Future UI work must translate approved assets into SwiftUI rather than reinterpret layout, spacing, theme or navigation during implementation.
 - Implementation sprints focus on translating approved designs into SwiftUI components.
 - Significant UI changes require design review before implementation.
 - New screens extend the approved application shell rather than replacing it.
@@ -719,3 +723,4 @@ This mirrors the successful approach used for `Architecture_v1.0_Frozen.md`.
 - ADR-009 — Reactive Store Architecture
 - ADR-013 — Store Ownership
 - ADR-016 — Universal Import Pipeline
+- ADR-022 — Preview Compatibility During Test Builds

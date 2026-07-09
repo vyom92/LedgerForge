@@ -256,18 +256,44 @@ Completed
 
 ---
 
+# Sprint 22
+
+## Objective
+Translate the approved UI/UX v1.0 assets into SwiftUI presentation while preserving the existing LedgerForge architecture and data flows.
+
+## Status
+Completed
+
+## Outcome
+- Deep Indigo application shell translated into SwiftUI.
+- Dashboard, Accounts, Transactions, Import Wizard shell, Settings and Developer Console foundation screens implemented from approved assets.
+- Reusable UI presentation helpers introduced, including `LFTheme`, `LFPanel` and `LFSearchField`.
+- `TransactionListView` restyled while preserving `TransactionListViewModel` search and credit/debit toggle behaviour.
+- `DeveloperConsoleView` restyled while preserving `DeveloperConsole.shared` as the read-only message source.
+- Import Wizard remains a shell; full multi-step import workflow remains future work.
+- Settings and Developer Console controls remain non-mutating unless behaviour already existed.
+- No repository, database, validation, parser, import pipeline, CSV import, hydration, financial truth or transaction extraction changes were made.
+- Baseline build passed.
+- Post-implementation build passed.
+- Focused dashboard/hydrator validation passed: 7 tests, 0 failures.
+- Full active validation passed: 77 tests, 0 failures.
+- Checkpoint commit: `b7013c6`
+- Implementation commit: `eb5e5ee`
+- Git push to `origin/main` completed successfully.
+---
+
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `7430224`
-- Latest Implementation Commit: `539e4a5`
-- Latest Tag: `sprint-20`
+- Latest Commit: `eb5e5ee`
+- Latest Implementation Commit: `eb5e5ee`
+- Latest Tag: `sprint-21`
 - Latest ADR: ADR-023 — Frozen UI/UX Architecture
-- Architecture Baseline: Sprint 20 plus UI/UX v1.0 Frozen
-- Latest Milestone: Application Shell and UI/UX Asset Freeze
+- Architecture Baseline: Sprint 22 plus UI/UX v1.0 Frozen
+- Latest Milestone: Approved UI/UX v1.0 translated into SwiftUI foundation screens
 - Build: Passing
-- Validation: Build passing; full regression baseline passing. Sprint 21 validation complete.
+- Validation: Build passing; full active validation passing. Sprint 22 validation complete.
 
 ## Session Startup Order
 1. Project documents/.github/AGENTS.md
@@ -301,25 +327,32 @@ Runtime Stores
 ↓
 Dashboard
 
+
 ## Current Work
 
-Active Work: Documentation sync after approved UI/UX asset freeze
+Active Work: Workflow v2.1 documentation audit and housekeeping
 
 Objective:
-- Align project documentation with the approved UI/UX v1.0 asset freeze and relocated AI workflow documentation.
+- Align project documentation and folder structure with the frozen Workflow v2.1 process before starting Sprint 23.
 
 Scope:
-- Planning required before the next implementation sprint.
+- `Implementation.md` is the ChatGPT-owned sprint planning and workflow document.
+- `Codex response.md` is the Codex-owned latest planning/execution output.
+- `PROJECT_STATE.md` is the Codex-owned current repository truth.
+- Only the ACTIVE sprint block in `Implementation.md` should be read by Codex.
+- Archived sprint blocks in `Implementation.md` are historical reference only.
 - Approved UI assets live under `Project documents/UI Assets/Approved/`.
 - `DesignBoard_v2.0.png` is the master UI reference.
 - Individual approved assets define screen-level implementation details.
 - `AppIcon_v1.0.png` is the approved app icon reference.
-- Project documents/.github is the canonical location for AI workflow prompt and context files.
+- `Project documents/.github/` is the canonical location for AI workflow prompt and context files.
 - Preserve RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
 - Preserve import, parser, validation and repository semantics.
 - Preserve transaction search and credit/debit toggle behaviour.
 
 Out of Scope:
+- Source code changes
+- SwiftUI implementation changes
 - PDF support
 - OCR
 - Parser changes
@@ -335,4 +368,4 @@ Out of Scope:
 - Investments
 
 Next Major Milestone:
-- Continue UI implementation from approved assets without redesigning the frozen visual system.
+- Sprint 23 — UI Component Extraction, planned through `Implementation.md` using Workflow v2.1.

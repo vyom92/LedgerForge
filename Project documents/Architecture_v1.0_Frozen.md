@@ -1,6 +1,6 @@
 # LedgerForge Architecture v1.0 (Frozen)
 
-**Status:** Frozen v1.0 baseline, aligned through Sprint 18 / Milestone M6
+**Status:** Frozen v1.0 baseline, architecture aligned through Sprint 22 (UI Foundation).
 
 This document is the architectural baseline for LedgerForge v1.0. It remains frozen except for status-alignment updates required to reflect completed implementation milestones and approved ADRs.
 
@@ -60,9 +60,9 @@ ImportCoordinator
 → Validation
 → Repository Persistence Boundary
 → Repositories
+→ RepositoryStoreHydrator
 → Runtime Stores
-→ SQLite
-→ DashboardViewModel
+→ ViewModels
 → Financial Dashboard
 
 ### Pipeline Principles
@@ -81,7 +81,8 @@ ImportCoordinator
 - Statement Parsers produce FinancialDocument as the canonical parser output.
 - Validation is the only stage permitted to verify financial correctness.
 - Repository protocols are the persistence boundary for transactions and accounts.
-- Repository persistence updates runtime stores only after validated writes complete successfully.
+- Repository persistence updates runtime stores only after validated writes complete successfully through RepositoryStoreHydrator.
+- RepositoryStoreHydrator is the only approved persistence-to-runtime boundary.
 - Stores expose validated runtime state to the UI.
 - Rules Engine enriches validated financial data but never alters imported financial truth.
 - Every supported file format must converge into the same deterministic pipeline before parser execution.
@@ -142,13 +143,13 @@ ImportCoordinator
 - Milestone M4: FinancialDocument-native Parsing ✅
 - Milestone M5: Validation Pipeline Refinement ✅
 - Milestone M6: Repository & Data Platform ✅
-- Milestone M7: Dashboard Experience 🚧
+- Milestone M7: Dashboard Experience (Foundation Complete) ✅
 - Milestone M8: Insights & Analytics
 - Milestone M9: Financial Ecosystem
 
 ## North Star
 
-LedgerForge should become the trusted financial workspace that users open to understand their financial life. Imports, OCR, parsers and profile learning exist to keep financial information accurate and current with minimal manual effort. The dashboard and insights remain the primary experience.
+LedgerForge should become the trusted personal financial operating system that users open to understand their financial life. Imports, OCR, parsers and profile learning exist to keep financial information accurate and current with minimal manual effort. The dashboard and insights remain the primary experience.
 
 ### Success Criteria
 

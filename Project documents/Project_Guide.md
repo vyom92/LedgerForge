@@ -4,13 +4,14 @@ This is the canonical project operating manual. Read this document first, then u
 
 ## Current Project Snapshot
 
+- **Workflow:** Workflow v2.1 (Frozen)
 - **Current Milestone:** M7 – Dashboard Experience
-- **Current Sprint:** Documentation sync after Sprint 21
-- **Current Phase:** UI/UX v1.0 visual asset freeze
+- **Current Sprint:** Workflow v2.1 documentation audit and repository housekeeping
+- **Current Phase:** Workflow v2.1 Freeze
 - **Build Status:** Passing
-- **Validation Status:** Build passing; full regression baseline passing. Sprint 21 validation complete.
-- **Last Architecture Review:** 2026-07-07
-- **Current Codex Baseline:** Sprint 21
+- **Validation Status:** Build passing; full active validation passing. Sprint 22 validation complete.
+- **Last Architecture Review:** 2026-07-08
+- **Current Development Baseline:** Sprint 22 (UI Foundation)
 
 ## Current Architecture Status
 
@@ -29,9 +30,9 @@ This is the canonical project operating manual. Read this document first, then u
 | Parser Selection | Framework implemented; deterministic selector active |
 | FinancialDocument | Immutable handoff model integrated after Statement Parser and before Validation |
 | Password Management | Operational; DefaultPasswordProvider integrated |
-| Dashboard | Application shell implemented; UI/UX v1.0 visual system frozen with approved Deep Indigo assets. |
-| Investments | Future module |
-| Validation | Build passing; full regression baseline passing. Sprint 21 validation complete |
+| Workflow | Workflow v2.1 active. `Project documents/Implementation.md` is the canonical sprint planning document. |
+| Dashboard | Approved Deep Indigo UI translated into SwiftUI foundation screens. Reusable presentation components established. |
+| Validation | Build passing; full active validation passing. Sprint 22 validation complete |
 | Documentation | Project_Guide.md is canonical routing document |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -82,6 +83,9 @@ Dashboard
 | Architecture_v1.0_Frozen.md       | Definitive system design and constraints             | Architecture review, design tasks | Highest     |
 | ADR.md                          | Architecture Decision Records documenting key decisions | Architecture review, design tasks | High        |
 | Project documents/PROJECT_STATE.md | Permanent verified repository state and AI handoff | Every implementation session | Highest |
+
+| Project documents/Implementation.md | Active sprint planning and workflow | Every implementation session | Highest |
+
 | Database_v1_Architecture.md       | Database schema and component design                  | Database changes, design tasks    | High        |
 | Product Vision.md               | High-level goals, target users, and product impact    | New feature planning              | High        |
 | Engineering Standards.md        | Coding standards and engineering guidelines           | All engineering tasks             | Medium      |
@@ -89,7 +93,7 @@ Dashboard
 | Project documents/.github/Project_Context.md      | AI bootstrap context and current project state summary | AI onboarding | Medium |
 | Project documents/.github/ai-instructions.md     | AI behavior and interaction policies                   | AI onboarding                    | Medium      |
 | Project documents/.github/prompts.md             | Prompt templates and examples for AI responses         | AI onboarding                    | Medium      |
-| Project documents/Codex response.md | Current sprint working log, implementation notes, build/test progress | Sprint reviews, bug fixes, testing | High        |
+| Project documents/Codex response.md | Project documents/Codex response.md | Latest Codex planning or execution output | Planning review and implementation review | High |
 
 Only consult the documents required by the Task Routing Guide. Do not load the complete documentation set unless performing a full architecture or repository review.
 
@@ -97,14 +101,15 @@ Only consult the documents required by the Task Routing Guide. Do not load the c
 
 The precedence for documentation is as follows:
 
-1. Architecture_v1.0_Frozen.md  
-2. ADR.md  
-3. Project documents/PROJECT_STATE.md  
-4. Engineering Standards.md  
-5. Database_v1_Architecture.md  
-6. Product Vision.md  
-7. AI_WORKFLOW.md  
-8. Project documents/Codex response.md  
+1. Architecture_v1.0_Frozen.md
+2. ADR.md
+3. Project documents/PROJECT_STATE.md
+4. Project documents/Implementation.md
+5. Engineering Standards.md
+6. Database_v1_Architecture.md
+7. Product Vision.md
+8. AI_WORKFLOW.md
+9. Project documents/Codex response.md
 
 Approved documentation always overrides any implicit or assumed implementation details.
 
@@ -145,7 +150,7 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 |-----------------------|-------------------------------------------------------------------|
 | New Feature           | Product Vision.md, Architecture_v1.0_Frozen.md, ADR.md            |
 | Database Work         | Database_v1_Architecture.md, ADR.md, Engineering Standards.md     |
-| Repository Changes    | Project documents/PROJECT_STATE.md, Project documents/Codex response.md  |
+| Repository Changes    | PROJECT_STATE, Implementation.md, Codex response  |
 | Import Framework      | Architecture_v1.0_Frozen.md, ADR.md, Engineering Standards.md     |
 | Reader Implementation | Architecture_v1.0_Frozen.md, ADR.md                               |
 | Parser Implementation | Architecture_v1.0_Frozen.md, ADR.md                               |
@@ -201,7 +206,7 @@ Do NOT:
 - Introduce optional future work.
 - Modify unrelated documentation.
 
-If future work is discovered, document it in `Project documents/Codex response.md` and stop.
+If future work is discovered, create a proposed future sprint inside `Project documents/Implementation.md`. Do not implement it.
 
 Additionally:
 
@@ -215,60 +220,53 @@ Additionally:
 
 ## Standard AI Workflow
 
-### 1. Before every implementation
+### Phase 1 — Planning
 
-- Confirm the requested sprint and stop condition.
-- Read Project_Guide.md first.  
-- Use the Task Routing Guide before opening any other document.
-- Read only the documents identified by the Task Routing Guide.  
-- Review Project documents/PROJECT_STATE.md.
-- Review Project documents/Codex response.md for the current sprint context.
-- Produce an implementation plan in `Project documents/Codex response.md`.
-- Wait for approval before coding.  
+- Read Project_Guide.md first.
+- Use the Task Routing Guide.
+- Review `Project documents/PROJECT_STATE.md`.
+- Read only the ACTIVE sprint in `Project documents/Implementation.md`.
+- Execute the Planning Prompt.
+- Output findings only to `Project documents/Codex response.md`.
+- Do not modify source code.
 
-### 2. During implementation
+### Phase 2 — Review
 
-- Work on one sprint only.  
-- Do not implement future sprints.  
-- Do not redesign approved architecture.  
-- Build continuously.  
-- Run the required sprint validation.
-- If command-line tests fail solely because of the known SwiftUI Preview tooling issue after a successful build, execute the equivalent Xcode regression suite and treat that result as authoritative.
-- If the project builds successfully and required sprint validation passes, prepare an automated Git commit.
-- Verify `git status` contains only sprint-related files.
-- Verify there are no unresolved merge conflict markers.
-- Generate a concise commit message describing the completed sprint work.
-- Commit the sprint changes.
-- Push to the tracked branch (normally `origin/main`).
-- Push the sprint tag if one was created.
-- Maintain Project documents/Codex response.md during implementation.
-- Record significant architectural decisions, implementation rationale and validation exceptions as they occur rather than reconstructing them at sprint completion.
-- After a successful build, required validation, commit, push and tag (if applicable), update `Project documents/PROJECT_STATE.md` with the verified repository state.
-- Record the commit hash, tag and push result in Project documents/Codex response.md.
-- If the build or required sprint validation fails, do not commit or push. Record the failure and stop.
-- Keep changes limited to the approved sprint.  
-- Keep commits logically grouped.
-- Prefer extending existing architecture over introducing parallel implementations.
-- Reuse existing repository contracts where practical. Introduce new repository APIs only when existing contracts cannot express the required behaviour cleanly.
-- Repository-backed runtime store hydration remains the only approved persistence → presentation boundary.
+- ChatGPT reviews `Codex response.md`.
+- ChatGPT updates the ACTIVE sprint in `Implementation.md`.
+- Replace the Planning Prompt with the approved Implementation Prompt.
 
-### 3. Before stopping
+### Phase 3 — Implementation
 
-- Update Project documents/Codex response.md throughout the sprint.
-- After a successful build, required validation, commit, push and tag (if applicable), update `Project documents/PROJECT_STATE.md`.
-- Include summary, files created, files modified, build result, validation result, commit hash (if committed), tag (if created), push result, documentation updated, remaining technical debt, deferred items and next recommended sprint.  
-- Stop exactly at the approved sprint boundary.  
-- Confirm the repository builds successfully before considering the sprint complete.
-- Verify Project_Guide.md, PROJECT_STATE.md and Codex response.md are mutually consistent before closing the sprint.
+- Read only the ACTIVE sprint.
+- Implement only the approved scope.
+- Build continuously.
+- Execute required validation.
+- Verify only sprint-related files are staged.
+- Commit.
+- Push.
+- Update `Project documents/Codex response.md`.
+- Update `Project documents/PROJECT_STATE.md`.
+
+### Phase 4 — Completion
+
+- Confirm build passes.
+- Confirm validation passes.
+- Confirm push completed.
+- ChatGPT archives the completed sprint in `Implementation.md`.
+- ChatGPT creates the next ACTIVE sprint.
 
 ## Sprint Roadmap
 
-- **Completed Sprints:** Sprint 10 cleanup, Sprint 11A, Sprint 11B, Sprint 11C, Sprint 11D, Sprint 12A, Sprint 12B, Sprint 12C, Sprint 13, Sprint 14, Sprint 15, Sprint 16, Sprint 17, Sprint 18, Sprint 19, Sprint 20
-- **Current Sprint:** Documentation sync after Sprint 21 – UI/UX visual asset freeze
-- **Upcoming Sprints:**
-  - Sprint 22 – Import Workflow & UI Completion
-  - Sprint 23 – PDF Input Adapter Integration
-  - Sprint 24+ – Insights & Analytics
+The ACTIVE sprint is the only sprint read by Codex.
+
+Development is managed exclusively through `Project documents/Implementation.md`.
+
+Only one ACTIVE sprint exists at any time.
+
+Completed sprints are archived inside the same document.
+
+Future sprint planning is created only after the current sprint completes.
 
 ## Product Milestones
 
@@ -310,7 +308,7 @@ Additionally:
 - Application Shell ✅
 - Sidebar navigation ✅
 - Approved UI asset freeze ✅
-- Dashboard implementation from frozen UI 🚧
+- Dashboard implementation from frozen UI ✅
 - Import workflow integration ⏳
 
 ### M8 – Insights & Analytics
@@ -398,7 +396,7 @@ To minimise token consumption:
 - Use the Task Routing Guide.
 - Open only the documents required for the requested task.
 - Do not reread unchanged reference documents.
-- Treat sprint reports as historical unless the current task requires them.
+- Read only the ACTIVE sprint in `Implementation.md`. Archived sprints are historical reference only.
 - Prefer referencing documentation over repeating it.
 
 This layered documentation approach keeps AI context small while preserving deterministic behaviour.
@@ -410,9 +408,11 @@ This layered documentation approach keeps AI context small while preserving dete
 - Never make changes outside the approved sprint.  
 - Never continue into the next sprint unless explicitly instructed.  
 - Never redesign approved architecture.  
-- If documentation and implementation conflict, stop and report the conflict.  
-- Maintain Project documents/Codex response.md during implementation.
-- Update Project documents/PROJECT_STATE.md only after the sprint has been successfully validated, committed, pushed and tagged if applicable.
+- If documentation and implementation conflict,stop and report the conflict.  
+- Maintain `Project documents/Codex response.md` during planning and implementation.
+- Update `Project documents/PROJECT_STATE.md` after successful validation and push.
+- Never modify archived sprint sections in `Project documents/Implementation.md`.
+- Read only the ACTIVE sprint in `Project documents/Implementation.md`.
 - Leave the repository in a buildable state.  
 - Never bypass repository abstractions.  
 - Never access SQLite directly from Views, ViewModels or Stores.  

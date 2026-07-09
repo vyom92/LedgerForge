@@ -2,7 +2,8 @@
 
 # LedgerForge — Database v1 Architecture (Design Baseline)
 
-Status: Database v1 design baseline, aligned through Sprint 19 / Milestone M7
+Status: Database v1 design baseline, architecture aligned through Sprint 22 / Milestone M7 UI Foundation
+
 ## Summary
 
 This document defines the LedgerForge Database v1 architecture. It is a vendor-neutral, SQLite-targeted design that fulfills the project's ADRs, Architecture_v1.0, Product Vision and Engineering Standards. The design prioritizes:
@@ -12,6 +13,7 @@ This document defines the LedgerForge Database v1 architecture. It is a vendor-n
 - Format-independence (ADR-011)
 - Traceability and auditability for every imported value (ADR-004, ADR-007)
 - Extensibility for future features (ExchangeRateStore, Money type, synchronization)
+- Repository-backed runtime hydration as the only approved persistence-to-presentation boundary
 
 ## Top-level goals
 
@@ -21,6 +23,7 @@ This document defines the LedgerForge Database v1 architecture. It is a vendor-n
 - Preserve native currency at every level and store exchange rates separately and versioned.
 - Support efficient queries for dashboards and full-text search for payee/description.
 - Clearly separate Source Truth, Derived Data and Presentation throughout the persistence layer.
+- Preserve the approved presentation path: Repository Persistence → RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
 
 ## Import Coordination
 
@@ -425,8 +428,8 @@ III. How imported documents map into accounts & transactions (traceability)
 5. Institution Detection, Statement Classification and Parser Selection determine the parser/profile before Statement Parser execution produces FinancialDocument and transaction candidates.
 6. ImportValidator validates the FinancialDocument and produces deterministic validation results.
 7. Repository persistence is allowed only after validation passes.
-8. If validation passes: create/update the import session, create/match accounts through approved repository boundaries, persist trusted transactions, and update runtime stores after validated writes complete successfully.
-9. Dashboard and report data must be loaded through repository-backed runtime state and include only trusted transactions to guarantee ADR-010 compliance.
+88. If validation passes: create/update the import session, create/match accounts through approved repository boundaries, persist trusted transactions, and update runtime stores only through RepositoryStoreHydrator after validated writes complete successfully.
+9. Dashboard, accounts, transaction browsing and report data must be loaded through repository-backed runtime state and include only trusted transactions to guarantee ADR-010 compliance.
 
 IV. Multi-currency support
 
@@ -658,7 +661,8 @@ XVIII. Next steps (recommended)
 2. Add migration tests whenever schema changes are introduced.
 3. Add approved fixtures for each newly supported institution before treating parser behaviour as stable.
 4. Preserve RawDocument and row-level traceability for every supported file format.
-5. Review database implications before implementing Dashboard refinement, Insights & Analytics, Multi-Currency, Investments or document/institution persistence features.
+5. Review database implications before implementing PDF support, Insights & Analytics, Multi-Currency, Investments or document/institution persistence features.
+6. Treat UI shell, dashboard, accounts, transactions, import wizard shell, settings and developer console presentation work as database-neutral unless a future sprint explicitly proposes schema changes.
 
 XIX. Appendix: canonical fields and conventions
 
@@ -680,4 +684,4 @@ End of design baseline
 
 
 --
-Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through Sprint 19 / Milestone M7. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.
+Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through Sprint 22 / Milestone M7 UI Foundation. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.

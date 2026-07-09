@@ -1,5 +1,3 @@
-
-
 # BUILD_AND_PROJECT_CONVENTIONS
 
 ## Purpose
@@ -13,8 +11,8 @@ It complements:
 - ADR.md
 - Engineering Standards.md
 - Project_Guide.md
-- AGENTS.md
 - AI_WORKFLOW.md
+- Implementation.md
 
 This document focuses on build mechanics, Xcode project management, validation workflow and repository hygiene.
 
@@ -49,17 +47,50 @@ Every new repository API should have a narrowly defined responsibility.
 The approved presentation pipeline is:
 
 Reader
-→ RawDocument
-→ Institution Detection
-→ Statement Classification
-→ Parser Selection
-→ FinancialDocument
-→ Validation
-→ Repository Persistence
-→ RepositoryStoreHydrator
-→ Runtime Stores
-→ ViewModels
-→ Views
+
+↓
+
+RawDocument
+
+↓
+
+Institution Detection
+
+↓
+
+Statement Classification
+
+↓
+
+Parser Selection
+
+↓
+
+FinancialDocument
+
+↓
+
+Validation
+
+↓
+
+Repository Persistence
+
+↓
+
+RepositoryStoreHydrator
+
+↓
+
+Runtime Stores
+
+↓
+
+ViewModels
+
+↓
+
+Views
 
 No component may bypass this pipeline.
 
@@ -67,20 +98,39 @@ No component may bypass this pipeline.
 
 ## UI Asset References
 
-Approved UI references live under `Project documents/UI Assets/Approved/`.
+Approved UI references live under:
+
+`Project documents/UI Assets/Approved/`
 
 - `DesignBoard_v2.0.png` is the master UI reference.
 - Individual approved assets define screen-level implementation details.
-- `AppIcon_v1.0.png` is the approved app icon reference.
-- Implementation sprints must translate approved assets into SwiftUI rather than redesigning the UI.
+- `AppIcon_v1.0.png` is the approved application icon.
+- Implementation sprints translate approved assets into SwiftUI. They must not redesign the approved UI language.
 
 ---
 
 ## AI Workflow Document Location
 
-AI workflow prompt and context files live under `Project documents/.github/`.
+AI workflow prompt and context files live under:
 
-Root-level `.github` documentation files were intentionally moved under `Project documents/.github/` so project workflow documentation remains with the rest of the project documents.
+`Project documents/.github/`
+
+Root-level AI workflow documentation was intentionally relocated so all project guidance lives within the project documentation hierarchy.
+
+---
+
+# Workflow Authority
+
+Workflow v2.1 is the approved LedgerForge development workflow.
+
+- `Project documents/Implementation.md` is the canonical sprint planning document.
+- ChatGPT owns and maintains `Implementation.md`.
+- Codex reads only the ACTIVE sprint.
+- Codex never edits `Implementation.md`.
+- Codex updates only:
+  - `Project documents/Codex response.md`
+  - `Project documents/PROJECT_STATE.md`
+- Archived sprint sections are historical reference only.
 
 ---
 
@@ -120,11 +170,17 @@ Always verify.
 Preferred implementation rhythm:
 
 Implementation
+
 ↓
+
 Build
+
 ↓
+
 Focused Tests
+
 ↓
+
 Next Change
 
 Avoid implementing an entire sprint before compiling.
@@ -152,7 +208,7 @@ If blocked solely by a known toolchain issue:
 
 - run the equivalent Xcode validation
 - record that Xcode became authoritative
-- record the reason in Codex response.md
+- record the reason in `Codex response.md`
 
 ---
 
@@ -160,7 +216,7 @@ If blocked solely by a known toolchain issue:
 
 Runtime Stores own observable application state.
 
-RepositoryStoreHydrator is the only approved persistence → runtime boundary.
+`RepositoryStoreHydrator` is the only approved persistence → runtime boundary.
 
 Hydration should:
 
@@ -177,14 +233,15 @@ Before committing:
 
 - verify git status
 - verify staged files belong only to the approved sprint
+- verify only the ACTIVE sprint was implemented
 - verify documentation consistency
 - verify required validation completed
 
 Standard verification:
 
-- git status
-- git diff --stat
-- git diff --cached --stat
+- `git status`
+- `git diff --stat`
+- `git diff --cached --stat`
 
 ---
 
@@ -193,16 +250,15 @@ Standard verification:
 Before closing every sprint verify consistency between:
 
 - Project_Guide.md
+- Implementation.md
 - PROJECT_STATE.md
 - Codex response.md
 
-If architecture changed:
+If architecture changed, also review:
 
 - ADR.md
 - Architecture_v1.0_Frozen.md
 - Engineering Standards.md
-
-must also be reviewed.
 
 ---
 
@@ -224,11 +280,12 @@ Avoid:
 
 A sprint is considered complete only when:
 
-- implementation is complete
+- implementation complete
 - build passes
 - required validation passes
-- documentation is synchronized
-- repository is clean
+- documentation synchronized
+- `PROJECT_STATE.md` updated if required
+- `Codex response.md` updated
 - commit created
 - push completed
 - tag created when applicable

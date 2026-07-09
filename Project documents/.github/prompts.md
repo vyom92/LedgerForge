@@ -1,249 +1,181 @@
-# Prompt Template Library
+# LedgerForge Prompt Template Library
 
-**Mandatory first document for every prompt**
+This document contains reusable prompt templates.
 
-`Project documents/Project_Guide.md`
+Workflow, architecture and engineering rules are defined elsewhere.
+
+Always begin with:
+
+1. `Project documents/Project_Guide.md`
+2. `Project documents/PROJECT_STATE.md`
+3. `Project documents/Implementation.md`
+
+Read only the ACTIVE sprint.
 
 ---
 
-# Sprint Planning
+# Planning Prompt
 
 ## Objective
 
-<Describe the sprint objective>
+<Describe sprint objective>
 
-## Confirm
+## Instructions
 
-- Approved sprint
-- Sprint scope
-- Stop condition
+- Read the required documentation using the Task Routing Guide.
+- Analyse only.
+- Produce an implementation plan.
+- Identify:
+  - files to modify
+  - files to create
+  - risks
+  - dependencies
+  - validation required
+- Output only to:
 
-## Before Doing Anything
+`Project documents/Codex response.md`
 
-- Read `Project documents/Project_Guide.md`
-- Read `Project documents/PROJECT_STATE.md`
-- Read `Project documents/Codex response.md` for the current sprint context.
-- Use the Task Routing Guide in `Project documents/Project_Guide.md` to determine any additional documents required.
+Do not modify source code.
 
-## Produce
-
-- Architecture review
-- Files to modify
-- Files to create
-- Risks
-- Dependencies
-- Complexity
-- Build impact
-
-Produce the implementation plan in
-`Project documents/Codex response.md`.
-
-Stop and wait for approval before implementation.
+Do not commit.
 
 ---
 
-# Sprint Implementation
+# Implementation Prompt
 
-## Mandatory Rules
+## Objective
 
-- Implement only the approved sprint.
-- Preserve user-visible behaviour.
-- Preserve approved financial truth.
+Implement the approved sprint only.
+
+## Instructions
+
+- Read only the ACTIVE sprint.
+- Execute only the approved Implementation Prompt.
+- Preserve approved architecture.
+- Preserve financial truth.
 - Build continuously.
-- Run the required sprint validation after significant changes.
-- Record which validation path (command-line or Xcode) is authoritative whenever they differ.
-- If command-line tests fail solely because of the known SwiftUI Preview tooling issue after a successful build, execute the equivalent Xcode regression suite and treat that result as authoritative.
-- Verify `git status` contains only sprint-related files.
-- Verify there are no unresolved merge conflict markers.
-- Generate a concise commit message from completed work.
+- Run required validation.
 - Commit.
-- Push to the tracked branch (normally `origin/main`).
-- Push the sprint tag (if created).
-- Record build result, validation result, commit hash, tag and push result in `Project documents/Codex response.md`.
-- Update `Project documents/PROJECT_STATE.md` only after a successful build, required validation, commit, push, tag (if applicable), and verification that Project_Guide.md and Codex response.md are consistent.
-- Update `Project documents/Project_Guide.md` only if workflow, roadmap or engineering guidance changed.
-- If validation fails, do not commit or push. Record the failure and stop.
-- Add new files to the Xcode navigator.
-- Add new files to target membership.
-- Stop exactly at the approved sprint boundary.
-- Prefer reusing existing repository contracts. Introduce new repository APIs only when existing contracts cannot express the required behaviour cleanly.
-- Record significant architectural decisions, implementation rationale and validation exceptions in `Project documents/Codex response.md` as they occur, not only at sprint completion.
+- Push.
+- Update:
+  - `Project documents/Codex response.md`
+  - `Project documents/PROJECT_STATE.md`
 
-### Completion Report
-
-Provide:
-
-- Files changed
-- Files created
-- Files removed
-- Build status
-- Validation status
-- Commit hash
-- Tag (if created)
-- Push result
-- Architectural decisions
-- Risks
-- Remaining technical debt
-- Deferred work
-- Recommended next sprint
+Do not modify `Implementation.md`.
 
 ---
 
-# Bug Fix
+# Documentation Sync Prompt
 
-## Problem
+Documentation only.
 
-<Describe the observed behaviour>
-
-## Expected Behaviour
-
-<Describe the correct behaviour>
-
-## Requirements
-
-- Make the smallest possible change.
-- Preserve existing behaviour.
-- Build continuously.
-- Run the required validation.
-- Remove temporary diagnostics before completion.
+- No source changes.
+- Update only approved documentation.
+- Do not modify `Implementation.md`.
+- Update `Codex response.md`.
+- Update `PROJECT_STATE.md` only if project state changes.
 
 ---
 
-# Refactor
+# Bug Fix Prompt
 
-## Goal
+Objective:
 
-Improve maintainability without changing behaviour.
+<Describe bug>
 
-## Requirements
+Requirements:
+
+- Smallest possible change.
+- Preserve behaviour.
+- Build.
+- Validate.
+- Commit.
+- Push.
+
+---
+
+# Refactor Prompt
+
+Objective:
+
+<Describe refactor>
+
+Requirements:
 
 - Preserve behaviour.
 - Reduce duplication.
-- Improve naming.
-- Preserve architecture.
-- Do not change financial logic.
+- Improve maintainability.
+- No functional changes.
 
 ---
 
-# New Financial Institution
+# New Institution Prompt
 
-## Institution
+Institution:
 
 <Name>
 
-## Requirements
+Requirements:
 
-- Use only supplied reference documents.
-- Never infer statement layouts.
-- Institution Detection before Statement Classification.
-- Parser Selection before Statement Parser.
-- Produce FinancialDocument.
+- Use supplied fixtures only.
+- Do not infer layouts.
 - Preserve parser behaviour.
-- Validate using approved reference fixtures.
+- Validate against approved fixtures.
 
 ---
 
-# Architecture Review
+# Architecture Review Prompt
 
-## Review against
+Review against:
 
 - Product Vision
-- Project_Guide.md
+- Architecture
 - Engineering Standards
 - ADRs
 
-## Verify
-
-- Readers only extract RawDocument.
-- Institution Detection identifies the source.
-- Statement Classification identifies the statement type.
-- Parser Selection chooses the parser.
-- Statement Parsers produce FinancialDocument.
-- Validation remains centralized.
-- Repository persistence occurs only after successful validation.
-- Repository persistence completes before runtime stores are refreshed.
-- Repository-backed runtime store hydration remains the only approved persistence → UI path.
-- Startup hydration executes exactly once per application launch unless an explicit refresh is requested.
-- Runtime Stores own observable application state.
-- Views contain no business logic.
-- No duplicated financial calculations.
-- No unnecessary coupling.
-
-Do not modify code during review.
-
----
-
-# Regression Review
-
-Validate against every approved reference fixture.
-
 Confirm:
 
-- Correct parser selected.
-- Institution detected correctly.
-- Statement type detected correctly.
-- Transaction count preserved.
-- Financial truth preserved.
-- Validation behaviour unchanged.
-- Validation results unchanged unless explicitly expected.
-- Parser-to-FinancialDocument boundary preserved.
-- Dashboard unchanged unless expected.
-- No parser regressions.
+- Import pipeline preserved.
+- Repository boundaries preserved.
+- RepositoryStoreHydrator remains the only persistence-to-runtime boundary.
+- No duplicated financial logic.
+- No unnecessary coupling.
 
-Produce PASS / FAIL.
+No code changes.
 
 ---
 
-# Sprint Completion Report
+# Regression Prompt
 
-Provide:
+Validate:
 
-- Build status
-- Validation status
-- Authoritative validation path (Command-line or Xcode)
-- Commit hash
-- Tag (if created)
-- Push result
-- Files modified
-- Files created
-- Files removed
-- Architectural decisions
-- Technical debt
-- Known issues
+- Institution Detection
+- Statement Classification
+- Parser Selection
+- Financial truth
+- Validation
+- Repository behaviour
+- Dashboard behaviour
+
+Output:
+
+PASS / FAIL
+
+---
+
+# Project Guide Verification Prompt
+
+Read:
+
+- `Project_Guide.md`
+- `PROJECT_STATE.md`
+- ACTIVE sprint only
+
+Produce:
+
+- Documents required
+- Files likely to change
 - Risks
-- Deferred work
-- Recommended next sprint
-- Documentation consistency verified (`Project_Guide.md`, `PROJECT_STATE.md`, `Codex response.md`)
+- Stop condition
 
----
-
-# Project Guide Verification
-
-## Test 1
-
-- Read `Project documents/Project_Guide.md`.
-- List only the documents required for the requested sprint.
-- Explain why each document is required.
-- List intentionally skipped documents.
-- Do not write code.
-
-## Test 2
-
-- Read `Project documents/Project_Guide.md`.
-- Describe exactly what the requested sprint may change.
-- List five things it must not change.
-- Quote the relevant sections.
-- Do not write code.
-
-## Test 3
-
-- Read `Project documents/Project_Guide.md`.
-- Read `Project documents/PROJECT_STATE.md`.
-- Follow the Standard AI Workflow.
-- Produce only:
-  - Documents to read
-  - Implementation plan
-  - Risks
-  - Files likely to change
-  - Stop condition
-- Do not write code.
+No code changes.

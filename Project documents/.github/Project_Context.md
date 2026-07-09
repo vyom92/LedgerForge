@@ -1,164 +1,155 @@
 # LedgerForge Project Context
 
-## Current Phase
-
-M7 — Dashboard Experience (UI/UX v1.0 asset freeze)
-
-LedgerForge has completed its foundational multi-format import architecture, deterministic document ingestion pipeline, repository integration cleanup, repository-backed dashboard hydration, and the Sprint 21 application shell. The current documentation baseline is the approved UI/UX v1.0 visual asset freeze.
+> Purpose: Provide a concise snapshot of the project for AI agents and developers.
+>
+> Detailed workflow, architecture and engineering guidance live in the canonical project documentation.
 
 ---
 
-## Current Architecture
+# Current Phase
 
-ImportCoordinator
+**Current Milestone**
+
+Milestone M7 — Dashboard Experience
+
+**Current Sprint**
+
+Sprint 23 (Planning)
+
+Current work is focused on:
+
+- Workflow v2.1 freeze
+- Documentation consolidation
+- Repository housekeeping
+- UI component extraction
+
+---
+
+# Project Summary
+
+LedgerForge is an offline-first macOS personal financial operating system.
+
+It imports financial documents from multiple institutions, extracts validated financial data through a deterministic import pipeline, stores trusted financial truth in a repository-backed database, and presents that information through a modern SwiftUI interface.
+
+The approved UI/UX visual language is frozen and implementation now focuses on translating approved assets into production SwiftUI.
+
+---
+
+# Current Architecture (Summary)
+
+The approved production pipeline is:
+
+Reader
+
 ↓
-Reader (PDF / CSV / XLS / XLSX / TXT)
-↓
+
 RawDocument
+
 ↓
+
 Institution Detection
+
 ↓
+
 Statement Classification
+
 ↓
+
 Parser Selection
+
 ↓
-Statement Parser
-↓
+
 FinancialDocument
+
 ↓
+
 Validation
+
 ↓
-Repositories
+
+Repository Persistence
+
 ↓
-SQLite
+
+RepositoryStoreHydrator
+
 ↓
-TransactionStore
+
+Runtime Stores
+
 ↓
-AccountStore
+
+ViewModels
+
 ↓
-DashboardViewModel
-↓
+
 Views
 
-All supported document formats converge into this single deterministic pipeline.
-This pipeline is the canonical production architecture defined by the current ADRs and PROJECT_STATE.md.
+RepositoryStoreHydrator is the only approved persistence-to-runtime boundary.
 
 ---
 
-## Completed Milestones
+# Completed Milestones
 
-- Multi-format import framework
-- RawDocument extraction
+- Multi-format document import framework
+- RawDocument pipeline
 - Institution Detection
 - Statement Classification
 - Parser Selection
-- FinancialDocument-native parsing
+- FinancialDocument model
 - Validation framework
-- Repository integration cleanup
-- Import sessions
-- TransactionStore
-- AccountStore
-- Reactive dashboard foundation
-- Financial Snapshot
-- Application Shell
-- Approved UI/UX v1.0 visual assets
-- Product Vision
-- Architecture documentation
-- Engineering Standards
-- Architecture Decision Records (ADRs)
-- AI workflow documentation
-- Xcode MCP integration
+- Repository architecture
+- RepositoryStoreHydrator
+- Runtime Stores
+- Dashboard foundation
+- Application shell
+- Sprint 22 SwiftUI UI Foundation
+- Approved UI/UX asset freeze
+- Workflow v2.1
 
 ---
 
-## Current Priorities
+# Current Priorities
 
-1. Implement future UI work from approved assets without redesign.
-2. Preserve repository-backed dashboard presentation boundaries.
+1. Complete Workflow v2.1 repository freeze.
+2. Sprint 23 — UI Component Extraction.
 3. Expand regression fixtures.
-4. Password handling for encrypted financial documents.
-5. Insights and analytics.
+4. Password-protected document support.
+5. PDF import.
+6. Insights & Analytics.
 
 ---
 
-## Financial Principles
+# Design Authority
 
-- Preserve imported financial truth.
-- Native currency is never modified.
-- Currency conversion is presentation only.
-- Support multiple currencies simultaneously.
-- Every financial calculation must remain deterministic, explainable and auditable.
+Master UI reference:
 
----
+`Project documents/UI Assets/Approved/DesignBoard_v2.0.png`
 
-## Product Principles
+Approved screen assets:
 
-LedgerForge is not a CSV importer.
+`Project documents/UI Assets/Approved/`
 
-LedgerForge is a financial document ingestion platform.
+App icon:
 
-Readers extract RawDocument.
-
-Institution Detection identifies the source.
-
-Statement Classification identifies the statement type.
-
-Parser Selection chooses the appropriate parser.
-
-Statement Parsers produce FinancialDocument.
-
-Validation verifies financial correctness.
-
-Stores own validated runtime state.
-
-ViewModels present data.
-
-Views display data.
+`Project documents/UI Assets/Approved/AppIcon_v1.0.png`
 
 ---
 
-## Reference Assets
+# Canonical Documentation
 
-Always prefer approved project references over assumptions.
+Every implementation begins with:
 
-Current references include:
+1. `Project_Guide.md`
+2. `PROJECT_STATE.md`
+3. `Implementation.md`
 
-- `Project documents/UI Assets/Approved/DesignBoard_v2.0.png`
-- Approved screen-level UI assets
-- `Project documents/UI Assets/Approved/AppIcon_v1.0.png`
-- Axis Bank statements
-- Axis Credit Card statements
-- CBQ Bank statements
-- CBQ Credit Card statements
-- Amex statements
-- HDFC statements
-- IBKR statements
-- Zurich ISP statements
-
-If an implementation requires a reference that is unavailable, stop and request the appropriate document before continuing.
+Use the Task Routing Guide in `Project_Guide.md` to determine any additional documents required for the current task.
 
 ---
 
-## Development Workflow
+# Definition of Success
 
-1. Read `Project_Guide.md`.
-2. Read `PROJECT_STATE.md`.
-3. Confirm the approved sprint and stop condition.
-4. Read `Codex response.md`.
-5. Use the Task Routing Guide to determine which additional documentation is required.
-6. Produce an implementation plan.
-7. Obtain approval.
-8. Implement one approved sprint.
-9. Build continuously.
-10. Run the required sprint validation.
-11. Commit.
-12. Push the tracked branch.
-13. Push the sprint tag (if applicable).
-14. Update PROJECT_STATE.md after the successful commit, push and tag (if applicable).
-15. Update Project_Guide.md only if workflow, roadmap or engineering guidance changed.
+LedgerForge becomes the trusted personal financial operating system that allows users to import financial documents from multiple institutions, preserve financial truth through a deterministic validation pipeline, and present accurate, explainable financial insight through a repository-backed SwiftUI application.
 
----
-
-## Definition of Success
-
-LedgerForge becomes the trusted offline financial operating system that ingests financial documents from multiple institutions, automatically identifies their origin and statement type, securely unlocks encrypted financial documents, extracts accurate financial data, validates every result before persistence, and presents a trustworthy multi-currency financial dashboard. Every supported input format must preserve identical financial truth through the deterministic import pipeline.
+Every future sprint should reduce manual work, preserve architectural integrity and improve user confidence without compromising financial accuracy.
