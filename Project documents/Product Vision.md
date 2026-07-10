@@ -9,6 +9,8 @@ The primary product is the financial dashboard. Document import, OCR, profile le
 
 LedgerForge is designed from the outset as a multi-currency financial operating system. Every monetary value retains its native currency, while dashboards and reports present configurable base and secondary currency views using transparent, auditable exchange rates.
 
+LedgerForge is designed for private personal use and is intentionally optimized for a single user's financial workflow rather than broad commercial configurability.
+
 ---
 
 # Vision
@@ -30,6 +32,37 @@ The application should answer financial questions instead of simply storing fina
 
 ---
 
+# Financial Identity
+
+LedgerForge models financial entities rather than merely financial institutions.
+
+A financial institution may contain multiple independent financial entities, including:
+
+- Bank accounts
+- Credit cards
+- Loans
+- Brokerage accounts
+- Retirement accounts
+- Future financial products
+
+Every imported document should resolve to a single financial entity using verified identifiers wherever possible.
+
+Preferred identifiers include:
+
+- Account numbers
+- IBANs
+- Credit card numbers
+- Broker account IDs
+- Future investment identifiers such as folio numbers
+
+Display names exist only for presentation.
+
+Repository identifiers remain immutable throughout the lifetime of the application.
+
+Financial entities become the permanent owners of financial history. Documents, statements and transactions exist to describe activity occurring within those entities.
+
+---
+
 # Product Principles
 
 Every feature should satisfy at least one of these goals:
@@ -39,10 +72,22 @@ Every feature should satisfy at least one of these goals:
 3. Surface meaningful financial insight.
 4. Preserve financial truth.
 
+LedgerForge should never sacrifice accuracy for convenience.
 
-LedgerForge should never sacrifice accuracy for convenience. Every calculation must remain deterministic, explainable and reproducible.
+Every calculation must remain deterministic, explainable and reproducible.
 
 Approved reference fixtures define financial truth for supported institutions and formats. When the same statement is available in multiple formats, such as CSV and PDF, LedgerForge must preserve equivalent observable financial results across those formats.
+
+Additional architectural principles:
+
+- Financial entities are more important than financial institutions.
+- Repository identity never changes.
+- Display names are presentation only.
+- Import order must never change the final financial truth.
+- Original financial data is immutable.
+- Derived analytics are calculated separately.
+- Internal transfers between financial entities owned by the user must never alter income, expenses or net worth.
+- Multi-currency reporting must preserve original transaction values and derive converted values independently.
 
 ---
 
@@ -54,11 +99,11 @@ Primary modules:
 
 - Dashboard
 - Accounts
-- Transactions
+- Activity
 - Documents
 - Import History
 - Investments
-- Budget & Cash Flow
+- Salary & Planning
 - Multi-Currency Dashboard
 - Financial Timeline
 - Financial Intelligence
@@ -100,10 +145,23 @@ The user should primarily experience financial insight. Importing statements sho
 
 LedgerForge should never ask the user for information it can determine automatically.
 
+LedgerForge should automate reasoning before automating data entry.
+
+Small amounts of manual input are acceptable when they avoid fragile automation.
+
+Automation should primarily focus on:
+
+- Reconciliation
+- Financial understanding
+- Relationship discovery
+- Intelligent classification
+- Decision support
+
 The system should continuously learn:
 
 - Statement formats
 - Institutions
+- Financial entities
 - Categories
 - Recurring transactions
 - Salary patterns
@@ -113,7 +171,9 @@ The system should continuously learn:
 
 Every successful import should improve future imports.
 
-Automation should quietly disappear into the background. The user should primarily experience trustworthy financial insights rather than the mechanics of importing and processing documents.
+Automation should quietly disappear into the background.
+
+The user should primarily experience trustworthy financial insight rather than the mechanics of importing and processing documents.
 
 ---
 
@@ -159,6 +219,41 @@ Importing documents should require little or no user interaction beyond selectin
 The statement, not the file format, is the source of financial truth. Equivalent CSV, PDF and future spreadsheet representations of the same statement should reconcile to the same approved expected results.
 ---
 
+# Financial Intelligence
+
+LedgerForge should progressively evolve beyond document processing into financial understanding.
+
+Financial intelligence builds upon deterministic document processing and repository-backed financial truth.
+
+Future intelligence should include:
+
+- Statement continuity
+- Historical backfill imports
+- Overlap-aware importing
+- Duplicate detection
+- Money journey reconstruction
+- Internal transfer recognition
+- Salary verification
+- Retirement tracking
+- Investment understanding
+- Cash-flow planning
+- Financial forecasting
+- Cross-account reconciliation
+
+LedgerForge should understand how money moves between financial entities owned by the user rather than treating every transaction independently.
+
+A salary may move through multiple accounts before funding investments or paying liabilities. These intermediate transfers should be recognised as movement of existing assets rather than new income or expenses.
+
+Financial intelligence must always remain:
+
+- Deterministic
+- Explainable
+- Auditable
+- Reproducible
+
+Every automated conclusion must be traceable back to its supporting financial evidence.
+---
+
 # Explainable Intelligence
 
 Every automatic decision must be:
@@ -178,6 +273,20 @@ Every automated financial calculation should identify the data source, exchange 
 
 LedgerForge should become the trusted personal financial operating system that users open every day because it provides the clearest, most accurate understanding of their financial life.
 
-Importing documents becomes an almost invisible maintenance activity while repository-backed dashboards evolve into a living financial operating system that continuously reflects a user's complete financial position.
+Importing documents should become an almost invisible maintenance activity while repository-backed dashboards evolve into a living financial operating system that continuously reflects a user's complete financial position.
 
-Every future feature should reinforce this vision by reducing manual work, increasing confidence and preserving financial truth.
+LedgerForge should progressively evolve from historical financial record keeping into intelligent financial planning and decision support while remaining offline-first and preserving financial truth.
+
+The application should ultimately help answer questions such as:
+
+- Where did my money come from?
+- Where did it go?
+- What merely moved between my own accounts?
+- What changed my net worth?
+- What should I do next?
+
+Future capabilities such as salary planning, retirement tracking, investment analysis and financial forecasting should reinforce this vision without compromising explainability, determinism or user trust.
+
+Every future feature should reinforce the core mission by reducing manual work, increasing confidence and preserving financial truth.
+
+LedgerForge should favour deterministic financial understanding over opaque statistical inference or black-box AI.

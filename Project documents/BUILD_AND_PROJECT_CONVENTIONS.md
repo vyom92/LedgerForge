@@ -74,6 +74,10 @@ Validation
 
 ↓
 
+Fingerprinting & Duplicate Detection
+
+↓
+
 Repository Persistence
 
 ↓
@@ -93,6 +97,8 @@ ViewModels
 Views
 
 No component may bypass this pipeline.
+
+Every implementation must preserve this sequence unless an approved ADR explicitly changes the architecture.
 
 ---
 
@@ -123,14 +129,22 @@ Root-level AI workflow documentation was intentionally relocated so all project 
 
 Workflow v2.1 is the approved LedgerForge development workflow.
 
-- `Project documents/Implementation.md` is the canonical sprint planning document.
-- ChatGPT owns and maintains `Implementation.md`.
-- Codex reads only the ACTIVE sprint.
-- Codex never edits `Implementation.md`.
-- Codex updates only:
-  - `Project documents/Codex response.md`
-  - `Project documents/PROJECT_STATE.md`
-- Archived sprint sections are historical reference only.
+Authoritative workflow documents:
+
+1. `Project documents/.github/Context_Manifest.yaml`
+2. `Project documents/AI_WORKFLOW.md`
+3. `Project documents/Project_Guide.md`
+
+Workflow responsibilities:
+
+- Desktop ChatGPT owns the content and approval of `Project documents/Implementation.md`.
+- ChatGPT in Xcode may apply Desktop ChatGPT-approved documentation wording during approved planning and documentation tasks.
+- Codex executes only the approved ACTIVE sprint.
+- Codex never edits `Project documents/Implementation.md`.
+- Codex maintains `Project documents/Codex response.md` as the execution log.
+- `Project documents/PROJECT_STATE.md` remains the authoritative record of verified repository state and is updated only after successful validation or an approved documentation-only factual correction.
+
+When workflow guidance appears elsewhere, these documents remain authoritative.
 
 ---
 

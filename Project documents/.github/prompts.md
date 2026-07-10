@@ -2,15 +2,23 @@
 
 This document contains reusable prompt templates.
 
-Workflow, architecture and engineering rules are defined elsewhere.
+Workflow, architecture, document authority and engineering rules are defined by the project documentation.
+
+---
+
+# Mandatory Bootstrap
 
 Always begin with:
 
-1. `Project documents/Project_Guide.md`
-2. `Project documents/PROJECT_STATE.md`
-3. `Project documents/Implementation.md`
+1. `Project documents/.github/Context_Manifest.yaml`
+2. `Project documents/.github/AGENTS.md`
+3. `Project documents/Project_Guide.md`
+4. `Project documents/PROJECT_STATE.md`
+5. `Project documents/Implementation.md` (ACTIVE sprint only)
 
-Read only the ACTIVE sprint.
+Then read only the additional documentation required by the Task Routing Guide.
+
+Never read archived sprint sections unless explicitly requested.
 
 ---
 
@@ -18,26 +26,47 @@ Read only the ACTIVE sprint.
 
 ## Objective
 
-<Describe sprint objective>
+<Describe the ACTIVE sprint objective exactly as defined in `Project documents/Implementation.md`.>
+
+## Bootstrap
+
+Always read in this order:
+
+1. `Project documents/.github/Context_Manifest.yaml`
+2. `Project documents/.github/AGENTS.md`
+3. `Project documents/Project_Guide.md`
+4. `Project documents/PROJECT_STATE.md`
+5. `Project documents/Implementation.md` (ACTIVE sprint only)
+
+Then load only the additional documentation required by the Task Routing Guide.
 
 ## Instructions
 
-- Read the required documentation using the Task Routing Guide.
 - Analyse only.
-- Produce an implementation plan.
-- Identify:
-  - files to modify
-  - files to create
-  - risks
-  - dependencies
-  - validation required
-- Output only to:
+- Do not modify source code.
+- Do not modify tests.
+- Do not modify `Project documents/Implementation.md`.
+- Do not commit.
+- Do not push.
+- Keep planning strictly within the ACTIVE sprint.
+- Preserve approved architecture, ADRs, database design and workflow.
+- Identify only the files required for the approved sprint.
+
+## Deliverables
+
+Output only to:
 
 `Project documents/Codex response.md`
 
-Do not modify source code.
+Include:
 
-Do not commit.
+- Files to modify
+- Files to create (if any)
+- Risks
+- Dependencies
+- Validation required
+- Files that must remain untouched
+- Stop condition
 
 ---
 
@@ -45,7 +74,7 @@ Do not commit.
 
 ## Objective
 
-Implement the approved sprint only.
+Implement the approved ACTIVE sprint only.
 
 ## Instructions
 
@@ -53,15 +82,16 @@ Implement the approved sprint only.
 - Execute only the approved Implementation Prompt.
 - Preserve approved architecture.
 - Preserve financial truth.
+- Keep changes inside the approved sprint boundary.
 - Build continuously.
 - Run required validation.
-- Commit.
-- Push.
+- Commit only after successful validation.
+- Push only after a successful commit.
 - Update:
   - `Project documents/Codex response.md`
-  - `Project documents/PROJECT_STATE.md`
+  - `Project documents/PROJECT_STATE.md` (only after successful validation)
 
-Do not modify `Implementation.md`.
+Never modify `Project documents/Implementation.md`.
 
 ---
 
@@ -69,21 +99,25 @@ Do not modify `Implementation.md`.
 
 Documentation only.
 
+Requirements:
+
 - No source changes.
+- No test changes.
 - Update only approved documentation.
-- Do not modify `Implementation.md`.
-- Update `Codex response.md`.
-- Update `PROJECT_STATE.md` only if project state changes.
+- Never modify `Project documents/Implementation.md`.
+- Update `Project documents/Codex response.md`.
+- Update `Project documents/PROJECT_STATE.md` only when verified repository facts change.
+- Present documentation changes for review before committing unless explicitly instructed otherwise.
 
 ---
 
 # Bug Fix Prompt
 
-Objective:
+## Objective
 
 <Describe bug>
 
-Requirements:
+## Requirements
 
 - Smallest possible change.
 - Preserve behaviour.
@@ -96,31 +130,33 @@ Requirements:
 
 # Refactor Prompt
 
-Objective:
+## Objective
 
 <Describe refactor>
 
-Requirements:
+## Requirements
 
 - Preserve behaviour.
 - Reduce duplication.
 - Improve maintainability.
 - No functional changes.
+- Maintain architectural boundaries.
 
 ---
 
 # New Institution Prompt
 
-Institution:
+## Institution
 
 <Name>
 
-Requirements:
+## Requirements
 
 - Use supplied fixtures only.
 - Do not infer layouts.
 - Preserve parser behaviour.
 - Validate against approved fixtures.
+- Do not affect existing institution behaviour.
 
 ---
 
@@ -140,6 +176,7 @@ Confirm:
 - RepositoryStoreHydrator remains the only persistence-to-runtime boundary.
 - No duplicated financial logic.
 - No unnecessary coupling.
+- No workflow drift.
 
 No code changes.
 
@@ -167,15 +204,17 @@ PASS / FAIL
 
 Read:
 
+- `Project documents/.github/Context_Manifest.yaml`
 - `Project_Guide.md`
 - `PROJECT_STATE.md`
-- ACTIVE sprint only
+- `Implementation.md` (ACTIVE sprint only)
 
 Produce:
 
 - Documents required
 - Files likely to change
 - Risks
+- Validation required
 - Stop condition
 
 No code changes.

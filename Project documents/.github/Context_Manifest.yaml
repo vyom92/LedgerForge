@@ -1,0 +1,152 @@
+---
+app:
+  name: "LedgerForge"
+  description: "Private, single-user, offline-first personal financial intelligence application."
+  characteristics:
+    - private
+    - single-user
+    - offline-first
+    - deterministic
+    - explainable
+
+bootstrap:
+  read_order:
+    - "Project documents/.github/Context_Manifest.yaml"
+    - "Project documents/.github/AGENTS.md"
+    - "Project documents/Project_Guide.md"
+    - "Project documents/PROJECT_STATE.md"
+    - "Project documents/Product Vision.md"
+    - "Project documents/Implementation.md#ACTIVE"
+  rules:
+    - "Read only the ACTIVE sprint in Implementation.md."
+    - "Read architecture, database, UI/UX, ADR, engineering, and source files only when required by the ACTIVE sprint."
+    - "Use PROJECT_STATE.md for verified repository state."
+    - "Use Git tags and releases for release history."
+    - "Do not duplicate volatile sprint, test, commit, or release facts in this manifest."
+
+precedence:
+  authoritative_documents:
+    - "Project documents/Product Vision.md"
+    - "Project documents/Project_Guide.md"
+    - "Project documents/PROJECT_STATE.md"
+    - "Project documents/Implementation.md#ACTIVE"
+    - "Project documents/ADR.md"
+    - "Project documents/Architecture_v1.0_Frozen.md"
+    - "Project documents/Database_v1_Architecture.md"
+    - "Project documents/UI_UX_v1.0_Frozen.md"
+    - "Project documents/Engineering Standards.md"
+    - "Project documents/BUILD_AND_PROJECT_CONVENTIONS.md"
+  working_documents:
+    - "Project documents/Codex response.md"
+    - "Project documents/.github/Project_Context.md"
+  templates:
+    - "Project documents/.github/prompts.md"
+
+state_sources:
+  verified_repository_state: "Project documents/PROJECT_STATE.md"
+  active_sprint: "Project documents/Implementation.md#ACTIVE"
+  release_history: "Git tags and GitHub releases"
+  execution_report: "Project documents/Codex response.md"
+
+workflow_roles:
+  planner:
+    current_tool: "Desktop ChatGPT"
+    owns:
+      - "product vision"
+      - "roadmap"
+      - "financial domain modelling"
+      - "sprint scope"
+      - "planning review"
+      - "acceptance review"
+      - "approved wording for Implementation.md"
+    rules:
+      - "May approve exact documentation wording."
+      - "Does not rely on direct repository editing."
+
+  documentation_executor:
+    current_tool: "ChatGPT in Xcode"
+    owns:
+      - "approved documentation edits"
+      - "documentation alignment"
+      - "exact diffs"
+      - "focused repository inspection"
+    rules:
+      - "May edit Implementation.md only when applying Desktop ChatGPT-approved wording."
+      - "Must not invent sprint scope, product intent, architecture, or financial rules."
+      - "Must stop and report conflicts instead of improvising."
+      - "Must present diffs before commit unless explicitly instructed otherwise."
+
+  implementation_executor:
+    current_tool: "Codex"
+    owns:
+      - "approved multi-file implementation"
+      - "regression tests"
+      - "build and test validation"
+      - "implementation reporting"
+      - "PROJECT_STATE.md updates after successful validation"
+    rules:
+      - "Must not modify Implementation.md."
+      - "Must not expand the ACTIVE sprint scope."
+      - "Must preserve approved architecture and financial truth."
+
+  reviewer:
+    current_tool: "Desktop ChatGPT"
+    owns:
+      - "diff review"
+      - "implementation review"
+      - "UX review"
+      - "final sprint acceptance"
+
+protected:
+  files:
+    - "Project documents/Implementation.md#ARCHIVE"
+    - "Project documents/Architecture_v1.0_Frozen.md"
+    - "Project documents/Database_v1_Architecture.md"
+    - "Project documents/UI_UX_v1.0_Frozen.md"
+  rules:
+    - "Archived sprint content is immutable except for explicit factual corrections approved by the planner."
+    - "ADRs are append-only; do not rewrite decision history."
+    - "Frozen baselines may change only through an explicitly approved replacement or versioned update."
+    - "RepositoryStoreHydrator remains the persistence-to-runtime boundary."
+    - "Repository identifiers are immutable."
+    - "Display names must never define financial identity."
+
+execution_rules:
+  documentation:
+    - "Documentation-only tasks must not modify Swift, tests, assets, or Xcode project files."
+    - "Apply approved wording exactly."
+    - "Report resolved repository paths."
+    - "Present one unified diff per edited file."
+    - "Do not commit or push before approval unless explicitly instructed."
+  implementation:
+    - "Build must succeed."
+    - "All enabled tests must pass."
+    - "Financial truth must remain deterministic, explainable, and reproducible."
+    - "Do not bypass repository abstractions or runtime-store boundaries."
+    
+documentation_baseline:
+  workflow_version: "2.1"
+  architecture_baseline: "v1.0 Frozen"
+  database_baseline: "v1.0"
+  uiux_baseline: "v1.0 Frozen"
+  current_milestone: "M7 – Dashboard Experience"
+
+  canonical_bootstrap: "Project documents/.github/Context_Manifest.yaml"
+  canonical_workflow: "Project documents/AI_WORKFLOW.md"
+  canonical_routing: "Project documents/Project_Guide.md"
+
+  repository_principles:
+    - "Repository is the single source of truth."
+    - "Repository state belongs only in PROJECT_STATE.md."
+    - "Sprint planning belongs only in Implementation.md."
+    - "Execution history belongs only in Codex response.md."
+  
+notes:
+  pipeline_rule: "Preserve the canonical import pipeline, validation-before-persistence, fingerprinting, duplicate detection, and RepositoryStoreHydrator boundary."
+
+  context_rule: "The repository is the durable project memory. Conversations are disposable execution contexts."
+
+  anti_drift_rule: "When duplicate guidance exists, update the non-authoritative document instead of creating another source of truth."
+
+  manifest_scope: "This manifest defines bootstrap order, document authority, workflow ownership, and repository guardrails. It must not duplicate volatile repository state."
+...

@@ -2,7 +2,11 @@
 
 This workflow applies to every AI-assisted implementation in LedgerForge.
 
-`Project_Guide.md` is the mandatory first document. Use it to determine which additional documentation is required for the current task instead of reading every project document by default.
+`Project documents/.github/Context_Manifest.yaml` is the mandatory bootstrap document.
+
+Read it first to determine the current project state, document precedence, bootstrap order, assistant responsibilities, and protected files.
+
+Then follow the complete bootstrap order defined in the manifest.
 
 ---
 
@@ -16,35 +20,55 @@ Rules:
 
 - Read only the ACTIVE sprint.
 - Archived sprints are historical reference only.
-- ChatGPT owns and maintains `Implementation.md`.
-- Codex never edits `Implementation.md`.
-- Codex updates only:
-  - `Project documents/Codex response.md`
-  - `Project documents/PROJECT_STATE.md`
+- Desktop ChatGPT owns the content and approval of `Project documents/Implementation.md`.
+- ChatGPT in Xcode may apply exact Desktop ChatGPT-approved wording.
+- During implementation, Codex may modify only files required by the approved ACTIVE sprint.
+- Codex may update:
+  - `Project documents/Codex response.md` as the execution report.
+  - `Project documents/PROJECT_STATE.md` only after successful validation.
+- Codex never edits `Project documents/Implementation.md`.
 
 ---
 
 # Before Every Planning Cycle
 
 1. Confirm the requested sprint, scope and stop condition.
-2. Read:
+
+2. Bootstrap in this exact order:
+
+   - `Project documents/.github/Context_Manifest.yaml`
+   - `Project documents/.github/AGENTS.md`
    - `Project documents/Project_Guide.md`
    - `Project documents/PROJECT_STATE.md`
    - `Project documents/Implementation.md`
+
 3. Read only the ACTIVE sprint.
-4. Use the Task Routing Guide in `Project_Guide.md` to determine which additional documents are required. Depending on the task these may include:
+
+4. Use the Task Routing Guide in `Project_Guide.md` to determine which additional documentation is required for the approved sprint.
+
+5. Read only the documents required for that sprint. These may include:
+
    - `Project documents/.github/Project_Context.md`
-   - `Project documents/.github/ai-instructions.md`
    - `Project documents/.github/prompts.md`
    - `Project documents/ADR.md`
    - `Project documents/Engineering Standards.md`
    - `Project documents/Product Vision.md`
    - `Project documents/Architecture_v1.0_Frozen.md`
    - `Project documents/Database_v1_Architecture.md`
-5. Execute the **Planning Prompt** from the ACTIVE sprint.
-6. Output planning findings only to `Project documents/Codex response.md`.
-7. Do not modify source code.
-8. Do not commit or push.
+   - `Project documents/UI_UX_v1.0_Frozen.md`
+   - `Project documents/BUILD_AND_PROJECT_CONVENTIONS.md`
+
+6. Execute only the Planning Prompt contained in the ACTIVE sprint.
+
+7. Output planning findings only to:
+
+   `Project documents/Codex response.md`
+
+8. Do not modify source code.
+
+9. Do not modify `Implementation.md`.
+
+10. Do not commit or push.
 
 ---
 
@@ -52,13 +76,17 @@ Rules:
 
 Implementation begins only after ChatGPT has reviewed the planning output and replaced the Planning Prompt with the approved Implementation Prompt.
 
-Read:
+Read in this order:
 
+- `Project documents/.github/Context_Manifest.yaml`
+- `Project documents/.github/AGENTS.md`
 - `Project documents/Project_Guide.md`
 - `Project documents/PROJECT_STATE.md`
 - `Project documents/Implementation.md`
 
 Read only the ACTIVE sprint.
+
+Then read only the additional documentation required for that sprint.
 
 Execute only the approved Implementation Prompt.
 
@@ -70,6 +98,9 @@ Every implementation must:
 
 - Work on one approved sprint only.
 - Keep changes limited to the approved sprint.
+- Never expand the sprint scope without an approved planning update.
+- Never implement future milestones because related code appears straightforward.
+- Prefer minimal, reversible changes over broad refactors.
 - Preserve existing user-visible behaviour unless explicitly requested otherwise.
 - Prefer extending existing architecture over creating parallel implementations.
 - Prefer migration over duplication.
@@ -85,6 +116,7 @@ Every implementation must:
 - If a sprint tag is created, push the tag after the branch push succeeds.
 - Update `Project documents/PROJECT_STATE.md` only after a successful commit and push.
 - Update `Project documents/Codex response.md` with implementation results.
+- Treat `Project documents/Codex response.md` as the authoritative implementation log for the current sprint.
 - Never modify `Project documents/Implementation.md`.
 - If the build or required tests fail, do not commit or push. Record the failure in `Project documents/Codex response.md` and stop.
 - Leave zero compile errors introduced by the sprint.
@@ -128,6 +160,10 @@ Do not modify `Project documents/Implementation.md`.
 - Never modify architecture without updating the relevant documentation.
 - Architecture documentation overrides implementation assumptions.
 - Engineering Standards define coding policy.
+- `Context_Manifest.yaml` defines bootstrap order only; it must not duplicate volatile repository state.
+- `PROJECT_STATE.md` remains the single source of truth for verified repository status.
+- `Implementation.md` remains the only active sprint planning document.
+- If documentation precedence conflicts with the manifest, stop and report the conflict instead of guessing.
 - If documentation conflicts with implementation, stop and report the conflict.
 
 ---
@@ -156,3 +192,6 @@ Before considering a sprint complete, confirm:
 - `Codex response.md` updated.
 - No future sprint work included.
 - Repository remains buildable.
+- Bootstrap order remains consistent with `Context_Manifest.yaml`.
+- No protected documentation was modified outside its assigned ownership.
+- No workflow drift was introduced.

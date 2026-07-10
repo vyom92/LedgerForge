@@ -1,6 +1,6 @@
 # LedgerForge Architecture v1.0 (Frozen)
 
-**Status:** Frozen v1.0 baseline, architecture aligned through Sprint 22 (UI Foundation).
+**Status:** Frozen v1.0 baseline, architecture aligned through Sprint 25 (Account Identity & Import Foundation).
 
 This document is the architectural baseline for LedgerForge v1.0. It remains frozen except for status-alignment updates required to reflect completed implementation milestones and approved ADRs.
 
@@ -212,3 +212,4 @@ No major architectural changes to the v1.0 baseline unless:
 3. The change preserves the core architecture principles.
 
 Future enhancements will be tracked under Architecture v1.1.
+
