@@ -1,0 +1,66 @@
+---
+app:
+  name: "LedgerForge"
+  description: "Private, single-user, offline-first personal finance application."
+  characteristics:
+    - private
+    - single-user
+    - offline-first
+
+bootstrap:
+  read_order:
+    - "Project documents/.github/Context_Manifest.yaml"
+    - "Project documents/Project_Guide.md"
+    - "Project documents/PROJECT_STATE.md"
+    - "Project documents/Implementation.md#ACTIVE"
+  rule: "Always read only the ACTIVE sprint in Implementation.md."
+
+precedence:
+  authoritative_documents:
+    - "Project documents/Architecture_v1.0_Frozen.md"
+    - "Project documents/ADR.md"
+    - "Project documents/PROJECT_STATE.md"
+    - "Project documents/Implementation.md#ACTIVE"
+    - "Project documents/Engineering Standards.md"
+    - "Project documents/Database_v1_Architecture.md"
+    - "Project documents/Product Vision.md"
+    - "Project documents/UI_UX_v1.0_Frozen.md"
+
+state:
+  completed_sprint: "Sprint 25 — Account Identity & Import Foundation"
+  latest_tag: "sprint-21"
+  latest_commit: "9424d5a"
+  build_status: "passing"
+  tests:
+    total: 86
+    failed: 0
+
+active_sprint:
+  file: "Project documents/Implementation.md"
+  section: "ACTIVE"
+  rule: "Do not modify Implementation.md during implementation."
+
+assistants:
+  chatgpt_desktop:
+    owns: ["ideation", "architecture_discussion", "proposal_drafting"]
+    never_owns: ["repository_edits", "commits", "Implementation.md during implementation"]
+  chatgpt_xcode:
+    owns: ["code_changes_per_active_sprint", "doc_sync", "Project documents/Codex response.md", "Project documents/PROJECT_STATE.md"]
+    never_owns: ["Implementation.md during implementation", "architecture_redesign_without_ADR"]
+  codex:
+    owns: ["precise_file_edits"]
+    never_owns: ["planning", "Implementation.md", "multi_file_changes_without_explicit_instructions"]
+
+protected:
+  files:
+    - "Project documents/Implementation.md"
+    - "Project documents/Implementation.md#ARCHIVE"
+    - "Project documents/Architecture_v1.0_Frozen.md"
+    - "Project documents/UI_UX_v1.0_Frozen.md"
+  rules:
+    - "Append-only for ADRs; new ADRs are added without rewriting history."
+    - "Preserve frozen architecture/UI unless a newer frozen version is approved."
+
+notes:
+  pipeline_rule: "Preserve ADR-016 canonical pipeline and RepositoryStoreHydrator boundary."
+...
