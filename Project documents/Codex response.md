@@ -83,7 +83,9 @@ Sprint 24 stabilised durable persistence and the verified UI behaviour defects w
 ## Commit And Push
 
 - Implementation commit: `abbef6f`
-- Push target: `origin/main`
+- Project-state commit: `9786e5e`
+- Push result: `origin/main` updated successfully.
+- Local tracking ref note: remote push succeeded; the sandbox could not update the local `origin/main` ref lock under `.git`.
 
 ## Manual Verification Notes
 
