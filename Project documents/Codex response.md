@@ -1,114 +1,111 @@
 # Codex Response
 
-## Sprint 23 Completion Report - UI Component Extraction
+## Sprint 24 Completion Report - Persistence and UI Behaviour Stabilisation
 
-Sprint 23 extracted reusable SwiftUI presentation components from the Sprint 22 interface while preserving the approved UI/UX v1.0 appearance, existing navigation, import pipeline, repository hydration, runtime stores, ViewModels and validation behavior.
+Sprint 24 stabilised durable persistence and the verified UI behaviour defects without changing parser architecture, statement parsing, financial calculations, import validation logic, database schema, navigation architecture, PDF/OCR scope or future analytics modules.
 
 ## Summary
 
-- Extracted shared Deep Indigo presentation primitives into `Views/Common`.
-- Kept `ContentView` as the application composition root and startup hydration coordinator.
-- Removed generic reusable component definitions from `ContentView.swift`.
-- Replaced duplicated status badge, filter chip, info row and empty-state helpers in `TransactionListView` and `DeveloperConsoleView`.
-- Preserved transaction search and credit/debit toggle behavior.
-- Preserved `DeveloperConsole.shared` as the Developer Console data source.
-- Applied the approved minor UI-spec fix so Developer Console is hidden by default until Developer Mode is enabled.
-- Made no repository, database, validation, parser, import pipeline, runtime store, ViewModel, financial truth or transaction extraction changes.
-
-## Files Created
-
-- `Views/Common/LFActionRow.swift`
-- `Views/Common/LFEmptyState.swift`
-- `Views/Common/LFFilterChip.swift`
-- `Views/Common/LFIconTile.swift`
-- `Views/Common/LFInfoRow.swift`
-- `Views/Common/LFInlineBadge.swift`
-- `Views/Common/LFPanel.swift`
-- `Views/Common/LFSearchField.swift`
-- `Views/Common/LFStatusBadge.swift`
-- `Views/Common/LFTheme.swift`
+- Wired production startup to a durable `SQLiteRepositoryProvider` through `DatabaseProvider.shared`.
+- Preserved in-memory repositories for tests and added a testing reset helper.
+- Kept repository writes through `DefaultImportPersistenceCoordinator`.
+- Kept startup/runtime restoration through `RepositoryStoreHydrator`.
+- Added a structured `ImportEngineResult` so the Import screen can show success/failure, filename and imported transaction count.
+- Refreshed runtime stores from persisted repositories after successful import.
+- Added SQLite bootstrap, provider-recreation and account display-name regression coverage.
+- Removed duplicate in-app macOS traffic-light visuals.
+- Expanded sidebar and Credit/Debit controls to full visible hit targets.
+- Marked future placeholder controls as pending rather than active menus/actions.
+- Improved account display names while preserving stable repository account identity.
 
 ## Files Modified
 
+- `LedgerForgeApp.swift`
+- `Database/SQLiteRepositoryProvider.swift`
+- `Services/ImportEngine.swift`
+- `Services/ImportPersistenceMapper.swift`
+- `Services/ImportPersistenceCoordinator.swift` was reviewed; no change required.
+- `Services/RepositoryStoreHydrator.swift` was reviewed; no change required.
+- `Core/AccountStore.swift`
 - `ContentView.swift`
 - `Views/TransactionListView.swift`
 - `Views/DeveloperConsoleView.swift`
-- `LedgerForge.xcodeproj/project.pbxproj`
+- `LedgerForgeTests/ImportRepositoryIntegrationTests.swift`
 - `Project documents/Codex response.md`
+- `Project documents/PROJECT_STATE.md`
 
-`Project documents/Implementation.md` was not modified by Codex and remains excluded from Sprint 23 staging.
+`Project documents/Implementation.md` was not modified by Codex during implementation.
 
-## Components Extracted
+## Persistence Result
 
-- `LFTheme`
-  - Deep Indigo colors, status colors, typography helpers and `Color(hex:)`.
-- `LFPanel`
-  - Shared glass/card panel primitive.
-- `LFSearchField`
-  - Shared search field used by table/list presentation.
-- `LFStatusBadge`
-  - Shared status pill component.
-- `LFFilterChip`
-  - Shared menu-backed filter chip component.
-- `LFInfoRow`
-  - Shared title/value detail row.
-- `LFEmptyState` and `LFCompactEmptyState`
-  - Shared empty-state views.
-- `LFIconTile`
-  - Shared icon tile primitive.
-- `LFActionRow`
-  - Shared action-row component.
-- `LFInlineBadge`
-  - Shared compact toolbar badge.
+- `LedgerForgeApp.configurePersistence(path:)` now initializes SQLite, installs its repositories into `DatabaseProvider.shared`, retains the provider for app lifetime and logs the configured database path.
+- If SQLite initialization fails, the app falls back to in-memory repositories and logs the failure.
+- `SQLiteRepositoryProvider` now exposes `databasePath` for bootstrap diagnostics.
+- Restart-style coverage verifies data written through SQLite can be restored by recreating the provider and hydrating runtime stores.
 
-## Build Result
+## Import Result
 
-- Xcode build passed after component extraction.
+- `ImportEngine.importFileAndReturnResult(from:)` returns filename, transaction count, validation status, persistence status and error message.
+- The old `importFile(from:)` entry point remains available and delegates to the structured async path.
+- `ContentView` displays import idle, importing, completed and failed states.
+- Completed imports show filename, transaction count and a `View Transactions` action.
+- Future preview and validation wizard stages remain pending and were not implemented.
 
-## Validation Result
+## UI Behaviour
 
-- Focused dashboard and hydration validation passed:
-  - `DashboardViewModelTests`
-  - `RepositoryStoreHydratorTests`
-  - 7 tests passed, 0 failed.
-- Full active test plan passed:
-  - 77 tests passed, 0 failed, 0 skipped.
-- UI launch tests passed as part of the active test plan.
-- No unresolved merge conflict markers were found.
+- Sidebar rows now use the full visible rounded rectangle as the content shape and accessibility label.
+- Credit and Debit transaction filters now use full rectangular button hit targets while preserving mutual toggle behaviour.
+- Fake traffic-light controls were removed from the application shell; native macOS window controls remain.
+- Placeholder filters/settings/import options/developer filters now display pending state without active chevrons.
+- Working controls remain enabled, including Import Statement, Browse Files, View links, search, Developer Mode and Credit/Debit filters.
 
-## Behavior Preserved
+## Account Naming
 
-- Startup still reaches the Dashboard.
-- `ContentView` still triggers repository-backed runtime store hydration.
-- Dashboard still consumes runtime stores through `DashboardViewModel`.
-- Transaction viewer still uses `TransactionListViewModel`.
-- Transaction search behavior is unchanged.
-- Credit/debit toggle behavior is unchanged.
-- CSV import entry point remains available.
-- Developer Console remains in the Developer section and still reads from `DeveloperConsole.shared`.
+- Account display names now prefer available institution/document/currency metadata.
+- Imported Axis Bank INR accounts display as `Axis Bank INR`.
+- Stable repository account identity still uses the original import filename component, preserving existing deterministic IDs.
+- No account matching or merge architecture was introduced.
 
-## Architecture Compliance
+## Validation
 
-- Views and ViewModels do not access SQLite directly.
-- RepositoryStoreHydrator remains the only persistence-to-runtime-store boundary.
-- No repository contracts were changed.
-- No import, parser, validation, database or persistence behavior was changed.
-- New Swift files were added through Xcode-safe project tooling, not by manual `.pbxproj` editing.
-
-## Remaining Technical Debt
-
-- Some larger screen-specific dashboard, import and settings sections remain in `ContentView.swift`; they should stay local until a future sprint has an approved screen-level extraction scope.
-
-- `LFIconTile` is available as a reusable primitive but not yet broadly adopted across all eligible call sites.
-- No additional UI automation coverage was added; existing UI launch coverage remains the current validation baseline.
+- Xcode build passed.
+- Xcode active test plan passed:
+  - 84 tests passed
+  - 0 failed
+  - 0 skipped
+- New regression coverage passed:
+  - SQLite production bootstrap wiring.
+  - SQLite provider recreation after persistence.
+  - RepositoryStoreHydrator runtime restoration after provider recreation.
+  - Account display name cleanup without stable ID change.
+- Command-line `xcodebuild test` failed before test execution because the sandbox blocked Xcode test-manager/DerivedData services. The equivalent active Xcode test plan was then run through Xcode tooling and passed.
 
 ## Commit And Push
 
-- Implementation commit: `8090de4` — Sprint 23: extract reusable UI components.
-- Push result: `origin/main` updated successfully.
-- Local tracking ref note: remote push succeeded; the sandbox could not update the local `origin/main` ref lock under `.git`.
-- Sprint tag: not created yet.
+- Implementation commit: `37918c9`
+- Push target: `origin/main`
 
-## Next Recommended Sprint
+## Manual Verification Notes
 
-Sprint 24 should continue only from the ACTIVE sprint in `Project documents/Implementation.md`. Recommended follow-up, if approved there, is a focused screen-level decomposition pass for `ContentView` without changing presentation behavior or architecture.
+- Build and UI launch tests verify the app launches with the updated shell.
+- Sidebar implementation now gives selected, hover/click and accessibility focus the same full-row content shape.
+- Credit/Debit controls now have full rectangular content shapes and existing ViewModel filter tests still pass.
+- Application restart persistence is covered by SQLite provider-recreation regression tests.
+
+## Architecture Compliance
+
+- Views and ViewModels still do not access SQLite directly.
+- Repository protocols remain the persistence boundary.
+- RepositoryStoreHydrator remains the only persistence-to-runtime-store boundary.
+- Import validation still precedes persistence.
+- Parser output and validation behaviour were not changed.
+- Database schema was not changed.
+
+## Remaining Deferred Work
+
+- Full multi-step Import Wizard.
+- Functional preview/validation wizard screens.
+- Account matching and merge architecture.
+- Functional dashboard/account/transaction filter menus.
+- Settings persistence.
+- PDF import and OCR.

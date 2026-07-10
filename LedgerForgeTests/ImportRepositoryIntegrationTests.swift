@@ -127,6 +127,94 @@ struct ImportRepositoryIntegrationTests {
         }
     }
 
+    @Test func appPersistenceBootstrapConfiguresDurableSQLiteProvider() async throws {
+        let folder = try temporaryFolder(named: "LedgerForgePersistenceBootstrapTests")
+        defer {
+            LedgerForgeApp.configureInMemoryPersistenceForTesting()
+            try? FileManager.default.removeItem(at: folder)
+        }
+
+        let dbPath = folder.appendingPathComponent("bootstrap.sqlite").path
+        #expect(LedgerForgeApp.configurePersistence(path: dbPath))
+
+        let workspace = WorkspaceDTO(
+            id: "workspace-bootstrap",
+            name: "Bootstrap Workspace",
+            createdAtISO: "2026-07-10T00:00:00Z"
+        )
+        #expect(try DatabaseProvider.shared.workspaceRepo.upsertWorkspace(workspace) == workspace.id)
+
+        LedgerForgeApp.configureInMemoryPersistenceForTesting()
+        #expect(LedgerForgeApp.configurePersistence(path: dbPath))
+
+        let restoredWorkspace = try DatabaseProvider.shared.workspaceRepo.workspace(id: workspace.id)
+        #expect(restoredWorkspace == workspace)
+    }
+
+    @Test func persistedImportHydratesRuntimeStoresAfterSQLiteProviderRecreation() async throws {
+        let folder = try temporaryFolder(named: "LedgerForgePersistenceRelaunchRegressionTests")
+        defer {
+            resetRuntimeStoresForImportIntegration()
+            try? FileManager.default.removeItem(at: folder)
+        }
+
+        let dbPath = folder.appendingPathComponent("relaunch.sqlite").path
+        let fixture = makeValidFixture()
+        let initialProvider = try SQLiteRepositoryProvider(path: dbPath)
+        let coordinator = DefaultImportPersistenceCoordinator(
+            workspaceRepo: initialProvider.workspaceRepo,
+            accountRepo: initialProvider.accountRepo,
+            importSessionRepo: initialProvider.importSessionRepo,
+            transactionRepo: initialProvider.transactionRepo,
+            mapper: ImportPersistenceMapper(
+                workspaceId: "workspace-import-integration",
+                workspaceName: "Import Integration Workspace"
+            )
+        )
+
+        let persistence = try coordinator.persistValidatedImport(
+            financialDocument: fixture.financialDocument,
+            importSession: fixture.importSession,
+            validation: fixture.validation
+        )
+        #expect(persistence.persisted)
+
+        resetRuntimeStoresForImportIntegration()
+        let relaunchedProvider = try SQLiteRepositoryProvider(path: dbPath)
+        let hydrator = RepositoryStoreHydrator(
+            accountRepo: relaunchedProvider.accountRepo,
+            transactionRepo: relaunchedProvider.transactionRepo,
+            workspaceId: "workspace-import-integration"
+        )
+
+        let hydration = try hydrator.hydrateIfNeeded()
+
+        #expect(hydration.didHydrate)
+        #expect(hydration.accountCount == 1)
+        #expect(hydration.transactionCount == 2)
+        #expect(AccountStore.shared.accounts.first?.name == "Axis Bank INR")
+        #expect(TransactionStore.shared.transactions.count == 2)
+        #expect(TransactionStore.shared.transactions.allSatisfy { !$0.account.contains(".csv") })
+    }
+
+    @Test func mapperUsesCleanAccountDisplayNameWithoutChangingStableAccountIdentity() async throws {
+        let fixture = makeValidFixture()
+        let mapper = ImportPersistenceMapper(
+            workspaceId: "workspace-import-integration",
+            workspaceName: "Import Integration Workspace"
+        )
+
+        let payload = try mapper.payload(
+            financialDocument: fixture.financialDocument,
+            importSession: fixture.importSession,
+            validation: fixture.validation
+        )
+
+        #expect(payload.account.name == "Axis Bank INR")
+        #expect(!payload.account.name.localizedCaseInsensitiveContains(".csv"))
+        #expect(payload.account.id == "account-workspace-import-integration-axis-bank-repository-integration-csv")
+    }
+
 }
 
 private struct ImportRepositoryHandles {
@@ -158,10 +246,7 @@ private func makeInMemoryProvider() -> ImportRepositoryHandles {
 }
 
 private func withTemporarySQLiteProvider<T>(_ body: (ImportRepositoryHandles) throws -> T) throws -> T {
-    let folder = FileManager.default.temporaryDirectory
-        .appendingPathComponent("LedgerForgeImportRepositoryIntegrationTests")
-        .appendingPathComponent(UUID().uuidString)
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let folder = try temporaryFolder(named: "LedgerForgeImportRepositoryIntegrationTests")
     defer {
         try? FileManager.default.removeItem(at: folder)
     }
@@ -174,6 +259,19 @@ private func withTemporarySQLiteProvider<T>(_ body: (ImportRepositoryHandles) th
         transactionRepo: provider.transactionRepo
     )
     return try body(handles)
+}
+
+private func temporaryFolder(named name: String) throws -> URL {
+    let folder = FileManager.default.temporaryDirectory
+        .appendingPathComponent(name)
+        .appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    return folder
+}
+
+private func resetRuntimeStoresForImportIntegration() {
+    AccountStore.shared.replaceAccounts([])
+    TransactionStore.shared.replaceTransactions([])
 }
 
 private func makeValidFixture(currency: String = "INR") -> ImportRepositoryFixture {

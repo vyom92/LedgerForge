@@ -83,13 +83,17 @@ final class AccountStore: ObservableObject {
     /// Integrate an import session and its transactions into the AccountStore.
     /// This will create or update a single account derived from the import metadata.
     /// Rules:
-    /// - Account identity: institution name + import file name.
+    /// - Display name: best available import metadata, with filename only as a cleaned fallback.
     /// - Balance: prefer the last transaction.balance if present, otherwise derive from last transaction.amount.
     func integrateImport(importSession: ImportSession, transactions: [Transaction]) {
 
-        // Use institution string and file name to identify an account. Keep this deterministic and explainable.
         let institutionName = importSession.institution?.rawValue ?? "Unknown"
-        let accountName = importSession.fileName
+        let accountName = ImportPersistenceMapper.displayAccountName(
+            institutionName: institutionName,
+            documentType: importSession.documentType,
+            currency: transactions.first?.currency,
+            fallbackFileName: importSession.fileName
+        )
 
         // Determine account type from document type
         let type: AccountType

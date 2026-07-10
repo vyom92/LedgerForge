@@ -63,10 +63,18 @@ private enum AppShellSection: String, CaseIterable {
     }
 }
 
+private enum ImportPresentationState: Equatable {
+    case idle
+    case importing(String)
+    case completed(fileName: String, transactionCount: Int)
+    case failed(fileName: String, message: String)
+}
+
 struct ContentView: View {
 
     @State private var showingImporter = false
     @State private var selectedFile = "No statement imported"
+    @State private var importState: ImportPresentationState = .idle
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @State private var selectedSection: AppShellSection = .dashboard
     @State private var didStartRepositoryHydration = false
@@ -105,11 +113,15 @@ struct ContentView: View {
             switch result {
             case .success(let url):
                 selectedFile = url.lastPathComponent
-                ImportEngine.shared.importFile(from: url)
+                importState = .importing(url.lastPathComponent)
                 selectedSection = .imports
+                Task {
+                    await runImport(from: url)
+                }
 
             case .failure(let error):
                 selectedFile = error.localizedDescription
+                importState = .failed(fileName: "Import failed", message: error.localizedDescription)
                 selectedSection = .imports
             }
         }
@@ -120,9 +132,6 @@ struct ContentView: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
-            windowControls
-                .padding(.bottom, 24)
-
             HStack(spacing: 12) {
                 appMark
 
@@ -206,8 +215,8 @@ struct ContentView: View {
                     .frame(width: selectedSection == .transactions ? 420 : 280)
             }
 
-            toolbarButton("1 Apr - 8 Jul 2026", systemImage: "calendar", disabled: true)
-            toolbarButton("Filters", systemImage: "line.3.horizontal.decrease", disabled: true)
+            toolbarButton("Date range pending", systemImage: "calendar", disabled: true)
+            toolbarButton("Filters pending", systemImage: "line.3.horizontal.decrease", disabled: true)
 
             Button {
                 showingImporter = true
@@ -325,9 +334,9 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: 14) {
                             HStack(spacing: 14) {
                                 LFSearchField(placeholder: "Search accounts...")
-                                LFFilterChip(title: "All Types")
-                                LFFilterChip(title: "All Institutions")
-                                LFFilterChip(title: "All Status")
+                                LFFilterChip(title: "Types", value: "Pending", showsChevron: false)
+                                LFFilterChip(title: "Institutions", value: "Pending", showsChevron: false)
+                                LFFilterChip(title: "Status", value: "Pending", showsChevron: false)
                             }
 
                             accountTableHeader
@@ -403,7 +412,7 @@ struct ContentView: View {
                         }
                         .buttonStyle(.plain)
 
-                        importedFileRow(name: selectedFile, subtitle: selectedFile == "No statement imported" ? "No file selected" : "Ready for current import pipeline", icon: "doc.text", color: LFTheme.info)
+                        importResultPanel
 
                         HStack(spacing: 10) {
                             Image(systemName: "info.circle")
@@ -440,11 +449,11 @@ struct ContentView: View {
                         Text("Import Options")
                             .font(.title3.weight(.semibold))
 
-                        settingsPickerRow("File Password", value: "Resolved by password provider", icon: "lock")
-                        settingsPickerRow("Date Format", value: "DD MMM YYYY", icon: "calendar")
-                        settingsPickerRow("Duplicate Handling", value: "Skip duplicates", icon: "rectangle.on.rectangle")
-                        settingsPickerRow("Create / Link Accounts", value: "Automatically link", icon: "link")
-                        settingsPickerRow("Category Detection", value: "Future rules module", icon: "sparkles")
+                        settingsPendingRow("File Password", value: "Resolved by password provider", icon: "lock")
+                        settingsPendingRow("Date Format", value: "DD MMM YYYY", icon: "calendar")
+                        settingsPendingRow("Duplicate Handling", value: "Skip duplicates", icon: "rectangle.on.rectangle")
+                        settingsPendingRow("Create / Link Accounts", value: "Automatically link", icon: "link")
+                        settingsPendingRow("Category Detection", value: "Future rules module", icon: "sparkles")
 
                         VStack(alignment: .leading, spacing: 8) {
                             Label("Smart Detection", systemImage: "star")
@@ -477,18 +486,7 @@ struct ContentView: View {
 
                 Spacer()
 
-                Label("Preview step pending", systemImage: "arrow.right")
-                    .labelStyle(.titleAndIcon)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(LFTheme.textSecondary)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 13)
-                    .background(LFTheme.surface.opacity(0.65))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(LFTheme.border, lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                importFooterAction
             }
         }
         .padding(28)
@@ -516,21 +514,21 @@ struct ContentView: View {
                 VStack(spacing: 18) {
                     LFPanel(title: "Application") {
                         VStack(spacing: 0) {
-                            settingsPickerRow("Startup Behaviour", value: "Open Dashboard", icon: "macwindow")
-                            settingsPickerRow("Default Landing Page", value: "Dashboard", icon: "house")
-                            settingsPickerRow("Currency", value: "INR (₹)", icon: "indianrupeesign")
-                            settingsPickerRow("Date Format", value: "DD MMM YYYY", icon: "calendar")
-                            settingsPickerRow("Number Format", value: "Indian (12,34,567.89)", icon: "textformat.123")
+                            settingsPendingRow("Startup Behaviour", value: "Open Dashboard", icon: "macwindow")
+                            settingsPendingRow("Default Landing Page", value: "Dashboard", icon: "house")
+                            settingsPendingRow("Currency", value: "INR (₹)", icon: "indianrupeesign")
+                            settingsPendingRow("Date Format", value: "DD MMM YYYY", icon: "calendar")
+                            settingsPendingRow("Number Format", value: "Indian (12,34,567.89)", icon: "textformat.123")
                             settingsToggleRow("Developer Mode", icon: "chevron.left.forwardslash.chevron.right", isOn: $developerModeEnabled)
                         }
                     }
 
                     LFPanel(title: "Default Settings") {
                         VStack(spacing: 0) {
-                            settingsPickerRow("Default Account Type", value: "Savings Account", icon: "wallet.pass")
-                            settingsPickerRow("Default Transaction Status", value: "Cleared", icon: "checkmark.circle")
-                            settingsPickerRow("Default Category", value: "Uncategorized", icon: "tag")
-                            settingsPickerRow("Items Per Page", value: "25", icon: "tablecells")
+                            settingsPendingRow("Default Account Type", value: "Savings Account", icon: "wallet.pass")
+                            settingsPendingRow("Default Transaction Status", value: "Cleared", icon: "checkmark.circle")
+                            settingsPendingRow("Default Category", value: "Uncategorized", icon: "tag")
+                            settingsPendingRow("Items Per Page", value: "25", icon: "tablecells")
                         }
                     }
                 }
@@ -817,17 +815,30 @@ struct ContentView: View {
 
     private var importStepper: some View {
         HStack(spacing: 14) {
-            wizardStep(1, title: "Select Files", subtitle: "Choose files to import", active: true)
-            stepLine(active: true)
-            wizardStep(2, title: "Detect & Review", subtitle: "Detect institution", active: false)
+            wizardStep(1, title: "Select Files", subtitle: "Choose files to import", active: importStep >= 1)
+            stepLine(active: importStep >= 2)
+            wizardStep(2, title: "Detect & Review", subtitle: "Detect institution", active: importStep >= 2)
             stepLine(active: false)
-            wizardStep(3, title: "Map & Validate", subtitle: "Confirm data", active: false)
+            wizardStep(3, title: "Map & Validate", subtitle: "Pending", active: false)
             stepLine(active: false)
-            wizardStep(4, title: "Preview", subtitle: "Review transactions", active: false)
-            stepLine(active: false)
-            wizardStep(5, title: "Import", subtitle: "Complete import", active: false)
+            wizardStep(4, title: "Preview", subtitle: "Pending", active: false)
+            stepLine(active: importStep >= 5)
+            wizardStep(5, title: "Import", subtitle: "Complete import", active: importStep >= 5)
         }
         .padding(.vertical, 10)
+    }
+
+    private var importStep: Int {
+        switch importState {
+        case .idle:
+            return 1
+        case .importing:
+            return 2
+        case .completed:
+            return 5
+        case .failed:
+            return 2
+        }
     }
 
     private var totalAccountBalance: Decimal {
@@ -851,14 +862,6 @@ struct ContentView: View {
         .foregroundStyle(LFTheme.textSecondary)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-    }
-
-    private var windowControls: some View {
-        HStack(spacing: 8) {
-            Circle().fill(Color(hex: 0xFF5F57)).frame(width: 12, height: 12)
-            Circle().fill(Color(hex: 0xFFBD2E)).frame(width: 12, height: 12)
-            Circle().fill(Color(hex: 0x28C840)).frame(width: 12, height: 12)
-        }
     }
 
     private var appMark: some View {
@@ -941,10 +944,12 @@ struct ContentView: View {
             .background(
                 selectedSection == section ? AnyShapeStyle(LFTheme.primaryGradient) : AnyShapeStyle(Color.clear)
             )
+            .contentShape(RoundedRectangle(cornerRadius: 7))
             .clipShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
         .foregroundStyle(selectedSection == section ? .white : LFTheme.text)
+        .accessibilityLabel(section.rawValue)
     }
 
     private func toolbarButton(_ title: String, systemImage: String, disabled: Bool = false) -> some View {
@@ -1080,7 +1085,93 @@ struct ContentView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
-    private func settingsPickerRow(_ title: String, value: String, icon: String) -> some View {
+    private var importResultPanel: some View {
+        Group {
+            switch importState {
+            case .idle:
+                importedFileRow(
+                    name: selectedFile,
+                    subtitle: "No file selected",
+                    icon: "doc.text",
+                    color: LFTheme.info
+                )
+            case .importing(let fileName):
+                importedFileRow(
+                    name: fileName,
+                    subtitle: "Import running through the current pipeline",
+                    icon: "hourglass",
+                    color: LFTheme.warning
+                )
+            case .completed(let fileName, let transactionCount):
+                VStack(alignment: .leading, spacing: 12) {
+                    importedFileRow(
+                        name: fileName,
+                        subtitle: "Imported \(transactionCount) transaction(s)",
+                        icon: "checkmark.circle.fill",
+                        color: LFTheme.success
+                    )
+                    Button {
+                        selectedSection = .transactions
+                    } label: {
+                        Label("View Transactions", systemImage: "list.bullet")
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity)
+                            .background(LFTheme.primaryGradient)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .contentShape(RoundedRectangle(cornerRadius: 8))
+                }
+            case .failed(let fileName, let message):
+                importedFileRow(
+                    name: fileName,
+                    subtitle: message,
+                    icon: "exclamationmark.triangle.fill",
+                    color: LFTheme.danger
+                )
+            }
+        }
+    }
+
+    private var importFooterAction: some View {
+        Group {
+            switch importState {
+            case .completed:
+                Button {
+                    selectedSection = .transactions
+                } label: {
+                    Label("View Transactions", systemImage: "arrow.right")
+                        .labelStyle(.titleAndIcon)
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 13)
+                        .frame(minWidth: 180)
+                        .background(LFTheme.primaryGradient)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+            default:
+                Label("Preview step pending", systemImage: "arrow.right")
+                    .labelStyle(.titleAndIcon)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(LFTheme.textSecondary)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 13)
+                    .background(LFTheme.surface.opacity(0.65))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(LFTheme.border, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+
+    private func settingsPendingRow(_ title: String, value: String, icon: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .foregroundStyle(LFTheme.textSecondary)
@@ -1093,9 +1184,13 @@ struct ContentView: View {
                     .foregroundStyle(LFTheme.textSecondary)
             }
             Spacer()
-            Image(systemName: "chevron.down")
-                .font(.caption)
+            Text("Pending")
+                .font(.caption2.weight(.medium))
                 .foregroundStyle(LFTheme.textSecondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(LFTheme.surfaceRaised.opacity(0.65))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .padding(.vertical, 11)
     }
@@ -1321,6 +1416,32 @@ struct ContentView: View {
             dashboardViewModel.markHydrationFailed(error)
             DeveloperConsole.shared.log("Dashboard Hydration: FAILED")
             DeveloperConsole.shared.log(error.localizedDescription)
+        }
+    }
+
+    @MainActor
+    private func runImport(from url: URL) async {
+        let result = await ImportEngine.shared.importFileAndReturnResult(from: url)
+        selectedFile = result.fileName
+
+        if result.succeeded {
+            importState = .completed(
+                fileName: result.fileName,
+                transactionCount: result.transactionCount
+            )
+            do {
+                let hydrationResult = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
+                dashboardViewModel.markHydrationCompleted(hydrationResult)
+            } catch {
+                dashboardViewModel.markHydrationFailed(error)
+                DeveloperConsole.shared.log("Dashboard Hydration Refresh: FAILED")
+                DeveloperConsole.shared.log(error.localizedDescription)
+            }
+        } else {
+            importState = .failed(
+                fileName: result.fileName,
+                message: result.errorMessage ?? "Import failed."
+            )
         }
     }
 

@@ -6,6 +6,18 @@
 
 import Foundation
 
+struct ImportEngineResult: Equatable {
+    let fileName: String
+    let transactionCount: Int
+    let validationPassed: Bool
+    let persisted: Bool
+    let errorMessage: String?
+
+    var succeeded: Bool {
+        validationPassed && persisted && errorMessage == nil
+    }
+}
+
 final class ImportEngine {
 
     static let shared = ImportEngine()
@@ -33,12 +45,12 @@ final class ImportEngine {
         DeveloperConsole.shared.log("")
 
         Task {
-            await processImport(from: url)
+            _ = await importFileAndReturnResult(from: url)
         }
 
     }
 
-    private func processImport(from url: URL) async {
+    func importFileAndReturnResult(from url: URL) async -> ImportEngineResult {
 
         do {
 
@@ -46,7 +58,13 @@ final class ImportEngine {
 
             guard !contents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 DeveloperConsole.shared.log("ERROR: Imported document is empty.")
-                return
+                return ImportEngineResult(
+                    fileName: url.lastPathComponent,
+                    transactionCount: 0,
+                    validationPassed: false,
+                    persisted: false,
+                    errorMessage: "Imported document is empty."
+                )
             }
 
             DocumentStore.shared.update(with: contents)
@@ -118,19 +136,22 @@ final class ImportEngine {
 
                 // Replace transactions only for validated imports. TransactionStore is the single owner of imported transactions.
                 // ADR-010 requires validation before trusted state is updated.
+                var persistenceResult = ImportPersistenceResult.skipped
+                var persistenceErrorMessage: String?
                 if validation.passed {
                     do {
-                        let persistence = try importPersistenceCoordinator.persistValidatedImport(
+                        persistenceResult = try importPersistenceCoordinator.persistValidatedImport(
                             financialDocument: financialDocument,
                             importSession: importSession,
                             validation: validation
                         )
-                        if persistence.persisted {
+                        if persistenceResult.persisted {
                             DeveloperConsole.shared.log("Repository Persistence: COMPLETED")
                         }
                     } catch {
                         DeveloperConsole.shared.log("Repository Persistence: FAILED")
                         DeveloperConsole.shared.log(error.localizedDescription)
+                        persistenceErrorMessage = error.localizedDescription
                     }
 
                     await MainActor.run {
@@ -155,16 +176,37 @@ final class ImportEngine {
                     DeveloperConsole.shared.log("===================================")
                 }
                 DeveloperConsole.shared.log("File: \(importSession.fileName)")
+                return ImportEngineResult(
+                    fileName: importSession.fileName,
+                    transactionCount: financialDocument.transactions.count,
+                    validationPassed: validation.passed,
+                    persisted: persistenceResult.persisted,
+                    errorMessage: validation.passed ? persistenceErrorMessage : "Import validation failed."
+                )
 
             } else {
 
                 DeveloperConsole.shared.log("No suitable parser found.")
+                return ImportEngineResult(
+                    fileName: document.filename,
+                    transactionCount: 0,
+                    validationPassed: false,
+                    persisted: false,
+                    errorMessage: "No suitable parser found."
+                )
 
             }
 
         } catch {
 
             DeveloperConsole.shared.log("ERROR: \(error.localizedDescription)")
+            return ImportEngineResult(
+                fileName: url.lastPathComponent,
+                transactionCount: 0,
+                validationPassed: false,
+                persisted: false,
+                errorMessage: error.localizedDescription
+            )
 
         }
 

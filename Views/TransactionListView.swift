@@ -57,10 +57,10 @@ struct TransactionListView: View {
     private var transactionFilterBar: some View {
         LFPanel {
             HStack(spacing: 12) {
-                LFFilterChip(title: "All Accounts", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65))
-                LFFilterChip(title: "All Categories", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65))
-                LFFilterChip(title: "All Types", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65))
-                LFFilterChip(title: "All Status", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65))
+                LFFilterChip(title: "Accounts", value: "Pending", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65), showsChevron: false)
+                LFFilterChip(title: "Categories", value: "Pending", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65), showsChevron: false)
+                LFFilterChip(title: "Types", value: "Pending", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65), showsChevron: false)
+                LFFilterChip(title: "Status", value: "Pending", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65), showsChevron: false)
 
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
@@ -74,31 +74,33 @@ struct TransactionListView: View {
                 .overlay(RoundedRectangle(cornerRadius: 7).stroke(LFTheme.border, lineWidth: 1))
                 .clipShape(RoundedRectangle(cornerRadius: 7))
 
-                Button {
+                transactionTypeButton(
+                    "Credits",
+                    systemImage: "arrow.down.circle",
+                    selected: viewModel.showOnlyCredits,
+                    color: LFTheme.success
+                ) {
                     if viewModel.showOnlyCredits {
                         viewModel.showOnlyCredits = false
                     } else {
                         viewModel.showOnlyCredits = true
                         viewModel.showOnlyDebits = false
                     }
-                } label: {
-                    Label("Credits", systemImage: "arrow.down.circle")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(viewModel.showOnlyCredits ? LFTheme.success : LFTheme.text)
 
-                Button {
+                transactionTypeButton(
+                    "Debits",
+                    systemImage: "arrow.up.circle",
+                    selected: viewModel.showOnlyDebits,
+                    color: LFTheme.danger
+                ) {
                     if viewModel.showOnlyDebits {
                         viewModel.showOnlyDebits = false
                     } else {
                         viewModel.showOnlyDebits = true
                         viewModel.showOnlyCredits = false
                     }
-                } label: {
-                    Label("Debits", systemImage: "arrow.up.circle")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(viewModel.showOnlyDebits ? LFTheme.danger : LFTheme.text)
             }
             .font(.caption)
         }
@@ -288,6 +290,31 @@ struct TransactionListView: View {
             .clipShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
+    }
+
+    private func transactionTypeButton(
+        _ title: String,
+        systemImage: String,
+        selected: Bool,
+        color: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(minWidth: 92)
+                .background(selected ? color.opacity(0.16) : LFTheme.backgroundDeep.opacity(0.65))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(selected ? color.opacity(0.65) : LFTheme.border, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+                .contentShape(RoundedRectangle(cornerRadius: 7))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(selected ? color : LFTheme.text)
     }
 
     private func rangeButton(_ title: String, selected: Bool = false, icon: String? = nil, disabled: Bool = false) -> some View {

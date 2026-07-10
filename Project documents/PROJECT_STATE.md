@@ -308,18 +308,44 @@ Completed
 - Git push to `origin/main` completed successfully.
 ---
 
+# Sprint 24
+
+## Objective
+Stabilise LedgerForge after Sprint 23 by resolving verified persistence and user-interface behaviour defects without introducing unrelated functionality.
+
+## Status
+Completed
+
+## Outcome
+- Production startup now configures durable SQLite persistence through `DatabaseProvider.shared`.
+- In-memory repository providers remain available for tests.
+- Import persistence still writes through `DefaultImportPersistenceCoordinator`.
+- Startup and post-import runtime restoration still flow through `RepositoryStoreHydrator`.
+- Import completion now displays success/failure state, imported filename, transaction count and `View Transactions`.
+- Sidebar rows and Credit/Debit controls now use full visible hit targets.
+- Duplicate fake macOS traffic-light controls were removed.
+- Placeholder controls now display pending state instead of active menu/action affordances where functionality is not implemented.
+- Account display names no longer use raw `.csv` filenames when institution/currency metadata is available.
+- Stable repository account identity was preserved.
+- No parser, validation, financial calculation, database schema, PDF, OCR or navigation architecture changes were made.
+- Xcode build passed.
+- Active Xcode test plan passed: 84 tests, 0 failures.
+- Implementation commit: `37918c9`
+
+---
+
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: `8090de4`
-- Latest Implementation Commit: `8090de4`
+- Latest Commit: `37918c9`
+- Latest Implementation Commit: `37918c9`
 - Latest Tag: `sprint-21`
 - Latest ADR: ADR-023 — Frozen UI/UX Architecture
-- Architecture Baseline: Sprint 23 plus UI/UX v1.0 Frozen
-- Latest Milestone: UI Component Extraction
+- Architecture Baseline: Sprint 24 plus UI/UX v1.0 Frozen
+- Latest Milestone: Persistence and UI Behaviour Stabilisation
 - Build: Passing
-- Validation: Build passing; full active validation passing. Sprint 23 validation complete.
+- Validation: Build passing; full active validation passing. Sprint 24 validation complete.
 
 ## Session Startup Order
 1. Project documents/.github/AGENTS.md
@@ -349,6 +375,10 @@ Validation
 ↓
 Repositories
 ↓
+SQLite
+↓
+RepositoryStoreHydrator
+↓
 Runtime Stores
 ↓
 Dashboard
@@ -356,10 +386,10 @@ Dashboard
 
 ## Current Work
 
-Active Work: Sprint 23 complete; next work must be taken from the ACTIVE sprint in `Project documents/Implementation.md`.
+Active Work: Sprint 24 complete; next work must be taken from the ACTIVE sprint in `Project documents/Implementation.md`.
 
 Objective:
-- Stop at the approved Sprint 23 boundary after reusable UI component extraction.
+- Stop at the approved Sprint 24 boundary after persistence and UI behaviour stabilisation.
 
 Scope:
 - `Implementation.md` is the ChatGPT-owned sprint planning and workflow document.
@@ -376,10 +406,9 @@ Scope:
 - Preserve import, parser, validation and repository semantics.
 - Preserve transaction search and credit/debit toggle behaviour.
 - Preserve the approved UI/UX v1.0 appearance.
+- Preserve durable SQLite startup persistence wiring.
 
 Out of Scope:
-- Source code changes
-- SwiftUI implementation changes
 - PDF support
 - OCR
 - Parser changes

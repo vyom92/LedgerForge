@@ -102,7 +102,12 @@ struct ImportPersistenceMapper {
         createdAtISO: String
     ) -> AccountDTO {
         let institutionName = importSession.institution?.rawValue ?? "Unknown"
-        let accountName = importSession.fileName
+        let accountName = Self.displayAccountName(
+            institutionName: institutionName,
+            documentType: importSession.documentType,
+            currency: financialDocument.transactions.first?.currency,
+            fallbackFileName: importSession.fileName
+        )
         let accountType: String? = {
             switch importSession.documentType {
             case .bankAccount:
@@ -115,7 +120,7 @@ struct ImportPersistenceMapper {
         }()
 
         return AccountDTO(
-            id: stableID(prefix: "account", components: [workspaceId, institutionName, accountName]),
+            id: stableID(prefix: "account", components: [workspaceId, institutionName, importSession.fileName]),
             workspaceId: workspaceId,
             name: accountName,
             institutionId: nil,
@@ -124,6 +129,41 @@ struct ImportPersistenceMapper {
             description: "Imported from \(importSession.fileName)",
             createdAtISO: createdAtISO
         )
+    }
+
+    static func displayAccountName(
+        institutionName: String,
+        documentType: DocumentType?,
+        currency: String?,
+        fallbackFileName: String
+    ) -> String {
+        let trimmedInstitution = institutionName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedInstitution.isEmpty && trimmedInstitution != "Unknown" {
+            switch documentType {
+            case .bankAccount?:
+                return [trimmedInstitution, currency].compactMap { value in
+                    let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return trimmed?.isEmpty == false ? trimmed : nil
+                }.joined(separator: " ")
+            case .creditCard?:
+                return "\(trimmedInstitution) Credit Card"
+            default:
+                return trimmedInstitution
+            }
+        }
+
+        let baseName = (fallbackFileName as NSString).deletingPathExtension
+        let separators = CharacterSet(charactersIn: "_-")
+        let cleaned = baseName
+            .components(separatedBy: separators)
+            .filter { component in
+                let lowercased = component.lowercased()
+                return !["csv", "statement", "statements", "export", "baseline"].contains(lowercased)
+            }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return cleaned.isEmpty ? "Imported Account" : cleaned.capitalized
     }
 
     private func transactionDTO(

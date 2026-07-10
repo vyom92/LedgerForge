@@ -77,8 +77,8 @@ struct DeveloperConsoleView: View {
 
     private var consoleFilters: some View {
         HStack(spacing: 12) {
-            LFFilterChip(title: "Log Level", value: "All", width: 180, surface: LFTheme.surfaceRaised)
-            LFFilterChip(title: "Source", value: "All", width: 180, surface: LFTheme.surfaceRaised)
+            LFFilterChip(title: "Log Level", value: "Pending", width: 180, surface: LFTheme.surfaceRaised.opacity(0.65), showsChevron: false)
+            LFFilterChip(title: "Source", value: "Pending", width: 180, surface: LFTheme.surfaceRaised.opacity(0.65), showsChevron: false)
             LFSearchField(placeholder: "Search logs...")
             Label("Pause pending", systemImage: "pause")
                 .font(.caption.weight(.semibold))

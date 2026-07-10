@@ -6,6 +6,7 @@ import SQLite3
 
 /// SQLite-backed provider that runs migrations and exposes repository implementations.
 public final class SQLiteRepositoryProvider {
+    public let databasePath: String
     public let database: SQLiteDatabase
     public let workspaceRepo: WorkspaceRepository
     public let transactionRepo: TransactionRepository
@@ -14,6 +15,7 @@ public final class SQLiteRepositoryProvider {
 
     public init(path: String? = nil) throws {
         let dbPath = path ?? Self.defaultDBPath()
+        self.databasePath = dbPath
         self.database = SQLiteDatabase(path: dbPath)
         try database.open()
         try database.runMigrations(allMigrations)
