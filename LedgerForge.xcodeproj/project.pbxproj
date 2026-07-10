@@ -106,7 +106,6 @@
 		28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionStore.swift; sourceTree = "<group>"; };
 		28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionListViewModel.swift; sourceTree = "<group>"; };
 		28171F672FFC1718006115B7 /* Database_v1_Architecture.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Database_v1_Architecture.md; sourceTree = "<group>"; };
-		281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AI_WORKFLOW.md; sourceTree = "<group>"; };
 		281BB1332FFC3FB5006E7424 /* Codex response.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Codex response.md"; sourceTree = "<group>"; };
 		281BB1362FFC4160006E7424 /* Repository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Repository.swift; sourceTree = "<group>"; };
 		281BB1372FFC4184006E7424 /* SQLiteDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteDatabase.swift; sourceTree = "<group>"; };
@@ -136,6 +135,7 @@
 		286242552FFCE80D00B8AA66 /* PDFDocumentReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFDocumentReader.swift; sourceTree = "<group>"; };
 		2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureInstitutionDetector.swift; sourceTree = "<group>"; };
 		286242762FFD168100B8AA66 /* PROJECT_STATE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PROJECT_STATE.md; sourceTree = "<group>"; };
+		286CA451300288D000731C41 /* AI_WORKFLOW.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AI_WORKFLOW.md; sourceTree = "<group>"; };
 		286D63EF2FFD3057000CEC65 /* FinancialDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialDocument.swift; sourceTree = "<group>"; };
 		286D68EF2FFFE6440078AAC5 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
 		286D68F22FFFF60E0078AAC5 /* LFTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFTheme.swift; sourceTree = "<group>"; };
@@ -200,6 +200,7 @@
 		281BB15F2FFC48C4006E7424 /* Exceptions for ".github" folder in "LedgerForge" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Context_Manifest.yaml,
 				Project_Context.md,
 				prompts.md,
 			);
@@ -530,19 +531,19 @@
 		28B87B272FFB2C90009BEE8C /* Project documents */ = {
 			isa = PBXGroup;
 			children = (
-				28B87B3E2FFBD1DE009BEE8C /* .github */,
-				283E97932FFE3A470034CA98 /* Branding */,
 				28A3A4C22FFE1E3900DD5727 /* UI Assets */,
+				283E97932FFE3A470034CA98 /* Branding */,
+				28B87B3E2FFBD1DE009BEE8C /* .github */,
 				28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */,
 				281BB1782FFC4CDA006E7424 /* Project_Guide.md */,
-				28B87B2E2FFB2D25009BEE8C /* ADR.md */,
+				28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */,
+				286CA451300288D000731C41 /* AI_WORKFLOW.md */,
 				28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */,
 				28A3A4C12FFE1DBA00DD5727 /* UI_UX_v1.0_Frozen.md */,
 				286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */,
 				28171F672FFC1718006115B7 /* Database_v1_Architecture.md */,
-				28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */,
+				28B87B2E2FFB2D25009BEE8C /* ADR.md */,
 				286242762FFD168100B8AA66 /* PROJECT_STATE.md */,
-				281BB1312FFC3C49006E7424 /* AI_WORKFLOW.md */,
 				2857FA502FFEA28B00948892 /* Implementation.md */,
 				281BB1332FFC3FB5006E7424 /* Codex response.md */,
 			);

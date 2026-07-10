@@ -1,8 +1,8 @@
 # LedgerForge Project Context
 
-> Purpose: Provide a concise snapshot of the project for AI agents and developers.
+> Purpose: Provide a concise bootstrap snapshot of the project for AI assistants and developers.
 >
-> Detailed workflow, architecture and engineering guidance live in the canonical project documentation.
+> This document is intentionally lightweight. Authoritative workflow, architecture, planning and repository state live in the canonical project documentation.
 
 ---
 
@@ -14,14 +14,22 @@ Milestone M7 — Dashboard Experience
 
 **Current Sprint**
 
-Sprint 23 (Planning)
+Sprint 26 — Documentation Alignment & Bootstrap Manifest Adoption
 
-Current work is focused on:
+**Current Focus**
 
-- Workflow v2.1 freeze
-- Documentation consolidation
-- Repository housekeeping
-- UI component extraction
+- Documentation baseline freeze
+- Bootstrap alignment
+- Workflow v2.1 consolidation
+- Repository documentation consistency
+
+For verified implementation status, always refer to:
+
+- `Project documents/PROJECT_STATE.md`
+
+For the ACTIVE sprint plan, always refer to:
+
+- `Project documents/Implementation.md`
 
 ---
 
@@ -31,13 +39,13 @@ LedgerForge is an offline-first macOS personal financial operating system.
 
 It imports financial documents from multiple institutions, extracts validated financial data through a deterministic import pipeline, stores trusted financial truth in a repository-backed database, and presents that information through a modern SwiftUI interface.
 
-The approved UI/UX visual language is frozen and implementation now focuses on translating approved assets into production SwiftUI.
+Artificial intelligence assists the user but never replaces deterministic financial truth.
 
 ---
 
 # Current Architecture (Summary)
 
-The approved production pipeline is:
+Approved production pipeline:
 
 Reader
 
@@ -67,6 +75,10 @@ Validation
 
 ↓
 
+Fingerprinting & Duplicate Detection
+
+↓
+
 Repository Persistence
 
 ↓
@@ -91,7 +103,7 @@ RepositoryStoreHydrator is the only approved persistence-to-runtime boundary.
 
 # Completed Milestones
 
-- Multi-format document import framework
+- Multi-format import foundation
 - RawDocument pipeline
 - Institution Detection
 - Statement Classification
@@ -99,24 +111,26 @@ RepositoryStoreHydrator is the only approved persistence-to-runtime boundary.
 - FinancialDocument model
 - Validation framework
 - Repository architecture
+- SQLite persistence
 - RepositoryStoreHydrator
 - Runtime Stores
 - Dashboard foundation
 - Application shell
-- Sprint 22 SwiftUI UI Foundation
-- Approved UI/UX asset freeze
+- SwiftUI UI foundation
+- Approved UI/UX baseline
 - Workflow v2.1
+- Sprint 25 repository identity and import foundation
 
 ---
 
 # Current Priorities
 
-1. Complete Workflow v2.1 repository freeze.
-2. Sprint 23 — UI Component Extraction.
-3. Expand regression fixtures.
+1. Complete Sprint 26 documentation alignment.
+2. Freeze bootstrap documentation.
+3. Prepare Sprint 27.
 4. Password-protected document support.
 5. PDF import.
-6. Insights & Analytics.
+6. Statement Intelligence foundation.
 
 ---
 
@@ -138,13 +152,15 @@ App icon:
 
 # Canonical Documentation
 
-Every implementation begins with:
+Bootstrap every session using:
 
-1. `Project_Guide.md`
-2. `PROJECT_STATE.md`
-3. `Implementation.md`
+1. `Project documents/.github/Context_Manifest.yaml`
+2. `Project documents/.github/AGENTS.md`
+3. `Project_Guide.md`
+4. `Project documents/PROJECT_STATE.md`
+5. `Project documents/Implementation.md` (ACTIVE sprint only)
 
-Use the Task Routing Guide in `Project_Guide.md` to determine any additional documents required for the current task.
+Then use the Task Routing Guide in `Project_Guide.md` to determine any additional documentation required.
 
 ---
 
@@ -152,4 +168,4 @@ Use the Task Routing Guide in `Project_Guide.md` to determine any additional doc
 
 LedgerForge becomes the trusted personal financial operating system that allows users to import financial documents from multiple institutions, preserve financial truth through a deterministic validation pipeline, and present accurate, explainable financial insight through a repository-backed SwiftUI application.
 
-Every future sprint should reduce manual work, preserve architectural integrity and improve user confidence without compromising financial accuracy.
+Every sprint should reduce manual work, preserve architectural integrity, improve user confidence, and maintain a single source of truth across code and documentation.
