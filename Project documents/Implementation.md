@@ -28,87 +28,163 @@ Archived sprints are historical record only.
 
 # ACTIVE SPRINT
 
-## Sprint 23 — UI Component Extraction
+## Sprint 24 — Persistence and UI Behaviour Stabilisation
 
 ### Status
 
-        🟢 Ready for Implementation
+🟢 Ready for Implementation
 
 ### Objective
 
-Extract the reusable SwiftUI components introduced during Sprint 22 into dedicated files while preserving all behaviour, appearance and architecture.
+Stabilise LedgerForge after the Sprint 23 UI extraction by resolving verified persistence and user-interface behaviour defects without introducing unrelated functionality.
 
 ### Context
 
 #### Required Files
 
-- Project documents/Project_Guide.md
-- Project documents/PROJECT_STATE.md
-- Project documents/Architecture_v1.0_Frozen.md
-- Project documents/Engineering Standards.md
-- Project documents/UI_UX_v1.0_Frozen.md
-- ContentView.swift
-- Views/TransactionListView.swift
-- Views/DeveloperConsoleView.swift
+- `Project documents/Project_Guide.md`
+- `Project documents/PROJECT_STATE.md`
+- `Project documents/Architecture_v1.0_Frozen.md`
+- `Project documents/Database_v1_Architecture.md`
+- `Project documents/Engineering Standards.md`
+- `Project documents/UI_UX_v1.0_Frozen.md`
+- `Project documents/Codex response.md`
+- `LedgerForgeApp.swift`
+- `ContentView.swift`
+- `Views/TransactionListView.swift`
+- `Views/Common/LFTheme.swift`
+- `Services/ImportEngine.swift`
+- `Services/ImportPersistenceCoordinator.swift`
+- `Services/RepositoryStoreHydrator.swift`
+- `Database/Repository.swift`
+- `Database/SQLiteRepositoryProvider.swift`
+- `Core/TransactionStore.swift`
+- `Core/AccountStore.swift`
+- `ViewModels/DashboardViewModel.swift`
+- `ViewModels/TransactionListViewModel.swift`
 
 #### Required Assets
 
-- Project documents/UI Assets/Approved/DesignBoard_v2.0.png
-- Project documents/UI Assets/Approved/ComponentLibrary_v1.0.png
-- Project documents/UI Assets/Approved/Dashboard_v1.0.png
-- Project documents/UI Assets/Approved/Transactions_v1.0.png
-- Project documents/UI Assets/Approved/DeveloperConsole_v1.0.png
+- `Project documents/UI Assets/Approved/DesignBoard_v2.0.png`
+- `Project documents/UI Assets/Approved/ComponentLibrary_v1.0.png`
+- `Project documents/UI Assets/Approved/Dashboard_v1.0.png`
+- `Project documents/UI Assets/Approved/Transactions_v1.0.png`
+- `Project documents/UI Assets/Approved/ImportWizard_v1.0.png`
+- `Project documents/UI Assets/Approved/Settings_v1.0.png`
 
-#### Required Reports (Optional)
+#### Required Reports
 
-- Project documents/Codex response.md (Sprint 23 Planning Report)
+- `Project documents/Codex response.md`
+- Sprint 23 implementation report and validation result
+- Current manual UI/UX audit findings
 
 #### Constraints
 
-- Presentation refactor only.
-- Preserve approved UI/UX.
-- Preserve import pipeline.
+- Behaviour stabilisation only.
+- No new product modules.
+- No PDF implementation.
+- No OCR implementation.
+- No full Import Wizard implementation.
 - Preserve repository architecture.
 - Preserve Runtime Store architecture.
-- Preserve ViewModel contracts.
-- Preserve financial behaviour.
-- Build and regression validation required.
-- ContentView remains the application composition root.
-- Extract only reusable or clearly reusable presentation components.
-- Do not extract one-off views purely to reduce file size.
+- Preserve financial calculations.
+- Preserve parser behaviour.
+- Preserve import validation logic.
+- Preserve the approved visual design.
+- Preserve existing ViewModel contracts unless a verified defect requires a narrow correction.
+- Do not redesign the navigation architecture.
+- Do not modify the database schema unless planning proves it is strictly required for persistence.
+- All implemented fixes must receive regression coverage where practical.
+- Prefer the smallest complete fix over broad refactoring.
 
-#### Previous Sprint References (Optional)
+#### Previous Sprint References
 
+- Sprint 23 — UI Component Extraction
 - Sprint 22 — Translate Frozen UI Assets into SwiftUI
-
 
 ---
 
+
 ## Planning Review (ChatGPT)
 
-### Review Summary
+### Status
 
-Planning approved with the following implementation decisions:
+✅ Planning Approved
 
-- Extract only reusable or clearly reusable presentation components.
-- ContentView remains the application composition root.
-- Prefer `Views/Common/` over `Views/Components/`.
-- Do not create shared components where duplication is not yet justified.
-- Do not introduce shared formatting APIs unless formatting already exists in multiple files.
-- Minor usability fixes are permitted only where they are local presentation fixes.
+### Review Outcome
 
-### Approved Optional Fixes
+The Sprint 24 planning report has been reviewed and approved.
 
-- Fix Developer Console visibility default if confirmed.
-- Fix TransactionList scrolling regression if encountered during extraction.
+The proposed implementation sequence correctly prioritises:
 
-### Implementation Decision
+1. Production persistence bootstrap.
+2. Startup hydration.
+3. Persistence regression validation.
+4. Sidebar hit-target corrections.
+5. Credit/Debit hit-target corrections.
+6. Removal of duplicate fake macOS traffic-light controls.
+7. Import completion feedback.
+8. Placeholder-control honesty.
+9. Account display naming improvements.
 
-Planning approved.
+### Mandatory Clarifications
 
-Planning complete.
+Implementation must additionally observe the following:
 
-Implementation approved.
+#### Persistence
+
+- Do **not** assume a `DatabaseProvider(sqlite:)` initializer exists.
+- Determine the supported production bootstrap API.
+- If the architecture lacks a production bootstrap, introduce the smallest supported factory or initializer necessary.
+- Preserve the existing in-memory provider for unit and integration tests.
+
+#### Account Naming
+
+- Improve **display names only**.
+- Never modify repository identifiers.
+- Never change stable account identity.
+- Never introduce automatic account matching.
+
+#### Import Completion
+
+Implement only:
+
+- Success state
+- Failure state
+- Imported filename
+- Imported transaction count
+- View Transactions action
+
+Do **not** implement:
+
+- Preview
+- Validation UI
+- Remaining Import Wizard stages
+
+#### Placeholder Controls
+
+Differentiate between:
+
+- Functional controls (remain enabled)
+- Future functionality (clearly disabled or labelled pending)
+
+Do not disable working controls.
+
+#### Sidebar Validation
+
+Implementation must manually verify:
+
+- Full-width hover state
+- Full-width click target
+- Selected state
+- Keyboard focus
+- Accessibility focus
+
+#### Repository Architecture
+
+RepositoryStoreHydrator remains the **only** persistence-to-runtime boundary.
+
+Do not bypass it.
 
 ---
 
@@ -118,92 +194,68 @@ Read only the ACTIVE sprint.
 
 This is an implementation task.
 
-Execute only the approved scope.
+Update only the files required to complete the approved Sprint 24 scope.
 
----
+### Approved Scope
 
-## Objective
+#### Phase 1 — Critical Backend
 
-Extract reusable SwiftUI presentation components from the Sprint 22 implementation while preserving behaviour, appearance, architecture and existing data flow.
+1. Resolve production persistence across application restart.
+2. Restore runtime state from persistent storage during application launch.
+3. Preserve the existing repository architecture.
+4. Preserve in-memory repositories for testing.
+5. Add regression coverage for persistence and restart behaviour.
 
----
+#### Phase 2 — Critical UI Behaviour
 
-## Read Only
+6. Make sidebar navigation rows fully clickable.
+7. Make Credit/Debit controls use full rectangular hit targets.
+8. Remove duplicate fake macOS traffic-light controls.
 
-- Project documents/Project_Guide.md
-- Project documents/PROJECT_STATE.md
-- ACTIVE Sprint 23 in Project documents/Implementation.md
-- Project documents/Architecture_v1.0_Frozen.md
-- Project documents/Engineering Standards.md
-- Project documents/UI_UX_v1.0_Frozen.md
-- Project documents/Codex response.md (Sprint 23 Planning Report)
+#### Phase 3 — UX Polish
 
----
+9. Improve import completion feedback.
+10. Clearly distinguish placeholder controls from functional controls.
+11. Improve account display naming without changing account identity.
 
-## Approved Scope
+### Do Not Modify
 
-Extract only reusable or clearly reusable presentation components.
-
-ContentView remains the application composition root.
-
-Do not extract one-off views simply to reduce file size.
-
-Prefer reusable components under:
-
-Views/Common/
-
-Review the planning report for the approved extraction order.
-
----
-
-## Permitted Minor Fixes
-
-If encountered naturally during extraction:
-
-- Fix Developer Console default visibility.
-- Fix TransactionList scrolling regression.
-
-Do not introduce new functionality.
-
----
-
-## Do Not Modify
-
-- Import pipeline
-- Repository layer
-- Database
-- Validation
+- Parser architecture
+- Statement parsing behaviour
 - Financial calculations
-- Parser behaviour
-- Runtime Stores
-- ViewModels
-- Approved UI design
-- Navigation flow
+- Import validation logic
+- Approved UI styling
+- Navigation architecture
+- PDF import
+- OCR
+- Category analytics
+- Investment modules
+- Database schema unless strictly required
 
----
+### Validation
 
-## Validation
+Implementation is complete only when:
 
-- Build successfully.
-- Run required sprint validation.
-- Run regression tests.
-- Verify dashboard hydration.
-- Verify transaction search/filter behaviour.
-- Verify CSV import behaviour.
-- Verify Developer Console behaviour.
+- Build succeeds.
+- All enabled tests pass.
+- CSV import verified.
+- Dashboard totals verified.
+- Transaction search verified.
+- Credit/Debit filters verified.
+- Sidebar hit targets verified.
+- Import completion verified.
+- Application restart preserves imported data.
 
----
+### Completion
 
-## Completion
+When implementation is complete:
 
-- Commit.
-- Push.
-- Update Project documents/Codex response.md.
-- Update Project documents/PROJECT_STATE.md.
-
-Do not modify Implementation.md.
-
-Stop exactly at the approved sprint boundary.
+1. Commit changes.
+2. Push to the current branch.
+3. Update `Project documents/Codex response.md`.
+4. Update `Project documents/PROJECT_STATE.md`.
+5. Do **not** modify `Implementation.md`.
+6. Stop after Sprint 24 scope.
 
 ---
 
@@ -211,13 +263,11 @@ Stop exactly at the approved sprint boundary.
 
 Documentation-only work.
 
-May update documentation files.
+May update documentation files only when explicitly approved after implementation.
 
 Must not modify source code.
 
 Must not be combined with implementation work in the same execution unless explicitly approved.
-
-Update only the documentation explicitly listed in this sprint.
 
 ══════════════════════════════════════════════════════════════
 
@@ -228,6 +278,69 @@ Completed sprints are archived by ChatGPT only.
 New sprints are always inserted above this section.
 
 Archived sprints must never be modified.
+
+══════════════════════════════════════════════════════════════
+
+## Sprint 23 — UI Component Extraction
+
+**Status**
+
+✅ Complete
+
+**Completed**
+
+2026-07-09
+
+**Objective**
+
+Extract the reusable SwiftUI components introduced during Sprint 22 into dedicated files while preserving behaviour, appearance and architecture.
+
+**Related Commit(s)**
+
+Implementation: `8090de4`
+
+Project-state update: `a3d39c1`
+
+Stabilisation follow-up: recorded in subsequent repository history
+
+**Outcome**
+
+Reusable UI primitives were extracted into `Views/Common/`.
+
+`ContentView.swift` remained the application composition root.
+
+The Deep Indigo design language, existing runtime-store data flow and application behaviour were preserved.
+
+Developer Console visibility was corrected.
+
+The UI and backend were subsequently audited, resulting in:
+
+- transaction scrolling repair
+- improved search and filter behaviour
+- more honest placeholder controls
+- improved dashboard runtime refresh
+- safer account and balance hydration
+- strengthened repository and CSV regression coverage
+- restored passing build and test suite
+
+**Validation**
+
+- Clean build
+- All enabled unit tests passed
+- Repository contract tests passed
+- Import integration tests passed
+- CSV regression tests passed
+- UI tests passed when run normally
+
+**Deferred Work**
+
+- Durable SQLite persistence in the live application
+- Startup restoration after application relaunch
+- Full-width navigation hit targets
+- Removal of duplicate fake macOS traffic-light controls
+- Import completion feedback
+- Full Import Wizard
+- Account identity improvements
 
 ══════════════════════════════════════════════════════════════
 
