@@ -26,9 +26,9 @@ Archived sprints are historical record only.
 
 ══════════════════════════════════════════════════════════════
 
-# ACTIVE SPRINT
+# =======ACTIVE SPRINT==========
 
-## Sprint 24 — Persistence and UI Behaviour Stabilisation
+## Sprint 25 — Account Identity & Import Foundation
 
 ### Status
 
@@ -36,11 +36,37 @@ Archived sprints are historical record only.
 
 ### Objective
 
-Stabilise LedgerForge after the Sprint 23 UI extraction by resolving verified persistence and user-interface behaviour defects without introducing unrelated functionality.
+Strengthen LedgerForge's account identity architecture by improving institution attribution, account display naming, duplicate-account prevention and import foundations while preserving the repository architecture, Runtime Store architecture and durable SQLite persistence introduced in Sprint 24.
 
-### Context
+---
 
-#### Required Files
+## Context
+
+Sprint 24 successfully stabilised the application.
+
+Verified outcomes include:
+
+- Durable SQLite persistence.
+- Repository hydration after application restart.
+- Runtime Store synchronisation.
+- Stable build.
+- 84 enabled tests passing.
+- Sidebar hit-target improvements.
+- Credit/Debit hit-target improvements.
+- Removal of duplicate macOS traffic-light controls.
+- Improved import completion state.
+
+The remaining architectural weakness is account identity.
+
+Repository persistence is now reliable.
+
+The next objective is to improve how accounts are represented without changing their stable repository identity.
+
+---
+
+## Required Files
+
+### Project Documentation
 
 - `Project documents/Project_Guide.md`
 - `Project documents/PROJECT_STATE.md`
@@ -49,142 +75,175 @@ Stabilise LedgerForge after the Sprint 23 UI extraction by resolving verified pe
 - `Project documents/Engineering Standards.md`
 - `Project documents/UI_UX_v1.0_Frozen.md`
 - `Project documents/Codex response.md`
-- `LedgerForgeApp.swift`
-- `ContentView.swift`
-- `Views/TransactionListView.swift`
-- `Views/Common/LFTheme.swift`
+- 'Services/ImportPersistenceMapper.swift'
+
+### Backend
+
 - `Services/ImportEngine.swift`
 - `Services/ImportPersistenceCoordinator.swift`
 - `Services/RepositoryStoreHydrator.swift`
 - `Database/Repository.swift`
 - `Database/SQLiteRepositoryProvider.swift`
-- `Core/TransactionStore.swift`
 - `Core/AccountStore.swift`
-- `ViewModels/DashboardViewModel.swift`
-- `ViewModels/TransactionListViewModel.swift`
+- `Core/TransactionStore.swift`
 
-#### Required Assets
+### Models
 
-- `Project documents/UI Assets/Approved/DesignBoard_v2.0.png`
-- `Project documents/UI Assets/Approved/ComponentLibrary_v1.0.png`
-- `Project documents/UI Assets/Approved/Dashboard_v1.0.png`
-- `Project documents/UI Assets/Approved/Transactions_v1.0.png`
-- `Project documents/UI Assets/Approved/ImportWizard_v1.0.png`
-- `Project documents/UI Assets/Approved/Settings_v1.0.png`
-
-#### Required Reports
-
-- `Project documents/Codex response.md`
-- Sprint 23 implementation report and validation result
-- Current manual UI/UX audit findings
-
-#### Constraints
-
-- Behaviour stabilisation only.
-- No new product modules.
-- No PDF implementation.
-- No OCR implementation.
-- No full Import Wizard implementation.
-- Preserve repository architecture.
-- Preserve Runtime Store architecture.
-- Preserve financial calculations.
-- Preserve parser behaviour.
-- Preserve import validation logic.
-- Preserve the approved visual design.
-- Preserve existing ViewModel contracts unless a verified defect requires a narrow correction.
-- Do not redesign the navigation architecture.
-- Do not modify the database schema unless planning proves it is strictly required for persistence.
-- All implemented fixes must receive regression coverage where practical.
-- Prefer the smallest complete fix over broad refactoring.
-
-#### Previous Sprint References
-
-- Sprint 23 — UI Component Extraction
-- Sprint 22 — Translate Frozen UI Assets into SwiftUI
+- Account
+- Workspace
+- Institution
+- ImportSession
+- FinancialDocument
 
 ---
 
+## Required Reports
+
+- Sprint 25 Planning Report
+- PROJECT_STATE.md
+- Sprint 24 Completion Report
+
+---
+
+## Constraints
+
+### Preserve
+
+- Repository architecture.
+- Runtime Store architecture.
+- SQLite persistence.
+- RepositoryStoreHydrator as the only persistence-to-runtime boundary.
+- Stable repository identifiers.
+- Financial calculations.
+- Parser behaviour.
+- Existing import validation.
+- Existing test suite.
+
+### Do Not Implement
+
+- PDF parsing.
+- OCR.
+- Import Wizard implementation.
+- Category engine.
+- Rules engine.
+- Investment features.
+- Database schema changes unless proven strictly necessary.
+
+---
 
 ## Planning Review (ChatGPT)
 
 ### Status
 
-✅ Planning Approved
+✅ Approved
 
-### Review Outcome
+The planning report has been reviewed.
 
-The Sprint 24 planning report has been reviewed and approved.
+Implementation is approved with the following clarifications.
 
-The proposed implementation sequence correctly prioritises:
+### Approved Scope
 
-1. Production persistence bootstrap.
-2. Startup hydration.
-3. Persistence regression validation.
-4. Sidebar hit-target corrections.
-5. Credit/Debit hit-target corrections.
-6. Removal of duplicate fake macOS traffic-light controls.
-7. Import completion feedback.
-8. Placeholder-control honesty.
-9. Account display naming improvements.
+#### Phase 1 — Institution Attribution
 
-### Mandatory Clarifications
+Persist institution metadata through the existing repository path.
 
-Implementation must additionally observe the following:
+Target flow:
 
-#### Persistence
+Parser
 
-- Do **not** assume a `DatabaseProvider(sqlite:)` initializer exists.
-- Determine the supported production bootstrap API.
-- If the architecture lacks a production bootstrap, introduce the smallest supported factory or initializer necessary.
-- Preserve the existing in-memory provider for unit and integration tests.
+↓
 
-#### Account Naming
+ImportPersistenceMapper
 
-- Improve **display names only**.
-- Never modify repository identifiers.
-- Never change stable account identity.
-- Never introduce automatic account matching.
+↓
 
-#### Import Completion
+Repository
 
-Implement only:
+↓
 
-- Success state
-- Failure state
-- Imported filename
-- Imported transaction count
-- View Transactions action
+SQLite
 
-Do **not** implement:
+↓
 
-- Preview
-- Validation UI
-- Remaining Import Wizard stages
+RepositoryStoreHydrator
 
-#### Placeholder Controls
+↓
 
-Differentiate between:
+Runtime Store
 
-- Functional controls (remain enabled)
-- Future functionality (clearly disabled or labelled pending)
+No schema redesign.
 
-Do not disable working controls.
+No heuristic inference.
 
-#### Sidebar Validation
+---
 
-Implementation must manually verify:
+#### Phase 2 — Account Display
 
-- Full-width hover state
-- Full-width click target
-- Selected state
-- Keyboard focus
-- Accessibility focus
+Improve repository account display names.
 
-#### Repository Architecture
+Rules:
 
-RepositoryStoreHydrator remains the **only** persistence-to-runtime boundary.
+- Display names may change.
+- Repository IDs must never change.
+- Display names must never participate in matching.
+- Preserve existing persisted account identity.
 
-Do not bypass it.
+---
+
+#### Phase 3 — Duplicate Prevention Foundation
+
+Prepare the architecture required for future duplicate prevention.
+
+Do not implement automatic matching.
+
+Do not compare:
+
+- filenames
+- account names
+- institution names
+- display names
+
+Future matching must rely only on verified account identifiers.
+
+Do not introduce a concrete identity service or type during this sprint.
+
+---
+
+#### Phase 4 — Import Foundation
+
+Document and prepare the future import pipeline.
+
+Target architecture:
+
+Reader
+
+↓
+
+Format Processor
+
+↓
+
+FinancialDocument
+
+↓
+
+Validation
+
+↓
+
+Persistence
+
+↓
+
+RepositoryStoreHydrator
+
+↓
+
+Runtime Stores
+
+No PDF implementation.
+
+No OCR.
 
 ---
 
@@ -192,70 +251,36 @@ Do not bypass it.
 
 Read only the ACTIVE sprint.
 
-This is an implementation task.
+Implement only the approved Sprint 25 scope.
 
-Update only the files required to complete the approved Sprint 24 scope.
+Do not read archived sprint sections.
 
-### Approved Scope
-
-#### Phase 1 — Critical Backend
-
-1. Resolve production persistence across application restart.
-2. Restore runtime state from persistent storage during application launch.
-3. Preserve the existing repository architecture.
-4. Preserve in-memory repositories for testing.
-5. Add regression coverage for persistence and restart behaviour.
-
-#### Phase 2 — Critical UI Behaviour
-
-6. Make sidebar navigation rows fully clickable.
-7. Make Credit/Debit controls use full rectangular hit targets.
-8. Remove duplicate fake macOS traffic-light controls.
-
-#### Phase 3 — UX Polish
-
-9. Improve import completion feedback.
-10. Clearly distinguish placeholder controls from functional controls.
-11. Improve account display naming without changing account identity.
-
-### Do Not Modify
-
-- Parser architecture
-- Statement parsing behaviour
-- Financial calculations
-- Import validation logic
-- Approved UI styling
-- Navigation architecture
-- PDF import
-- OCR
-- Category analytics
-- Investment modules
-- Database schema unless strictly required
-
-### Validation
+### Validation Requirements
 
 Implementation is complete only when:
 
 - Build succeeds.
 - All enabled tests pass.
-- CSV import verified.
-- Dashboard totals verified.
-- Transaction search verified.
-- Credit/Debit filters verified.
-- Sidebar hit targets verified.
-- Import completion verified.
-- Application restart preserves imported data.
+- Repository persistence remains unchanged.
+- SQLite persistence remains unchanged.
+- Restart persistence remains verified.
+- Repository IDs remain stable.
+- Institution attribution survives restart.
+- Display names improve without affecting identity.
+- No duplicate accounts are created by verified identifiers.
+- No new compiler warnings appear.
+- Existing CSV import behaviour remains unchanged.
 
 ### Completion
 
 When implementation is complete:
 
-1. Commit changes.
-2. Push to the current branch.
+1. Commit.
+2. Push.
 3. Update `Project documents/Codex response.md`.
 4. Update `Project documents/PROJECT_STATE.md`.
-5. Do **not** modify `Implementation.md`.
-6. Stop after Sprint 24 scope.
+5. Do not modify `Implementation.md`.
+6. Stop at Sprint 25 scope.
 
 ---
 
@@ -263,15 +288,13 @@ When implementation is complete:
 
 Documentation-only work.
 
-May update documentation files only when explicitly approved after implementation.
+May update documentation after implementation has been approved.
 
-Must not modify source code.
-
-Must not be combined with implementation work in the same execution unless explicitly approved.
+Must never be combined with implementation work.
 
 ══════════════════════════════════════════════════════════════
 
-# ARCHIVE
+# ********ARCHIVE****************
 
 Completed sprints are archived by ChatGPT only.
 
@@ -280,6 +303,56 @@ New sprints are always inserted above this section.
 Archived sprints must never be modified.
 
 ══════════════════════════════════════════════════════════════
+
+## Sprint 24 — Persistence and UI Behaviour Stabilisation
+
+**Status**
+
+✅ Complete
+
+**Completed**
+
+2026-07-10
+
+**Outcome**
+
+- Durable SQLite persistence implemented.
+- Repository hydration restored application state after restart.
+- Runtime Store hydration stabilised.
+- Sidebar rows use full-width hit targets.
+- Credit/Debit filters use full rectangular hit targets.
+- Duplicate in-app macOS traffic-light controls removed.
+- Import completion feedback improved.
+- Placeholder controls clearly distinguished.
+- Repository account persistence verified.
+- Restart persistence verified.
+- Manual regression completed.
+- Build succeeds.
+- All enabled tests pass.
+
+**Validation**
+
+- Clean build
+- All enabled unit tests passed
+- CSV import verified
+- Repository persistence verified
+- Restart verified
+- Dashboard totals verified
+- Transactions verified
+- Accounts verified
+- Sidebar behaviour verified
+- Credit/Debit filters verified
+
+**Deferred Work**
+
+- Account identity improvements
+- Institution attribution
+- PDF import pipeline
+- Import Wizard implementation
+- Category engine
+- Rules engine
+- Investment modules
+
 
 ## Sprint 23 — UI Component Extraction
 
