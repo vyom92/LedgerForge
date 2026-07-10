@@ -19,16 +19,17 @@ struct DeveloperConsoleView: View {
                 LFInlineBadge(title: "Environment: Local", color: LFTheme.success)
                 LFInlineBadge(title: Self.timeFormatter.string(from: Date()), color: LFTheme.textSecondary)
 
-                Button {
-                    // Console mutation is out of Sprint 22 scope; this is a visual shell control.
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 10)
-                .background(LFTheme.primaryGradient)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
+                Label("Refresh pending", systemImage: "arrow.clockwise")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(LFTheme.textSecondary)
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 10)
+                    .background(LFTheme.surfaceRaised.opacity(0.65))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7)
+                            .stroke(LFTheme.border, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
             }
 
             HStack(alignment: .top, spacing: 14) {
@@ -79,16 +80,17 @@ struct DeveloperConsoleView: View {
             LFFilterChip(title: "Log Level", value: "All", width: 180, surface: LFTheme.surfaceRaised)
             LFFilterChip(title: "Source", value: "All", width: 180, surface: LFTheme.surfaceRaised)
             LFSearchField(placeholder: "Search logs...")
-            Button {
-                // Visual-only pause control for the shell.
-            } label: {
-                Label("Pause", systemImage: "pause")
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(LFTheme.surfaceRaised)
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
-            }
-            .buttonStyle(.plain)
+            Label("Pause pending", systemImage: "pause")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(LFTheme.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(LFTheme.surfaceRaised.opacity(0.65))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(LFTheme.border, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 7))
             LFInlineBadge(title: "Live", color: LFTheme.success)
         }
     }
@@ -112,7 +114,7 @@ struct DeveloperConsoleView: View {
                 } else {
                     ForEach(Array(console.messages.enumerated()), id: \.offset) { index, message in
                         HStack(spacing: 14) {
-                            Text(Self.timeFormatter.string(from: Date()))
+                            Text("#\(index + 1)")
                                 .font(.system(.caption, design: .monospaced))
                                 .foregroundStyle(LFTheme.textSecondary)
                                 .frame(width: 86, alignment: .leading)
@@ -130,12 +132,12 @@ struct DeveloperConsoleView: View {
                                 .lineLimit(2)
                                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                            Text(index.isMultiple(of: 2) ? "45ms" : "120ms")
+                            Text("local")
                                 .font(.caption2)
                                 .foregroundStyle(LFTheme.textSecondary)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 5)
-                                .background(LFTheme.surfaceRaised)
+                                .background(LFTheme.surfaceRaised.opacity(0.65))
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
                         }
                         .padding(.vertical, 10)
@@ -156,17 +158,17 @@ struct DeveloperConsoleView: View {
                 .font(.caption)
                 .foregroundStyle(LFTheme.textSecondary)
             Spacer()
-            Button {
-                // Command execution is out of Sprint 22 scope.
-            } label: {
-                Label("Execute", systemImage: "play")
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(LFTheme.primaryGradient)
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
-            }
-            .buttonStyle(.plain)
+            Label("Commands pending", systemImage: "play")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(LFTheme.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(LFTheme.surfaceRaised.opacity(0.65))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(LFTheme.border, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 7))
         }
         .padding(12)
         .background(LFTheme.backgroundDeep.opacity(0.65))
@@ -190,16 +192,17 @@ struct DeveloperConsoleView: View {
             LFInfoRow(title: "Engine", value: "SQLite", verticalPadding: 5)
             LFInfoRow(title: "Path", value: "~/Application Support/LedgerForge", verticalPadding: 5)
             LFInfoRow(title: "Boundary", value: "Repository protocols", verticalPadding: 5)
-            Button {
-                // Opening external database tools is out of Sprint 22 scope.
-            } label: {
-                Label("Open in DB Browser", systemImage: "cylinder")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(LFTheme.surfaceRaised)
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
-            }
-            .buttonStyle(.plain)
+            Label("DB Browser pending", systemImage: "cylinder")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(LFTheme.textSecondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(LFTheme.surfaceRaised.opacity(0.65))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(LFTheme.border, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 7))
         }
     }
 
@@ -215,8 +218,8 @@ struct DeveloperConsoleView: View {
 
     private var featureFlagsPanel: some View {
         LFPanel(title: "Feature Flags") {
-            featureFlag("AI Category Detection", enabled: false)
-            featureFlag("Advanced Parsing Engine", enabled: true)
+            featureFlag("AI Category Detection", status: "Future")
+            featureFlag("Advanced Parsing Engine", status: "Current")
         }
     }
 
@@ -247,24 +250,29 @@ struct DeveloperConsoleView: View {
             Text(title)
                 .foregroundStyle(color)
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption2)
-                .foregroundStyle(color)
+            Text("Pending")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(LFTheme.textSecondary)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(LFTheme.surfaceRaised.opacity(0.65))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .font(.caption)
         .padding(.vertical, 8)
     }
 
-    private func featureFlag(_ title: String, enabled: Bool) -> some View {
-        HStack {
+    private func featureFlag(_ title: String, status: String) -> some View {
+        let isCurrent = status == "Current"
+        return HStack {
             Text(title)
             Spacer()
-            Text(enabled ? "ON" : "OFF")
+            Text(status)
                 .font(.caption2.weight(.bold))
-                .foregroundStyle(enabled ? LFTheme.success : LFTheme.textSecondary)
+                .foregroundStyle(isCurrent ? LFTheme.success : LFTheme.textSecondary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
-                .background((enabled ? LFTheme.success : LFTheme.textSecondary).opacity(0.14))
+                .background((isCurrent ? LFTheme.success : LFTheme.textSecondary).opacity(0.14))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .font(.caption)

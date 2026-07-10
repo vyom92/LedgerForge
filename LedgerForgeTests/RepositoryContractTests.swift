@@ -96,7 +96,10 @@ struct RepositoryContractTests {
                 workspaceId: fixture.workspaceId,
                 importSessionId: fixture.importSessionId
             )
-            #expect(originalStored == [firstTransaction, secondTransaction])
+            #expect(
+                originalStored.sorted { $0.id < $1.id }
+                    == [firstTransaction, secondTransaction]
+            )
 
             let replacement = transaction(
                 id: "transaction-3",

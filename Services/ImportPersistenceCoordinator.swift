@@ -81,19 +81,30 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         _ = try accountRepo.upsertAccount(payload.account)
         _ = try importSessionRepo.createImportSession(payload.importSession)
 
-        try transactionRepo.replaceTransactions(
-            workspaceId: payload.workspace.id,
-            importSessionId: payload.importSession.id,
-            transactions: payload.transactions
-        )
-
-        try importSessionRepo.updateImportSession(
-            payload.importSession.id,
-            updates: PartialImportSessionUpdate(
-                validationStatus: "passed",
-                completedAtISO: payload.completedAtISO
+        do {
+            try transactionRepo.replaceTransactions(
+                workspaceId: payload.workspace.id,
+                importSessionId: payload.importSession.id,
+                transactions: payload.transactions
             )
-        )
+
+            try importSessionRepo.updateImportSession(
+                payload.importSession.id,
+                updates: PartialImportSessionUpdate(
+                    validationStatus: "passed",
+                    completedAtISO: payload.completedAtISO
+                )
+            )
+        } catch {
+            try? importSessionRepo.updateImportSession(
+                payload.importSession.id,
+                updates: PartialImportSessionUpdate(
+                    validationStatus: "failed",
+                    completedAtISO: payload.completedAtISO
+                )
+            )
+            throw error
+        }
 
         return ImportPersistenceResult(
             persisted: true,

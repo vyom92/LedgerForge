@@ -16,12 +16,12 @@ struct LFSearchField: View {
                 .font(.subheadline)
                 .foregroundStyle(LFTheme.textSecondary)
             Spacer()
-            Text("⌘K")
+            Text("Pending")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(LFTheme.textSecondary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(Color.white.opacity(0.05))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(LFTheme.surfaceRaised.opacity(LFTheme.placeholderOpacity))
                 .clipShape(RoundedRectangle(cornerRadius: 5))
         }
         .padding(.horizontal, 12)
@@ -32,5 +32,7 @@ struct LFSearchField: View {
                 .stroke(LFTheme.border, lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .opacity(LFTheme.placeholderOpacity)
+        .help("Search is planned for a future sprint.")
     }
 }

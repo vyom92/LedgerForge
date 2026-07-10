@@ -20,6 +20,7 @@ enum LFTheme {
     static let info = Color(hex: 0x38BDF8)
     static let text = Color(hex: 0xF3F6FF)
     static let textSecondary = Color(hex: 0x9AA4B2)
+    static let placeholderOpacity = 0.65
 
     static let backgroundGradient = LinearGradient(
         colors: [

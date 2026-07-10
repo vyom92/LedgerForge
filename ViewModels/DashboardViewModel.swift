@@ -122,7 +122,7 @@ final class DashboardViewModel: ObservableObject {
             $0 + ($1.debit ?? .zero)
         }
 
-        let netWorth = transactions.last?.balance ?? .zero
+        let netWorth = Self.latestKnownBalance(from: transactions)
 
         snapshot = DashboardSnapshot(
             netWorth: netWorth,
@@ -130,6 +130,8 @@ final class DashboardViewModel: ObservableObject {
             expenses: expenses,
             cashFlow: income - expenses
         )
+
+        refreshPresentationStateIfRuntimeDataAvailable()
     }
 
     private func refresh(accounts: [Account]) {
@@ -143,6 +145,38 @@ final class DashboardViewModel: ObservableObject {
                 currentBalance: $0.currentBalance
             )
         }
+
+        refreshPresentationStateIfRuntimeDataAvailable()
+    }
+    private func refreshPresentationStateIfRuntimeDataAvailable() {
+        guard case .failed = presentationState else {
+            if !accounts.isEmpty || transactionCount > 0 {
+                presentationState = .loaded("Loaded \(accounts.count) account(s), \(transactionCount) transaction(s)")
+            }
+            return
+        }
+    }
+
+    private static func latestKnownBalance(from transactions: [Transaction]) -> Decimal {
+        transactions
+            .enumerated()
+            .compactMap { offset, transaction -> (offset: Int, date: Date?, balance: Decimal)? in
+                guard let balance = transaction.balance else { return nil }
+                return (offset, transaction.date, balance)
+            }
+            .sorted { lhs, rhs in
+                switch (lhs.date, rhs.date) {
+                case let (left?, right?) where left != right:
+                    return left > right
+                case (.some, nil):
+                    return true
+                case (nil, .some):
+                    return false
+                default:
+                    return lhs.offset > rhs.offset
+                }
+            }
+            .first?.balance ?? .zero
     }
 
     private static func recentTransactionSummaries(

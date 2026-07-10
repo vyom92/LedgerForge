@@ -27,6 +27,8 @@ struct RepositoryStoreHydratorTests {
         #expect(AccountStore.shared.accounts.first?.currentBalance == Decimal(1_050))
         #expect(TransactionStore.shared.transactions.first?.description == "Trusted credit")
         #expect(TransactionStore.shared.transactions.first?.credit == Decimal(100))
+        #expect(TransactionStore.shared.transactions.first?.account == "Axis NRE")
+        #expect(TransactionStore.shared.transactions.first?.sourceBank == "Axis")
     }
 
     @Test func hydratorRunsOnlyOnceUnlessForced() throws {
@@ -70,6 +72,42 @@ struct RepositoryStoreHydratorTests {
         #expect(TransactionStore.shared.transactions.count == 1)
         #expect(TransactionStore.shared.transactions.first?.description == "Trusted credit")
         #expect(TransactionStore.shared.transactions.first?.credit == Decimal(25))
+        #expect(TransactionStore.shared.transactions.first?.account == "Axis NRE")
+    }
+    @Test func hydratorUsesLatestDatedRunningBalanceForAccountBalance() throws {
+        resetRuntimeStores()
+        let provider = try seededProvider()
+        let hydrator = RepositoryStoreHydrator(
+            accountRepo: provider.accountRepo,
+            transactionRepo: provider.transactionRepo,
+            workspaceId: "workspace-dashboard"
+        )
+
+        try provider.transactionRepo.replaceTransactions(
+            workspaceId: "workspace-dashboard",
+            importSessionId: "import-dashboard",
+            transactions: [
+                trustedTransaction(
+                    id: "transaction-newer",
+                    amountMinor: 25_00,
+                    runningBalanceMinor: 1_075_00,
+                    postedDateISO: "2026-07-09"
+                ),
+                trustedTransaction(
+                    id: "transaction-older",
+                    amountMinor: 100_00,
+                    runningBalanceMinor: 1_050_00,
+                    postedDateISO: "2026-07-08"
+                )
+            ]
+        )
+
+        let result = try hydrator.hydrateIfNeeded(forceRefresh: true)
+
+        #expect(result.didHydrate)
+        #expect(AccountStore.shared.accounts.first?.currentBalance == Decimal(1_075))
+        #expect(TransactionStore.shared.transactions.first?.description == "Trusted credit")
+        #expect(TransactionStore.shared.transactions.last?.balance == Decimal(1_075))
     }
 }
 
@@ -89,7 +127,7 @@ private func seededProvider() throws -> InMemoryRepositoryProvider {
         id: "account-dashboard",
         workspaceId: workspace.id,
         name: "Axis NRE",
-        institutionId: nil,
+        institutionId: "Axis",
         accountType: "bank",
         nativeCurrency: "INR",
         description: "Dashboard account",
@@ -137,14 +175,15 @@ private func seededProvider() throws -> InMemoryRepositoryProvider {
 private func trustedTransaction(
     id: String = "transaction-trusted",
     amountMinor: Int64 = 100_00,
-    runningBalanceMinor: Int64 = 1_050_00
+    runningBalanceMinor: Int64 = 1_050_00,
+    postedDateISO: String = "2026-07-08"
 ) -> TransactionDTO {
     TransactionDTO(
         id: id,
         workspaceId: "workspace-dashboard",
         accountId: "account-dashboard",
         importSessionId: "import-dashboard",
-        postedDateISO: "2026-07-08",
+        postedDateISO: postedDateISO,
         description: "Trusted credit",
         nativeCurrency: "INR",
         amountMinor: amountMinor,

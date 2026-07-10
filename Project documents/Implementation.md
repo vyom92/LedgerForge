@@ -32,7 +32,7 @@ Archived sprints are historical record only.
 
 ### Status
 
-🟡 Planning
+        🟢 Ready for Implementation
 
 ### Objective
 
@@ -42,53 +42,73 @@ Extract the reusable SwiftUI components introduced during Sprint 22 into dedicat
 
 #### Required Files
 
-List only the project documents, source files or reports required for this sprint.
+- Project documents/Project_Guide.md
+- Project documents/PROJECT_STATE.md
+- Project documents/Architecture_v1.0_Frozen.md
+- Project documents/Engineering Standards.md
+- Project documents/UI_UX_v1.0_Frozen.md
+- ContentView.swift
+- Views/TransactionListView.swift
+- Views/DeveloperConsoleView.swift
 
 #### Required Assets
 
-List only the approved UI assets or branding assets required for implementation.
+- Project documents/UI Assets/Approved/DesignBoard_v2.0.png
+- Project documents/UI Assets/Approved/ComponentLibrary_v1.0.png
+- Project documents/UI Assets/Approved/Dashboard_v1.0.png
+- Project documents/UI Assets/Approved/Transactions_v1.0.png
+- Project documents/UI Assets/Approved/DeveloperConsole_v1.0.png
 
 #### Required Reports (Optional)
 
-List previous implementation reports or `Codex response.md` only when they are genuinely required.
+- Project documents/Codex response.md (Sprint 23 Planning Report)
 
 #### Constraints
 
-List architectural, engineering or sprint boundaries that must not be violated.
+- Presentation refactor only.
+- Preserve approved UI/UX.
+- Preserve import pipeline.
+- Preserve repository architecture.
+- Preserve Runtime Store architecture.
+- Preserve ViewModel contracts.
+- Preserve financial behaviour.
+- Build and regression validation required.
+- ContentView remains the application composition root.
+- Extract only reusable or clearly reusable presentation components.
+- Do not extract one-off views purely to reduce file size.
 
 #### Previous Sprint References (Optional)
 
-Reference completed sprints only when they are directly relevant to the current work.
+- Sprint 22 — Translate Frozen UI Assets into SwiftUI
 
----
-
-## Planning Prompt (Codex)
-
-Analyse the repository and produce an implementation plan only.
-
-- Repository analysis only.
-- No source changes.
-- No documentation changes.
-- No commits.
-- No implementation.
-- Read only the ACTIVE sprint.
-- Ignore archived sprint sections.
-
-Output findings to `Codex response.md`.
 
 ---
 
 ## Planning Review (ChatGPT)
 
-Review Codex findings.
+### Review Summary
 
-Refine scope.
+Planning approved with the following implementation decisions:
 
-Approve implementation approach.
+- Extract only reusable or clearly reusable presentation components.
+- ContentView remains the application composition root.
+- Prefer `Views/Common/` over `Views/Components/`.
+- Do not create shared components where duplication is not yet justified.
+- Do not introduce shared formatting APIs unless formatting already exists in multiple files.
+- Minor usability fixes are permitted only where they are local presentation fixes.
 
-Record any planning decisions required before implementation.
+### Approved Optional Fixes
 
-Replace the Planning Prompt with the approved Implementation Prompt after review.
+- Fix Developer Console visibility default if confirmed.
+- Fix TransactionList scrolling regression if encountered during extraction.
+
+### Implementation Decision
+
+Planning approved.
+
+Planning complete.
+
+Implementation approved.
 
 ---
 
@@ -96,21 +116,94 @@ Replace the Planning Prompt with the approved Implementation Prompt after review
 
 Read only the ACTIVE sprint.
 
-Implement only the approved scope.
+This is an implementation task.
 
-Build.
+Execute only the approved scope.
 
-Test.
+---
 
-Commit.
+## Objective
 
-Push.
+Extract reusable SwiftUI presentation components from the Sprint 22 implementation while preserving behaviour, appearance, architecture and existing data flow.
 
-Update `Codex response.md`.
+---
 
-Update `PROJECT_STATE.md`.
+## Read Only
 
-Do not modify archived sprint sections.
+- Project documents/Project_Guide.md
+- Project documents/PROJECT_STATE.md
+- ACTIVE Sprint 23 in Project documents/Implementation.md
+- Project documents/Architecture_v1.0_Frozen.md
+- Project documents/Engineering Standards.md
+- Project documents/UI_UX_v1.0_Frozen.md
+- Project documents/Codex response.md (Sprint 23 Planning Report)
+
+---
+
+## Approved Scope
+
+Extract only reusable or clearly reusable presentation components.
+
+ContentView remains the application composition root.
+
+Do not extract one-off views simply to reduce file size.
+
+Prefer reusable components under:
+
+Views/Common/
+
+Review the planning report for the approved extraction order.
+
+---
+
+## Permitted Minor Fixes
+
+If encountered naturally during extraction:
+
+- Fix Developer Console default visibility.
+- Fix TransactionList scrolling regression.
+
+Do not introduce new functionality.
+
+---
+
+## Do Not Modify
+
+- Import pipeline
+- Repository layer
+- Database
+- Validation
+- Financial calculations
+- Parser behaviour
+- Runtime Stores
+- ViewModels
+- Approved UI design
+- Navigation flow
+
+---
+
+## Validation
+
+- Build successfully.
+- Run required sprint validation.
+- Run regression tests.
+- Verify dashboard hydration.
+- Verify transaction search/filter behaviour.
+- Verify CSV import behaviour.
+- Verify Developer Console behaviour.
+
+---
+
+## Completion
+
+- Commit.
+- Push.
+- Update Project documents/Codex response.md.
+- Update Project documents/PROJECT_STATE.md.
+
+Do not modify Implementation.md.
+
+Stop exactly at the approved sprint boundary.
 
 ---
 

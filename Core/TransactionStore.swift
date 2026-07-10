@@ -25,27 +25,27 @@ final class TransactionStore: ObservableObject {
 
     // Replace all transactions after a successful import and store validation result.
     func replaceTransactions(_ transactions: [Transaction], validation: ImportValidationResult? = nil) {
-        if Thread.isMainThread {
+        let update = {
             self.transactions = transactions
             self.lastValidation = validation
-            return
         }
 
-        DispatchQueue.main.async {
-            self.transactions = transactions
-            self.lastValidation = validation
+        if Thread.isMainThread {
+            update()
+        } else {
+            DispatchQueue.main.async(execute: update)
         }
     }
-
-    // ...existing code...
     
-    // Simple search by description (case-insensitive)
+    // Simple search by description, account, file, or bank (case-insensitive)
     func search(_ text: String) -> [Transaction] {
-        guard !text.isEmpty else { return transactions }
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else { return transactions }
         return transactions.filter {
-            $0.description.localizedCaseInsensitiveContains(text) ||
-            $0.sourceFile.localizedCaseInsensitiveContains(text) ||
-            $0.sourceBank.localizedCaseInsensitiveContains(text)
+            $0.description.localizedCaseInsensitiveContains(trimmedText) ||
+            $0.account.localizedCaseInsensitiveContains(trimmedText) ||
+            $0.sourceFile.localizedCaseInsensitiveContains(trimmedText) ||
+            $0.sourceBank.localizedCaseInsensitiveContains(trimmedText)
         }
     }
 

@@ -106,7 +106,7 @@ struct ContentView: View {
             case .success(let url):
                 selectedFile = url.lastPathComponent
                 ImportEngine.shared.importFile(from: url)
-                selectedSection = .transactions
+                selectedSection = .imports
 
             case .failure(let error):
                 selectedFile = error.localizedDescription
@@ -405,6 +405,22 @@ struct ContentView: View {
 
                         importedFileRow(name: selectedFile, subtitle: selectedFile == "No statement imported" ? "No file selected" : "Ready for current import pipeline", icon: "doc.text", color: LFTheme.info)
 
+                        HStack(spacing: 10) {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(LFTheme.warning)
+                            Text("Preview, validation and step-by-step review are visual placeholders until a future Import Wizard sprint.")
+                                .font(.caption)
+                                .foregroundStyle(LFTheme.textSecondary)
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(LFTheme.warning.opacity(0.08))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(LFTheme.warning.opacity(0.25), lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
                         HStack(spacing: 12) {
                             Image(systemName: "shield.checkered")
                                 .foregroundStyle(LFTheme.primaryHover)
@@ -461,17 +477,18 @@ struct ContentView: View {
 
                 Spacer()
 
-                Button {
-                    showingImporter = true
-                } label: {
-                    Label("Next", systemImage: "arrow.right")
-                        .labelStyle(.titleAndIcon)
-                        .padding(.horizontal, 48)
-                        .padding(.vertical, 13)
-                        .background(LFTheme.primaryGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .buttonStyle(.plain)
+                Label("Preview step pending", systemImage: "arrow.right")
+                    .labelStyle(.titleAndIcon)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(LFTheme.textSecondary)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 13)
+                    .background(LFTheme.surface.opacity(0.65))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(LFTheme.border, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
         .padding(28)

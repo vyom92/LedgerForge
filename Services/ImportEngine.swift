@@ -44,6 +44,11 @@ final class ImportEngine {
 
             let contents = try await readTextDocument(from: url)
 
+            guard !contents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                DeveloperConsole.shared.log("ERROR: Imported document is empty.")
+                return
+            }
+
             DocumentStore.shared.update(with: contents)
 
             let metadata = InstitutionDetector().detect(from: contents)
@@ -128,8 +133,12 @@ final class ImportEngine {
                         DeveloperConsole.shared.log(error.localizedDescription)
                     }
 
-                    TransactionStore.shared.replaceTransactions(financialDocument.transactions, validation: validation)
-                    AccountStore.shared.integrateImport(importSession: importSession, transactions: financialDocument.transactions)
+                    await MainActor.run {
+                        TransactionStore.shared.replaceTransactions(financialDocument.transactions, validation: validation)
+                        AccountStore.shared.integrateImport(importSession: importSession, transactions: financialDocument.transactions)
+                    }
+
+                    DeveloperConsole.shared.log("Runtime Stores: UPDATED")
                 }
 
                 DeveloperConsole.shared.log("Transactions Parsed: \(financialDocument.transactions.count)")

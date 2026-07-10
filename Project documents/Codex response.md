@@ -98,6 +98,7 @@ Sprint 23 extracted reusable SwiftUI presentation components from the Sprint 22 
 ## Remaining Technical Debt
 
 - Some larger screen-specific dashboard, import and settings sections remain in `ContentView.swift`; they should stay local until a future sprint has an approved screen-level extraction scope.
+
 - `LFIconTile` is available as a reusable primitive but not yet broadly adopted across all eligible call sites.
 - No additional UI automation coverage was added; existing UI launch coverage remains the current validation baseline.
 

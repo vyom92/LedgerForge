@@ -63,10 +63,18 @@ struct ImportRepositoryIntegrationTests {
             #expect(transactions.allSatisfy { $0.accountId == result.accountId })
             #expect(transactions.allSatisfy { $0.importSessionId == fixture.importSession.id.uuidString })
             #expect(transactions.allSatisfy { $0.documentId == nil })
-            #expect(transactions.map(\.amountMinor) == [10_000, -5_000])
-            #expect(transactions.map(\.amountDecimal) == ["100", "-50"])
-            #expect(transactions.map(\.direction) == ["credit", "debit"])
-            #expect(transactions.map(\.runningBalanceMinor) == [110_000, 105_000])
+
+            let orderedTransactions = transactions.sorted {
+                if $0.postedDateISO == $1.postedDateISO {
+                    return $0.id < $1.id
+                }
+                return $0.postedDateISO < $1.postedDateISO
+            }
+
+            #expect(orderedTransactions.map(\.amountMinor) == [10_000, -5_000])
+            #expect(orderedTransactions.map(\.amountDecimal) == ["100", "-50"])
+            #expect(orderedTransactions.map(\.direction) == ["credit", "debit"])
+            #expect(orderedTransactions.map(\.runningBalanceMinor) == [110_000, 105_000])
         }
     }
 

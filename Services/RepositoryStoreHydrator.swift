@@ -73,7 +73,9 @@ final class RepositoryStoreHydrator {
 
         let transactionDTOs = try transactionRepo.trustedTransactions(workspaceId: workspaceId)
         let accountDTOs = try accountRepo.accounts(workspaceId: workspaceId)
-        let transactions = try transactionDTOs.map(Self.transaction(from:))
+        let transactions = try transactionDTOs.map {
+            try Self.transaction(from: $0, accounts: accountDTOs)
+        }
         let accounts = try Self.accounts(from: accountDTOs, transactions: transactionDTOs)
 
         accountStore.replaceAccounts(accounts)
@@ -90,12 +92,10 @@ final class RepositoryStoreHydrator {
     private static func accounts(from accountDTOs: [AccountDTO], transactions: [TransactionDTO]) throws -> [Account] {
         try accountDTOs.map { accountDTO in
             let accountTransactions = transactions.filter { $0.accountId == accountDTO.id }
-            let latestBalance: Decimal?
-            if let runningBalanceMinor = accountTransactions.compactMap(\.runningBalanceMinor).last {
-                latestBalance = try decimal(fromMinorUnits: runningBalanceMinor, currency: accountDTO.nativeCurrency)
-            } else {
-                latestBalance = nil
-            }
+            let latestBalance = try latestRunningBalance(
+                from: accountTransactions,
+                currency: accountDTO.nativeCurrency
+            )
 
             return Account(
                 institution: accountDTO.institutionId ?? "Unknown",
@@ -109,11 +109,12 @@ final class RepositoryStoreHydrator {
         }
     }
 
-    private static func transaction(from dto: TransactionDTO) throws -> Transaction {
+    private static func transaction(from dto: TransactionDTO, accounts: [AccountDTO]) throws -> Transaction {
         guard let postedDate = dayFormatter.date(from: dto.postedDateISO) else {
             throw RepositoryStoreHydrationError.invalidPostedDate(dto.postedDateISO)
         }
 
+        let accountDTO = accounts.first { $0.id == dto.accountId }
         let amount = try decimal(fromMinorUnits: dto.amountMinor, currency: dto.nativeCurrency)
         let runningBalance = try dto.runningBalanceMinor.map {
             try decimal(fromMinorUnits: $0, currency: dto.nativeCurrency)
@@ -127,8 +128,8 @@ final class RepositoryStoreHydrator {
             amount: amount,
             balance: runningBalance,
             currency: dto.nativeCurrency,
-            account: dto.accountId ?? "",
-            sourceBank: "",
+            account: accountDTO?.name ?? dto.accountId ?? "",
+            sourceBank: accountDTO?.institutionId ?? "",
             sourceFile: dto.importSessionId ?? ""
         )
     }
@@ -168,6 +169,31 @@ final class RepositoryStoreHydrator {
         default:
             return nil
         }
+    }
+
+    private static func latestRunningBalance(from transactions: [TransactionDTO], currency: String) throws -> Decimal? {
+        let latest = transactions
+            .enumerated()
+            .compactMap { offset, transaction -> (offset: Int, date: Date?, balanceMinor: Int64)? in
+                guard let balanceMinor = transaction.runningBalanceMinor else { return nil }
+                return (offset, dayFormatter.date(from: transaction.postedDateISO), balanceMinor)
+            }
+            .sorted { lhs, rhs in
+                switch (lhs.date, rhs.date) {
+                case let (left?, right?) where left != right:
+                    return left > right
+                case (.some, nil):
+                    return true
+                case (nil, .some):
+                    return false
+                default:
+                    return lhs.offset > rhs.offset
+                }
+            }
+            .first
+
+        guard let latest else { return nil }
+        return try decimal(fromMinorUnits: latest.balanceMinor, currency: currency)
     }
 
     private static let dayFormatter: DateFormatter = {

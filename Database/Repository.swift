@@ -1,6 +1,6 @@
 // Database/Repository.swift
 // Repository protocol definitions for LedgerForge persistence layer
-// Generated for Sprint 10 Phase 2B
+// Repository contracts are part of the frozen persistence boundary.
 
 import Foundation
 

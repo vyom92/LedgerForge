@@ -19,13 +19,14 @@ final class AccountStore: ObservableObject {
     private init() {}
 
     func replaceAccounts(_ accounts: [Account]) {
-        if Thread.isMainThread {
+        let update = {
             self.accounts = accounts
-            return
         }
 
-        DispatchQueue.main.async {
-            self.accounts = accounts
+        if Thread.isMainThread {
+            update()
+        } else {
+            DispatchQueue.main.async(execute: update)
         }
     }
 
@@ -104,23 +105,15 @@ final class AccountStore: ObservableObject {
         // Determine currency from first transaction if available
         let currency = transactions.first?.currency ?? "INR"
 
-        // Determine most recent balance from transactions
-        let lastBalance: Decimal?
-        if let lastWithBalance = transactions.last(where: { $0.balance != nil }) {
-            lastBalance = lastWithBalance.balance
-        } else if let lastTransaction = transactions.last {
-            // If no explicit balance column, use cumulative amount as a best-effort current balance.
-            lastBalance = lastTransaction.amount
-        } else {
-            lastBalance = nil
-        }
+        // Determine the latest known balance from transactions without assuming array order.
+        let latestBalance = Self.latestKnownBalance(from: transactions)
 
         // Create or update account
         if let existing = findAccount(institution: institutionName, name: accountName) {
             // Update balance and lastImport
             var updated = existing
-            if let lastBalance = lastBalance {
-                updated.currentBalance = lastBalance
+            if let latestBalance = latestBalance {
+                updated.currentBalance = latestBalance
             }
             updated.currencyCode = currency
             updated.lastImport = importSession.importedAt
@@ -136,7 +129,7 @@ final class AccountStore: ObservableObject {
                 name: accountName,
                 type: type,
                 currencyCode: currency,
-                currentBalance: lastBalance ?? .zero,
+                currentBalance: latestBalance ?? .zero,
                 includeInNetWorth: true,
                 lastImport: importSession.importedAt
             )
@@ -144,6 +137,45 @@ final class AccountStore: ObservableObject {
     }
 
     // MARK: - Balance updates
+
+    nonisolated private static func latestKnownBalance(from transactions: [Transaction]) -> Decimal? {
+        let transactionsWithBalance: [(offset: Int, date: Date?, balance: Decimal)] = transactions
+            .enumerated()
+            .compactMap { offset, transaction in
+                guard let balance = transaction.balance else { return nil }
+                return (offset: offset, date: transaction.date, balance: balance)
+            }
+
+        if let latestWithBalance = transactionsWithBalance.sorted(by: isNewer).first {
+            return latestWithBalance.balance
+        }
+
+        return transactions
+            .enumerated()
+            .sorted { lhs, rhs in
+                isNewer(
+                    lhs: (offset: lhs.offset, date: lhs.element.date, balance: lhs.element.amount),
+                    rhs: (offset: rhs.offset, date: rhs.element.date, balance: rhs.element.amount)
+                )
+            }
+            .first?.element.amount
+    }
+
+    nonisolated private static func isNewer(
+        lhs: (offset: Int, date: Date?, balance: Decimal),
+        rhs: (offset: Int, date: Date?, balance: Decimal)
+    ) -> Bool {
+        switch (lhs.date, rhs.date) {
+        case let (left?, right?) where left != right:
+            return left > right
+        case (.some, nil):
+            return true
+        case (nil, .some):
+            return false
+        default:
+            return lhs.offset > rhs.offset
+        }
+    }
 
     func updateBalance(for id: UUID, newBalance: Decimal, lastImport: Date? = nil) {
         DispatchQueue.main.async {

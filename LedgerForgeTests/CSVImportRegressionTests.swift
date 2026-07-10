@@ -31,7 +31,9 @@ struct CSVImportRegressionTests {
         let validation = ImportValidator.validate(financialDocument: financialDocument)
 
         #expect(String(describing: type(of: parser)) == fixture.expected.expectedParser)
+        #expect(metadata.institution.rawValue == fixture.expected.institution)
         #expect(financialDocument.transactions.count == fixture.expected.transactionCount)
+        #expect(financialDocument.transactions.first?.currency == fixture.expected.currency)
         #expect(validation.debitTotal == fixture.expected.debitTotalDecimal)
         #expect(validation.creditTotal == fixture.expected.creditTotalDecimal)
         #expect(validation.openingBalance == fixture.expected.openingBalanceDecimal)

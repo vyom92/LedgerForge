@@ -50,14 +50,26 @@ final class TransactionListViewModel: ObservableObject {
     }
 
     var filteredTransactions: [Transaction] {
-        transactions.filter { transaction in
-            let matchesSearch = searchText.isEmpty ||
-                transaction.description.localizedCaseInsensitiveContains(searchText)
+        let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filterCredits = showOnlyCredits && !showOnlyDebits
+        let filterDebits = showOnlyDebits && !showOnlyCredits
 
-            let matchesCredit = !showOnlyCredits || transaction.credit != nil
-            let matchesDebit = !showOnlyDebits || transaction.debit != nil
+        return transactions.filter { transaction in
+            let matchesSearch = trimmedSearch.isEmpty ||
+                transaction.description.localizedCaseInsensitiveContains(trimmedSearch) ||
+                transaction.account.localizedCaseInsensitiveContains(trimmedSearch) ||
+                transaction.sourceBank.localizedCaseInsensitiveContains(trimmedSearch)
 
-            return matchesSearch && matchesCredit && matchesDebit
+            let matchesType: Bool
+            if filterCredits {
+                matchesType = transaction.credit != nil
+            } else if filterDebits {
+                matchesType = transaction.debit != nil
+            } else {
+                matchesType = true
+            }
+
+            return matchesSearch && matchesType
         }
     }
 }

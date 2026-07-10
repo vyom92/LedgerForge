@@ -21,13 +21,14 @@ struct TransactionListView: View {
                 transactionFilterBar
                 transactionTable
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             transactionDetailPanel
                 .frame(width: 330)
         }
         .padding(28)
         .background(LFTheme.backgroundGradient)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var transactionRangeAndSummary: some View {
@@ -35,12 +36,12 @@ struct TransactionListView: View {
             HStack(spacing: 14) {
                 HStack(spacing: 0) {
                     rangeButton("All", selected: true)
-                    rangeButton("Today")
-                    rangeButton("Yesterday")
-                    rangeButton("This Week")
-                    rangeButton("This Month", selected: true)
-                    rangeButton("Last Month")
-                    rangeButton("Custom", icon: "calendar")
+                    rangeButton("Today", disabled: true)
+                    rangeButton("Yesterday", disabled: true)
+                    rangeButton("This Week", disabled: true)
+                    rangeButton("This Month", disabled: true)
+                    rangeButton("Last Month", disabled: true)
+                    rangeButton("Custom", icon: "calendar", disabled: true)
                 }
 
                 Spacer()
@@ -138,28 +139,28 @@ struct TransactionListView: View {
                     )
                     .frame(minHeight: 260)
                 } else {
-                    ForEach(filteredTransactions) { transaction in
-                        transactionRow(transaction)
-                        Divider().overlay(LFTheme.divider)
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(filteredTransactions) { transaction in
+                                transactionRow(transaction)
+                                Divider().overlay(LFTheme.divider)
+                            }
+                        }
                     }
+                    .frame(maxHeight: .infinity)
                 }
 
                 HStack {
                     Text("Showing \(filteredTransactions.count) of \(viewModel.transactions.count) transactions")
                     Spacer()
-                    paginationButton("chevron.left")
-                    Text("1")
-                        .font(.caption.weight(.semibold))
-                        .frame(width: 30, height: 30)
-                        .background(LFTheme.primaryGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 7))
-                    paginationButton("2")
-                    paginationButton("3")
-                    paginationButton("chevron.right")
-                    Text("10 / page")
+                    Text("Pagination pending")
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
-                        .background(LFTheme.surfaceRaised)
+                        .background(LFTheme.surfaceRaised.opacity(0.65))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 7)
+                                .stroke(LFTheme.border, lineWidth: 1)
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: 7))
                 }
                 .font(.caption)
@@ -238,12 +239,13 @@ struct TransactionListView: View {
     }
 
     private func transactionRow(_ transaction: Transaction) -> some View {
-        Button {
+        let isSelected = selectedTransaction?.id == transaction.id
+        return Button {
             selectedTransactionID = transaction.id
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: selectedTransactionID == transaction.id ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(selectedTransactionID == transaction.id ? LFTheme.primaryHover : LFTheme.textSecondary)
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(isSelected ? LFTheme.primaryHover : LFTheme.textSecondary)
                     .frame(width: 20)
                 Text(formatDate(transaction.date))
                     .frame(width: 84, alignment: .leading)
@@ -278,17 +280,17 @@ struct TransactionListView: View {
             .font(.caption)
             .padding(.vertical, 12)
             .padding(.horizontal, 8)
-            .background(selectedTransactionID == transaction.id ? LFTheme.primary.opacity(0.16) : Color.clear)
+            .background(isSelected ? LFTheme.primary.opacity(0.16) : Color.clear)
             .overlay(
                 RoundedRectangle(cornerRadius: 7)
-                    .stroke(selectedTransactionID == transaction.id ? LFTheme.primary : Color.clear, lineWidth: 1)
+                    .stroke(isSelected ? LFTheme.primary : Color.clear, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
     }
 
-    private func rangeButton(_ title: String, selected: Bool = false, icon: String? = nil) -> some View {
+    private func rangeButton(_ title: String, selected: Bool = false, icon: String? = nil, disabled: Bool = false) -> some View {
         HStack(spacing: 6) {
             Text(title)
             if let icon {
@@ -296,10 +298,13 @@ struct TransactionListView: View {
             }
         }
         .font(.caption)
+        .foregroundStyle(disabled ? LFTheme.textSecondary.opacity(0.55) : LFTheme.text)
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .background(selected ? AnyShapeStyle(LFTheme.primaryGradient) : AnyShapeStyle(Color.clear))
         .overlay(Rectangle().stroke(LFTheme.divider, lineWidth: 1))
+        .opacity(disabled ? 0.65 : 1)
+        .help(disabled ? "Date range filters are planned for a future sprint." : "")
     }
 
     private func transactionSummaryCard(_ title: String, value: String, color: Color) -> some View {
@@ -318,20 +323,6 @@ struct TransactionListView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private func paginationButton(_ titleOrIcon: String) -> some View {
-        let isIcon = titleOrIcon.contains("chevron")
-        return Group {
-            if isIcon {
-                Image(systemName: titleOrIcon)
-            } else {
-                Text(titleOrIcon)
-            }
-        }
-        .font(.caption)
-        .frame(width: 30, height: 30)
-        .background(LFTheme.surfaceRaised)
-        .clipShape(RoundedRectangle(cornerRadius: 7))
-    }
 
     private func formatDate(_ date: Date?) -> String {
         guard let date else { return "—" }

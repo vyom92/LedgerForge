@@ -17,6 +17,7 @@ public final class SQLiteRepositoryProvider {
         self.database = SQLiteDatabase(path: dbPath)
         try database.open()
         try database.runMigrations(allMigrations)
+        try database.execute(sql: "PRAGMA foreign_keys = ON;")
 
         self.workspaceRepo = SQLiteWorkspaceRepo(db: database)
         self.transactionRepo = SQLiteTransactionRepo(db: database)
@@ -187,7 +188,7 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
             sql += " AND import_session_id = ?"
             params.append(importSessionId)
         }
-        sql += " ORDER BY posted_date, id;"
+        sql += " ORDER BY posted_date DESC, id DESC;"
 
         return try db.query(sql: sql, params: params) { row in
             let transactionId = row.string(at: 0) ?? ""
@@ -220,7 +221,7 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
     }
 
     func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] {
-        let sql = "SELECT id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at FROM transactions WHERE workspace_id = ? AND is_trusted = 1 ORDER BY posted_date, id;"
+        let sql = "SELECT id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at FROM transactions WHERE workspace_id = ? AND is_trusted = 1 ORDER BY posted_date DESC, id DESC;"
         return try db.query(sql: sql, params: [workspaceId]) { row in
             let transactionId = row.string(at: 0) ?? ""
             let rawRows = try rawRows(for: transactionId)
