@@ -334,18 +334,44 @@ Completed
 
 ---
 
+# Sprint 25
+
+## Objective
+Strengthen account identity foundations by persisting institution attribution, preserving stable repository account IDs, preventing duplicate accounts for the current stable identity path and preparing the import pipeline for future format processing.
+
+## Status
+Completed
+
+## Outcome
+- Known import institutions now persist through `AccountDTO.institutionId`.
+- SQLite account upserts now ensure referenced institution rows exist before storing attributed accounts.
+- Repository account IDs remain unchanged and continue to use the existing stable ID components.
+- Account display names remain metadata-driven and do not participate in matching.
+- Restart hydration now restores account institution and transaction source bank from repository data.
+- Repeat imports using the same current stable identity do not create duplicate repository accounts.
+- ImportEngine now separates current CSV format processing from orchestration while preserving CSV analyzer, normalizer, parser selection, validation and persistence behavior.
+- No automatic account matching, verified-identifier matching service, PDF parsing, OCR, Import Wizard implementation, category engine, rules engine or database schema change was introduced.
+- TransactionListViewModel now initializes from the current runtime-store snapshot, preserving search/filter behavior and stabilizing full-suite validation against shared-store timing.
+- Xcode build passed.
+- Active Xcode test plan passed: 86 tests, 0 failures.
+- Implementation commit: `9424d5a`
+- Git push to `origin/main` completed successfully.
+- Local tracking ref note: remote push succeeded; sandbox could not update local `origin/main` ref lock under `.git`.
+
+---
+
 # Current Project State
 
 ## Repository
 - Primary Branch: `main`
-- Latest Commit: Sprint 24 completion commit
-- Latest Implementation Commit: `abbef6f`
+- Latest Commit: Sprint 25 implementation commit
+- Latest Implementation Commit: `9424d5a`
 - Latest Tag: `sprint-21`
 - Latest ADR: ADR-023 — Frozen UI/UX Architecture
-- Architecture Baseline: Sprint 24 plus UI/UX v1.0 Frozen
-- Latest Milestone: Persistence and UI Behaviour Stabilisation
+- Architecture Baseline: Sprint 25 plus UI/UX v1.0 Frozen
+- Latest Milestone: Account Identity & Import Foundation
 - Build: Passing
-- Validation: Build passing; full active validation passing. Sprint 24 validation complete.
+- Validation: Build passing; full active validation passing. Sprint 25 validation complete.
 
 ## Session Startup Order
 1. Project documents/.github/AGENTS.md
@@ -386,10 +412,10 @@ Dashboard
 
 ## Current Work
 
-Active Work: Sprint 24 complete; next work must be taken from the ACTIVE sprint in `Project documents/Implementation.md`.
+Active Work: Sprint 25 complete; next work must be taken from the ACTIVE sprint in `Project documents/Implementation.md`.
 
 Objective:
-- Stop at the approved Sprint 24 boundary after persistence and UI behaviour stabilisation.
+- Stop at the approved Sprint 25 boundary after account identity and import foundation work.
 
 Scope:
 - `Implementation.md` is the ChatGPT-owned sprint planning and workflow document.
@@ -407,14 +433,19 @@ Scope:
 - Preserve transaction search and credit/debit toggle behaviour.
 - Preserve the approved UI/UX v1.0 appearance.
 - Preserve durable SQLite startup persistence wiring.
+- Preserve stable repository account identifiers.
+- Preserve institution attribution through repository hydration.
 
 Out of Scope:
 - PDF support
 - OCR
-- Parser changes
+- Parser behaviour changes
 - Validation redesign
 - Repository redesign
 - Database schema changes
+- Automatic account matching
+- Concrete verified-identifier matching service
+- Import Wizard implementation
 - Transaction extraction changes
 - Analytics
 - Budgets
