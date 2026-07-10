@@ -82,7 +82,7 @@ Sprint 24 stabilised durable persistence and the verified UI behaviour defects w
 
 ## Commit And Push
 
-- Implementation commit: `37918c9`
+- Implementation commit: `abbef6f`
 - Push target: `origin/main`
 
 ## Manual Verification Notes
