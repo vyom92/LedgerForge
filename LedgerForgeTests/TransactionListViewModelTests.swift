@@ -14,11 +14,9 @@ struct TransactionListViewModelTests {
     @Test
     func searchTrimsWhitespaceAndMatchesDescriptionAccountAndBank() async throws {
         TransactionStore.shared.replaceTransactions([])
+        TransactionStore.shared.replaceTransactions(Self.sampleTransactions)
 
         let viewModel = TransactionListViewModel()
-
-        TransactionStore.shared.replaceTransactions(Self.sampleTransactions)
-        await waitForViewModelUpdate()
 
         viewModel.searchText = "  axis  "
         #expect(
@@ -46,11 +44,9 @@ struct TransactionListViewModelTests {
     @Test
     func creditAndDebitFiltersAreMutuallySafe() async throws {
         TransactionStore.shared.replaceTransactions([])
+        TransactionStore.shared.replaceTransactions(Self.sampleTransactions)
 
         let viewModel = TransactionListViewModel()
-
-        TransactionStore.shared.replaceTransactions(Self.sampleTransactions)
-        await waitForViewModelUpdate()
 
         viewModel.showOnlyCredits = true
         viewModel.showOnlyDebits = false
@@ -84,11 +80,9 @@ struct TransactionListViewModelTests {
     @Test
     func totalsUseAllRuntimeTransactions() async throws {
         TransactionStore.shared.replaceTransactions([])
+        TransactionStore.shared.replaceTransactions(Self.sampleTransactions)
 
         let viewModel = TransactionListViewModel()
-
-        TransactionStore.shared.replaceTransactions(Self.sampleTransactions)
-        await waitForViewModelUpdate()
 
         viewModel.searchText = "salary"
 

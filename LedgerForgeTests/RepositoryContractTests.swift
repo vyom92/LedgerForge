@@ -19,6 +19,26 @@ struct RepositoryContractTests {
         }
     }
 
+    @Test func accountRepositoryPreservesInstitutionAttribution() async throws {
+        try runForEachProvider { provider in
+            let fixture = try seedWorkspace(provider)
+            let attributed = AccountDTO(
+                id: "account-attributed",
+                workspaceId: fixture.workspaceId,
+                name: "Axis Bank INR",
+                institutionId: "Axis Bank",
+                accountType: "bank",
+                nativeCurrency: "INR",
+                description: "Attributed account",
+                createdAtISO: "2026-07-06T12:01:00Z"
+            )
+
+            #expect(try provider.accountRepo.upsertAccount(attributed) == attributed.id)
+            #expect(try provider.accountRepo.account(id: attributed.id) == attributed)
+            #expect(try provider.accountRepo.accounts(workspaceId: fixture.workspaceId) == [attributed])
+        }
+    }
+
     @Test func accountRepositoryCanListAccountsForWorkspace() async throws {
         try runForEachProvider { provider in
             let fixture = try seedWorkspace(provider)

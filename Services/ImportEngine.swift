@@ -18,6 +18,13 @@ struct ImportEngineResult: Equatable {
     }
 }
 
+private struct ImportFormatProcessingResult {
+    let document: Document
+    let metadata: DocumentMetadata
+    let normalizedRows: [NormalizedRow]
+    let parser: StatementParser?
+}
+
 final class ImportEngine {
 
     static let shared = ImportEngine()
@@ -69,19 +76,14 @@ final class ImportEngine {
 
             DocumentStore.shared.update(with: contents)
 
-            let metadata = InstitutionDetector().detect(from: contents)
+            let processedDocument = processCSVDocument(contents: contents, url: url)
+            let metadata = processedDocument.metadata
+            let document = processedDocument.document
 
             DeveloperConsole.shared.log("Detected Institution: \(metadata.institution.rawValue)")
             DeveloperConsole.shared.log("Document Type: \(metadata.documentType.rawValue)")
             DeveloperConsole.shared.log("Confidence: \(Int(metadata.confidence * 100))%")
             DeveloperConsole.shared.log("")
-
-            let analyzer = CSVAnalyzer()
-
-            let document = analyzer.analyze(
-                text: contents,
-                fileURL: url
-            )
 
             DeveloperConsole.shared.log("========== DOCUMENT ==========")
             DeveloperConsole.shared.log("File: \(document.filename)")
@@ -94,98 +96,12 @@ final class ImportEngine {
             DeveloperConsole.shared.log("==============================")
             DeveloperConsole.shared.log("")
 
-            let normalizer = CSVNormalizer()
-
-            let normalizedRows = normalizer.normalize(
-                text: contents,
-                document: document
-            )
+            let normalizedRows = processedDocument.normalizedRows
 
             DeveloperConsole.shared.log("Normalized Rows: \(normalizedRows.count)")
             DeveloperConsole.shared.log("")
 
-            if let parser = StatementParserRegistry.shared.parser(
-                for: document,
-                metadata: metadata
-            ) {
-
-                DeveloperConsole.shared.log("Selected Parser: \(parser.name)")
-
-                let normalizedDocument = NormalizedDocument(
-                    document: document,
-                    metadata: metadata,
-                    rows: normalizedRows
-                )
-
-                let financialDocument = try parser.parse(
-                    document: normalizedDocument
-                )
-
-                let validation = ImportValidator.validate(
-                    financialDocument: financialDocument
-                )
-
-                let importSession = ImportSession(
-                    fileName: document.filename,
-                    institution: metadata.institution,
-                    documentType: metadata.documentType,
-                    parserName: parser.name,
-                    transactionCount: financialDocument.transactions.count,
-                    validation: validation
-                )
-
-                // Replace transactions only for validated imports. TransactionStore is the single owner of imported transactions.
-                // ADR-010 requires validation before trusted state is updated.
-                var persistenceResult = ImportPersistenceResult.skipped
-                var persistenceErrorMessage: String?
-                if validation.passed {
-                    do {
-                        persistenceResult = try importPersistenceCoordinator.persistValidatedImport(
-                            financialDocument: financialDocument,
-                            importSession: importSession,
-                            validation: validation
-                        )
-                        if persistenceResult.persisted {
-                            DeveloperConsole.shared.log("Repository Persistence: COMPLETED")
-                        }
-                    } catch {
-                        DeveloperConsole.shared.log("Repository Persistence: FAILED")
-                        DeveloperConsole.shared.log(error.localizedDescription)
-                        persistenceErrorMessage = error.localizedDescription
-                    }
-
-                    await MainActor.run {
-                        TransactionStore.shared.replaceTransactions(financialDocument.transactions, validation: validation)
-                        AccountStore.shared.integrateImport(importSession: importSession, transactions: financialDocument.transactions)
-                    }
-
-                    DeveloperConsole.shared.log("Runtime Stores: UPDATED")
-                }
-
-                DeveloperConsole.shared.log("Transactions Parsed: \(financialDocument.transactions.count)")
-                DeveloperConsole.shared.log("Import Session Created")
-                DeveloperConsole.shared.log("Validation: \(validation.passed ? "PASSED" : "FAILED")")
-                DeveloperConsole.shared.log("Validation Issues: \(validation.issues.count)")
-                if !validation.issues.isEmpty {
-                    DeveloperConsole.shared.log("======== VALIDATION ISSUES ========")
-
-                    for issue in validation.issues {
-                        DeveloperConsole.shared.log(issue.message)
-                    }
-
-                    DeveloperConsole.shared.log("===================================")
-                }
-                DeveloperConsole.shared.log("File: \(importSession.fileName)")
-                return ImportEngineResult(
-                    fileName: importSession.fileName,
-                    transactionCount: financialDocument.transactions.count,
-                    validationPassed: validation.passed,
-                    persisted: persistenceResult.persisted,
-                    errorMessage: validation.passed ? persistenceErrorMessage : "Import validation failed."
-                )
-
-            } else {
-
+            guard let parser = processedDocument.parser else {
                 DeveloperConsole.shared.log("No suitable parser found.")
                 return ImportEngineResult(
                     fileName: document.filename,
@@ -194,8 +110,82 @@ final class ImportEngine {
                     persisted: false,
                     errorMessage: "No suitable parser found."
                 )
-
             }
+
+            DeveloperConsole.shared.log("Selected Parser: \(parser.name)")
+
+            let normalizedDocument = NormalizedDocument(
+                document: document,
+                metadata: metadata,
+                rows: normalizedRows
+            )
+
+            let financialDocument = try parser.parse(
+                document: normalizedDocument
+            )
+
+            let validation = ImportValidator.validate(
+                financialDocument: financialDocument
+            )
+
+            let importSession = ImportSession(
+                fileName: document.filename,
+                institution: metadata.institution,
+                documentType: metadata.documentType,
+                parserName: parser.name,
+                transactionCount: financialDocument.transactions.count,
+                validation: validation
+            )
+
+            // Replace transactions only for validated imports. TransactionStore is the single owner of imported transactions.
+            // ADR-010 requires validation before trusted state is updated.
+            var persistenceResult = ImportPersistenceResult.skipped
+            var persistenceErrorMessage: String?
+            if validation.passed {
+                do {
+                    persistenceResult = try importPersistenceCoordinator.persistValidatedImport(
+                        financialDocument: financialDocument,
+                        importSession: importSession,
+                        validation: validation
+                    )
+                    if persistenceResult.persisted {
+                        DeveloperConsole.shared.log("Repository Persistence: COMPLETED")
+                    }
+                } catch {
+                    DeveloperConsole.shared.log("Repository Persistence: FAILED")
+                    DeveloperConsole.shared.log(error.localizedDescription)
+                    persistenceErrorMessage = error.localizedDescription
+                }
+
+                await MainActor.run {
+                    TransactionStore.shared.replaceTransactions(financialDocument.transactions, validation: validation)
+                    AccountStore.shared.integrateImport(importSession: importSession, transactions: financialDocument.transactions)
+                }
+
+                DeveloperConsole.shared.log("Runtime Stores: UPDATED")
+            }
+
+            DeveloperConsole.shared.log("Transactions Parsed: \(financialDocument.transactions.count)")
+            DeveloperConsole.shared.log("Import Session Created")
+            DeveloperConsole.shared.log("Validation: \(validation.passed ? "PASSED" : "FAILED")")
+            DeveloperConsole.shared.log("Validation Issues: \(validation.issues.count)")
+            if !validation.issues.isEmpty {
+                DeveloperConsole.shared.log("======== VALIDATION ISSUES ========")
+
+                for issue in validation.issues {
+                    DeveloperConsole.shared.log(issue.message)
+                }
+
+                DeveloperConsole.shared.log("===================================")
+            }
+            DeveloperConsole.shared.log("File: \(importSession.fileName)")
+            return ImportEngineResult(
+                fileName: importSession.fileName,
+                transactionCount: financialDocument.transactions.count,
+                validationPassed: validation.passed,
+                persisted: persistenceResult.persisted,
+                errorMessage: validation.passed ? persistenceErrorMessage : "Import validation failed."
+            )
 
         } catch {
 
@@ -210,6 +200,33 @@ final class ImportEngine {
 
         }
 
+    }
+
+    private func processCSVDocument(contents: String, url: URL) -> ImportFormatProcessingResult {
+        let metadata = InstitutionDetector().detect(from: contents)
+        let analyzer = CSVAnalyzer()
+        let document = analyzer.analyze(
+            text: contents,
+            fileURL: url
+        )
+
+        let normalizer = CSVNormalizer()
+        let normalizedRows = normalizer.normalize(
+            text: contents,
+            document: document
+        )
+
+        let parser = StatementParserRegistry.shared.parser(
+            for: document,
+            metadata: metadata
+        )
+
+        return ImportFormatProcessingResult(
+            document: document,
+            metadata: metadata,
+            normalizedRows: normalizedRows,
+            parser: parser
+        )
     }
 
     private func readTextDocument(from url: URL) async throws -> String {

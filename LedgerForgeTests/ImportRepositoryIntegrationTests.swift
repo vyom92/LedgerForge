@@ -40,7 +40,7 @@ struct ImportRepositoryIntegrationTests {
             let storedAccount = try provider.accountRepo.account(id: accountId)
             let account = try #require(storedAccount)
             #expect(account.workspaceId == "workspace-import-integration")
-            #expect(account.institutionId == nil)
+            #expect(account.institutionId == "Axis Bank")
             #expect(account.accountType == "bank")
             #expect(account.nativeCurrency == "INR")
 
@@ -193,8 +193,10 @@ struct ImportRepositoryIntegrationTests {
         #expect(hydration.accountCount == 1)
         #expect(hydration.transactionCount == 2)
         #expect(AccountStore.shared.accounts.first?.name == "Axis Bank INR")
+        #expect(AccountStore.shared.accounts.first?.institution == "Axis Bank")
         #expect(TransactionStore.shared.transactions.count == 2)
         #expect(TransactionStore.shared.transactions.allSatisfy { !$0.account.contains(".csv") })
+        #expect(TransactionStore.shared.transactions.allSatisfy { $0.sourceBank == "Axis Bank" })
     }
 
     @Test func mapperUsesCleanAccountDisplayNameWithoutChangingStableAccountIdentity() async throws {
@@ -211,8 +213,45 @@ struct ImportRepositoryIntegrationTests {
         )
 
         #expect(payload.account.name == "Axis Bank INR")
+        #expect(payload.account.institutionId == "Axis Bank")
         #expect(!payload.account.name.localizedCaseInsensitiveContains(".csv"))
         #expect(payload.account.id == "account-workspace-import-integration-axis-bank-repository-integration-csv")
+    }
+
+    @Test func repeatImportFromSameStableIdentityDoesNotCreateDuplicateRepositoryAccounts() async throws {
+        try runForEachProvider { provider in
+            let firstFixture = makeValidFixture(
+                importSessionId: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
+            )
+            let secondFixture = makeValidFixture(
+                importSessionId: UUID(uuidString: "66666666-7777-8888-9999-000000000000")!
+            )
+            let coordinator = DefaultImportPersistenceCoordinator(
+                workspaceRepo: provider.workspaceRepo,
+                accountRepo: provider.accountRepo,
+                importSessionRepo: provider.importSessionRepo,
+                transactionRepo: provider.transactionRepo,
+                mapper: ImportPersistenceMapper(
+                    workspaceId: "workspace-import-integration",
+                    workspaceName: "Import Integration Workspace"
+                )
+            )
+
+            let firstResult = try coordinator.persistValidatedImport(
+                financialDocument: firstFixture.financialDocument,
+                importSession: firstFixture.importSession,
+                validation: firstFixture.validation
+            )
+            let secondResult = try coordinator.persistValidatedImport(
+                financialDocument: secondFixture.financialDocument,
+                importSession: secondFixture.importSession,
+                validation: secondFixture.validation
+            )
+
+            #expect(firstResult.accountId == secondResult.accountId)
+            #expect(try provider.accountRepo.accounts(workspaceId: "workspace-import-integration").count == 1)
+            #expect(try provider.accountRepo.accounts(workspaceId: "workspace-import-integration").first?.institutionId == "Axis Bank")
+        }
     }
 
 }
@@ -274,7 +313,10 @@ private func resetRuntimeStoresForImportIntegration() {
     TransactionStore.shared.replaceTransactions([])
 }
 
-private func makeValidFixture(currency: String = "INR") -> ImportRepositoryFixture {
+private func makeValidFixture(
+    currency: String = "INR",
+    importSessionId: UUID = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
+) -> ImportRepositoryFixture {
     let transactions = [
         makeTransaction(
             date: Date(timeIntervalSince1970: 1_804_896_000),
@@ -298,6 +340,7 @@ private func makeValidFixture(currency: String = "INR") -> ImportRepositoryFixtu
     let financialDocument = makeFinancialDocument(transactions: transactions)
     let validation = ImportValidator.validate(financialDocument: financialDocument)
     let importSession = makeImportSession(
+        id: importSessionId,
         transactionCount: transactions.count,
         validation: validation
     )
@@ -343,11 +386,12 @@ private func makeFinancialDocument(transactions: [Transaction]) -> FinancialDocu
 }
 
 private func makeImportSession(
+    id: UUID = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
     transactionCount: Int,
     validation: ImportValidationResult
 ) -> ImportSession {
     ImportSession(
-        id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
+        id: id,
         importedAt: Date(timeIntervalSince1970: 1_804_896_000),
         fileName: "repository-integration.csv",
         institution: .axis,

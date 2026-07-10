@@ -102,6 +102,7 @@ struct ImportPersistenceMapper {
         createdAtISO: String
     ) -> AccountDTO {
         let institutionName = importSession.institution?.rawValue ?? "Unknown"
+        let institutionId = Self.institutionId(for: importSession.institution)
         let accountName = Self.displayAccountName(
             institutionName: institutionName,
             documentType: importSession.documentType,
@@ -123,12 +124,20 @@ struct ImportPersistenceMapper {
             id: stableID(prefix: "account", components: [workspaceId, institutionName, importSession.fileName]),
             workspaceId: workspaceId,
             name: accountName,
-            institutionId: nil,
+            institutionId: institutionId,
             accountType: accountType,
             nativeCurrency: financialDocument.transactions.first?.currency ?? "INR",
             description: "Imported from \(importSession.fileName)",
             createdAtISO: createdAtISO
         )
+    }
+
+    private static func institutionId(for institution: Institution?) -> String? {
+        guard let institution, institution != .unknown else {
+            return nil
+        }
+
+        return institution.rawValue
     }
 
     static func displayAccountName(

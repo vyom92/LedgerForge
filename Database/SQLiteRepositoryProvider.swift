@@ -68,6 +68,8 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
     init(db: SQLiteDatabase) { self.db = db }
 
     func upsertAccount(_ account: AccountDTO) throws -> String {
+        try ensureInstitutionExists(id: account.institutionId, createdAtISO: account.createdAtISO)
+
         let now = account.createdAtISO
         let sql = "INSERT OR REPLACE INTO accounts (id, workspace_id, name, institution_id, account_type, native_currency, description, created_at, closed_at, created_from_import_session_id) VALUES (?,?,?,?,?,?,?,?,?,?);"
         try db.executePrepared(sql: sql, params: [account.id, account.workspaceId, account.name, account.institutionId ?? NSNull(), account.accountType ?? NSNull(), account.nativeCurrency, account.description ?? NSNull(), now, NSNull(), NSNull()])
@@ -104,6 +106,24 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
                 createdAtISO: row.string(at: 7) ?? ""
             )
         }
+    }
+
+    private func ensureInstitutionExists(id: String?, createdAtISO: String) throws {
+        guard let id, !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+
+        let code = id
+            .lowercased()
+            .map { character -> Character in
+                if character.isLetter || character.isNumber {
+                    return character
+                }
+                return "-"
+            }
+
+        let sql = "INSERT OR IGNORE INTO institutions (id, code, name, country, created_at) VALUES (?,?,?,?,?);"
+        try db.executePrepared(sql: sql, params: [id, String(code), id, NSNull(), createdAtISO])
     }
 }
 

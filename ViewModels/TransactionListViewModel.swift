@@ -21,6 +21,10 @@ final class TransactionListViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
+        transactions = TransactionStore.shared.transactions
+        validationPassed = TransactionStore.shared.lastValidation?.passed ?? false
+        validationIssues = TransactionStore.shared.lastValidation?.issues ?? []
+
         TransactionStore.shared.$transactions
             .receive(on: RunLoop.main)
             .sink { [weak self] tx in
