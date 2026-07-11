@@ -407,21 +407,48 @@ Completed
 
 ---
 
+# Sprint 28
+
+## Objective
+Implement the Confirmation-Gated Import Workflow by introducing an explicit review and confirmation boundary between validation and persistence.
+
+## Status
+Completed
+
+## Outcome
+- Confirmation-gated import workflow implemented.
+- Prepared import model implemented as the in-memory bridge between prepare, review and commit.
+- Prepare stage performs read, detection, classification, parser selection, parsing and validation without persistence, runtime-store updates or dashboard refresh.
+- Read-only import preview implemented in the Import Wizard.
+- Validation review implemented before persistence.
+- Explicit confirmation is required before persistence.
+- Validation failure cannot be persisted.
+- Cancellation discards prepared state and performs no writes, runtime-store updates or dashboard refresh.
+- Commit uses the prepared `FinancialDocument` and existing `ImportPersistenceCoordinator`.
+- Existing post-commit forced `RepositoryStoreHydrator` dashboard refresh preserved.
+- Existing Sprint 27 import outcome presentation preserved after commit.
+- Xcode build passed.
+- Active Xcode test plan passed: 94 tests, 0 failures.
+- Implementation commit: `262a07d`
+- Git push to `origin/main` completed successfully.
+
+---
+
 # Current Project State
 
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: 152ad12
+* Latest Implementation Commit: 262a07d
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-025 — Stable Financial Entity Identity
-* Architecture Baseline: Sprint 27 / UI_UX v1.0 Frozen
+* Architecture Baseline: Sprint 28 / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 27 — Import Outcome Visibility completed; awaiting review
-* Current Phase: Sprint 27 implementation complete
+* Current Sprint: Sprint 28 — Confirmation-Gated Import Workflow completed; awaiting review
+* Current Phase: Sprint 28 implementation complete
 * Build Status: Passing
-* Validation Status: Sprint 27 active Xcode test plan passed (89 tests, 0 failures)
+* Validation Status: Sprint 28 active Xcode test plan passed (94 tests, 0 failures)
 
 ## Bootstrap
 
@@ -482,18 +509,19 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 27 — Import Outcome Visibility completed; await review, archival and the next ACTIVE sprint in `Project documents/Implementation.md`.
+Active Work: Sprint 28 — Confirmation-Gated Import Workflow completed; await review, archival and the next ACTIVE sprint in `Project documents/Implementation.md`.
 
 Objective:
 
-* Import result panel now exposes validation and persistence outcomes from `ImportEngineResult`.
-* View Transactions is gated to successfully persisted imports.
-* Existing import execution and post-import hydration behaviour preserved.
+* Import Wizard now prepares statements for read-only preview and validation review before persistence.
+* Confirm Import is required before persistence begins.
+* Cancellation discards prepared in-memory state without writes, runtime-store updates or dashboard refresh.
+* Existing persistence path, post-import hydration and Sprint 27 outcome presentation are preserved after confirmation.
 
 Scope:
 
-* Sprint 27 was a UI presentation sprint.
-* No parser, reader, validation, repository, runtime store, SQLite or financial logic changes were made.
+* Sprint 28 was a workflow sprint.
+* No parser, reader, validation, repository contract, runtime store contract, SQLite schema or financial calculation changes were made.
 * `Project documents/Implementation.md` is the Desktop ChatGPT-owned sprint planning and workflow document.
 * Codex must never edit `Project documents/Implementation.md`.
 * `Project documents/Codex response.md` records the latest planning or execution report produced by the executing assistant.
@@ -530,4 +558,4 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Desktop ChatGPT review of Sprint 27, archival and preparation of the next ACTIVE sprint in `Project documents/Implementation.md`.
+* Desktop ChatGPT review of Sprint 28, archival and preparation of the next ACTIVE sprint in `Project documents/Implementation.md`.
