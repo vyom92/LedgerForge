@@ -66,8 +66,66 @@ private enum AppShellSection: String, CaseIterable {
 private enum ImportPresentationState: Equatable {
     case idle
     case importing(String)
-    case completed(fileName: String, transactionCount: Int)
+    case completed(ImportOutcomePresentation)
     case failed(fileName: String, message: String)
+}
+
+enum ImportOutcomeTone: Equatable {
+    case success
+    case warning
+    case danger
+
+    var color: Color {
+        switch self {
+        case .success:
+            return LFTheme.success
+        case .warning:
+            return LFTheme.warning
+        case .danger:
+            return LFTheme.danger
+        }
+    }
+}
+
+struct ImportOutcomePresentation: Equatable {
+    let fileName: String
+    let transactionCount: Int
+    let validationStatus: String
+    let persistenceStatus: String
+    let message: String?
+    let allowsViewingTransactions: Bool
+    let iconName: String
+    let tone: ImportOutcomeTone
+
+    init(result: ImportEngineResult) {
+        fileName = result.fileName
+        transactionCount = result.transactionCount
+        validationStatus = result.validationPassed ? "Validation Passed" : "Validation Failed"
+        allowsViewingTransactions = result.validationPassed && result.persisted
+        message = result.errorMessage?.isEmpty == false ? result.errorMessage : nil
+
+        if result.validationPassed && result.persisted {
+            persistenceStatus = "Persistence Succeeded"
+            iconName = "checkmark.circle.fill"
+            tone = .success
+        } else if result.validationPassed {
+            persistenceStatus = "Persistence Failed"
+            iconName = "exclamationmark.triangle.fill"
+            tone = .warning
+        } else {
+            persistenceStatus = "Not Persisted"
+            iconName = "xmark.octagon.fill"
+            tone = .danger
+        }
+    }
+
+    var fileSubtitle: String {
+        if allowsViewingTransactions {
+            return "Imported \(transactionCount) transaction(s)"
+        }
+
+        return "Processed \(transactionCount) transaction(s)"
+    }
 }
 
 struct ContentView: View {
@@ -1102,28 +1160,51 @@ struct ContentView: View {
                     icon: "hourglass",
                     color: LFTheme.warning
                 )
-            case .completed(let fileName, let transactionCount):
+            case .completed(let outcome):
                 VStack(alignment: .leading, spacing: 12) {
                     importedFileRow(
-                        name: fileName,
-                        subtitle: "Imported \(transactionCount) transaction(s)",
-                        icon: "checkmark.circle.fill",
-                        color: LFTheme.success
+                        name: outcome.fileName,
+                        subtitle: outcome.fileSubtitle,
+                        icon: outcome.iconName,
+                        color: outcome.tone.color
                     )
-                    Button {
-                        selectedSection = .transactions
-                    } label: {
-                        Label("View Transactions", systemImage: "list.bullet")
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .frame(maxWidth: .infinity)
-                            .background(LFTheme.primaryGradient)
+
+                    HStack(spacing: 8) {
+                        LFStatusBadge(
+                            title: outcome.validationStatus,
+                            color: outcome.validationStatus == "Validation Passed" ? LFTheme.success : LFTheme.danger
+                        )
+                        LFStatusBadge(title: outcome.persistenceStatus, color: outcome.tone.color)
+                    }
+
+                    LFInfoRow(title: "Transactions", value: "\(outcome.transactionCount)")
+
+                    if let message = outcome.message {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(LFTheme.textSecondary)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(LFTheme.surface)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white)
-                    .contentShape(RoundedRectangle(cornerRadius: 8))
+
+                    if outcome.allowsViewingTransactions {
+                        Button {
+                            selectedSection = .transactions
+                        } label: {
+                            Label("View Transactions", systemImage: "list.bullet")
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .frame(maxWidth: .infinity)
+                                .background(LFTheme.primaryGradient)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.white)
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                    }
                 }
             case .failed(let fileName, let message):
                 importedFileRow(
@@ -1139,7 +1220,7 @@ struct ContentView: View {
     private var importFooterAction: some View {
         Group {
             switch importState {
-            case .completed:
+            case .completed(let outcome) where outcome.allowsViewingTransactions:
                 Button {
                     selectedSection = .transactions
                 } label: {
@@ -1155,20 +1236,24 @@ struct ContentView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
             default:
-                Label("Preview step pending", systemImage: "arrow.right")
-                    .labelStyle(.titleAndIcon)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(LFTheme.textSecondary)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 13)
-                    .background(LFTheme.surface.opacity(0.65))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(LFTheme.border, lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                importFooterPendingAction
             }
         }
+    }
+
+    private var importFooterPendingAction: some View {
+        Label("Preview step pending", systemImage: "arrow.right")
+            .labelStyle(.titleAndIcon)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(LFTheme.textSecondary)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 13)
+            .background(LFTheme.surface.opacity(0.65))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(LFTheme.border, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private func settingsPendingRow(_ title: String, value: String, icon: String) -> some View {
@@ -1422,13 +1507,11 @@ struct ContentView: View {
     @MainActor
     private func runImport(from url: URL) async {
         let result = await ImportEngine.shared.importFileAndReturnResult(from: url)
+        let outcome = ImportOutcomePresentation(result: result)
         selectedFile = result.fileName
+        importState = .completed(outcome)
 
-        if result.succeeded {
-            importState = .completed(
-                fileName: result.fileName,
-                transactionCount: result.transactionCount
-            )
+        if outcome.allowsViewingTransactions {
             do {
                 let hydrationResult = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
                 dashboardViewModel.markHydrationCompleted(hydrationResult)
@@ -1437,11 +1520,6 @@ struct ContentView: View {
                 DeveloperConsole.shared.log("Dashboard Hydration Refresh: FAILED")
                 DeveloperConsole.shared.log(error.localizedDescription)
             }
-        } else {
-            importState = .failed(
-                fileName: result.fileName,
-                message: result.errorMessage ?? "Import failed."
-            )
         }
     }
 

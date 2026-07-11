@@ -1,8 +1,8 @@
-# Sprint 26 Implementation Report
+# Sprint 27 Implementation Report
 
 ## Summary
 
-Sprint 26 documentation alignment completed. Active workflow documentation now presents one bootstrap and ownership model centered on `Project documents/.github/Context_Manifest.yaml`, repository-root `AGENTS.md`, `Project documents/Project_Guide.md`, `Project documents/PROJECT_STATE.md` and the ACTIVE sprint only in `Project documents/Implementation.md`.
+Implemented Import Outcome Visibility in the existing import result panel. The panel now distinguishes validation and persistence outcomes using existing `ImportEngineResult` data and shared LedgerForge UI components.
 
 ## Bootstrap Documents Reviewed
 
@@ -10,107 +10,85 @@ Sprint 26 documentation alignment completed. Active workflow documentation now p
 - `AGENTS.md`
 - `Project documents/Project_Guide.md`
 - `Project documents/PROJECT_STATE.md`
-- `Project documents/Implementation.md` ACTIVE Sprint 26 section only
+- `Project documents/Implementation.md` ACTIVE Sprint 27 section only
 
-## Additional Documents Reviewed
+## Additional Files Reviewed
 
-- `Project documents/AI_WORKFLOW.md`
-- `Project documents/.github/Project_Context.md`
-- `Project documents/.github/prompts.md`
-- `Project documents/BUILD_AND_PROJECT_CONVENTIONS.md`
-- `Project documents/Engineering Standards.md`
+- `ContentView.swift`
+- `Services/ImportEngine.swift`
+- `Views/Common/LFStatusBadge.swift`
+- `Views/Common/LFInfoRow.swift`
+- Existing LedgerForge test files for Swift Testing style and project membership pattern
+
+## Sprint Objective
+
+Expose verified import outcome information already available from `ImportEngineResult` in the existing Import Result panel without changing import execution, validation, persistence, repository or hydration semantics.
 
 ## Files Modified
 
-- `AGENTS.md`
-- `Project documents/.github/Context_Manifest.yaml`
-- `Project documents/.github/Project_Context.md`
-- `Project documents/.github/prompts.md`
-- `Project documents/AI_WORKFLOW.md`
-- `Project documents/BUILD_AND_PROJECT_CONVENTIONS.md`
-- `Project documents/Engineering Standards.md`
+- `ContentView.swift`
+- `LedgerForgeTests/ImportOutcomePresentationTests.swift`
 - `Project documents/PROJECT_STATE.md`
-- `Project documents/Project_Guide.md`
 - `Project documents/Codex response.md`
 
-## Documentation Corrections Completed
+## Implementation Completed
 
-Corrected bootstrap ordering, assistant ownership wording, authoritative AGENTS location, ADR currency, Sprint 25/Sprint 26 status metadata, Project Guide paths and manifest scope. Removed volatile repository state from `Project documents/.github/Context_Manifest.yaml` so verified facts remain in `Project documents/PROJECT_STATE.md`.
+- Added `ImportOutcomePresentation` mapping for `ImportEngineResult`.
+- Added validation status presentation: `Validation Passed` and `Validation Failed`.
+- Added persistence status presentation: `Persistence Succeeded`, `Persistence Failed` and `Not Persisted`.
+- Updated the existing import result panel to show filename, transaction count, status badges and existing error text.
+- Preserved the existing View Transactions action and gated it to successful validation plus persistence only.
+- Preserved forced `RepositoryStoreHydrator` refresh after successful persisted imports.
+- Added focused automated coverage for successful import, validation failure and persistence failure presentation mapping.
 
-## Repository-Wide Consistency Validation
+## Validation
 
-Required searches were run for `Context_Manifest`, `AGENTS.md`, `.github/AGENTS.md`, `Project_Guide`, `PROJECT_STATE`, `Implementation.md`, `ADR-023`, `ADR-024`, `ADR-025`, `Sprint 25`, `Sprint 26`, `M7`, `Dashboard Experience`, `Desktop ChatGPT`, `ChatGPT in Xcode`, `Codex` and `Frozen`.
+### Build
 
-### Bootstrap Order
+Passed. Xcode `BuildProject` completed successfully.
 
-Passed. Active workflow documentation now uses the approved bootstrap order: `Project documents/.github/Context_Manifest.yaml`, root `AGENTS.md`, `Project documents/Project_Guide.md`, `Project documents/PROJECT_STATE.md`, then the ACTIVE sprint only in `Project documents/Implementation.md`.
+### Tests
 
-### AGENTS.md Location
+Passed. Xcode active test plan `TestPlan` completed with 89 tests passed, 0 failed, 0 skipped.
 
-Passed. Root `AGENTS.md` is confirmed as authoritative. No active documentation requires `Project documents/.github/AGENTS.md`.
+Focused Sprint 27 tests passed:
 
-### ADR Currency
+- `ImportOutcomePresentationTests/successfulImportShowsValidationAndPersistenceSuccess()`
+- `ImportOutcomePresentationTests/validationFailureShowsNotPersistedAndHidesTransactionsAction()`
+- `ImportOutcomePresentationTests/persistenceFailureShowsValidationPassedAndHidesTransactionsAction()`
 
-Passed. Active status documentation identifies ADR-025 as current. ADR-023 and ADR-024 remain only as historical ADR records or chronology.
+### Manual Verification
 
-### Sprint State
+Verified by reviewing the `ContentView.swift` rendering paths after build and test validation:
 
-Passed. Sprint 25 remains the verified implementation baseline. Sprint 26 is recorded as completed documentation alignment with no source, test, project, database or asset changes.
+- Successful persisted results display validation success, persistence success and View Transactions.
+- Validation failures display validation failure, Not Persisted and no View Transactions.
+- Persistence failures display validation success, persistence failure and no View Transactions.
 
-### Assistant Ownership
+## Architecture Verification
 
-Passed. Desktop ChatGPT owns architecture, planning, documentation review, sprint planning and `Project documents/Implementation.md`. ChatGPT in Xcode owns approved documentation execution and repository-aware documentation search. Codex owns approved Swift implementation, validation, commits, pushes and the two handoff documents.
-
-### Document Responsibility Boundaries
-
-Passed. `Project documents/.github/Context_Manifest.yaml` is bootstrap/routing only, `Project documents/PROJECT_STATE.md` records verified facts, `Project documents/Implementation.md` remains planner-owned sprint definition and `Project documents/Codex response.md` records the latest execution report.
-
-### Frozen Documents
-
-Passed. Frozen architecture and UI documents were not modified.
-
-### Milestone Naming
-
-Passed. Active milestone naming remains M7 — Dashboard Experience.
-
-### Repository Paths
-
-Passed. Ambiguous active workflow references were normalized to complete repository paths where required.
-
-## Source and Project File Verification
-
-Passed. `git diff --name-only` contains only approved documentation files. No Swift source, tests, Xcode project files, database files or assets changed. `Project documents/Implementation.md` is unchanged.
-
-## Build Result
-
-Not rerun. Sprint 26 is documentation-only and no source, test, project, database or asset file changed. Build status remains the last verified Sprint 25 build status: passing.
-
-## Test Result
-
-Not rerun. Sprint 26 is documentation-only and no test-affecting file changed. Test status remains the last verified Sprint 25 result: 86 tests, 0 failures.
+Passed. No repository API, runtime store contract, SQLite access, validation logic, parser, reader, normalizer, financial calculation or persistence behaviour was changed. The approved Repository → RepositoryStoreHydrator → Runtime Stores → ViewModels → Views boundary remains intact.
 
 ## Git Diff Verification
 
-Passed. Diff reviewed before commit. Only approved documentation files are modified, and no unresolved merge conflict markers remain.
+Pending final pre-commit review.
 
 ## Commit
 
-Documentation alignment commit: `70a8cc1`.
+Pending.
 
 ## Push Result
 
-Git push to `origin/main` completed successfully.
-
-Local tracking ref note: remote push succeeded; sandbox could not update local `origin/main` ref lock under `.git`.
+Pending.
 
 ## Remaining Required Issues
 
 None.
 
-## Recommended Follow-Up
+## Recommended Follow-up
 
-Desktop ChatGPT should review this report, archive Sprint 26 and prepare the next ACTIVE sprint in `Project documents/Implementation.md`.
+Desktop ChatGPT should review Sprint 27, archive it and prepare the next ACTIVE sprint in `Project documents/Implementation.md`.
 
-## Sprint 26 Completion Status
+## Sprint 27 Completion Status
 
-Completed. Documentation alignment commit `70a8cc1` was pushed to `origin/main`.
+Implementation and validation completed. Commit and push are pending.

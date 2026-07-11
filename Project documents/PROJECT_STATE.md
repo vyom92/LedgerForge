@@ -383,21 +383,44 @@ Completed
 
 ---
 
+# Sprint 27
+
+## Objective
+Make import outcomes explicit in the existing import result panel by showing verified validation and persistence states without changing the import pipeline, financial behaviour or repository architecture.
+
+## Status
+Completed
+
+## Outcome
+- Import Outcome Visibility implemented in the existing import result panel.
+- Successful imports show filename, transaction count, Validation Passed, Persistence Succeeded and View Transactions.
+- Validation failures show filename, transaction count where available, Validation Failed, Not Persisted and the existing error message.
+- Persistence failures show filename, transaction count, Validation Passed, Persistence Failed and the existing error message.
+- View Transactions is available only after successful validation and persistence.
+- Existing import execution, validation-before-persistence, repository boundaries and post-import hydration behaviour preserved.
+- Focused import outcome presentation coverage added.
+- Xcode build passed.
+- Active Xcode test plan passed: 89 tests, 0 failures.
+- Implementation commit: `PENDING`
+- Git push to `origin/main`: pending.
+
+---
+
 # Current Project State
 
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: 9424d5a
+* Latest Implementation Commit: PENDING
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-025 — Stable Financial Entity Identity
-* Architecture Baseline: Sprint 25 / UI_UX v1.0 Frozen
+* Architecture Baseline: Sprint 27 / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 26 — Documentation Alignment & Bootstrap Manifest Adoption completed; awaiting next ACTIVE sprint
-* Current Phase: Awaiting Sprint 26 archival and next ACTIVE sprint
+* Current Sprint: Sprint 27 — Import Outcome Visibility completed; awaiting review
+* Current Phase: Sprint 27 implementation complete
 * Build Status: Passing
-* Validation Status: Sprint 25 validation complete (86 tests passing). Sprint 26 documentation consistency validation complete.
+* Validation Status: Sprint 27 active Xcode test plan passed (89 tests, 0 failures)
 
 ## Bootstrap
 
@@ -458,32 +481,25 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 26 documentation alignment completed; await the next ACTIVE sprint in `Project documents/Implementation.md`.
+Active Work: Sprint 27 — Import Outcome Visibility completed; await review, archival and the next ACTIVE sprint in `Project documents/Implementation.md`.
 
 Objective:
 
-* Documentation bootstrap and workflow alignment completed.
-* Root `AGENTS.md` confirmed as authoritative.
-* Active documentation aligned through ADR-025.
-* Sprint 25 remains the verified implementation baseline.
-* Preserve the verified Sprint 25 build and test status until a future sprint reruns validation.
+* Import result panel now exposes validation and persistence outcomes from `ImportEngineResult`.
+* View Transactions is gated to successfully persisted imports.
+* Existing import execution and post-import hydration behaviour preserved.
 
 Scope:
 
-* Sprint 26 is documentation-only.
-* No source code, project files, database files or tests may be modified.
+* Sprint 27 was a UI presentation sprint.
+* No parser, reader, validation, repository, runtime store, SQLite or financial logic changes were made.
 * `Project documents/Implementation.md` is the Desktop ChatGPT-owned sprint planning and workflow document.
-* Xcode GPT may apply exact approved documentation wording.
 * Codex must never edit `Project documents/Implementation.md`.
 * `Project documents/Codex response.md` records the latest planning or execution report produced by the executing assistant.
 * `Project documents/PROJECT_STATE.md` records verified repository facts only.
 * `Project documents/.github/Context_Manifest.yaml` is the bootstrap manifest and routing document, not a repository state database.
 * Only the ACTIVE sprint block in `Project documents/Implementation.md` should be read during sprint execution.
 * Archived sprint blocks in `Project documents/Implementation.md` are historical reference only.
-* Approved UI assets live under Project documents/UI Assets/Approved/.
-* DesignBoard_v2.0.png is the master UI reference.
-* Individual approved assets define screen-level implementation details.
-* AppIcon_v1.0.png is the approved application icon reference.
 * Preserve RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
 * Preserve import, parser, validation and repository semantics.
 * Preserve transaction search and credit/debit toggle behaviour.
@@ -494,8 +510,6 @@ Scope:
 
 Out of Scope:
 
-* Source-code changes
-* Test changes
 * PDF support
 * OCR
 * Parser behaviour changes
@@ -515,4 +529,4 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Prepare the next ACTIVE sprint in `Project documents/Implementation.md`.
+* Desktop ChatGPT review of Sprint 27, archival and preparation of the next ACTIVE sprint in `Project documents/Implementation.md`.
