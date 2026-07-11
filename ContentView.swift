@@ -63,11 +63,25 @@ private enum AppShellSection: String, CaseIterable {
     }
 }
 
-private enum ImportPresentationState: Equatable {
+private enum ImportPresentationState {
     case idle
-    case importing(String)
+    case preparing(String)
+    case previewReady(PreparedImport)
+    case validationFailed(PreparedImport)
+    case committing(PreparedImport)
     case completed(ImportOutcomePresentation)
     case failed(fileName: String, message: String)
+}
+
+private extension ImportPresentationState {
+    var isTerminal: Bool {
+        switch self {
+        case .completed, .failed:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 enum ImportOutcomeTone: Equatable {
@@ -171,10 +185,10 @@ struct ContentView: View {
             switch result {
             case .success(let url):
                 selectedFile = url.lastPathComponent
-                importState = .importing(url.lastPathComponent)
+                importState = .preparing(url.lastPathComponent)
                 selectedSection = .imports
                 Task {
-                    await runImport(from: url)
+                    await prepareImport(from: url)
                 }
 
             case .failure(let error):
@@ -434,9 +448,9 @@ struct ContentView: View {
             HStack(alignment: .top, spacing: 18) {
                 LFPanel {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Upload Files")
+                        Text("Prepare Statement")
                             .font(.title3.weight(.semibold))
-                        Text("Supported formats in the current implementation: CSV and spreadsheet exports.")
+                        Text("Choose a file, review the parsed statement and confirm before LedgerForge writes financial data.")
                             .font(.subheadline)
                             .foregroundStyle(LFTheme.textSecondary)
 
@@ -469,22 +483,23 @@ struct ContentView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .disabled(importSelectionDisabled)
 
                         importResultPanel
 
                         HStack(spacing: 10) {
                             Image(systemName: "info.circle")
-                                .foregroundStyle(LFTheme.warning)
-                            Text("Preview, validation and step-by-step review are visual placeholders until a future Import Wizard sprint.")
+                                .foregroundStyle(LFTheme.info)
+                            Text("No data is written until Confirm Import is selected.")
                                 .font(.caption)
                                 .foregroundStyle(LFTheme.textSecondary)
                             Spacer()
                         }
                         .padding(12)
-                        .background(LFTheme.warning.opacity(0.08))
+                        .background(LFTheme.info.opacity(0.08))
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
-                                .stroke(LFTheme.warning.opacity(0.25), lineWidth: 1)
+                                .stroke(LFTheme.info.opacity(0.25), lineWidth: 1)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 8))
 
@@ -504,43 +519,24 @@ struct ContentView: View {
 
                 LFPanel {
                     VStack(alignment: .leading, spacing: 18) {
-                        Text("Import Options")
+                        Text("Validation Review")
                             .font(.title3.weight(.semibold))
 
-                        settingsPendingRow("File Password", value: "Resolved by password provider", icon: "lock")
-                        settingsPendingRow("Date Format", value: "DD MMM YYYY", icon: "calendar")
-                        settingsPendingRow("Duplicate Handling", value: "Skip duplicates", icon: "rectangle.on.rectangle")
-                        settingsPendingRow("Create / Link Accounts", value: "Automatically link", icon: "link")
-                        settingsPendingRow("Category Detection", value: "Future rules module", icon: "sparkles")
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Label("Smart Detection", systemImage: "star")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(LFTheme.primaryHover)
-                            Text("Institution detection, statement classification and parser selection remain deterministic and local.")
-                                .font(.caption)
-                                .foregroundStyle(LFTheme.textSecondary)
-                        }
-                        .padding(14)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(LFTheme.primary.opacity(0.10))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(LFTheme.primary.opacity(0.35), lineWidth: 1)
-                        )
+                        validationReviewPanel
                     }
                 }
             }
 
             HStack {
                 Button("Cancel") {
-                    selectedSection = .dashboard
+                    cancelPreparedImport()
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 42)
                 .padding(.vertical, 13)
                 .background(LFTheme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                .disabled(importState.isTerminal)
 
                 Spacer()
 
@@ -873,13 +869,13 @@ struct ContentView: View {
 
     private var importStepper: some View {
         HStack(spacing: 14) {
-            wizardStep(1, title: "Select Files", subtitle: "Choose files to import", active: importStep >= 1)
+            wizardStep(1, title: "Choose File", subtitle: "Select statement", active: importStep >= 1)
             stepLine(active: importStep >= 2)
-            wizardStep(2, title: "Detect & Review", subtitle: "Detect institution", active: importStep >= 2)
-            stepLine(active: false)
-            wizardStep(3, title: "Map & Validate", subtitle: "Pending", active: false)
-            stepLine(active: false)
-            wizardStep(4, title: "Preview", subtitle: "Pending", active: false)
+            wizardStep(2, title: "Prepare", subtitle: "Read and validate", active: importStep >= 2)
+            stepLine(active: importStep >= 3)
+            wizardStep(3, title: "Preview", subtitle: "Read-only review", active: importStep >= 3)
+            stepLine(active: importStep >= 4)
+            wizardStep(4, title: "Confirm", subtitle: "Explicit commit", active: importStep >= 4)
             stepLine(active: importStep >= 5)
             wizardStep(5, title: "Import", subtitle: "Complete import", active: importStep >= 5)
         }
@@ -890,12 +886,25 @@ struct ContentView: View {
         switch importState {
         case .idle:
             return 1
-        case .importing:
+        case .preparing:
             return 2
+        case .previewReady, .validationFailed:
+            return 3
+        case .committing:
+            return 4
         case .completed:
             return 5
         case .failed:
             return 2
+        }
+    }
+
+    private var importSelectionDisabled: Bool {
+        switch importState {
+        case .preparing, .committing:
+            return true
+        default:
+            return false
         }
     }
 
@@ -1153,13 +1162,19 @@ struct ContentView: View {
                     icon: "doc.text",
                     color: LFTheme.info
                 )
-            case .importing(let fileName):
-                importedFileRow(
-                    name: fileName,
-                    subtitle: "Import running through the current pipeline",
-                    icon: "hourglass",
-                    color: LFTheme.warning
-                )
+            case .preparing(let fileName):
+                VStack(alignment: .leading, spacing: 12) {
+                    importedFileRow(
+                        name: fileName,
+                        subtitle: "Preparing read-only preview",
+                        icon: "hourglass",
+                        color: LFTheme.warning
+                    )
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            case .previewReady(let preparedImport), .validationFailed(let preparedImport), .committing(let preparedImport):
+                preparedImportPreview(preparedImport)
             case .completed(let outcome):
                 VStack(alignment: .leading, spacing: 12) {
                     importedFileRow(
@@ -1217,9 +1232,99 @@ struct ContentView: View {
         }
     }
 
+    private func preparedImportPreview(_ preparedImport: PreparedImport) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            importedFileRow(
+                name: preparedImport.fileName,
+                subtitle: preparedImport.validation.passed ? "Prepared for confirmation" : "Validation failed before persistence",
+                icon: preparedImport.validation.passed ? "doc.text.magnifyingglass" : "xmark.octagon.fill",
+                color: preparedImport.validation.passed ? LFTheme.success : LFTheme.danger
+            )
+
+            HStack(spacing: 8) {
+                LFStatusBadge(title: preparedImport.detectedInstitution.rawValue, color: LFTheme.primary)
+                LFStatusBadge(title: preparedImport.detectedDocumentType.rawValue, color: LFTheme.info)
+                LFStatusBadge(title: preparedImport.parserName, color: LFTheme.textSecondary)
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                LFInfoRow(title: "Transactions", value: "\(preparedImport.transactionCount)")
+                LFInfoRow(title: "Currency", value: preparedImport.detectedCurrency ?? "Unknown")
+                LFInfoRow(title: "Account", value: preparedImport.accountMetadata ?? "Unknown")
+                LFInfoRow(title: "Statement Period", value: statementPeriodText(preparedImport.statementPeriod))
+                LFInfoRow(title: "Opening Balance", value: balanceText(preparedImport.validation.openingBalance, currency: preparedImport.detectedCurrency))
+                LFInfoRow(title: "Closing Balance", value: balanceText(preparedImport.validation.closingBalance, currency: preparedImport.detectedCurrency))
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Transaction Preview")
+                    .font(.subheadline.weight(.semibold))
+                tableHeader(["Date", "Description", "Currency", "Type", "Amount", "Balance"])
+                ForEach(preparedImport.financialDocument.transactions.prefix(12)) { transaction in
+                    previewTransactionRow(transaction)
+                }
+            }
+            .padding(12)
+            .background(LFTheme.surface.opacity(0.55))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    private func previewTransactionRow(_ transaction: Transaction) -> some View {
+        HStack(spacing: 14) {
+            Text(formatDate(transaction.date))
+                .frame(width: 84, alignment: .leading)
+            Text(transaction.description)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(transaction.currency)
+                .foregroundStyle(LFTheme.textSecondary)
+                .frame(width: 92, alignment: .leading)
+            Text(transaction.credit != nil ? "Credit" : "Debit")
+                .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
+                .frame(width: 68, alignment: .leading)
+            Text(formatSignedCurrency(transaction.amount, isCredit: transaction.credit != nil))
+                .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
+                .monospacedDigit()
+                .frame(width: 112, alignment: .trailing)
+            Text(balanceText(transaction.balance, currency: transaction.currency))
+                .foregroundStyle(LFTheme.textSecondary)
+                .monospacedDigit()
+                .frame(width: 86, alignment: .trailing)
+        }
+        .font(.caption)
+        .padding(.vertical, 8)
+    }
+
     private var importFooterAction: some View {
         Group {
             switch importState {
+            case .previewReady(let preparedImport):
+                Button {
+                    Task {
+                        await confirmPreparedImport(preparedImport)
+                    }
+                } label: {
+                    Label("Confirm Import", systemImage: "checkmark.circle")
+                        .labelStyle(.titleAndIcon)
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 13)
+                        .frame(minWidth: 180)
+                        .background(LFTheme.primaryGradient)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+            case .committing:
+                Label("Importing", systemImage: "hourglass")
+                    .labelStyle(.titleAndIcon)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(LFTheme.textSecondary)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 13)
+                    .background(LFTheme.surface.opacity(0.65))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             case .completed(let outcome) where outcome.allowsViewingTransactions:
                 Button {
                     selectedSection = .transactions
@@ -1241,8 +1346,67 @@ struct ContentView: View {
         }
     }
 
+    private var validationReviewPanel: some View {
+        Group {
+            switch importState {
+            case .previewReady(let preparedImport), .validationFailed(let preparedImport), .committing(let preparedImport):
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 8) {
+                        LFStatusBadge(
+                            title: preparedImport.validation.passed ? "Validation Passed" : "Validation Failed",
+                            color: preparedImport.validation.passed ? LFTheme.success : LFTheme.danger
+                        )
+                        LFStatusBadge(
+                            title: "\(preparedImport.validation.issues.count) issue(s)",
+                            color: preparedImport.validation.issues.isEmpty ? LFTheme.success : LFTheme.warning
+                        )
+                    }
+
+                    LFInfoRow(title: "Rows Read", value: "\(preparedImport.validation.rowsRead)")
+                    LFInfoRow(title: "Transactions Parsed", value: "\(preparedImport.validation.transactionsParsed)")
+                    LFInfoRow(title: "Debit Total", value: balanceText(preparedImport.validation.debitTotal, currency: preparedImport.detectedCurrency))
+                    LFInfoRow(title: "Credit Total", value: balanceText(preparedImport.validation.creditTotal, currency: preparedImport.detectedCurrency))
+
+                    Text("No data has been written.")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(LFTheme.info)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(LFTheme.info.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    if preparedImport.validation.issues.isEmpty {
+                        LFCompactEmptyState(message: "No validation issues")
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Validation Issues")
+                                .font(.subheadline.weight(.semibold))
+                            ForEach(preparedImport.validation.issues) { issue in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: validationIssueIcon(issue.severity))
+                                        .foregroundStyle(validationIssueColor(issue.severity))
+                                        .frame(width: 18)
+                                    Text(issue.message)
+                                        .font(.caption)
+                                        .foregroundStyle(LFTheme.textSecondary)
+                                }
+                            }
+                        }
+                    }
+                }
+            default:
+                VStack(alignment: .leading, spacing: 12) {
+                    settingsPendingRow("File Password", value: "Resolved by password provider", icon: "lock")
+                    settingsPendingRow("Date Format", value: "DD MMM YYYY", icon: "calendar")
+                    settingsPendingRow("Duplicate Handling", value: "Existing repository path", icon: "rectangle.on.rectangle")
+                    settingsPendingRow("Create / Link Accounts", value: "Existing persistence mapper", icon: "link")
+                }
+            }
+        }
+    }
+
     private var importFooterPendingAction: some View {
-        Label("Preview step pending", systemImage: "arrow.right")
+        Label("Awaiting confirmation", systemImage: "arrow.right")
             .labelStyle(.titleAndIcon)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(LFTheme.textSecondary)
@@ -1505,8 +1669,27 @@ struct ContentView: View {
     }
 
     @MainActor
-    private func runImport(from url: URL) async {
-        let result = await ImportEngine.shared.importFileAndReturnResult(from: url)
+    private func prepareImport(from url: URL) async {
+        do {
+            let preparedImport = try await ImportEngine.shared.prepareImport(from: url)
+            selectedFile = preparedImport.fileName
+            importState = preparedImport.validation.passed ? .previewReady(preparedImport) : .validationFailed(preparedImport)
+        } catch {
+            selectedFile = url.lastPathComponent
+            importState = .failed(fileName: url.lastPathComponent, message: error.localizedDescription)
+            DeveloperConsole.shared.log("ERROR: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    private func confirmPreparedImport(_ preparedImport: PreparedImport) async {
+        guard case .previewReady(let currentPreparedImport) = importState,
+              currentPreparedImport.id == preparedImport.id else {
+            return
+        }
+
+        importState = .committing(preparedImport)
+        let result = await ImportEngine.shared.commitPreparedImport(preparedImport)
         let outcome = ImportOutcomePresentation(result: result)
         selectedFile = result.fileName
         importState = .completed(outcome)
@@ -1520,6 +1703,47 @@ struct ContentView: View {
                 DeveloperConsole.shared.log("Dashboard Hydration Refresh: FAILED")
                 DeveloperConsole.shared.log(error.localizedDescription)
             }
+        }
+    }
+
+    private func cancelPreparedImport() {
+        selectedFile = "No statement imported"
+        importState = .idle
+        selectedSection = .dashboard
+    }
+
+    private func statementPeriodText(_ period: ClosedRange<Date>?) -> String {
+        guard let period else { return "Unknown" }
+        if period.lowerBound == period.upperBound {
+            return formatDate(period.lowerBound)
+        }
+        return "\(formatDate(period.lowerBound)) - \(formatDate(period.upperBound))"
+    }
+
+    private func balanceText(_ value: Decimal?, currency: String?) -> String {
+        guard let value else { return "Unknown" }
+        return formatCurrency(value, currencyCode: currency ?? "INR")
+    }
+
+    private func validationIssueIcon(_ severity: ValidationSeverity) -> String {
+        switch severity {
+        case .info:
+            return "info.circle"
+        case .warning:
+            return "exclamationmark.triangle"
+        case .error:
+            return "xmark.octagon"
+        }
+    }
+
+    private func validationIssueColor(_ severity: ValidationSeverity) -> Color {
+        switch severity {
+        case .info:
+            return LFTheme.info
+        case .warning:
+            return LFTheme.warning
+        case .error:
+            return LFTheme.danger
         }
     }
 
