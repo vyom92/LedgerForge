@@ -205,9 +205,9 @@ PASS / FAIL
 Read:
 
 - `Project documents/.github/Context_Manifest.yaml`
-- `Project_Guide.md`
-- `PROJECT_STATE.md`
-- `Implementation.md` (ACTIVE sprint only)
+- `Project documents/Project_Guide.md`
+- `Project documents/PROJECT_STATE.md`
+- `Project documents/Implementation.md` (ACTIVE sprint only)
 
 Produce:
 

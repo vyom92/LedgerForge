@@ -121,7 +121,7 @@ Before implementation:
 1. Bootstrap using:
    - `Project documents/.github/Context_Manifest.yaml`
    - `AGENTS.md`
-   - `Project_Guide.md`
+   - `Project documents/Project_Guide.md`
    - `Project documents/PROJECT_STATE.md`
    - `Project documents/Implementation.md` (ACTIVE sprint only)
 2. Use the Task Routing Guide to identify any additional documentation required.
@@ -161,8 +161,8 @@ A task is complete only when:
 - The feature has been manually verified.
 - Approved reference fixtures continue producing identical financial truth.
 - Documentation is updated if architecture changed.
-- `PROJECT_STATE.md` reflects the current repository state.
-- `Codex response.md` records the completed planning or implementation cycle.
+- `Project documents/PROJECT_STATE.md` reflects the current repository state.
+- `Project documents/Codex response.md` records the completed planning or implementation cycle.
 - The implementation follows Product Vision and Architecture.
 
 ---
@@ -221,8 +221,8 @@ The code should make adding the next financial institution easier than adding th
 
 - Never assume statement layouts.
 - Always request reference documents when required.
-- Read only the ACTIVE sprint in `Implementation.md`.
-- Never modify `Implementation.md`.
+- Read only the ACTIVE sprint in `Project documents/Implementation.md`.
+- Never modify `Project documents/Implementation.md`.
 - Archived sprint sections are historical reference only.
 - Never invent financial rules.
 - Verify the filename in the header comment before editing.

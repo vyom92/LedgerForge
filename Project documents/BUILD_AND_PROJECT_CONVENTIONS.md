@@ -6,13 +6,13 @@ This document defines the project conventions that are not architectural decisio
 
 It complements:
 
-- Product Vision.md
-- Architecture_v1.0_Frozen.md
-- ADR.md
-- Engineering Standards.md
-- Project_Guide.md
-- AI_WORKFLOW.md
-- Implementation.md
+- Project documents/Product Vision.md
+- Project documents/Architecture_v1.0_Frozen.md
+- Project documents/ADR.md
+- Project documents/Engineering Standards.md
+- Project documents/Project_Guide.md
+- Project documents/AI_WORKFLOW.md
+- Project documents/Implementation.md
 
 This document focuses on build mechanics, Xcode project management, validation workflow and repository hygiene.
 
@@ -121,7 +121,7 @@ AI workflow prompt and context files live under:
 
 `Project documents/.github/`
 
-Root-level AI workflow documentation was intentionally relocated so all project guidance lives within the project documentation hierarchy.
+The repository-root `AGENTS.md` remains the authoritative agent bootstrap file. Project-specific prompt and context files live under `Project documents/.github/`.
 
 ---
 
@@ -132,13 +132,14 @@ Workflow v2.1 is the approved LedgerForge development workflow.
 Authoritative workflow documents:
 
 1. `Project documents/.github/Context_Manifest.yaml`
-2. `Project documents/AI_WORKFLOW.md`
+2. `AGENTS.md`
 3. `Project documents/Project_Guide.md`
+4. `Project documents/AI_WORKFLOW.md`
 
 Workflow responsibilities:
 
 - Desktop ChatGPT owns the content and approval of `Project documents/Implementation.md`.
-- ChatGPT in Xcode may apply Desktop ChatGPT-approved documentation wording during approved planning and documentation tasks.
+- ChatGPT in Xcode may apply Desktop ChatGPT approved documentation wording during approved planning and documentation tasks.
 - Codex executes only the approved ACTIVE sprint.
 - Codex never edits `Project documents/Implementation.md`.
 - Codex maintains `Project documents/Codex response.md` as the execution log.
@@ -222,7 +223,7 @@ If blocked solely by a known toolchain issue:
 
 - run the equivalent Xcode validation
 - record that Xcode became authoritative
-- record the reason in `Codex response.md`
+- record the reason in `Project documents/Codex response.md`
 
 ---
 
@@ -263,16 +264,16 @@ Standard verification:
 
 Before closing every sprint verify consistency between:
 
-- Project_Guide.md
-- Implementation.md
-- PROJECT_STATE.md
-- Codex response.md
+- Project documents/Project_Guide.md
+- Project documents/Implementation.md
+- Project documents/PROJECT_STATE.md
+- Project documents/Codex response.md
 
 If architecture changed, also review:
 
-- ADR.md
-- Architecture_v1.0_Frozen.md
-- Engineering Standards.md
+- Project documents/ADR.md
+- Project documents/Architecture_v1.0_Frozen.md
+- Project documents/Engineering Standards.md
 
 ---
 
@@ -298,8 +299,8 @@ A sprint is considered complete only when:
 - build passes
 - required validation passes
 - documentation synchronized
-- `PROJECT_STATE.md` updated if required
-- `Codex response.md` updated
+- `Project documents/PROJECT_STATE.md` updated if required
+- `Project documents/Codex response.md` updated
 - commit created
 - push completed
 - tag created when applicable

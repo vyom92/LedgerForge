@@ -8,14 +8,15 @@ Its only purpose is to direct planning and implementation assistants to the corr
 
 ## Mandatory Entry Point
 
-Before performing any planning, review, implementation, documentation sync or refactoring:
+Before performing any planning, review, implementation, documentation synchronization or refactoring:
 
 1. Read `Project documents/.github/Context_Manifest.yaml`.
-2. Read `Project documents/Project_Guide.md`.
-3. Read `Project documents/PROJECT_STATE.md` to establish verified repository state.
-4. Read `Project documents/Implementation.md` and only the ACTIVE sprint.
-5. Use the manifest and the Project Guide to determine which additional documents and source files are required for the task.
-6. Execute only the approved Planning Prompt, Implementation Prompt or documentation change package.
+2. Read this repository-root `AGENTS.md`.
+3. Read `Project documents/Project_Guide.md`.
+4. Read `Project documents/PROJECT_STATE.md` to establish verified repository state.
+5. Read only the ACTIVE sprint in `Project documents/Implementation.md`.
+6. Use the manifest and Project Guide to determine any additional documentation and source files required for the approved task.
+7. Execute only the approved Planning Prompt, Implementation Prompt or Documentation Change Package.
 
 ---
 
@@ -33,13 +34,13 @@ Before performing any planning, review, implementation, documentation sync or re
 #### Planning and Documentation
 
 - Desktop ChatGPT owns the content and approval of `Project documents/Implementation.md`.
-- ChatGPT in Xcode may apply exact Desktop ChatGPT-approved wording during approved planning or documentation tasks.
+- ChatGPT in Xcode may apply exact Desktop ChatGPT approved wording during approved planning or documentation tasks.
 - Codex must never modify `Project documents/Implementation.md`.
 - Documentation executors must apply approved wording faithfully and must not expand scope.
 - `Project documents/Codex response.md` is the authoritative planning and implementation execution log maintained by the executing assistant.
 - `Project documents/PROJECT_STATE.md` is the authoritative record of verified repository state and is updated only after successful validation, unless an approved documentation-only task explicitly requires a factual correction.
 - If approved wording conflicts with verified repository state, stop and report the conflict instead of improvising.
-- Present exact diffs before committing unless the approved task explicitly authorises an immediate commit.
+- Present exact diffs before committing unless the approved task explicitly authorizes an immediate commit.
 
 ### Implementation
 
@@ -77,7 +78,7 @@ Before performing any planning, review, implementation, documentation sync or re
 
 ---
 
-`Project documents/.github/Context_Manifest.yaml` is the bootstrap router.
+`Project documents/.github/Context_Manifest.yaml` is the canonical bootstrap manifest.
 
 `Project documents/Project_Guide.md` remains the detailed source of truth for workflow, document precedence, task routing and sprint execution.
 

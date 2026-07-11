@@ -360,34 +360,59 @@ Completed
 
 ---
 
+# Sprint 26
+
+## Objective
+Align repository documentation to the approved Context_Manifest.yaml bootstrap, fix stale references and ensure a clean, fast startup path for assistants without changing source code.
+
+## Status
+Completed
+
+## Outcome
+- Documentation bootstrap and workflow alignment completed.
+- Root `AGENTS.md` confirmed as the authoritative AGENTS path.
+- Active documentation aligned through ADR-025.
+- Sprint 25 remains the verified implementation baseline.
+- Build status remains the last verified Sprint 25 build status.
+- Test status remains the last verified Sprint 25 result: 86 tests, 0 failures.
+- No source code, tests, project files, database files or assets changed during Sprint 26.
+- Documentation commit: `PENDING`
+- Git push to `origin/main`: pending.
+- Await the next ACTIVE sprint in `Project documents/Implementation.md`.
+
+---
+
 # Current Project State
 
 ## Repository
 
-- Primary Branch: `main`
-- Latest Implementation Commit: `9424d5a`
-- Latest Tag: `sprint-21`
-- Latest ADR: ADR-025 — Stable Financial Entity Identity
-- Architecture Baseline: Sprint 25 / UI_UX v1.0 Frozen
-- Current Milestone: M7 — Dashboard Experience
-- Build Status: Passing
-- Validation Status: Sprint 25 validation complete (86 tests passing)
+* Primary Branch: main
+* Latest Implementation Commit: 9424d5a
+* Latest Tag: sprint-21
+* Latest Documentation Commit: PENDING
+* Latest ADR: ADR-025 — Stable Financial Entity Identity
+* Architecture Baseline: Sprint 25 / UI_UX v1.0 Frozen
+* Current Milestone: M7 — Dashboard Experience
+* Current Sprint: Sprint 26 — Documentation Alignment & Bootstrap Manifest Adoption completed; awaiting next ACTIVE sprint
+* Current Phase: Awaiting Sprint 26 archival and next ACTIVE sprint
+* Build Status: Passing
+* Validation Status: Sprint 25 validation complete (86 tests passing). Sprint 26 documentation consistency validation complete.
 
 ## Bootstrap
 
-Authoritative bootstrap order is defined in:
+The authoritative bootstrap order is defined in:
 
-`Project documents/.github/Context_Manifest.yaml`
+Project documents/.github/Context_Manifest.yaml
 
-Current approved order:
+Approved bootstrap order:
 
-1. Context_Manifest.yaml
+1. Project documents/.github/Context_Manifest.yaml
 2. AGENTS.md
-3. Project_Guide.md
-4. PROJECT_STATE.md
-5. Implementation.md (ACTIVE sprint only)
+3. Project documents/Project_Guide.md
+4. Project documents/PROJECT_STATE.md
+5. Project documents/Implementation.md — ACTIVE sprint only
 
-Additional documentation is determined by the Task Routing Guide.
+Additional documentation is loaded only when required by the Task Routing Guide.
 
 ## Current Pipeline
 
@@ -432,47 +457,61 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 25 complete; next work must be taken from the ACTIVE sprint in `Project documents/Implementation.md`.
+Active Work: Sprint 26 documentation alignment completed; await the next ACTIVE sprint in `Project documents/Implementation.md`.
 
 Objective:
-- Stop at the approved Sprint 25 boundary after account identity and import foundation work.
+
+* Documentation bootstrap and workflow alignment completed.
+* Root `AGENTS.md` confirmed as authoritative.
+* Active documentation aligned through ADR-025.
+* Sprint 25 remains the verified implementation baseline.
+* Preserve the verified Sprint 25 build and test status until a future sprint reruns validation.
 
 Scope:
-- `Implementation.md` is the ChatGPT-owned sprint planning and workflow document.
-- `Codex response.md` is the Codex-owned latest planning/execution output.
-- `PROJECT_STATE.md` is the Codex-owned current repository truth.
-- Only the ACTIVE sprint block in `Implementation.md` should be read by Codex.
-- Archived sprint blocks in `Implementation.md` are historical reference only.
-- Approved UI assets live under `Project documents/UI Assets/Approved/`.
-- `DesignBoard_v2.0.png` is the master UI reference.
-- Individual approved assets define screen-level implementation details.
-- `AppIcon_v1.0.png` is the approved app icon reference.
-- `Project documents/.github/` is the canonical location for AI workflow prompt and context files.
-- Preserve RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
-- Preserve import, parser, validation and repository semantics.
-- Preserve transaction search and credit/debit toggle behaviour.
-- Preserve the approved UI/UX v1.0 appearance.
-- Preserve durable SQLite startup persistence wiring.
-- Preserve stable repository account identifiers.
-- Preserve institution attribution through repository hydration.
+
+* Sprint 26 is documentation-only.
+* No source code, project files, database files or tests may be modified.
+* `Project documents/Implementation.md` is the Desktop ChatGPT-owned sprint planning and workflow document.
+* Xcode GPT may apply exact approved documentation wording.
+* Codex must never edit `Project documents/Implementation.md`.
+* `Project documents/Codex response.md` records the latest planning or execution report produced by the executing assistant.
+* `Project documents/PROJECT_STATE.md` records verified repository facts only.
+* `Project documents/.github/Context_Manifest.yaml` is the bootstrap manifest and routing document, not a repository state database.
+* Only the ACTIVE sprint block in `Project documents/Implementation.md` should be read during sprint execution.
+* Archived sprint blocks in `Project documents/Implementation.md` are historical reference only.
+* Approved UI assets live under Project documents/UI Assets/Approved/.
+* DesignBoard_v2.0.png is the master UI reference.
+* Individual approved assets define screen-level implementation details.
+* AppIcon_v1.0.png is the approved application icon reference.
+* Preserve RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
+* Preserve import, parser, validation and repository semantics.
+* Preserve transaction search and credit/debit toggle behaviour.
+* Preserve the approved UI/UX v1.0 appearance.
+* Preserve durable SQLite startup persistence wiring.
+* Preserve stable repository account identifiers.
+* Preserve institution attribution through repository hydration.
 
 Out of Scope:
-- PDF support
-- OCR
-- Parser behaviour changes
-- Validation redesign
-- Repository redesign
-- Database schema changes
-- Automatic account matching
-- Concrete verified-identifier matching service
-- Import Wizard implementation
-- Transaction extraction changes
-- Analytics
-- Budgets
-- Insights
-- Reports
-- Multi-currency
-- Investments
+
+* Source-code changes
+* Test changes
+* PDF support
+* OCR
+* Parser behaviour changes
+* Validation redesign
+* Repository redesign
+* Database schema changes
+* Automatic account matching
+* Concrete verified-identifier matching service
+* Import Wizard implementation
+* Transaction extraction changes
+* Analytics
+* Budgets
+* Insights
+* Reports
+* Multi-currency
+* Investments
 
 Next Major Milestone:
-- Next ACTIVE sprint in `Project documents/Implementation.md`.
+
+* Prepare the next ACTIVE sprint in `Project documents/Implementation.md`.

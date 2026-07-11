@@ -1,15 +1,15 @@
 # LedgerForge Project Guide
 
-This is the canonical project operating manual. Read this document first, then use the Task Routing Guide to load only the documents required for the current task. Avoid loading unnecessary documentation.
+This is the canonical project operating manual. Read `Project documents/.github/Context_Manifest.yaml` first, then `AGENTS.md`, then this document. Use the Task Routing Guide to load only the documents required for the current task. Avoid loading unnecessary documentation.
 
 ## Current Project Snapshot
 
 - **Workflow:** Workflow v2.1 (Frozen)
 - **Current Milestone:** M7 – Dashboard Experience
-- **Current Sprint:** Sprint 26 – Documentation Alignment & Bootstrap Manifest Adoption
-- **Current Phase:** Documentation Alignment
+- **Current Sprint:** Sprint 26 – Documentation Alignment & Bootstrap Manifest Adoption completed; awaiting archival
+- **Current Phase:** Awaiting next ACTIVE sprint
 - **Build Status:** Passing
-- **Validation Status:** Sprint 25 validated. Documentation Sprint 26 in progress.
+- **Validation Status:** Sprint 25 validated. Documentation Sprint 26 consistency validation complete.
 - **Last Architecture Review:** 2026-07-08
 - **Current Development Baseline:** Sprint 25
 
@@ -19,7 +19,7 @@ This is the canonical project operating manual. Read this document first, then u
 |-----------|--------------|
 | Product Vision | Current and authoritative |
 | Architecture | Frozen v1.0 baseline active |
-| ADRs | Current through ADR-023 |
+| ADRs | Current through ADR-025 |
 | Database | Production-ready foundation |
 | Repository Layer | Stable with contract tests |
 | Persistence | SQLite repository layer active |
@@ -33,7 +33,7 @@ This is the canonical project operating manual. Read this document first, then u
 | Workflow | Workflow v2.1 active. `Project documents/Implementation.md` is the canonical sprint planning document. |
 | Dashboard | Deep Indigo UI foundation implemented. Repository-backed dashboard active. Continued refinement under M7. |
 | Validation | Build passing. Sprint 25 validation complete. |
-| Documentation | Context_Manifest.yaml + Project_Guide.md provide canonical bootstrap and routing. |
+| Documentation | `Project documents/.github/Context_Manifest.yaml` and `Project documents/Project_Guide.md` provide the canonical bootstrap and routing. |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
 
@@ -68,11 +68,13 @@ Repositories
 ↓
 SQLite
 ↓
+RepositoryStoreHydrator
+↓
 Runtime Stores
 ↓
 ViewModels
 ↓
-Dashboard
+Views
 ```
 
 
@@ -81,7 +83,7 @@ Dashboard
 | Document | Purpose | Read When | Priority |
 |----------|---------|-----------|----------|
 | Project documents/.github/Context_Manifest.yaml | Machine-readable bootstrap manifest defining document precedence, assistant responsibilities and workflow entrypoint | Every AI session | Highest |
-| Project_Guide.md | Repository navigation guide and task routing | Every AI session | Highest |
+| Project documents/Project_Guide.md | Repository navigation guide and task routing | Every AI session | Highest |
 | Project documents/PROJECT_STATE.md | Verified repository state and implementation history | Every implementation session | Highest |
 | Project documents/Implementation.md | ACTIVE sprint planning document | Every planning and implementation session | Highest |
 | Architecture_v1.0_Frozen.md | Definitive system architecture and constraints | Architecture work | High |
@@ -102,20 +104,21 @@ Only consult the documents required by the Task Routing Guide. Avoid loading the
 The precedence for documentation is as follows:
 
 1. Project documents/.github/Context_Manifest.yaml
-2. Project_Guide.md
-3. Architecture_v1.0_Frozen.md
-4. ADR.md
-5. Project documents/PROJECT_STATE.md
-6. Project documents/Implementation.md
-7. Engineering Standards.md
-8. Database_v1_Architecture.md
-9. Product Vision.md
-10. AI_WORKFLOW.md
-11. Project documents/Codex response.md
+2. AGENTS.md
+3. Project documents/Project_Guide.md
+4. Architecture_v1.0_Frozen.md
+5. ADR.md
+6. Project documents/PROJECT_STATE.md
+7. Project documents/Implementation.md
+8. Engineering Standards.md
+9. Database_v1_Architecture.md
+10. Product Vision.md
+11. AI_WORKFLOW.md
+12. Project documents/Codex response.md
 
 Approved documentation always overrides any implicit or assumed implementation details.
 
-Project_Guide.md is the navigation document. It routes readers to the authoritative source rather than duplicating detailed guidance.
+`Project documents/Project_Guide.md` is the navigation document. It routes readers to the authoritative source rather than duplicating detailed guidance.
 
 ## Project Principles
 
@@ -164,7 +167,7 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 | UI Work | UI_UX_v1.0_Frozen.md, Architecture_v1.0_Frozen.md, Engineering Standards.md |
 | Testing | Project documents/PROJECT_STATE.md, Project documents/Codex response.md, Engineering Standards.md |
 | Bug Fixes | Project documents/PROJECT_STATE.md, Project documents/Codex response.md, Engineering Standards.md |
-| Documentation Updates | Project_Guide.md, AI_WORKFLOW.md, Engineering Standards.md |
+| Documentation Updates | Project documents/Project_Guide.md, AI_WORKFLOW.md, Engineering Standards.md |
 | Reference Fixtures | Project documents/PROJECT_STATE.md, Project documents/Codex response.md |
 
 
@@ -180,7 +183,7 @@ Project_Guide.md is the navigation document. It routes readers to the authoritat
 - **LedgerForgeTests:** Unit, integration, fixture and contract tests.  
 - **LedgerForgeUITests:** UI automation tests.  
 - **Project documents:** Documentation, architecture records, sprint reports.  
-- **Project documents/.github:** Canonical AI instructions, prompts, and context. Root-level `.github` documentation files were intentionally moved here.  
+- **Project documents/.github:** Canonical bootstrap, AI instructions and prompts.  
 - **Tests:** Automated tests including unit, integration, and UI tests.  
 
 ## Folder Ownership
@@ -224,8 +227,9 @@ Additionally:
 
 ### Phase 1 — Planning
 
-- Read Project documents/.github/Context_Manifest.yaml first.
-- Then read Project_Guide.md.
+- Read `Project documents/.github/Context_Manifest.yaml` first.
+- Read `AGENTS.md`.
+- Then read `Project documents/Project_Guide.md`.
 - Use the Task Routing Guide.
 - Review `Project documents/PROJECT_STATE.md`.
 - Read only the ACTIVE sprint in `Project documents/Implementation.md`.
@@ -391,24 +395,26 @@ Every supported import format should be validated against an approved baseline f
 
 Mark completed items as appropriate over time.
 
-## Context Optimisation
+### Context Optimisation
 
 To minimise token consumption:
 
-- Read Context_Manifest.yaml first.
-- Then read Project_Guide.md.
+- Read `Project documents/.github/Context_Manifest.yaml` first.
+- Read `AGENTS.md`.
+- Then read `Project documents/Project_Guide.md`.
 - Use the Task Routing Guide.
 - Open only the documents required for the requested task.
 - Do not reread unchanged reference documents.
-- Read only the ACTIVE sprint in `Implementation.md`. Archived sprints are historical reference only.
+- Read only the ACTIVE sprint in `Project documents/Implementation.md`. Archived sprints are historical reference only.
 - Prefer referencing documentation over repeating it.
 
-This layered documentation approach keeps AI context small while preserving deterministic behaviour.
+This layered bootstrap minimizes context loading while preserving deterministic behaviour.
 
 ## Instructions for AI Assistants
 
 - Bootstrap through `Project documents/.github/Context_Manifest.yaml`.
-- Read `Project_Guide.md` immediately afterwards.
+- Read `AGENTS.md`.
+- Then read `Project documents/Project_Guide.md`.
 - Load only the documentation required by the Task Routing Guide.
 - Read only the ACTIVE sprint in `Project documents/Implementation.md`.
 - Never modify archived sprint sections.
@@ -429,7 +435,7 @@ This layered documentation approach keeps AI context small while preserving dete
 - Generate commit messages from completed work.
 - Prefer document references over duplicated instructions.
 - Avoid loading unrelated documentation.
-- Treat `Project_Guide.md` as the repository index.
+- Treat `Project documents/Project_Guide.md` as the repository index.
 - If documentation and implementation conflict, stop and report the conflict instead of guessing.
   
 ## Project Philosophy
@@ -442,4 +448,4 @@ Documentation records the verified repository state.
 
 Every completed sprint should leave the project in a healthier state than it was found.
 
-Documentation should evolve only when architecture, workflow or verified repository state changes.
+Documentation should evolve only when approved architecture, workflow or verified repository state changes.

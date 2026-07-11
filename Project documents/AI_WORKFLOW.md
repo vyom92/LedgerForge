@@ -4,7 +4,7 @@ This workflow applies to every AI-assisted implementation in LedgerForge.
 
 `Project documents/.github/Context_Manifest.yaml` is the mandatory bootstrap document.
 
-Read it first to determine the current project state, document precedence, bootstrap order, assistant responsibilities, and protected files.
+Read it first to determine document precedence, bootstrap order, assistant responsibilities, routing guidance, and protected files.
 
 Then follow the complete bootstrap order defined in the manifest.
 
@@ -12,7 +12,7 @@ Then follow the complete bootstrap order defined in the manifest.
 
 # Workflow v2.1
 
-The development workflow is based on a single active sprint.
+The development workflow is based on a single ACTIVE sprint.
 
 `Project documents/Implementation.md` is the canonical sprint planning document.
 
@@ -21,10 +21,10 @@ Rules:
 - Read only the ACTIVE sprint.
 - Archived sprints are historical reference only.
 - Desktop ChatGPT owns the content and approval of `Project documents/Implementation.md`.
-- ChatGPT in Xcode may apply exact Desktop ChatGPT-approved wording.
+- ChatGPT in Xcode may apply exact Desktop ChatGPT approved wording.
 - During implementation, Codex may modify only files required by the approved ACTIVE sprint.
 - Codex may update:
-  - `Project documents/Codex response.md` as the execution report.
+  - `Project documents/Codex response.md` as the implementation execution report.
   - `Project documents/PROJECT_STATE.md` only after successful validation.
 - Codex never edits `Project documents/Implementation.md`.
 
@@ -44,7 +44,7 @@ Rules:
 
 3. Read only the ACTIVE sprint.
 
-4. Use the Task Routing Guide in `Project_Guide.md` to determine which additional documentation is required for the approved sprint.
+4. Use the Task Routing Guide in `Project documents/Project_Guide.md` to determine which additional documentation is required for the approved sprint.
 
 5. Read only the documents required for that sprint. These may include:
 
@@ -66,7 +66,7 @@ Rules:
 
 8. Do not modify source code.
 
-9. Do not modify `Implementation.md`.
+9. Do not modify `Project documents/Implementation.md`.
 
 10. Do not commit or push.
 
@@ -74,7 +74,7 @@ Rules:
 
 # Before Every Implementation
 
-Implementation begins only after ChatGPT has reviewed the planning output and replaced the Planning Prompt with the approved Implementation Prompt.
+Implementation begins only after Desktop ChatGPT has reviewed the planning output and replaced the Planning Prompt with the approved Implementation Prompt.
 
 Read in this order:
 
@@ -157,12 +157,12 @@ Do not modify `Project documents/Implementation.md`.
 
 # Documentation Rules
 
-- Never modify architecture without updating the relevant documentation.
+- Never modify approved architecture without updating the relevant documentation.
 - Architecture documentation overrides implementation assumptions.
 - Engineering Standards define coding policy.
-- `Context_Manifest.yaml` defines bootstrap order only; it must not duplicate volatile repository state.
-- `PROJECT_STATE.md` remains the single source of truth for verified repository status.
-- `Implementation.md` remains the only active sprint planning document.
+- `Project documents/.github/Context_Manifest.yaml` defines bootstrap order and document routing only. It must not duplicate verified repository state.
+- `Project documents/PROJECT_STATE.md` remains the single source of truth for verified repository status.
+- `Project documents/Implementation.md` remains the only ACTIVE sprint planning document.
 - If documentation precedence conflicts with the manifest, stop and report the conflict instead of guessing.
 - If documentation conflicts with implementation, stop and report the conflict.
 
@@ -188,10 +188,10 @@ Before considering a sprint complete, confirm:
 - Successful builds committed.
 - Successful commits pushed.
 - Commit message accurately reflects the completed sprint.
-- `PROJECT_STATE.md` updated if required.
-- `Codex response.md` updated.
+- `Project documents/PROJECT_STATE.md` updated if required.
+- `Project documents/Codex response.md` updated.
 - No future sprint work included.
 - Repository remains buildable.
-- Bootstrap order remains consistent with `Context_Manifest.yaml`.
+- Bootstrap order remains consistent with `Project documents/.github/Context_Manifest.yaml`.
 - No protected documentation was modified outside its assigned ownership.
 - No workflow drift was introduced.

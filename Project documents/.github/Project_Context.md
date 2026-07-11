@@ -156,11 +156,11 @@ Bootstrap every session using:
 
 1. `Project documents/.github/Context_Manifest.yaml`
 2. `AGENTS.md`
-3. `Project_Guide.md`
+3. `Project documents/Project_Guide.md`
 4. `Project documents/PROJECT_STATE.md`
 5. `Project documents/Implementation.md` (ACTIVE sprint only)
 
-Then use the Task Routing Guide in `Project_Guide.md` to determine any additional documentation required.
+Then use the Task Routing Guide in `Project documents/Project_Guide.md` to determine any additional documentation required.
 
 ---
 
