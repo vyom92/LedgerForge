@@ -363,26 +363,40 @@ Completed
 # Current Project State
 
 ## Repository
+
 - Primary Branch: `main`
-- Latest Commit: Sprint 25 implementation commit
 - Latest Implementation Commit: `9424d5a`
 - Latest Tag: `sprint-21`
-- Latest ADR: ADR-023 — Frozen UI/UX Architecture
-- Architecture Baseline: Sprint 25 plus UI/UX v1.0 Frozen
-- Latest Milestone: Account Identity & Import Foundation
-- Build: Passing
-- Validation: Build passing; full active validation passing. Sprint 25 validation complete.
+- Latest ADR: ADR-025 — Stable Financial Entity Identity
+- Architecture Baseline: Sprint 25 / UI_UX v1.0 Frozen
+- Current Milestone: M7 — Dashboard Experience
+- Build Status: Passing
+- Validation Status: Sprint 25 validation complete (86 tests passing)
 
-## Session Startup Order
-1. Project documents/.github/AGENTS.md
-2. Project_Guide.md
-3. PROJECT_STATE.md
-4. Latest ADR (currently ADR-023 — Frozen UI/UX Architecture)
-5. Project documents/Codex response.md
+## Bootstrap
+
+Authoritative bootstrap order is defined in:
+
+`Project documents/.github/Context_Manifest.yaml`
+
+Current approved order:
+
+1. Context_Manifest.yaml
+2. AGENTS.md
+3. Project_Guide.md
+4. PROJECT_STATE.md
+5. Implementation.md (ACTIVE sprint only)
+
+Additional documentation is determined by the Task Routing Guide.
 
 ## Current Pipeline
-Import Pipeline:
 
+ImportCoordinator
+↓
+PasswordProvider
+↓
+ReaderRegistry
+↓
 Reader
 ↓
 RawDocument
@@ -399,6 +413,10 @@ FinancialDocument
 ↓
 Validation
 ↓
+Fingerprinting & Duplicate Detection
+↓
+Repository Persistence Boundary
+↓
 Repositories
 ↓
 SQLite
@@ -407,7 +425,9 @@ RepositoryStoreHydrator
 ↓
 Runtime Stores
 ↓
-Dashboard
+ViewModels
+↓
+Views
 
 
 ## Current Work

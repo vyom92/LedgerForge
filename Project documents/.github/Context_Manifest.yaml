@@ -12,7 +12,7 @@ app:
 bootstrap:
   read_order:
     - "Project documents/.github/Context_Manifest.yaml"
-    - "Project documents/.github/AGENTS.md"
+    - "AGENTS.md"
     - "Project documents/Project_Guide.md"
     - "Project documents/PROJECT_STATE.md"
     - "Project documents/Product Vision.md"
@@ -149,4 +149,8 @@ notes:
   anti_drift_rule: "When duplicate guidance exists, update the non-authoritative document instead of creating another source of truth."
 
   manifest_scope: "This manifest defines bootstrap order, document authority, workflow ownership, and repository guardrails. It must not duplicate volatile repository state."
+  
+  repository_policy:
+        documentation_is_memory: true
+        conversations_are_disposable: true
 ...

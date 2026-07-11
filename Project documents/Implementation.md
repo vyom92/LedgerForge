@@ -34,8 +34,11 @@ Documentation-only sprint. No source changes. No behavior changes.
 
 ## Validation
 
-- All four docs reference Context_Manifest.yaml as the first bootstrap file.
-- Stale sprint/status lines updated to Sprint 25 where applicable.
-- No source files changed.
+- `Project documents/.github/Context_Manifest.yaml` exists and is the approved bootstrap manifest.
+- `AGENTS.md`, `AI_WORKFLOW.md`, `Project_Guide.md` and `Project_Context.md` reference the manifest as the first bootstrap document where applicable.
+- Bootstrap order is consistent across all workflow documentation.
+- Stale Sprint 25 alignment metadata has been updated where verified.
+- No source code, project files or tests have been modified.
+- Documentation remains internally consistent and free of contradictory workflow guidance.
 
 ---

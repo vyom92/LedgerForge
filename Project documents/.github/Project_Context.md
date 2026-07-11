@@ -155,7 +155,7 @@ App icon:
 Bootstrap every session using:
 
 1. `Project documents/.github/Context_Manifest.yaml`
-2. `Project documents/.github/AGENTS.md`
+2. `AGENTS.md`
 3. `Project_Guide.md`
 4. `Project documents/PROJECT_STATE.md`
 5. `Project documents/Implementation.md` (ACTIVE sprint only)

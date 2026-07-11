@@ -2,7 +2,7 @@
 
 # LedgerForge — Database v1 Architecture (Design Baseline)
 
-Status: Database v1 design baseline, architecture aligned through Sprint 22 / Milestone M7 UI Foundation
+Status: Database v1 design baseline, architecture aligned through Sprint 25 / Milestone M7 Dashboard Experience
 
 ## Summary
 
@@ -30,6 +30,7 @@ This document defines the LedgerForge Database v1 architecture. It is a vendor-n
 LedgerForge uses an ImportCoordinator as the orchestration layer for every financial document import.
 
 The ImportCoordinator is responsible for:
+
 - Receiving import requests.
 - Resolving optional passwords through PasswordProvider.
 - Selecting the appropriate Document Reader.
@@ -39,10 +40,11 @@ The ImportCoordinator is responsible for:
 - Coordinating Statement Classification.
 - Coordinating Parser Selection.
 - Coordinating Validation.
-- Coordinating repository persistence for validated domain objects.
-- Reporting progress to the user interface.
+- Coordinating Fingerprinting & Duplicate Detection after successful validation.
+- Coordinating repository persistence for validated, non-duplicate domain objects.
+- Reporting progress and import outcomes to the user interface.
 
-The ImportCoordinator never performs parsing, validation or business logic itself. It coordinates independent architectural components.
+The ImportCoordinator never performs parsing, validation, fingerprinting, duplicate matching or business logic itself. It coordinates independent architectural components.
 
 ## Financial Truth
 
@@ -421,15 +423,16 @@ II. Relationships (ER summary)
 
 III. How imported documents map into accounts & transactions (traceability)
 
-1. User triggers import → create `import_sessions` row (validation_status='pending').
-2. For each uploaded file, create `documents` row with sha256 and storage_path.
+1. User triggers import → create `import_sessions` row (`validation_status='pending'`).
+2. For each uploaded file, create a `documents` row with `sha256` and `storage_path`.
 3. Document Reader extracts the file into RawDocument.
-4. Persist RawDocument and row-level extraction output in normalized_documents and normalized_rows.
+4. Persist RawDocument and row-level extraction output in `normalized_documents` and `normalized_rows`.
 5. Institution Detection, Statement Classification and Parser Selection determine the parser/profile before Statement Parser execution produces FinancialDocument and transaction candidates.
 6. ImportValidator validates the FinancialDocument and produces deterministic validation results.
-7. Repository persistence is allowed only after validation passes.
-88. If validation passes: create/update the import session, create/match accounts through approved repository boundaries, persist trusted transactions, and update runtime stores only through RepositoryStoreHydrator after validated writes complete successfully.
-9. Dashboard, accounts, transaction browsing and report data must be loaded through repository-backed runtime state and include only trusted transactions to guarantee ADR-010 compliance.
+7. Fingerprinting & Duplicate Detection runs only after validation succeeds.
+8. Repository persistence is allowed only for validated, non-duplicate imports.
+9. When persistence succeeds: create or update the import session, create or match accounts through approved repository boundaries, persist trusted transactions, and update runtime stores only through RepositoryStoreHydrator.
+10. Dashboard, accounts, transaction browsing and report data must be loaded through repository-backed runtime state and include only trusted transactions to guarantee ADR-010 compliance.
 
 IV. Multi-currency support
 
@@ -684,4 +687,4 @@ End of design baseline
 
 
 --
-Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through Sprint 22 / Milestone M7 UI Foundation. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.
+Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through Sprint 25 / Milestone M7 Dashboard Experience. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.

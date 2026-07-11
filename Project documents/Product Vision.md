@@ -93,24 +93,29 @@ Additional architectural principles:
 
 # Core Experience
 
-LedgerForge should feel like a financial command center rather than an importer.
+LedgerForge should feel like a financial operating system rather than an importer.
 
-Primary modules:
+Primary application modules:
 
 - Dashboard
-- Accounts
-- Activity
-- Documents
-- Import History
-- Investments
 - Salary & Planning
+- Accounts
+- Transactions
+- Imports
+- Investments
 - Multi-Currency Dashboard
 - Financial Timeline
 - Financial Intelligence
 - Rules & Automation
 - Settings
 
-The Dashboard remains the primary destination. All other modules exist to support accurate, explainable and actionable financial insight.
+The Dashboard remains the primary destination.
+
+Salary & Planning becomes the user's monthly financial planning workspace.
+
+Import workflows remain temporary maintenance tasks rather than permanent destinations within the application.
+
+Every other module exists to support accurate, explainable and actionable financial insight.
 
 ---
 
@@ -191,18 +196,18 @@ Supported sources include:
 Every import follows the same deterministic pipeline:
 Every stage preserves explainability and traceability so identical financial evidence always produces identical financial results.
 
-1. Coordinate the import through the Unified Import Framework.
-2. Resolve an optional password through the import coordination layer when required.
-3. Select the appropriate reader for the file format.
-4. Extract raw document contents into RawDocument.
-5. Identify the financial institution.
-6. Determine the statement type (bank account, credit card, investment, salary, etc.).
-7. Select the appropriate parser using deterministic rules.
-8. Execute the Statement Parser.
-9. Produce an immutable FinancialDocument.
-10. Validate the extracted financial data.
-11. Persist validated financial data through repository protocols.
-12. Refresh runtime stores from the validated repository state.
+1. Coordinate the import through ImportCoordinator.
+2. Resolve an optional password through PasswordProvider.
+3. Select the appropriate Reader using ReaderRegistry.
+4. Extract the file into RawDocument.
+5. Perform Institution Detection.
+6. Perform Statement Classification.
+7. Select the appropriate Statement Parser.
+8. Produce an immutable FinancialDocument.
+9. Validate the financial document.
+10. Execute Fingerprinting & Duplicate Detection.
+11. Persist validated, non-duplicate financial data through repository boundaries.
+12. Refresh runtime stores exclusively through RepositoryStoreHydrator.
 
 Institution detection should rely on document fingerprints, metadata, recurring keywords, visual structure, and previous successful imports rather than filenames.
 
@@ -289,4 +294,6 @@ Future capabilities such as salary planning, retirement tracking, investment ana
 
 Every future feature should reinforce the core mission by reducing manual work, increasing confidence and preserving financial truth.
 
-LedgerForge should favour deterministic financial understanding over opaque statistical inference or black-box AI.
+Every future capability should reinforce the core mission of reducing manual work, increasing confidence, preserving financial truth and helping the user understand—not merely record—their financial life.
+
+LedgerForge should always favour deterministic financial understanding over opaque statistical inference or black-box AI, ensuring every insight remains explainable, reproducible and worthy of the user's trust.
