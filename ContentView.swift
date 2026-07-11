@@ -445,87 +445,91 @@ struct ContentView: View {
         VStack(spacing: 18) {
             importStepper
 
-            HStack(alignment: .top, spacing: 18) {
-                LFPanel {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Prepare Statement")
-                            .font(.title3.weight(.semibold))
-                        Text("Choose a file, review the parsed statement and confirm before LedgerForge writes financial data.")
-                            .font(.subheadline)
-                            .foregroundStyle(LFTheme.textSecondary)
+            ScrollView {
+                HStack(alignment: .top, spacing: 18) {
+                    LFPanel {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text("Prepare Statement")
+                                .font(.title3.weight(.semibold))
+                            Text("Choose a file, review the parsed statement and confirm before LedgerForge writes financial data.")
+                                .font(.subheadline)
+                                .foregroundStyle(LFTheme.textSecondary)
 
-                        Button {
-                            showingImporter = true
-                        } label: {
-                            VStack(spacing: 14) {
-                                Image(systemName: "icloud.and.arrow.up")
-                                    .font(.system(size: 42, weight: .light))
-                                    .foregroundStyle(LFTheme.primaryHover)
-                                Text("Drag & drop files here")
-                                    .font(.headline)
-                                Text("or")
+                            Button {
+                                showingImporter = true
+                            } label: {
+                                VStack(spacing: 14) {
+                                    Image(systemName: "icloud.and.arrow.up")
+                                        .font(.system(size: 42, weight: .light))
+                                        .foregroundStyle(LFTheme.primaryHover)
+                                    Text("Drag & drop files here")
+                                        .font(.headline)
+                                    Text("or")
+                                        .font(.caption)
+                                        .foregroundStyle(LFTheme.textSecondary)
+                                    Text("Browse Files")
+                                        .font(.subheadline.weight(.semibold))
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 9)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(LFTheme.primary, lineWidth: 1)
+                                        )
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 210)
+                                .background(LFTheme.primary.opacity(0.05))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(LFTheme.primary.opacity(0.75), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(importSelectionDisabled)
+
+                            importResultPanel
+
+                            HStack(spacing: 10) {
+                                Image(systemName: "info.circle")
+                                    .foregroundStyle(LFTheme.info)
+                                Text("No data is written until Confirm Import is selected.")
                                     .font(.caption)
                                     .foregroundStyle(LFTheme.textSecondary)
-                                Text("Browse Files")
-                                    .font(.subheadline.weight(.semibold))
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 9)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(LFTheme.primary, lineWidth: 1)
-                                    )
+                                Spacer()
                             }
-                            .frame(maxWidth: .infinity, minHeight: 210)
-                            .background(LFTheme.primary.opacity(0.05))
+                            .padding(12)
+                            .background(LFTheme.info.opacity(0.08))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(LFTheme.primary.opacity(0.75), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(LFTheme.info.opacity(0.25), lineWidth: 1)
                             )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(importSelectionDisabled)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                        importResultPanel
-
-                        HStack(spacing: 10) {
-                            Image(systemName: "info.circle")
-                                .foregroundStyle(LFTheme.info)
-                            Text("No data is written until Confirm Import is selected.")
-                                .font(.caption)
-                                .foregroundStyle(LFTheme.textSecondary)
-                            Spacer()
+                            HStack(spacing: 12) {
+                                Image(systemName: "shield.checkered")
+                                    .foregroundStyle(LFTheme.primaryHover)
+                                Text("Files are processed locally. Repository persistence still requires successful validation.")
+                                    .font(.caption)
+                                    .foregroundStyle(LFTheme.textSecondary)
+                                Spacer()
+                            }
+                            .padding(12)
+                            .background(LFTheme.primary.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
-                        .padding(12)
-                        .background(LFTheme.info.opacity(0.08))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(LFTheme.info.opacity(0.25), lineWidth: 1)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
 
-                        HStack(spacing: 12) {
-                            Image(systemName: "shield.checkered")
-                                .foregroundStyle(LFTheme.primaryHover)
-                            Text("Files are processed locally. Repository persistence still requires successful validation.")
-                                .font(.caption)
-                                .foregroundStyle(LFTheme.textSecondary)
-                            Spacer()
+                    LFPanel {
+                        VStack(alignment: .leading, spacing: 18) {
+                            Text("Validation Review")
+                                .font(.title3.weight(.semibold))
+
+                            validationReviewPanel
                         }
-                        .padding(12)
-                        .background(LFTheme.primary.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }
-
-                LFPanel {
-                    VStack(alignment: .leading, spacing: 18) {
-                        Text("Validation Review")
-                            .font(.title3.weight(.semibold))
-
-                        validationReviewPanel
-                    }
-                }
+                .frame(maxWidth: .infinity, alignment: .top)
             }
+            .frame(maxHeight: .infinity)
 
             HStack {
                 Button("Cancel") {
@@ -544,6 +548,7 @@ struct ContentView: View {
             }
         }
         .padding(28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(LFTheme.backgroundGradient)
     }
 
