@@ -11,7 +11,7 @@ Workflow, architecture, document authority and engineering rules are defined by 
 Always begin with:
 
 1. `Project documents/.github/Context_Manifest.yaml`
-2. `Project documents/.github/AGENTS.md`
+2. `AGENTS.md`
 3. `Project documents/Project_Guide.md`
 4. `Project documents/PROJECT_STATE.md`
 5. `Project documents/Implementation.md` (ACTIVE sprint only)
@@ -33,7 +33,7 @@ Never read archived sprint sections unless explicitly requested.
 Always read in this order:
 
 1. `Project documents/.github/Context_Manifest.yaml`
-2. `Project documents/.github/AGENTS.md`
+2. `AGENTS.md`
 3. `Project documents/Project_Guide.md`
 4. `Project documents/PROJECT_STATE.md`
 5. `Project documents/Implementation.md` (ACTIVE sprint only)

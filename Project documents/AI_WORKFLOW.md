@@ -37,7 +37,7 @@ Rules:
 2. Bootstrap in this exact order:
 
    - `Project documents/.github/Context_Manifest.yaml`
-   - `Project documents/.github/AGENTS.md`
+   - `AGENTS.md`
    - `Project documents/Project_Guide.md`
    - `Project documents/PROJECT_STATE.md`
    - `Project documents/Implementation.md`
@@ -79,7 +79,7 @@ Implementation begins only after ChatGPT has reviewed the planning output and re
 Read in this order:
 
 - `Project documents/.github/Context_Manifest.yaml`
-- `Project documents/.github/AGENTS.md`
+- `AGENTS.md`
 - `Project documents/Project_Guide.md`
 - `Project documents/PROJECT_STATE.md`
 - `Project documents/Implementation.md`

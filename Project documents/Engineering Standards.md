@@ -114,34 +114,39 @@ ViewModels/
 
 # Development Workflow
 
+## Planning
+
 Before implementation:
 
-1. Read `Project_Guide.md`.
-2. Read `PROJECT_STATE.md`.
-3. Read only the ACTIVE sprint in `Implementation.md`.
-4. Use the Task Routing Guide to identify additional required reference documents.
-5. Produce an implementation plan in `Codex response.md`.
-6. Wait for ChatGPT approval before implementation.
+1. Bootstrap using:
+   - `Project documents/.github/Context_Manifest.yaml`
+   - `AGENTS.md`
+   - `Project_Guide.md`
+   - `Project documents/PROJECT_STATE.md`
+   - `Project documents/Implementation.md` (ACTIVE sprint only)
+2. Use the Task Routing Guide to identify any additional documentation required.
+3. Produce a planning report in `Project documents/Codex response.md`.
+4. Wait for Desktop ChatGPT approval before implementation.
+5. Do not modify source code during the planning phase.
 
-
-Implementation:
+## Implementation
 
 1. Read only the approved Implementation Prompt from the ACTIVE sprint.
-2. Select exactly one file at a time.
-3. Verify the filename before editing.
-4. Implement one logical change.
-5. Build.
-6. Run the required sprint tests.
-7. Verify `git status` contains only sprint-related changes.
-8. Verify there are no unresolved merge conflict markers.
-9. Generate a concise commit message describing the completed work.
-10. Commit.
-11. Push to the tracked branch (normally `origin/main`).
-12. Push the sprint tag if one was created.
-13. Update `PROJECT_STATE.md` if required.
-14. Update `Codex response.md`.
-15. Continue to the next file only after successful validation.
-
+2. Work only within the approved sprint scope.
+3. Select exactly one file at a time.
+4. Verify the filename before editing.
+5. Implement one logical change.
+6. Build.
+7. Run the required sprint tests.
+8. Verify `git status` contains only sprint-related changes.
+9. Verify there are no unresolved merge conflict markers.
+10. Generate a concise commit message describing the completed work.
+11. Commit.
+12. Push to the tracked branch (normally `origin/main`).
+13. Push the sprint tag if one was created.
+14. Update `Project documents/PROJECT_STATE.md` only after successful validation.
+15. Update `Project documents/Codex response.md`.
+16. Continue to the next file only after successful validation.
 # Definition of Done
 
 A task is complete only when:

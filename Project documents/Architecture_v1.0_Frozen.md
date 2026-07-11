@@ -45,6 +45,7 @@ Every subsystem should ultimately improve one of three things:
 - Automation.
 
 If a feature does not improve at least one of these, it should be reconsidered.
+
 ## Import Pipeline
 
 ImportCoordinator
@@ -58,8 +59,10 @@ ImportCoordinator
 → Statement Parser
 → FinancialDocument
 → Validation
+→ Fingerprinting & Duplicate Detection
 → Repository Persistence Boundary
 → Repositories
+→ SQLite
 → RepositoryStoreHydrator
 → Runtime Stores
 → ViewModels
@@ -77,16 +80,18 @@ ImportCoordinator
 - Institution Detection identifies the originating institution using extracted document content.
 - Statement Classification determines the document family (Bank, Credit Card, Brokerage, Salary, Insurance, etc.).
 - Parser Selection chooses the correct parser implementation.
-- Statement Parsers construct FinancialDocument after parser selection.
-- Statement Parsers produce FinancialDocument as the canonical parser output.
+- Statement Parsers construct FinancialDocument as the canonical parser output.
 - Validation is the only stage permitted to verify financial correctness.
-- Repository protocols are the persistence boundary for transactions and accounts.
+- Fingerprinting & Duplicate Detection executes only after successful validation.
+- Duplicate detection must remain deterministic, explainable and auditable.
+- Repository protocols form the persistence boundary.
+- SQLite remains an implementation detail behind repository abstractions.
 - Repository persistence updates runtime stores only after validated writes complete successfully through RepositoryStoreHydrator.
 - RepositoryStoreHydrator is the only approved persistence-to-runtime boundary.
 - Stores expose validated runtime state to the UI.
 - Rules Engine enriches validated financial data but never alters imported financial truth.
-- Every supported file format must converge into the same deterministic pipeline before parser execution.
-- Equivalent reference fixtures across CSV, PDF and future formats must preserve the same observable financial truth.
+- Every supported file format converges into the same deterministic pipeline before parser execution.
+- Equivalent reference fixtures across CSV, PDF and future formats must preserve identical observable financial truth.
 
 ## Core Domain
 
