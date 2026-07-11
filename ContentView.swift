@@ -82,6 +82,15 @@ private extension ImportPresentationState {
             return false
         }
     }
+
+    var showsPreConfirmationNoWriteMessage: Bool {
+        switch self {
+        case .completed:
+            return false
+        default:
+            return true
+        }
+    }
 }
 
 enum ImportOutcomeTone: Equatable {
@@ -445,9 +454,9 @@ struct ContentView: View {
         VStack(spacing: 18) {
             importStepper
 
-            ScrollView {
-                HStack(alignment: .top, spacing: 18) {
-                    LFPanel {
+            HStack(alignment: .top, spacing: 18) {
+                LFPanel {
+                    ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Prepare Statement")
                                 .font(.title3.weight(.semibold))
@@ -488,21 +497,23 @@ struct ContentView: View {
 
                             importResultPanel
 
-                            HStack(spacing: 10) {
-                                Image(systemName: "info.circle")
-                                    .foregroundStyle(LFTheme.info)
-                                Text("No data is written until Confirm Import is selected.")
-                                    .font(.caption)
-                                    .foregroundStyle(LFTheme.textSecondary)
-                                Spacer()
+                            if importState.showsPreConfirmationNoWriteMessage {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "info.circle")
+                                        .foregroundStyle(LFTheme.info)
+                                    Text("No data is written until Confirm Import is selected.")
+                                        .font(.caption)
+                                        .foregroundStyle(LFTheme.textSecondary)
+                                    Spacer()
+                                }
+                                .padding(12)
+                                .background(LFTheme.info.opacity(0.08))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(LFTheme.info.opacity(0.25), lineWidth: 1)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
-                            .padding(12)
-                            .background(LFTheme.info.opacity(0.08))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(LFTheme.info.opacity(0.25), lineWidth: 1)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
 
                             HStack(spacing: 12) {
                                 Image(systemName: "shield.checkered")
@@ -517,8 +528,12 @@ struct ContentView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                     }
+                    .frame(maxHeight: .infinity)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                    LFPanel {
+                LFPanel {
+                    ScrollView {
                         VStack(alignment: .leading, spacing: 18) {
                             Text("Validation Review")
                                 .font(.title3.weight(.semibold))
@@ -526,20 +541,24 @@ struct ContentView: View {
                             validationReviewPanel
                         }
                     }
+                    .frame(maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, alignment: .top)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
             .frame(maxHeight: .infinity)
 
             HStack {
-                Button("Cancel") {
+                Button {
                     cancelPreparedImport()
+                } label: {
+                    Text("Cancel")
+                        .padding(.horizontal, 42)
+                        .padding(.vertical, 13)
+                        .background(LFTheme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
-                .padding(.horizontal, 42)
-                .padding(.vertical, 13)
-                .background(LFTheme.surface)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
                 .disabled(importState.isTerminal)
 
                 Spacer()
@@ -1318,6 +1337,7 @@ struct ContentView: View {
                         .frame(minWidth: 180)
                         .background(LFTheme.primaryGradient)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
@@ -1342,6 +1362,7 @@ struct ContentView: View {
                         .frame(minWidth: 180)
                         .background(LFTheme.primaryGradient)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)

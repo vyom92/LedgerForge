@@ -14,16 +14,16 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: 262a07d
+* Latest Implementation Commit: bc0af0c
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-025 — Stable Financial Entity Identity
-* Architecture Baseline: Sprint 28 / UI_UX v1.0 Frozen
+* Architecture Baseline: Sprint 29 / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 28 — Confirmation-Gated Import Workflow completed and approved
-* Current Phase: Sprint 28 awaiting archival and the next ACTIVE sprint
+* Current Sprint: Sprint 29 — Import Wizard Usability Stabilization implemented; awaiting Desktop ChatGPT review
+* Current Phase: Sprint 29 implementation pushed; do not begin Sprint 30
 * Build Status: Passing
-* Validation Status: Sprint 28 active Xcode test plan passed (94 tests, 0 failures)
+* Validation Status: Sprint 29 Xcode diagnostics passed, Xcode build passed and active Xcode test plan passed (94 tests, 0 failures, 0 skipped)
 
 ## Bootstrap
 
@@ -86,10 +86,13 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 28 completed and approved; awaiting archival and the next ACTIVE sprint in `Project documents/Implementation.md`.
+Active Work: Sprint 29 implementation completed and pushed; awaiting Desktop ChatGPT review, approval and archival in `Project documents/Implementation.md`.
 
 Objective:
 
+* Import Wizard review content now scrolls in a single central workspace.
+* The existing `Cancel` and footer action row remain outside the central review scroll area.
+* Sprint 28 confirmation-gated workflow remains unchanged.
 * Confirmation-gated Import Wizard implemented.
 * Import Wizard now prepares statements for read-only preview and validation review before persistence.
 * Explicit Confirm Import is required before persistence begins.
@@ -98,6 +101,7 @@ Objective:
 
 Scope:
 
+* Sprint 29 was a layout-only stabilization sprint.
 * Sprint 28 was a workflow sprint.
 * No parser, reader, validation, repository contract, runtime store contract, SQLite schema or financial calculation changes were made.
 * `Project documents/Implementation.md` is the Desktop ChatGPT-owned sprint planning and workflow document.
@@ -132,6 +136,7 @@ Scope:
 - Repository-backed Dashboard implemented.
 - Accounts and Transactions screens use runtime-store-backed data.
 - Confirmation-gated Import Wizard implemented.
+- Import Wizard review area has a single central scroll workspace with the action footer outside that scroll area.
 - Import preview and validation review occur before persistence.
 - Explicit confirmation is required before financial data is written.
 - Cancellation performs no writes.
@@ -141,10 +146,7 @@ Scope:
 
 ### Current Critical Product Issues
 
-1. Import Wizard scrolling and action visibility
-   - The wizard can extend beyond the visible workspace.
-   - Confirmation and cancellation actions are not reliably kept visible while reviewing long preview content.
-   - Product impact: the primary import workflow is harder to complete and review.
+- Runtime Import Wizard verification was not available through the current Xcode tool surface during Sprint 29 execution. Diagnostics, build and the full active Xcode test plan passed.
 
 ### Current Important Product Issues
 
@@ -168,7 +170,7 @@ No.
 
 ### Reason
 
-Resolve the critical Import Wizard usability regression before adding another major user-facing feature.
+Desktop ChatGPT should review Sprint 29 and perform runtime UI verification if an app launch/UI inspection workflow is available.
 
 Out of Scope:
 
@@ -197,6 +199,35 @@ Next Major Milestone:
 
 * Archive Sprint 28 in `Project documents/Implementation.md`.
 * Define and approve the next ACTIVE sprint from the verified Current Product Review.
+---
+
+# Sprint 29
+
+## Objective
+Stabilize Import Wizard usability by keeping long review content scrollable within the wizard workspace while preserving continuously visible action controls.
+
+## Status
+Implemented
+
+## Outcome
+- `ContentView.swift` layout-only change implemented for the Import Wizard.
+- Existing wizard stepper/header preserved.
+- Existing two-panel review layout preserved inside one central `ScrollView`.
+- Existing footer action row remains outside the central `ScrollView`.
+- No duplicate footer was introduced.
+- No nested Import Wizard review scroll views were introduced.
+- Validation gating remains implemented by the existing `ImportPresentationState` flow.
+- Cancellation behaviour remains implemented by the existing `cancelPreparedImport()` path.
+- No parser, reader, validation, persistence, repository, runtime-store, hydrator, SQLite or financial calculation changes were made.
+- Xcode diagnostics for `ContentView.swift` passed with 0 issues.
+- Xcode build passed.
+- Active Xcode test plan passed: 94 tests, 0 failures, 0 skipped.
+- Runtime Import Wizard UI verification could not be performed because the available Xcode tool surface did not expose an app launch or UI inspection workflow.
+- Implementation commit: `bc0af0c`
+- Git push to `origin/main` completed successfully.
+- Remote verification: `git ls-remote origin refs/heads/main` returned `bc0af0c65f092ad0302543b823d05c6b95120cab`.
+- Local tracking ref note: remote push succeeded; sandbox could not update local `origin/main` ref lock under `.git`.
+
 ---
 
 # Sprint 28
@@ -623,4 +654,3 @@ Completed
 - Git tag: `sprint-12b-complete`
 
 ---
-
