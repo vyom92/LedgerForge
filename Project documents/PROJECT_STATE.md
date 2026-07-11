@@ -376,8 +376,9 @@ Completed
 - Build status remains the last verified Sprint 25 build status.
 - Test status remains the last verified Sprint 25 result: 86 tests, 0 failures.
 - No source code, tests, project files, database files or assets changed during Sprint 26.
-- Documentation commit: `PENDING`
-- Git push to `origin/main`: pending.
+- Documentation alignment commit: `70a8cc1`
+- Git push to `origin/main` completed successfully.
+- Local tracking ref note: remote push succeeded; sandbox could not update local `origin/main` ref lock under `.git`.
 - Await the next ACTIVE sprint in `Project documents/Implementation.md`.
 
 ---
@@ -389,7 +390,7 @@ Completed
 * Primary Branch: main
 * Latest Implementation Commit: 9424d5a
 * Latest Tag: sprint-21
-* Latest Documentation Commit: PENDING
+* Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-025 — Stable Financial Entity Identity
 * Architecture Baseline: Sprint 25 / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
