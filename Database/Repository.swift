@@ -8,6 +8,7 @@ public enum RepositoryError: Error, LocalizedError {
     case providerNotConfigured(String)
     case recordNotFound(String)
     case relationshipViolation(String)
+    case conflictingAccountIdentifier(workspaceId: String, scheme: String, identifier: String, existingAccountId: String, attemptedAccountId: String)
 
     public var errorDescription: String? {
         switch self {
@@ -17,6 +18,8 @@ public enum RepositoryError: Error, LocalizedError {
             return message
         case .relationshipViolation(let message):
             return message
+        case .conflictingAccountIdentifier(let workspaceId, let scheme, _, let existingAccountId, let attemptedAccountId):
+            return "Identifier \(scheme) is already assigned in workspace \(workspaceId) to account \(existingAccountId), not \(attemptedAccountId)."
         }
     }
 }
@@ -38,6 +41,9 @@ public protocol AccountRepository {
     func upsertAccount(_ account: AccountDTO) throws -> String
     func account(id: String) throws -> AccountDTO?
     func accounts(workspaceId: String) throws -> [AccountDTO]
+    func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String
+    func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO]
+    func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String]
 }
 
 public protocol ImportSessionRepository {
@@ -119,6 +125,18 @@ struct PlaceholderAccountRepo: AccountRepository {
     }
 
     func accounts(workspaceId: String) throws -> [AccountDTO] {
+        throw RepositoryError.providerNotConfigured("AccountRepository")
+    }
+
+    func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String {
+        throw RepositoryError.providerNotConfigured("AccountRepository")
+    }
+
+    func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO] {
+        throw RepositoryError.providerNotConfigured("AccountRepository")
+    }
+
+    func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String] {
         throw RepositoryError.providerNotConfigured("AccountRepository")
     }
 }

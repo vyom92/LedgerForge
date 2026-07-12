@@ -108,6 +108,138 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
         }
     }
 
+    func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String {
+        try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+        do {
+            guard let account = try account(id: identifier.accountId) else {
+                throw RepositoryError.relationshipViolation("Account \(identifier.accountId) does not exist for identifier \(identifier.id).")
+            }
+            guard account.workspaceId == identifier.workspaceId else {
+                throw RepositoryError.relationshipViolation("Account \(identifier.accountId) belongs to workspace \(account.workspaceId), not \(identifier.workspaceId).")
+            }
+
+            let existing = try storedIdentifiers(
+                workspaceId: identifier.workspaceId,
+                scheme: identifier.scheme,
+                identifier: identifier.identifier
+            )
+
+            if let conflict = existing.first(where: { $0.accountId != identifier.accountId }) {
+                throw RepositoryError.conflictingAccountIdentifier(
+                    workspaceId: identifier.workspaceId,
+                    scheme: identifier.scheme,
+                    identifier: identifier.identifier,
+                    existingAccountId: conflict.accountId,
+                    attemptedAccountId: identifier.accountId
+                )
+            }
+
+            if let current = existing.sorted(by: { $0.id < $1.id }).first {
+                try db.execute(sql: "COMMIT;")
+                DeveloperConsole.shared.info(.database, "Existing account identifier reused", metadata: [
+                    "scheme": identifier.scheme,
+                    "identifier": FinancialIdentifier.redacted(identifier.identifier)
+                ])
+                return current.id
+            }
+
+            let insert = "INSERT INTO account_identifiers (id, account_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?);"
+            try db.executePrepared(sql: insert, params: [
+                identifier.id,
+                identifier.accountId,
+                identifier.scheme,
+                identifier.identifier,
+                Self.provenanceJSON(for: identifier),
+                identifier.createdAtISO
+            ])
+            try db.execute(sql: "COMMIT;")
+            DeveloperConsole.shared.info(.database, "Account identifier attached", metadata: [
+                "scheme": identifier.scheme,
+                "identifier": FinancialIdentifier.redacted(identifier.identifier)
+            ])
+            return identifier.id
+        } catch {
+            try? db.execute(sql: "ROLLBACK;")
+            if case RepositoryError.conflictingAccountIdentifier(_, let scheme, let identifierValue, _, _) = error {
+                DeveloperConsole.shared.warning(.database, "Conflicting account identifier rejected", metadata: [
+                    "scheme": scheme,
+                    "identifier": FinancialIdentifier.redacted(identifierValue)
+                ])
+            }
+            throw error
+        }
+    }
+
+    func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO] {
+        let sql = """
+        SELECT ai.id, ai.account_id, a.workspace_id, ai.scheme, ai.identifier, ai.provenance, ai.created_at
+        FROM account_identifiers ai
+        INNER JOIN accounts a ON a.id = ai.account_id
+        WHERE ai.account_id = ? AND a.workspace_id = ?
+        ORDER BY ai.scheme, ai.identifier, ai.id;
+        """
+        return try db.query(sql: sql, params: [accountId, workspaceId]) { row in
+            Self.identifierDTO(from: row)
+        }
+    }
+
+    func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String] {
+        try storedIdentifiers(workspaceId: workspaceId, scheme: scheme, identifier: identifier)
+            .map(\.accountId)
+            .sorted()
+    }
+
+    private func storedIdentifiers(workspaceId: String, scheme: String, identifier: String) throws -> [AccountIdentifierDTO] {
+        let sql = """
+        SELECT ai.id, ai.account_id, a.workspace_id, ai.scheme, ai.identifier, ai.provenance, ai.created_at
+        FROM account_identifiers ai
+        INNER JOIN accounts a ON a.id = ai.account_id
+        WHERE a.workspace_id = ? AND ai.scheme = ? AND ai.identifier = ?
+        ORDER BY ai.account_id, ai.id;
+        """
+        return try db.query(sql: sql, params: [workspaceId, scheme, identifier]) { row in
+            Self.identifierDTO(from: row)
+        }
+    }
+
+    private static func identifierDTO(from row: SQLiteRow) -> AccountIdentifierDTO {
+        let provenance = row.string(at: 5) ?? ""
+        let metadata = provenanceMetadata(from: provenance)
+        return AccountIdentifierDTO(
+            id: row.string(at: 0) ?? "",
+            accountId: row.string(at: 1) ?? "",
+            workspaceId: row.string(at: 2) ?? "",
+            scheme: row.string(at: 3) ?? "",
+            identifier: row.string(at: 4) ?? "",
+            strength: metadata["strength"] ?? "",
+            verificationState: metadata["verificationState"] ?? "",
+            provenance: metadata["provenance"] ?? provenance,
+            createdAtISO: row.string(at: 6) ?? ""
+        )
+    }
+
+    private static func provenanceJSON(for identifier: AccountIdentifierDTO) -> String {
+        let payload = [
+            "strength": identifier.strength,
+            "verificationState": identifier.verificationState,
+            "provenance": identifier.provenance
+        ]
+        guard JSONSerialization.isValidJSONObject(payload),
+              let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return identifier.provenance
+        }
+        return json
+    }
+
+    private static func provenanceMetadata(from value: String) -> [String: String] {
+        guard let data = value.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: String] else {
+            return ["provenance": value]
+        }
+        return object
+    }
+
     private func ensureInstitutionExists(id: String?, createdAtISO: String) throws {
         guard let id, !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return

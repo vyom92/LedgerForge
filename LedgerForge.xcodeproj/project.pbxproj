@@ -72,6 +72,7 @@
 		288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */; };
 		288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB1312FF7E3C600F09BC9 /* ColumnType.swift */; };
 		2899799D30038670009B3870 /* LFConsoleButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2899799C30038670009B3870 /* LFConsoleButton.swift */; };
+		28B5217D3003E9D30007B840 /* IdentityResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B5217C3003E9D30007B840 /* IdentityResolver.swift */; };
 		28B87B262FFB24CD009BEE8C /* TransactionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B252FFB24C3009BEE8C /* TransactionListView.swift */; };
 		28B87B312FFB2F22009BEE8C /* Services/DirectionResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B302FFB2F1B009BEE8C /* Services/DirectionResolver.swift */; };
 		28B87B332FFB31C9009BEE8C /* ImportValidationResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B87B322FFB31C4009BEE8C /* ImportValidationResult.swift */; };
@@ -180,6 +181,7 @@
 		288EB1312FF7E3C600F09BC9 /* ColumnType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColumnType.swift; sourceTree = "<group>"; };
 		2899799C30038670009B3870 /* LFConsoleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFConsoleButton.swift; sourceTree = "<group>"; };
 		28A3A4C12FFE1DBA00DD5727 /* UI_UX_v1.0_Frozen.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = UI_UX_v1.0_Frozen.md; sourceTree = "<group>"; };
+		28B5217C3003E9D30007B840 /* IdentityResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityResolver.swift; sourceTree = "<group>"; };
 		28B87B252FFB24C3009BEE8C /* TransactionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionListView.swift; sourceTree = "<group>"; };
 		28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Product Vision.md"; sourceTree = "<group>"; };
 		28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Engineering Standards.md"; sourceTree = "<group>"; };
@@ -425,6 +427,7 @@
 		288EB0DE2FF7A3D100F09BC9 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				28B5217C3003E9D30007B840 /* IdentityResolver.swift */,
 				28B87B342FFB31FC009BEE8C /* Services/ImportValidator.swift */,
 				28B87B302FFB2F1B009BEE8C /* Services/DirectionResolver.swift */,
 				288EB0E52FF7A6C000F09BC9 /* Services/ImportEngine.swift */,
@@ -732,6 +735,7 @@
 				286D68F92FFFF67D0078AAC5 /* LFStatusBadge.swift in Sources */,
 				2872790D2FFD286100468973 /* ParserSelection.swift in Sources */,
 				288EB1232FF7D89B00F09BC9 /* Parsers/AxisBankAccountParser.swift in Sources */,
+				28B5217D3003E9D30007B840 /* IdentityResolver.swift in Sources */,
 				281BB1842FFC4D40006E7424 /* ImportProgress.swift in Sources */,
 				286D68FB2FFFF6A60078AAC5 /* LFFilterChip.swift in Sources */,
 				281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */,

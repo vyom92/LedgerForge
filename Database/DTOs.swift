@@ -132,6 +132,38 @@ public struct AccountDTO: nonisolated Equatable {
     }
 }
 
+public struct AccountIdentifierDTO: nonisolated Equatable {
+    public let id: String
+    public let accountId: String
+    public let workspaceId: String
+    public let scheme: String
+    public let identifier: String
+    public let strength: String
+    public let verificationState: String
+    public let provenance: String
+    public let createdAtISO: String
+
+    public init(id: String = UUID().uuidString,
+                accountId: String,
+                workspaceId: String,
+                scheme: String,
+                identifier: String,
+                strength: String,
+                verificationState: String,
+                provenance: String,
+                createdAtISO: String) {
+        self.id = id
+        self.accountId = accountId
+        self.workspaceId = workspaceId
+        self.scheme = scheme
+        self.identifier = identifier
+        self.strength = strength
+        self.verificationState = verificationState
+        self.provenance = provenance
+        self.createdAtISO = createdAtISO
+    }
+}
+
 public struct ImportSessionDTO: Equatable {
     public let id: String
     public let workspaceId: String

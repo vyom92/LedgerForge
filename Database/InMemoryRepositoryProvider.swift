@@ -22,6 +22,7 @@ public final class InMemoryRepositoryProvider {
 private final class InMemoryRepositoryState {
     var workspaces: [String: WorkspaceDTO] = [:]
     var accounts: [String: AccountDTO] = [:]
+    var accountIdentifiers: [String: AccountIdentifierDTO] = [:]
     var importSessions: [String: ImportSessionRecordDTO] = [:]
     var transactions: [String: TransactionDTO] = [:]
 }
@@ -70,6 +71,62 @@ private final class InMemoryAccountRepo: AccountRepository {
                     return lhs.id < rhs.id
                 }
                 return lhs.name < rhs.name
+            }
+    }
+
+    func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String {
+        guard let account = state.accounts[identifier.accountId] else {
+            throw RepositoryError.relationshipViolation("Account \(identifier.accountId) does not exist for identifier \(identifier.id).")
+        }
+        guard account.workspaceId == identifier.workspaceId else {
+            throw RepositoryError.relationshipViolation("Account \(identifier.accountId) belongs to workspace \(account.workspaceId), not \(identifier.workspaceId).")
+        }
+
+        let existing = matchingIdentifiers(workspaceId: identifier.workspaceId, scheme: identifier.scheme, identifier: identifier.identifier)
+        if let conflict = existing.first(where: { $0.accountId != identifier.accountId }) {
+            throw RepositoryError.conflictingAccountIdentifier(
+                workspaceId: identifier.workspaceId,
+                scheme: identifier.scheme,
+                identifier: identifier.identifier,
+                existingAccountId: conflict.accountId,
+                attemptedAccountId: identifier.accountId
+            )
+        }
+
+        if let current = existing.sorted(by: { $0.id < $1.id }).first {
+            return current.id
+        }
+
+        state.accountIdentifiers[identifier.id] = identifier
+        return identifier.id
+    }
+
+    func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO] {
+        state.accountIdentifiers.values
+            .filter { $0.accountId == accountId && $0.workspaceId == workspaceId }
+            .sorted { lhs, rhs in
+                if lhs.scheme == rhs.scheme {
+                    if lhs.identifier == rhs.identifier {
+                        return lhs.id < rhs.id
+                    }
+                    return lhs.identifier < rhs.identifier
+                }
+                return lhs.scheme < rhs.scheme
+            }
+    }
+
+    func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String] {
+        matchingIdentifiers(workspaceId: workspaceId, scheme: scheme, identifier: identifier)
+            .map(\.accountId)
+            .sorted()
+    }
+
+    private func matchingIdentifiers(workspaceId: String, scheme: String, identifier: String) -> [AccountIdentifierDTO] {
+        state.accountIdentifiers.values
+            .filter {
+                $0.workspaceId == workspaceId
+                && $0.scheme == scheme
+                && $0.identifier == identifier
             }
     }
 }
