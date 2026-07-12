@@ -16,6 +16,8 @@ Only the ACTIVE sprint belongs in Implementation.md.
 
 ### High Priority
 
+Discovery outcome: Sprint 33 cannot be finalized until the source of verified FinancialIdentifier values is defined. The repository and resolver are ready, but the production import pipeline has no approved producer for strong identifiers.
+
 #### Identity
 
 - [ ] Production import integration using the Financial Identity Foundation
