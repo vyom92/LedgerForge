@@ -647,3 +647,383 @@ struct ExampleView_Previews: PreviewProvider {
         ExampleView()
     }
 }
+```
+
+The `#Preview` macro may be reconsidered in a future sprint only after the active Xcode toolchain reliably supports command-line and automated test compilation without triggering `PreviewsMacros.SwiftUIView` failures.
+
+## Rationale
+
+Sprint 18 validation was blocked because `xcodebuild test` compiled production SwiftUI view files and failed while expanding the external `#Preview` macro before any Sprint 18 test assertions could run.
+
+Investigation showed that scheme-only, test-target-only and build-setting-only workarounds did not prevent preview macro expansion. A controlled single-file experiment converted `ContentView.swift` from `#Preview` to `PreviewProvider`; the failure moved to the remaining preview files, confirming the root cause.
+
+Using `PreviewProvider` preserves Xcode preview functionality while avoiding the failing macro expansion path during test builds.
+
+## Consequences
+
+- Preview compatibility is allowed as a production-source-affecting but runtime-neutral change.
+- This decision must not be used to justify UI, repository, import, validation or persistence changes.
+- Future use of `#Preview` should be avoided until the toolchain issue is verified as resolved.
+- Once the toolchain issue is resolved, `#Preview` may be reintroduced through a dedicated architectural review and regression validation.
+- If `#Preview` is reintroduced, required regression validation must pass through the standard project workflow.
+- The decision exists to unblock validation, not to change user-visible behaviour.
+
+## Related ADRs
+
+- ADR-010 — Validation Before Persistence
+- ADR-016 — Universal Import Pipeline
+- ADR-017 — Deterministic Before Intelligent
+- ADR-018 — Unified Import Framework Operational
+- ADR-019 — Reference Fixtures Define Financial Truth
+- ADR-021 — Deterministic Statement Classification
+
+---
+
+# ADR-023 — Frozen UI/UX Architecture
+
+## Status
+
+Accepted
+
+## Implemented In
+
+Sprint 20, refined through Sprint 22 UI/UX asset freeze
+
+## Decision
+
+LedgerForge adopts a frozen UI/UX architecture in the same manner as the frozen backend architecture.
+
+Visual structure, navigation, interaction patterns and primary layouts are defined by `UI_UX_v1.0_Frozen.md` together with approved assets stored under `Project documents/UI Assets/Approved/`.
+
+`DesignBoard_v2.0.png` is the master UI reference. Individual approved assets define screen-level implementation details.
+
+Implementation sprints must implement the approved UI specification rather than redesigning the application during development.
+
+## Rationale
+
+Repeated visual redesign during implementation creates inconsistent navigation, duplicated components and architectural drift.
+
+Separating visual design from implementation allows UI decisions to be reviewed, approved and versioned independently from SwiftUI implementation.
+
+This mirrors the successful approach used for `Architecture_v1.0_Frozen.md`.
+
+## Consequences
+
+- UI/UX becomes an architectural concern rather than an implementation concern.
+- Approved UI assets become part of the project's architectural documentation.
+- `Project documents/UI Assets/Approved/DesignBoard_v2.0.png` is the authoritative visual reference for future UI implementation.
+- Future UI work must translate approved assets into SwiftUI rather than reinterpret layout, spacing, theme or navigation during implementation.
+- Implementation sprints focus on translating approved designs into SwiftUI components.
+- Significant UI changes require design review before implementation.
+- New screens extend the approved application shell rather than replacing it.
+
+## Related ADRs
+
+- ADR-002 — Dashboard-First Product
+- ADR-009 — Reactive Store Architecture
+- ADR-013 — Store Ownership
+- ADR-016 — Universal Import Pipeline
+- ADR-022 — Preview Compatibility During Test Builds
+
+---
+
+# ADR-024 — Repository Hydration Boundary
+
+## Status
+
+Accepted
+
+## Implemented In
+
+Sprint 19, stabilised through Sprint 24
+
+## Decision
+
+RepositoryStoreHydrator is the only approved boundary for transferring persisted repository state into observable runtime stores.
+
+The approved downstream application flow is:
+
+Repositories
+↓
+SQLite
+↓
+RepositoryStoreHydrator
+↓
+Runtime Stores
+↓
+ViewModels
+↓
+Views
+
+Views, ViewModels and Runtime Stores must never read from or write to SQLite directly.
+
+Runtime Stores may expose and transform hydrated state for presentation, but repositories remain the durable source of truth.
+
+## Rationale
+
+A single persistence-to-runtime boundary prevents duplicated hydration logic, inconsistent startup state and accidental bypassing of repository contracts.
+
+It also keeps SwiftUI presentation code independent of persistence implementation details and makes restart behaviour deterministic and testable.
+
+## Consequences
+
+- RepositoryStoreHydrator owns startup and refresh hydration into Runtime Stores.
+- Runtime Stores remain observable in-memory state, not persistence authorities.
+- Repository implementations remain the only components permitted to access SQLite.
+- New persisted domains must integrate through repositories and RepositoryStoreHydrator rather than creating parallel loading paths.
+- Dashboard, account and transaction state restored after relaunch must originate from repository-backed hydration.
+- ADR-016 and ADR-018 remain valid for the import pipeline, but their downstream `SQLite → Stores` shorthand is refined to `SQLite → RepositoryStoreHydrator → Runtime Stores`.
+
+## Related ADRs
+
+- ADR-009 — Reactive Store Architecture
+- ADR-010 — Validation Before Persistence
+- ADR-013 — Store Ownership
+- ADR-016 — Universal Import Pipeline
+- ADR-018 — Unified Import Framework Operational
+
+---
+
+# ADR-025 — Stable Financial Entity Identity
+
+## Status
+
+Accepted
+
+## Implemented In
+
+Sprint 25 foundation; future matching capabilities remain deferred
+
+## Decision
+
+LedgerForge models specific financial entities rather than treating a financial institution as the account identity.
+
+Examples of separate financial entities include:
+
+- Axis NRE account
+- Axis NRO account
+- HDFC NRE account
+- HDFC NRO account
+- CBQ current account
+- CBQ investment or mutual-fund account
+- Credit-card accounts
+- Brokerage accounts
+- Retirement accounts
+
+Repository identifiers for financial entities are immutable.
+
+Display names, institution labels and imported filenames are presentation or source metadata only and must never define durable identity or participate in account matching.
+
+Future matching must rely on verified financial identifiers where available, including account numbers, IBANs, card identifiers, broker account IDs and future investment identifiers such as folio numbers.
+
+## Rationale
+
+A single institution may contain multiple unrelated accounts and product types. Institution-level or display-name matching can silently merge distinct financial histories or create duplicate accounts when names or filenames change.
+
+Stable repository identity and verified identifiers provide a deterministic foundation for historical imports, overlap handling, duplicate prevention and cross-document reconciliation.
+
+## Consequences
+
+- Institution attribution remains metadata associated with a financial entity.
+- Display names may evolve without changing repository identity.
+- Filenames, institution names and display names must not be used as account-matching keys.
+- Duplicate-prevention and historical-import work must preserve existing repository IDs.
+- Verified identifiers must be canonicalised and stored separately from presentation metadata before automatic cross-file account matching is enabled.
+- Documents and transactions attach to a financial entity rather than merely to an institution.
+- Ambiguous identity must remain unresolved instead of being guessed.
+
+## Related ADRs
+
+- ADR-003 — Generic Import Engine
+- ADR-004 — Explainable Automation
+- ADR-008 — Multi-Currency Domain Model
+- ADR-010 — Validation Before Persistence
+- ADR-014 — Document-First Architecture
+- ADR-017 — Deterministic Before Intelligent
+- ADR-019 — Reference Fixtures Define Financial Truth
+- ADR-020 — Deterministic Institution Detection
+- ADR-021 — Deterministic Statement Classification
+- ADR-024 — Repository Hydration Boundary
+
+---
+
+# ADR-026 — Structured Developer Diagnostics
+
+## Status
+
+Accepted
+
+---
+
+## Intended Implementation
+
+Sprint 31 — Developer Diagnostics & Logging
+
+---
+
+## Context
+
+Prior to Sprint 31, the Developer Console stored diagnostics as unstructured plain strings.
+
+This made it difficult to:
+
+- distinguish operational lifecycle events from implementation details
+- classify diagnostics by subsystem
+- filter meaningful information
+- perform deterministic automated testing
+- evolve developer tooling without affecting financial behaviour
+
+The console had gradually become a mixture of informational messages, parser internals and debugging output without consistent semantics.
+
+---
+
+## Decision
+
+LedgerForge shall use structured, in-memory diagnostic entries instead of plain string messages.
+
+Every diagnostic entry shall contain:
+
+- Stable identity
+- Monotonic sequence number
+- Timestamp
+- Diagnostic level
+- Diagnostic category
+- Concise human-readable message
+- Optional structured metadata
+
+The initial diagnostic levels are:
+
+- Debug
+- Info
+- Warning
+- Error
+
+The initial diagnostic categories are:
+
+- Application
+- Import
+- Parser
+- Validation
+- Database
+- Runtime
+
+Levels describe severity.
+
+Categories describe the subsystem responsible for the event.
+
+These concepts must remain independent.
+
+---
+
+## Presentation
+
+Stored diagnostic history remains chronological.
+
+Presentation may display entries newest-first without modifying stored order or sequence numbers.
+
+Debug diagnostics remain hidden by default.
+
+The default Developer Console should present concise operational lifecycle events.
+
+Low-level implementation details belong in Debug diagnostics.
+
+---
+
+## Architectural Constraints
+
+Developer diagnostics shall remain:
+
+- in-memory only
+- presentation focused
+- deterministic
+- independent of repositories
+- independent of runtime stores
+- independent of SQLite
+
+Developer diagnostics must never become:
+
+- a persistence mechanism
+- a financial source of truth
+- a replacement for RepositoryStoreHydrator
+- a replacement for repository history
+
+---
+
+## Rationale
+
+Separating diagnostic severity from subsystem classification produces significantly clearer operational information.
+
+Structured diagnostics enable:
+
+- deterministic filtering
+- deterministic testing
+- concise lifecycle reporting
+- richer future developer tooling
+
+without affecting LedgerForge's financial architecture.
+
+Keeping diagnostics ephemeral prevents accidental architectural coupling between developer tooling and business data.
+
+---
+
+## Consequences
+
+Positive:
+
+- deterministic filtering
+- deterministic searching
+- concise import lifecycle
+- parser internals isolated to Debug
+- improved automated testing
+- easier future tooling
+- consistent Copy All formatting
+
+Negative:
+
+- slightly more complex diagnostic model
+- migration of existing logging call sites
+- additional UI filtering logic
+
+Accepted trade-off:
+
+The increase in implementation complexity is justified by substantially improved developer usability and maintainability.
+
+---
+
+## Non-Goals
+
+This ADR does **not** introduce:
+
+- persistent log storage
+- log export
+- analytics
+- performance profiling
+- repository inspection
+- SQL browsing
+- parser debugging
+- duplicate inspection
+
+Those capabilities require future ADRs.
+
+---
+
+## Related ADRs
+
+- ADR-004 — Explainable Automation
+- ADR-007 — Explain Before Automating
+- ADR-009 — Reactive Store Architecture
+- ADR-013 — Store Ownership
+- ADR-017 — Deterministic Before Intelligent
+- ADR-023 — Frozen UI/UX Architecture
+- ADR-024 — Repository Hydration Boundary
+
+---
+
+## Acceptance
+
+Change the status from **Proposed** to **Accepted** only after:
+
+- Sprint 31 implementation is complete
+- automated validation passes
+- manual runtime verification passes
+- Sprint 31 is recorded in `PROJECT_STATE.md`

@@ -109,12 +109,10 @@ Scope:
 * Desktop ChatGPT owns ACTIVE sprint planning.
 * Repository DTO `Equatable` conformances for `WorkspaceDTO`, `TransactionRawRowDTO`, `TransactionDTO`, `AccountDTO` and `ImportSessionRecordDTO` are explicitly nonisolated.
 * The app target default actor isolation remains `MainActor`.
-* `Project documents/Implementation.md` is the Desktop ChatGPT-owned sprint planning and workflow document.
 * `Project documents/Codex response.md` records the latest planning or execution report produced by the executing assistant.
 * `Project documents/PROJECT_STATE.md` records verified repository facts only.
 * `Project documents/.github/Context_Manifest.yaml` is the bootstrap manifest and routing document, not a repository state database.
 * Only the ACTIVE sprint block in `Project documents/Implementation.md` should be read during sprint execution.
-* `Project documents/Implementation.md` contains only the current ACTIVE sprint; completed sprint history belongs in `Project documents/PROJECT_STATE.md`.
 * Preserve RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
 * Preserve import, parser, validation and repository semantics.
 * Preserve transaction search and credit/debit toggle behaviour.
@@ -122,8 +120,6 @@ Scope:
 * Preserve durable SQLite startup persistence wiring.
 * Preserve stable repository account identifiers.
 * Preserve institution attribution through repository hydration.
-* Repository DTO `Equatable` conformances for `WorkspaceDTO`, `TransactionRawRowDTO`, `TransactionDTO`, `AccountDTO` and `ImportSessionRecordDTO` are explicitly nonisolated.
-* The app target default actor isolation remains `MainActor`.
 * DTO concurrency isolation maintenance commit `481185a711a3a7366229e74081401c84c7acc6c6` was pushed to `origin/main` and verified with `git ls-remote origin refs/heads/main`.
 
 ## Current Product Review
@@ -164,23 +160,62 @@ Scope:
 - Parser implementation details are available as Debug diagnostics.
 - Database reset preserves Developer Mode and non-financial preferences.
 - Importing after reset writes to the fresh provider and remains persisted after relaunch.
-- Old pre-reset data does not return.
-- Log Console plain-text search, `Copy All` and `Clear` are implemented.
-- Runtime Inspector displays provider state, hydration status, latest refresh result, account count, transaction count and SQLite path when available.
-- Repository Summary displays Accounts and Transactions counts only.
-- No parser, reader, validation, repository contract, runtime-store contract, SQLite schema or financial calculation changes were made.
-- Xcode diagnostics passed with 0 issues for resolvable modified Swift files.
-- Xcode diagnostics could not directly resolve `LedgerForge/Services/ImportEngine.swift` or `LedgerForge/Services/Services/ImportEngine.swift` by project path, but Xcode build compiled it successfully.
-- Xcode build passed.
-- Active Xcode test plan passed: 112 tests, 0 failures, 0 skipped.
-- Manual runtime verification passed.
-- Implementation commit: `274e1f5`
-- Full implementation commit: `274e1f5e8f1f6a90d0701442c8f7fb0286ec2c5b`
-- Git push to `origin/main` completed successfully.
-- Remote verification: `git ls-remote origin refs/heads/main` returned `274e1f5e8f1f6a90d0701442c8f7fb0286ec2c5b`.
-- Documentation handoff commit: `c86d360`
-- Full documentation handoff commit: `c86d360ae2ce63bb31b22928e6368307193bd7be`
-- Final remote `main` verification returned `c86d360ae2ce63bb31b22928e6368307193bd7be`.
+- Architecture v1.0 and UI/UX v1.0 remain preserved.
+
+### Current Critical Product Issues
+
+- None verified for Sprint 31.
+
+### Current Important Product Issues
+
+- Account rows display a chevron despite no verified account-detail navigation.
+- Some user-facing screens expose developer terminology such as repository or hydration language.
+- Toolbar composition varies across major screens.
+- Several user-facing controls display `Pending` or `Soon` states that add visual noise.
+- Transaction detail presentation does not yet use the available space effectively.
+
+### Current Cosmetic Issues
+
+- Institution logos are not implemented.
+- Dashboard charts are not interactive.
+- Hover and minor spacing polish remain future work.
+- Future sidebar modules remain visibly marked as unavailable.
+
+### Ready for Next Feature Sprint?
+
+Yes.
+
+### Reason
+
+Sprint 31 is completed and approved. Sprint 32 — Financial Identity Engine may now be defined as the next ACTIVE sprint.
+
+Out of Scope:
+
+* PDF support
+* OCR
+* Parser behaviour changes
+* Validation redesign
+* Repository redesign
+* Database schema changes
+* Automatic account matching
+* Concrete verified-identifier matching service
+* Editable import preview
+* Batch import
+* Duplicate-management UI
+* Password-entry UI
+* Import correction workflow
+* Transaction extraction changes
+* Analytics
+* Budgets
+* Insights
+* Reports
+* Multi-currency
+* Investments
+
+Next Major Milestone:
+
+* Replace the completed Sprint 31 ACTIVE contract with Sprint 32 — Financial Identity Engine.
+* Resume the deferred product roadmap with Sprint 32 — Financial Identity Engine, followed by Universal Import Platform, Financial Intelligence, Salary Planner, Investments and Analytics.
 
 ---
 
