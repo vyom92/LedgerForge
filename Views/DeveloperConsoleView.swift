@@ -3,6 +3,7 @@
 // Version: 0.0.4
 
 import SwiftUI
+import Combine
 #if os(macOS)
 import AppKit
 #endif
@@ -12,7 +13,13 @@ struct DeveloperConsoleView: View {
     @ObservedObject var console = DeveloperConsole.shared
     @ObservedObject private var accountStore = AccountStore.shared
     @ObservedObject private var transactionStore = TransactionStore.shared
-    @State private var logSearchText = ""
+
+    // Filters
+    @State private var filters = DeveloperConsole.Filters()
+    @State private var selectedLevel: LevelPicker = .all
+    @State private var selectedCategory: CategoryPicker = .all
+
+    // UI State
     @State private var hydrationStatus = "Not refreshed in console"
     @State private var latestRefreshResult = "No console refresh yet"
     @State private var actionError: String?
@@ -62,6 +69,12 @@ struct DeveloperConsoleView: View {
         } message: {
             Text("This irreversible development action removes all imported financial data and import history by switching to a fresh SQLite database. Application preferences, appearance and Developer Mode are preserved.")
         }
+        .onChange(of: selectedLevel) { _, _ in
+            applyLevelFilter()
+        }
+        .onChange(of: selectedCategory) { _, _ in
+            applyCategoryFilter()
+        }
     }
 
     private var runtimeSnapshot: DeveloperConsoleSnapshot {
@@ -75,37 +88,65 @@ struct DeveloperConsoleView: View {
         )
     }
 
-    private var displayedMessages: [String] {
-        console.filteredMessages(matching: logSearchText)
+    private var displayedEntries: [DeveloperLogEntry] {
+        let filtered = console.filteredEntries(using: filters)
+        return DeveloperConsole.newestFirst(filtered)
     }
 
     private var logHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Log Console")
+            HStack(alignment: .center, spacing: 10) {
+                Text("Developer Diagnostics")
                     .font(.headline)
                 Spacer()
-                LFInlineBadge(title: "\(displayedMessages.count) shown", color: LFTheme.textSecondary)
+                LFInlineBadge(title: "\(displayedEntries.count) shown", color: LFTheme.textSecondary)
             }
 
-            TextField("Plain-text log search", text: $logSearchText)
-                .textFieldStyle(.plain)
-                .font(.caption)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(LFTheme.surfaceRaised.opacity(0.65))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7)
-                        .stroke(LFTheme.border, lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 7))
+            HStack(spacing: 10) {
+                // Level filter
+                Picker("Level", selection: $selectedLevel) {
+                    Text("All Levels").tag(LevelPicker.all)
+                    Text("Debug").tag(LevelPicker.debug)
+                    Text("Info").tag(LevelPicker.info)
+                    Text("Warning").tag(LevelPicker.warning)
+                    Text("Error").tag(LevelPicker.error)
+                }
+                .pickerStyle(.menu)
+                .frame(width: 160)
+
+                // Category filter
+                Picker("Category", selection: $selectedCategory) {
+                    Text("All Categories").tag(CategoryPicker.all)
+                    Text("Application").tag(CategoryPicker.application)
+                    Text("Import").tag(CategoryPicker.`import`)
+                    Text("Parser").tag(CategoryPicker.parser)
+                    Text("Validation").tag(CategoryPicker.validation)
+                    Text("Database").tag(CategoryPicker.database)
+                    Text("Runtime").tag(CategoryPicker.runtime)
+                }
+                .pickerStyle(.menu)
+                .frame(width: 180)
+
+                // Search
+                TextField("Search diagnostics (message, metadata)", text: $filters.searchText)
+                    .textFieldStyle(.plain)
+                    .font(.caption)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(LFTheme.surfaceRaised.opacity(0.65))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7)
+                            .stroke(LFTheme.border, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+            }
         }
     }
 
     private var consoleLogTable: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                if console.messages.isEmpty {
+                if console.entries.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "terminal")
                             .font(.system(size: 34))
@@ -118,7 +159,7 @@ struct DeveloperConsoleView: View {
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity, minHeight: 260)
-                } else if displayedMessages.isEmpty {
+                } else if displayedEntries.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 34))
@@ -131,20 +172,8 @@ struct DeveloperConsoleView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 260)
                 } else {
-                    ForEach(Array(displayedMessages.enumerated()), id: \.offset) { index, message in
-                        HStack(spacing: 14) {
-                            Text("#\(index + 1)")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(LFTheme.textSecondary)
-                                .frame(width: 86, alignment: .leading)
-
-                            Text(message)
-                                .font(.system(.caption, design: .monospaced))
-                                .lineLimit(2)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(.vertical, 10)
-
+                    ForEach(displayedEntries) { entry in
+                        logRow(entry)
                         Divider().overlay(LFTheme.divider)
                     }
                 }
@@ -153,11 +182,74 @@ struct DeveloperConsoleView: View {
         .frame(minHeight: 430)
     }
 
+    @ViewBuilder
+    private func logRow(_ entry: DeveloperLogEntry) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text("#\(entry.sequence)")
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(LFTheme.textSecondary)
+                .frame(width: 86, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(Self.rowTimeFormatter.string(from: entry.timestamp))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(LFTheme.textSecondary)
+
+                    levelBadge(entry.level)
+                    categoryBadge(entry.category)
+                }
+
+                Text(entry.message)
+                    .font(.system(.caption, design: .monospaced))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let metadataText = DeveloperConsole.metadataText(for: entry) {
+                    Text(metadataText)
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(LFTheme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .padding(.vertical, 10)
+    }
+
+    private func levelBadge(_ level: DeveloperLogLevel) -> some View {
+        let color: Color = {
+            switch level {
+            case .debug: return LFTheme.textSecondary
+            case .info: return LFTheme.info
+            case .warning: return LFTheme.warning
+            case .error: return LFTheme.danger
+            }
+        }()
+        return Text(level.rawValue)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.15))
+            .foregroundStyle(color)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+
+    private func categoryBadge(_ category: DeveloperLogCategory) -> some View {
+        Text(category.rawValue)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(LFTheme.surfaceRaised.opacity(0.65))
+            .foregroundStyle(LFTheme.textSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+
     private var logActions: some View {
         HStack(spacing: 10) {
             Spacer()
 
-            consoleButton(
+            LFConsoleButton(
                 title: "Copy All",
                 systemImage: "doc.on.doc",
                 minWidth: 104,
@@ -166,7 +258,7 @@ struct DeveloperConsoleView: View {
                 copyAllLogs()
             }
 
-            consoleButton(
+            LFConsoleButton(
                 title: "Clear",
                 systemImage: "trash",
                 minWidth: 88,
@@ -174,6 +266,10 @@ struct DeveloperConsoleView: View {
                 foreground: LFTheme.danger
             ) {
                 console.clear()
+                // Reset presentation state
+                filters = DeveloperConsole.Filters()
+                selectedLevel = .all
+                selectedCategory = .all
             }
         }
         .padding(12)
@@ -209,7 +305,7 @@ struct DeveloperConsoleView: View {
     private var toolsPanel: some View {
         LFPanel(title: "Tools") {
             VStack(spacing: 10) {
-                consoleButton(
+                LFConsoleButton(
                     title: "Reload Data",
                     systemImage: "arrow.clockwise",
                     fill: LFTheme.surfaceRaised.opacity(0.65),
@@ -219,7 +315,7 @@ struct DeveloperConsoleView: View {
                     reloadData()
                 }
 
-                consoleButton(
+                LFConsoleButton(
                     title: "Reset Development Database",
                     systemImage: "exclamationmark.triangle",
                     fill: LFTheme.danger,
@@ -241,35 +337,38 @@ struct DeveloperConsoleView: View {
         }
     }
 
-    private func consoleButton(
-        title: String,
-        systemImage: String,
-        minWidth: CGFloat? = nil,
-        fill: Color,
-        foreground: Color = LFTheme.text,
-        isFullWidth: Bool = false,
-        showsBorder: Bool = true,
-        isDisabled: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.caption.weight(.semibold))
-                .frame(minWidth: minWidth)
-                .frame(maxWidth: isFullWidth ? .infinity : nil)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .foregroundStyle(foreground)
-                .background(fill)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7)
-                        .stroke(LFTheme.border, lineWidth: showsBorder ? 1 : 0)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-                .contentShape(RoundedRectangle(cornerRadius: 7))
+    private func applyLevelFilter() {
+        switch selectedLevel {
+        case .all:
+            filters.level = .all
+        case .debug:
+            filters.level = .exact(.debug)
+        case .info:
+            filters.level = .exact(.info)
+        case .warning:
+            filters.level = .exact(.warning)
+        case .error:
+            filters.level = .exact(.error)
         }
-        .buttonStyle(.plain)
-        .disabled(isDisabled)
+    }
+
+    private func applyCategoryFilter() {
+        switch selectedCategory {
+        case .all:
+            filters.category = .all
+        case .application:
+            filters.category = .exact(.application)
+        case .`import`:
+            filters.category = .exact(.`import`)
+        case .parser:
+            filters.category = .exact(.parser)
+        case .validation:
+            filters.category = .exact(.validation)
+        case .database:
+            filters.category = .exact(.database)
+        case .runtime:
+            filters.category = .exact(.runtime)
+        }
     }
 
     private func reloadData() {
@@ -279,13 +378,12 @@ struct DeveloperConsoleView: View {
             let result = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
             hydrationStatus = result.didHydrate ? "Forced refresh completed" : "No refresh required"
             latestRefreshResult = "\(result.accountCount) account(s), \(result.transactionCount) transaction(s)"
-            DeveloperConsole.shared.log("Reload Data: \(latestRefreshResult)")
+            DeveloperConsole.shared.info(.runtime, "Runtime refresh completed", metadata: ["accounts": "\(result.accountCount)", "transactions": "\(result.transactionCount)"])
         } catch {
             hydrationStatus = "Forced refresh failed"
             latestRefreshResult = "Refresh failed"
             actionError = error.localizedDescription
-            DeveloperConsole.shared.log("Reload Data: FAILED")
-            DeveloperConsole.shared.log(error.localizedDescription)
+            DeveloperConsole.shared.error(.runtime, "Runtime refresh failed", metadata: ["error": error.localizedDescription])
         }
         isRunningRepositoryAction = false
     }
@@ -297,12 +395,12 @@ struct DeveloperConsoleView: View {
             let result = try LedgerForgeApp.resetDevelopmentDatabase()
             hydrationStatus = "Reset hydration completed"
             latestRefreshResult = "\(result.accountCount) account(s), \(result.transactionCount) transaction(s)"
+            DeveloperConsole.shared.info(.database, "Development database reset", metadata: ["accounts": "\(result.accountCount)", "transactions": "\(result.transactionCount)"])
         } catch {
             hydrationStatus = "Reset failed"
             latestRefreshResult = "Reset failed"
             actionError = error.localizedDescription
-            DeveloperConsole.shared.log("Reset Development Database: FAILED")
-            DeveloperConsole.shared.log(error.localizedDescription)
+            DeveloperConsole.shared.error(.database, "Development database reset failed", metadata: ["error": error.localizedDescription])
         }
         isRunningRepositoryAction = false
     }
@@ -313,7 +411,7 @@ struct DeveloperConsoleView: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         #endif
-        DeveloperConsole.shared.log("Log Console: Copied all logs")
+        DeveloperConsole.shared.info(.application, "Copied complete diagnostic history")
     }
 
     private static let timeFormatter: DateFormatter = {
@@ -321,6 +419,22 @@ struct DeveloperConsoleView: View {
         formatter.dateFormat = "HH:mm:ss"
         return formatter
     }()
+
+    private static let rowTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
+    }()
+}
+
+// MARK: - Picker Models
+
+private enum LevelPicker: Hashable {
+    case all, debug, info, warning, error
+}
+
+private enum CategoryPicker: Hashable {
+    case all, application, `import`, parser, validation, database, runtime
 }
 
 struct DeveloperConsoleView_Previews: PreviewProvider {

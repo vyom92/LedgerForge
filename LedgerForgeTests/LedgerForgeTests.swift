@@ -130,19 +130,54 @@ struct LedgerForgeTests {
         #expect(snapshot.databasePath == "/tmp/sprint30.sqlite")
     }
 
-    @Test func logSearchCopyAndClearUsePlainStoredMessages() async {
-        let messages = [
-            "Import completed",
-            "Hydration failed",
-            "Reload Data: 1 account(s), 1 transaction(s)"
+    @Test func logSearchCopyAndClearUseStructuredDiagnosticEntries() async {
+        let baseDate = Date(timeIntervalSince1970: 1_804_896_000)
+        let entries = [
+            DeveloperLogEntry(
+                id: 1,
+                sequence: 1,
+                timestamp: baseDate,
+                level: .info,
+                category: .`import`,
+                message: "Import completed",
+                metadata: nil
+            ),
+            DeveloperLogEntry(
+                id: 2,
+                sequence: 2,
+                timestamp: baseDate.addingTimeInterval(1),
+                level: .error,
+                category: .runtime,
+                message: "Hydration failed",
+                metadata: nil
+            ),
+            DeveloperLogEntry(
+                id: 3,
+                sequence: 3,
+                timestamp: baseDate.addingTimeInterval(2),
+                level: .info,
+                category: .runtime,
+                message: "Reload Data",
+                metadata: ["result": "1 account(s), 1 transaction(s)"]
+            )
         ]
-        #expect(DeveloperConsole.filteredMessages(messages, matching: "hydration") == ["Hydration failed"])
-        #expect(DeveloperConsole.filteredMessages(messages, matching: "data").count == 1)
-        #expect(DeveloperConsole.logText(from: messages) == "Import completed\nHydration failed\nReload Data: 1 account(s), 1 transaction(s)")
 
-        DeveloperConsole.shared.log("Sprint 30 clear check")
-        DeveloperConsole.shared.clear()
-        #expect(DeveloperConsole.shared.messages.isEmpty)
+        var filters = DeveloperConsole.Filters()
+        filters.searchText = "hydration"
+        #expect(DeveloperConsole.filteredEntries(entries, using: filters).map(\.message) == ["Hydration failed"])
+
+        filters.searchText = "data"
+        #expect(DeveloperConsole.filteredEntries(entries, using: filters).count == 1)
+
+        let text = DeveloperConsole.logText(from: entries)
+        #expect(text.contains("[Info] [Import] Import completed"))
+        #expect(text.contains("[Error] [Runtime] Hydration failed"))
+        #expect(text.contains("[Info] [Runtime] Reload Data"))
+
+        let console = DeveloperConsole()
+        console.log("Sprint 30 clear check")
+        console.clear()
+        #expect(console.entries.isEmpty)
     }
 }
 

@@ -102,6 +102,7 @@ final class ImportEngine {
 
     private let importCoordinator: any ImportFramework.ImportCoordinator
     private let importPersistenceCoordinatorFactory: () -> ImportPersistenceCoordinating
+    private let developerConsole: DeveloperConsole
     private let committedPreparedImportLock = NSLock()
     private var committedPreparedImportIDs: Set<UUID> = []
 
@@ -110,9 +111,11 @@ final class ImportEngine {
             readerRegistry: DefaultReaderRegistry(),
             passwordProvider: DefaultPasswordProvider()
         ),
-        importPersistenceCoordinator: ImportPersistenceCoordinating? = nil
+        importPersistenceCoordinator: ImportPersistenceCoordinating? = nil,
+        developerConsole: DeveloperConsole = .shared
     ) {
         self.importCoordinator = importCoordinator
+        self.developerConsole = developerConsole
         if let importPersistenceCoordinator {
             self.importPersistenceCoordinatorFactory = {
                 importPersistenceCoordinator
@@ -125,28 +128,32 @@ final class ImportEngine {
     }
 
     func importFile(from url: URL) {
-
-        DeveloperConsole.shared.clear()
-
-        DeveloperConsole.shared.log("Import requested")
-        DeveloperConsole.shared.log(url.path)
-        DeveloperConsole.shared.log("")
-
         Task {
             _ = await importFileAndReturnResult(from: url)
         }
-
     }
 
     func importFileAndReturnResult(from url: URL) async -> ImportEngineResult {
+        let entryCountBeforeImport = developerConsole.entries.count
+        developerConsole.info(.`import`, "Import started", metadata: ["file": url.lastPathComponent])
 
         do {
             let preparedImport = try await prepareImport(from: url)
-            return await commitPreparedImport(preparedImport)
+
+            let result = await commitPreparedImport(preparedImport)
+            if result.succeeded {
+                developerConsole.info(.`import`, "Import completed", metadata: ["file": result.fileName, "transactions": "\(result.transactionCount)"])
+            } else {
+                developerConsole.error(.`import`, "Import failed", metadata: ["file": result.fileName, "error": result.errorMessage ?? "Unknown error"])
+            }
+            return result
 
         } catch {
 
-            DeveloperConsole.shared.log("ERROR: \(error.localizedDescription)")
+            if developerConsole.entries.count == entryCountBeforeImport + 1 {
+                developerConsole.error(.`import`, error.localizedDescription, metadata: ["file": url.lastPathComponent])
+            }
+            developerConsole.error(.`import`, "Import failed", metadata: ["file": url.lastPathComponent, "error": error.localizedDescription])
             return ImportEngineResult(
                 fileName: url.lastPathComponent,
                 transactionCount: 0,
@@ -163,86 +170,65 @@ final class ImportEngine {
         let contents = try await readTextDocument(from: url)
 
         guard !contents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            DeveloperConsole.shared.log("ERROR: Imported document is empty.")
+            developerConsole.error(.`import`, "Imported document is empty.")
             throw ImportError.invalidDocument(message: "Imported document is empty.")
         }
 
         let processedDocument = processCSVDocument(contents: contents, url: url)
-        let metadata = processedDocument.metadata
-        let document = processedDocument.document
 
-        DeveloperConsole.shared.log("Detected Institution: \(metadata.institution.rawValue)")
-        DeveloperConsole.shared.log("Document Type: \(metadata.documentType.rawValue)")
-        DeveloperConsole.shared.log("Confidence: \(Int(metadata.confidence * 100))%")
-        DeveloperConsole.shared.log("")
+        developerConsole.info(.`import`, "Institution detected", metadata: ["institution": processedDocument.metadata.institution.rawValue])
+        developerConsole.info(.`import`, "Parser selected", metadata: ["parser": processedDocument.parser?.name ?? "None"])
 
-        DeveloperConsole.shared.log("========== DOCUMENT ==========")
-        DeveloperConsole.shared.log("File: \(document.filename)")
-        DeveloperConsole.shared.log("Rows: \(document.rowCount)")
-        DeveloperConsole.shared.log("Columns: \(document.columnCount)")
-        DeveloperConsole.shared.log("Header Row: \(document.headerRow ?? -1)")
-        DeveloperConsole.shared.log("First Transaction Row: \(document.firstTransactionRow ?? -1)")
-        DeveloperConsole.shared.log("Delimiter: \(document.delimiter ?? "?")")
-        DeveloperConsole.shared.log("Encoding: \(document.encoding ?? "Unknown")")
-        DeveloperConsole.shared.log("==============================")
-        DeveloperConsole.shared.log("")
-
-        let normalizedRows = processedDocument.normalizedRows
-
-        DeveloperConsole.shared.log("Normalized Rows: \(normalizedRows.count)")
-        DeveloperConsole.shared.log("")
+        // Parser internals (Debug)
+        developerConsole.debug(.parser, "Detected document", metadata: [
+            "file": processedDocument.document.filename,
+            "rows": "\(processedDocument.document.rowCount)",
+            "columns": "\(processedDocument.document.columnCount)",
+            "headerRow": "\(processedDocument.document.headerRow ?? -1)",
+            "firstTxnRow": "\(processedDocument.document.firstTransactionRow ?? -1)",
+            "delimiter": String(processedDocument.document.delimiter ?? "?"),
+            "encoding": processedDocument.document.encoding ?? "Unknown"
+        ])
+        developerConsole.debug(.parser, "Normalization details", metadata: [
+            "normalizedRows": "\(processedDocument.normalizedRows.count)"
+        ])
 
         guard let parser = processedDocument.parser else {
-            DeveloperConsole.shared.log("No suitable parser found.")
+            developerConsole.warning(.`import`, "No suitable parser found.")
             throw ImportError.invalidDocument(message: "No suitable parser found.")
         }
 
-        DeveloperConsole.shared.log("Selected Parser: \(parser.name)")
-
         let normalizedDocument = NormalizedDocument(
-            document: document,
-            metadata: metadata,
-            rows: normalizedRows
+            document: processedDocument.document,
+            metadata: processedDocument.metadata,
+            rows: processedDocument.normalizedRows
         )
 
         let financialDocument = try parser.parse(
             document: normalizedDocument
         )
+        developerConsole.debug(.parser, "Row count", metadata: ["transactions": "\(financialDocument.transactions.count)"])
 
         let validation = ImportValidator.validate(
             financialDocument: financialDocument
         )
+        developerConsole.info(.validation, "Validation completed", metadata: ["passed": validation.passed ? "true" : "false", "issues": "\(validation.issues.count)"])
 
         let importSession = ImportSession(
-            fileName: document.filename,
-            institution: metadata.institution,
-            documentType: metadata.documentType,
+            fileName: processedDocument.document.filename,
+            institution: processedDocument.metadata.institution,
+            documentType: processedDocument.metadata.documentType,
             parserName: parser.name,
             transactionCount: financialDocument.transactions.count,
             validation: validation
         )
 
-        DeveloperConsole.shared.log("Transactions Parsed: \(financialDocument.transactions.count)")
-        DeveloperConsole.shared.log("Import Prepared")
-        DeveloperConsole.shared.log("Validation: \(validation.passed ? "PASSED" : "FAILED")")
-        DeveloperConsole.shared.log("Validation Issues: \(validation.issues.count)")
-        if !validation.issues.isEmpty {
-            DeveloperConsole.shared.log("======== VALIDATION ISSUES ========")
-
-            for issue in validation.issues {
-                DeveloperConsole.shared.log(issue.message)
-            }
-
-            DeveloperConsole.shared.log("===================================")
-        }
-        DeveloperConsole.shared.log("File: \(importSession.fileName)")
-
         return PreparedImport(
             sourceURL: url,
             rawContents: contents,
-            fileName: document.filename,
-            detectedInstitution: metadata.institution,
-            detectedDocumentType: metadata.documentType,
+            fileName: processedDocument.document.filename,
+            detectedInstitution: processedDocument.metadata.institution,
+            detectedDocumentType: processedDocument.metadata.documentType,
             parserName: parser.name,
             financialDocument: financialDocument,
             validation: validation,
@@ -252,6 +238,7 @@ final class ImportEngine {
 
     func commitPreparedImport(_ preparedImport: PreparedImport) async -> ImportEngineResult {
         guard preparedImport.validation.passed else {
+            developerConsole.error(.validation, "Validation failed", metadata: ["file": preparedImport.fileName])
             return ImportEngineResult(
                 fileName: preparedImport.fileName,
                 transactionCount: preparedImport.transactionCount,
@@ -262,6 +249,7 @@ final class ImportEngine {
         }
 
         guard markPreparedImportCommitted(preparedImport.id) else {
+            developerConsole.warning(.`import`, "Prepared import already committed", metadata: ["file": preparedImport.fileName])
             return ImportEngineResult(
                 fileName: preparedImport.fileName,
                 transactionCount: preparedImport.transactionCount,
@@ -281,11 +269,10 @@ final class ImportEngine {
                 validation: preparedImport.validation
             )
             if persistenceResult.persisted {
-                DeveloperConsole.shared.log("Repository Persistence: COMPLETED")
+                developerConsole.info(.database, "Repository persistence completed")
             }
         } catch {
-            DeveloperConsole.shared.log("Repository Persistence: FAILED")
-            DeveloperConsole.shared.log(error.localizedDescription)
+            developerConsole.error(.database, "Repository persistence failed", metadata: ["error": error.localizedDescription])
             persistenceErrorMessage = error.localizedDescription
         }
 
@@ -301,8 +288,7 @@ final class ImportEngine {
             )
         }
 
-        DeveloperConsole.shared.log("Runtime Stores: UPDATED")
-        DeveloperConsole.shared.log("Import Session Created")
+        developerConsole.info(.runtime, "Runtime refresh completed")
 
         return ImportEngineResult(
             fileName: preparedImport.fileName,
