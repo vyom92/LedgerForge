@@ -1027,3 +1027,110 @@ Change the status from **Proposed** to **Accepted** only after:
 - automated validation passes
 - manual runtime verification passes
 - Sprint 31 is recorded in `PROJECT_STATE.md`
+
+---
+
+# ADR-027 — Parser-Owned Financial Identifier Extraction
+
+## Status
+
+Accepted
+
+---
+
+## Context
+
+Sprint 32 introduced the canonical `FinancialIdentifier` domain model, workspace-scoped repository APIs and deterministic `FinancialIdentityResolver`.
+
+The completed Financial Identifier Architecture Discovery confirmed that production imports do not currently produce verified `FinancialIdentifier` values. `FinancialDocument` carries parsed transactions and document metadata, but it does not carry structured financial identifiers, verification state or identifier provenance.
+
+The architecture discovery evaluated four candidate architectures for identifier extraction:
+
+- extraction inside `StatementParser` implementations
+- a downstream `IdentifierExtractor` operating after `FinancialDocument` creation
+- extraction inside `ImportEngine`
+- extraction inside `ImportPersistenceCoordinator`
+
+Financial identifier extraction must remain deterministic, explainable and specific to the statement structure understood by the selected parser. Duplicate parsing systems and heuristic reconstruction from filenames, display names, institution labels, account text or other weak values must be avoided.
+
+---
+
+## Decision
+
+1. Verified `FinancialIdentifier` objects SHALL originate exclusively inside `StatementParser` implementations.
+
+2. Statement parsers are the only components permitted to classify an identifier as verified.
+
+3. `FinancialDocument` SHALL carry an immutable collection of `FinancialIdentifier` values produced by the parser.
+
+4. `ImportEngine` SHALL NOT derive identifiers.
+
+5. `ImportPersistenceCoordinator` SHALL NOT extract identifiers.
+
+6. `FinancialIdentityResolver` SHALL consume parser-produced identifiers only.
+
+7. Weak parser-derived values, including display names, filenames, institution labels, account text, masked values and suffixes, SHALL NOT be promoted to verified identifiers.
+
+---
+
+## Consequences
+
+Positive consequences:
+
+- A single source of truth owns financial identifier extraction and verification.
+- No duplicated parsing system is introduced.
+- Identifier generation remains deterministic and explainable.
+- Parser-level tests can validate identifier extraction alongside financial interpretation.
+- The architecture scales naturally to brokers, investment accounts and other institution-specific financial entities.
+- Existing repository contracts remain unchanged.
+- The SQLite schema remains unchanged.
+
+Trade-offs:
+
+- `FinancialDocument` must be extended before parser-produced identifiers can flow through the import pipeline.
+- Existing parsers require incremental updates to produce supported identifiers.
+- Financial Identity integration can occur only after the relevant parser supports identifier extraction.
+
+---
+
+## Alternatives Considered
+
+### Parser → FinancialDocument → IdentifierExtractor
+
+Rejected.
+
+This creates a second parsing system after the statement parser has already interpreted the source document. It duplicates institution-specific knowledge and risks inconsistent financial and identity interpretation.
+
+### ImportEngine Extraction
+
+Rejected.
+
+`ImportEngine` owns orchestration. Identifier extraction would introduce institution-specific parsing responsibility into the orchestration layer.
+
+### ImportPersistenceCoordinator Extraction
+
+Rejected.
+
+The persistence coordinator operates after parsing and validation. Extracting identifiers there would encourage heuristic reconstruction from already-reduced metadata and would mix persistence coordination with document interpretation.
+
+---
+
+## Non-Goals
+
+This ADR does not:
+
+- integrate `FinancialIdentityResolver`
+- change repository behaviour
+- modify parser behaviour
+- introduce UI
+- introduce schema migrations
+- implement account reuse
+
+Those changes belong to future implementation sprints.
+
+---
+
+## Related ADRs
+
+- ADR-025 — Stable Financial Entity Identity
+- ADR-026 — Structured Developer Diagnostics
