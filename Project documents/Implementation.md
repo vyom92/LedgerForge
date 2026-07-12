@@ -1,6 +1,6 @@
 # =======ACTIVE SPRINT==========
 
-## Sprint 29 — Import Wizard Usability Stabilization
+## Sprint 30 — Developer Console Foundation
 
 ### Status
 
@@ -8,88 +8,105 @@
 
 ### Objective
 
-Fix the verified Import Wizard usability regression by keeping the review content scrollable within the available workspace while keeping `Cancel` and `Confirm Import` continuously visible.
+Expand the existing Developer Console into a safe internal testing and diagnosis surface for database reset, runtime inspection, repository summary, log management and canonical data reload.
 
-This sprint is limited to layout and interaction stabilization of the existing Sprint 28 confirmation-gated import workflow.
-
----
+Sprint 30 is Developer Mode only. It must not introduce new end-user financial features or alter parser, validation, import, repository, schema or financial semantics.
 
 ## User Outcome
 
-While reviewing a prepared import, the user can scroll through preview and validation content without losing access to the primary actions.
-
-The Import Wizard must remain usable at normal desktop window sizes without requiring the user to hunt for confirmation controls below an oversized page.
-
----
-
-## Verified Problem
-
-The current Import Wizard progresses correctly through preparation, preview and validation review, but the full page can grow beyond the visible workspace.
-
-As a result:
-
-- review content and action controls compete for vertical space
-- `Cancel` and `Confirm Import` may move outside the visible viewport
-- the user must scroll the entire wizard page to complete the workflow
-- the confirmation boundary is functionally correct but less predictable and harder to use
-
----
+During development, the user can reset LedgerForge to a clean financial state, inspect the current runtime state, reload repository-backed data and manage diagnostic logs without using Terminal, Finder or a separate SQLite browser.
 
 ## Scope
 
-### 1. Stable Wizard Layout
+### 1. Development Database Reset
 
-Refactor the existing Import Wizard layout so that:
+Add a visibly destructive `Reset Development Database` control inside the Developer Console.
 
-- the wizard fits within the available content area
-- the review content occupies the flexible central region
-- long preview and validation content scrolls within that region
-- the primary action area remains fixed and continuously visible
+Requirements:
 
-### 2. Pinned Action Footer
+- visible only when Developer Mode is enabled
+- styled as destructive/red
+- protected by an explicit confirmation dialog
+- confirmation explains that all imported financial data and import history will be permanently removed
+- action preserves application preferences, appearance, Developer Mode and other non-financial settings
+- action completes without an application restart
 
-Keep the following actions visible while review content scrolls:
+Approved reset strategy:
 
-- `Cancel`
-- `Confirm Import`
+- create a fresh SQLite repository provider at a new development database path
+- replace `DatabaseProvider.shared` with the fresh provider
+- force canonical repository hydration using `RepositoryStoreHydrator.hydrateIfNeeded(forceRefresh: true)`
+- clear repository-backed runtime state through the hydration path
+- refresh Dashboard presentation into the empty state
+- do not delete the active SQLite file while connections may still be open
+- do not introduce direct SQL table deletion from Views or ViewModels
 
-The footer must preserve the existing validation gating:
+After reset, verify:
 
-- `Confirm Import` is enabled only for a valid prepared import
-- failed validation must not expose a persistence path
-- repeated confirmation remains guarded
+- accounts = 0
+- transactions = 0
+- Dashboard shows the empty state
+- Transactions screen shows the empty state
+- Developer Console runtime counts show 0
+- no restart is required
 
-### 3. Existing Workflow Preservation
+### 2. Runtime Inspector
 
-Preserve the complete Sprint 28 workflow:
+Add a read-only Developer Console panel showing only verified existing state:
 
-Choose File
-↓
-Prepare
-↓
-Read-Only Preview
-↓
-Validation Review
-↓
-Explicit Confirmation
-↓
-Persist
-↓
-Dashboard Refresh
-↓
-Sprint 27 Import Outcome
+- repository/provider type or state
+- hydration status
+- account count
+- transaction count
+- latest refresh result or equivalent available hydration result
+- current SQLite database path, if safely available from existing provider configuration
 
-No import, parser, validation, persistence, repository, runtime-store or hydration behaviour may change.
+Do not create duplicate mutable state solely for the inspector.
 
----
+### 3. Repository Summary
+
+Show read-only counts for currently supported repository-backed entities:
+
+- Accounts
+- Transactions
+
+Do not add document, import-session, category, rule, investment or other counts unless existing repository APIs already expose them safely.
+
+### 4. Log Console Improvements
+
+Improve the existing plain-string log console with:
+
+- text-only substring search
+- `Copy All`
+- `Clear`
+
+ Rules:
+
+- search must be clearly presented as plain text search
+- do not add fake severity or category filters
+- `Clear` must use the existing `DeveloperConsole.clear()` behaviour
+- `Copy All` must copy the intended complete log text without mutating stored messages
+
+### 5. Runtime Refresh
+
+Add one canonical `Reload Data` action.
+
+Requirements:
+
+- invokes `RepositoryStoreHydrator.hydrateIfNeeded(forceRefresh: true)`
+- updates runtime account and transaction state through the existing hydrator path
+- updates Runtime Inspector counts and hydration status
+- does not create separate per-entity refresh operations
 
 ## Expected Files
 
-Primary implementation:
+Likely implementation files:
 
-- `ContentView.swift`
-
-Tests may be added or updated only where required to verify layout-state or action-availability behaviour.
+- `DeveloperConsoleView.swift`
+- `DeveloperConsole.swift` only if narrowly required
+- current application/provider bootstrap or composition-root file only where provider replacement must be coordinated
+- existing SQLite provider file only if a narrow read-only path exposure is required
+- focused tests
 
 Documentation after successful implementation:
 
@@ -100,62 +117,175 @@ Codex must not modify:
 
 - `Project documents/Implementation.md`
 
----
+Do not create speculative abstractions or placeholder tools.
+
+## Architecture Constraints
+
+Preserve:
+
+```text
+Repository Provider
+↓
+Repositories
+↓
+SQLite
+↓
+RepositoryStoreHydrator
+↓
+Runtime Stores
+↓
+ViewModels
+↓
+Views
+```
+
+Rules:
+
+- no direct SQLite access from Views or ViewModels
+- no repository contract redesign
+- no schema changes
+- no parser changes
+- no validation changes
+- no import workflow changes
+- no financial calculation changes
+- reset must be unavailable outside Developer Mode
+- destructive actions must require confirmation
+- runtime and repository inspectors are read-only
+
+If safe provider replacement cannot be achieved with the current lifecycle, stop and report the blocker instead of deleting an active database file.
 
 ## Acceptance Criteria
 
-### Layout
+### Database Reset
 
-- The Import Wizard does not require the entire page to scroll solely because preview or validation content is long.
-- Preview and validation content scroll within the available central workspace.
-- The action footer remains visible at normal supported desktop window sizes.
-- No content is clipped or rendered inaccessible.
+- destructive control is visible only in Developer Mode
+- entire visible button rectangle is clickable
+- confirmation is required
+- confirmation clearly states irreversibility and affected data
+- fresh SQLite provider is created safely
+- canonical forced hydration runs after provider replacement
+- accounts become 0
+- transactions become 0
+- Dashboard becomes empty
+- Transactions screen becomes empty
+- Developer Console runtime counts become 0
+- application preferences and Developer Mode remain unchanged
+- no application restart is required
 
-### Actions
+### Runtime Inspector
 
-- `Cancel` remains visible throughout preview and validation review.
-- `Confirm Import` remains visible throughout preview and validation review.
-- `Confirm Import` remains disabled or unavailable after failed validation.
-- Repeated confirmation remains prevented.
-- Cancellation still performs no writes, runtime-store updates or dashboard refresh.
+- account count is visible and accurate
+- transaction count is visible and accurate
+- hydration state or result is visible and accurate
+- provider/database path is shown only when safely available
+- inspector updates after Reset and Reload Data
+- inspector is read-only
 
-### Visual Consistency
+### Repository Summary
 
-- Existing Deep Indigo styling is preserved.
-- Existing shared LedgerForge components are reused where practical.
-- No unrelated screen is redesigned.
-- Toolbar, sidebar and wizard-step styling remain unchanged unless directly required for the layout fix.
+- account and transaction counts reflect repository-backed runtime state
+- no unsupported entity counts are shown
 
-### Architecture
+### Log Console
 
-- No parser changes.
-- No validation changes.
-- No persistence changes.
-- No repository changes.
-- No runtime-store changes.
-- No hydrator changes.
-- No SQLite or schema changes.
-- No financial behaviour changes.
+- substring search filters displayed messages without changing stored logs
+- `Copy All` copies log text
+- `Clear` removes stored messages through `DeveloperConsole.clear()`
+- no fake severity or category system is introduced
+
+### Reload Data
+
+- uses the existing forced hydration path
+- updates account and transaction runtime state
+- updates inspector state
+- does not duplicate refresh logic
+
+### Integrity
+
+- existing import behaviour remains unchanged
+- existing confirmation-gated workflow remains unchanged
+- existing Dashboard calculations remain unchanged
+- existing repository boundaries remain unchanged
+- no schema changes
+- no preferences are erased during financial-data reset
 
 ---
 
-## Out of Scope
+## Automated Test Requirements
 
-- Account chevron removal
-- Toolbar standardization across screens
-- Developer terminology cleanup
-- `Pending` or `Soon` badge cleanup
-- Transaction detail redesign
-- Developer Console database-reset control
-- Editable import preview
-- Duplicate-management UI
-- Password UI
-- Batch import
-- Drag and drop
+Add focused deterministic tests for:
+
+- reset swaps to a fresh provider and produces zero account and transaction counts
+- reset preserves non-financial preferences where testable
+- forced hydration after reset reports empty state
+- `Reload Data` refreshes runtime counts from repository state
+- Runtime Inspector and Repository Summary reflect current store counts
+- substring search filters plain-string logs
+- `Clear` empties log messages
+- `Copy All` produces expected text where logic can be tested without fragile UI automation
+- destructive reset cannot be triggered without confirmed action at the presentation or state layer where practical
+
+Use temporary SQLite paths and existing repository-test patterns.
+
+Do not delete or alter the developer's real database during tests.
+
+---
+
+## Manual Validation
+
+Verify in the running application:
+
+1. Enable Developer Mode and open Developer Console.
+2. Confirm Runtime Inspector shows current account and transaction counts.
+3. Confirm the current SQLite path or provider state is displayed when supported.
+4. Use log search, `Copy All` and `Clear`.
+5. Import a test statement and confirm counts increase.
+6. Select `Reset Development Database`.
+7. Confirm the first click only opens the warning dialog.
+8. Cancel once and verify nothing changes.
+9. Confirm reset on the second attempt.
+10. Verify accounts = 0 and transactions = 0.
+11. Verify Dashboard and Transactions show empty states.
+12. Verify Developer Mode and preferences remain enabled and preserved.
+13. Verify no application restart is required.
+14. Use `Reload Data` and confirm counts and state remain accurate.
+
+---
+
+## Deferred
+
+- Import Inspector
+- Validation Timeline
+- structured log categories or severity
+- recent import-session browser
+- Open Database Folder
+- Export SQLite
+- database vacuum
+- repository rebuild
+- balance recalculation
+- search reindexing
+- Duplicate Inspector
+
+---
+
+## Explicitly Out of Scope
+
+- Feature Flags Viewer
+- SQL editor or browser
+- performance profiler
+- memory or thread inspector
+- parser changes
+- new institutions or formats
+- duplicate-management UI
+- password UI
+- import workflow redesign
 - Dashboard redesign
-- New parsers or file formats
-
-These remain verified product-review items for later focused sprints.
+- analytics
+- budgets
+- insights
+- investments
+- database schema changes
+- production user-facing reset controls
 
 ---
 
@@ -163,183 +293,61 @@ These remain verified product-review items for later focused sprints.
 
 Before completion:
 
-- Xcode diagnostics pass for modified files.
-- Xcode project build passes.
-- Full active Xcode test plan passes using Xcode-native validation tools.
-- Existing Sprint 28 workflow tests continue passing.
-- Manual verification confirms the action footer remains visible while preview content scrolls.
-- Manual verification confirms validation failure still blocks confirmation.
-- Manual verification confirms cancellation still performs no writes.
-- `Project documents/Implementation.md` remains unchanged.
-- Complete diff is reviewed.
-- Only approved Sprint 29 files are included in the implementation commit.
+- Xcode diagnostics pass for modified files
+- Xcode project build passes
+- Xcode-native `RunAllTests` is used as the authoritative full test validation
+- all existing tests continue passing
+- focused Sprint 30 tests pass
+- manual runtime verification is recorded honestly
+- `Project documents/Implementation.md` remains unchanged
+- complete diff is reviewed
+- only approved Sprint 30 files are committed
+- no merge markers or whitespace damage remain
+
+Do not run CLI `xcodebuild test` first when Xcode-native validation is available.
 
 ---
 
 ## Stop Conditions
 
-Stop and report without expanding scope if:
+Stop and report without committing if:
 
-- the layout fix requires import workflow redesign
-- persistence or state contracts must change
-- the frozen UI/UX architecture must change
-- unrelated screens require modification
+- reset requires deleting an actively open SQLite database
+- provider replacement cannot be coordinated safely
+- schema or repository-contract changes become necessary
+- non-financial preferences cannot be preserved
+- reset races with an active import or hydration operation and cannot be safely gated
+- scope must expand into deferred modules
 - deterministic validation cannot be completed
 
 ---
 
 ## Completion Criteria
 
-Sprint 29 is complete only when:
+Sprint 30 is complete only when:
 
-- review content scrolls within the Import Wizard workspace
-- `Cancel` and `Confirm Import` remain continuously visible
-- validation gating remains correct
-- cancellation remains write-free
-- the confirmation-gated workflow remains unchanged
-- the application builds successfully
-- the full active test plan passes
+- Developer Mode exposes the completed Developer Console foundation
+- safe database reset works without Terminal or application restart
+- reset produces zero accounts and zero transactions
+- Dashboard and Transactions return to empty state
+- preferences and Developer Mode remain preserved
+- Runtime Inspector and Repository Summary display accurate state
+- `Reload Data` uses canonical forced hydration
+- log search, `Copy All` and `Clear` work
+- architecture and financial behaviour remain unchanged
+- diagnostics and build pass
+- full active test plan passes
 - `PROJECT_STATE.md` is updated with verified facts
-- `Codex response.md` contains the Sprint 29 implementation report
+- `Codex response.md` contains the Sprint 30 implementation report
 - approved changes are committed and pushed
 
-Do not archive Sprint 29.
+Do not archive Sprint 30.
 
-Do not create Sprint 30.
+Do not create Sprint 31.
 
-Desktop ChatGPT will review the implementation, approve or reject Sprint 29, archive it and prepare the next ACTIVE sprint.
+Desktop ChatGPT will review the implementation, approve or reject Sprint 30, archive it and prepare the next ACTIVE sprint.
 
 ---
 
 # =======ARCHIVED SPRINTS==========
 
-## Sprint 28 — Confirmation-Gated Import Workflow
-
-### Status
-
-✅ Completed
-
-### Objective
-
-Introduce a read-only preview and validation review between successful parsing and repository persistence, requiring explicit user confirmation before any financial data is written.
-
-### Outcome
-
-Completed successfully.
-
-Achievements:
-
-- Prepared import model introduced as the in-memory bridge between preparation, review and commit.
-- Import preparation performs reading, detection, classification, parser selection, parsing and validation without persistence.
-- Read-only transaction preview implemented.
-- Validation review implemented before persistence.
-- Explicit confirmation is required before persistence.
-- Validation failure cannot be persisted.
-- Cancellation discards prepared state without repository writes, runtime-store mutation or dashboard refresh.
-- Commit uses the prepared `FinancialDocument` and existing persistence coordinator.
-- Existing post-import hydration and Sprint 27 outcome presentation preserved.
-- Xcode build passed.
-- Active Xcode test plan passed: 94 tests, 0 failures.
-- Implementation commit: `262a07d`.
-- Documentation handoff commit: `0170b44`.
-
-### Validation
-
-Verified:
-
-- Preparation performs no writes.
-- Preview is read-only.
-- Validation is visible before persistence.
-- Confirmation is required before persistence.
-- Cancellation performs no writes.
-- Existing parser, validation, repository, runtime-store, hydration and financial semantics remain unchanged.
-- Architecture v1.0 preserved.
-- UI/UX v1.0 Frozen preserved.
-
----
-
-## Sprint 27 — Import Outcome Visibility
-
-### Status
-
-✅ Completed
-
-### Objective
-
-Make import outcomes explicit in the existing import result panel by showing verified validation and persistence states without changing the import pipeline, financial behaviour or repository architecture.
-
-### Outcome
-
-Completed successfully.
-
-Achievements:
-
-- Import outcome presentation enhanced using existing `ImportEngineResult` data.
-- Validation and persistence outcomes are presented independently.
-- Existing `LFStatusBadge` components are used for status presentation.
-- `View Transactions` is available only after successful validation and persistence.
-- Existing import execution behaviour was preserved.
-- Existing repository boundaries were preserved.
-- Existing post-import runtime hydration behaviour was preserved.
-- Focused automated tests were added for import outcome presentation.
-- Application built successfully.
-- Full automated test suite passed (89 tests).
-- Implementation committed and pushed successfully.
-
-### Validation
-
-Verified:
-
-- Import outcome panel distinguishes:
-  - Successful import
-  - Validation failure
-  - Persistence failure
-- Existing import pipeline behaviour is unchanged.
-- Validation-before-persistence behaviour is unchanged.
-- Repository architecture is unchanged.
-- No repository APIs changed.
-- No runtime store contracts changed.
-- No database schema changes were introduced.
-- Architecture v1.0 preserved.
-- UI/UX v1.0 Frozen preserved.
-
----
-
-## Sprint 26 — Documentation Alignment & Bootstrap Manifest Adoption
-
-### Status
-
-✅ Completed
-
-### Objective
-
-Align repository documentation to the new Context_Manifest.yaml bootstrap, eliminate stale references, establish a deterministic bootstrap sequence and freeze the project documentation workflow before resuming feature development.
-
-### Outcome
-
-Completed successfully.
-
-Achievements:
-
-- Context_Manifest bootstrap adopted.
-- Repository bootstrap order standardized.
-- Documentation precedence synchronized.
-- Assistant responsibilities aligned.
-- PROJECT_STATE ownership clarified.
-- Implementation ownership clarified.
-- Repository-wide documentation consistency validated.
-- Sprint 26 implementation report completed.
-- Documentation changes committed and pushed.
-- No source code, tests, project files or assets modified.
-
-### Validation
-
-Verified:
-
-- Bootstrap order is consistent.
-- Latest ADR is ADR-025.
-- Sprint 25 remains the verified implementation baseline.
-- Sprint 26 completed as a documentation-only sprint.
-- Root `AGENTS.md` is authoritative.
-- `PROJECT_STATE.md` remains the verified repository state document.
-- `Implementation.md` remained unchanged throughout implementation.
