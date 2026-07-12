@@ -182,6 +182,7 @@
 		2899799C30038670009B3870 /* LFConsoleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFConsoleButton.swift; sourceTree = "<group>"; };
 		28A3A4C12FFE1DBA00DD5727 /* UI_UX_v1.0_Frozen.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = UI_UX_v1.0_Frozen.md; sourceTree = "<group>"; };
 		28B5217C3003E9D30007B840 /* IdentityResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityResolver.swift; sourceTree = "<group>"; };
+		28B5218230040C360007B840 /* FUTURE_WORK.MD */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = FUTURE_WORK.MD; sourceTree = "<group>"; };
 		28B87B252FFB24C3009BEE8C /* TransactionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionListView.swift; sourceTree = "<group>"; };
 		28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Product Vision.md"; sourceTree = "<group>"; };
 		28B87B2C2FFB2CDA009BEE8C /* Engineering Standards.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "Engineering Standards.md"; sourceTree = "<group>"; };
@@ -542,6 +543,7 @@
 				283E97932FFE3A470034CA98 /* Branding */,
 				28B87B3E2FFBD1DE009BEE8C /* .github */,
 				28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */,
+				28B5218230040C360007B840 /* FUTURE_WORK.MD */,
 				281BB1782FFC4CDA006E7424 /* Project_Guide.md */,
 				28D11EAB2FFDAC5200C12A68 /* BUILD_AND_PROJECT_CONVENTIONS.md */,
 				286CA451300288D000731C41 /* AI_WORKFLOW.md */,

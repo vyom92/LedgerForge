@@ -14,68 +14,97 @@ Only the ACTIVE sprint belongs in Implementation.md.
 
 ## Backlog
 
-### Developer Tools
+### High Priority
 
-- Granular database reset
-- Reset transactions only
-- Reset import sessions
-- Reset financial identity
-- Reset repository
-- Factory reset
-- Better developer diagnostics
+#### Identity
+
+- [ ] Production import integration using the Financial Identity Foundation
+- [ ] Automatic account reuse during imports
+- [ ] Identity conflict handling workflow
+- [ ] Manual identity conflict resolution
+- [ ] Duplicate account review tools
+
+#### Developer Tools
+
+- [ ] Fix Reset Development Database persistence across application restart
+- [ ] Granular database reset
+- [ ] Reset transactions only
+- [ ] Reset import sessions
+- [ ] Reset financial identity
+- [ ] Reset repository
+- [ ] Factory reset
+- [ ] Better developer diagnostics
 
 ---
 
-### Transactions
+### Medium Priority
 
-- Multi-selection
-- Bulk action toolbar
-- Delete selected transactions
-- Delete import session
-- Undo support (future consideration)
+#### Transactions
 
----
+- [ ] Multi-selection
+- [ ] Bulk action toolbar
+- [ ] Delete selected transactions
+- [ ] Delete import session
+- [ ] Undo support
 
-### Accounts
+#### Accounts
 
-- Friendly account naming
+- [ ] Friendly account naming
   - Axis NRE
   - Axis NRO
   - Axis Savings
   - CBQ Current
-- Manual account merge
-- Archive account
-- Account notes
+- [ ] Manual account merge
+- [ ] Archive account
+- [ ] Account notes
+
+#### User Experience
+
+- [ ] Better account icons
+- [ ] Saved transaction filters
+- [ ] Dashboard customization
+- [ ] Improved search experience
 
 ---
 
-### Identity
+### Low Priority
 
-- Identifier confidence scoring
-- Alias support
-- Manual conflict resolution
-- Duplicate account review tools
+#### Identity
+
+- [ ] Identifier confidence scoring
+- [ ] Alias support
+
+#### Analytics
+
+Future analytics work will be added after the Financial Identity platform and import pipeline are fully complete.
 
 ---
 
-### Analytics
+### Research / Ideas
 
-Future analytics work will be added after the financial identity and import platform are complete.
+Ideas that may become future architecture work but are not currently approved for implementation.
 
 ---
 
 ## Workflow
 
-- Items in this document are NOT scheduled work.
+- This document is the permanent repository backlog.
+- Items here are approved ideas but are **not** scheduled work.
 - Desktop ChatGPT decides when an item becomes an ACTIVE sprint.
-- Moving an item into Implementation.md removes it from this backlog.
+- When an item becomes part of `Implementation.md`, remove it from this document.
+- Completed work belongs in `PROJECT_STATE.md`.
+- Architecture decisions belong in `ADR.md`.
+- Temporary planning and execution reports belong in `Codex response.md`.
 
 ---
 
 ## Verification
 
-- Confirm only FUTURE_WORK.md was added.
-- Confirm no existing files changed.
-- Do not commit.
-- Do not push.
+When updating this document:
+
+- Only add or remove backlog items.
+- Do not record implementation progress here.
+- Do not record completed sprint history here.
+- Do not convert backlog items into ACTIVE sprint plans.
+- Keep this document implementation-agnostic.
 
