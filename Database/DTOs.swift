@@ -3,7 +3,7 @@
 
 import Foundation
 
-public struct WorkspaceDTO: Equatable {
+public struct WorkspaceDTO: nonisolated Equatable {
     public let id: String
     public let name: String
     public let createdAtISO: String
@@ -20,7 +20,7 @@ public struct WorkspaceDTO: Equatable {
     }
 }
 
-public struct TransactionRawRowDTO: Equatable {
+public struct TransactionRawRowDTO: nonisolated Equatable {
     public let id: String
     public let normalizedRowId: String
     public let contributionType: String?
@@ -32,7 +32,7 @@ public struct TransactionRawRowDTO: Equatable {
     }
 }
 
-public struct TransactionDTO: Equatable {
+public struct TransactionDTO: nonisolated Equatable {
     public let id: String
     public let workspaceId: String
     public let accountId: String?
@@ -103,7 +103,7 @@ public struct TransactionDTO: Equatable {
     }
 }
 
-public struct AccountDTO: Equatable {
+public struct AccountDTO: nonisolated Equatable {
     public let id: String
     public let workspaceId: String
     public let name: String
@@ -161,7 +161,7 @@ public struct ImportSessionDTO: Equatable {
     }
 }
 
-public struct ImportSessionRecordDTO: Equatable {
+public struct ImportSessionRecordDTO: nonisolated Equatable {
     public let id: String
     public let workspaceId: String
     public let userVisibleName: String?
