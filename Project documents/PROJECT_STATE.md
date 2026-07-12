@@ -14,18 +14,18 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: 481185a
+* Latest Implementation Commit: 63c18cc
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-026 — Structured Developer Diagnostics (Accepted)
-* Architecture Baseline: Sprint 31 / UI_UX v1.0 Frozen
+* Architecture Baseline: Sprint 32 / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 31 — Developer Diagnostics & Logging completed and approved
-* Current Phase: Pre-Sprint 32 documentation alignment and planning for Sprint 32 — Financial Identity Engine
+* Current Sprint: Sprint 32 — Financial Identity Foundation implemented and manually verified
+* Current Phase: Sprint 32 documentation handoff
 * Build Status: Passing
-* Validation Status: Pre-Sprint 32 DTO concurrency isolation maintenance passed Xcode diagnostics, Xcode build passed, active Xcode test plan passed (112 tests, 0 failures, 0 skipped), and prior DTO Equatable actor-isolation warnings were removed
+* Validation Status: Sprint 32 passed Xcode diagnostics for all modified Swift files Xcode resolved, Xcode BuildProject passed, focused Sprint 32 tests passed (15 tests, 0 failures, 0 skipped), complete Xcode-native RunAllTests passed (127 tests, 0 failures, 0 skipped), git diff check passed, and manual runtime verification passed
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-* Latest Verified Implementation Remote: 481185a711a3a7366229e74081401c84c7acc6c6
+* Latest Verified Implementation Remote: 63c18cc990f1fca1931bdb055160c739512c52f3
 * Latest Documentation Handoff Commit: 5f8b61d0c401418b613ff355e1fdc6b6c2d45a86
 
 ## Bootstrap
@@ -89,21 +89,22 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 31 and the DTO concurrency isolation maintenance are completed and verified. The next planning action is Sprint 32 — Financial Identity Engine.
+Active Work: Sprint 32 — Financial Identity Foundation is implemented, pushed and manually verified. Documentation handoff is in progress.
 
 Objective:
 
-* Complete Documentation Sync Cycle 2.
-* Preserve the verified Sprint 31 and DTO maintenance baseline.
-* Prepare Sprint 32 — Financial Identity Engine as the next ACTIVE sprint.
-* Do not begin implementation until Desktop ChatGPT replaces the ACTIVE contract in `Implementation.md`.
+* Complete Sprint 32 documentation handoff.
+* Preserve the verified Sprint 32 implementation baseline.
+* Wait for Desktop ChatGPT review before defining the next ACTIVE sprint.
 
 Scope:
 
+* Sprint 32 established deterministic financial identity infrastructure only.
 * Sprint 31 was a Developer Console diagnostics and logging sprint.
 * Sprint 30 was a Developer Mode-only foundation sprint.
 * Sprint 29 was a layout-only stabilization sprint.
-* No parser, reader, validation, repository contract, runtime store contract, SQLite schema or financial calculation changes were made in Sprint 31.
+* Sprint 32 changed repository contracts for workspace-scoped financial identifier operations.
+* No parser, reader, validation, runtime store contract, SQLite schema or financial calculation changes were made in Sprint 32.
 * `Project documents/Implementation.md` contains only the current ACTIVE sprint; completed sprint history belongs in `Project documents/PROJECT_STATE.md`.
 * Codex must never edit `Project documents/Implementation.md`.
 * Desktop ChatGPT owns ACTIVE sprint planning.
@@ -120,7 +121,7 @@ Scope:
 * Preserve durable SQLite startup persistence wiring.
 * Preserve stable repository account identifiers.
 * Preserve institution attribution through repository hydration.
-* DTO concurrency isolation maintenance commit `481185a711a3a7366229e74081401c84c7acc6c6` was pushed to `origin/main` and verified with `git ls-remote origin refs/heads/main`.
+* Sprint 32 implementation commit `63c18cc990f1fca1931bdb055160c739512c52f3` was pushed to `origin/main` and verified with `git ls-remote origin refs/heads/main`.
 
 ## Current Product Review
 
@@ -160,11 +161,20 @@ Scope:
 - Parser implementation details are available as Debug diagnostics.
 - Database reset preserves Developer Mode and non-financial preferences.
 - Importing after reset writes to the fresh provider and remains persisted after relaunch.
+- Canonical financial identifier domain types are implemented.
+- Deterministic financial identifier normalization is implemented.
+- Strong and weak identifier classification is implemented.
+- Verification state and provenance representation are implemented.
+- Workspace-scoped account identifier repository operations are implemented.
+- In-Memory and SQLite repository providers have parity for identifier operations.
+- SQLite identifier conflict prevention is transactional through repository logic.
+- Deterministic financial identity resolver is implemented and remains disconnected from production import.
+- Identity diagnostics are concise and redact identifier values.
 - Architecture v1.0 and UI/UX v1.0 remain preserved.
 
 ### Current Critical Product Issues
 
-- None verified for Sprint 31.
+- None verified for Sprint 32.
 
 ### Current Important Product Issues
 
@@ -173,6 +183,7 @@ Scope:
 - Toolbar composition varies across major screens.
 - Several user-facing controls display `Pending` or `Soon` states that add visual noise.
 - Transaction detail presentation does not yet use the available space effectively.
+- Reset Development Database does not persist across application restart; reset switches to a temporary SQLite file under Development Resets, but startup bootstrap reconnects to `ledgerforge.sqlite`.
 
 ### Current Cosmetic Issues
 
@@ -187,7 +198,7 @@ Yes.
 
 ### Reason
 
-Sprint 31 is completed and approved. Sprint 32 — Financial Identity Engine may now be defined as the next ACTIVE sprint.
+Sprint 32 implementation, automated validation and manual runtime verification are complete. Desktop ChatGPT review is required before the next ACTIVE sprint is defined.
 
 Out of Scope:
 
@@ -214,10 +225,48 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Replace the completed Sprint 31 ACTIVE contract with Sprint 32 — Financial Identity Engine.
-* Resume the deferred product roadmap with Sprint 32 — Financial Identity Engine, followed by Universal Import Platform, Financial Intelligence, Salary Planner, Investments and Analytics.
+* Complete Sprint 32 documentation handoff review.
+* Define the next ACTIVE sprint after Desktop ChatGPT approval.
 
 ---
+
+# Sprint 32
+
+## Objective
+Establish LedgerForge's deterministic Financial Identity Foundation without changing production import behaviour, parser behaviour, runtime hydration, UI or existing financial relationships.
+
+## Status
+Implemented and manually verified
+
+## Outcome
+- Canonical financial identifier model implemented.
+- Identifier kinds, strength categories, verification state and provenance are represented.
+- Deterministic normalization is implemented and invalid normalized values are rejected.
+- Repository contracts now expose workspace-scoped financial identifier operations.
+- In-Memory repository provider implements identifier storage, lookup, idempotent writes, workspace isolation and conflict rejection.
+- SQLite repository provider reuses the existing `account_identifiers` table.
+- SQLite schema version remains 2.
+- No migration was introduced.
+- SQLite attach behaviour uses `BEGIN IMMEDIATE TRANSACTION`, checks existing workspace-scoped mappings, reuses identical mappings, rejects conflicting ownership, inserts only when safe, commits successful writes and rolls back failed writes.
+- Duplicate stored mappings are surfaced as candidate ambiguity rather than collapsed.
+- Deterministic `FinancialIdentityResolver` is implemented.
+- Resolver outcomes include Resolved, No Match, Ambiguous and Conflict.
+- Resolver remains disconnected from production import workflows.
+- Concise identity diagnostics were added with redacted identifier values.
+- No parser files, `FinancialDocument`, `ImportPersistenceMapper`, `ImportPersistenceCoordinator`, account-ID generation, UI files or runtime stores were changed.
+- `Project documents/Implementation.md` was not modified.
+- Xcode diagnostics passed with 0 issues for all modified Swift files Xcode resolved.
+- Xcode BuildProject passed.
+- Focused Sprint 32 tests passed: 15 tests, 0 failures, 0 skipped.
+- Complete Xcode-native RunAllTests passed: 127 tests, 0 failures, 0 skipped.
+- Manual runtime verification passed.
+- Implementation commit: `63c18cc`
+- Full implementation commit: `63c18cc990f1fca1931bdb055160c739512c52f3`
+- Git push to `origin/main` completed successfully.
+- Direct remote verification: `git ls-remote origin refs/heads/main` returned `63c18cc990f1fca1931bdb055160c739512c52f3`.
+
+## Follow-Up Maintenance
+- Reset Development Database does not persist across application restart because reset switches to a temporary SQLite file under Development Resets while startup bootstrap reconnects to `ledgerforge.sqlite`.
 
 # Sprint 31
 
@@ -760,4 +809,3 @@ Completed
 - Git tag: `sprint-12b-complete`
 
 ---
-
