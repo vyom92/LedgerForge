@@ -14,16 +14,16 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: bc0af0c
+* Latest Implementation Commit: dd248c4
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-025 — Stable Financial Entity Identity
-* Architecture Baseline: Sprint 29 / UI_UX v1.0 Frozen
+* Architecture Baseline: Sprint 30 / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 29 — Import Wizard Usability Stabilization implemented; awaiting Desktop ChatGPT review
-* Current Phase: Sprint 29 implementation pushed; do not begin Sprint 30
+* Current Sprint: Sprint 30 — Developer Console Foundation completed and approved
+* Current Phase: Sprint 30 completed and approved; awaiting replacement of the ACTIVE sprint with Sprint 31
 * Build Status: Passing
-* Validation Status: Sprint 29 Xcode diagnostics passed, Xcode build passed and active Xcode test plan passed (94 tests, 0 failures, 0 skipped)
+* Validation Status: Sprint 30 Xcode diagnostics passed, Xcode build passed, active Xcode test plan passed (98 tests, 0 failures, 0 skipped), and manual runtime verification passed
 
 ## Bootstrap
 
@@ -86,23 +86,25 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 29 implementation completed and pushed; awaiting Desktop ChatGPT review, approval and archival in `Project documents/Implementation.md`.
+Active Work: Sprint 30 completed and approved; prepare Sprint 31 as the next ACTIVE sprint in `Project documents/Implementation.md`.
 
 Objective:
 
-* Import Wizard review content now scrolls in a single central workspace.
-* The existing `Cancel` and footer action row remain outside the central review scroll area.
-* Sprint 28 confirmation-gated workflow remains unchanged.
-* Confirmation-gated Import Wizard implemented.
-* Import Wizard now prepares statements for read-only preview and validation review before persistence.
-* Explicit Confirm Import is required before persistence begins.
-* Cancellation discards prepared in-memory state without writes, runtime-store updates or dashboard refresh.
-* Existing persistence path, post-import hydration and Sprint 27 outcome presentation remain preserved after confirmation.
+* Developer Console now exposes a development-only safe database reset.
+* Developer Console now exposes Runtime Inspector and Repository Summary panels.
+* Developer Console log console now supports plain-text search, `Copy All` and `Clear`.
+* Developer Console now exposes one canonical `Reload Data` action.
+* Reset creates and installs a fresh SQLite provider and forces canonical hydration.
+* Reset produces 0 accounts and 0 transactions.
+* Dashboard, Accounts and Transactions show empty states after reset.
+* Developer Mode and non-financial preferences remain preserved.
+* Reload Data after reset does not restore old data.
+* Importing the Axis CSV after reset writes into the fresh provider and persists across app relaunch.
 
 Scope:
 
+* Sprint 30 was a Developer Mode-only foundation sprint.
 * Sprint 29 was a layout-only stabilization sprint.
-* Sprint 28 was a workflow sprint.
 * No parser, reader, validation, repository contract, runtime store contract, SQLite schema or financial calculation changes were made.
 * `Project documents/Implementation.md` is the Desktop ChatGPT-owned sprint planning and workflow document.
 * Codex must never edit `Project documents/Implementation.md`.
@@ -142,11 +144,18 @@ Scope:
 - Cancellation performs no writes.
 - Import outcome visibility distinguishes validation and persistence results.
 - Developer Console is available behind Developer Mode.
+- Developer Console can reset the development SQLite provider without restart.
+- Runtime Inspector and Repository Summary show runtime account and transaction counts.
+- Developer Console log search, `Copy All` and `Clear` are implemented.
+- Developer Console `Reload Data` uses canonical forced hydration.
+- Developer Console destructive and utility controls use full visible hit targets.
+- Database reset preserves Developer Mode and non-financial preferences.
+- Importing after reset writes to the fresh provider and remains persisted after relaunch.
 - Architecture v1.0 and UI/UX v1.0 remain preserved.
 
 ### Current Critical Product Issues
 
-- Runtime Import Wizard verification was not available through the current Xcode tool surface during Sprint 29 execution. Diagnostics, build and the full active Xcode test plan passed.
+- None verified for Sprint 30.
 
 ### Current Important Product Issues
 
@@ -155,7 +164,10 @@ Scope:
 - Toolbar composition varies across major screens.
 - Several user-facing controls display `Pending` or `Soon` states that add visual noise.
 - Transaction detail presentation does not yet use the available space effectively.
-- A development-only database reset control is not yet implemented.
+- Developer Console logging is still stored as unstructured plain strings.
+- Developer Console logs do not yet distinguish Debug, Info, Warning and Error levels.
+- Import logging is too verbose for the main console and mixes lifecycle events with parser diagnostics.
+- Developer Console log ordering is oldest-first; newest events are not shown at the top.
 
 ### Current Cosmetic Issues
 
@@ -166,11 +178,11 @@ Scope:
 
 ### Ready for Next Feature Sprint?
 
-No.
+Yes.
 
 ### Reason
 
-Desktop ChatGPT should review Sprint 29 and perform runtime UI verification if an app launch/UI inspection workflow is available.
+Sprint 30 is completed and approved. The next ACTIVE sprint may now be defined.
 
 Out of Scope:
 
@@ -197,8 +209,52 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Archive Sprint 28 in `Project documents/Implementation.md`.
-* Define and approve the next ACTIVE sprint from the verified Current Product Review.
+* Replace the completed Sprint 30 ACTIVE contract with Sprint 31 — Developer Console UX & Structured Logging.
+* After Sprint 31, resume the deferred product roadmap beginning with Sprint 32 — Financial Identity Engine.
+
+---
+
+# Sprint 30
+
+## Objective
+Expand the existing Developer Console into a safe internal testing and diagnosis surface for database reset, runtime inspection, repository summary, log management and canonical data reload.
+
+## Status
+Completed
+
+## Outcome
+- Developer Mode exposes the completed Developer Console foundation.
+- `Reset Development Database` is available inside the Developer Console only.
+- Reset is destructive/red and protected by an explicit confirmation dialog.
+- The full visible rounded rectangles of `Copy All`, `Clear`, `Reload Data` and `Reset Development Database` are clickable.
+- Cancelling reset leaves database path, accounts, transactions, Dashboard, Developer Mode and preferences unchanged.
+- Confirming reset installs a fresh SQLite provider without restart.
+- Reset uses provider replacement and `RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)`.
+- Reset does not delete the old active SQLite file.
+- Reset produces 0 accounts and 0 transactions.
+- Dashboard, Accounts and Transactions show empty states after reset.
+- Runtime Inspector and Repository Summary show 0 accounts and 0 transactions after reset.
+- Developer Mode and non-financial preferences remain preserved.
+- `Reload Data` uses canonical forced hydration and does not restore old data after reset.
+- Importing the Axis CSV after reset succeeds, updates the fresh provider and runtime state, and remains persisted after app relaunch.
+- Old pre-reset data does not return.
+- Log Console plain-text search, `Copy All` and `Clear` are implemented.
+- Runtime Inspector displays provider state, hydration status, latest refresh result, account count, transaction count and SQLite path when available.
+- Repository Summary displays Accounts and Transactions counts only.
+- No parser, reader, validation, repository contract, runtime-store contract, SQLite schema or financial calculation changes were made.
+- Xcode diagnostics passed with 0 issues for resolvable modified Swift files.
+- Xcode diagnostics could not directly resolve `LedgerForge/Services/Services/ImportEngine.swift` by project path, but Xcode build compiled it successfully.
+- Xcode build passed.
+- Active Xcode test plan passed: 98 tests, 0 failures, 0 skipped.
+- Manual runtime verification passed.
+- Implementation commit: `dd248c4`
+- Full implementation commit: `dd248c41b011c125e1d0d0b56020b288a6b0b1c1`
+- Git push to `origin/main` completed successfully.
+- Remote verification: `git ls-remote origin refs/heads/main` returned `dd248c41b011c125e1d0d0b56020b288a6b0b1c1`.
+- Documentation handoff commit: `9148c3d`
+- Full documentation handoff commit: `9148c3d5c3c928037edaaf267af15bc9592bac4e`
+- Final remote `main` verification returned `9148c3d5c3c928037edaaf267af15bc9592bac4e`.
+
 ---
 
 # Sprint 29
