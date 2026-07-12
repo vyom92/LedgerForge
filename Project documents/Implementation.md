@@ -1,6 +1,6 @@
 # =======ACTIVE SPRINT==========
 
-## Sprint 30 — Developer Console Foundation
+## Sprint 31 — Developer Diagnostics & Logging
 
 ### Status
 
@@ -8,346 +8,1089 @@
 
 ### Objective
 
-Expand the existing Developer Console into a safe internal testing and diagnosis surface for database reset, runtime inspection, repository summary, log management and canonical data reload.
+Transform the existing Developer Console into a cohesive developer diagnostics workspace that provides clear, structured insight into LedgerForge's internal behaviour while preserving the existing architecture and keeping all financial behaviour unchanged.
 
-Sprint 30 is Developer Mode only. It must not introduce new end-user financial features or alter parser, validation, import, repository, schema or financial semantics.
+Sprint 31 focuses exclusively on developer diagnostics, logging quality and reusable diagnostic UI components.
+
+It must not introduce new financial features or alter parser behaviour, validation behaviour, repository contracts, runtime hydration, database schema or financial calculations.
+
+---
 
 ## User Outcome
 
-During development, the user can reset LedgerForge to a clean financial state, inspect the current runtime state, reload repository-backed data and manage diagnostic logs without using Terminal, Finder or a separate SQLite browser.
+During development, the user can clearly understand what LedgerForge is doing, why it is doing it and whether operations completed successfully without being overwhelmed by low-level parser diagnostics or implementation details.
+
+The Developer Console becomes the central workspace for monitoring application activity, viewing structured diagnostic information and understanding the lifecycle of major operations while remaining lightweight and easy to read.
+
+---
 
 ## Scope
 
-### 1. Development Database Reset
+### 1. Structured Diagnostic Log
 
-Add a visibly destructive `Reset Development Database` control inside the Developer Console.
+Replace the existing plain-string log implementation with a structured logging model.
+
+Each log entry shall contain only verified diagnostic information.
+
+Each entry should support:
+
+- sequence number
+- timestamp
+- log level
+- category
+- concise message
+- optional structured metadata where appropriate
+
+The logging model must remain lightweight and deterministic.
+
+Do not introduce a general-purpose logging framework or external dependency.
+
+---
+
+### 2. Diagnostic Levels
+
+Introduce meaningful diagnostic levels.
+
+Supported levels:
+
+- Debug
+- Info
+- Warning
+- Error
+
+Rules:
+
+- every log entry belongs to exactly one level
+- Debug is intended for implementation details
+- Info represents normal successful application activity
+- Warning represents recoverable conditions
+- Error represents operations that failed or could not complete
+- do not invent artificial severity values
+- do not duplicate levels with categories
+
+---
+
+### 3. Diagnostic Categories
+
+Introduce structured categories.
+
+Supported categories:
+
+- Application
+- Import
+- Parser
+- Validation
+- Database
+- Runtime
+
+Rules:
+
+- every log entry belongs to one category
+- categories describe the subsystem
+- levels describe importance
+- future categories may be added without redesigning the logging model
+
+---
+
+### 4. Import Lifecycle Presentation
+
+Replace verbose import logging with concise lifecycle events.
+
+The primary console should present events such as:
+
+- Import started
+- Institution detected
+- Parser selected
+- Validation completed
+- Repository persistence completed
+- Runtime refresh completed
+- Import completed
+- Import failed
+
+Parser-specific diagnostics such as:
+
+- detected delimiter
+- encoding
+- row counts
+- header detection
+- normalization details
+- parser internals
+
+must no longer appear in the default log view.
+
+Those details belong to Debug entries only.
+
+The console should answer:
+
+"What is LedgerForge doing?"
+
+rather than
+
+"How is LedgerForge implemented?"
+
+---
+
+### 5. Log Presentation
+
+Improve readability of the Developer Console.
 
 Requirements:
 
-- visible only when Developer Mode is enabled
-- styled as destructive/red
-- protected by an explicit confirmation dialog
-- confirmation explains that all imported financial data and import history will be permanently removed
-- action preserves application preferences, appearance, Developer Mode and other non-financial settings
-- action completes without an application restart
+- newest log entries appear first
+- original sequence numbers remain unchanged
+- timestamps remain visible
+- long messages wrap correctly
+- log presentation remains performant with large histories
+- visual hierarchy should clearly distinguish lifecycle events from warnings and errors
 
-Approved reset strategy:
+Do not renumber historical entries after reversing display order.
 
-- create a fresh SQLite repository provider at a new development database path
-- replace `DatabaseProvider.shared` with the fresh provider
-- force canonical repository hydration using `RepositoryStoreHydrator.hydrateIfNeeded(forceRefresh: true)`
-- clear repository-backed runtime state through the hydration path
-- refresh Dashboard presentation into the empty state
-- do not delete the active SQLite file while connections may still be open
-- do not introduce direct SQL table deletion from Views or ViewModels
+Preserve chronological integrity.
 
-After reset, verify:
+---
 
-- accounts = 0
-- transactions = 0
-- Dashboard shows the empty state
-- Transactions screen shows the empty state
-- Developer Console runtime counts show 0
-- no restart is required
+### 6. Diagnostic Filtering
 
-### 2. Runtime Inspector
+Provide lightweight filtering without changing stored log data.
 
-Add a read-only Developer Console panel showing only verified existing state:
+Supported filters:
 
-- repository/provider type or state
+- All Levels
+- Debug
+- Info
+- Warning
+- Error
+
+Supported category filters:
+
+- All Categories
+- Application
+- Import
+- Parser
+- Validation
+- Database
+- Runtime
+
+Rules:
+
+- filtering affects presentation only
+- filtering must never modify stored log entries
+- multiple filters may be combined
+- clearing filters restores the complete log history
+- search operates on the currently filtered view
+- filtering must remain responsive for large log histories
+
+---
+
+### 7. Search, Copy and Clear
+
+Preserve the existing Developer Console utilities while improving usability.
+
+Search
+
+- plain-text substring search
+- case-insensitive
+- searches message and visible metadata only
+- does not mutate stored logs
+
+Copy All
+
+- copies the complete stored diagnostic history
+- preserves chronological order of the underlying log
+- includes timestamps, level and category
+- remains available regardless of active filters
+
+Clear
+
+- removes all stored log entries
+- resets search and filter state
+- does not affect runtime stores
+- does not affect repositories
+- does not affect application state
+
+No additional export functionality is included in this sprint.
+
+---
+
+### 8. Runtime Inspector Refinement
+
+Refine presentation of the existing Runtime Inspector.
+
+The Runtime Inspector should present concise runtime information including, where available:
+
+- repository provider
+- active database path
 - hydration status
 - account count
 - transaction count
-- latest refresh result or equivalent available hydration result
-- current SQLite database path, if safely available from existing provider configuration
+- latest refresh result
 
-Do not create duplicate mutable state solely for the inspector.
+Rules:
 
-### 3. Repository Summary
+- presentation only
+- no new runtime state
+- no duplicate ownership of existing data
+- continue using RepositoryStoreHydrator as the canonical runtime source
 
-Show read-only counts for currently supported repository-backed entities:
+No additional runtime controls are introduced.
 
-- Accounts
-- Transactions
+---
 
-Do not add document, import-session, category, rule, investment or other counts unless existing repository APIs already expose them safely.
+### 9. Reusable Diagnostic UI Components
 
-### 4. Log Console Improvements
+Eliminate recurring Developer Console interaction inconsistencies.
 
-Improve the existing plain-string log console with:
+Introduce reusable LedgerForge diagnostic controls where appropriate.
 
-- text-only substring search
-- `Copy All`
-- `Clear`
+These should include consistent behaviour for:
 
- Rules:
-
-- search must be clearly presented as plain text search
-- do not add fake severity or category filters
-- `Clear` must use the existing `DeveloperConsole.clear()` behaviour
-- `Copy All` must copy the intended complete log text without mutating stored messages
-
-### 5. Runtime Refresh
-
-Add one canonical `Reload Data` action.
+- Primary buttons
+- Secondary buttons
+- Destructive buttons
+- Toolbar buttons
 
 Requirements:
 
-- invokes `RepositoryStoreHydrator.hydrateIfNeeded(forceRefresh: true)`
-- updates runtime account and transaction state through the existing hydrator path
-- updates Runtime Inspector counts and hydration status
-- does not create separate per-entity refresh operations
+- entire visible control is clickable
+- consistent padding
+- consistent corner radius
+- consistent hover behaviour
+- consistent keyboard focus
+- consistent accessibility behaviour
+- consistent disabled appearance
+- no control may respond only when clicking directly on its text or icon
+
+The goal is to establish reusable interaction behaviour rather than repeatedly correcting individual screens.
+
+---
+
+### 10. Developer Diagnostics Philosophy
+
+The Developer Console should present operational information rather than implementation details.
+
+Default presentation should answer questions such as:
+
+- What operation is running?
+- Did it complete successfully?
+- What subsystem produced this event?
+- Does the developer need to take action?
+
+Implementation details belong in Debug entries.
+
+The default experience should remain concise, readable and focused on application behaviour.
+
+Developer Console is not intended to become:
+
+- a SQL browser
+- a parser debugger
+- a repository explorer
+- a runtime object inspector
+
+Those remain future capabilities if ever required.
+
+---
 
 ## Expected Files
 
-Likely implementation files:
+Expected implementation files may include:
 
-- `DeveloperConsoleView.swift`
-- `DeveloperConsole.swift` only if narrowly required
-- current application/provider bootstrap or composition-root file only where provider replacement must be coordinated
-- existing SQLite provider file only if a narrow read-only path exposure is required
-- focused tests
-
-Documentation after successful implementation:
-
+- `Core/DeveloperConsole.swift`
+- `Views/DeveloperConsoleView.swift`
+- Shared diagnostic UI component files where appropriate
+- Focused Developer Console tests
 - `Project documents/PROJECT_STATE.md`
 - `Project documents/Codex response.md`
 
-Codex must not modify:
+Additional files may be modified only where directly required by Sprint 31.
 
-- `Project documents/Implementation.md`
+`Project documents/Implementation.md` must not be modified by Codex.
 
-Do not create speculative abstractions or placeholder tools.
+---
 
 ## Architecture Constraints
 
-Preserve:
+Preserve the existing architecture:
 
-```text
-Repository Provider
+Developer Console
 ↓
-Repositories
-↓
-SQLite
+Developer Diagnostics
 ↓
 RepositoryStoreHydrator
 ↓
 Runtime Stores
 ↓
-ViewModels
+Repositories
 ↓
-Views
-```
+SQLite
 
-Rules:
+Requirements:
 
-- no direct SQLite access from Views or ViewModels
-- no repository contract redesign
-- no schema changes
 - no parser changes
 - no validation changes
-- no import workflow changes
+- no repository contract changes
+- no database schema changes
 - no financial calculation changes
-- reset must be unavailable outside Developer Mode
-- destructive actions must require confirmation
-- runtime and repository inspectors are read-only
+- no runtime-store duplication
+- no direct SQLite access from UI
+- no additional persistence mechanisms
+- no external logging frameworks
+- no replacement of RepositoryStoreHydrator
+- no architectural changes outside the Developer Console
 
-If safe provider replacement cannot be achieved with the current lifecycle, stop and report the blocker instead of deleting an active database file.
+Structured logging must remain a presentation and diagnostics improvement only.
+
+Financial behaviour must remain completely unchanged.
+
+---
 
 ## Acceptance Criteria
 
-### Database Reset
+Sprint 31 is complete only when all of the following are satisfied.
 
-- destructive control is visible only in Developer Mode
-- entire visible button rectangle is clickable
-- confirmation is required
-- confirmation clearly states irreversibility and affected data
-- fresh SQLite provider is created safely
-- canonical forced hydration runs after provider replacement
-- accounts become 0
-- transactions become 0
-- Dashboard becomes empty
-- Transactions screen becomes empty
-- Developer Console runtime counts become 0
-- application preferences and Developer Mode remain unchanged
-- no application restart is required
+### Structured Diagnostic Log
+
+- Plain string logging has been replaced by structured diagnostic entries.
+- Every log entry contains:
+  - sequence number
+  - timestamp
+  - level
+  - category
+  - message
+- Optional metadata is supported without becoming mandatory.
+- Existing logging behaviour remains deterministic.
+
+---
+
+### Diagnostic Levels
+
+Supported levels:
+
+- Debug
+- Info
+- Warning
+- Error
+
+Requirements:
+
+- every entry belongs to exactly one level
+- levels remain semantically meaningful
+- Debug is hidden by default
+- levels are visually distinguishable
+
+---
+
+### Diagnostic Categories
+
+Supported categories:
+
+- Application
+- Import
+- Parser
+- Validation
+- Database
+- Runtime
+
+Requirements:
+
+- every entry belongs to exactly one category
+- categories remain extensible
+- category filtering operates correctly
+
+---
+
+### Import Lifecycle
+
+Default import presentation shows concise lifecycle events.
+
+Examples include:
+
+- Import Started
+- Institution Detected
+- Parser Selected
+- Validation Completed
+- Repository Updated
+- Runtime Refreshed
+- Import Completed
+- Import Failed
+
+Parser implementation details no longer appear in the default console.
+
+Parser diagnostics remain accessible through Debug entries.
+
+---
+
+### Log Presentation
+
+Requirements:
+
+- newest entries displayed first
+- historical sequence numbers preserved
+- timestamps visible
+- long messages wrap correctly
+- scrolling remains smooth with large histories
+- newest entries appear without requiring manual scrolling
+
+---
+
+### Filtering
+
+Users can filter by:
+
+- Level
+- Category
+
+Requirements:
+
+- filtering affects presentation only
+- stored logs remain unchanged
+- multiple filters work together
+- clearing filters restores the complete log
+- filter changes occur without rebuilding log history
+
+---
+
+### Search
+
+Requirements:
+
+- plain-text substring search
+- case-insensitive
+- searches visible message content and metadata
+- works together with active filters
+- clearing search restores the filtered view
+
+---
+
+### Copy All
+
+Requirements:
+
+- copies the complete stored diagnostic history
+- preserves chronological sequence
+- includes:
+  - timestamp
+  - level
+  - category
+  - message
+- independent of current filters
+
+---
+
+### Clear
+
+Requirements:
+
+- removes all stored diagnostic entries
+- clears search state
+- clears filter state
+- affects only diagnostic history
+- does not alter repositories
+- does not alter runtime stores
+- does not alter application state
+
+---
 
 ### Runtime Inspector
 
-- account count is visible and accurate
-- transaction count is visible and accurate
-- hydration state or result is visible and accurate
-- provider/database path is shown only when safely available
-- inspector updates after Reset and Reload Data
-- inspector is read-only
+Requirements:
 
-### Repository Summary
+Runtime Inspector continues to display verified runtime information including:
 
-- account and transaction counts reflect repository-backed runtime state
-- no unsupported entity counts are shown
+- provider
+- database path
+- hydration status
+- account count
+- transaction count
+- latest refresh result
 
-### Log Console
+No duplicate runtime state is introduced.
 
-- substring search filters displayed messages without changing stored logs
-- `Copy All` copies log text
-- `Clear` removes stored messages through `DeveloperConsole.clear()`
-- no fake severity or category system is introduced
+---
 
-### Reload Data
+### Reusable Diagnostic Controls
 
-- uses the existing forced hydration path
-- updates account and transaction runtime state
-- updates inspector state
-- does not duplicate refresh logic
+Developer Console controls use shared behaviour.
 
-### Integrity
+Requirements:
 
-- existing import behaviour remains unchanged
-- existing confirmation-gated workflow remains unchanged
-- existing Dashboard calculations remain unchanged
-- existing repository boundaries remain unchanged
-- no schema changes
-- no preferences are erased during financial-data reset
+- entire visible control is clickable
+- hover behaviour consistent
+- focus behaviour consistent
+- accessibility behaviour consistent
+- disabled appearance consistent
+- padding consistent
+- corner radius consistent
+
+No Developer Console control responds only to clicks directly on text or icons.
+
+---
+
+### Architecture Integrity
+
+The following remain unchanged:
+
+- parser behaviour
+- validation behaviour
+- repository contracts
+- RepositoryStoreHydrator
+- runtime-store ownership
+- SQLite schema
+- financial calculations
+- import workflow
+- persistence behaviour
+
+Sprint 31 must remain entirely within the Developer Console and diagnostics experience.
 
 ---
 
 ## Automated Test Requirements
 
-Add focused deterministic tests for:
+Add focused deterministic tests covering only Sprint 31 functionality.
 
-- reset swaps to a fresh provider and produces zero account and transaction counts
-- reset preserves non-financial preferences where testable
-- forced hydration after reset reports empty state
-- `Reload Data` refreshes runtime counts from repository state
-- Runtime Inspector and Repository Summary reflect current store counts
-- substring search filters plain-string logs
-- `Clear` empties log messages
-- `Copy All` produces expected text where logic can be tested without fragile UI automation
-- destructive reset cannot be triggered without confirmed action at the presentation or state layer where practical
+Tests shall verify:
 
-Use temporary SQLite paths and existing repository-test patterns.
+### Structured Diagnostic Log
 
-Do not delete or alter the developer's real database during tests.
+- structured log entries replace plain string storage
+- sequence numbers remain unique
+- timestamps are assigned
+- level is correctly assigned
+- category is correctly assigned
+- optional metadata remains optional
+- existing log ordering remains deterministic
+
+---
+
+### Diagnostic Levels
+
+Verify:
+
+- Debug entries are created correctly
+- Info entries are created correctly
+- Warning entries are created correctly
+- Error entries are created correctly
+
+Verify Debug entries are hidden by default.
+
+Verify enabling Debug immediately reveals existing Debug entries.
+
+---
+
+### Diagnostic Categories
+
+Verify category assignment for:
+
+- Application
+- Import
+- Parser
+- Validation
+- Database
+- Runtime
+
+Verify category filtering returns only matching entries.
+
+Verify removing category filters restores the complete history.
+
+---
+
+### Import Lifecycle
+
+Verify successful imports produce concise lifecycle events.
+
+Verify default logging contains lifecycle milestones only.
+
+Verify parser implementation details appear only when Debug logging is enabled.
+
+Verify lifecycle ordering remains correct.
+
+---
+
+### Log Presentation
+
+Verify:
+
+- newest entries appear first
+- sequence numbers remain unchanged
+- timestamps remain visible
+- long messages remain readable
+- presentation order does not modify stored history
+
+---
+
+### Filtering
+
+Verify:
+
+- Level filters operate correctly
+- Category filters operate correctly
+- combined filters operate correctly
+- clearing filters restores all entries
+- filtering never mutates stored logs
+
+---
+
+### Search
+
+Verify:
+
+- substring search
+- case-insensitive matching
+- search operates only on visible filtered entries
+- clearing search restores the filtered view
+- search never alters stored logs
+
+---
+
+### Copy All
+
+Verify:
+
+- complete diagnostic history is copied
+- timestamps included
+- levels included
+- categories included
+- messages included
+- copied history preserves chronological sequence regardless of display order
+
+---
+
+### Clear
+
+Verify:
+
+- all diagnostic entries removed
+- search reset
+- filter reset
+- runtime stores unchanged
+- repositories unchanged
+- application state unchanged
+
+---
+
+### Runtime Inspector
+
+Verify Runtime Inspector continues to display verified runtime information only.
+
+Verify displayed values remain consistent with RepositoryStoreHydrator and runtime stores.
+
+No duplicate runtime state may be introduced.
+
+---
+
+### Reusable Diagnostic Controls
+
+Verify reusable controls provide:
+
+- full visible hit target
+- consistent hover state
+- consistent disabled appearance
+- consistent keyboard focus
+- identical accessibility behaviour
+
+Where practical, focused tests should verify shared diagnostic control configuration and action wiring. Full visible hit-target behaviour must be confirmed through manual runtime verification.
 
 ---
 
 ## Manual Validation
 
-Verify in the running application:
+Desktop ChatGPT will perform manual runtime verification.
 
-1. Enable Developer Mode and open Developer Console.
-2. Confirm Runtime Inspector shows current account and transaction counts.
-3. Confirm the current SQLite path or provider state is displayed when supported.
-4. Use log search, `Copy All` and `Clear`.
-5. Import a test statement and confirm counts increase.
-6. Select `Reset Development Database`.
-7. Confirm the first click only opens the warning dialog.
-8. Cancel once and verify nothing changes.
-9. Confirm reset on the second attempt.
-10. Verify accounts = 0 and transactions = 0.
-11. Verify Dashboard and Transactions show empty states.
-12. Verify Developer Mode and preferences remain enabled and preserved.
-13. Verify no application restart is required.
-14. Use `Reload Data` and confirm counts and state remain accurate.
+Verify the following:
+
+### Developer Console
+
+- opens only when Developer Mode is enabled
+- layout remains visually consistent
+- Runtime Inspector remains accurate
+- Repository Summary remains accurate
+
+---
+
+### Structured Logging
+
+Verify:
+
+- lifecycle events are concise
+- parser implementation details are hidden by default
+- Debug logging reveals parser diagnostics
+- timestamps remain readable
+- newest events appear at the top
+- sequence numbers remain unchanged
+
+---
+
+### Filtering
+
+Verify:
+
+- Level filters
+- Category filters
+- combined filters
+- filter clearing
+- search while filters are active
+
+---
+
+### Search
+
+Verify:
+
+- case-insensitive matching
+- partial substring matching
+- clearing search restores current filtered view
+
+---
+
+### Copy All
+
+Verify copied output includes:
+
+- timestamps
+- levels
+- categories
+- messages
+
+Verify copied output contains the complete stored diagnostic history.
+
+---
+
+### Clear
+
+Verify:
+
+- log history removed
+- filters reset
+- search reset
+- Runtime Inspector unchanged
+- Repository Summary unchanged
+
+---
+
+### Import Diagnostics
+
+Import a known statement.
+
+Verify only concise lifecycle events appear in the default log.
+
+Enable Debug.
+
+Verify parser diagnostics become visible.
+
+Disable Debug.
+
+Verify parser diagnostics disappear while lifecycle events remain visible.
+
+---
+
+### Runtime Behaviour
+
+Verify:
+
+- Reload Data continues working
+- Database Reset continues working
+- Dashboard behaviour unchanged
+- Accounts behaviour unchanged
+- Transactions behaviour unchanged
+- financial calculations unchanged
+
+---
+
+### UI Consistency
+
+Verify all reusable diagnostic controls:
+
+- use the full visible control as the hit target
+- maintain consistent hover behaviour
+- maintain consistent keyboard focus
+- maintain consistent disabled appearance
+- remain visually consistent throughout the Developer Console
+
+Desktop ChatGPT will approve Sprint 31 only after successful manual verification.
 
 ---
 
 ## Deferred
 
+The following diagnostic capabilities are explicitly deferred:
+
 - Import Inspector
 - Validation Timeline
-- structured log categories or severity
-- recent import-session browser
-- Open Database Folder
-- Export SQLite
-- database vacuum
-- repository rebuild
-- balance recalculation
-- search reindexing
-- Duplicate Inspector
+- structured per-operation performance metrics
+- individual log-entry export
+- diagnostic session export
+- persistent diagnostic history across launches
+- advanced log retention policies
+- database browser
+- SQL console
+- repository explorer
+- parser debugger
+- duplicate inspector
+- memory inspector
+- thread inspector
+- network inspector
+
+These capabilities are intentionally deferred because they require either additional repository contracts, richer runtime instrumentation or broader architectural decisions beyond Sprint 31.
 
 ---
 
 ## Explicitly Out of Scope
 
-- Feature Flags Viewer
-- SQL editor or browser
-- performance profiler
-- memory or thread inspector
-- parser changes
-- new institutions or formats
-- duplicate-management UI
-- password UI
+Sprint 31 must not introduce:
+
+- parser behaviour changes
+- validation behaviour changes
+- repository contract changes
+- database schema changes
+- new persistence mechanisms
+- financial calculation changes
 - import workflow redesign
+- account identity changes
+- duplicate-detection changes
+- new institutions
+- new import formats
 - Dashboard redesign
+- Accounts redesign
+- Transactions redesign
 - analytics
 - budgets
 - insights
+- salary planning
 - investments
-- database schema changes
-- production user-facing reset controls
+- production user-facing diagnostic controls
+- third-party logging frameworks
+
+Sprint 31 is strictly a Developer Console diagnostics sprint.
 
 ---
 
 ## Validation
 
-Before completion:
+Before Sprint 31 may be completed, the following must be satisfied:
 
-- Xcode diagnostics pass for modified files
-- Xcode project build passes
-- Xcode-native `RunAllTests` is used as the authoritative full test validation
-- all existing tests continue passing
-- focused Sprint 30 tests pass
-- manual runtime verification is recorded honestly
-- `Project documents/Implementation.md` remains unchanged
-- complete diff is reviewed
-- only approved Sprint 30 files are committed
-- no merge markers or whitespace damage remain
+### Automated Validation
 
-Do not run CLI `xcodebuild test` first when Xcode-native validation is available.
+- Xcode diagnostics pass for every modified Swift file that Xcode can resolve.
+- Xcode project build passes.
+- Xcode-native `RunAllTests` is the authoritative validation.
+- Existing test suite continues passing.
+- All Sprint 31 focused tests pass.
+
+Do not use CLI `xcodebuild test` as the primary validation path when Xcode-native validation is available.
+
+### Code Review
+
+Before committing:
+
+- inspect the complete Git diff
+- verify only approved Sprint 31 files changed
+- verify `Project documents/Implementation.md` remains unchanged
+- verify no merge markers remain
+- verify no whitespace damage remains
+- verify no unrelated UI changes were introduced
+- verify no architecture drift occurred
+
+### Runtime Validation
+
+Manual runtime verification remains mandatory.
+
+If Codex cannot launch or inspect the running application, it must:
+
+- complete diagnostics
+- complete build
+- complete automated tests
+- clearly report the limitation
+- stop before final completion until manual runtime verification is supplied
+
+Runtime evidence must never be fabricated from static inspection.
 
 ---
 
 ## Stop Conditions
 
-Stop and report without committing if:
+Stop immediately and report without committing if:
 
-- reset requires deleting an actively open SQLite database
-- provider replacement cannot be coordinated safely
-- schema or repository-contract changes become necessary
-- non-financial preferences cannot be preserved
-- reset races with an active import or hydration operation and cannot be safely gated
-- scope must expand into deferred modules
-- deterministic validation cannot be completed
+- structured logging requires repository contract changes
+- structured logging requires schema changes
+- parser behaviour must change
+- validation behaviour must change
+- financial calculations must change
+- import workflow semantics must change
+- Runtime Inspector behaviour cannot be preserved
+- Database Reset behaviour cannot be preserved
+- reusable controls require application-wide UI redesign outside Sprint 31
+- deterministic testing cannot be achieved
+- manual runtime verification exposes incorrect filtering
+- manual runtime verification exposes incorrect severity assignment
+- manual runtime verification exposes inaccessible controls
+- scope expands into deferred capabilities
+- scope expands into excluded capabilities
+
+Do not work around architectural boundaries.
+
+Do not begin Sprint 32.
 
 ---
 
 ## Completion Criteria
 
-Sprint 30 is complete only when:
+Sprint 31 is complete only when all of the following are true.
 
-- Developer Mode exposes the completed Developer Console foundation
-- safe database reset works without Terminal or application restart
-- reset produces zero accounts and zero transactions
-- Dashboard and Transactions return to empty state
-- preferences and Developer Mode remain preserved
-- Runtime Inspector and Repository Summary display accurate state
-- `Reload Data` uses canonical forced hydration
-- log search, `Copy All` and `Clear` work
-- architecture and financial behaviour remain unchanged
-- diagnostics and build pass
-- full active test plan passes
-- `PROJECT_STATE.md` is updated with verified facts
-- `Codex response.md` contains the Sprint 30 implementation report
-- approved changes are committed and pushed
+### Structured Logging
 
-Do not archive Sprint 30.
-
-Do not create Sprint 31.
-
-Desktop ChatGPT will review the implementation, approve or reject Sprint 30, archive it and prepare the next ACTIVE sprint.
+- plain-string logging has been replaced by structured diagnostic entries
+- every entry contains:
+  - sequence number
+  - timestamp
+  - level
+  - category
+  - message
+- optional metadata remains supported
 
 ---
 
-# =======ARCHIVED SPRINTS==========
+### Diagnostic Levels
 
+- Debug behaves correctly
+- Info behaves correctly
+- Warning behaves correctly
+- Error behaves correctly
+- Debug is hidden by default
+
+---
+
+### Categories
+
+Application
+
+Import
+
+Parser
+
+Validation
+
+Database
+
+Runtime
+
+All categories operate correctly and filtering behaves as expected.
+
+---
+
+### Presentation
+
+- newest entries appear first
+- stored sequence numbers remain unchanged
+- timestamps remain visible
+- lifecycle events are concise
+- parser implementation details appear only when Debug is enabled
+
+---
+
+### Filtering
+
+- Level filtering works
+- Category filtering works
+- combined filtering works
+- search works together with filters
+- filtering never mutates stored history
+
+---
+
+### Search
+
+- substring search works
+- case-insensitive search works
+- clearing search restores the filtered view
+
+---
+
+### Copy All
+
+- copies the complete diagnostic history
+- includes timestamp
+- includes level
+- includes category
+- includes message
+- preserves chronological sequence
+
+---
+
+### Clear
+
+- removes diagnostic history only
+- resets filters
+- resets search
+- leaves runtime state unchanged
+- leaves repositories unchanged
+
+---
+
+### Runtime Inspector
+
+- remains accurate
+- Repository Summary remains accurate
+- Database Reset remains functional
+- Reload Data remains functional
+
+---
+
+### Reusable Diagnostic Controls
+
+Developer Console controls:
+
+- use full visible hit targets
+- use consistent hover behaviour
+- use consistent focus behaviour
+- use consistent accessibility behaviour
+- use consistent disabled appearance
+
+---
+
+### Architecture Integrity
+
+The following remain unchanged:
+
+- parser
+- validation
+- repositories
+- RepositoryStoreHydrator
+- runtime-store ownership
+- persistence
+- SQLite schema
+- financial behaviour
+
+---
+
+### Final Validation
+
+- Xcode diagnostics pass
+- Xcode build passes
+- Xcode-native RunAllTests passes
+- manual runtime verification passes
+
+---
+
+### Documentation
+
+- `PROJECT_STATE.md` updated with verified facts only
+- `Codex response.md` replaced with the completed Sprint 31 implementation report
+
+---
+
+### Git
+
+- approved implementation committed
+- pushed to `origin/main`
+- remote `main` verified using:
+
+```bash
+git ls-remote origin refs/heads/main
+```
+
+---
+
+Do not archive Sprint 31.
+
+Do not create Sprint 32.
+
+Desktop ChatGPT will review the implementation, approve or reject Sprint 31, record its completed state in `PROJECT_STATE.md`, and prepare Sprint 32 — Financial Identity Engine as the next ACTIVE sprint.
