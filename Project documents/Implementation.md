@@ -1,1096 +1,834 @@
 # =======ACTIVE SPRINT==========
 
-## Sprint 31 — Developer Diagnostics & Logging
+## Sprint 32 — Financial Identity Foundation
 
 ### Status
 
 🟢 Ready for Implementation
 
-### Objective
+---
 
-Transform the existing Developer Console into a cohesive developer diagnostics workspace that provides clear, structured insight into LedgerForge's internal behaviour while preserving the existing architecture and keeping all financial behaviour unchanged.
+## Objective
 
-Sprint 31 focuses exclusively on developer diagnostics, logging quality and reusable diagnostic UI components.
+Establish LedgerForge's deterministic Financial Identity Foundation.
 
-It must not introduce new financial features or alter parser behaviour, validation behaviour, repository contracts, runtime hydration, database schema or financial calculations.
+This sprint establishes the repository and domain foundations required for stable financial account identity without changing existing financial behaviour, parser behaviour, runtime hydration or import workflows.
+
+The Financial Identity Engine will allow LedgerForge to recognise the same real-world financial account across repeated imports using verified identifiers rather than relying solely on generated account IDs.
+
+Sprint 32 deliberately focuses only on deterministic identity infrastructure.
+
+It does not introduce automatic account merging, fuzzy matching, duplicate resolution, financial analytics or user-facing identity management.
+
+---
+
+## Verified Baseline
+
+The following repository state is considered verified before Sprint 32 begins.
+
+Completed work includes:
+
+- Sprint 31 — Developer Diagnostics & Logging
+- Structured Developer Diagnostics (ADR-026 Accepted)
+- DTO concurrency isolation maintenance
+- Explicit nonisolated Equatable on:
+  - WorkspaceDTO
+  - TransactionRawRowDTO
+  - TransactionDTO
+  - AccountDTO
+  - ImportSessionRecordDTO
+- App target default actor isolation remains MainActor
+- Repository architecture remains unchanged
+- Runtime hydration remains owned by RepositoryStoreHydrator
+- SQLite schema version remains unchanged
+- Xcode diagnostics pass
+- Xcode BuildProject passes
+- Xcode-native RunAllTests passes
+- Manual runtime verification completed for Sprint 31
+
+Sprint 32 begins from this verified baseline only.
+
+No architectural rollback is permitted.
 
 ---
 
 ## User Outcome
 
-During development, the user can clearly understand what LedgerForge is doing, why it is doing it and whether operations completed successfully without being overwhelmed by low-level parser diagnostics or implementation details.
+After Sprint 32, LedgerForge will possess a deterministic financial identity infrastructure capable of storing, normalizing and resolving verified financial account identifiers.
 
-The Developer Console becomes the central workspace for monitoring application activity, viewing structured diagnostic information and understanding the lifecycle of major operations while remaining lightweight and easy to read.
+This capability remains internal.
+
+Users will not observe any behavioural changes during imports.
+
+Existing imports, accounts, transactions, dashboards and runtime stores must continue to behave exactly as before.
+
+This sprint prepares the repository layer for future account reuse while intentionally leaving production import behaviour unchanged.
 
 ---
 
 ## Scope
 
-### 1. Structured Diagnostic Log
+Sprint 32 establishes only the identity foundation.
 
-Replace the existing plain-string log implementation with a structured logging model.
+### Included
 
-Each log entry shall contain only verified diagnostic information.
+- canonical financial identifier model
+- identifier normalization
+- identifier strength classification
+- identifier verification state
+- identifier provenance
+- workspace-scoped repository persistence
+- workspace-scoped repository lookup
+- deterministic identity resolver
+- SQLite implementation
+- In-Memory implementation
+- repository parity
+- comprehensive automated testing
+- concise developer diagnostics where appropriate
 
-Each entry should support:
+### Explicitly Excluded
 
-- sequence number
-- timestamp
-- log level
-- category
-- concise message
-- optional structured metadata where appropriate
+Sprint 32 must **not** introduce:
 
-The logging model must remain lightweight and deterministic.
+- production import integration
+- parser modifications
+- `FinancialDocument` modifications
+- account-ID generation changes
+- automatic account reuse
+- duplicate account merging
+- fuzzy matching
+- AI-assisted matching
+- filename-based matching
+- display-name matching
+- institution-label matching
+- user-facing identity management
+- new UI
+- schema migration
+- account identifier backfill
+- financial calculations
+- analytics
+- budgeting
+- investment functionality
 
-Do not introduce a general-purpose logging framework or external dependency.
+The objective is to build deterministic infrastructure only.
 
 ---
 
-### 2. Diagnostic Levels
+## Architectural Principles
 
-Introduce meaningful diagnostic levels.
+The following principles are mandatory throughout Sprint 32.
 
-Supported levels:
+### Deterministic
 
-- Debug
-- Info
-- Warning
-- Error
+Every identity decision must always produce the same result for identical inputs.
+
+No randomness, heuristics or probabilistic matching is permitted.
+
+---
+
+### Explainable
+
+Every identity decision must be understandable from repository state alone.
+
+Every successful or unsuccessful resolution must have a deterministic explanation.
+
+---
+
+### Repository Owned
+
+Identity belongs to the repository layer.
+
+Runtime stores, ViewModels and Views must never become owners of identity resolution.
+
+---
+
+### Provider Parity
+
+The In-Memory repository and SQLite repository must behave identically.
+
+A repository test that passes against one provider must pass unchanged against the other.
+
+---
+
+### Backwards Compatible
+
+Existing account IDs remain unchanged.
+
+Existing transaction relationships remain unchanged.
+
+Existing import behaviour remains unchanged.
+
+Existing SQLite databases remain valid.
+
+No migration is introduced during Sprint 32.
+
+---
+
+## Canonical Financial Identifier Model
+
+Sprint 32 introduces a canonical identifier model that represents real-world financial account identifiers independently of account names, filenames or generated repository IDs.
+
+The model must remain lightweight, deterministic and suitable for repository persistence.
+
+Each identifier shall record:
+
+- identifier kind
+- normalized value
+- identifier strength
+- verification state
+- provenance
+- creation timestamp where required by persistence
+
+No external libraries may be introduced.
+
+---
+
+## Identifier Strength
+
+Exactly two strength categories are supported.
+
+### Strong
+
+A strong identifier may independently establish exact account identity when it is verified and resolves unambiguously.
+
+Examples include:
+
+- full normalized IBAN
+- verified institution-issued account ID
+- verified broker account ID
+- another full institution-issued identifier whose uniqueness has been established
+
+---
+
+### Weak
+
+Weak identifiers may support diagnostics or future workflows but must never independently establish exact account identity.
+
+Examples include:
+
+- card last four digits
+- partially masked PAN
+- account suffix
+- account nickname
+- display name
+- filename
+- institution label
 
 Rules:
 
-- every log entry belongs to exactly one level
-- Debug is intended for implementation details
-- Info represents normal successful application activity
-- Warning represents recoverable conditions
-- Error represents operations that failed or could not complete
-- do not invent artificial severity values
-- do not duplicate levels with categories
+- weak identifiers must never produce an exact match
+- weak identifiers must never override a strong match
+- weak identifiers must never broaden a strong match into another account
+- partially masked values remain weak unless a future approved sprint explicitly proves uniqueness
 
 ---
 
-### 3. Diagnostic Categories
+## Identifier Normalization
 
-Introduce structured categories.
-
-Supported categories:
-
-- Application
-- Import
-- Parser
-- Validation
-- Database
-- Runtime
-
-Rules:
-
-- every log entry belongs to one category
-- categories describe the subsystem
-- levels describe importance
-- future categories may be added without redesigning the logging model
-
----
-
-### 4. Import Lifecycle Presentation
-
-Replace verbose import logging with concise lifecycle events.
-
-The primary console should present events such as:
-
-- Import started
-- Institution detected
-- Parser selected
-- Validation completed
-- Repository persistence completed
-- Runtime refresh completed
-- Import completed
-- Import failed
-
-Parser-specific diagnostics such as:
-
-- detected delimiter
-- encoding
-- row counts
-- header detection
-- normalization details
-- parser internals
-
-must no longer appear in the default log view.
-
-Those details belong to Debug entries only.
-
-The console should answer:
-
-"What is LedgerForge doing?"
-
-rather than
-
-"How is LedgerForge implemented?"
-
----
-
-### 5. Log Presentation
-
-Improve readability of the Developer Console.
+Every supported identifier kind must define deterministic normalization rules.
 
 Requirements:
 
-- newest log entries appear first
-- original sequence numbers remain unchanged
-- timestamps remain visible
-- long messages wrap correctly
-- log presentation remains performant with large histories
-- visual hierarchy should clearly distinguish lifecycle events from warnings and errors
+- normalization must be explicit and fully testable
+- normalization must not depend on locale-sensitive behaviour
+- normalization must never silently infer missing characters
+- normalized values are used for repository persistence and lookup
+- invalid normalized values must be rejected
+- empty normalized values must be rejected
 
-Do not renumber historical entries after reversing display order.
+Original imported values may be retained only as provenance metadata.
 
-Preserve chronological integrity.
+Institution-specific heuristics are explicitly out of scope.
 
 ---
 
-### 6. Diagnostic Filtering
+## Verification and Provenance
 
-Provide lightweight filtering without changing stored log data.
+Every identifier records both verification state and provenance.
 
-Supported filters:
+Verification must never be assumed simply because text was extracted from an imported document.
 
-- All Levels
-- Debug
-- Info
-- Warning
-- Error
+Examples of provenance include:
 
-Supported category filters:
-
-- All Categories
-- Application
-- Import
-- Parser
-- Validation
-- Database
-- Runtime
+- user confirmed
+- institution-issued structured field
+- imported metadata
+- parser-derived text
+- migration or administrative source
 
 Rules:
 
-- filtering affects presentation only
-- filtering must never modify stored log entries
-- multiple filters may be combined
-- clearing filters restores the complete log history
-- search operates on the currently filtered view
-- filtering must remain responsive for large log histories
+- only verified strong identifiers may independently establish account identity
+- parser-derived text remains unverified unless explicitly promoted by a future approved sprint
+- provenance must remain deterministic and inspectable
+- AI inference is not permitted
 
 ---
 
-### 7. Search, Copy and Clear
+## Repository Contract Extension
 
-Preserve the existing Developer Console utilities while improving usability.
+Extend the repository layer with workspace-scoped financial identifier operations.
 
-Search
+The repository remains the single persistence boundary for all identifier storage and lookup.
 
-- plain-text substring search
-- case-insensitive
-- searches message and visible metadata only
-- does not mutate stored logs
+Required capabilities include:
 
-Copy All
-
-- copies the complete stored diagnostic history
-- preserves chronological order of the underlying log
-- includes timestamps, level and category
-- remains available regardless of active filters
-
-Clear
-
-- removes all stored log entries
-- resets search and filter state
-- does not affect runtime stores
-- does not affect repositories
-- does not affect application state
-
-No additional export functionality is included in this sprint.
-
----
-
-### 8. Runtime Inspector Refinement
-
-Refine presentation of the existing Runtime Inspector.
-
-The Runtime Inspector should present concise runtime information including, where available:
-
-- repository provider
-- active database path
-- hydration status
-- account count
-- transaction count
-- latest refresh result
+- attach a normalized identifier to an account
+- retrieve all identifiers associated with an account
+- locate candidate account IDs using a normalized identifier within one workspace
+- detect conflicting identifier ownership
+- preserve idempotent writes
 
 Rules:
 
-- presentation only
-- no new runtime state
-- no duplicate ownership of existing data
-- continue using RepositoryStoreHydrator as the canonical runtime source
+- every lookup must be explicitly scoped by workspace ID
+- repository APIs must never use filenames, display names or institution labels as identity keys
+- repository APIs must never silently choose one account when multiple candidates exist
+- ambiguity must always be surfaced explicitly
+- all repository behaviour must remain deterministic
 
-No additional runtime controls are introduced.
+Existing repository contracts unrelated to account identity must remain unchanged.
 
 ---
 
-### 9. Reusable Diagnostic UI Components
+## In-Memory Repository Implementation
 
-Eliminate recurring Developer Console interaction inconsistencies.
-
-Introduce reusable LedgerForge diagnostic controls where appropriate.
-
-These should include consistent behaviour for:
-
-- Primary buttons
-- Secondary buttons
-- Destructive buttons
-- Toolbar buttons
+The In-Memory repository must fully implement the new repository contract.
 
 Requirements:
 
-- entire visible control is clickable
-- consistent padding
-- consistent corner radius
-- consistent hover behaviour
-- consistent keyboard focus
-- consistent accessibility behaviour
-- consistent disabled appearance
-- no control may respond only when clicking directly on its text or icon
+- behaviour must match the SQLite implementation
+- attaching the same identifier to the same account is idempotent
+- attaching an identifier already owned by another account in the same workspace fails deterministically
+- candidate lookup returns every matching account ID
+- workspace isolation is always enforced
+- failed writes must not modify repository state
+- deterministic ordering must be preserved where applicable
 
-The goal is to establish reusable interaction behaviour rather than repeatedly correcting individual screens.
+Provider parity with SQLite is mandatory.
 
 ---
 
-### 10. Developer Diagnostics Philosophy
+## SQLite Repository Implementation
 
-The Developer Console should present operational information rather than implementation details.
+Implement repository support using the existing `account_identifiers` table.
 
-Default presentation should answer questions such as:
+Requirements:
 
-- What operation is running?
-- Did it complete successfully?
-- What subsystem produced this event?
-- Does the developer need to take action?
+- preserve schema version 2
+- do not modify database migrations
+- reuse the existing `account_identifiers` table
+- perform all identifier lookups within the owning workspace
+- preserve every existing account, transaction and import-session relationship
+- existing account IDs must never change
 
-Implementation details belong in Debug entries.
+Repository conflict detection must occur transactionally.
 
-The default experience should remain concise, readable and focused on application behaviour.
+SQLite implementation requirements:
 
-Developer Console is not intended to become:
+1. begin an immediate write transaction
+2. query existing mappings within the requested workspace
+3. reuse an identical existing mapping
+4. reject conflicting ownership
+5. insert only when no mapping exists
+6. commit only after successful validation
+7. roll back every failed transaction
 
-- a SQL browser
-- a parser debugger
-- a repository explorer
-- a runtime object inspector
+Because SQLite does not currently enforce uniqueness for account identifiers, repository logic must provide deterministic conflict prevention.
 
-Those remain future capabilities if ever required.
+Duplicate mappings discovered during lookup must always be reported as ambiguity.
+
+Repository enforcement must not be described as database-level uniqueness.
+
+---
+
+## Deterministic Identity Resolver
+
+Introduce a dedicated Financial Identity Resolver.
+
+The resolver operates entirely independently from the production import pipeline.
+
+Its responsibility is to evaluate verified financial identifiers and determine a deterministic resolution outcome.
+
+Supported outcomes:
+
+- **Resolved**
+- **No Match**
+- **Ambiguous**
+- **Conflict**
+
+Definitions:
+
+### Resolved
+
+All verified strong identifiers converge on exactly one account.
+
+### No Match
+
+No verified strong identifier resolves to an existing account.
+
+This includes:
+
+- no identifiers supplied
+- only weak identifiers supplied
+- verified identifiers that have no repository match
+
+### Ambiguous
+
+One or more verified identifiers resolve to multiple candidate accounts.
+
+### Conflict
+
+Different verified strong identifiers resolve to different accounts.
+
+Resolver rules:
+
+1. all matching strong identifiers converging on one account produce **Resolved**
+2. conflicting strong identifiers produce **Conflict**
+3. one verified match plus one non-matching verified identifier still produces **Resolved**
+4. multiple candidate matches produce **Ambiguous**
+5. weak identifiers alone always produce **No Match**
+6. absence of identifiers produces **No Match**
+7. weak identifiers never override, weaken or broaden a strong match
+8. silent account selection is never permitted
+
+Resolver behaviour must remain deterministic regardless of identifier ordering.
+
+---
+
+## Developer Diagnostics
+
+Extend the existing Developer Diagnostics framework with concise identity-related events.
+
+Diagnostics may report:
+
+- identifier attached
+- existing identifier reused
+- conflicting identifier rejected
+- resolver returned Resolved
+- resolver returned No Match
+- resolver returned Ambiguous
+- resolver returned Conflict
+
+Requirements:
+
+- diagnostics remain in-memory only
+- sensitive identifiers must never be logged in full
+- identifiers should be safely redacted where appropriate
+- diagnostics are informational only
+- diagnostics must never become a financial source of truth
+- no new Developer Console UI is introduced
+- no persistent logging is added
+
+---
+
+## Execution Phases
+
+Implementation should proceed in the following order.
+
+### Phase 1 — Domain Model
+
+Establish the financial identifier domain.
+
+Tasks:
+
+- introduce canonical financial identifier types
+- implement identifier strength classification
+- implement verification state
+- implement provenance representation
+- implement deterministic normalization
+- ensure all domain types remain immutable where appropriate
+
+No repository behaviour changes occur during this phase.
+
+---
+
+### Phase 2 — Repository Contracts
+
+Extend repository protocols to support financial identifiers.
+
+Tasks:
+
+- introduce workspace-scoped identifier operations
+- define deterministic repository errors
+- preserve all existing repository APIs
+- preserve backwards compatibility
+
+Repository contracts should remain persistence-focused and must not contain business logic.
+
+---
+
+### Phase 3 — Repository Implementations
+
+Implement the new repository behaviour.
+
+Tasks:
+
+- implement In-Memory repository support
+- implement SQLite repository support
+- ensure behavioural parity
+- implement transactional conflict prevention
+- preserve schema version 2
+
+No schema migration is permitted.
+
+---
+
+### Phase 4 — Identity Resolver
+
+Implement the Financial Identity Resolver.
+
+Tasks:
+
+- deterministic account resolution
+- ambiguity detection
+- conflict detection
+- exact-match resolution
+- workspace-scoped repository lookup interaction
+
+The resolver must remain completely independent from the production import pipeline.
+
+The resolver may query repository identifier APIs but must not be connected to:
+
+- `ImportPersistenceMapper`
+- `ImportPersistenceCoordinator`
+- `ImportEngine`
+- parser implementations
+- `FinancialDocument`
+
+The resolver is infrastructure only and must not alter production import behaviour during Sprint 32.
+
+---
+
+### Phase 5 — Developer Diagnostics
+
+Add concise identity diagnostics.
+
+Diagnostics should assist developers without exposing sensitive financial information.
+
+No new UI components are required.
+
+---
+
+### Phase 6 — Automated Testing
+
+Complete comprehensive repository and resolver testing.
+
+Every new repository behaviour must be validated against both providers.
+
+Regression testing must demonstrate that existing LedgerForge functionality remains unchanged.
 
 ---
 
 ## Expected Files
 
-Expected implementation files may include:
+The following files are expected to change during Sprint 32.
 
-- `Core/DeveloperConsole.swift`
-- `Views/DeveloperConsoleView.swift`
-- Shared diagnostic UI component files where appropriate
-- Focused Developer Console tests
+### Repository Layer
+
+- `Database/Repository.swift`
+- `Database/InMemoryRepositoryProvider.swift`
+- `Database/SQLiteRepositoryProvider.swift`
+- `Database/DTOs.swift` (only if required for identifier persistence)
+
+### Services
+
+- `LedgerForge/Services/IdentityResolver.swift`
+
+### Tests
+
+- `LedgerForgeTests/AccountIdentifierRepositoryTests.swift`
+- `LedgerForgeTests/IdentityResolverTests.swift`
+- focused additions to existing repository contract tests
+
+### Documentation
+
+Upon successful completion only:
+
 - `Project documents/PROJECT_STATE.md`
 - `Project documents/Codex response.md`
 
-Additional files may be modified only where directly required by Sprint 31.
+`Project documents/Implementation.md` must never be modified by Codex.
 
-`Project documents/Implementation.md` must not be modified by Codex.
+Additional source files may be modified only when directly required to satisfy the approved Sprint 32 scope.
 
 ---
 
 ## Architecture Constraints
 
-Preserve the existing architecture:
+The approved architecture remains:
 
-Developer Console
-↓
-Developer Diagnostics
-↓
-RepositoryStoreHydrator
-↓
-Runtime Stores
-↓
 Repositories
+
 ↓
+
 SQLite
+
+↓
+
+RepositoryStoreHydrator
+
+↓
+
+Runtime Stores
+
+↓
+
+ViewModels
+
+↓
+
+Views
 
 Requirements:
 
-- no parser changes
-- no validation changes
-- no repository contract changes
-- no database schema changes
-- no financial calculation changes
-- no runtime-store duplication
-- no direct SQLite access from UI
-- no additional persistence mechanisms
-- no external logging frameworks
-- no replacement of RepositoryStoreHydrator
-- no architectural changes outside the Developer Console
+- repository protocols remain the persistence boundary
+- SQLite remains accessible only through repository implementations
+- RepositoryStoreHydrator must not become an identity engine
+- runtime stores remain presentation models
+- ViewModels remain orchestration only
+- Views remain presentation only
 
-Structured logging must remain a presentation and diagnostics improvement only.
+The following behaviour must remain unchanged:
 
-Financial behaviour must remain completely unchanged.
+- account ID generation
+- transaction ownership
+- import-session ownership
+- runtime hydration
+- dashboard presentation
+- account presentation
+- parser behaviour
+- import behaviour
+- SQLite schema version
+
+No external dependencies may be introduced.
+
+AI, fuzzy matching, probabilistic matching and heuristic matching are explicitly prohibited during Sprint 32.
 
 ---
 
 ## Acceptance Criteria
 
-Sprint 31 is complete only when all of the following are satisfied.
+Sprint 32 is complete only when all of the following are satisfied.
 
-### Structured Diagnostic Log
+### Domain Model
 
-- Plain string logging has been replaced by structured diagnostic entries.
-- Every log entry contains:
-  - sequence number
-  - timestamp
-  - level
-  - category
-  - message
-- Optional metadata is supported without becoming mandatory.
-- Existing logging behaviour remains deterministic.
+- canonical financial identifier model exists
+- identifier kinds are explicitly defined
+- strong and weak identifier categories exist
+- verification state is represented
+- provenance is represented
+- normalization is deterministic
+- invalid normalized values are rejected
 
 ---
 
-### Diagnostic Levels
+### Repository Contracts
 
-Supported levels:
-
-- Debug
-- Info
-- Warning
-- Error
-
-Requirements:
-
-- every entry belongs to exactly one level
-- levels remain semantically meaningful
-- Debug is hidden by default
-- levels are visually distinguishable
+- repository identifier APIs are workspace-scoped
+- attaching a new identifier succeeds
+- attaching the same mapping is idempotent
+- conflicting ownership is rejected
+- listing identifiers for an account succeeds
+- candidate lookup returns every matching account ID
+- ambiguous candidates are never silently collapsed
 
 ---
 
-### Diagnostic Categories
+### In-Memory Repository
 
-Supported categories:
-
-- Application
-- Import
-- Parser
-- Validation
-- Database
-- Runtime
-
-Requirements:
-
-- every entry belongs to exactly one category
-- categories remain extensible
-- category filtering operates correctly
+- behaviour matches the documented repository contract
+- workspace isolation is enforced
+- idempotent writes create no duplicate mappings
+- conflicting writes leave repository state unchanged
 
 ---
 
-### Import Lifecycle
+### SQLite Repository
 
-Default import presentation shows concise lifecycle events.
-
-Examples include:
-
-- Import Started
-- Institution Detected
-- Parser Selected
-- Validation Completed
-- Repository Updated
-- Runtime Refreshed
-- Import Completed
-- Import Failed
-
-Parser implementation details no longer appear in the default console.
-
-Parser diagnostics remain accessible through Debug entries.
+- schema version remains 2
+- existing `account_identifiers` table is reused
+- lookup remains workspace-scoped
+- conflict detection and insertion occur atomically
+- failed writes roll back cleanly
+- idempotent writes create no duplicate mappings
+- duplicate stored mappings are surfaced as ambiguity
+- existing account IDs remain unchanged
 
 ---
 
-### Log Presentation
+### Identity Resolver
 
-Requirements:
-
-- newest entries displayed first
-- historical sequence numbers preserved
-- timestamps visible
-- long messages wrap correctly
-- scrolling remains smooth with large histories
-- newest entries appear without requiring manual scrolling
-
----
-
-### Filtering
-
-Users can filter by:
-
-- Level
-- Category
-
-Requirements:
-
-- filtering affects presentation only
-- stored logs remain unchanged
-- multiple filters work together
-- clearing filters restores the complete log
-- filter changes occur without rebuilding log history
+- converging strong identifiers produce **Resolved**
+- conflicting strong identifiers produce **Conflict**
+- one verified match plus one verified no-match produces **Resolved**
+- multiple candidate matches produce **Ambiguous**
+- weak identifiers alone produce **No Match**
+- absence of identifiers produces **No Match**
+- weak identifiers never override a strong match
+- resolver behaviour is deterministic regardless of input ordering
+- resolver may query workspace-scoped repository identifier APIs
+- resolver remains disconnected from production import workflows
+- no path silently selects among multiple accounts
 
 ---
 
-### Search
+### Developer Diagnostics
 
-Requirements:
-
-- plain-text substring search
-- case-insensitive
-- searches visible message content and metadata
-- works together with active filters
-- clearing search restores the filtered view
+- identity diagnostics integrate with the existing Developer Console
+- sensitive identifiers are never logged in full
+- diagnostics remain concise
+- diagnostics remain in-memory only
+- no new persistent diagnostic storage is introduced
 
 ---
 
-### Copy All
+### Compatibility
 
-Requirements:
+The following behaviour must remain unchanged:
 
-- copies the complete stored diagnostic history
-- preserves chronological sequence
-- includes:
-  - timestamp
-  - level
-  - category
-  - message
-- independent of current filters
-
----
-
-### Clear
-
-Requirements:
-
-- removes all stored diagnostic entries
-- clears search state
-- clears filter state
-- affects only diagnostic history
-- does not alter repositories
-- does not alter runtime stores
-- does not alter application state
-
----
-
-### Runtime Inspector
-
-Requirements:
-
-Runtime Inspector continues to display verified runtime information including:
-
-- provider
-- database path
-- hydration status
-- account count
-- transaction count
-- latest refresh result
-
-No duplicate runtime state is introduced.
-
----
-
-### Reusable Diagnostic Controls
-
-Developer Console controls use shared behaviour.
-
-Requirements:
-
-- entire visible control is clickable
-- hover behaviour consistent
-- focus behaviour consistent
-- accessibility behaviour consistent
-- disabled appearance consistent
-- padding consistent
-- corner radius consistent
-
-No Developer Console control responds only to clicks directly on text or icons.
-
----
-
-### Architecture Integrity
-
-The following remain unchanged:
-
+- production import behaviour
 - parser behaviour
-- validation behaviour
-- repository contracts
-- RepositoryStoreHydrator
-- runtime-store ownership
-- SQLite schema
-- financial calculations
-- import workflow
-- persistence behaviour
-
-Sprint 31 must remain entirely within the Developer Console and diagnostics experience.
-
----
-
-## Automated Test Requirements
-
-Add focused deterministic tests covering only Sprint 31 functionality.
-
-Tests shall verify:
-
-### Structured Diagnostic Log
-
-- structured log entries replace plain string storage
-- sequence numbers remain unique
-- timestamps are assigned
-- level is correctly assigned
-- category is correctly assigned
-- optional metadata remains optional
-- existing log ordering remains deterministic
+- `FinancialDocument`
+- account ID generation
+- transaction ownership
+- import-session ownership
+- RepositoryStoreHydrator behaviour
+- runtime stores
+- dashboard presentation
+- account presentation
+- existing SQLite databases
 
 ---
 
-### Diagnostic Levels
+## Automated Validation
 
-Verify:
+Before Sprint 32 may be considered complete:
 
-- Debug entries are created correctly
-- Info entries are created correctly
-- Warning entries are created correctly
-- Error entries are created correctly
+### Xcode Diagnostics
 
-Verify Debug entries are hidden by default.
+- diagnostics pass for every modified Swift file that Xcode can resolve
 
-Verify enabling Debug immediately reveals existing Debug entries.
+### Build
 
----
+- Xcode BuildProject passes
 
-### Diagnostic Categories
+### Tests
 
-Verify category assignment for:
+- Xcode-native RunAllTests passes
+- all new repository tests pass
+- all new resolver tests pass
+- no existing regression tests fail
 
-- Application
-- Import
-- Parser
-- Validation
-- Database
-- Runtime
+Repository behaviour must be validated against both:
 
-Verify category filtering returns only matching entries.
-
-Verify removing category filters restores the complete history.
-
----
-
-### Import Lifecycle
-
-Verify successful imports produce concise lifecycle events.
-
-Verify default logging contains lifecycle milestones only.
-
-Verify parser implementation details appear only when Debug logging is enabled.
-
-Verify lifecycle ordering remains correct.
-
----
-
-### Log Presentation
-
-Verify:
-
-- newest entries appear first
-- sequence numbers remain unchanged
-- timestamps remain visible
-- long messages remain readable
-- presentation order does not modify stored history
-
----
-
-### Filtering
-
-Verify:
-
-- Level filters operate correctly
-- Category filters operate correctly
-- combined filters operate correctly
-- clearing filters restores all entries
-- filtering never mutates stored logs
-
----
-
-### Search
-
-Verify:
-
-- substring search
-- case-insensitive matching
-- search operates only on visible filtered entries
-- clearing search restores the filtered view
-- search never alters stored logs
-
----
-
-### Copy All
-
-Verify:
-
-- complete diagnostic history is copied
-- timestamps included
-- levels included
-- categories included
-- messages included
-- copied history preserves chronological sequence regardless of display order
-
----
-
-### Clear
-
-Verify:
-
-- all diagnostic entries removed
-- search reset
-- filter reset
-- runtime stores unchanged
-- repositories unchanged
-- application state unchanged
-
----
-
-### Runtime Inspector
-
-Verify Runtime Inspector continues to display verified runtime information only.
-
-Verify displayed values remain consistent with RepositoryStoreHydrator and runtime stores.
-
-No duplicate runtime state may be introduced.
-
----
-
-### Reusable Diagnostic Controls
-
-Verify reusable controls provide:
-
-- full visible hit target
-- consistent hover state
-- consistent disabled appearance
-- consistent keyboard focus
-- identical accessibility behaviour
-
-Where practical, focused tests should verify shared diagnostic control configuration and action wiring. Full visible hit-target behaviour must be confirmed through manual runtime verification.
+- In-Memory provider
+- SQLite provider
 
 ---
 
 ## Manual Validation
 
-Desktop ChatGPT will perform manual runtime verification.
+Manual runtime regression verification is required after automated validation.
 
-Verify the following:
+The user will perform runtime verification in Xcode.
 
-### Developer Console
+Codex must not claim runtime verification unless evidence is explicitly supplied.
 
-- opens only when Developer Mode is enabled
-- layout remains visually consistent
-- Runtime Inspector remains accurate
-- Repository Summary remains accurate
-
----
-
-### Structured Logging
+Because Sprint 32 is infrastructure-only, manual validation is limited to regression safety.
 
 Verify:
 
-- lifecycle events are concise
-- parser implementation details are hidden by default
-- Debug logging reveals parser diagnostics
-- timestamps remain readable
-- newest events appear at the top
-- sequence numbers remain unchanged
+- application launches successfully
+- existing SQLite databases open successfully
+- Dashboard behaviour is unchanged
+- Accounts behaviour is unchanged
+- Transactions behaviour is unchanged
+- existing imports behave exactly as before
+- Developer Console continues functioning normally
+- no user-facing identity UI exists
+- existing account IDs remain unchanged
+- existing relationships remain unchanged
 
----
-
-### Filtering
-
-Verify:
-
-- Level filters
-- Category filters
-- combined filters
-- filter clearing
-- search while filters are active
-
----
-
-### Search
-
-Verify:
-
-- case-insensitive matching
-- partial substring matching
-- clearing search restores current filtered view
-
----
-
-### Copy All
-
-Verify copied output includes:
-
-- timestamps
-- levels
-- categories
-- messages
-
-Verify copied output contains the complete stored diagnostic history.
-
----
-
-### Clear
-
-Verify:
-
-- log history removed
-- filters reset
-- search reset
-- Runtime Inspector unchanged
-- Repository Summary unchanged
-
----
-
-### Import Diagnostics
-
-Import a known statement.
-
-Verify only concise lifecycle events appear in the default log.
-
-Enable Debug.
-
-Verify parser diagnostics become visible.
-
-Disable Debug.
-
-Verify parser diagnostics disappear while lifecycle events remain visible.
-
----
-
-### Runtime Behaviour
-
-Verify:
-
-- Reload Data continues working
-- Database Reset continues working
-- Dashboard behaviour unchanged
-- Accounts behaviour unchanged
-- Transactions behaviour unchanged
-- financial calculations unchanged
-
----
-
-### UI Consistency
-
-Verify all reusable diagnostic controls:
-
-- use the full visible control as the hit target
-- maintain consistent hover behaviour
-- maintain consistent keyboard focus
-- maintain consistent disabled appearance
-- remain visually consistent throughout the Developer Console
-
-Desktop ChatGPT will approve Sprint 31 only after successful manual verification.
-
----
-
-## Deferred
-
-The following diagnostic capabilities are explicitly deferred:
-
-- Import Inspector
-- Validation Timeline
-- structured per-operation performance metrics
-- individual log-entry export
-- diagnostic session export
-- persistent diagnostic history across launches
-- advanced log retention policies
-- database browser
-- SQL console
-- repository explorer
-- parser debugger
-- duplicate inspector
-- memory inspector
-- thread inspector
-- network inspector
-
-These capabilities are intentionally deferred because they require either additional repository contracts, richer runtime instrumentation or broader architectural decisions beyond Sprint 31.
+No manual identity-resolution workflow is required during this sprint.
 
 ---
 
 ## Explicitly Out of Scope
 
-Sprint 31 must not introduce:
+Sprint 32 must not introduce:
 
-- parser behaviour changes
-- validation behaviour changes
-- repository contract changes
-- database schema changes
-- new persistence mechanisms
-- financial calculation changes
-- import workflow redesign
-- account identity changes
-- duplicate-detection changes
-- new institutions
-- new import formats
-- Dashboard redesign
-- Accounts redesign
-- Transactions redesign
-- analytics
-- budgets
-- insights
-- salary planning
+- production import integration
+- ImportPersistenceMapper modifications
+- ImportPersistenceCoordinator modifications
+- parser modifications
+- FinancialDocument modifications
+- account-ID generation changes
+- automatic account reuse
+- duplicate account merging
+- identity-management UI
+- duplicate-management UI
+- schema migration
+- account identifier backfill
+- fuzzy matching
+- AI-assisted matching
+- filename-based identity
+- display-name identity
+- institution-label identity
+- masked PAN as an exact identifier
+- card last four as an exact identifier
+- new financial calculations
+- budgeting
 - investments
-- production user-facing diagnostic controls
-- third-party logging frameworks
-
-Sprint 31 is strictly a Developer Console diagnostics sprint.
-
----
-
-## Validation
-
-Before Sprint 31 may be completed, the following must be satisfied:
-
-### Automated Validation
-
-- Xcode diagnostics pass for every modified Swift file that Xcode can resolve.
-- Xcode project build passes.
-- Xcode-native `RunAllTests` is the authoritative validation.
-- Existing test suite continues passing.
-- All Sprint 31 focused tests pass.
-
-Do not use CLI `xcodebuild test` as the primary validation path when Xcode-native validation is available.
-
-### Code Review
-
-Before committing:
-
-- inspect the complete Git diff
-- verify only approved Sprint 31 files changed
-- verify `Project documents/Implementation.md` remains unchanged
-- verify no merge markers remain
-- verify no whitespace damage remains
-- verify no unrelated UI changes were introduced
-- verify no architecture drift occurred
-
-### Runtime Validation
-
-Manual runtime verification remains mandatory.
-
-If Codex cannot launch or inspect the running application, it must:
-
-- complete diagnostics
-- complete build
-- complete automated tests
-- clearly report the limitation
-- stop before final completion until manual runtime verification is supplied
-
-Runtime evidence must never be fabricated from static inspection.
+- analytics
 
 ---
 
 ## Stop Conditions
 
-Stop immediately and report without committing if:
+Stop implementation immediately and report without committing if:
 
-- structured logging requires repository contract changes
-- structured logging requires schema changes
-- parser behaviour must change
-- validation behaviour must change
-- financial calculations must change
-- import workflow semantics must change
-- Runtime Inspector behaviour cannot be preserved
-- Database Reset behaviour cannot be preserved
-- reusable controls require application-wide UI redesign outside Sprint 31
-- deterministic testing cannot be achieved
-- manual runtime verification exposes incorrect filtering
-- manual runtime verification exposes incorrect severity assignment
-- manual runtime verification exposes inaccessible controls
-- scope expands into deferred capabilities
-- scope expands into excluded capabilities
+- the verified `account_identifiers` schema differs materially from the inspected schema
+- workspace-scoped lookup cannot be implemented safely
+- transaction-safe conflict prevention cannot be guaranteed
+- implementation requires changing existing account IDs
+- implementation requires changing transaction ownership
+- implementation requires changing import-session ownership
+- implementation requires parser modifications
+- implementation requires `FinancialDocument` modifications
+- implementation requires production import integration
+- implementation requires schema migration
+- implementation expands into UI
+- deterministic behaviour cannot be guaranteed
+- provider parity cannot be maintained
+- implementation expands into fuzzy or AI matching
 
-Do not work around architectural boundaries.
+Do not work around these boundaries.
 
-Do not begin Sprint 32.
-
----
-
-## Completion Criteria
-
-Sprint 31 is complete only when all of the following are true.
-
-### Structured Logging
-
-- plain-string logging has been replaced by structured diagnostic entries
-- every entry contains:
-  - sequence number
-  - timestamp
-  - level
-  - category
-  - message
-- optional metadata remains supported
+Do not begin Sprint 33.
 
 ---
 
-### Diagnostic Levels
+## Completion
 
-- Debug behaves correctly
-- Info behaves correctly
-- Warning behaves correctly
-- Error behaves correctly
-- Debug is hidden by default
+Sprint 32 is complete only when:
 
----
+- canonical financial identifier infrastructure is implemented
+- repository contracts are complete
+- In-Memory and SQLite providers behave identically
+- deterministic resolver behaviour is implemented
+- all new automated tests pass
+- the existing test suite passes
+- manual regression verification passes
+- production import behaviour remains unchanged
+- existing account IDs remain unchanged
+- schema version remains 2
+- `PROJECT_STATE.md` is updated with verified facts
+- `Codex response.md` is replaced with the Sprint 32 implementation report
+- implementation commit is created and pushed
+- remote `main` is verified
+- documentation handoff is completed
 
-### Categories
+Desktop ChatGPT will review Sprint 32 before defining the next ACTIVE sprint.
 
-Application
 
-Import
-
-Parser
-
-Validation
-
-Database
-
-Runtime
-
-All categories operate correctly and filtering behaves as expected.
-
----
-
-### Presentation
-
-- newest entries appear first
-- stored sequence numbers remain unchanged
-- timestamps remain visible
-- lifecycle events are concise
-- parser implementation details appear only when Debug is enabled
-
----
-
-### Filtering
-
-- Level filtering works
-- Category filtering works
-- combined filtering works
-- search works together with filters
-- filtering never mutates stored history
-
----
-
-### Search
-
-- substring search works
-- case-insensitive search works
-- clearing search restores the filtered view
-
----
-
-### Copy All
-
-- copies the complete diagnostic history
-- includes timestamp
-- includes level
-- includes category
-- includes message
-- preserves chronological sequence
-
----
-
-### Clear
-
-- removes diagnostic history only
-- resets filters
-- resets search
-- leaves runtime state unchanged
-- leaves repositories unchanged
-
----
-
-### Runtime Inspector
-
-- remains accurate
-- Repository Summary remains accurate
-- Database Reset remains functional
-- Reload Data remains functional
-
----
-
-### Reusable Diagnostic Controls
-
-Developer Console controls:
-
-- use full visible hit targets
-- use consistent hover behaviour
-- use consistent focus behaviour
-- use consistent accessibility behaviour
-- use consistent disabled appearance
-
----
-
-### Architecture Integrity
-
-The following remain unchanged:
-
-- parser
-- validation
-- repositories
-- RepositoryStoreHydrator
-- runtime-store ownership
-- persistence
-- SQLite schema
-- financial behaviour
-
----
-
-### Final Validation
-
-- Xcode diagnostics pass
-- Xcode build passes
-- Xcode-native RunAllTests passes
-- manual runtime verification passes
-
----
-
-### Documentation
-
-- `PROJECT_STATE.md` updated with verified facts only
-- `Codex response.md` replaced with the completed Sprint 31 implementation report
-
----
-
-### Git
-
-- approved implementation committed
-- pushed to `origin/main`
-- remote `main` verified using:
-
-```bash
-git ls-remote origin refs/heads/main
-```
-
----
-
-Do not archive Sprint 31.
-
-Do not create Sprint 32.
-
-Desktop ChatGPT will review the implementation, approve or reject Sprint 31, record its completed state in `PROJECT_STATE.md`, and prepare Sprint 32 — Financial Identity Engine as the next ACTIVE sprint.
