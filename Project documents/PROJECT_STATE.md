@@ -14,7 +14,7 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: 274e1f5
+* Latest Implementation Commit: 481185a
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-026 — Structured Developer Diagnostics (Accepted)
@@ -23,7 +23,9 @@ Principles:
 * Current Sprint: Sprint 31 — Developer Diagnostics & Logging completed and approved
 * Current Phase: Sprint 31 completed and approved; awaiting replacement of the ACTIVE sprint with Sprint 32 — Financial Identity Engine
 * Build Status: Passing
-* Validation Status: Sprint 31 Xcode diagnostics passed for resolvable modified Swift files, Xcode build passed, active Xcode test plan passed (112 tests, 0 failures, 0 skipped), and manual runtime verification passed
+* Validation Status: Pre-Sprint 32 DTO concurrency isolation maintenance passed Xcode diagnostics, Xcode build passed, active Xcode test plan passed (112 tests, 0 failures, 0 skipped), and prior DTO Equatable actor-isolation warnings were removed
+* Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
+* Latest Verified Remote Main: 481185a711a3a7366229e74081401c84c7acc6c6
 
 ## Bootstrap
 
@@ -86,7 +88,7 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 31 completed and approved. Prepare Sprint 32 — Financial Identity Engine as the next ACTIVE sprint in `Project documents/Implementation.md`.
+Active Work: Pre-Sprint 32 DTO concurrency isolation maintenance completed and verified. Sprint 31 remains completed and approved; prepare Sprint 32 — Financial Identity Engine as the next ACTIVE sprint in `Project documents/Implementation.md`.
 
 Objective:
 
@@ -124,6 +126,9 @@ Scope:
 * Preserve durable SQLite startup persistence wiring.
 * Preserve stable repository account identifiers.
 * Preserve institution attribution through repository hydration.
+* Repository DTO `Equatable` conformances for `WorkspaceDTO`, `TransactionRawRowDTO`, `TransactionDTO`, `AccountDTO` and `ImportSessionRecordDTO` are explicitly nonisolated.
+* The app target default actor isolation remains `MainActor`.
+* DTO concurrency isolation maintenance commit `481185a711a3a7366229e74081401c84c7acc6c6` was pushed to `origin/main` and verified with `git ls-remote origin refs/heads/main`.
 
 ## Current Product Review
 
