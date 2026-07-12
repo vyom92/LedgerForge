@@ -11,6 +11,7 @@ struct FinancialDocument: Identifiable {
     let metadata: DocumentMetadata
     let parserName: String
     let transactions: [Transaction]
+    let financialIdentifiers: [FinancialIdentifier]
     let selectionReasons: [String]
     let createdAt: Date
 
@@ -20,6 +21,7 @@ struct FinancialDocument: Identifiable {
         metadata: DocumentMetadata,
         parserName: String,
         transactions: [Transaction],
+        financialIdentifiers: [FinancialIdentifier] = [],
         selectionReasons: [String] = [],
         createdAt: Date = Date()
     ) {
@@ -28,6 +30,7 @@ struct FinancialDocument: Identifiable {
         self.metadata = metadata
         self.parserName = parserName
         self.transactions = transactions
+        self.financialIdentifiers = financialIdentifiers
         self.selectionReasons = selectionReasons
         self.createdAt = createdAt
     }

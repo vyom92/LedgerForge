@@ -14,6 +14,7 @@ struct FinancialDocumentTests {
         #expect(parsedFixture.financialDocument.metadata == parsedFixture.normalizedDocument.metadata)
         #expect(parsedFixture.financialDocument.parserName == "Axis Bank Account")
         #expect(parsedFixture.financialDocument.transactions.count == parsedFixture.expected.transactionCount)
+        #expect(parsedFixture.financialDocument.financialIdentifiers.isEmpty)
         #expect(String(describing: type(of: parsedFixture.parser)) == parsedFixture.expected.expectedParser)
     }
 
@@ -63,8 +64,35 @@ struct FinancialDocumentTests {
         #expect(financialDocument.metadata == parsedFixture.normalizedDocument.metadata)
         #expect(financialDocument.parserName == parsedFixture.parser.name)
         #expect(financialDocument.transactions.count == parsedFixture.expected.transactionCount)
+        #expect(financialDocument.financialIdentifiers.isEmpty)
         #expect(financialDocument.selectionReasons == ["Parser produced FinancialDocument directly."])
         #expect(financialDocument.createdAt == createdAt)
+    }
+
+    @Test func financialDocumentPreservesParserProducedFinancialIdentifiers() async throws {
+        let parsedFixture = try await parseApprovedAxisCSVFixture()
+        let identifier = try FinancialIdentifier(
+            kind: .institutionAccountId,
+            rawValue: "axis.account:1234",
+            verificationState: .verified,
+            provenance: .institutionStructuredField
+        )
+        let financialDocument = FinancialDocument(
+            sourceDocument: parsedFixture.normalizedDocument.document,
+            metadata: parsedFixture.normalizedDocument.metadata,
+            parserName: parsedFixture.parser.name,
+            transactions: parsedFixture.financialDocument.transactions,
+            financialIdentifiers: [identifier]
+        )
+
+        let preservedIdentifier = try #require(financialDocument.financialIdentifiers.first)
+
+        #expect(financialDocument.financialIdentifiers == [identifier])
+        #expect(preservedIdentifier.kind == .institutionAccountId)
+        #expect(preservedIdentifier.normalizedValue == "AXIS.ACCOUNT:1234")
+        #expect(preservedIdentifier.strength == .strong)
+        #expect(preservedIdentifier.verificationState == .verified)
+        #expect(preservedIdentifier.provenance == .institutionStructuredField)
     }
 
     private static let dayMonthYearFormatter: DateFormatter = {

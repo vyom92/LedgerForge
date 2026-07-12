@@ -30,7 +30,8 @@ final class AxisBankAccountParser: StatementParser {
                 sourceDocument: document.document,
                 metadata: document.metadata,
                 parserName: name,
-                transactions: []
+                transactions: [],
+                financialIdentifiers: []
             )
         }
 
@@ -107,7 +108,8 @@ final class AxisBankAccountParser: StatementParser {
             sourceDocument: document.document,
             metadata: document.metadata,
             parserName: name,
-            transactions: transactions
+            transactions: transactions,
+            financialIdentifiers: []
         )
     }
 }

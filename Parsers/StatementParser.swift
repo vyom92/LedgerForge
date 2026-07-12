@@ -15,6 +15,11 @@ protocol StatementParser {
         metadata: DocumentMetadata
     ) -> Bool
 
+    /// Parses normalized statement content into the canonical financial handoff.
+    ///
+    /// Under ADR-027, statement parsers are the exclusive production origin of
+    /// verified financial identifiers and return them through
+    /// `FinancialDocument.financialIdentifiers`.
     func parse(
         document: NormalizedDocument
     ) throws -> FinancialDocument

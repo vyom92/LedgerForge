@@ -114,7 +114,7 @@ struct ImportValidatorTests {
         #expect(validation.issues.isEmpty)
     }
 
-    @Test func financialDocumentValidationMatchesTransactionValidation() {
+    @Test func financialDocumentValidationMatchesTransactionValidationWithOrWithoutIdentifiers() throws {
         let transactions = [
             makeTransaction(
                 description: "Opening credit",
@@ -131,15 +131,27 @@ struct ImportValidatorTests {
                 balance: 1_050
             )
         ]
-        let financialDocument = makeFinancialDocument(transactions: transactions)
+        let identifier = try FinancialIdentifier(
+            kind: .institutionAccountId,
+            rawValue: "axis.validation:1234",
+            verificationState: .verified,
+            provenance: .institutionStructuredField
+        )
+        let documentWithoutIdentifiers = makeFinancialDocument(transactions: transactions)
+        let documentWithIdentifiers = makeFinancialDocument(
+            transactions: transactions,
+            financialIdentifiers: [identifier]
+        )
 
-        let documentValidation = ImportValidator.validate(financialDocument: financialDocument)
+        let validationWithoutIdentifiers = ImportValidator.validate(financialDocument: documentWithoutIdentifiers)
+        let validationWithIdentifiers = ImportValidator.validate(financialDocument: documentWithIdentifiers)
         let transactionValidation = ImportValidator.validate(transactions: transactions)
 
-        assertEquivalent(documentValidation, transactionValidation)
+        assertEquivalent(validationWithIdentifiers, validationWithoutIdentifiers)
+        assertEquivalent(validationWithIdentifiers, transactionValidation)
     }
 
-    @Test func validationDoesNotMutateFinancialDocumentOrTransactions() {
+    @Test func validationDoesNotMutateFinancialDocumentIdentifiersOrTransactions() throws {
         let createdAt = Date(timeIntervalSince1970: 1_804_896_000)
         let transactions = [
             makeTransaction(
@@ -157,8 +169,15 @@ struct ImportValidatorTests {
                 balance: 1_050
             )
         ]
+        let identifier = try FinancialIdentifier(
+            kind: .institutionAccountId,
+            rawValue: "axis.validation:1234",
+            verificationState: .verified,
+            provenance: .institutionStructuredField
+        )
         let financialDocument = makeFinancialDocument(
             transactions: transactions,
+            financialIdentifiers: [identifier],
             selectionReasons: ["Selected parser for validation test."],
             createdAt: createdAt
         )
@@ -166,6 +185,7 @@ struct ImportValidatorTests {
         let originalTransactionIDs = financialDocument.transactions.map(\.id)
         let originalDescriptions = financialDocument.transactions.map(\.description)
         let originalBalances = financialDocument.transactions.map(\.balance)
+        let originalFinancialIdentifiers = financialDocument.financialIdentifiers
 
         _ = ImportValidator.validate(financialDocument: financialDocument)
 
@@ -173,12 +193,14 @@ struct ImportValidatorTests {
         #expect(financialDocument.transactions.map(\.id) == originalTransactionIDs)
         #expect(financialDocument.transactions.map(\.description) == originalDescriptions)
         #expect(financialDocument.transactions.map(\.balance) == originalBalances)
+        #expect(financialDocument.financialIdentifiers == originalFinancialIdentifiers)
         #expect(financialDocument.selectionReasons == ["Selected parser for validation test."])
         #expect(financialDocument.createdAt == createdAt)
     }
 
     private func makeFinancialDocument(
         transactions: [Transaction],
+        financialIdentifiers: [FinancialIdentifier] = [],
         selectionReasons: [String] = [],
         createdAt: Date = Date(timeIntervalSince1970: 1_804_896_000)
     ) -> FinancialDocument {
@@ -197,6 +219,7 @@ struct ImportValidatorTests {
             ),
             parserName: "Validation Test Parser",
             transactions: transactions,
+            financialIdentifiers: financialIdentifiers,
             selectionReasons: selectionReasons,
             createdAt: createdAt
         )
