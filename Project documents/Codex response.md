@@ -1,10 +1,10 @@
-# Sprint 30 Implementation Report
+# Sprint 31 Implementation Report
 
 ## Summary
 
-Implemented Sprint 30 Developer Console Foundation. The Developer Console now provides development-only database reset, runtime inspection, repository summary, log search/copy/clear and canonical `Reload Data`.
+Implemented Sprint 31 Developer Diagnostics & Logging. The Developer Console now uses structured in-memory diagnostic entries, meaningful levels and categories, concise import lifecycle logging, newest-first presentation, filtering, search, complete chronological Copy All, diagnostic-only Clear behaviour, Runtime Inspector presentation refinement and reusable Developer Console control behaviour.
 
-Manual runtime verification passed. Xcode diagnostics, Xcode build and the full active Xcode test plan passed. The implementation was committed and pushed to `origin/main`.
+Automated validation and manual runtime verification passed. The implementation was committed, pushed to `origin/main` and verified with `git ls-remote`.
 
 ## Bootstrap Documents Reviewed
 
@@ -12,172 +12,266 @@ Manual runtime verification passed. Xcode diagnostics, Xcode build and the full 
 - `AGENTS.md`
 - `Project documents/Project_Guide.md`
 - `Project documents/PROJECT_STATE.md`
-- `Project documents/Implementation.md` ACTIVE Sprint 30 section only
+- `Project documents/Implementation.md` ACTIVE Sprint 31 section only
 
 ## Files Inspected
 
 - `Core/DeveloperConsole.swift`
+- `Core/LFConsoleButton.swift`
 - `Views/DeveloperConsoleView.swift`
-- `Services/RepositoryStoreHydrator.swift`
-- `Database/Repository.swift`
-- `Database/SQLiteRepositoryProvider.swift`
-- `LedgerForgeApp.swift`
-- `Core/AccountStore.swift`
-- `Core/TransactionStore.swift`
 - `Services/ImportEngine.swift`
-- `ViewModels/DashboardViewModel.swift`
-- `ContentView.swift`
-- `LedgerForgeTests/RepositoryStoreHydratorTests.swift`
-- `LedgerForgeTests/ImportRepositoryIntegrationTests.swift`
-- `LedgerForgeTests/RepositoryContractTests.swift`
+- `LedgerForgeTests/DeveloperDiagnosticsTests.swift`
 - `LedgerForgeTests/LedgerForgeTests.swift`
+- `LedgerForge.xcodeproj/project.pbxproj`
+- `Project documents/PROJECT_STATE.md`
+- `Project documents/Codex response.md`
+- `Project documents/Project_Guide.md`
+- `Project documents/ADR.md`
 
 ## Files Modified
 
+Implementation commit:
+
 - `Core/DeveloperConsole.swift`
-- `Views/DeveloperConsoleView.swift`
-- `LedgerForgeApp.swift`
-- `Services/ImportEngine.swift`
-- `ViewModels/DashboardViewModel.swift`
+- `Core/LFConsoleButton.swift`
+- `LedgerForge.xcodeproj/project.pbxproj`
+- `LedgerForgeTests/DeveloperDiagnosticsTests.swift`
 - `LedgerForgeTests/LedgerForgeTests.swift`
+- `Services/ImportEngine.swift`
+- `Views/DeveloperConsoleView.swift`
+
+Documentation handoff:
+
 - `Project documents/PROJECT_STATE.md`
 - `Project documents/Codex response.md`
+- `Project documents/Project_Guide.md`
+- `Project documents/ADR.md`
 
-## Database Reset Implementation
+`Project documents/Implementation.md` was not modified.
 
-- Added `Reset Development Database` inside the Developer Console tools panel.
-- The reset control is styled destructive/red.
-- The full visible rounded rectangle is clickable.
-- First click opens a destructive confirmation dialog only.
-- Cancel leaves state unchanged.
-- Confirm creates and installs a fresh SQLite provider.
-- The reset path does not delete the previously active SQLite file.
-- The reset path forces canonical hydration with `RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)`.
-- Automated tests verified reset produced 0 accounts and 0 transactions using temporary SQLite paths.
+## Structured Diagnostic Model
 
-## Provider Replacement Strategy
+- Replaced plain string storage with `DeveloperLogEntry`.
+- Entries contain stable identity, sequence number, timestamp, level, category, message and optional metadata.
+- Diagnostic history remains in memory only.
+- Stored history remains chronological.
+- Sequence numbers are monotonic and deterministic.
+- Optional metadata remains optional.
+- Legacy `log(_:)` maps to `Info` / `Application`.
+- No external logging framework was introduced.
 
-- Provider replacement is coordinated in `LedgerForgeApp`, the existing app composition root.
-- `LedgerForgeApp.resetDevelopmentDatabase(path:)` installs a fresh `SQLiteRepositoryProvider`.
-- `DatabaseProvider.shared` is reassigned using the fresh provider repositories.
-- The current provider state and SQLite path are exposed read-only for the Developer Console.
-- `ImportEngine` resolves the default persistence coordinator at commit time so imports after reset write through the current provider.
+## Diagnostic Levels
+
+Implemented approved levels only:
+
+- Debug
+- Info
+- Warning
+- Error
+
+Debug entries are hidden by default. Selecting Debug reveals existing Debug entries immediately.
+
+## Diagnostic Categories
+
+Implemented approved categories only:
+
+- Application
+- Import
+- Parser
+- Validation
+- Database
+- Runtime
+
+Every entry belongs to exactly one category.
+
+## Import Lifecycle Logging
+
+Default import diagnostics now show concise lifecycle events:
+
+- Import started
+- Institution detected
+- Parser selected
+- Validation completed
+- Repository persistence completed
+- Runtime refresh completed
+- Import completed
+
+Failure flow records:
+
+- Import started
+- specific failure event
+- Import failed
+
+Parser internals such as row counts, delimiter, encoding, header row, first transaction row and normalization details are Debug / Parser diagnostics.
+
+## Presentation and Ordering
+
+- Stored entries remain chronological.
+- Developer Console displays entries newest-first.
+- Sequence numbers are preserved and not renumbered.
+- Timestamps, level, category, message and metadata are visible.
+- Warning and Error levels are visually distinct.
+- Long messages and metadata wrap.
+- `LazyVStack` is used for responsive presentation.
+
+## Filtering and Search
+
+- Level filter supports All Levels, Debug, Info, Warning and Error.
+- Category filter supports All Categories, Application, Import, Parser, Validation, Database and Runtime.
+- Filters affect presentation only.
+- Search applies after filters.
+- Search is case-insensitive.
+- Search covers message and visible metadata.
+- Clearing filters restores the default view.
+- Clear resets search and filter state.
+
+## Copy All and Clear
+
+Copy All:
+
+- Copies complete stored diagnostic history.
+- Ignores active filters.
+- Uses chronological stored order.
+- Includes timestamp, level, category and message.
+
+Clear:
+
+- Removes all stored diagnostic entries.
+- Resets search and filters in the Developer Console.
+- Leaves Runtime Inspector unchanged.
+- Leaves Repository Summary unchanged.
+- Leaves repositories unchanged.
+- Leaves runtime stores unchanged.
+- Leaves application state unchanged.
 
 ## Runtime Inspector
 
-- Added a read-only Runtime Inspector panel.
-- Displays provider state, hydration status, latest refresh result, account count, transaction count and SQLite path when available.
-- Inspector values are derived from provider configuration and runtime stores.
-- No inspector state is persisted.
+Runtime Inspector remains presentation-only and continues to display:
 
-## Repository Summary
+- provider
+- database path
+- hydration status
+- account count
+- transaction count
+- latest refresh result
 
-- Added read-only repository summary counts for Accounts and Transactions only.
-- No unsupported entity counts were added.
+No duplicate runtime state was introduced.
 
-## Log Console Improvements
+## Reusable Diagnostic Controls
 
-- Added plain-text substring search for visible log messages.
-- Search does not mutate stored logs.
-- Added `Copy All`.
-- Added `Clear`.
-- `Clear` calls `DeveloperConsole.clear()`.
-- `Copy All` uses the complete stored log text.
-- No severity filters, category filters or structured logging redesign were added.
+`Core/LFConsoleButton.swift` centralizes Developer Console control behaviour:
 
-## Reload Data
+- full visible content shape
+- consistent padding
+- consistent corner radius
+- hover state
+- keyboard focus state
+- disabled opacity
+- accessibility label
 
-- Added one `Reload Data` action.
-- `Reload Data` calls `RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)`.
-- Reload updates runtime account and transaction stores through the existing hydrator path.
-- Reload updates Runtime Inspector hydration/result state.
-- Manual runtime verification confirmed reload after reset did not restore old data.
-
-## Preference Preservation
-
-- Reset does not touch `UserDefaults` or appearance/developer-mode state.
-- Automated tests verified a non-financial `UserDefaults` value remained preserved across reset.
-- Manual runtime verification confirmed Developer Mode and non-financial preferences remained preserved.
+`LFConsoleButton.swift` is present in the Xcode project navigator under `LedgerForge/Core` and is included in the app Sources build phase.
 
 ## Architecture Verification
 
-- No direct SQLite access was added to Views, ViewModels or Runtime Stores.
+- No parser behaviour changes were made.
+- No validation behaviour changes were made.
 - No repository contracts were changed.
-- No schema changes were made.
-- No parser changes were made.
-- No validation changes were made.
-- No import workflow redesign was made.
+- No SQLite schema changes were made.
 - No financial calculations were changed.
-- Reset uses provider replacement plus canonical forced hydration.
-- Runtime stores are cleared through `RepositoryStoreHydrator`, not through a parallel hydration path.
+- No runtime-store ownership changes were made.
+- No direct SQLite access was added to Views, ViewModels or Runtime Stores.
+- No new persistence mechanism was introduced for logs.
+- No external logging framework was introduced.
+- `RepositoryStoreHydrator` remains the persistence-to-runtime boundary.
+- Reload Data continues to use `RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)`.
+- Reset Development Database continues to use existing `LedgerForgeApp.resetDevelopmentDatabase()` wiring.
 
 ## Validation
 
 ### Diagnostics
 
-Passed. Xcode diagnostics reported 0 issues for:
+Passed with 0 issues for Xcode-resolvable modified Swift files:
 
 - `LedgerForge/Core/DeveloperConsole.swift`
+- `LedgerForge/Core/LFConsoleButton.swift`
 - `LedgerForge/Views/DeveloperConsoleView.swift`
-- `LedgerForge/LedgerForgeApp.swift`
-- `LedgerForge/ViewModels/DashboardViewModel.swift`
-- `LedgerForgeTests/LedgerForgeTests.swift`
+- `LedgerForge/LedgerForgeTests/DeveloperDiagnosticsTests.swift`
+- `LedgerForge/LedgerForgeTests/LedgerForgeTests.swift`
 
-The Xcode diagnostics tool could not resolve `LedgerForge/Services/Services/ImportEngine.swift` by project path, but Xcode `BuildProject` compiled it successfully.
+Xcode diagnostics could not resolve:
+
+- `LedgerForge/Services/ImportEngine.swift`
+- `LedgerForge/Services/Services/ImportEngine.swift`
+
+Xcode `BuildProject` compiled `ImportEngine.swift` successfully.
 
 ### Build
 
 Passed. Xcode `BuildProject` completed successfully.
 
+Build log:
+
+`/var/folders/cx/mf26lvyn7bb4bt65f3fb334m0000gn/T/ActionArtifacts/28092332-2397-485B-A693-BE7467E4443A/BuildProject/BuildProject-Log-20260712-120346.txt`
+
 ### Tests
 
 Passed. Xcode-native `RunAllTests` completed with:
 
-- Total tests: 98
-- Passed: 98
+- Total tests: 112
+- Passed: 112
 - Failed: 0
 - Skipped: 0
 - Expected failures: 0
 - Not run: 0
 
+Test summary:
+
+`/var/folders/cx/mf26lvyn7bb4bt65f3fb334m0000gn/T/ActionArtifacts/28092332-2397-485B-A693-BE7467E4443A/RunAllTests/C25AC324-AEA8-4758-B816-A18359D52ACA.txt`
+
 ### Runtime Verification
 
-Passed by manual runtime verification.
+Manual runtime verification passed.
 
-Verified:
+Verified manually:
 
-- The full visible rectangles of `Copy All`, `Clear`, `Reload Data` and `Reset Development Database` are clickable.
-- Cancelling reset leaves database path, accounts, transactions, Dashboard, Developer Mode and preferences unchanged.
-- Confirming reset installs a fresh SQLite provider without restart.
-- Accounts become 0.
-- Transactions become 0.
-- Dashboard, Accounts and Transactions show empty states.
-- Runtime Inspector and Repository Summary both show 0 accounts and 0 transactions.
-- Developer Mode and non-financial preferences remain preserved.
-- Reload Data after reset does not restore old data.
-- Importing the Axis CSV after reset succeeds and updates the fresh provider and runtime state.
-- After quitting and relaunching LedgerForge, the post-reset import remains persisted.
-- Old pre-reset data does not return.
-- No remaining Sprint 30 runtime defect was observed.
+- Developer Console is gated by Developer Mode.
+- Runtime Inspector remains accurate.
+- Repository Summary remains accurate.
+- Newest log entries appear at the top.
+- Sequence numbers remain preserved.
+- Debug entries are hidden by default.
+- Switching to Debug reveals parser diagnostics.
+- Switching back hides parser diagnostics.
+- Level filters work correctly.
+- Category filters work correctly.
+- Combined filtering works.
+- Search filters correctly.
+- Copy All copies the complete chronological history.
+- Clear resets diagnostics, filters and search without affecting runtime state.
+- Reload Data functions correctly.
+- Reset Development Database functions correctly.
+- Dashboard, Accounts, Transactions, Imports and financial calculations remain unchanged.
+- Full visible button hit targets work correctly.
 
 ## Git Diff Verification
 
 - `Project documents/Implementation.md` had no content diff.
-- Changed implementation files were limited to approved Sprint 30 files.
-- Documentation changes were limited to `Project documents/PROJECT_STATE.md` and `Project documents/Codex response.md`.
+- Implementation commit contained only Sprint 31 implementation files.
+- Documentation handoff changes are limited to approved handoff documents plus explicitly approved documentation changes.
 - No merge conflict markers were found.
-- Tests use temporary SQLite paths under the system temporary directory.
-- Tests do not delete or alter the developer's real database.
+- `git diff --check` passed after trailing whitespace in the new diagnostics tests was corrected.
+- No unrelated UI redesign was introduced.
+- No architecture drift was identified.
 
 ## Commit
 
-Implementation commit: `dd248c4`
+Implementation commit: `274e1f5`
 
-Full implementation commit: `dd248c41b011c125e1d0d0b56020b288a6b0b1c1`
+Full implementation commit: `274e1f5e8f1f6a90d0701442c8f7fb0286ec2c5b`
 
 Commit message:
 
-`Implement Sprint 30 developer console foundation`
+`Implement Sprint 31 developer diagnostics and logging`
 
 ## Push Result
 
@@ -185,18 +279,20 @@ Git push to `origin/main` completed successfully.
 
 Remote verification:
 
-`dd248c41b011c125e1d0d0b56020b288a6b0b1c1	refs/heads/main`
+`274e1f5e8f1f6a90d0701442c8f7fb0286ec2c5b	refs/heads/main`
 
 Local tracking ref note: remote push succeeded; sandbox could not update the local `origin/main` tracking ref lock under `.git`.
 
 ## Remaining Required Issues
 
-None for Sprint 30 implementation.
+None for Sprint 31 implementation.
 
 ## Recommended Follow-Up
 
-Desktop ChatGPT should review Sprint 30, then approve/archive Sprint 30 or request a focused correction.
+Desktop ChatGPT should review Sprint 31, then approve/archive Sprint 31 or request a focused correction.
 
-## Sprint 30 Completion Status
+Do not begin Sprint 32 until Desktop ChatGPT updates `Project documents/Implementation.md`.
 
-Sprint 30 implementation, automated validation, manual runtime verification, implementation commit, push and remote verification are complete.
+## Sprint 31 Completion Status
+
+Sprint 31 implementation, automated validation, manual runtime verification, implementation commit, push and remote verification are complete.

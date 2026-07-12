@@ -844,3 +844,186 @@ Stable repository identity and verified identifiers provide a deterministic foun
 - ADR-020 — Deterministic Institution Detection
 - ADR-021 — Deterministic Statement Classification
 - ADR-024 — Repository Hydration Boundary
+
+---
+
+# ADR-026 — Structured Developer Diagnostics
+
+## Status
+
+Proposed
+
+---
+
+## Intended Implementation
+
+Sprint 31 — Developer Diagnostics & Logging
+
+---
+
+## Context
+
+Prior to Sprint 31, the Developer Console stored diagnostics as unstructured plain strings.
+
+This made it difficult to:
+
+- distinguish operational lifecycle events from implementation details
+- classify diagnostics by subsystem
+- filter meaningful information
+- perform deterministic automated testing
+- evolve developer tooling without affecting financial behaviour
+
+The console had gradually become a mixture of informational messages, parser internals and debugging output without consistent semantics.
+
+---
+
+## Decision
+
+LedgerForge shall use structured, in-memory diagnostic entries instead of plain string messages.
+
+Every diagnostic entry shall contain:
+
+- Stable identity
+- Monotonic sequence number
+- Timestamp
+- Diagnostic level
+- Diagnostic category
+- Concise human-readable message
+- Optional structured metadata
+
+The initial diagnostic levels are:
+
+- Debug
+- Info
+- Warning
+- Error
+
+The initial diagnostic categories are:
+
+- Application
+- Import
+- Parser
+- Validation
+- Database
+- Runtime
+
+Levels describe severity.
+
+Categories describe the subsystem responsible for the event.
+
+These concepts must remain independent.
+
+---
+
+## Presentation
+
+Stored diagnostic history remains chronological.
+
+Presentation may display entries newest-first without modifying stored order or sequence numbers.
+
+Debug diagnostics remain hidden by default.
+
+The default Developer Console should present concise operational lifecycle events.
+
+Low-level implementation details belong in Debug diagnostics.
+
+---
+
+## Architectural Constraints
+
+Developer diagnostics shall remain:
+
+- in-memory only
+- presentation focused
+- deterministic
+- independent of repositories
+- independent of runtime stores
+- independent of SQLite
+
+Developer diagnostics must never become:
+
+- a persistence mechanism
+- a financial source of truth
+- a replacement for RepositoryStoreHydrator
+- a replacement for repository history
+
+---
+
+## Rationale
+
+Separating diagnostic severity from subsystem classification produces significantly clearer operational information.
+
+Structured diagnostics enable:
+
+- deterministic filtering
+- deterministic testing
+- concise lifecycle reporting
+- richer future developer tooling
+
+without affecting LedgerForge's financial architecture.
+
+Keeping diagnostics ephemeral prevents accidental architectural coupling between developer tooling and business data.
+
+---
+
+## Consequences
+
+Positive:
+
+- deterministic filtering
+- deterministic searching
+- concise import lifecycle
+- parser internals isolated to Debug
+- improved automated testing
+- easier future tooling
+- consistent Copy All formatting
+
+Negative:
+
+- slightly more complex diagnostic model
+- migration of existing logging call sites
+- additional UI filtering logic
+
+Accepted trade-off:
+
+The increase in implementation complexity is justified by substantially improved developer usability and maintainability.
+
+---
+
+## Non-Goals
+
+This ADR does **not** introduce:
+
+- persistent log storage
+- log export
+- analytics
+- performance profiling
+- repository inspection
+- SQL browsing
+- parser debugging
+- duplicate inspection
+
+Those capabilities require future ADRs.
+
+---
+
+## Related ADRs
+
+- ADR-004 — Explainable Automation
+- ADR-007 — Explain Before Automating
+- ADR-009 — Reactive Store Architecture
+- ADR-013 — Store Ownership
+- ADR-017 — Deterministic Before Intelligent
+- ADR-023 — Frozen UI/UX Architecture
+- ADR-024 — Repository Hydration Boundary
+
+---
+
+## Acceptance
+
+Change the status from **Proposed** to **Accepted** only after:
+
+- Sprint 31 implementation is complete
+- automated validation passes
+- manual runtime verification passes
+- Sprint 31 is recorded in `PROJECT_STATE.md`

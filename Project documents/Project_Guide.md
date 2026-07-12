@@ -4,14 +4,19 @@ This is the canonical project operating manual. Read `Project documents/.github/
 
 ## Current Project Snapshot
 
+This document intentionally avoids duplicating volatile repository state.
+
+The authoritative sources are:
+
+- **Current ACTIVE Sprint:** `Project documents/Implementation.md`
+- **Verified Repository State:** `Project documents/PROJECT_STATE.md`
+- **Latest Implementation Report:** `Project documents/Codex response.md`
+
+Project Baseline:
+
 - **Workflow:** Workflow v2.1 (Frozen)
-- **Current Milestone:** M7 – Dashboard Experience
-- **Current Sprint:** Sprint 26 – Documentation Alignment & Bootstrap Manifest Adoption completed; awaiting archival
-- **Current Phase:** Awaiting next ACTIVE sprint
-- **Build Status:** Passing
-- **Validation Status:** Sprint 25 validated. Documentation Sprint 26 consistency validation complete.
-- **Last Architecture Review:** 2026-07-08
-- **Current Development Baseline:** Sprint 25
+- **Architecture:** Architecture v1.0 (Frozen)
+- **Development Model:** Documentation → Planning → Implementation → Validation → Handoff
 
 ## Current Architecture Status
 
@@ -245,35 +250,67 @@ Additionally:
 
 ### Phase 3 — Implementation
 
-- Read only the ACTIVE sprint.
-- Implement only the approved scope.
-- Build continuously.
-- Execute required validation.
-- Verify only sprint-related files are staged.
-- Commit.
-- Push.
-- Update `Project documents/Codex response.md`.
-- Update `Project documents/PROJECT_STATE.md`.
+- Read only the ACTIVE sprint in `Project documents/Implementation.md`.
+- Implement only the approved sprint scope.
+- Preserve approved architecture and existing behaviour unless the sprint explicitly changes it.
+- Build continuously during implementation.
+- Run Xcode diagnostics.
+- Run Xcode BuildProject.
+- Run Xcode-native `RunAllTests`.
+- Stop before commit if automated validation fails.
+- Stop before commit if required manual runtime verification has not yet been completed.
+- Verify only sprint-related files are modified.
+- Verify `Project documents/Implementation.md` remains unchanged.
+- Verify no unresolved merge conflict markers remain.
+- Create the implementation commit.
+- Push to `origin/main`.
+- Verify the remote branch directly.
+- Update `Project documents/Codex response.md` with verified implementation facts.
+- Update `Project documents/PROJECT_STATE.md` only after successful validation, verified push and required manual runtime verification.
 
 ### Phase 4 — Completion
 
-- Confirm build passes.
-- Confirm validation passes.
-- Confirm push completed.
-- ChatGPT archives the completed sprint in `Implementation.md`.
-- ChatGPT creates the next ACTIVE sprint.
+Completion is permitted only after all required validation has succeeded.
+
+Required completion sequence:
+
+1. Confirm Xcode diagnostics pass.
+2. Confirm Xcode build passes.
+3. Confirm Xcode-native RunAllTests passes.
+4. Complete required manual runtime verification.
+5. Verify only sprint-related files are staged.
+6. Verify `Project documents/Implementation.md` remains unchanged.
+7. Verify no unresolved merge conflict markers remain.
+8. Create the implementation commit.
+9. Push to `origin/main`.
+10. Verify the remote branch using `git ls-remote origin refs/heads/main`.
+11. Update `Project documents/Codex response.md` with verified implementation, validation, commit, push and remote verification facts.
+12. Update `Project documents/PROJECT_STATE.md` with verified repository state only.
+13. Create and push a documentation handoff commit when required.
+14. Desktop ChatGPT reviews the completed sprint.
+15. If approved, Desktop ChatGPT records the completed sprint in `PROJECT_STATE.md` and prepares the next ACTIVE sprint in `Project documents/Implementation.md`.
+
+Never claim a sprint is complete until both automated validation and required manual runtime verification have been successfully performed.
 
 ## Sprint Roadmap
 
-The ACTIVE sprint is the only sprint read by Codex.
-
 Development is managed exclusively through `Project documents/Implementation.md`.
 
-Only one ACTIVE sprint exists at any time.
+Rules:
 
-Completed sprints are archived inside the same document.
+- Only one ACTIVE sprint exists at any time.
+- Codex reads only the ACTIVE sprint.
+- Desktop ChatGPT owns sprint planning.
+- Desktop ChatGPT owns sprint approval.
+- Desktop ChatGPT prepares the next ACTIVE sprint only after the current sprint has been successfully completed and approved.
 
-Future sprint planning is created only after the current sprint completes.
+Completed sprint history is maintained in:
+
+`Project documents/PROJECT_STATE.md`
+
+`Project documents/Implementation.md` is not a historical archive.
+
+Future sprint planning begins only after the current sprint has completed.
 
 ## Product Milestones
 
@@ -403,9 +440,10 @@ To minimise token consumption:
 - Read `AGENTS.md`.
 - Then read `Project documents/Project_Guide.md`.
 - Use the Task Routing Guide.
-- Open only the documents required for the requested task.
+- Open only the documentation required for the requested task.
 - Do not reread unchanged reference documents.
-- Read only the ACTIVE sprint in `Project documents/Implementation.md`. Archived sprints are historical reference only.
+- Read only the ACTIVE sprint in `Project documents/Implementation.md`.
+- Use `Project documents/PROJECT_STATE.md` for completed sprint history.
 - Prefer referencing documentation over repeating it.
 
 This layered bootstrap minimizes context loading while preserving deterministic behaviour.
@@ -417,12 +455,12 @@ This layered bootstrap minimizes context loading while preserving deterministic 
 - Then read `Project documents/Project_Guide.md`.
 - Load only the documentation required by the Task Routing Guide.
 - Read only the ACTIVE sprint in `Project documents/Implementation.md`.
-- Never modify archived sprint sections.
+- Treat `Project documents/PROJECT_STATE.md` as the authoritative completed sprint history.
 - Never modify `Project documents/Implementation.md` unless acting under the Desktop ChatGPT planning workflow.
 - Never make changes outside the approved ACTIVE sprint.
 - Never redesign approved architecture without an approved ADR.
 - Maintain `Project documents/Codex response.md` during planning and implementation.
-- Update `Project documents/PROJECT_STATE.md` only after successful validation and push.
+- Update `Project documents/PROJECT_STATE.md` only after successful validation, required manual runtime verification, verified implementation commit and verified push.
 - Leave the repository in a buildable state.
 - Never bypass repository abstractions.
 - Never access SQLite directly from Views, ViewModels or Runtime Stores.
@@ -435,7 +473,7 @@ This layered bootstrap minimizes context loading while preserving deterministic 
 - Generate commit messages from completed work.
 - Prefer document references over duplicated instructions.
 - Avoid loading unrelated documentation.
-- Treat `Project documents/Project_Guide.md` as the repository index.
+- Treat `Project documents/Project_Guide.md` as the repository navigation index.
 - If documentation and implementation conflict, stop and report the conflict instead of guessing.
   
 ## Project Philosophy

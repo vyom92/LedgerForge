@@ -14,16 +14,16 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: dd248c4
+* Latest Implementation Commit: 274e1f5
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
-* Latest ADR: ADR-025 — Stable Financial Entity Identity
-* Architecture Baseline: Sprint 30 / UI_UX v1.0 Frozen
+* Latest ADR: ADR-026 — Structured Developer Diagnostics (Accepted)
+* Architecture Baseline: Sprint 31 / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 30 — Developer Console Foundation completed and approved
-* Current Phase: Sprint 30 completed and approved; awaiting replacement of the ACTIVE sprint with Sprint 31
+* Current Sprint: Sprint 31 — Developer Diagnostics & Logging completed and approved
+* Current Phase: Sprint 31 completed and approved; awaiting replacement of the ACTIVE sprint with Sprint 32 — Financial Identity Engine
 * Build Status: Passing
-* Validation Status: Sprint 30 Xcode diagnostics passed, Xcode build passed, active Xcode test plan passed (98 tests, 0 failures, 0 skipped), and manual runtime verification passed
+* Validation Status: Sprint 31 Xcode diagnostics passed for resolvable modified Swift files, Xcode build passed, active Xcode test plan passed (112 tests, 0 failures, 0 skipped), and manual runtime verification passed
 
 ## Bootstrap
 
@@ -86,33 +86,37 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 30 completed and approved; prepare Sprint 31 as the next ACTIVE sprint in `Project documents/Implementation.md`.
+Active Work: Sprint 31 completed and approved. Prepare Sprint 32 — Financial Identity Engine as the next ACTIVE sprint in `Project documents/Implementation.md`.
 
 Objective:
 
-* Developer Console now exposes a development-only safe database reset.
-* Developer Console now exposes Runtime Inspector and Repository Summary panels.
-* Developer Console log console now supports plain-text search, `Copy All` and `Clear`.
-* Developer Console now exposes one canonical `Reload Data` action.
-* Reset creates and installs a fresh SQLite provider and forces canonical hydration.
-* Reset produces 0 accounts and 0 transactions.
-* Dashboard, Accounts and Transactions show empty states after reset.
-* Developer Mode and non-financial preferences remain preserved.
-* Reload Data after reset does not restore old data.
-* Importing the Axis CSV after reset writes into the fresh provider and persists across app relaunch.
+* Developer Console diagnostics are structured in memory.
+* Diagnostic entries include stable identity, sequence number, timestamp, level, category, message and optional metadata.
+* Supported levels are Debug, Info, Warning and Error.
+* Supported categories are Application, Import, Parser, Validation, Database and Runtime.
+* Stored diagnostic history remains chronological.
+* Developer Console presentation shows newest entries first without renumbering.
+* Debug entries are hidden by default.
+* Level filtering, category filtering and case-insensitive search are implemented.
+* Copy All copies complete chronological stored history with timestamp, level, category and message.
+* Clear removes diagnostics and resets search/filter presentation state without affecting runtime stores or repositories.
+* Import lifecycle logging is concise by default.
+* Parser internals are emitted as Debug diagnostics.
+* Runtime Inspector, Repository Summary, Reload Data and Reset Development Database remain functional.
 
 Scope:
 
+* Sprint 31 was a Developer Console diagnostics and logging sprint.
 * Sprint 30 was a Developer Mode-only foundation sprint.
 * Sprint 29 was a layout-only stabilization sprint.
-* No parser, reader, validation, repository contract, runtime store contract, SQLite schema or financial calculation changes were made.
+* No parser, reader, validation, repository contract, runtime store contract, SQLite schema or financial calculation changes were made in Sprint 31.
 * `Project documents/Implementation.md` is the Desktop ChatGPT-owned sprint planning and workflow document.
 * Codex must never edit `Project documents/Implementation.md`.
 * `Project documents/Codex response.md` records the latest planning or execution report produced by the executing assistant.
 * `Project documents/PROJECT_STATE.md` records verified repository facts only.
 * `Project documents/.github/Context_Manifest.yaml` is the bootstrap manifest and routing document, not a repository state database.
 * Only the ACTIVE sprint block in `Project documents/Implementation.md` should be read during sprint execution.
-* Archived sprint blocks in `Project documents/Implementation.md` are historical reference only.
+* `Project documents/Implementation.md` contains only the current ACTIVE sprint; completed sprint history belongs in `Project documents/PROJECT_STATE.md`.
 * Preserve RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
 * Preserve import, parser, validation and repository semantics.
 * Preserve transaction search and credit/debit toggle behaviour.
@@ -138,7 +142,7 @@ Scope:
 - Repository-backed Dashboard implemented.
 - Accounts and Transactions screens use runtime-store-backed data.
 - Confirmation-gated Import Wizard implemented.
-- Import Wizard review area has a single central scroll workspace with the action footer outside that scroll area.
+- Import Wizard preview and validation panels use independent constrained scroll regions with the action footer outside both scroll areas.
 - Import preview and validation review occur before persistence.
 - Explicit confirmation is required before financial data is written.
 - Cancellation performs no writes.
@@ -146,16 +150,24 @@ Scope:
 - Developer Console is available behind Developer Mode.
 - Developer Console can reset the development SQLite provider without restart.
 - Runtime Inspector and Repository Summary show runtime account and transaction counts.
-- Developer Console log search, `Copy All` and `Clear` are implemented.
+- Developer Console uses structured diagnostic entries with levels, categories, timestamps, sequence numbers and optional metadata.
+- Developer Console displays newest diagnostics first while preserving chronological stored history.
+- Developer Console hides Debug entries by default.
+- Developer Console level filtering, category filtering and combined filtering are implemented.
+- Developer Console search operates after filters and searches message plus visible metadata.
+- Developer Console `Copy All` copies complete chronological diagnostic history.
+- Developer Console `Clear` removes diagnostics and resets diagnostic presentation state only.
 - Developer Console `Reload Data` uses canonical forced hydration.
 - Developer Console destructive and utility controls use full visible hit targets.
+- Import diagnostics show concise lifecycle events by default.
+- Parser implementation details are available as Debug diagnostics.
 - Database reset preserves Developer Mode and non-financial preferences.
 - Importing after reset writes to the fresh provider and remains persisted after relaunch.
 - Architecture v1.0 and UI/UX v1.0 remain preserved.
 
 ### Current Critical Product Issues
 
-- None verified for Sprint 30.
+- None verified for Sprint 31.
 
 ### Current Important Product Issues
 
@@ -164,10 +176,6 @@ Scope:
 - Toolbar composition varies across major screens.
 - Several user-facing controls display `Pending` or `Soon` states that add visual noise.
 - Transaction detail presentation does not yet use the available space effectively.
-- Developer Console logging is still stored as unstructured plain strings.
-- Developer Console logs do not yet distinguish Debug, Info, Warning and Error levels.
-- Import logging is too verbose for the main console and mixes lifecycle events with parser diagnostics.
-- Developer Console log ordering is oldest-first; newest events are not shown at the top.
 
 ### Current Cosmetic Issues
 
@@ -182,7 +190,7 @@ Yes.
 
 ### Reason
 
-Sprint 30 is completed and approved. The next ACTIVE sprint may now be defined.
+Sprint 31 is completed and approved. Sprint 32 — Financial Identity Engine may now be defined as the next ACTIVE sprint.
 
 Out of Scope:
 
@@ -209,8 +217,53 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Replace the completed Sprint 30 ACTIVE contract with Sprint 31 — Developer Console UX & Structured Logging.
-* After Sprint 31, resume the deferred product roadmap beginning with Sprint 32 — Financial Identity Engine.
+* Replace the completed Sprint 31 ACTIVE contract with Sprint 32 — Financial Identity Engine.
+* Resume the deferred product roadmap with Sprint 32 — Financial Identity Engine, followed by Universal Import Platform, Financial Intelligence, Salary Planner, Investments and Analytics.
+
+---
+
+# Sprint 31
+
+## Objective
+Transform the existing Developer Console into a cohesive developer diagnostics workspace with structured diagnostic entries, concise import lifecycle logging, filtering, search, newest-first presentation and reusable Developer Console controls.
+
+## Status
+Completed
+
+## Outcome
+- Plain-string Developer Console storage was replaced with structured `DeveloperLogEntry` values.
+- Every diagnostic entry has stable identity, sequence number, timestamp, level, category, message and optional metadata.
+- Diagnostic levels are Debug, Info, Warning and Error.
+- Diagnostic categories are Application, Import, Parser, Validation, Database and Runtime.
+- Stored diagnostic history remains chronological.
+- Developer Console presentation displays newest entries first without renumbering sequence numbers.
+- Debug diagnostics are hidden by default.
+- Selecting Debug reveals existing parser diagnostics.
+- Level filtering, category filtering and combined filtering are implemented.
+- Case-insensitive search applies after filters and searches message plus visible metadata.
+- Copy All copies complete stored diagnostic history in chronological order.
+- Clear removes diagnostic entries and resets diagnostic search/filter state only.
+- Import lifecycle logging is concise by default.
+- Parser internals are emitted as Debug / Parser diagnostics.
+- Runtime Inspector remains accurate.
+- Repository Summary remains accurate.
+- Reload Data remains functional through `RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)`.
+- Reset Development Database remains functional through existing app reset wiring.
+- Full visible Developer Console button hit targets were manually verified.
+- Dashboard, Accounts, Transactions, Imports and financial calculations remain unchanged.
+- No parser, validation, repository contract, runtime-store contract, SQLite schema or financial calculation changes were made.
+- Xcode diagnostics passed with 0 issues for resolvable modified Swift files.
+- Xcode diagnostics could not directly resolve `LedgerForge/Services/ImportEngine.swift` or `LedgerForge/Services/Services/ImportEngine.swift` by project path, but Xcode build compiled it successfully.
+- Xcode build passed.
+- Active Xcode test plan passed: 112 tests, 0 failures, 0 skipped.
+- Manual runtime verification passed.
+- Implementation commit: `274e1f5`
+- Full implementation commit: `274e1f5e8f1f6a90d0701442c8f7fb0286ec2c5b`
+- Git push to `origin/main` completed successfully.
+- Remote verification: `git ls-remote origin refs/heads/main` returned `274e1f5e8f1f6a90d0701442c8f7fb0286ec2c5b`.
+- Documentation handoff commit: `c86d360`
+- Full documentation handoff commit: `c86d360ae2ce63bb31b22928e6368307193bd7be`
+- Final remote `main` verification returned `c86d360ae2ce63bb31b22928e6368307193bd7be`.
 
 ---
 
@@ -263,7 +316,7 @@ Completed
 Stabilize Import Wizard usability by keeping long review content scrollable within the wizard workspace while preserving continuously visible action controls.
 
 ## Status
-Implemented
+Completed
 
 ## Outcome
 - `ContentView.swift` layout-only change implemented for the Import Wizard.
@@ -282,7 +335,6 @@ Implemented
 - Implementation commit: `bc0af0c`
 - Git push to `origin/main` completed successfully.
 - Remote verification: `git ls-remote origin refs/heads/main` returned `bc0af0c65f092ad0302543b823d05c6b95120cab`.
-- Local tracking ref note: remote push succeeded; sandbox could not update local `origin/main` ref lock under `.git`.
 
 ---
 
