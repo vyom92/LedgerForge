@@ -152,6 +152,8 @@ final class DashboardViewModel: ObservableObject {
         guard case .failed = presentationState else {
             if !accounts.isEmpty || transactionCount > 0 {
                 presentationState = .loaded("Loaded \(accounts.count) account(s), \(transactionCount) transaction(s)")
+            } else {
+                presentationState = .empty("No persisted dashboard data")
             }
             return
         }

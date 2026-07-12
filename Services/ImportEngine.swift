@@ -101,7 +101,7 @@ final class ImportEngine {
     static let shared = ImportEngine()
 
     private let importCoordinator: any ImportFramework.ImportCoordinator
-    private let importPersistenceCoordinator: ImportPersistenceCoordinating
+    private let importPersistenceCoordinatorFactory: () -> ImportPersistenceCoordinating
     private let committedPreparedImportLock = NSLock()
     private var committedPreparedImportIDs: Set<UUID> = []
 
@@ -110,10 +110,18 @@ final class ImportEngine {
             readerRegistry: DefaultReaderRegistry(),
             passwordProvider: DefaultPasswordProvider()
         ),
-        importPersistenceCoordinator: ImportPersistenceCoordinating = DefaultImportPersistenceCoordinator()
+        importPersistenceCoordinator: ImportPersistenceCoordinating? = nil
     ) {
         self.importCoordinator = importCoordinator
-        self.importPersistenceCoordinator = importPersistenceCoordinator
+        if let importPersistenceCoordinator {
+            self.importPersistenceCoordinatorFactory = {
+                importPersistenceCoordinator
+            }
+        } else {
+            self.importPersistenceCoordinatorFactory = {
+                DefaultImportPersistenceCoordinator()
+            }
+        }
     }
 
     func importFile(from url: URL) {
@@ -266,6 +274,7 @@ final class ImportEngine {
         var persistenceResult = ImportPersistenceResult.skipped
         var persistenceErrorMessage: String?
         do {
+            let importPersistenceCoordinator = importPersistenceCoordinatorFactory()
             persistenceResult = try importPersistenceCoordinator.persistValidatedImport(
                 financialDocument: preparedImport.financialDocument,
                 importSession: preparedImport.importSession,
