@@ -18,7 +18,7 @@ Principles:
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-026 — Structured Developer Diagnostics (Accepted)
-* Architecture Baseline: Sprint 32 / UI_UX v1.0 Frozen
+* Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
 * Current Sprint: Sprint 32 — Financial Identity Foundation implemented and manually verified
 * Current Phase: Sprint 32 documentation handoff
@@ -26,7 +26,7 @@ Principles:
 * Validation Status: Sprint 32 passed Xcode diagnostics for all modified Swift files Xcode resolved, Xcode BuildProject passed, focused Sprint 32 tests passed (15 tests, 0 failures, 0 skipped), complete Xcode-native RunAllTests passed (127 tests, 0 failures, 0 skipped), git diff check passed, and manual runtime verification passed
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
 * Latest Verified Implementation Remote: 63c18cc990f1fca1931bdb055160c739512c52f3
-* Latest Documentation Handoff Commit: 5f8b61d0c401418b613ff355e1fdc6b6c2d45a86
+* Previous Documentation Handoff Commit: 5f8b61d0c401418b613ff355e1fdc6b6c2d45a86
 
 ## Bootstrap
 
@@ -159,8 +159,8 @@ Scope:
 - Developer Console destructive and utility controls use full visible hit targets.
 - Import diagnostics show concise lifecycle events by default.
 - Parser implementation details are available as Debug diagnostics.
-- Database reset preserves Developer Mode and non-financial preferences.
-- Importing after reset writes to the fresh provider and remains persisted after relaunch.
+- Database reset preserves Developer Mode and non-financial preferences during the active session.
+- Reset Development Database switches the running app to a fresh temporary SQLite provider, but the primary database is restored on the next application launch; this is tracked as a current maintenance issue.
 - Canonical financial identifier domain types are implemented.
 - Deterministic financial identifier normalization is implemented.
 - Strong and weak identifier classification is implemented.
@@ -209,7 +209,7 @@ Out of Scope:
 * Repository redesign
 * Database schema changes
 * Automatic account matching
-* Concrete verified-identifier matching service
+* Production import integration using verified identifiers
 * Editable import preview
 * Batch import
 * Duplicate-management UI
