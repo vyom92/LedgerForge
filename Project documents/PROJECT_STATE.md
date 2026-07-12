@@ -21,11 +21,12 @@ Principles:
 * Architecture Baseline: Sprint 31 / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
 * Current Sprint: Sprint 31 — Developer Diagnostics & Logging completed and approved
-* Current Phase: Sprint 31 completed and approved; awaiting replacement of the ACTIVE sprint with Sprint 32 — Financial Identity Engine
+* Current Phase: Pre-Sprint 32 documentation alignment and planning for Sprint 32 — Financial Identity Engine
 * Build Status: Passing
 * Validation Status: Pre-Sprint 32 DTO concurrency isolation maintenance passed Xcode diagnostics, Xcode build passed, active Xcode test plan passed (112 tests, 0 failures, 0 skipped), and prior DTO Equatable actor-isolation warnings were removed
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-* Latest Verified Remote Main: 481185a711a3a7366229e74081401c84c7acc6c6
+* Latest Verified Implementation Remote: 481185a711a3a7366229e74081401c84c7acc6c6
+* Latest Documentation Handoff Commit: 5f8b61d0c401418b613ff355e1fdc6b6c2d45a86
 
 ## Bootstrap
 
@@ -88,23 +89,14 @@ Views
 
 ## Current Work
 
-Active Work: Pre-Sprint 32 DTO concurrency isolation maintenance completed and verified. Sprint 31 remains completed and approved; prepare Sprint 32 — Financial Identity Engine as the next ACTIVE sprint in `Project documents/Implementation.md`.
+Active Work: Sprint 31 and the DTO concurrency isolation maintenance are completed and verified. The next planning action is Sprint 32 — Financial Identity Engine.
 
 Objective:
 
-* Developer Console diagnostics are structured in memory.
-* Diagnostic entries include stable identity, sequence number, timestamp, level, category, message and optional metadata.
-* Supported levels are Debug, Info, Warning and Error.
-* Supported categories are Application, Import, Parser, Validation, Database and Runtime.
-* Stored diagnostic history remains chronological.
-* Developer Console presentation shows newest entries first without renumbering.
-* Debug entries are hidden by default.
-* Level filtering, category filtering and case-insensitive search are implemented.
-* Copy All copies complete chronological stored history with timestamp, level, category and message.
-* Clear removes diagnostics and resets search/filter presentation state without affecting runtime stores or repositories.
-* Import lifecycle logging is concise by default.
-* Parser internals are emitted as Debug diagnostics.
-* Runtime Inspector, Repository Summary, Reload Data and Reset Development Database remain functional.
+* Complete Documentation Sync Cycle 2.
+* Preserve the verified Sprint 31 and DTO maintenance baseline.
+* Prepare Sprint 32 — Financial Identity Engine as the next ACTIVE sprint.
+* Do not begin implementation until Desktop ChatGPT replaces the ACTIVE contract in `Implementation.md`.
 
 Scope:
 
@@ -112,8 +104,12 @@ Scope:
 * Sprint 30 was a Developer Mode-only foundation sprint.
 * Sprint 29 was a layout-only stabilization sprint.
 * No parser, reader, validation, repository contract, runtime store contract, SQLite schema or financial calculation changes were made in Sprint 31.
-* `Project documents/Implementation.md` is the Desktop ChatGPT-owned sprint planning and workflow document.
+* `Project documents/Implementation.md` contains only the current ACTIVE sprint; completed sprint history belongs in `Project documents/PROJECT_STATE.md`.
 * Codex must never edit `Project documents/Implementation.md`.
+* Desktop ChatGPT owns ACTIVE sprint planning.
+* Repository DTO `Equatable` conformances for `WorkspaceDTO`, `TransactionRawRowDTO`, `TransactionDTO`, `AccountDTO` and `ImportSessionRecordDTO` are explicitly nonisolated.
+* The app target default actor isolation remains `MainActor`.
+* `Project documents/Implementation.md` is the Desktop ChatGPT-owned sprint planning and workflow document.
 * `Project documents/Codex response.md` records the latest planning or execution report produced by the executing assistant.
 * `Project documents/PROJECT_STATE.md` records verified repository facts only.
 * `Project documents/.github/Context_Manifest.yaml` is the bootstrap manifest and routing document, not a repository state database.
@@ -168,62 +164,23 @@ Scope:
 - Parser implementation details are available as Debug diagnostics.
 - Database reset preserves Developer Mode and non-financial preferences.
 - Importing after reset writes to the fresh provider and remains persisted after relaunch.
-- Architecture v1.0 and UI/UX v1.0 remain preserved.
-
-### Current Critical Product Issues
-
-- None verified for Sprint 31.
-
-### Current Important Product Issues
-
-- Account rows display a chevron despite no verified account-detail navigation.
-- Some user-facing screens expose developer terminology such as repository or hydration language.
-- Toolbar composition varies across major screens.
-- Several user-facing controls display `Pending` or `Soon` states that add visual noise.
-- Transaction detail presentation does not yet use the available space effectively.
-
-### Current Cosmetic Issues
-
-- Institution logos are not implemented.
-- Dashboard charts are not interactive.
-- Hover and minor spacing polish remain future work.
-- Future sidebar modules remain visibly marked as unavailable.
-
-### Ready for Next Feature Sprint?
-
-Yes.
-
-### Reason
-
-Sprint 31 is completed and approved. Sprint 32 — Financial Identity Engine may now be defined as the next ACTIVE sprint.
-
-Out of Scope:
-
-* PDF support
-* OCR
-* Parser behaviour changes
-* Validation redesign
-* Repository redesign
-* Database schema changes
-* Automatic account matching
-* Concrete verified-identifier matching service
-* Editable import preview
-* Batch import
-* Duplicate-management UI
-* Password-entry UI
-* Import correction workflow
-* Transaction extraction changes
-* Analytics
-* Budgets
-* Insights
-* Reports
-* Multi-currency
-* Investments
-
-Next Major Milestone:
-
-* Replace the completed Sprint 31 ACTIVE contract with Sprint 32 — Financial Identity Engine.
-* Resume the deferred product roadmap with Sprint 32 — Financial Identity Engine, followed by Universal Import Platform, Financial Intelligence, Salary Planner, Investments and Analytics.
+- Old pre-reset data does not return.
+- Log Console plain-text search, `Copy All` and `Clear` are implemented.
+- Runtime Inspector displays provider state, hydration status, latest refresh result, account count, transaction count and SQLite path when available.
+- Repository Summary displays Accounts and Transactions counts only.
+- No parser, reader, validation, repository contract, runtime-store contract, SQLite schema or financial calculation changes were made.
+- Xcode diagnostics passed with 0 issues for resolvable modified Swift files.
+- Xcode diagnostics could not directly resolve `LedgerForge/Services/ImportEngine.swift` or `LedgerForge/Services/Services/ImportEngine.swift` by project path, but Xcode build compiled it successfully.
+- Xcode build passed.
+- Active Xcode test plan passed: 112 tests, 0 failures, 0 skipped.
+- Manual runtime verification passed.
+- Implementation commit: `274e1f5`
+- Full implementation commit: `274e1f5e8f1f6a90d0701442c8f7fb0286ec2c5b`
+- Git push to `origin/main` completed successfully.
+- Remote verification: `git ls-remote origin refs/heads/main` returned `274e1f5e8f1f6a90d0701442c8f7fb0286ec2c5b`.
+- Documentation handoff commit: `c86d360`
+- Full documentation handoff commit: `c86d360ae2ce63bb31b22928e6368307193bd7be`
+- Final remote `main` verification returned `c86d360ae2ce63bb31b22928e6368307193bd7be`.
 
 ---
 
@@ -258,7 +215,7 @@ Completed
 - Dashboard, Accounts, Transactions, Imports and financial calculations remain unchanged.
 - No parser, validation, repository contract, runtime-store contract, SQLite schema or financial calculation changes were made.
 - Xcode diagnostics passed with 0 issues for resolvable modified Swift files.
-- Xcode diagnostics could not directly resolve `LedgerForge/Services/ImportEngine.swift` or `LedgerForge/Services/Services/ImportEngine.swift` by project path, but Xcode build compiled it successfully.
+- Xcode diagnostics could not directly resolve `LedgerForge/Services/Services/ImportEngine.swift` by project path, but Xcode build compiled it successfully.
 - Xcode build passed.
 - Active Xcode test plan passed: 112 tests, 0 failures, 0 skipped.
 - Manual runtime verification passed.
@@ -326,17 +283,18 @@ Completed
 ## Outcome
 - `ContentView.swift` layout-only change implemented for the Import Wizard.
 - Existing wizard stepper/header preserved.
-- Existing two-panel review layout preserved inside one central `ScrollView`.
-- Existing footer action row remains outside the central `ScrollView`.
+- Import Wizard preview and validation panels use independent constrained scroll regions.
+- The action footer remains outside both scroll regions and continuously visible.
 - No duplicate footer was introduced.
-- No nested Import Wizard review scroll views were introduced.
 - Validation gating remains implemented by the existing `ImportPresentationState` flow.
 - Cancellation behaviour remains implemented by the existing `cancelPreparedImport()` path.
 - No parser, reader, validation, persistence, repository, runtime-store, hydrator, SQLite or financial calculation changes were made.
 - Xcode diagnostics for `ContentView.swift` passed with 0 issues.
 - Xcode build passed.
 - Active Xcode test plan passed: 94 tests, 0 failures, 0 skipped.
-- Runtime Import Wizard UI verification could not be performed because the available Xcode tool surface did not expose an app launch or UI inspection workflow.
+- Full visible Cancel and primary-action button hit targets were manually verified.
+- The stale no-write completion message is hidden after successful completion.
+- Manual runtime verification passed.
 - Implementation commit: `bc0af0c`
 - Git push to `origin/main` completed successfully.
 - Remote verification: `git ls-remote origin refs/heads/main` returned `bc0af0c65f092ad0302543b823d05c6b95120cab`.
@@ -767,3 +725,4 @@ Completed
 - Git tag: `sprint-12b-complete`
 
 ---
+
