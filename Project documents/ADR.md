@@ -1134,3 +1134,253 @@ Those changes belong to future implementation sprints.
 
 - ADR-025 — Stable Financial Entity Identity
 - ADR-026 — Structured Developer Diagnostics
+
+---
+
+# ADR-028 — Bounded Parser Source Evidence
+
+## Status
+
+Accepted
+
+## Implemented In
+
+Sprint 34
+
+---
+
+⸻
+
+Context
+
+LedgerForge separates document extraction from financial interpretation.
+
+Under ADR-012, readers extract source content and parsers interpret its financial meaning. Parsers must not perform file I/O.
+
+Under ADR-027, verified FinancialIdentifier values originate exclusively inside StatementParser implementations. Generic orchestration, normalization and persistence components must not derive or verify identifiers.
+
+The current CSV import path retains the complete extracted text while preparing an import. CSVAnalyzer identifies the structural location of the first transaction, and CSVNormalizer creates normalized transaction rows beginning at that boundary.
+
+However, the existing NormalizedDocument parser input contains only:
+
+* the analyzed Document
+* DocumentMetadata
+* normalized transaction rows
+
+Source evidence appearing before the first transaction is therefore omitted from the parser handoff.
+
+The evidence has not been destroyed. It remains available during generic format processing but is not represented in the parser input.
+
+A parser requires bounded access to this evidence to deterministically interpret institution-specific values such as full account identifiers. Moving that interpretation into generic processing would violate the existing reader, parser and identifier-ownership boundaries.
+
+⸻
+
+## Decision
+
+Parser source evidence
+
+Format-processing components may transport bounded, uninterpreted source evidence into NormalizedDocument.
+
+NormalizedDocument shall expose an immutable sourceContext.
+
+The context shall contain ordered source fragments that appeared structurally before the first transaction.
+
+For line-oriented extracted text, every fragment shall contain:
+
+* the exact textual content of one extracted source line, excluding its newline delimiter
+* its one-based ordinal within the extracted source text
+
+The context shall preserve:
+
+* empty lines
+* original source ordering
+* exact extracted line content
+* one-based source ordinals
+
+The first transaction and every later source line shall be excluded.
+
+A transaction header appearing before the first transaction may be included because the boundary is structural rather than semantic.
+
+Interpretation ownership
+
+Source context is evidence only.
+
+Generic readers, analyzers, normalizers and orchestration components shall not:
+
+* assign financial meaning to source fragments
+* search for institution-specific account labels
+* construct FinancialIdentifier values
+* classify identifier verification
+* promote weak or masked values
+* embed institution-specific source-context fields
+
+Only the selected StatementParser may interpret the transported evidence.
+
+Only the parser may produce or verify a FinancialIdentifier, as required by ADR-027.
+
+Lifetime and privacy
+
+Source context shall remain transient parser-input data.
+
+It shall not be stored in:
+
+* Document
+* PreparedImport
+* FinancialDocument
+* import sessions
+* repositories
+* SQLite
+* runtime stores
+* diagnostics
+* analytics
+
+Source-fragment text shall not be logged.
+
+The context is bounded by the first-transaction structural boundary. The complete source document and post-boundary transaction content shall not be duplicated into the context.
+
+## Compatibility
+
+Existing NormalizedDocument construction shall remain source-compatible by defaulting sourceContext to an empty value.
+
+CSV normalization shall expose a result containing both normalized rows and source context.
+
+The existing row-only normalization method shall remain available as a compatibility wrapper.
+
+Production CSV import shall obtain rows and context from one normalization operation.
+
+Conformance restraint
+
+New source-context and normalization-result types shall receive only the protocol conformances required by production behaviour.
+
+Equatable, Codable, Sendable, or other conformances shall not be added automatically for test convenience.
+
+Tests shall inspect stored fields directly.
+
+⸻
+
+Rationale
+
+This decision transports existing source evidence without moving financial interpretation into the generic import pipeline.
+
+It preserves the established boundaries:
+
+* readers extract
+* format processing identifies structure
+* parsers interpret financial meaning
+* parsers alone verify financial identifiers
+* persistence stores only approved downstream domain data
+
+A bounded context avoids storing the complete document in long-lived models while still providing parsers with deterministic evidence.
+
+The design remains format-neutral. Future PDF, XLS, XLSX, or TXT processing may provide equivalent bounded source fragments without introducing institution-specific meaning into format-processing components.
+
+Retaining the row-only normalization API avoids unnecessary migration across existing callers and tests.
+
+⸻
+
+## Consequences
+
+Positive consequences
+
+* Parsers can receive source evidence without reopening files.
+* ADR-012 remains intact.
+* ADR-027 identifier ownership remains intact.
+* No duplicate institution-specific parsing system is introduced.
+* Existing normalized transaction rows remain unchanged.
+* Existing NormalizedDocument construction remains source-compatible.
+* Existing row-only normalization callers remain source-compatible.
+* Source evidence has an explicit and testable lifetime.
+* Future formats can use the same parser-input principle.
+* Source-fragment preservation can be tested deterministically.
+
+Trade-offs
+
+* NormalizedDocument gains a small transient source-context model.
+* CSV normalization gains a composite result type.
+* ImportEngine must transport one additional uninterpreted value.
+* Pre-transaction source content temporarily occupies additional memory.
+* Future format implementations must define an equivalent structural boundary before populating source context.
+
+ADR-028 establishes the permanent contract for transporting parser source evidence. Future formats shall implement equivalent structural evidence while preserving parser ownership of financial interpretation.
+
+⸻
+
+Alternatives Considered
+
+Store the complete extracted text in Document
+
+Rejected.
+
+Document describes analyzed source structure and currently survives beyond the immediate normalization operation. Attaching complete source text would broaden its responsibility, lengthen sensitive-data lifetime, and duplicate content already held during import preparation.
+
+Store source context in PreparedImport
+
+Rejected.
+
+The parser requires evidence before PreparedImport is created. Retaining the context afterward would unnecessarily extend its lifetime beyond parsing.
+
+Allow parsers to reopen Document.url
+
+Rejected.
+
+Parser file I/O violates ADR-012, duplicates reader behaviour, complicates password handling, and makes parser execution dependent on external file availability.
+
+Extract identifiers in ImportEngine
+
+Rejected.
+
+ImportEngine owns orchestration and must remain institution-neutral. Identifier interpretation there would violate ADR-027.
+
+Extract identifiers in persistence coordination
+
+Rejected.
+
+Persistence operates after parsing and validation. It lacks the complete source meaning and must not reconstruct identity from reduced metadata.
+
+Replace the existing normalization API
+
+Rejected.
+
+Replacing the row-only return type would force an unnecessary migration across existing callers and tests. A new composite-result operation with a compatibility wrapper provides the required production path without breaking established call sites.
+
+Add institution-specific fields to source context
+
+Rejected.
+
+Fields such as accountNumber, iban, customerId, verifiedIdentifier, or institution-specific labels would move interpretation outside the parser and violate ADR-027.
+
+⸻
+
+## Non-Goals
+
+This ADR does not:
+
+* extract any financial identifier
+* modify StatementParser protocol
+* integrate FinancialIdentityResolver
+* perform account matching or account reuse
+* attach identifiers to repositories
+* change persistence
+* change SQLite
+* change readers
+* implement PDF source context
+* change financial calculations
+* introduce user-facing behaviour
+* add source-fragment logging
+* establish a maximum arbitrary line or character count beyond the structural first-transaction boundary
+
+Those changes require separate implementation decisions and sprints.
+
+⸻
+
+## Related ADRs
+
+* ADR-003 — Generic Import Engine
+* ADR-011 — Unified FinancialDocument Pipeline
+* ADR-012 — Separation of Readers and Parsers
+* ADR-016 — Universal Import Pipeline
+* ADR-017 — Deterministic Before Intelligent
+* ADR-019 — Reference Fixtures Define Financial Truth
+* ADR-025 — Stable Financial Entity Identity
+* ADR-026 — Structured Developer Diagnostics
+* ADR-027 — Parser-Owned Financial Identifier Extraction
