@@ -14,19 +14,19 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: 45696a5 — Implement Sprint 33 parser identifier handoff
+* Latest Implementation Commit: 5025c8a — Implement Sprint 34 bounded parser source context
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
-* Latest ADR: ADR-027 — Parser-Owned Financial Identifier Extraction (Accepted)
+* Latest ADR: ADR-028 — Bounded Parser Source Evidence (Accepted)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 33 — Parser Financial Identifier Handoff implemented and manually verified
-* Current Phase: Awaiting Sprint 34 planning
+* Current Sprint: Sprint 34 — Bounded Parser Source Context implemented and manually verified
+* Current Phase: Awaiting Sprint 35 planning
 * Build Status: Passing
-* Validation Status: Sprint 33 passed clean Xcode diagnostics and static analysis, Xcode build passed, complete Xcode-native test plan passed (128 tests, 0 failures, 0 skipped), CSV financial regression passed, git diff check passed, and manual runtime verification passed
+* Validation Status: Sprint 34 passed clean Xcode diagnostics and static analysis, Xcode clean build passed, focused CSV import regression tests passed, complete Xcode-native test plan passed (132 tests, 0 failures, 0 skipped), Axis CSV financial regression passed, git diff check passed, and manual runtime verification passed
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-* Latest Verified Implementation Remote: 45696a51cc0f6b22a94855fa3120cbc6e6c504c3
-* Previous Documentation Handoff Commit: 5f8b61d0c401418b613ff355e1fdc6b6c2d45a86
+* Latest Verified Implementation Remote: 5025c8ae85a36c71e0d5e97c7cf8d0ff00161095
+* Latest Documentation Handoff Commit: 9bdd3d6f5dc207ff554cbc410d26a9b2a8f454dc
 
 ## Bootstrap
 
@@ -89,20 +89,23 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 33 — Parser Financial Identifier Handoff is implemented, pushed and manually verified. Awaiting Sprint 34 planning.
+Active Work: Sprint 34 — Bounded Parser Source Context is implemented, pushed and manually verified. Awaiting Sprint 35 planning.
 
 Objective:
 
-* Preserve the verified Sprint 33 implementation baseline.
-* Await Sprint 34 planning.
+* Preserve the verified Sprint 34 implementation baseline.
+* Await Sprint 35 planning.
 
 Scope:
 
-* Sprint 33 introduced the parser-owned immutable `FinancialIdentifier` handoff in `FinancialDocument`.
-* Sprint 33 preserved runtime behaviour and financial truth; no runtime or financial calculation changes were made.
-* Sprint 33 made no schema, repository, persistence, DTO, runtime store, ViewModel or UI changes.
-* Sprint 33 did not perform identifier extraction, identity resolution, repository lookup, account reuse or persistence integration.
-* ADR-027 — Parser-Owned Financial Identifier Extraction is Accepted.
+* Sprint 34 introduced immutable, bounded pre-transaction source context in `NormalizedDocument`.
+* CSV normalization now returns coherent normalized rows and bounded source context from one source-line collection while retaining the row-only compatibility API.
+* `ImportEngine` transports source context into `NormalizedDocument` without interpreting or logging fragment text.
+* Sprint 34 preserved normalized transaction rows, parser selection, parser behaviour, `FinancialDocument` output, validation, persistence, runtime behaviour and financial truth.
+* Sprint 34 made no parser, reader, schema, repository, persistence, DTO, runtime store, ViewModel or UI changes.
+* Sprint 34 did not perform identifier extraction, identity resolution, repository lookup, account reuse or persistence integration.
+* Axis parser output continues to contain an empty financial identifier collection.
+* ADR-028 — Bounded Parser Source Evidence is Accepted.
 * `Project documents/Implementation.md` contains only the current ACTIVE sprint; completed sprint history belongs in `Project documents/PROJECT_STATE.md`.
 * Codex must never edit `Project documents/Implementation.md`.
 * Desktop ChatGPT owns ACTIVE sprint planning.
@@ -119,7 +122,7 @@ Scope:
 * Preserve durable SQLite startup persistence wiring.
 * Preserve stable repository account identifiers.
 * Preserve institution attribution through repository hydration.
-* Sprint 33 implementation commit `45696a51cc0f6b22a94855fa3120cbc6e6c504c3` was pushed to `origin/main` and verified with `git ls-remote origin refs/heads/main`.
+* Sprint 34 implementation commit `5025c8ae85a36c71e0d5e97c7cf8d0ff00161095` was pushed to `origin/main` and verified with `git ls-remote origin refs/heads/main`.
 
 ## Current Product Review
 
@@ -172,7 +175,7 @@ Scope:
 
 ### Current Critical Product Issues
 
-- None verified for Sprint 32.
+- None verified for Sprint 34.
 
 ### Current Important Product Issues
 
@@ -192,11 +195,11 @@ Scope:
 
 ### Ready for Next Feature Sprint?
 
-Awaiting Sprint 34 planning.
+Awaiting Sprint 35 planning.
 
 ### Reason
 
-Sprint 33 implementation, automated validation and manual runtime verification are complete. Sprint 34 planning is the next phase.
+Sprint 34 implementation, automated validation and manual runtime verification are complete. Sprint 35 planning is the next phase.
 
 Out of Scope:
 
@@ -223,8 +226,44 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Complete Sprint 32 documentation handoff review.
-* Define the next ACTIVE sprint after Desktop ChatGPT approval.
+* Define the Sprint 35 ACTIVE sprint after Desktop ChatGPT approval.
+
+---
+
+# Sprint 34
+
+## Objective
+Carry ordered, bounded and uninterpreted pre-transaction source evidence into the existing `NormalizedDocument` parser input without changing runtime or financial behaviour.
+
+## Status
+Implemented and manually verified
+
+## Outcome
+- Added immutable `NormalizedDocument.SourceFragment` and `NormalizedDocument.SourceContext` types.
+- Added immutable `sourceContext` to `NormalizedDocument` with a default empty value that preserves existing construction.
+- Added `CSVNormalizationResult` containing normalized rows and bounded source context.
+- Added the context-aware CSV normalization path and retained the existing row-only API as a compatibility wrapper.
+- Source fragments preserve exact extracted pre-transaction line content, empty lines, original ordering and one-based source ordinals.
+- The first transaction and all later source lines are excluded from source context.
+- Invalid or missing normalization prerequisites return empty rows and empty context.
+- `ImportEngine` carries the coherent normalization result and passes context unchanged into `NormalizedDocument`.
+- No fragment text is interpreted or logged by generic processing.
+- Normalized transaction rows, parser selection, parser behaviour, `FinancialDocument` output, validation, persistence, runtime behaviour and financial calculations remain unchanged.
+- Axis parser output continues to contain an empty financial identifier collection.
+- No parser, reader, schema, repository, persistence, DTO, runtime-store, ViewModel, UI or Xcode project-file changes were made.
+- Xcode diagnostics passed with zero issues for the modified Swift files.
+- Xcode static analysis passed.
+- Xcode clean build passed.
+- Focused `CSVImportRegressionTests` passed: 5 tests, 0 failures, 0 skipped.
+- Complete Xcode-native test plan passed: 132 tests, 0 failures, 0 skipped.
+- Axis CSV financial regression passed with 81 transactions and unchanged approved financial values.
+- `git diff --check` passed.
+- Manual runtime verification passed; the Axis import preview remained unchanged and cancellation completed without persistence.
+- Planning commit: `56ffaec2c4c7c230a54f6b212b90b3659e1cbb17`
+- Implementation commit: `5025c8a`
+- Full implementation commit: `5025c8ae85a36c71e0d5e97c7cf8d0ff00161095`
+- Git push to `origin/main` completed successfully.
+- Direct remote verification: `git ls-remote origin refs/heads/main` returned `5025c8ae85a36c71e0d5e97c7cf8d0ff00161095` before the documentation handoff.
 
 ---
 
