@@ -14,6 +14,14 @@
 
 import Foundation
 
+struct CSVNormalizationResult {
+
+    let rows: [NormalizedRow]
+
+    let sourceContext: NormalizedDocument.SourceContext
+
+}
+
 final class CSVNormalizer {
 
     func normalize(
@@ -21,18 +29,45 @@ final class CSVNormalizer {
         document: Document
     ) -> [NormalizedRow] {
 
-        guard
-            let delimiter = document.delimiter,
-            let firstRow = document.firstTransactionRow
-        else {
-            return []
-        }
+        normalizeWithSourceContext(
+            text: text,
+            document: document
+        ).rows
+
+    }
+
+    func normalizeWithSourceContext(
+        text: String,
+        document: Document
+    ) -> CSVNormalizationResult {
 
         let lines = text.components(separatedBy: .newlines)
 
-        guard firstRow > 0, firstRow <= lines.count else {
-            return []
+        guard
+            let delimiter = document.delimiter,
+            let firstRow = document.firstTransactionRow,
+            firstRow > 0,
+            firstRow <= lines.count
+        else {
+            return CSVNormalizationResult(
+                rows: [],
+                sourceContext: .empty
+            )
         }
+
+        let preTransactionFragments = lines
+            .prefix(firstRow - 1)
+            .enumerated()
+            .map { index, line in
+                NormalizedDocument.SourceFragment(
+                    sourceOrdinal: index + 1,
+                    text: line
+                )
+            }
+
+        let sourceContext = NormalizedDocument.SourceContext(
+            preTransactionFragments: preTransactionFragments
+        )
 
         var rows: [NormalizedRow] = []
 
@@ -56,7 +91,10 @@ final class CSVNormalizer {
             )
         }
 
-        return rows
+        return CSVNormalizationResult(
+            rows: rows,
+            sourceContext: sourceContext
+        )
     }
 
 }

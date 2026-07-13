@@ -92,7 +92,7 @@ struct PreparedImport: Identifiable {
 private struct ImportFormatProcessingResult {
     let document: Document
     let metadata: DocumentMetadata
-    let normalizedRows: [NormalizedRow]
+    let normalization: CSVNormalizationResult
     let parser: StatementParser?
 }
 
@@ -190,7 +190,7 @@ final class ImportEngine {
             "encoding": processedDocument.document.encoding ?? "Unknown"
         ])
         developerConsole.debug(.parser, "Normalization details", metadata: [
-            "normalizedRows": "\(processedDocument.normalizedRows.count)"
+            "normalizedRows": "\(processedDocument.normalization.rows.count)"
         ])
 
         guard let parser = processedDocument.parser else {
@@ -201,7 +201,8 @@ final class ImportEngine {
         let normalizedDocument = NormalizedDocument(
             document: processedDocument.document,
             metadata: processedDocument.metadata,
-            rows: processedDocument.normalizedRows
+            rows: processedDocument.normalization.rows,
+            sourceContext: processedDocument.normalization.sourceContext
         )
 
         let financialDocument = try parser.parse(
@@ -322,7 +323,7 @@ final class ImportEngine {
         )
 
         let normalizer = CSVNormalizer()
-        let normalizedRows = normalizer.normalize(
+        let normalization = normalizer.normalizeWithSourceContext(
             text: contents,
             document: document
         )
@@ -335,7 +336,7 @@ final class ImportEngine {
         return ImportFormatProcessingResult(
             document: document,
             metadata: metadata,
-            normalizedRows: normalizedRows,
+            normalization: normalization,
             parser: parser
         )
     }

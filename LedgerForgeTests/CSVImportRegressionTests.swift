@@ -16,7 +16,10 @@ struct CSVImportRegressionTests {
         let text = try CSVReader().read(from: fixture.csvURL)
         let document = CSVAnalyzer().analyze(text: text, fileURL: fixture.csvURL)
         let metadata = InstitutionDetector().detect(from: text)
-        let rows = CSVNormalizer().normalize(text: text, document: document)
+        let normalization = CSVNormalizer().normalizeWithSourceContext(
+            text: text,
+            document: document
+        )
         let parser = try #require(
             StatementParserRegistry.shared.parser(for: document, metadata: metadata),
             "Expected the current CSV path to select a parser for the approved Axis Bank fixture."
@@ -25,7 +28,8 @@ struct CSVImportRegressionTests {
         let normalizedDocument = NormalizedDocument(
             document: document,
             metadata: metadata,
-            rows: rows
+            rows: normalization.rows,
+            sourceContext: normalization.sourceContext
         )
         let financialDocument = try parser.parse(document: normalizedDocument)
         let validation = ImportValidator.validate(financialDocument: financialDocument)
@@ -39,8 +43,130 @@ struct CSVImportRegressionTests {
         #expect(validation.openingBalance == fixture.expected.openingBalanceDecimal)
         #expect(validation.closingBalance == fixture.expected.closingBalanceDecimal)
         #expect(validation.passed == fixture.expected.validationPassed)
+        #expect(financialDocument.financialIdentifiers.isEmpty)
     }
 
+    @Test func sourceContextPreservesExactPreTransactionFragmentsAndBoundary() {
+        let text = "  Account Number,001  \n\nTran Date,Particulars,Debit,Credit,Balance\n01-01-2026,First,100,,900\n02-01-2026,Second,,25,925"
+        let document = Self.makeDocument(firstTransactionRow: 4, delimiter: ",")
+
+        let result = CSVNormalizer().normalizeWithSourceContext(
+            text: text,
+            document: document
+        )
+
+        let fragments = result.sourceContext.preTransactionFragments
+
+        #expect(fragments.count == 3)
+        #expect(fragments.map { $0.sourceOrdinal } == [1, 2, 3])
+        #expect(fragments.map { $0.text } == [
+            "  Account Number,001  ",
+            "",
+            "Tran Date,Particulars,Debit,Credit,Balance"
+        ])
+        #expect(!fragments.map { $0.text }.contains("01-01-2026,First,100,,900"))
+        #expect(!fragments.map { $0.text }.contains("02-01-2026,Second,,25,925"))
+    }
+
+    @Test func invalidOrMissingNormalizationPrerequisitesReturnEmptyRowsAndContext() {
+        let text = "Header,Value\nTransaction,1"
+        let documents = [
+            Self.makeDocument(firstTransactionRow: 2, delimiter: nil),
+            Self.makeDocument(firstTransactionRow: nil, delimiter: ","),
+            Self.makeDocument(firstTransactionRow: 0, delimiter: ","),
+            Self.makeDocument(firstTransactionRow: 3, delimiter: ",")
+        ]
+
+        for document in documents {
+            let result = CSVNormalizer().normalizeWithSourceContext(
+                text: text,
+                document: document
+            )
+            let compatibilityRows = CSVNormalizer().normalize(
+                text: text,
+                document: document
+            )
+
+            #expect(result.rows.isEmpty)
+            #expect(result.sourceContext.preTransactionFragments.isEmpty)
+            #expect(compatibilityRows.isEmpty)
+        }
+    }
+
+    @Test func rowOnlyNormalizationMatchesCompositeNormalizationRows() {
+        let text = "Header,Value\n01-01-2026, Description ,, 10 \n\n"
+        let document = Self.makeDocument(firstTransactionRow: 2, delimiter: ",")
+        let normalizer = CSVNormalizer()
+
+        let result = normalizer.normalizeWithSourceContext(
+            text: text,
+            document: document
+        )
+        let compatibilityRows = normalizer.normalize(
+            text: text,
+            document: document
+        )
+
+        #expect(compatibilityRows.map { $0.rowNumber } == result.rows.map { $0.rowNumber })
+        #expect(compatibilityRows.map { $0.values } == result.rows.map { $0.values })
+        #expect(result.rows.map { $0.rowNumber } == [2])
+        #expect(result.rows.map { $0.values } == [["01-01-2026", "Description", "", "10"]])
+    }
+
+    @Test func normalizedDocumentDefaultsAndRetainsSourceContext() {
+        let document = Self.makeDocument(firstTransactionRow: 2, delimiter: ",")
+        let metadata = DocumentMetadata(
+            institution: .unknown,
+            documentType: .unknown,
+            fileFormat: .csv,
+            confidence: 0
+        )
+        let defaultDocument = NormalizedDocument(
+            document: document,
+            metadata: metadata,
+            rows: []
+        )
+        let sourceContext = NormalizedDocument.SourceContext(
+            preTransactionFragments: [
+                NormalizedDocument.SourceFragment(
+                    sourceOrdinal: 1,
+                    text: "  exact source  "
+                ),
+                NormalizedDocument.SourceFragment(
+                    sourceOrdinal: 2,
+                    text: ""
+                )
+            ]
+        )
+        let explicitDocument = NormalizedDocument(
+            document: document,
+            metadata: metadata,
+            rows: [],
+            sourceContext: sourceContext
+        )
+
+        #expect(defaultDocument.sourceContext.preTransactionFragments.isEmpty)
+        #expect(explicitDocument.sourceContext.preTransactionFragments.map { $0.sourceOrdinal } == [1, 2])
+        #expect(explicitDocument.sourceContext.preTransactionFragments.map { $0.text } == [
+            "  exact source  ",
+            ""
+        ])
+    }
+
+    private static func makeDocument(
+        firstTransactionRow: Int?,
+        delimiter: Character?
+    ) -> Document {
+        var document = Document(
+            filename: "sprint-34.csv",
+            url: URL(fileURLWithPath: "/tmp/sprint-34.csv"),
+            fileType: "CSV",
+            importedAt: Date(timeIntervalSince1970: 0)
+        )
+        document.firstTransactionRow = firstTransactionRow
+        document.delimiter = delimiter
+        return document
+    }
 }
 
 private struct CSVBaselineFixture {
