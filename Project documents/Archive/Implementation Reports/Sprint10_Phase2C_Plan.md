@@ -1,4 +1,4 @@
-<!-- Project documents/Implementation Reports/Sprint10_Phase2C_Plan.md -->
+<!-- Project documents/Archive/Implementation Reports/Sprint10_Phase2C_Plan.md -->
 
 # Sprint 10 Phase 2C — SQLite Repository Persistence Plan
 

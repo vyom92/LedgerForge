@@ -1,8 +1,19 @@
 # LedgerForge Architecture v1.0 (Frozen)
 
-**Status:** Frozen v1.0 baseline, architecture aligned through Sprint 25 (Account Identity & Import Foundation).
+**Status:** Frozen v1.0 baseline, status-aligned through accepted ADR-028 and verified Sprint 37 implementation.
 
 This document is the architectural baseline for LedgerForge v1.0. It remains frozen except for status-alignment updates required to reflect completed implementation milestones and approved ADRs.
+
+## Implementation Status Boundary
+
+- Production import support is verified only for the approved Axis Bank NRE CSV layout.
+- PDF text extraction, institution detection, statement classification and parser selection are implemented foundations, not production PDF statement support.
+- The password-provider contract and locked-PDF reader interface exist; no production credential source, password-entry workflow or Keychain integration exists.
+- XLS, XLSX, TXT and OCR remain planned.
+- The parser registry does not provide production HDFC, CBQ, Axis credit-card, or broader Axis account-layout coverage.
+- Parser-owned verified Axis account identifiers and deterministic confirmed-import account resolution are integrated, but arbitrary multi-institution, multi-layout and cross-format identity support remains planned.
+
+This status note does not alter the frozen architecture or imply support from the presence of a protocol, model, reader or fixture alone.
 
 ## Vision
 
@@ -51,7 +62,7 @@ If a feature does not improve at least one of these, it should be reconsidered.
 ImportCoordinator
 → PasswordProvider
 → ReaderRegistry
-→ Reader (PDF / CSV / XLS / XLSX / TXT)
+→ Reader (production CSV; PDF foundation; future XLS / XLSX / TXT)
 → RawDocument
 → Institution Detection
 → Statement Classification
@@ -130,7 +141,9 @@ ImportCoordinator
 - Multi-Currency Dashboard
 - Exchange Rates
 
-## Supported Document Families
+## Target Document Families
+
+These are architecture compatibility targets, not current production parser coverage.
 
 - Bank Accounts
 - Credit Cards
@@ -142,7 +155,7 @@ ImportCoordinator
 
 ## Milestones
 
-- Milestone M1: Robust Statement Import ✅
+- Milestone M1: Statement Import Foundation ✅ (production support remains limited to the approved Axis Bank NRE CSV layout)
 - Milestone M2: Statement Understanding ✅
 - Milestone M3: Canonical Financial Handoff ✅
 - Milestone M4: FinancialDocument-native Parsing ✅
@@ -154,7 +167,7 @@ ImportCoordinator
 
 ## North Star
 
-LedgerForge should become the trusted personal financial operating system that users open to understand their financial life. Imports, OCR, parsers and profile learning exist to keep financial information accurate and current with minimal manual effort. The dashboard and insights remain the primary experience.
+LedgerForge should become the trusted personal financial operating system that users open to understand their financial life. Imports, future OCR, parsers and profile learning exist to keep financial information accurate and current with minimal manual effort. The dashboard and insights remain the primary experience.
 
 ### Success Criteria
 
@@ -165,6 +178,8 @@ The application should quietly maintain an accurate financial model while presen
 Financial calculations must remain deterministic, explainable and consistent across institutions, currencies and future investment modules.
 
 ## Compatibility Review
+
+These institutions and document families are design-review targets. Listing them does not establish production parser support.
 
 Every architectural decision should be reviewed against:
 
@@ -217,4 +232,3 @@ No major architectural changes to the v1.0 baseline unless:
 3. The change preserves the core architecture principles.
 
 Future enhancements will be tracked under Architecture v1.1.
-

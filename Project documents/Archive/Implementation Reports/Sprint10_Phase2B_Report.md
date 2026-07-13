@@ -1,4 +1,4 @@
-<!-- Project documents/Implementation Reports/Sprint10_Phase2B_Report.md -->
+<!-- Project documents/Archive/Implementation Reports/Sprint10_Phase2B_Report.md -->
 
 # Sprint 10 Phase 2B — SQLite Foundation Implementation Report
 
@@ -15,7 +15,7 @@
 - `Database/Migrations.swift` — migration definitions (contains Migration v1 SQL for the initial schema).
 - `Database/SQLiteDatabase.swift` — SQLite helper (open/execute and migration runner).
 - `Database/SQLiteRepositoryProvider.swift` — SQLite-backed provider which runs migrations and provides minimal repository implementations (transaction repo is a placeholder per sprint scope).
-- `Project documents/Implementation Reports/Sprint10_Phase2B_Report.md` (this file).
+- `Project documents/Archive/Implementation Reports/Sprint10_Phase2B_Report.md` (this file, subsequently archived).
 
 ## Files Modified
 
@@ -24,7 +24,7 @@
 ## New Project Folders
 
 - `Database/` created and added to Xcode project.
-- `Project documents/Implementation Reports/` created and added to project documents group.
+- The original implementation-report folder was created and added to the project documents group; these historical reports now live under `Project documents/Archive/Implementation Reports/`.
 
 ## Database Components Implemented
 

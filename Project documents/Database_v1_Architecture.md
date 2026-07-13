@@ -2,7 +2,11 @@
 
 # LedgerForge — Database v1 Architecture (Design Baseline)
 
-Status: Database v1 design baseline, architecture aligned through Sprint 25 / Milestone M7 Dashboard Experience
+Status: Database v1 design baseline, status-aligned through accepted ADR-028 and verified Sprint 37 implementation
+
+This is an approved design baseline, not an inventory of production-supported formats or fully populated production tables. Current verified implementation state belongs in `PROJECT_STATE.md`.
+
+Production import is verified only for the approved Axis Bank NRE CSV layout. PDF reading and statement-understanding components are foundation-only; production PDF, password workflows, XLS, XLSX, TXT and OCR remain planned. Schema capacity or a reader protocol does not establish end-user format or institution support.
 
 ## Summary
 
@@ -17,7 +21,7 @@ This document defines the LedgerForge Database v1 architecture. It is a vendor-n
 
 ## Top-level goals
 
-- Provide a schema that maps Document Reader outputs (PDF, CSV, XLS/XLSX, TXT) into persisted RawDocument/row-level ingestion records (normalized_documents + normalized_rows).
+- Provide a format-neutral schema capable of mapping current CSV and future PDF, XLS/XLSX or TXT Reader outputs into RawDocument/row-level ingestion records (`normalized_documents` + `normalized_rows`) when those persistence paths are implemented.
 - Enable deterministic statement fingerprinting and deduplication.
 - Persist validation metadata so only validated imports become trusted application data (transactions marked trusted).
 - Preserve native currency at every level and store exchange rates separately and versioned.
@@ -78,7 +82,7 @@ Checklist — what this design baseline contains
 - Migration strategy and schema_migrations guidance
 - How imported documents map to accounts and transactions
 - Multi-currency support details
-- Canonical mapping for PDF, CSV, XLS/XLSX, TXT → RawDocument and row-level ingestion records
+- Canonical target mapping for CSV and future PDF, XLS/XLSX and TXT → RawDocument and row-level ingestion records
 - Validation metadata storage and workflow mapping
 - Detailed statement fingerprinting algorithm and schema
 - Security, operational and testing notes
@@ -257,19 +261,19 @@ These traceability columns (`reader_version`, `parser_version`, `layout_version`
   - closed_at DATETIME
   - created_from_import_session_id TEXT REFERENCES import_sessions(id)
 - Indexes: (workspace_id), (institution_id), (native_currency)
-- Notes: Parsers should provide stable identifiers where possible; otherwise, use account_identifiers and human-in-the-loop merges.
+- Notes: Durable identity is the immutable repository account ID. Only Statement Parsers may produce verified financial identifiers. Filenames, display names, institution labels, masked values, suffixes and other weak evidence must not define identity or automatically resolve an account.
 
 10) account_identifiers
-- Purpose: external identifiers (masked PAN, IBAN, institution_id) to support deterministic matching and merging
+- Purpose: store normalized financial identifiers with strength, verification and provenance so repository resolution can use parser-produced verified strong identifiers deterministically
 - Columns:
   - id TEXT PRIMARY KEY
   - account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE
-  - scheme TEXT NOT NULL -- e.g., 'masked_pan','iban','institution_account_id'
+  - scheme TEXT NOT NULL -- e.g., 'iban','institution_account_id'; weak kinds may be stored only with explicit weak classification
   - identifier TEXT NOT NULL -- normalized identifier
-  - provenance JSON -- (document_id, parser, profile_id)
+  - provenance JSON -- parser provenance plus strength and verification metadata in the current schema representation
   - created_at DATETIME NOT NULL
 - Indexes: (scheme, identifier)
-- Notes: Use to resolve accounts across imports.
+- Notes: Automatic resolution uses only verified strong identifiers and remains workspace-scoped through the owning account. Masked numbers, suffixes, filenames, display names and institution labels cannot be promoted or used as verified matching keys. Parsers create identifiers; coordinators and persistence only transport or store them.
 
 11) transactions
 - Purpose: canonical parsed transactions persisted through repositories and exposed through runtime stores (ADR-013). Transactions keep native currency and are flagged trusted only after validation.
@@ -431,7 +435,7 @@ III. How imported documents map into accounts & transactions (traceability)
 6. ImportValidator validates the FinancialDocument and produces deterministic validation results.
 7. Fingerprinting & Duplicate Detection runs only after validation succeeds.
 8. Repository persistence is allowed only for validated, non-duplicate imports.
-9. When persistence succeeds: create or update the import session, create or match accounts through approved repository boundaries, persist trusted transactions, and update runtime stores only through RepositoryStoreHydrator.
+9. When persistence succeeds: create or update the import session, resolve an account only from parser-produced verified strong identifiers (or create a new opaque repository identity when no match exists), persist trusted transactions through approved repository boundaries, and update runtime stores only through RepositoryStoreHydrator. Filenames, display names, institution labels and weak identifiers never resolve accounts.
 10. Dashboard, accounts, transaction browsing and report data must be loaded through repository-backed runtime state and include only trusted transactions to guarantee ADR-010 compliance.
 
 IV. Multi-currency support
@@ -445,17 +449,21 @@ IV. Multi-currency support
 
 Password management is outside the responsibility of Document Readers.
 
-Encrypted financial documents are unlocked before extraction using institution-specific credentials stored securely within the operating system's secure credential storage.
+The protocol boundary and locked-PDF reader interface are implemented foundations. The production default provider currently supplies no password; credential storage, password entry, per-file override and Keychain integration remain planned.
+
+The target workflow unlocks encrypted financial documents before extraction using institution-specific credentials stored securely within the operating system's secure credential storage.
 
 Document Readers always receive either an already-accessible document or the resolved password required to open it.
 
-Document Readers never perform decryption.
+Document Readers may apply a supplied password while extracting a document, but they never retrieve credentials or own password-storage, prompting or policy decisions.
 
-If no stored credential succeeds, LedgerForge prompts the user once.
+In the planned workflow, LedgerForge prompts the user when no stored credential succeeds.
 
-Successful credentials update the stored password profile.
+Successful credential profile updates remain planned.
 
 ## OCR Strategy
+
+OCR is a future reader capability and is not implemented or production-supported.
 
 PDF Document Readers first determine whether a document contains extractable text.
 
@@ -482,9 +490,9 @@ OCR remains an implementation detail of the Document Reader.
 
 Downstream components remain unaware of whether OCR was required.
 
-V. Format-independence: PDF, CSV, XLS/XLSX, TXT mapping
+V. Format-independence target: CSV, PDF, XLS/XLSX and TXT mapping
 
-- Document Readers convert each supported file format into RawDocument.
+- Document Readers convert each implemented file format into RawDocument. CSV is the current production path; PDF is foundation-only and XLS, XLSX, TXT and OCR are planned.
 - Institution Detection, Statement Classification and Parser Selection operate on extracted content independent of the original file format.
 - Statement Parsers produce FinancialDocument after parser selection.
 - normalized_rows persist row-level extracted content so downstream parsers, validators and stores can trace results regardless of file format.
@@ -504,7 +512,7 @@ Design goals:
 - Provide fingerprint_data to support future fuzzy-matching algorithms.
 
 Recommended algorithm (canonical, upgradeable):
-1. Canonical inputs: institution_code (detector), canonical account identifier (parser-provided or masked number), min_date, max_date, normalized row signatures.
+1. Canonical inputs: institution_code (detector), an optional parser-produced verified strong account identifier, min_date, max_date and normalized row signatures. Masked values, suffixes, filenames, display names and institution labels must not become canonical account identity inputs.
 2. Row signature: normalize whitespace, unicode normalization, lowercased description, normalize numbers into a standard decimal string using `amount_decimal` and dates to ISO format, produce `date|amount_decimal|normalized_description`.
 3. Sort row signatures deterministically (by date, amount, description) and concat them into a buffer.
 4. rows_checksum = SHA256(concat_row_signatures).
@@ -628,7 +636,7 @@ CREATE TABLE document_fingerprints (
 
 XV. Testing & verification recommendations
 
-- Maintain approved CSV and PDF reference fixtures for every supported institution. Verify identical financial truth across equivalent formats, ensure RawDocument extraction remains stable, Institution Detection/Statement Classification/Parser Selection remain deterministic, parsers generate FinancialDocument and expected transactions, validation detects expected issues, and only trusted transactions reach dashboards.
+- Maintain approved fixtures for every production-supported institution and layout. The current Axis CSV fixture validates the production path; the Axis PDF fixture validates only the reader and statement-understanding foundations explicitly covered by tests until production PDF parsing and cross-format equivalence are implemented.
 - Add unit tests for fingerprinting: identical normalized inputs must produce identical fingerprints; minor benign whitespace changes should not change fingerprint if normalization rules say so.
 - Add migration tests for every schema change using sample DBs representing previous versions.
 
@@ -687,4 +695,4 @@ End of design baseline
 
 
 --
-Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through Sprint 25 / Milestone M7 Dashboard Experience. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.
+Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through accepted ADR-028 and verified Sprint 37 implementation without redesigning the Database v1 baseline. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.

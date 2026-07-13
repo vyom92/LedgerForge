@@ -20,13 +20,20 @@ Then read only the additional documentation required by the Task Routing Guide.
 
 Never read archived sprint sections unless explicitly requested.
 
+For sprint selection or backlog work, read `Project documents/FUTURE_WORK.MD` after verified repository state. Do not load it for routine implementation when the ACTIVE sprint is already defined.
+
 ---
 
 # Planning Prompt
 
+MODE: Work
+MODEL: <Approved Work model>
+REASONING: <Approved reasoning level>
+PURPOSE: Perform evidence-backed repository discovery for Chat to use when planning the next ACTIVE sprint.
+
 ## Objective
 
-<Describe the ACTIVE sprint objective exactly as defined in `Project documents/Implementation.md`.>
+<Describe the approved repository-discovery question. Chat, not Work, defines the ACTIVE sprint.>
 
 ## Bootstrap
 
@@ -36,7 +43,8 @@ Always read in this order:
 2. `AGENTS.md`
 3. `Project documents/Project_Guide.md`
 4. `Project documents/PROJECT_STATE.md`
-5. `Project documents/Implementation.md` (ACTIVE sprint only)
+5. `Project documents/FUTURE_WORK.MD` when selecting or checking unscheduled work
+6. `Project documents/Implementation.md` (ACTIVE sprint only, if defined)
 
 Then load only the additional documentation required by the Task Routing Guide.
 
@@ -48,9 +56,10 @@ Then load only the additional documentation required by the Task Routing Guide.
 - Do not modify `Project documents/Implementation.md`.
 - Do not commit.
 - Do not push.
-- Keep planning strictly within the ACTIVE sprint.
+- Keep discovery strictly within the approved question and task boundary.
+- Do not define or schedule the next sprint; report verified evidence for Chat.
 - Preserve approved architecture, ADRs, database design and workflow.
-- Identify only the files required for the approved sprint.
+- Identify only the files required by the approved discovery or sprint scope.
 
 ## Deliverables
 
@@ -71,6 +80,11 @@ Include:
 ---
 
 # Implementation Prompt
+
+MODE: Codex
+MODEL: <Approved Codex model>
+REASONING: <Approved reasoning level>
+PURPOSE: Implement and validate the approved ACTIVE sprint without expanding scope.
 
 ## Objective
 
@@ -97,7 +111,10 @@ Never modify `Project documents/Implementation.md`.
 
 # Documentation Sync Prompt
 
-Documentation only.
+MODE: Work
+MODEL: <Approved Work model>
+REASONING: <Approved reasoning level>
+PURPOSE: Investigate and execute an explicitly approved documentation-only synchronization.
 
 Requirements:
 
@@ -112,6 +129,11 @@ Requirements:
 ---
 
 # Bug Fix Prompt
+
+MODE: Codex
+MODEL: <Approved Codex model>
+REASONING: <Approved reasoning level>
+PURPOSE: Implement and validate one explicitly approved bug fix.
 
 ## Objective
 
@@ -130,6 +152,11 @@ Requirements:
 
 # Refactor Prompt
 
+MODE: Codex
+MODEL: <Approved Codex model>
+REASONING: <Approved reasoning level>
+PURPOSE: Perform one approved behaviour-preserving refactor.
+
 ## Objective
 
 <Describe refactor>
@@ -146,6 +173,11 @@ Requirements:
 
 # New Institution Prompt
 
+MODE: Codex
+MODEL: <Approved Codex model>
+REASONING: <Approved reasoning level>
+PURPOSE: Implement only the approved institution parser scope using supplied fixtures.
+
 ## Institution
 
 <Name>
@@ -161,6 +193,11 @@ Requirements:
 ---
 
 # Architecture Review Prompt
+
+MODE: Work
+MODEL: <Approved Work model>
+REASONING: <Approved reasoning level>
+PURPOSE: Review verified repository evidence against accepted architecture without making architectural decisions.
 
 Review against:
 
@@ -184,6 +221,11 @@ No code changes.
 
 # Regression Prompt
 
+MODE: Codex
+MODEL: <Approved Codex model>
+REASONING: <Approved reasoning level>
+PURPOSE: Run the approved regression scope and report evidence-backed results.
+
 Validate:
 
 - Institution Detection
@@ -202,11 +244,17 @@ PASS / FAIL
 
 # Project Guide Verification Prompt
 
+MODE: Work
+MODEL: <Approved Work model>
+REASONING: <Approved reasoning level>
+PURPOSE: Verify bootstrap and task routing without changing source code.
+
 Read:
 
 - `Project documents/.github/Context_Manifest.yaml`
 - `Project documents/Project_Guide.md`
 - `Project documents/PROJECT_STATE.md`
+- `Project documents/FUTURE_WORK.MD` when the requested verification includes sprint planning or backlog routing
 - `Project documents/Implementation.md` (ACTIVE sprint only)
 
 Produce:

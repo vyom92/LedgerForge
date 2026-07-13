@@ -792,7 +792,7 @@ Accepted
 
 ## Implemented In
 
-Sprint 25 foundation; future matching capabilities remain deferred
+Sprint 25 stable-identity foundation; Sprints 32–35 verified-identifier foundation and parser extraction; Sprint 36 deterministic confirmed-import resolution
 
 ## Decision
 
@@ -828,7 +828,7 @@ Stable repository identity and verified identifiers provide a deterministic foun
 - Display names may evolve without changing repository identity.
 - Filenames, institution names and display names must not be used as account-matching keys.
 - Duplicate-prevention and historical-import work must preserve existing repository IDs.
-- Verified identifiers must be canonicalised and stored separately from presentation metadata before automatic cross-file account matching is enabled.
+- Verified strong identifiers are canonicalised and stored separately from presentation metadata; deterministic confirmed-import resolution uses only parser-produced verified strong identifiers.
 - Documents and transactions attach to a financial entity rather than merely to an institution.
 - Ambiguous identity must remain unresolved instead of being guessed.
 
@@ -855,7 +855,7 @@ Accepted
 
 ---
 
-## Intended Implementation
+## Implemented In
 
 Sprint 31 — Developer Diagnostics & Logging
 
@@ -1019,9 +1019,9 @@ Those capabilities require future ADRs.
 
 ---
 
-## Acceptance
+## Acceptance Evidence
 
-Change the status from **Proposed** to **Accepted** only after:
+ADR-026 was accepted after:
 
 - Sprint 31 implementation is complete
 - automated validation passes
@@ -1035,6 +1035,12 @@ Change the status from **Proposed** to **Accepted** only after:
 ## Status
 
 Accepted
+
+---
+
+## Implemented In
+
+Sprint 33 FinancialDocument identifier handoff; Sprint 35 approved Axis identifier extraction; Sprint 36 resolver integration
 
 ---
 

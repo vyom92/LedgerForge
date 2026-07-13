@@ -34,7 +34,7 @@ Items already promoted into the ACTIVE sprint must not remain in this backlog.
 
 - [ ] Cross-repository atomic persistence for workspace, account, identifier, import-session and transaction writes
 - [ ] Recovery and cleanup for partial or interrupted imports
-- [ ] Safe non-destructive repository update semantics that preserve related identifiers, sessions and transactions
+- [ ] Targeted repository metadata mutations for fields other than display name, preserving identifiers, sessions and transactions
 - [ ] Concurrent-import guarantees and deterministic serialization of identity resolution and identifier attachment
 - [ ] Import failure recovery that reconciles repository state and runtime state
 - [ ] Durable import audit trail with validation issues, failure outcomes and source-provenance inspection
@@ -100,7 +100,6 @@ Items already promoted into the ACTIVE sprint must not remain in this backlog.
 
 #### Import Workflow
 
-- [ ] Complete multi-step Import Wizard
 - [ ] Batch import
 - [ ] Multi-file drag-and-drop import center
 - [ ] Editable import preview
@@ -258,7 +257,7 @@ Ideas in this section may become future architecture work but are not approved i
 
 - This document is the permanent repository backlog.
 - Items here are approved ideas or recorded maintenance needs, but are **not** scheduled work.
-- Desktop ChatGPT decides when an item becomes an ACTIVE sprint.
+- Chat decides when an item becomes an ACTIVE sprint.
 - When an item becomes part of `Implementation.md`, remove it from this document.
 - Completed work belongs in `PROJECT_STATE.md`.
 - Architecture decisions belong in `ADR.md`.

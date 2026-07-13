@@ -24,17 +24,19 @@ Project Baseline:
 |-----------|--------------|
 | Product Vision | Current and authoritative |
 | Architecture | Frozen v1.0 baseline active |
-| ADRs | Current through ADR-026 |
+| ADRs | Current through accepted ADR-028 |
 | Database | Production-ready foundation |
 | Repository Layer | Stable with contract tests |
 | Persistence | SQLite repository layer active |
-| Import Framework | Operational; CSV and PDF reader foundation active |
-| Readers | CSV and PDF readers integrated into Unified Import Framework |
+| Import Framework | Operational for the approved Axis Bank NRE CSV path; PDF reader infrastructure is foundation-only |
+| Readers | CSV production reader and text-extracting PDF reader foundation integrated; no production XLS, XLSX, TXT or OCR reader |
 | Institution Detection | Framework implemented; legacy behaviour preserved |
 | Statement Classification | Framework implemented; deterministic classification active |
 | Parser Selection | Framework implemented; deterministic selector active |
 | FinancialDocument | Immutable handoff model integrated after Statement Parser and before Validation |
-| Password Management | Operational; DefaultPasswordProvider integrated |
+| Parser Coverage | Production-verified for the approved Axis Bank NRE CSV layout only; broader Axis, HDFC and CBQ families remain planned |
+| Financial Identity | Parser-owned verified Axis identifier extraction and deterministic confirmed-import account resolution are production-integrated |
+| Password Management | Password-provider protocol and locked-PDF reader interface implemented; the default provider supplies no credential and no production password-entry or Keychain workflow exists |
 | Workflow | Workflow v2.1 active. Project documents/Implementation.md is the current ACTIVE sprint implementation contract. |
 | Dashboard | Deep Indigo UI foundation implemented. Repository-backed dashboard active. Continued refinement under M7. |
 | Validation | Latest verified build and validation state is recorded in Project documents/PROJECT_STATE.md. |
@@ -51,7 +53,7 @@ PasswordProvider
 ↓
 ReaderRegistry
 ↓
-Reader (CSV/PDF)
+Reader (production CSV; PDF extraction foundation; future formats planned)
 ↓
 RawDocument
 ↓
@@ -88,17 +90,20 @@ Views
 | Document | Purpose | Read When | Priority |
 |----------|---------|-----------|----------|
 | Project documents/.github/Context_Manifest.yaml | Machine-readable bootstrap manifest defining document precedence, assistant responsibilities and workflow entrypoint | Every AI session | Highest |
+| AGENTS.md | Repository-root bootstrap and non-negotiable execution boundaries | Every AI session | Highest |
 | Project documents/Project_Guide.md | Repository navigation guide and task routing | Every AI session | Highest |
 | Project documents/PROJECT_STATE.md | Verified repository state and completed sprint history | Every implementation session | Highest |
 | Project documents/Implementation.md | Current ACTIVE sprint implementation contract | Every planning and implementation session | Highest |
+| Project documents/FUTURE_WORK.MD | Unscheduled backlog and research items | Sprint planning, backlog review and reprioritisation | High |
 | Architecture_v1.0_Frozen.md | Definitive system architecture and constraints | Architecture work | High |
 | ADR.md | Architecture Decision Records | Architecture work | High |
 | Database_v1_Architecture.md | Database architecture and schema | Database work | High |
 | Product Vision.md | Product direction and long-term goals | Feature planning | High |
+| UI_UX_v1.0_Frozen.md | Frozen visual architecture and approved UI baseline | UI work | High |
 | Engineering Standards.md | Coding standards and engineering policy | Engineering tasks | Medium |
+| BUILD_AND_PROJECT_CONVENTIONS.md | Xcode, build, validation and repository mechanics | Build or project-structure work | Medium |
 | AI_WORKFLOW.md | Operational workflow for AI assistants | AI-assisted work | Medium |
 | Project documents/.github/Project_Context.md | Bootstrap summary and project snapshot | AI onboarding | Medium |
-| Project documents/.github/ai-instructions.md | AI interaction rules | AI onboarding | Medium |
 | Project documents/.github/prompts.md | Reusable planning and implementation prompts | AI onboarding | Medium |
 | Project documents/Codex response.md | Current planning and implementation execution log | Planning and implementation review | Medium |
 
@@ -122,6 +127,8 @@ The precedence for documentation is as follows:
 12. Project documents/Codex response.md
 
 Approved documentation always overrides any implicit or assumed implementation details.
+
+`Project documents/FUTURE_WORK.MD` is not an implementation contract and never overrides the ACTIVE sprint. It is consulted only when selecting, recording or reprioritising unscheduled work.
 
 `Project documents/Project_Guide.md` is the navigation document. It routes readers to the authoritative source rather than duplicating detailed guidance.
 
@@ -158,6 +165,8 @@ Approved documentation always overrides any implicit or assumed implementation d
 
 | Task | Documents to Consult |
 |------|----------------------|
+| Sprint Planning | Project documents/PROJECT_STATE.md, Project documents/FUTURE_WORK.MD, then task-relevant Product Vision, Architecture, ADRs, standards and fixtures |
+| Backlog Review | Project documents/PROJECT_STATE.md, Project documents/Implementation.md (ACTIVE only), Project documents/FUTURE_WORK.MD |
 | New Feature | Product Vision.md, Architecture_v1.0_Frozen.md, ADR.md |
 | Architecture Review | Architecture_v1.0_Frozen.md, ADR.md |
 | Database Work | Database_v1_Architecture.md, ADR.md, Engineering Standards.md |
@@ -172,7 +181,7 @@ Approved documentation always overrides any implicit or assumed implementation d
 | UI Work | UI_UX_v1.0_Frozen.md, Architecture_v1.0_Frozen.md, Engineering Standards.md |
 | Testing | Project documents/PROJECT_STATE.md, Project documents/Codex response.md, Engineering Standards.md |
 | Bug Fixes | Project documents/PROJECT_STATE.md, Project documents/Codex response.md, Engineering Standards.md |
-| Documentation Updates | Project documents/Project_Guide.md, AI_WORKFLOW.md, Engineering Standards.md |
+| Documentation Updates | Project documents/Project_Guide.md, AI_WORKFLOW.md, Engineering Standards.md, plus every document explicitly included by the approved change package |
 | Reference Fixtures | Project documents/PROJECT_STATE.md, Project documents/Codex response.md |
 
 
@@ -216,7 +225,7 @@ Do NOT:
 - Introduce optional future work.
 - Modify unrelated documentation.
 
-Record discovered future work in Project documents/Codex response.md and stop. Desktop ChatGPT decides whether and when to define it as a future ACTIVE sprint.
+Record implementation-time discoveries in `Project documents/Codex response.md` and stop. Chat decides whether the item belongs in `Project documents/FUTURE_WORK.MD` or a future ACTIVE sprint; Codex must not schedule it.
 
 Additionally:
 
@@ -228,6 +237,15 @@ Additionally:
   Repository Persistence → RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
 - If an architectural conflict is discovered, stop implementation and document it in Project documents/Codex response.md.
 
+## Assistant Role Boundaries
+
+- **Chat:** plans sprints, reviews repository reports, approves documentation outcomes and owns `Project documents/Implementation.md`.
+- **Work:** performs repository-wide investigation and executes explicitly approved documentation changes, including documentation-only commits and pushes when authorised.
+- **Codex:** performs approved Swift implementation, builds, tests and implementation Git operations, then updates the implementation handoff documents with verified facts.
+- **ChatGPT in Xcode:** may apply exact Chat-approved wording for a narrowly scoped documentation task; it does not plan sprints or architecture.
+
+All assistants must distinguish verified repository evidence from inference and stop rather than publish speculative repository claims.
+
 ## Standard AI Workflow
 
 ### Phase 1 — Planning
@@ -237,16 +255,16 @@ Additionally:
 - Then read `Project documents/Project_Guide.md`.
 - Use the Task Routing Guide.
 - Review `Project documents/PROJECT_STATE.md`.
-- Read only the ACTIVE sprint in `Project documents/Implementation.md`.
-- Execute the Planning Prompt.
-- Output findings only to `Project documents/Codex response.md`.
+- When defining the next sprint, review `Project documents/FUTURE_WORK.MD`, then the relevant architecture, ADRs, product vision, standards and fixtures.
+- Read only the ACTIVE sprint in `Project documents/Implementation.md` when one is defined.
+- Work executes approved repository discovery and records evidence in `Project documents/Codex response.md`; Chat owns the resulting sprint definition.
 - Do not modify source code.
 
-### Phase 2 — Review
+### Phase 2 — Chat Review
 
-- ChatGPT reviews `Codex response.md`.
-- ChatGPT updates the ACTIVE sprint in `Implementation.md`.
-- Replace the Planning Prompt with the approved Implementation Prompt.
+- Chat reviews `Codex response.md` and the relevant backlog evidence.
+- Chat updates the ACTIVE sprint in `Implementation.md`.
+- Chat replaces repository-discovery wording with the approved Implementation Prompt.
 
 ### Phase 3 — Implementation
 
@@ -268,6 +286,13 @@ Additionally:
 - Update `Project documents/Codex response.md` with verified implementation facts.
 - Update `Project documents/PROJECT_STATE.md` only after successful validation, verified push and required manual runtime verification.
 
+### Documentation Synchronization
+
+- Chat approves the documentation outcome and scope.
+- Work investigates the repository, edits only approved documentation and validates the complete documentation diff.
+- Work may commit and push documentation-only changes only when explicitly authorised.
+- Documentation synchronization never modifies `Project documents/Implementation.md`, and any additional exclusions in the approved task remain absolute.
+
 ### Phase 4 — Completion
 
 Completion is permitted only after all required validation has succeeded.
@@ -287,8 +312,8 @@ Required completion sequence:
 11. Update `Project documents/Codex response.md` with verified implementation, validation, commit, push and remote verification facts.
 12. Update `Project documents/PROJECT_STATE.md` with verified repository state only.
 13. Create and push a documentation handoff commit when required.
-14. Desktop ChatGPT reviews and approves the completed sprint.
-15. Desktop ChatGPT defines the next ACTIVE sprint in Project documents/Implementation.md.
+14. Chat reviews and approves the completed sprint.
+15. Chat consults `Project documents/FUTURE_WORK.MD` and task-relevant evidence before defining the next ACTIVE sprint in `Project documents/Implementation.md`.
 
 Never claim a sprint is complete until both automated validation and required manual runtime verification have been successfully performed.
 
@@ -300,9 +325,9 @@ Rules:
 
 - Only one ACTIVE sprint exists at any time.
 - Codex reads only the ACTIVE sprint.
-- Desktop ChatGPT owns sprint planning.
-- Desktop ChatGPT owns sprint approval.
-- Desktop ChatGPT prepares the next ACTIVE sprint only after the current sprint has been successfully completed and approved.
+- Chat owns sprint planning and approval.
+- Chat prepares the next ACTIVE sprint only after the current sprint has been successfully completed and approved.
+- Sprint planning consults verified repository state, `Project documents/FUTURE_WORK.MD` and task-relevant architecture evidence in that order.
 
 Completed sprint history is maintained in:
 
@@ -314,9 +339,10 @@ Future sprint planning begins only after the current sprint has completed.
 
 ## Product Milestones
 
-### M1 – Robust Statement Import ✅
-- CSV/PDF readers
-- Password handling
+### M1 – Statement Import Foundation ✅
+- Production Axis Bank NRE CSV import
+- CSV reader plus PDF text-extraction foundation
+- Password-provider interface; production credential and password-entry workflows remain planned
 - Raw document extraction
 - Unified import framework
 
@@ -324,6 +350,7 @@ Future sprint planning begins only after the current sprint has completed.
 - Institution Detection
 - Statement Classification
 - Parser Selection
+- Production parser coverage remains limited to the approved Axis Bank NRE CSV layout
 
 ### M3 – Canonical Financial Handoff ✅
 - FinancialDocument
@@ -353,7 +380,7 @@ Future sprint planning begins only after the current sprint has completed.
 - Sidebar navigation ✅
 - Approved UI asset freeze ✅
 - Dashboard implementation from frozen UI ✅
-- Import workflow integration ⏳
+- Confirmation-gated import workflow integration ✅
 
 ### M8 – Insights & Analytics
 - Spending analytics
@@ -366,17 +393,9 @@ Future sprint planning begins only after the current sprint has completed.
 - Public API
 - Plugin architecture
 
-## Known Technical Debt
+## Known Technical Debt and Unscheduled Work
 
-Maintain a concise list of active architectural and implementation debt.
-
-Current items:
-
-- ImportEngine still owns orchestration responsibilities that will gradually move into dedicated pipeline components as later milestones are completed.
-- Additional approved regression fixtures should be added for future institutions (CBQ, HDFC, SBI, etc.).
-- Additional import fixtures should compare equivalent financial truth across CSV and PDF where available.
-
-Remove items as they are completed.
+`Project documents/FUTURE_WORK.MD` is the canonical backlog for active technical debt, unscheduled enhancements and research. This guide intentionally does not duplicate that volatile list.
 
 ## Reference Fixtures
 
@@ -387,7 +406,7 @@ The following fixtures define the approved financial baseline used throughout Le
 - Axis Bank NRE CSV
 - Axis Bank NRE PDF (same statement period)
 
-Both fixtures represent identical financial truth.
+Both fixtures represent the same expected financial truth. The CSV fixture verifies the current production import path. The PDF fixture verifies reader, detection, classification and parser-selection foundations and is a future cross-format equivalence checkpoint; it does not establish production PDF statement support.
 
 Future readers, parsers and import pipelines must produce equivalent observable financial results unless an intentional behavioural change is explicitly approved.
 
@@ -404,33 +423,7 @@ Every supported import format should be validated against an approved baseline f
 
 ## Future Modules
 
-### Import
-- XLS/XLSX Reader
-- OCR
-
-### Intelligence
-- Rules Engine
-
-### Dashboard
-- Insights
-- Charts & Analytics
-- Budgets
-- Advanced Transaction Browsing
-- Multi-Currency Dashboard
-- Net Worth
-- Cash Flow
-
-### Wealth
-- Investments
-- Insurance
-- Salary Reconciliation
-
-### Ecosystem
-- Public API
-- Backup & Restore
-- Plugin Architecture
-
-Mark completed items as appropriate over time.
+Product direction belongs in `Project documents/Product Vision.md`; unscheduled module and format work belongs in `Project documents/FUTURE_WORK.MD`. Neither source is production-support evidence.
 
 ### Context Optimisation
 
@@ -441,6 +434,7 @@ To minimise token consumption:
 - Then read `Project documents/Project_Guide.md`.
 - Use the Task Routing Guide.
 - Open only the documentation required for the requested task.
+- For sprint planning or backlog work, read `Project documents/FUTURE_WORK.MD` after verified repository state.
 - Do not reread unchanged reference documents.
 - Read only the ACTIVE sprint in `Project documents/Implementation.md`.
 - Use `Project documents/PROJECT_STATE.md` for completed sprint history.
@@ -456,10 +450,10 @@ This layered bootstrap minimizes context loading while preserving deterministic 
 - Load only the documentation required by the Task Routing Guide.
 - Read only the ACTIVE sprint in `Project documents/Implementation.md`.
 - Treat `Project documents/PROJECT_STATE.md` as the authoritative completed sprint history.
-- Never modify `Project documents/Implementation.md` unless acting under the Desktop ChatGPT planning workflow.
+- Never modify `Project documents/Implementation.md` unless acting as Chat within the approved sprint-planning workflow.
 - Never make changes outside the approved ACTIVE sprint.
 - Never redesign approved architecture without an approved ADR.
-- Maintain `Project documents/Codex response.md` during planning and implementation.
+- Work maintains `Project documents/Codex response.md` during approved repository discovery; Codex maintains it during implementation.
 - Update `Project documents/PROJECT_STATE.md` only after successful validation, required manual runtime verification, verified implementation commit and verified push.
 - Leave the repository in a buildable state.
 - Never bypass repository abstractions.

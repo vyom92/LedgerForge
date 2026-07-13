@@ -5,7 +5,7 @@
 LedgerForge is an offline-first personal financial operating system that consolidates every aspect of a user's financial life into a single trustworthy workspace.
 
 
-The primary product is the financial dashboard. Document import, OCR, profile learning and automation exist only to keep that dashboard accurate with minimal manual effort.
+The primary product is the financial dashboard. Document import and future OCR, profile learning and automation exist only to keep that dashboard accurate with minimal manual effort.
 
 LedgerForge is designed from the outset as a multi-currency financial operating system. Every monetary value retains its native currency, while dashboards and reports present configurable base and secondary currency views using transparent, auditable exchange rates.
 
@@ -186,18 +186,20 @@ The user should primarily experience trustworthy financial insight rather than t
 
 LedgerForge treats every imported document as structured financial evidence rather than as a file.
 
-Supported sources include:
+Target source formats include:
 
 - PDF statements
 - CSV exports
 - XLS/XLSX exports
 - TXT exports (where provided by institutions)
 
+This list expresses product direction, not current production support. Verified production import is currently limited to the approved Axis Bank NRE CSV layout. PDF text extraction and statement-understanding foundations exist, while production PDF parsing, password workflows, XLS, XLSX, TXT and OCR remain planned. Broader Axis layouts and account types, HDFC and CBQ parser families also remain planned.
+
 Every import follows the same deterministic pipeline:
 Every stage preserves explainability and traceability so identical financial evidence always produces identical financial results.
 
 1. Coordinate the import through ImportCoordinator.
-2. Resolve an optional password through PasswordProvider.
+2. Resolve an optional password through PasswordProvider when a production credential workflow exists.
 3. Select the appropriate Reader using ReaderRegistry.
 4. Extract the file into RawDocument.
 5. Perform Institution Detection.
@@ -215,7 +217,7 @@ Statement layouts and institution formats may evolve over time. LedgerForge shou
 
 The import pipeline should be format-independent. Whether data originates from PDF, CSV, XLS/XLSX or TXT, downstream processing should produce identical financial truth after reader-specific extraction and deterministic parser execution.
 
-Reader-specific adapters (CSV, PDF, XLS/XLSX and future formats) are responsible only for producing equivalent financial evidence. Once a FinancialDocument has been produced, downstream validation, persistence and presentation must remain independent of the original file format.
+Reader-specific adapters (production CSV, PDF foundation, and future XLS/XLSX or other formats) are responsible only for producing equivalent financial evidence. Once a FinancialDocument has been produced, downstream validation, persistence and presentation must remain independent of the original file format.
 
 Repository persistence must never bypass validation. Dashboards, accounts and future analytics consume repository-backed runtime state rather than parser output directly.
 

@@ -15,8 +15,9 @@ Before performing any planning, review, implementation, documentation synchroniz
 3. Read `Project documents/Project_Guide.md`.
 4. Read `Project documents/PROJECT_STATE.md` to establish verified repository state.
 5. Read only the ACTIVE sprint in `Project documents/Implementation.md`.
-6. Use the manifest and Project Guide to determine any additional documentation and source files required for the approved task.
-7. Execute only the approved Planning Prompt, Implementation Prompt or Documentation Change Package.
+6. For sprint planning or backlog work, read `Project documents/FUTURE_WORK.MD` after verified repository state; do not load it for routine implementation when the ACTIVE sprint is already defined.
+7. Use the manifest and Project Guide to determine any additional documentation and source files required for the approved task.
+8. Execute only the approved Planning Prompt, Implementation Prompt or Documentation Change Package.
 
 ---
 
@@ -33,8 +34,11 @@ Before performing any planning, review, implementation, documentation synchroniz
 
 #### Planning and Documentation
 
-- Desktop ChatGPT owns the content and approval of `Project documents/Implementation.md`.
-- ChatGPT in Xcode may apply exact Desktop ChatGPT approved wording during approved planning or documentation tasks.
+- Chat owns the content and approval of `Project documents/Implementation.md`.
+- Chat plans sprints, reviews reports and approves documentation outcomes.
+- Work performs repository-wide investigation and approved documentation synchronization.
+- ChatGPT in Xcode may apply exact Chat-approved wording during a narrowly approved documentation task.
+- Codex performs Swift implementation, builds, tests and implementation Git operations.
 - Codex must never modify `Project documents/Implementation.md`.
 - Documentation executors must apply approved wording faithfully and must not expand scope.
 - `Project documents/Codex response.md` is the authoritative planning and implementation execution log maintained by the executing assistant.

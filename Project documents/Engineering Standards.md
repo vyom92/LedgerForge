@@ -66,13 +66,9 @@ Detectors/
 - Classify document types.
 - Identify parser candidates.
 
-Builders/
-- Construct immutable FinancialDocument objects.
-- Preserve deterministic financial truth.
-- Never perform validation.
-
 Parsers/
 - Produce FinancialDocument.
+- Own institution- and layout-specific financial interpretation, including verification of parser-supported financial identifiers.
 - Never perform validation.
 - Never persist data.
 
@@ -125,9 +121,10 @@ Before implementation:
    - `Project documents/PROJECT_STATE.md`
    - `Project documents/Implementation.md` (ACTIVE sprint only)
 2. Use the Task Routing Guide to identify any additional documentation required.
-3. Produce a planning report in `Project documents/Codex response.md`.
-4. Wait for Desktop ChatGPT approval before implementation.
-5. Do not modify source code during the planning phase.
+3. When selecting the next sprint, review `Project documents/FUTURE_WORK.MD` after verified repository state.
+4. Work produces an evidence-backed repository-discovery report in `Project documents/Codex response.md`.
+5. Wait for Chat approval and an approved ACTIVE sprint before implementation.
+6. Do not modify source code during the planning phase.
 
 ## Implementation
 
@@ -221,6 +218,7 @@ The code should make adding the next financial institution easier than adding th
 
 - Never assume statement layouts.
 - Always request reference documents when required.
+- Chat owns sprint planning and approval; Work owns explicitly approved repository-wide documentation synchronization; Codex owns approved Swift implementation and implementation Git operations.
 - Read only the ACTIVE sprint in `Project documents/Implementation.md`.
 - Never modify `Project documents/Implementation.md`.
 - Archived sprint sections are historical reference only.
@@ -233,7 +231,7 @@ The code should make adding the next financial institution easier than adding th
 - Report the commit hash, tag (if created) and push result after every successful automated commit.
 - Resolve compile errors before continuing.
 - Run regression tests whenever parser or import code changes.
-- Verify approved CSV/PDF reference fixtures before merging reader or parser changes.
+- Verify production-supported fixtures for production claims. Foundation-only fixtures, including the current Axis PDF fixture, validate only the layers explicitly covered by their tests and do not establish end-to-end format support.
 - Summarize architectural decisions after every sprint.
 
 ---

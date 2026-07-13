@@ -4,6 +4,8 @@ Version: 1.0
 
 Status: FROZEN
 
+Status alignment: the frozen visual baseline remains active. Approved implementation through Sprint 37 adds repository-ID account selection, inline display-name editing and trusted account import provenance within the existing Accounts list-plus-inspector layout. Until repository-backed lifecycle semantics exist, the Accounts inspector omits the former hardcoded Status row. These are verified status clarifications, not a redesign of the baseline.
+
 Purpose:
 This document defines the visual architecture, interaction model and design language of LedgerForge.
 
@@ -245,7 +247,9 @@ Account Type
 
 Balance
 
-Status
+Selected-account detail and activity
+
+The implementation must not present a lifecycle Status value unless it is backed by verified repository semantics.
 
 Supports future grouping.
 

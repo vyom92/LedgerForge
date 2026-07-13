@@ -1,4 +1,4 @@
-<!-- Project documents/Implementation Reports/Sprint10_Phase2C_Report.md -->
+<!-- Project documents/Archive/Implementation Reports/Sprint10_Phase2C_Report.md -->
 
 # Sprint 10 Phase 2C — SQLite Repository Persistence Implementation Report
 
@@ -20,7 +20,7 @@ Date: 2026-07-06
 
 - `Database/DTOs.swift` — strongly typed DTOs: `TransactionDTO`, `TransactionRawRowDTO`, `AccountDTO`, `ImportSessionDTO`.
 - `LedgerForgeTests/RepositoryContractTests.swift` — repository contract tests (in-memory SQLite smoke test).
-- `Project documents/Implementation Reports/Sprint10_Phase2C_Report.md` (this file).
+- `Project documents/Archive/Implementation Reports/Sprint10_Phase2C_Report.md` (this file, subsequently archived).
 
 # Files Modified
 

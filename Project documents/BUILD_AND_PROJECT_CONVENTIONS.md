@@ -138,9 +138,10 @@ Authoritative workflow documents:
 
 Workflow responsibilities:
 
-- Desktop ChatGPT owns the content and approval of `Project documents/Implementation.md`.
-- ChatGPT in Xcode may apply Desktop ChatGPT approved documentation wording during approved planning and documentation tasks.
-- Codex executes only the approved ACTIVE sprint.
+- Chat owns sprint planning, report review, documentation outcome approval and `Project documents/Implementation.md`.
+- Work performs repository-wide investigation and explicitly approved documentation synchronization.
+- ChatGPT in Xcode may apply exact Chat-approved documentation wording during a narrowly scoped documentation task.
+- Codex executes only the approved ACTIVE sprint and owns Swift implementation validation and implementation Git operations.
 - Codex never edits `Project documents/Implementation.md`.
 - Codex maintains `Project documents/Codex response.md` as the execution log.
 - `Project documents/PROJECT_STATE.md` remains the authoritative record of verified repository state and is updated only after successful validation or an approved documentation-only factual correction.
@@ -274,6 +275,8 @@ If architecture changed, also review:
 - Project documents/ADR.md
 - Project documents/Architecture_v1.0_Frozen.md
 - Project documents/Engineering Standards.md
+
+When selecting or reprioritising future work, also review `Project documents/FUTURE_WORK.MD`. Do not load or update the backlog during routine implementation of an already-defined ACTIVE sprint unless the approved task explicitly requires it.
 
 ---
 

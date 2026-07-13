@@ -6,30 +6,14 @@
 
 ---
 
-# Current Phase
+# Current State Routing
 
-**Current Milestone**
+This document does not duplicate sprint numbers, priorities, build results or completed-work history.
 
-Milestone M7 — Dashboard Experience
-
-**Current Sprint**
-
-Sprint 26 — Documentation Alignment & Bootstrap Manifest Adoption
-
-**Current Focus**
-
-- Documentation baseline freeze
-- Bootstrap alignment
-- Workflow v2.1 consolidation
-- Repository documentation consistency
-
-For verified implementation status, always refer to:
-
-- `Project documents/PROJECT_STATE.md`
-
-For the ACTIVE sprint plan, always refer to:
-
-- `Project documents/Implementation.md`
+- Verified implementation state and completed sprint history: `Project documents/PROJECT_STATE.md`
+- ACTIVE sprint contract: `Project documents/Implementation.md` (ACTIVE section only)
+- Unscheduled backlog and research: `Project documents/FUTURE_WORK.MD`
+- Latest planning or implementation execution report: `Project documents/Codex response.md`
 
 ---
 
@@ -37,7 +21,7 @@ For the ACTIVE sprint plan, always refer to:
 
 LedgerForge is an offline-first macOS personal financial operating system.
 
-It imports financial documents from multiple institutions, extracts validated financial data through a deterministic import pipeline, stores trusted financial truth in a repository-backed database, and presents that information through a modern SwiftUI interface.
+It is designed to import financial documents from multiple institutions, extract validated financial data through a deterministic import pipeline, store trusted financial truth in a repository-backed database, and present that information through a modern SwiftUI interface. Current production import remains limited to the verified capability boundary below.
 
 Artificial intelligence assists the user but never replaces deterministic financial truth.
 
@@ -46,6 +30,18 @@ Artificial intelligence assists the user but never replaces deterministic financ
 # Current Architecture (Summary)
 
 Approved production pipeline:
+
+ImportCoordinator
+
+↓
+
+PasswordProvider
+
+↓
+
+ReaderRegistry
+
+↓
 
 Reader
 
@@ -83,6 +79,14 @@ Repository Persistence
 
 ↓
 
+Repositories
+
+↓
+
+SQLite
+
+↓
+
 RepositoryStoreHydrator
 
 ↓
@@ -101,36 +105,16 @@ RepositoryStoreHydrator is the only approved persistence-to-runtime boundary.
 
 ---
 
-# Completed Milestones
+# Capability Boundary
 
-- Multi-format import foundation
-- RawDocument pipeline
-- Institution Detection
-- Statement Classification
-- Parser Selection
-- FinancialDocument model
-- Validation framework
-- Repository architecture
-- SQLite persistence
-- RepositoryStoreHydrator
-- Runtime Stores
-- Dashboard foundation
-- Application shell
-- SwiftUI UI foundation
-- Approved UI/UX baseline
-- Workflow v2.1
-- Sprint 25 repository identity and import foundation
+- Production import support is verified only for the approved Axis Bank NRE CSV layout.
+- CSV is the production reader path. PDF text extraction, institution detection, statement classification and parser selection are implemented foundations, not production PDF statement support.
+- The password-provider interface and locked-PDF reader contract exist, but the default provider supplies no credential and there is no production password-entry or Keychain workflow.
+- XLS, XLSX, TXT and OCR remain planned.
+- The parser registry contains the verified Axis bank-account parser used by the approved CSV fixture. Broader Axis layouts and account types, HDFC and CBQ remain planned.
+- Parser-owned verified identifier extraction and deterministic confirmed-import account resolution are implemented for the approved Axis path. This does not establish complete arbitrary multi-account, multi-format or multi-institution support.
 
----
-
-# Current Priorities
-
-1. Complete Sprint 26 documentation alignment.
-2. Freeze bootstrap documentation.
-3. Prepare Sprint 27.
-4. Password-protected document support.
-5. PDF import.
-6. Statement Intelligence foundation.
+Consult `Project documents/PROJECT_STATE.md` for the complete verified implementation record and `Project documents/FUTURE_WORK.MD` for unscheduled work.
 
 ---
 
@@ -161,6 +145,8 @@ Bootstrap every session using:
 5. `Project documents/Implementation.md` (ACTIVE sprint only)
 
 Then use the Task Routing Guide in `Project documents/Project_Guide.md` to determine any additional documentation required.
+
+For sprint planning, consult `Project documents/FUTURE_WORK.MD` after verified repository state and before task-relevant architecture, ADRs, product vision, standards and fixtures. Do not load the backlog for routine implementation when the ACTIVE sprint is already defined.
 
 ---
 

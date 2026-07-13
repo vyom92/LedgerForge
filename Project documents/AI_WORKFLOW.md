@@ -20,9 +20,10 @@ Rules:
 
 - Read only the ACTIVE sprint.
 - Archived sprints are historical reference only.
-- Desktop ChatGPT owns the content and approval of `Project documents/Implementation.md`.
-- ChatGPT in Xcode may apply exact Desktop ChatGPT approved wording.
-- During implementation, Codex may modify only files required by the approved ACTIVE sprint.
+- Chat owns sprint planning, report review, documentation outcome approval and the content of `Project documents/Implementation.md`.
+- Work performs repository-wide investigation and explicitly approved documentation synchronization.
+- ChatGPT in Xcode may apply exact Chat-approved wording for a narrowly scoped documentation task.
+- Codex performs Swift implementation, builds, tests and implementation Git operations for the approved ACTIVE sprint.
 - Codex may update:
   - `Project documents/Codex response.md` as the implementation execution report.
   - `Project documents/PROJECT_STATE.md` only after successful validation.
@@ -44,9 +45,11 @@ Rules:
 
 3. Read only the ACTIVE sprint.
 
-4. Use the Task Routing Guide in `Project documents/Project_Guide.md` to determine which additional documentation is required for the approved sprint.
+4. When selecting the next sprint, read `Project documents/FUTURE_WORK.MD` after verified repository state. Check that completed or promoted work is not duplicated there.
 
-5. Read only the documents required for that sprint. These may include:
+5. Use the Task Routing Guide in `Project documents/Project_Guide.md` to determine which additional documentation is required for the approved sprint.
+
+6. Read only the documents required for that sprint. These may include:
 
    - `Project documents/.github/Project_Context.md`
    - `Project documents/.github/prompts.md`
@@ -58,23 +61,23 @@ Rules:
    - `Project documents/UI_UX_v1.0_Frozen.md`
    - `Project documents/BUILD_AND_PROJECT_CONVENTIONS.md`
 
-6. Execute only the Planning Prompt contained in the ACTIVE sprint.
+7. Work executes approved repository discovery and reports verified evidence. Chat defines or revises the ACTIVE sprint.
 
-7. Output planning findings only to:
+8. Output repository-discovery findings only to:
 
    `Project documents/Codex response.md`
 
-8. Do not modify source code.
+9. Do not modify source code.
 
-9. Do not modify `Project documents/Implementation.md`.
+10. Do not modify `Project documents/Implementation.md`.
 
-10. Do not commit or push.
+11. Do not commit or push unless the approved task is an explicitly authorised documentation synchronization.
 
 ---
 
 # Before Every Implementation
 
-Implementation begins only after Desktop ChatGPT has reviewed the planning output and replaced the Planning Prompt with the approved Implementation Prompt.
+Implementation begins only after Chat has reviewed the repository-discovery output and installed the approved Implementation Prompt.
 
 Read in this order:
 
@@ -163,6 +166,8 @@ Do not modify `Project documents/Implementation.md`.
 - `Project documents/.github/Context_Manifest.yaml` defines bootstrap order and document routing only. It must not duplicate verified repository state.
 - `Project documents/PROJECT_STATE.md` remains the single source of truth for verified repository status.
 - `Project documents/Implementation.md` remains the only ACTIVE sprint planning document.
+- `Project documents/FUTURE_WORK.MD` remains the single backlog for unscheduled work and research; it is not an implementation contract or progress log.
+- Repository-wide documentation synchronization is performed by Work only when explicitly approved.
 - If documentation precedence conflicts with the manifest, stop and report the conflict instead of guessing.
 - If documentation conflicts with implementation, stop and report the conflict.
 
@@ -171,7 +176,9 @@ Do not modify `Project documents/Implementation.md`.
 # Deferred Work Rules
 
 - Never leave TODOs undocumented.
-- Record all deferred work in `Project documents/Codex response.md`.
+- During implementation, record discovered deferred work in `Project documents/Codex response.md` and stop at the approved boundary.
+- Chat decides whether a discovered item should be added to or reprioritised in `Project documents/FUTURE_WORK.MD`.
+- Remove backlog items only when verified evidence confirms they entered the ACTIVE sprint or were completed.
 - Do not begin future sprint work.
 - Stop exactly at the approved sprint boundary.
 

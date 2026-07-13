@@ -1,4 +1,4 @@
-<!-- Project documents/Implementation Reports/Database_Architecture_Update_Report.md -->
+<!-- Project documents/Archive/Implementation Reports/Database_Architecture_Update_Report.md -->
 
 # Database Architecture v1.0 — Update Report
 
