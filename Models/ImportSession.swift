@@ -48,3 +48,15 @@ struct ImportSession: Identifiable {
         self.validation = validation
     }
 }
+
+/// Runtime-safe representation of an import session. It is populated only by
+/// RepositoryStoreHydrator and deliberately does not expose repository DTOs.
+struct RepositoryImportSession: Identifiable, Equatable {
+    let id: String
+    let workspaceId: String
+    let sourceDocumentName: String?
+    let startedAtISO: String
+    let completedAtISO: String?
+    let validationStatus: String
+    let parserVersion: String?
+}

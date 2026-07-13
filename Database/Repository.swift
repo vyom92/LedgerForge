@@ -39,6 +39,8 @@ public protocol TransactionRepository {
 
 public protocol AccountRepository {
     func upsertAccount(_ account: AccountDTO) throws -> String
+    @discardableResult
+    func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool
     func account(id: String) throws -> AccountDTO?
     func accounts(workspaceId: String) throws -> [AccountDTO]
     func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String
@@ -117,6 +119,10 @@ struct PlaceholderTransactionRepo: TransactionRepository {
 
 struct PlaceholderAccountRepo: AccountRepository {
     func upsertAccount(_ account: AccountDTO) throws -> String {
+        throw RepositoryError.providerNotConfigured("AccountRepository")
+    }
+
+    func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool {
         throw RepositoryError.providerNotConfigured("AccountRepository")
     }
 

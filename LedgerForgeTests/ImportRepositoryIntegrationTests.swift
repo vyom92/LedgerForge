@@ -291,6 +291,7 @@ struct ImportRepositoryIntegrationTests {
         let relaunchedProvider = try SQLiteRepositoryProvider(path: dbPath)
         let hydrator = RepositoryStoreHydrator(
             accountRepo: relaunchedProvider.accountRepo,
+            importSessionRepo: relaunchedProvider.importSessionRepo,
             transactionRepo: relaunchedProvider.transactionRepo,
             workspaceId: "workspace-import-integration"
         )
@@ -583,6 +584,14 @@ private final class ObservingAccountRepository: AccountRepository {
     func upsertAccount(_ account: AccountDTO) throws -> String {
         upsertCallCount += 1
         return try base.upsertAccount(account)
+    }
+
+    func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool {
+        try base.updateAccountDisplayName(
+            accountId: accountId,
+            workspaceId: workspaceId,
+            displayName: displayName
+        )
     }
 
     func account(id: String) throws -> AccountDTO? {

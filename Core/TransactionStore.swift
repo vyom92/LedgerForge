@@ -21,7 +21,7 @@ final class TransactionStore: ObservableObject {
     @Published private(set) var transactions: [Transaction] = []
     @Published private(set) var lastValidation: ImportValidationResult?
 
-    private init() {}
+    init() {}
 
     // Replace all transactions after a successful import and store validation result.
     func replaceTransactions(_ transactions: [Transaction], validation: ImportValidationResult? = nil) {
@@ -57,6 +57,11 @@ final class TransactionStore: ObservableObject {
     // Transactions for a specific account name
     func transactions(forAccount name: String) -> [Transaction] {
         transactions.filter { $0.account == name }
+    }
+
+    /// Repository-identity filtering used by account detail presentation.
+    func transactions(repositoryAccountId: String) -> [Transaction] {
+        transactions.filter { $0.repositoryAccountId == repositoryAccountId }
     }
 
     // Find a transaction by id

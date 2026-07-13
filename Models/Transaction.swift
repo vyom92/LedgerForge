@@ -30,4 +30,8 @@ struct Transaction: Identifiable {
     var sourceBank: String
 
     var sourceFile: String
+
+    /// Immutable persistence references retained exclusively through repository hydration.
+    var repositoryAccountId: String? = nil
+    var repositoryImportSessionId: String? = nil
 }

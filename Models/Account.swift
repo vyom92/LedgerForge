@@ -25,6 +25,10 @@ struct Account: Identifiable, Codable {
 
     let id: UUID
 
+    /// Immutable persistence references retained exclusively through repository hydration.
+    let repositoryAccountId: String?
+    let workspaceId: String?
+
     var institution: String
     var name: String
 
@@ -54,9 +58,12 @@ struct Account: Identifiable, Codable {
     var status: AccountStatus
 
     var lastImport: Date?
+    var identitySummaries: [AccountIdentitySummary]
 
     init(
         id: UUID = UUID(),
+        repositoryAccountId: String? = nil,
+        workspaceId: String? = nil,
         institution: String,
         name: String,
         nickname: String? = nil,
@@ -68,9 +75,12 @@ struct Account: Identifiable, Codable {
         baseCurrencyBalance: Decimal? = nil,
         exchangeRateToBaseCurrency: Decimal? = nil,
         status: AccountStatus = .active,
-        lastImport: Date? = nil
+        lastImport: Date? = nil,
+        identitySummaries: [AccountIdentitySummary] = []
     ) {
         self.id = id
+        self.repositoryAccountId = repositoryAccountId
+        self.workspaceId = workspaceId
         self.institution = institution
         self.name = name
         self.nickname = nickname
@@ -83,5 +93,17 @@ struct Account: Identifiable, Codable {
         self.exchangeRateToBaseCurrency = exchangeRateToBaseCurrency
         self.status = status
         self.lastImport = lastImport
+        self.identitySummaries = identitySummaries
     }
+}
+
+/// Presentation-safe financial identity derived during repository hydration.
+/// It intentionally contains no normalized identifier value.
+struct AccountIdentitySummary: Identifiable, Codable, Equatable {
+    let id: String
+    let kind: String
+    let redactedValue: String
+    let strength: String
+    let verificationState: String
+    let provenance: String
 }

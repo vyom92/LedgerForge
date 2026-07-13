@@ -8,55 +8,84 @@ import Testing
 struct RepositoryStoreHydratorTests {
 
     @Test func hydratorLoadsTrustedRepositoryDataIntoRuntimeStores() throws {
-        resetRuntimeStores()
         let provider = try seededProvider()
-        let hydrator = RepositoryStoreHydrator(
-            accountRepo: provider.accountRepo,
-            transactionRepo: provider.transactionRepo,
-            workspaceId: "workspace-dashboard"
-        )
+        let stores = RuntimeStores()
+        let hydrator = makeHydrator(provider: provider, stores: stores)
 
         let result = try hydrator.hydrateIfNeeded()
 
         #expect(result.didHydrate)
         #expect(result.accountCount == 1)
         #expect(result.transactionCount == 1)
-        #expect(AccountStore.shared.accounts.count == 1)
-        #expect(TransactionStore.shared.transactions.count == 1)
-        #expect(AccountStore.shared.accounts.first?.name == "Axis NRE")
-        #expect(AccountStore.shared.accounts.first?.currentBalance == Decimal(1_050))
-        #expect(TransactionStore.shared.transactions.first?.description == "Trusted credit")
-        #expect(TransactionStore.shared.transactions.first?.credit == Decimal(100))
-        #expect(TransactionStore.shared.transactions.first?.account == "Axis NRE")
-        #expect(TransactionStore.shared.transactions.first?.sourceBank == "Axis")
+        #expect(stores.accounts.accounts.count == 1)
+        #expect(stores.transactions.transactions.count == 1)
+        #expect(stores.accounts.accounts.first?.name == "Axis NRE")
+        #expect(stores.accounts.accounts.first?.currentBalance == Decimal(1_050))
+        #expect(stores.transactions.transactions.first?.description == "Trusted credit")
+        #expect(stores.transactions.transactions.first?.credit == Decimal(100))
+        #expect(stores.transactions.transactions.first?.account == "Axis NRE")
+        #expect(stores.transactions.transactions.first?.sourceBank == "Axis")
+        #expect(stores.accounts.accounts.first?.repositoryAccountId == "account-dashboard")
+        #expect(stores.accounts.accounts.first?.workspaceId == "workspace-dashboard")
+        #expect(stores.transactions.transactions.first?.repositoryAccountId == "account-dashboard")
+        #expect(stores.transactions.transactions.first?.repositoryImportSessionId == "import-dashboard")
+        #expect(stores.importSessions.importSessions.map(\.id) == ["import-dashboard"])
+    }
+
+    @Test func hydratorRedactsOnlyVerifiedStrongIdentifiersBeforeRuntimePresentation() throws {
+        let provider = try seededProvider()
+        let stores = RuntimeStores()
+        let verifiedIdentifier = "AXIS-ACCOUNT-12345678"
+        _ = try provider.accountRepo.attachIdentifier(AccountIdentifierDTO(
+            id: "identifier-verified",
+            accountId: "account-dashboard",
+            workspaceId: "workspace-dashboard",
+            scheme: FinancialIdentifierKind.institutionAccountId.rawValue,
+            identifier: verifiedIdentifier,
+            strength: FinancialIdentifierStrength.strong.rawValue,
+            verificationState: FinancialIdentifierVerificationState.verified.rawValue,
+            provenance: FinancialIdentifierProvenance.institutionStructuredField.rawValue,
+            createdAtISO: "2026-07-08T00:05:00Z"
+        ))
+        _ = try provider.accountRepo.attachIdentifier(AccountIdentifierDTO(
+            id: "identifier-weak",
+            accountId: "account-dashboard",
+            workspaceId: "workspace-dashboard",
+            scheme: FinancialIdentifierKind.accountSuffix.rawValue,
+            identifier: "5678",
+            strength: FinancialIdentifierStrength.weak.rawValue,
+            verificationState: FinancialIdentifierVerificationState.verified.rawValue,
+            provenance: FinancialIdentifierProvenance.parserDerivedText.rawValue,
+            createdAtISO: "2026-07-08T00:05:00Z"
+        ))
+        let hydrator = makeHydrator(provider: provider, stores: stores)
+
+        _ = try hydrator.hydrateIfNeeded()
+
+        let summaries = try #require(stores.accounts.accounts.first?.identitySummaries)
+        #expect(summaries.count == 1)
+        #expect(summaries.first?.redactedValue == FinancialIdentifier.redacted(verifiedIdentifier))
+        #expect(summaries.first?.redactedValue != verifiedIdentifier)
     }
 
     @Test func hydratorRunsOnlyOnceUnlessForced() throws {
-        resetRuntimeStores()
         let provider = try seededProvider()
-        let hydrator = RepositoryStoreHydrator(
-            accountRepo: provider.accountRepo,
-            transactionRepo: provider.transactionRepo,
-            workspaceId: "workspace-dashboard"
-        )
+        let stores = RuntimeStores()
+        let hydrator = makeHydrator(provider: provider, stores: stores)
 
         let firstResult = try hydrator.hydrateIfNeeded()
         let secondResult = try hydrator.hydrateIfNeeded()
 
         #expect(firstResult.didHydrate)
         #expect(!secondResult.didHydrate)
-        #expect(AccountStore.shared.accounts.count == 1)
-        #expect(TransactionStore.shared.transactions.count == 1)
+        #expect(stores.accounts.accounts.count == 1)
+        #expect(stores.transactions.transactions.count == 1)
     }
 
     @Test func forcedHydrationRefreshesRuntimeStoresWithoutDuplicatingState() throws {
-        resetRuntimeStores()
         let provider = try seededProvider()
-        let hydrator = RepositoryStoreHydrator(
-            accountRepo: provider.accountRepo,
-            transactionRepo: provider.transactionRepo,
-            workspaceId: "workspace-dashboard"
-        )
+        let stores = RuntimeStores()
+        let hydrator = makeHydrator(provider: provider, stores: stores)
 
         _ = try hydrator.hydrateIfNeeded()
         try provider.transactionRepo.replaceTransactions(
@@ -69,19 +98,15 @@ struct RepositoryStoreHydratorTests {
 
         #expect(refreshResult.didHydrate)
         #expect(refreshResult.transactionCount == 1)
-        #expect(TransactionStore.shared.transactions.count == 1)
-        #expect(TransactionStore.shared.transactions.first?.description == "Trusted credit")
-        #expect(TransactionStore.shared.transactions.first?.credit == Decimal(25))
-        #expect(TransactionStore.shared.transactions.first?.account == "Axis NRE")
+        #expect(stores.transactions.transactions.count == 1)
+        #expect(stores.transactions.transactions.first?.description == "Trusted credit")
+        #expect(stores.transactions.transactions.first?.credit == Decimal(25))
+        #expect(stores.transactions.transactions.first?.account == "Axis NRE")
     }
     @Test func hydratorUsesLatestDatedRunningBalanceForAccountBalance() throws {
-        resetRuntimeStores()
         let provider = try seededProvider()
-        let hydrator = RepositoryStoreHydrator(
-            accountRepo: provider.accountRepo,
-            transactionRepo: provider.transactionRepo,
-            workspaceId: "workspace-dashboard"
-        )
+        let stores = RuntimeStores()
+        let hydrator = makeHydrator(provider: provider, stores: stores)
 
         try provider.transactionRepo.replaceTransactions(
             workspaceId: "workspace-dashboard",
@@ -105,15 +130,28 @@ struct RepositoryStoreHydratorTests {
         let result = try hydrator.hydrateIfNeeded(forceRefresh: true)
 
         #expect(result.didHydrate)
-        #expect(AccountStore.shared.accounts.first?.currentBalance == Decimal(1_075))
-        #expect(TransactionStore.shared.transactions.first?.description == "Trusted credit")
-        #expect(TransactionStore.shared.transactions.last?.balance == Decimal(1_075))
+        #expect(stores.accounts.accounts.first?.currentBalance == Decimal(1_075))
+        #expect(stores.transactions.transactions.first?.description == "Trusted credit")
+        #expect(stores.transactions.transactions.last?.balance == Decimal(1_075))
     }
 }
 
-private func resetRuntimeStores() {
-    AccountStore.shared.replaceAccounts([])
-    TransactionStore.shared.replaceTransactions([])
+private struct RuntimeStores {
+    let accounts = AccountStore()
+    let transactions = TransactionStore()
+    let importSessions = ImportSessionStore()
+}
+
+private func makeHydrator(provider: InMemoryRepositoryProvider, stores: RuntimeStores) -> RepositoryStoreHydrator {
+    RepositoryStoreHydrator(
+        accountRepo: provider.accountRepo,
+        importSessionRepo: provider.importSessionRepo,
+        transactionRepo: provider.transactionRepo,
+        accountStore: stores.accounts,
+        transactionStore: stores.transactions,
+        importSessionStore: stores.importSessions,
+        workspaceId: "workspace-dashboard"
+    )
 }
 
 private func seededProvider() throws -> InMemoryRepositoryProvider {

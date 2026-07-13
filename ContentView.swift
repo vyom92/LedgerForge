@@ -157,6 +157,7 @@ struct ContentView: View {
     @State private var selectedFile = "No statement imported"
     @State private var importState: ImportPresentationState = .idle
     @StateObject private var dashboardViewModel = DashboardViewModel()
+    @StateObject private var accountsViewModel = AccountsViewModel()
     @State private var selectedSection: AppShellSection = .dashboard
     @State private var didStartRepositoryHydration = false
     @State private var developerModeEnabled = false
@@ -404,8 +405,8 @@ struct ContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 14) {
-                    accountMetric("Total Balance", value: formatCurrency(totalAccountBalance), detail: "Across \(dashboardViewModel.accounts.count) account(s)", icon: "wallet.pass")
-                    accountMetric("Cash & Bank", value: formatCurrency(totalAccountBalance), detail: "\(dashboardViewModel.accounts.count) linked account(s)", icon: "building.columns")
+                    accountMetric("Total Balance", value: formatCurrency(totalAccountBalance), detail: "Across \(accountsViewModel.accounts.count) account(s)", icon: "wallet.pass")
+                    accountMetric("Cash & Bank", value: formatCurrency(totalAccountBalance), detail: "\(accountsViewModel.accounts.count) linked account(s)", icon: "building.columns")
                     accountMetric("Credit Cards", value: formatCurrency(.zero), detail: "Planned module", icon: "creditcard", tint: LFTheme.danger)
                     accountMetric("Investments", value: "Future", detail: "Out of Sprint 22 scope", icon: "chart.bar.xaxis", tint: LFTheme.primaryHover)
                 }
@@ -422,7 +423,7 @@ struct ContentView: View {
 
                             accountTableHeader
 
-                            if dashboardViewModel.accountSummaries.isEmpty {
+                            if accountsViewModel.accounts.isEmpty {
                                 LFEmptyState(
                                     title: "No accounts found",
                                     message: "Trusted repository-backed accounts appear here after import.",
@@ -433,7 +434,7 @@ struct ContentView: View {
                                     selectedSection = .imports
                                 }
                             } else {
-                                ForEach(dashboardViewModel.accountSummaries) { account in
+                                ForEach(accountsViewModel.accounts) { account in
                                     accountRow(account)
                                 }
                             }
@@ -832,19 +833,48 @@ struct ContentView: View {
     private var accountDetailPanel: some View {
         LFPanel {
             VStack(alignment: .leading, spacing: 18) {
-                if let account = dashboardViewModel.accountSummaries.first {
+                if let account = accountsViewModel.selectedAccount {
                     HStack(spacing: 12) {
                         accountIcon(account.institution)
                             .frame(width: 48, height: 48)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(account.displayName)
-                                .font(.headline)
+                            if accountsViewModel.isEditingDisplayName {
+                                TextField("Display name", text: $accountsViewModel.displayNameDraft)
+                                    .textFieldStyle(.roundedBorder)
+                            } else {
+                                Text(account.displayName)
+                                    .font(.headline)
+                            }
                             Text(account.institution)
                                 .font(.caption)
                                 .foregroundStyle(LFTheme.textSecondary)
                         }
                         Spacer()
                         Image(systemName: "star")
+                            .foregroundStyle(LFTheme.warning)
+                    }
+
+                    if accountsViewModel.isEditingDisplayName {
+                        HStack(spacing: 10) {
+                            Button("Save") {
+                                accountsViewModel.saveDisplayName()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            Button("Cancel") {
+                                accountsViewModel.cancelDisplayNameEdit()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    } else {
+                        Button("Edit display name") {
+                            accountsViewModel.beginDisplayNameEdit()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    if let message = accountsViewModel.presentationState.message {
+                        Text(message)
+                            .font(.caption)
                             .foregroundStyle(LFTheme.warning)
                     }
 
@@ -859,30 +889,95 @@ struct ContentView: View {
                     }
 
                     LFInfoRow(title: "Institution", value: account.institution)
-                    LFInfoRow(title: "Account Type", value: "Repository account")
+                    LFInfoRow(title: "Account Type", value: account.accountTypeLabel)
                     LFInfoRow(title: "Currency", value: account.currencyCode)
-                    LFInfoRow(title: "Status", value: "Active")
+                    LFInfoRow(title: "Transactions", value: "\(accountsViewModel.transactionCount)")
 
                     Divider().overlay(LFTheme.divider)
 
                     Text("Recent Activity")
                         .font(.headline)
 
-                    ForEach(dashboardViewModel.recentTransactionSummaries.prefix(3)) { transaction in
+                    if accountsViewModel.recentActivity.isEmpty {
+                        LFCompactEmptyState(message: "No trusted activity for this account")
+                    }
+
+                    ForEach(accountsViewModel.recentActivity) { transaction in
                         HStack {
-                            Image(systemName: transaction.isCredit ? "arrow.down" : "arrow.up")
-                                .foregroundStyle(transaction.isCredit ? LFTheme.success : LFTheme.danger)
+                            Image(systemName: transaction.credit != nil ? "arrow.down" : "arrow.up")
+                                .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
                                 .frame(width: 28, height: 28)
-                                .background((transaction.isCredit ? LFTheme.success : LFTheme.danger).opacity(0.12))
+                                .background((transaction.credit != nil ? LFTheme.success : LFTheme.danger).opacity(0.12))
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             Text(transaction.description)
                                 .lineLimit(1)
                             Spacer()
-                            Text(formatSignedCurrency(transaction.amount, isCredit: transaction.isCredit))
-                                .foregroundStyle(transaction.isCredit ? LFTheme.success : LFTheme.danger)
+                            Text(formatSignedCurrency(transaction.amount, isCredit: transaction.credit != nil))
+                                .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
                                 .monospacedDigit()
                         }
                         .font(.caption)
+                    }
+
+                    Divider().overlay(LFTheme.divider)
+
+                    Text("Verified Financial Identity")
+                        .font(.headline)
+                    if account.identitySummaries.isEmpty {
+                        LFCompactEmptyState(message: "No verified strong identifiers")
+                    } else {
+                        ForEach(account.identitySummaries) { identifier in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(identifier.kind) · \(identifier.redactedValue)")
+                                    .font(.caption.weight(.semibold))
+                                Text("\(identifier.strength) · \(identifier.verificationState) · \(identifier.provenance)")
+                                    .font(.caption2)
+                                    .foregroundStyle(LFTheme.textSecondary)
+                            }
+                        }
+                    }
+
+                    Divider().overlay(LFTheme.divider)
+
+                    Text("Import History")
+                        .font(.headline)
+                    if accountsViewModel.importHistory.isEmpty {
+                        LFCompactEmptyState(message: "No trusted import history for this account")
+                    } else {
+                        ForEach(accountsViewModel.importHistory) { session in
+                            Button {
+                                accountsViewModel.selectImportSession(id: session.id)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(session.sourceDocumentName ?? "Imported statement")
+                                        .font(.caption.weight(.semibold))
+                                    Text("\(session.validationStatus) · \(session.transactionCount) transaction(s)")
+                                        .font(.caption2)
+                                        .foregroundStyle(LFTheme.textSecondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+
+                    if let session = accountsViewModel.selectedImportSession {
+                        Divider().overlay(LFTheme.divider)
+                        HStack {
+                            Text("Import Detail")
+                                .font(.headline)
+                            Spacer()
+                            Button("Close") {
+                                accountsViewModel.clearSelectedImportSession()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        LFInfoRow(title: "Source", value: session.sourceDocumentName ?? "Imported statement")
+                        LFInfoRow(title: "Status", value: session.validationStatus)
+                        LFInfoRow(title: "Transactions", value: "\(session.transactionCount)")
+                        if let parserVersion = session.parserVersion {
+                            LFInfoRow(title: "Parser", value: parserVersion)
+                        }
                     }
                 } else {
                     LFCompactEmptyState(message: "Select an account after importing trusted data")
@@ -933,7 +1028,7 @@ struct ContentView: View {
     }
 
     private var totalAccountBalance: Decimal {
-        dashboardViewModel.accountSummaries.reduce(.zero) { $0 + $1.currentBalance }
+        accountsViewModel.accounts.reduce(.zero) { $0 + $1.currentBalance }
     }
 
     private var accountTableHeader: some View {
@@ -946,8 +1041,6 @@ struct ContentView: View {
                 .frame(width: 100, alignment: .leading)
             Text("Balance")
                 .frame(width: 140, alignment: .trailing)
-            Text("Status")
-                .frame(width: 92, alignment: .leading)
         }
         .font(.caption)
         .foregroundStyle(LFTheme.textSecondary)
@@ -1110,37 +1203,43 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func accountRow(_ account: DashboardAccountSummary) -> some View {
-        HStack(spacing: 12) {
-            accountIcon(account.institution)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(account.displayName)
-                    .font(.subheadline.weight(.semibold))
-                Text(account.id.uuidString.prefix(12))
-                    .font(.caption)
-                    .foregroundStyle(LFTheme.textSecondary)
+    private func accountRow(_ account: AccountsAccountPresentation) -> some View {
+        Button {
+            accountsViewModel.selectAccount(repositoryAccountID: account.id)
+        } label: {
+            HStack(spacing: 12) {
+                accountIcon(account.institution)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(account.displayName)
+                        .font(.subheadline.weight(.semibold))
+                    Text(account.currencyCode)
+                        .font(.caption)
+                        .foregroundStyle(LFTheme.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(account.institution)
+                    .frame(width: 160, alignment: .leading)
+
+                LFStatusBadge(title: account.accountTypeLabel, color: LFTheme.primary)
+                    .frame(width: 100, alignment: .leading)
+
+                Text(formatCurrency(account.currentBalance, currencyCode: account.currencyCode))
+                    .foregroundStyle(account.currentBalance >= .zero ? LFTheme.success : LFTheme.danger)
+                    .monospacedDigit()
+                    .frame(width: 140, alignment: .trailing)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text(account.institution)
-                .frame(width: 160, alignment: .leading)
-
-            LFStatusBadge(title: "Bank", color: LFTheme.primary)
-                .frame(width: 100, alignment: .leading)
-
-            Text(formatCurrency(account.currentBalance, currencyCode: account.currencyCode))
-                .foregroundStyle(account.currentBalance >= .zero ? LFTheme.success : LFTheme.danger)
-                .monospacedDigit()
-                .frame(width: 140, alignment: .trailing)
-
-            LFStatusBadge(title: "Active", color: LFTheme.success)
-                .frame(width: 92, alignment: .leading)
+            .font(.caption)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 14)
+            .background(
+                accountsViewModel.selectedRepositoryAccountID == account.id
+                    ? LFTheme.primary.opacity(0.16)
+                    : LFTheme.surface.opacity(0.45)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-        .font(.caption)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 14)
-        .background(LFTheme.surface.opacity(0.45))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .buttonStyle(.plain)
     }
 
     private func accountIcon(_ institution: String) -> some View {

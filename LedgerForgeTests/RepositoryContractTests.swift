@@ -56,6 +56,133 @@ struct RepositoryContractTests {
         }
     }
 
+    @Test func accountRepositoryUpdatesOnlyTrimmedDisplayName() async throws {
+        try runForEachProvider { provider in
+            let fixture = try seedWorkspace(provider)
+            let original = AccountDTO(
+                id: "account-display-name",
+                workspaceId: fixture.workspaceId,
+                name: "Original Name",
+                institutionId: "Axis Bank",
+                accountType: "bank",
+                nativeCurrency: "INR",
+                description: "Imported source metadata",
+                createdAtISO: "2026-07-13T00:00:00Z"
+            )
+            let sibling = account(id: "account-sibling", workspaceId: fixture.workspaceId, name: "Original Name", currency: "INR")
+
+            #expect(try provider.accountRepo.upsertAccount(original) == original.id)
+            #expect(try provider.accountRepo.upsertAccount(sibling) == sibling.id)
+            #expect(try provider.accountRepo.updateAccountDisplayName(
+                accountId: original.id,
+                workspaceId: fixture.workspaceId,
+                displayName: "  Renamed Account  "
+            ))
+
+            #expect(try provider.accountRepo.account(id: original.id) == AccountDTO(
+                id: original.id,
+                workspaceId: original.workspaceId,
+                name: "Renamed Account",
+                institutionId: original.institutionId,
+                accountType: original.accountType,
+                nativeCurrency: original.nativeCurrency,
+                description: original.description,
+                createdAtISO: original.createdAtISO
+            ))
+            #expect(try provider.accountRepo.account(id: sibling.id) == sibling)
+            #expect(!(try provider.accountRepo.updateAccountDisplayName(
+                accountId: original.id,
+                workspaceId: fixture.workspaceId,
+                displayName: "Renamed Account"
+            )))
+            #expect(try provider.accountRepo.updateAccountDisplayName(
+                accountId: original.id,
+                workspaceId: fixture.workspaceId,
+                displayName: "renamed account"
+            ))
+
+            #expect(throws: Error.self) {
+                _ = try provider.accountRepo.updateAccountDisplayName(
+                    accountId: original.id,
+                    workspaceId: fixture.workspaceId,
+                    displayName: "   "
+                )
+            }
+            #expect(throws: Error.self) {
+                _ = try provider.accountRepo.updateAccountDisplayName(
+                    accountId: original.id,
+                    workspaceId: "other-workspace",
+                    displayName: "Different"
+                )
+            }
+            #expect(throws: Error.self) {
+                _ = try provider.accountRepo.updateAccountDisplayName(
+                    accountId: "missing-account",
+                    workspaceId: fixture.workspaceId,
+                    displayName: "Different"
+                )
+            }
+        }
+    }
+
+    @Test func sqliteDisplayNameUpdatePreservesUnmodelledAccountMetadataAndIdentifierRelationship() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LedgerForgeRepositoryContractTests")
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let provider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("rename.sqlite").path)
+        let workspace = WorkspaceDTO(id: "workspace-rename", name: "Rename Workspace", createdAtISO: "2026-07-13T00:00:00Z")
+        let session = importSession(id: "session-rename", workspaceId: workspace.id)
+        let original = AccountDTO(
+            id: "account-rename",
+            workspaceId: workspace.id,
+            name: "Original Name",
+            institutionId: "Axis",
+            accountType: "bank",
+            nativeCurrency: "INR",
+            description: "Existing metadata",
+            createdAtISO: "2026-07-13T00:01:00Z"
+        )
+        let identifier = AccountIdentifierDTO(
+            id: "identifier-rename",
+            accountId: original.id,
+            workspaceId: workspace.id,
+            scheme: FinancialIdentifierKind.institutionAccountId.rawValue,
+            identifier: "opaque-verified-identifier",
+            strength: FinancialIdentifierStrength.strong.rawValue,
+            verificationState: FinancialIdentifierVerificationState.verified.rawValue,
+            provenance: FinancialIdentifierProvenance.institutionStructuredField.rawValue,
+            createdAtISO: "2026-07-13T00:02:00Z"
+        )
+
+        _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+        _ = try provider.importSessionRepo.createImportSession(session)
+        _ = try provider.accountRepo.upsertAccount(original)
+        try provider.database.executePrepared(
+            sql: "UPDATE accounts SET closed_at = ?, created_from_import_session_id = ? WHERE id = ?;",
+            params: ["2026-07-13T00:03:00Z", session.id, original.id]
+        )
+        _ = try provider.accountRepo.attachIdentifier(identifier)
+
+        #expect(try provider.accountRepo.updateAccountDisplayName(
+            accountId: original.id,
+            workspaceId: workspace.id,
+            displayName: " Renamed Account "
+        ))
+
+        let preservedMetadata = try provider.database.query(
+            sql: "SELECT closed_at, created_from_import_session_id FROM accounts WHERE id = ?;",
+            params: [original.id]
+        ) { row in
+            [row.string(at: 0), row.string(at: 1)]
+        }.first
+        #expect(preservedMetadata == ["2026-07-13T00:03:00Z", session.id])
+        #expect(try provider.accountRepo.identifiers(accountId: original.id, workspaceId: workspace.id) == [identifier])
+        #expect(try provider.importSessionRepo.importSession(id: session.id)?.id == session.id)
+    }
+
     @Test func importSessionRepositoryCanCreateUpdateAndRetrieveSessionData() async throws {
         try runForEachProvider { provider in
             let fixture = try seedWorkspace(provider)

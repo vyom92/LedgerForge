@@ -18,6 +18,22 @@ struct IdentityResolverTests {
         #expect(try resolver.resolve(workspaceId: fixture.workspaceId, identifiers: [identifier]) == .resolved(accountId: fixture.primaryAccountId))
     }
 
+    @Test func verifiedIdentifierResolvesSameAccountAfterDisplayNameChange() async throws {
+        let provider = InMemoryRepositoryProvider()
+        let fixture = try seedResolverWorkspace(provider)
+        let identifier = try financialIdentifier(kind: .iban, value: "qa12 ledger forge 1234567890")
+        try attach(identifier, accountId: fixture.primaryAccountId, workspaceId: fixture.workspaceId, provider: provider)
+
+        #expect(try provider.accountRepo.updateAccountDisplayName(
+            accountId: fixture.primaryAccountId,
+            workspaceId: fixture.workspaceId,
+            displayName: "Renamed Account"
+        ))
+
+        let resolver = FinancialIdentityResolver(accountRepository: provider.accountRepo, developerConsole: nil)
+        #expect(try resolver.resolve(workspaceId: fixture.workspaceId, identifiers: [identifier]) == .resolved(accountId: fixture.primaryAccountId))
+    }
+
     @Test func weakIdentifiersOnlyReturnNoMatch() async throws {
         let provider = InMemoryRepositoryProvider()
         let fixture = try seedResolverWorkspace(provider)

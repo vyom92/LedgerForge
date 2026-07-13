@@ -59,6 +59,34 @@ private final class InMemoryAccountRepo: AccountRepository {
         return account.id
     }
 
+    func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool {
+        let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedDisplayName.isEmpty else {
+            throw RepositoryError.relationshipViolation("Account display name cannot be empty.")
+        }
+        guard let existing = state.accounts[accountId] else {
+            throw RepositoryError.recordNotFound("Account \(accountId) does not exist.")
+        }
+        guard existing.workspaceId == workspaceId else {
+            throw RepositoryError.relationshipViolation("Account \(accountId) does not belong to workspace \(workspaceId).")
+        }
+        guard existing.name != trimmedDisplayName else {
+            return false
+        }
+
+        state.accounts[accountId] = AccountDTO(
+            id: existing.id,
+            workspaceId: existing.workspaceId,
+            name: trimmedDisplayName,
+            institutionId: existing.institutionId,
+            accountType: existing.accountType,
+            nativeCurrency: existing.nativeCurrency,
+            description: existing.description,
+            createdAtISO: existing.createdAtISO
+        )
+        return true
+    }
+
     func account(id: String) throws -> AccountDTO? {
         state.accounts[id]
     }

@@ -16,7 +16,7 @@ final class AccountStore: ObservableObject {
 
     @Published private(set) var accounts: [Account] = []
 
-    private init() {}
+    init() {}
 
     func replaceAccounts(_ accounts: [Account]) {
         let update = {
@@ -40,6 +40,11 @@ final class AccountStore: ObservableObject {
     /// Find an account by id
     func account(id: UUID) -> Account? {
         return accounts.first { $0.id == id }
+    }
+
+    /// Finds a hydrated account by its immutable repository identity.
+    func account(repositoryAccountId: String) -> Account? {
+        accounts.first { $0.repositoryAccountId == repositoryAccountId }
     }
 
     // MARK: - Creation
