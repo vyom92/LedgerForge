@@ -21,6 +21,7 @@ struct ImportEngineResult: Equatable {
 enum ImportEngineCommitError: Error, LocalizedError, Equatable {
     case validationFailed
     case alreadyCommitted
+    case persistenceSkipped
 
     var errorDescription: String? {
         switch self {
@@ -28,6 +29,8 @@ enum ImportEngineCommitError: Error, LocalizedError, Equatable {
             return "Import validation failed."
         case .alreadyCommitted:
             return "Prepared import has already been committed."
+        case .persistenceSkipped:
+            return "Import persistence was skipped."
         }
     }
 }
@@ -271,25 +274,38 @@ final class ImportEngine {
             )
             if persistenceResult.persisted {
                 developerConsole.info(.database, "Repository persistence completed")
+            } else {
+                persistenceErrorMessage = ImportEngineCommitError.persistenceSkipped.localizedDescription
+                developerConsole.error(.database, "Repository persistence skipped")
             }
         } catch {
             developerConsole.error(.database, "Repository persistence failed", metadata: ["error": error.localizedDescription])
             persistenceErrorMessage = error.localizedDescription
         }
 
-        await MainActor.run {
-            DocumentStore.shared.update(with: preparedImport.rawContents)
-            TransactionStore.shared.replaceTransactions(
-                preparedImport.financialDocument.transactions,
-                validation: preparedImport.validation
-            )
-            AccountStore.shared.integrateImport(
-                importSession: preparedImport.importSession,
-                transactions: preparedImport.financialDocument.transactions
-            )
-        }
+        if persistenceResult.persisted {
+            await MainActor.run {
+                AccountStore.shared.integrateImport(
+                    importSession: preparedImport.importSession,
+                    transactions: preparedImport.financialDocument.transactions
+                )
+            }
 
-        developerConsole.info(.runtime, "Runtime refresh completed")
+            // AccountStore's legacy integration path publishes newly created accounts
+            // asynchronously. Wait for that queued publication before callers perform
+            // repository hydration, so hydration cannot be followed by a stale append.
+            await waitForPendingRuntimeStorePublication()
+
+            await MainActor.run {
+                DocumentStore.shared.update(with: preparedImport.rawContents)
+                TransactionStore.shared.replaceTransactions(
+                    preparedImport.financialDocument.transactions,
+                    validation: preparedImport.validation
+                )
+            }
+
+            developerConsole.info(.runtime, "Runtime refresh completed")
+        }
 
         return ImportEngineResult(
             fileName: preparedImport.fileName,
@@ -298,6 +314,14 @@ final class ImportEngine {
             persisted: persistenceResult.persisted,
             errorMessage: persistenceErrorMessage
         )
+    }
+
+    private func waitForPendingRuntimeStorePublication() async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                continuation.resume()
+            }
+        }
     }
 
     private func markPreparedImportCommitted(_ id: UUID) -> Bool {

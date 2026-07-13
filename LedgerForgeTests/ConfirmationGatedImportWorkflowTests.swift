@@ -4,11 +4,12 @@ import Foundation
 import Testing
 @testable import LedgerForge
 
+@Suite(.serialized)
 @MainActor
 struct ConfirmationGatedImportWorkflowTests {
 
     @Test func prepareImportParsesAndValidatesWithoutPersistenceOrRuntimeStoreMutation() async throws {
-        resetRuntimeStoresForConfirmationWorkflow()
+        await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = ImportEngine(importPersistenceCoordinator: persistence)
         let url = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
@@ -27,7 +28,7 @@ struct ConfirmationGatedImportWorkflowTests {
     }
 
     @Test func validationFailureBlocksCommitAndDoesNotPersist() async throws {
-        resetRuntimeStoresForConfirmationWorkflow()
+        await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = ImportEngine(importPersistenceCoordinator: persistence)
         let preparedImport = makePreparedImport(transactions: [])
@@ -44,7 +45,7 @@ struct ConfirmationGatedImportWorkflowTests {
     }
 
     @Test func confirmationCommitsUsingPreparedFinancialDocument() async throws {
-        resetRuntimeStoresForConfirmationWorkflow()
+        await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = ImportEngine(importPersistenceCoordinator: persistence)
         let preparedImport = makePreparedImport()
@@ -58,10 +59,11 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(persistence.capturedImportSession?.id == preparedImport.importSession.id)
         #expect(persistence.capturedValidation?.passed == preparedImport.validation.passed)
         #expect(TransactionStore.shared.transactions.count == preparedImport.transactionCount)
+        #expect(AccountStore.shared.accounts.count == 1)
     }
 
     @Test func duplicateConfirmationIsRejectedWithoutSecondPersistence() async throws {
-        resetRuntimeStoresForConfirmationWorkflow()
+        await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = ImportEngine(importPersistenceCoordinator: persistence)
         let preparedImport = makePreparedImport()
@@ -74,6 +76,84 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(!secondResult.persisted)
         #expect(secondResult.errorMessage == "Prepared import has already been committed.")
         #expect(persistence.persistCallCount == 1)
+    }
+
+    @Test func persistenceFailureLeavesEveryRuntimeFinancialStoreUnchanged() async throws {
+        await resetRuntimeStoresForConfirmationWorkflow()
+        let existingTransaction = makeConfirmationTransaction(
+            date: Date(timeIntervalSince1970: 1_804_809_600),
+            description: "Existing transaction",
+            debit: nil,
+            credit: 25,
+            amount: 25,
+            balance: 25
+        )
+        let existingAccount = Account(
+            institution: "Existing Bank",
+            name: "Existing Account",
+            type: .bank,
+            currencyCode: "INR",
+            currentBalance: 25
+        )
+        AccountStore.shared.replaceAccounts([existingAccount])
+        TransactionStore.shared.replaceTransactions([existingTransaction])
+        DocumentStore.shared.update(with: "existing,document")
+        await Task.yield()
+
+        let originalDocumentRows = DocumentStore.shared.rows
+        let originalTransactionIds = TransactionStore.shared.transactions.map(\.id)
+        let originalAccountIds = AccountStore.shared.accounts.map(\.id)
+        let persistence = CountingPersistenceCoordinator()
+        persistence.errorToThrow = ConfirmationPersistenceError.writeFailed
+        let engine = ImportEngine(importPersistenceCoordinator: persistence)
+
+        let result = await engine.commitPreparedImport(makePreparedImport())
+
+        #expect(result.validationPassed)
+        #expect(!result.persisted)
+        #expect(result.errorMessage == "Repository write failed.")
+        #expect(persistence.persistCallCount == 1)
+        #expect(DocumentStore.shared.rows == originalDocumentRows)
+        #expect(TransactionStore.shared.transactions.map(\.id) == originalTransactionIds)
+        #expect(AccountStore.shared.accounts.map(\.id) == originalAccountIds)
+    }
+
+    @Test func skippedPersistenceLeavesRuntimeStoresEmptyAndReportsFailure() async throws {
+        await resetRuntimeStoresForConfirmationWorkflow()
+        let persistence = CountingPersistenceCoordinator()
+        persistence.resultOverride = .skipped
+        let engine = ImportEngine(importPersistenceCoordinator: persistence)
+
+        let result = await engine.commitPreparedImport(makePreparedImport())
+
+        #expect(result.validationPassed)
+        #expect(!result.persisted)
+        #expect(result.errorMessage == "Import persistence was skipped.")
+        #expect(DocumentStore.shared.rows.isEmpty)
+        #expect(TransactionStore.shared.transactions.isEmpty)
+        #expect(AccountStore.shared.accounts.isEmpty)
+    }
+
+    @Test func ambiguousAndConflictingIdentityFailuresLeaveRuntimeStoresUnchanged() async throws {
+        let errors: [ImportPersistenceCoordinationError] = [
+            .ambiguousIdentity,
+            .conflictingIdentity
+        ]
+
+        for error in errors {
+            await resetRuntimeStoresForConfirmationWorkflow()
+            let persistence = CountingPersistenceCoordinator()
+            persistence.errorToThrow = error
+            let engine = ImportEngine(importPersistenceCoordinator: persistence)
+
+            let result = await engine.commitPreparedImport(makePreparedImport())
+
+            #expect(!result.persisted)
+            #expect(result.errorMessage == error.localizedDescription)
+            #expect(DocumentStore.shared.rows.isEmpty)
+            #expect(TransactionStore.shared.transactions.isEmpty)
+            #expect(AccountStore.shared.accounts.isEmpty)
+        }
     }
 
     @Test func sprint27OutcomePresentationStillReflectsCommitResults() async throws {
@@ -111,6 +191,7 @@ private final class CountingPersistenceCoordinator: ImportPersistenceCoordinatin
     private(set) var capturedImportSession: ImportSession?
     private(set) var capturedValidation: ImportValidationResult?
     var errorToThrow: Error?
+    var resultOverride: ImportPersistenceResult?
 
     func persistValidatedImport(
         financialDocument: FinancialDocument,
@@ -126,6 +207,10 @@ private final class CountingPersistenceCoordinator: ImportPersistenceCoordinatin
             throw errorToThrow
         }
 
+        if let resultOverride {
+            return resultOverride
+        }
+
         return ImportPersistenceResult(
             persisted: validation.passed,
             workspaceId: validation.passed ? "workspace-confirmation-test" : nil,
@@ -136,9 +221,20 @@ private final class CountingPersistenceCoordinator: ImportPersistenceCoordinatin
     }
 }
 
-private func resetRuntimeStoresForConfirmationWorkflow() {
+@MainActor
+private func resetRuntimeStoresForConfirmationWorkflow() async {
     AccountStore.shared.replaceAccounts([])
     TransactionStore.shared.replaceTransactions([])
+    DocumentStore.shared.clear()
+    await Task.yield()
+}
+
+private enum ConfirmationPersistenceError: Error, LocalizedError {
+    case writeFailed
+
+    var errorDescription: String? {
+        "Repository write failed."
+    }
 }
 
 private func makePreparedImport(

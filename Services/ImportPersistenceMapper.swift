@@ -36,7 +36,7 @@ struct ImportPersistencePayload {
 
 struct ImportPersistenceMapper {
 
-    private let workspaceId: String
+    let workspaceId: String
     private let workspaceName: String
     private let dateFormatter: ISO8601DateFormatter
 
@@ -53,7 +53,8 @@ struct ImportPersistenceMapper {
     func payload(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
-        validation: ImportValidationResult
+        validation: ImportValidationResult,
+        accountId: String
     ) throws -> ImportPersistencePayload {
         guard validation.passed else {
             throw ImportPersistenceError.validationFailed
@@ -63,6 +64,7 @@ struct ImportPersistenceMapper {
         let account = accountDTO(
             financialDocument: financialDocument,
             importSession: importSession,
+            accountId: accountId,
             createdAtISO: importedAtISO
         )
 
@@ -99,6 +101,7 @@ struct ImportPersistenceMapper {
     private func accountDTO(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
+        accountId: String,
         createdAtISO: String
     ) -> AccountDTO {
         let institutionName = importSession.institution?.rawValue ?? "Unknown"
@@ -121,7 +124,7 @@ struct ImportPersistenceMapper {
         }()
 
         return AccountDTO(
-            id: stableID(prefix: "account", components: [workspaceId, institutionName, importSession.fileName]),
+            id: accountId,
             workspaceId: workspaceId,
             name: accountName,
             institutionId: institutionId,
@@ -256,19 +259,6 @@ struct ImportPersistenceMapper {
 
     private func decimalString(_ amount: Decimal) -> String {
         NSDecimalNumber(decimal: amount).stringValue
-    }
-
-    private func stableID(prefix: String, components: [String]) -> String {
-        let body = components
-            .joined(separator: "-")
-            .lowercased()
-            .map { character -> Character in
-                if character.isLetter || character.isNumber {
-                    return character
-                }
-                return "-"
-            }
-        return "\(prefix)-\(String(body))"
     }
 
     private static let dayFormatter: DateFormatter = {
