@@ -14,18 +14,18 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: 5025c8a — Implement Sprint 34 bounded parser source context
+* Latest Implementation Commit: 3b682fc — Implement Sprint 35 verified Axis account identifier extraction
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-028 — Bounded Parser Source Evidence (Accepted)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 34 — Bounded Parser Source Context implemented and manually verified
-* Current Phase: Awaiting Sprint 35 planning
+* Current Sprint: Sprint 35 — Verified Axis Account Identifier Extraction implemented and manually verified
+* Current Phase: Awaiting Sprint 36 planning
 * Build Status: Passing
-* Validation Status: Sprint 34 passed clean Xcode diagnostics and static analysis, Xcode clean build passed, focused CSV import regression tests passed, complete Xcode-native test plan passed (132 tests, 0 failures, 0 skipped), Axis CSV financial regression passed, git diff check passed, and manual runtime verification passed
+* Validation Status: Sprint 35 passed Xcode diagnostics with zero issues, static analysis and clean build; focused FinancialDocument tests passed (13 tests, 0 failures, 0 skipped), focused CSV import regression tests passed (5 tests, 0 failures, 0 skipped), complete Xcode-native test plan passed (140 tests, 0 failures, 0 skipped), Axis CSV financial regression passed, git diff check passed, and manual runtime verification passed
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-* Latest Verified Implementation Remote: 5025c8ae85a36c71e0d5e97c7cf8d0ff00161095
+* Latest Verified Implementation Remote: 3b682fc2f0b43979388196b739a38b7f350e2be7
 * Latest Documentation Handoff Commit: 9bdd3d6f5dc207ff554cbc410d26a9b2a8f454dc
 
 ## Bootstrap
@@ -89,22 +89,22 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 34 — Bounded Parser Source Context is implemented, pushed and manually verified. Awaiting Sprint 35 planning.
+Active Work: Sprint 35 — Verified Axis Account Identifier Extraction is implemented, pushed and manually verified. Awaiting Sprint 36 planning.
 
 Objective:
 
-* Preserve the verified Sprint 34 implementation baseline.
-* Await Sprint 35 planning.
+* Preserve the verified Sprint 35 implementation baseline.
+* Await Sprint 36 planning.
 
 Scope:
 
-* Sprint 34 introduced immutable, bounded pre-transaction source context in `NormalizedDocument`.
-* CSV normalization now returns coherent normalized rows and bounded source context from one source-line collection while retaining the row-only compatibility API.
-* `ImportEngine` transports source context into `NormalizedDocument` without interpreting or logging fragment text.
-* Sprint 34 preserved normalized transaction rows, parser selection, parser behaviour, `FinancialDocument` output, validation, persistence, runtime behaviour and financial truth.
-* Sprint 34 made no parser, reader, schema, repository, persistence, DTO, runtime store, ViewModel or UI changes.
-* Sprint 34 did not perform identifier extraction, identity resolution, repository lookup, account reuse or persistence integration.
-* Axis parser output continues to contain an empty financial identifier collection.
+* `AxisBankAccountParser` now interprets bounded pre-transaction source context for the supported full Axis statement-account-number field.
+* One unambiguous full numeric value produces one verified, strong `.institutionAccountId` with `.institutionStructuredField` provenance.
+* Repeated identical values are deduplicated; missing, masked, suffix-only, unrelated, malformed or conflicting evidence produces no identifier without failing financial parsing.
+* Identifier extraction executes independently of transaction parsing and applies to both parser result paths.
+* Sprint 35 preserved parser selection, institution, 81 transactions, currency, transaction ordering, debit and credit totals, opening and closing balances, validation, import-preview behaviour and runtime behaviour.
+* Sprint 35 made no normalizer, reader, schema, repository, persistence, DTO, runtime store, ViewModel, UI or Xcode project-file changes.
+* Sprint 35 did not integrate identity resolution, repository lookup, account reuse, identifier attachment or persistence.
 * ADR-028 — Bounded Parser Source Evidence is Accepted.
 * `Project documents/Implementation.md` contains only the current ACTIVE sprint; completed sprint history belongs in `Project documents/PROJECT_STATE.md`.
 * Codex must never edit `Project documents/Implementation.md`.
@@ -122,7 +122,7 @@ Scope:
 * Preserve durable SQLite startup persistence wiring.
 * Preserve stable repository account identifiers.
 * Preserve institution attribution through repository hydration.
-* Sprint 34 implementation commit `5025c8ae85a36c71e0d5e97c7cf8d0ff00161095` was pushed to `origin/main` and verified with `git ls-remote origin refs/heads/main`.
+* Sprint 35 implementation commit `3b682fc2f0b43979388196b739a38b7f350e2be7` was pushed to `origin/main` and verified with `git ls-remote origin refs/heads/main`.
 
 ## Current Product Review
 
@@ -171,11 +171,12 @@ Scope:
 - SQLite identifier conflict prevention is transactional through repository logic.
 - Deterministic financial identity resolver is implemented and remains disconnected from production import.
 - Identity diagnostics are concise and redact identifier values.
+- Axis CSV parsing produces one verified strong account identifier only from one unambiguous full structured statement-account field.
 - Architecture v1.0 and UI/UX v1.0 remain preserved.
 
 ### Current Critical Product Issues
 
-- None verified for Sprint 34.
+- None verified for Sprint 35.
 
 ### Current Important Product Issues
 
@@ -195,17 +196,17 @@ Scope:
 
 ### Ready for Next Feature Sprint?
 
-Awaiting Sprint 35 planning.
+Awaiting Sprint 36 planning.
 
 ### Reason
 
-Sprint 34 implementation, automated validation and manual runtime verification are complete. Sprint 35 planning is the next phase.
+Sprint 35 implementation, automated validation and manual runtime verification are complete. Sprint 36 planning is the next phase.
 
 Out of Scope:
 
 * PDF support
 * OCR
-* Parser behaviour changes
+* Additional parser behaviour changes beyond approved Axis identifier extraction
 * Validation redesign
 * Repository redesign
 * Database schema changes
@@ -226,7 +227,39 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Define the Sprint 35 ACTIVE sprint after Desktop ChatGPT approval.
+* Define the Sprint 36 ACTIVE sprint after Desktop ChatGPT approval.
+
+---
+
+# Sprint 35
+
+## Objective
+Deterministically extract one verified full Axis Bank account identifier from bounded parser source context while preserving financial and runtime behaviour.
+
+## Status
+Implemented and manually verified
+
+## Outcome
+- `AxisBankAccountParser` recognises only the supported full structured statement-account-number field in `NormalizedDocument.sourceContext.preTransactionFragments`.
+- One unique valid full numeric value produces one verified strong `.institutionAccountId` with `.institutionStructuredField` provenance.
+- Repeated identical matches are deduplicated.
+- Missing, masked, suffix-only, unrelated, malformed and conflicting evidence returns no identifier without failing the import.
+- Identifier extraction is independent of transaction parsing and is used by both parser return paths.
+- No source fragment or unredacted identifier is logged.
+- Parser selection, institution, 81 transactions, currency, transaction ordering, financial totals, balances, validation and import-preview behaviour remain unchanged.
+- No resolver, repository lookup, account reuse, identifier attachment, persistence, schema, DTO, runtime-store, ViewModel, UI or project-file changes were made.
+- Xcode diagnostics, static analysis and clean build passed.
+- Focused `FinancialDocumentTests` passed: 13 tests, 0 failures, 0 skipped.
+- Focused `CSVImportRegressionTests` passed: 5 tests, 0 failures, 0 skipped.
+- Complete Xcode-native test plan passed: 140 tests, 0 failures, 0 skipped (`LedgerForgeTests`: 137; `LedgerForgeUITests`: 3).
+- Axis CSV financial regression and `git diff --check` passed.
+- Manual runtime verification passed; the unchanged read-only preview was cancelled without persistence.
+
+## Implementation Commit
+`3b682fc2f0b43979388196b739a38b7f350e2be7` — Implement Sprint 35 verified Axis account identifier extraction
+
+## Current Phase
+Awaiting Sprint 36 planning
 
 ---
 
