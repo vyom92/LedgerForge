@@ -20,14 +20,7 @@ Items already promoted into the ACTIVE sprint must not remain in this backlog.
 
 #### Accounts & Financial Identity
 
-- [ ] User-editable account display names
-  - Axis NRE
-  - Axis NRO
-  - Axis Savings
-  - CBQ Current
-  - Other user-defined names
-- [ ] Safe account metadata editing that preserves immutable repository identity, verified identifiers, transactions and import history
-- [ ] Account detail view with verified identity, institution, currency, type, balance, notes and import history
+- [ ] Broader account metadata editing beyond display names while preserving immutable identity and financial relationships
 - [ ] Identity conflict handling workflow
 - [ ] Manual identity conflict resolution
 - [ ] Explain why an imported statement matched, failed to match or conflicted
@@ -44,7 +37,7 @@ Items already promoted into the ACTIVE sprint must not remain in this backlog.
 - [ ] Safe non-destructive repository update semantics that preserve related identifiers, sessions and transactions
 - [ ] Concurrent-import guarantees and deterministic serialization of identity resolution and identifier attachment
 - [ ] Import failure recovery that reconciles repository state and runtime state
-- [ ] Durable import audit trail and provenance inspection
+- [ ] Durable import audit trail with validation issues, failure outcomes and source-provenance inspection
 - [ ] Data-integrity verification and repair tools
 
 #### Import Formats & Parser Coverage
@@ -103,8 +96,7 @@ Items already promoted into the ACTIVE sprint must not remain in this backlog.
 - [ ] Hide account without deleting financial history
 - [ ] Close-account status and closure date
 - [ ] Account ordering and favourites
-- [ ] Account balance and transaction-history drill-down
-- [ ] Remove misleading account-row navigation affordances until account-detail navigation exists
+- [ ] Full account transaction-history navigation, filtering and analysis
 
 #### Import Workflow
 
@@ -115,7 +107,7 @@ Items already promoted into the ACTIVE sprint must not remain in this backlog.
 - [ ] Import correction workflow before persistence
 - [ ] Account-match review and optional manual override
 - [ ] Duplicate-import review and management UI
-- [ ] Import-session history and detail view
+- [ ] Global import-session history and management, including failed and account-unassociated sessions
 - [ ] Delete or reverse an import session safely
 - [ ] Import progress, cancellation and retry workflow
 - [ ] Better validation guidance and actionable fix suggestions

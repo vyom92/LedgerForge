@@ -20,13 +20,13 @@ Principles:
 * Latest ADR: ADR-028 — Bounded Parser Source Evidence (Accepted)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 36 — Verified Account Resolution & Identity Seeding implemented and manually verified
-* Current Phase: Awaiting Sprint 37 planning
+* Current Sprint: Sprint 37 — Account Detail, Display Name & Import Provenance
+* Current Phase: Sprint 37 ready for implementation
 * Build Status: Passing
 * Validation Status: Sprint 36 passed Xcode diagnostics with zero issues, static analysis and clean build; focused Sprint 36 integration/workflow tests passed (21 tests, 0 failures, 0 skipped), unchanged identity/repository regression suites passed (31 tests, 0 failures, 0 skipped), complete Xcode-native test plan passed (149 tests, 0 failures, 0 skipped), Axis CSV financial regression passed, approved implementation diff checks passed, and manual runtime verification passed
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
 * Latest Verified Implementation Remote: eab8c885431492d3092f24d1185d71d169f2b1ae
-* Latest Documentation Handoff Commit: 9bdd3d6f5dc207ff554cbc410d26a9b2a8f454dc
+* Latest Documentation Handoff Commit: 6ccef671a520e5d8e8bee38168dd27ab0166f4eb
 
 ## Bootstrap
 
@@ -89,12 +89,12 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 36 — Verified Account Resolution & Identity Seeding is implemented, pushed and manually verified. Awaiting Sprint 37 planning.
+Active Work: Sprint 37 — Account Detail, Display Name & Import Provenance is approved and ready for implementation.
 
 Objective:
 
-* Preserve the verified Sprint 36 implementation baseline.
-* Await Sprint 37 planning.
+* Implement the approved Sprint 37 ACTIVE contract in `Project documents/Implementation.md`.
+* Preserve the verified Sprint 36 implementation and financial baseline until Sprint 37 validation succeeds.
 
 Scope:
 
@@ -184,7 +184,7 @@ Scope:
 
 ### Current Important Product Issues
 
-- Account rows display a chevron despite no verified account-detail navigation.
+- Dedicated Accounts rows currently contain no chevron and have no functional selection behaviour; the Accounts screen presents a list with a right-side inspector, and the inspector currently displays the first Dashboard account summary. The approved Sprint 37 scope addresses account selection and repository-backed inspector behaviour.
 - Some user-facing screens expose developer terminology such as repository or hydration language.
 - Toolbar composition varies across major screens.
 - Several user-facing controls display `Pending` or `Soon` states that add visual noise.
@@ -200,11 +200,11 @@ Scope:
 
 ### Ready for Next Feature Sprint?
 
-Awaiting Sprint 37 planning.
+Sprint 37 is ready for implementation.
 
 ### Reason
 
-Sprint 36 implementation, automated validation and manual runtime verification are complete. Sprint 37 planning is the next phase.
+Sprint 36 implementation and validation are complete. The Sprint 37 ACTIVE contract has been approved and now governs the next implementation phase.
 
 Out of Scope:
 
@@ -231,7 +231,7 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Define the Sprint 37 ACTIVE sprint after Desktop ChatGPT approval.
+* Implement, validate and manually verify Sprint 37.
 
 ---
 

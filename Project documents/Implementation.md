@@ -1,6 +1,6 @@
 # ======= ACTIVE SPRINT =======
 
-## Sprint 36 — Verified Account Resolution & Identity Seeding
+## Sprint 37 — Account Detail, Display Name & Import Provenance
 
 ### Status
 
@@ -10,36 +10,34 @@
 
 ## Objective
 
-Integrate parser-produced verified financial identifiers into production import persistence so LedgerForge can:
+Turn the existing Accounts page into a functional repository-backed master-detail experience.
 
-1. Reuse an existing repository account when identity resolves uniquely.
-2. Create and seed a new repository account when no match exists.
-3. Reject ambiguous or conflicting identity before any repository write.
-4. Prevent runtime-store mutation when persistence does not succeed.
-5. Remove filenames, institution labels and display metadata from durable account-ID construction.
+The approved layout remains:
 
-Sprint 36 completes the first production path from:
+    Accounts page
+    ├── complete account list
+    └── existing right-side account inspector
 
-```text
-StatementParser
-      ↓
-FinancialDocument.financialIdentifiers
-      ↓
-FinancialIdentityResolver
-      ↓
-Repository account selection
-      ↓
-Confirmed persistence
-```
+Sprint 37 must:
+
+1. Add deterministic account selection using immutable repository account IDs.
+2. Preserve repository account and workspace references through hydration.
+3. Add safe display-name editing without replacing account rows.
+4. Present verified strong financial identifiers using deterministic redaction.
+5. Present account-scoped recent activity and transaction counts.
+6. Present trusted-transaction-backed import history.
+7. Present read-only import-session detail inline within the existing inspector.
+8. Preserve all identifiers, transactions, import-session relationships, balances, financial calculations and existing import behaviour.
+9. Keep all persistence-to-runtime updates behind RepositoryStoreHydrator.
+
+Do not add another account-detail destination, full-screen account page, or chevron to dedicated Accounts rows.
 
 ---
 
 ## Governing Architecture
 
-Sprint 36 implements existing decisions from:
+Sprint 37 implements existing decisions from:
 
-- ADR-010 — Validation Before Persistence
-- ADR-019 — Reference Fixtures Define Financial Truth
 - ADR-024 — Repository Hydration Boundary
 - ADR-025 — Stable Financial Entity Identity
 - ADR-026 — Structured Developer Diagnostics
@@ -48,481 +46,602 @@ Sprint 36 implements existing decisions from:
 
 No new ADR is required.
 
-Only parsers may create or verify `FinancialIdentifier` values.
+The canonical flow remains:
 
-Persistence coordination may consume parser-produced identifiers to select a repository account, but it must never derive identifiers, upgrade evidence, interpret source fragments, or use presentation metadata as identity.
+    Repositories
+          ↓
+    RepositoryStoreHydrator
+          ↓
+    Runtime Stores
+          ↓
+    ViewModels
+          ↓
+    Views
+
+Views and ViewModels must not access SQLite or repository implementations directly.
+
+Only repository implementations may communicate with SQLite.
+
+RepositoryStoreHydrator remains the only approved persistence-to-runtime boundary.
+
+---
+
+## Current Verified Gaps
+
+The current repository and UI have these verified gaps:
+
+- Dedicated Accounts rows are not selectable.
+- The current inspector always displays the first Dashboard account summary.
+- DashboardViewModel.accountSummaries is limited to three accounts and is also consumed by the Accounts page.
+- Inspector recent activity is workspace-global rather than account-scoped.
+- The visible star control is decorative and has no implemented behaviour.
+- The inspector hardcodes Account Type as Repository account.
+- The inspector hardcodes Status as Active.
+- RepositoryStoreHydrator loses immutable repository references when creating runtime Account and Transaction values.
+- TransactionStore contains a display-name-based account filter, which is unsuitable after account renaming.
+- AccountRepository exposes replacement-style account upsert semantics but no targeted display-name mutation.
+- SQLite account upsert uses INSERT OR REPLACE and must not be used for display-name editing.
+- AccountDTO.description contains imported source metadata such as Imported from <filename> and must not be reused for notes.
+- Import sessions can be associated with an account only through trusted transactions carrying both accountId and importSessionId.
+- ImportSessionRepository reads one session by immutable ID and has no account-history query.
+- FinancialIdentifier.redacted is the existing deterministic masking utility.
 
 ---
 
 ## Approved Production Flow
 
-```text
-Passed validation
-      ↓
-FinancialIdentityResolver.resolve(
-    workspaceId,
-    financialDocument.financialIdentifiers
-)
-      ↓
-┌──────────────────────────────────────────────┐
-│ resolved(existingAccountId)                  │
-│   → verify existing account                  │
-│   → preserve existing account unchanged      │
-│   → persist against existing account ID      │
-│                                              │
-│ noMatch                                      │
-│   → generate opaque import-scoped account ID │
-│   → create account                           │
-│   → attach verified strong identifiers       │
-│   → persist against new account ID           │
-│                                              │
-│ ambiguous / conflict                         │
-│   → throw before every repository write      │
-│   → do not guess                             │
-└──────────────────────────────────────────────┘
-      ↓
-Successful persistence result
-      ↓
-Runtime-store mutation and hydration
-```
+### Initial and forced hydration
 
-Validation must remain before resolution.
+    Repositories
+          ↓
+    RepositoryStoreHydrator
+          ↓
+    AccountStore
+    TransactionStore
+    ImportSessionStore or equivalent runtime aggregate
+          ↓
+    AccountsViewModel
+          ↓
+    Accounts page and inspector
 
-Runtime mutation must occur only after persistence succeeds.
+The hydrator must:
 
----
+- Load repository accounts.
+- Preserve repository account ID and workspace ID in runtime account state.
+- Load trusted transactions.
+- Preserve repository account ID and import-session ID in runtime transaction state.
+- Load each referenced import session once.
+- Compose account-scoped history from trusted transaction relationships.
+- Redact verified identifiers before they reach ViewModel or View presentation state.
+- Replace runtime stores only after the complete hydration mapping succeeds.
 
-## Workspace Ownership
+### Display-name save flow
 
-`ImportPersistenceMapper` remains the single owner of the configured persistence workspace ID.
+    Validate draft
+          ↓
+    Targeted repository display-name update
+          ↓
+    Repository write succeeds
+          ↓
+    RepositoryStoreHydrator(forceRefresh: true)
+          ↓
+    Runtime stores replaced
+          ↓
+    AccountsViewModel preserves selection by repository account ID
 
-Expose that value as an internal read-only property.
-
-The coordinator must use the mapper-owned workspace ID for:
-
-- resolver lookup
-- workspace retrieval
-- account validation
-- payload mapping
-- identifier attachment
-
-Do not introduce another independently defaulted workspace ID.
+Do not mutate runtime stores optimistically.
 
 ---
 
-## Account-ID Selection
+## Repository Display-Name Mutation Contract
 
-### Existing account
+Add one targeted AccountRepository operation equivalent in responsibility to:
 
-For:
+    updateAccountDisplayName(accountId, workspaceId, displayName)
 
-```swift
-.resolved(accountId: existingAccountId)
-```
+Required semantics:
 
-the coordinator must:
+- Update only the persisted account name.
+- Verify that the account exists.
+- Verify workspace ownership.
+- Reject empty values.
+- Reject whitespace-only values.
+- Preserve account ID.
+- Preserve workspace ID.
+- Preserve institution.
+- Preserve account type.
+- Preserve native currency.
+- Preserve source description.
+- Preserve creation timestamp.
+- Preserve closure metadata.
+- Preserve created-from-import-session provenance.
+- Preserve verified identifiers.
+- Preserve identifier provenance.
+- Preserve transactions.
+- Preserve import-session relationships.
+- Do not use replacement-style upsert.
+- Allow duplicate display names.
+- Allow case-only changes.
+- Treat unchanged trimmed input as a no-op.
 
-- Fetch the account using `accountRepo.account(id:)`.
-- Confirm the account exists.
-- Confirm it belongs to the mapper-owned workspace.
-- Use its immutable repository ID.
-- Skip `upsertAccount`.
-- Preserve the stored `AccountDTO` exactly.
-- Map every new transaction to the existing account ID.
-- Perform no identifier attachment during Sprint 36.
+The in-memory and SQLite providers must have equivalent observable behaviour.
 
-A resolved import must not overwrite:
-
-- account name
-- institution
-- account type
-- currency
-- description
-- creation timestamp
-- existing identifiers
-
-### New account
-
-For:
-
-```swift
-.noMatch
-```
-
-create one opaque import-scoped account ID.
-
-The ID may use the import-session UUID because it is unique and unrelated to presentation metadata.
-
-The ID must not contain or derive from:
-
-- filename
-- institution name
-- display account name
-- document description
-- masked account values
-- account suffixes
-- source-context text
-
-The account display name and description may continue to use institution and filename information because those remain presentation/source metadata rather than identity.
+No user-editable immutable account field may be included in the mutation contract.
 
 ---
 
-## Mapper Contract
+## Runtime Repository-Reference Contract
 
-Update `ImportPersistenceMapper` so payload mapping receives the selected account ID explicitly.
+Runtime Account must retain:
 
-Conceptually:
+- immutable repository account ID
+- workspace ID
 
-```swift
-payload(
-    financialDocument: financialDocument,
-    importSession: importSession,
-    validation: validation,
-    accountId: selectedAccountId
-)
-```
+Runtime Transaction must retain:
 
-The mapper must:
+- repository account ID
+- repository import-session ID
 
-- construct `AccountDTO.id` using the supplied ID
-- pass that same ID to every `TransactionDTO`
-- preserve current DTO metadata mapping
-- preserve currency, dates, amounts, balances, direction and trust metadata
-- expose its configured workspace ID read-only
+Existing runtime UUID presentation identities may remain where required for SwiftUI compatibility, but they must not be used for:
 
-The mapper must not:
+- repository selection
+- account filtering
+- mutation
+- selection restoration
+- identity matching
 
-- invoke repositories
-- invoke the resolver
-- decide whether an account matches
-- inspect identifier strength or verification state
-- derive identity from the filename
-
-The coordinator selects identity.  
-The mapper constructs DTOs.  
-Apparently separation of responsibilities remains useful even after humans discover dependency injection.
+Display name, institution, currency and runtime UUID must never replace repository account ID for these operations.
 
 ---
 
-## Resolver Outcome Handling
+## Runtime Import-Session State
 
-### Resolved
+RepositoryStoreHydrator must load the import-session records referenced by trusted transactions.
 
-```text
-resolved(existingAccountId)
-```
+The approved runtime destination is:
+
+    RepositoryStoreHydrator
+          ↓
+    ImportSessionStore
+          ↓
+    AccountsViewModel
+
+A bounded equivalent runtime aggregate is permitted only when:
+
+- it remains clearly owned by runtime state,
+- it is populated only by RepositoryStoreHydrator,
+- raw repository DTOs are not exposed directly to Views,
+- it does not create a second persistence-to-runtime path.
+
+For each distinct trusted transaction importSessionId associated with an account:
+
+- load the persisted session once,
+- retain only sessions whose account association is proven,
+- preserve deterministic ordering,
+- do not synthesize missing provenance.
+
+Sessions without a proven account relationship must not appear in account history.
+
+---
+
+## AccountsViewModel Ownership
+
+Create a dedicated AccountsViewModel.
+
+Do not place Accounts-page selection, editing, history, or import-session detail behaviour into DashboardViewModel.
+
+AccountsViewModel owns:
+
+- the complete Accounts-page account collection,
+- selected repository account ID,
+- selected account presentation,
+- account-scoped recent activity,
+- account-scoped transaction count,
+- account-scoped import history,
+- selected import-session detail,
+- display-name draft,
+- edit state,
+- input validation,
+- Save,
+- Cancel,
+- repository failure presentation,
+- post-save hydration,
+- hydration-refresh failure presentation,
+- deterministic empty states.
+
+DashboardViewModel remains responsible for Dashboard presentation and retains its existing three-account summary limit.
+
+---
+
+## Account-Selection Contract
+
+Selection must:
+
+- use immutable repository account ID,
+- default deterministically after hydration,
+- preserve selection through forced hydration when the account remains available,
+- fall back deterministically if the selected account disappears,
+- never use display name,
+- never use institution,
+- never use currency,
+- never use runtime UUID,
+- never silently retarget an active edit draft.
+
+The implementation must choose and test one deterministic policy:
+
+- block account selection while editing, or
+- require explicit Save or Cancel before selection changes.
+
+The chosen policy must be visible to the user and must not discard a draft silently.
+
+---
+
+## Inspector Presentation Contract
+
+Evolve the existing right-side inspector.
+
+The inspector must display the selected account only.
+
+Repository-backed or safely derived fields:
+
+- display name,
+- institution,
+- account type,
+- currency,
+- current balance,
+- transaction count,
+- recent account activity,
+- verified financial identity summaries,
+- account-scoped import history.
+
+Do not continue showing the hardcoded Repository account account type.
+
+Do not continue showing hardcoded Active as repository truth.
+
+Remove the Status row from the inspector.
+
+Do not display Active, Unavailable, Not modelled, or another substitute until repository-backed account lifecycle semantics are implemented.
+
+Map persisted account-type values to user-facing labels such as Bank Account or Credit Card. Do not expose raw repository enum strings.
+
+Do not add closure semantics to Sprint 37.
+
+The star control remains outside Sprint 37 scope.
+
+Dedicated Accounts rows must remain without a chevron.
+
+---
+
+## Display-Name Editing Workflow
+
+Use inline editing within the existing inspector.
 
 Required behaviour:
 
-- Validate the existing account and workspace relationship.
-- Map the payload using `existingAccountId`.
-- Do not upsert the workspace if it already exists.
-- Do not upsert the account.
-- Do not attach identifiers.
-- Persist the import session and transactions against the existing account.
+- Edit enters draft mode.
+- Save validates and persists the draft.
+- Cancel discards the draft.
+- Surrounding whitespace is trimmed.
+- Empty input is rejected.
+- Whitespace-only input is rejected.
+- Duplicate names are allowed.
+- Case-only changes are allowed.
+- Unchanged trimmed input performs no repository write.
+- Failed persistence leaves runtime state unchanged.
+- Cancel performs no repository write.
+- Draft values are never installed optimistically into runtime stores.
+- Selection cannot silently change the edit target.
 
-### No match
+No maximum length may be invented without an existing repository convention.
 
-```text
-noMatch
-```
-
-Required behaviour:
-
-1. Generate a new opaque account ID.
-2. Map the payload using that ID.
-3. Read the workspace.
-4. Create/upsert the workspace only when absent.
-5. Create the new account.
-6. Attach eligible parser identifiers.
-7. Create the import session.
-8. Replace transactions.
-9. Complete the import session.
-
-Eligible identifiers are only:
-
-```text
-strength == strong
-verificationState == verified
-```
-
-Weak and unverified identifiers must neither resolve nor attach.
-
-### Ambiguous
-
-```text
-ambiguous(candidates:)
-```
-
-Required behaviour:
-
-- Throw a concise coordination error.
-- Perform zero repository writes.
-- Perform zero runtime-store mutation.
-- Do not expose candidate identifiers.
-- Do not select an account.
-
-### Conflict
-
-```text
-conflict(candidates:)
-```
-
-Required behaviour:
-
-- Throw a concise coordination error.
-- Perform zero repository writes.
-- Perform zero runtime-store mutation.
-- Preserve every existing relationship.
-- Do not guess between accounts.
+Notes are excluded from this workflow.
 
 ---
 
-## Workspace and Account Preservation
+## Save and Hydration Workflow
 
-The coordinator must use read-before-create behaviour.
+Required flow:
 
-### Workspace
+    AccountsViewModel validates draft
+          ↓
+    AccountMetadataCoordinator or equivalent Service invokes targeted repository mutation
+          ↓
+    Repository write succeeds
+          ↓
+    RepositoryStoreHydrator(forceRefresh: true)
+          ↓
+    AccountStore, TransactionStore and ImportSessionStore are replaced
+          ↓
+    AccountsViewModel restores selection by repository account ID
 
-```text
-workspaceRepo.workspace(id: workspaceId)
-```
+Reject:
 
-- Existing workspace: do not upsert.
-- Missing workspace: create using the mapped candidate workspace.
+- direct AccountStore mutation after save,
+- optimistic runtime rename,
+- ViewModel access to SQLite,
+- ViewModel ownership of repositories,
+- View access to repositories,
+- any parallel persistence-to-presentation path.
 
-### Account
+Failure behaviour:
 
-- Resolved account: do not upsert.
-- New no-match account: upsert once using its new opaque ID.
+### Repository failure
 
-Sprint 36 must not call replacement-style upserts for existing workspace or account records.
+- Do not hydrate.
+- Runtime state remains unchanged.
+- Present an actionable save failure.
 
----
+### Repository success followed by hydration failure
 
-## Identifier Attachment
-
-Identifier attachment occurs only for a newly created `noMatch` account.
-
-Order:
-
-```text
-new account creation
-      ↓
-verified strong identifier attachment
-      ↓
-import-session creation
-      ↓
-transaction persistence
-```
-
-Attachment must:
-
-- preserve the parser-produced normalized value
-- preserve kind
-- preserve strength
-- preserve verification state
-- preserve provenance
-- remain workspace-scoped
-- use the existing repository conflict enforcement
-- remain idempotent
-- never log the unredacted value
-
-Sprint 36 does not attach additional identifiers to an already resolved account.
-
-That behaviour is deferred because it introduces identifier-backfill policy rather than basic account resolution.
+- The persisted name remains durable.
+- Runtime state remains at the previous complete hydrated state.
+- Report a distinct saved, refresh failed condition.
+- Allow deterministic retry or relaunch recovery.
+- Do not claim rollback occurred.
+- Do not install the draft into runtime state.
 
 ---
 
-## Runtime Commit Gating
+## Identity Presentation and Redaction
 
-Update `ImportEngine.commitPreparedImport` so runtime state changes only when persistence succeeds.
+Show only verified strong identifiers.
 
-Required rule:
+Permitted fields:
 
-```text
-persistenceResult.persisted == true
-      ↓
-DocumentStore / TransactionStore / AccountStore updates permitted
-```
+- user-friendly identifier kind,
+- redacted identifier value,
+- strength,
+- verification state,
+- provenance category.
 
-If persistence:
+Redaction must use FinancialIdentifier.redacted before the value reaches ViewModel or View presentation state.
 
-- throws
-- returns `.skipped`
-- is rejected because identity is ambiguous
-- is rejected because identity conflicts
+Do not expose:
 
-then runtime financial stores must remain unchanged.
+- complete normalized identifiers,
+- complete account numbers,
+- complete IBANs,
+- raw source fragments,
+- repository IDs as financial identity,
+- identifier values in diagnostics.
 
-The import must report failure through the existing result and diagnostics path.
-
-No runtime-store type change is required.
+Weak and unverified identifiers must not appear as verified identity summaries.
 
 ---
 
-## Partial-Write Contract
+## Account-Scoped Import-History Contract
 
-Sprint 36 accepts the repository’s existing sequential persistence model.
+Build read-only account history only from trusted transactions that contain both:
 
-It does not introduce a cross-repository unit of work or global transaction.
+- repository account ID,
+- repository import-session ID.
 
-Guaranteed zero-write cases:
+For each distinct referenced session, load the persisted ImportSessionRecordDTO once.
 
-- failed validation
-- resolver ambiguity
-- resolver conflict
-- invalid resolved account or workspace relationship
-- payload mapping failure
+History may show:
 
-Later failures may retain repository records created by earlier successful operations according to existing behaviour.
+- source document name,
+- started date,
+- completed date when available,
+- persisted import/validation status,
+- parser version when available,
+- transaction count,
+- transaction date range,
+- currency where deterministically available.
 
-Sprint 36 does not promise rollback across:
+History ordering must be deterministic:
 
-- workspace creation
-- account creation
-- identifier attachment
-- import-session creation
-- transaction persistence
-- completion update
+1. newest persisted session date first,
+2. immutable session ID as stable tie-breaker.
 
-Cross-repository atomic persistence is separate future architecture work.
+Do not include sessions whose account association cannot be proven.
+
+Do not invent:
+
+- separate persistence outcome,
+- failure summary,
+- validation-issue detail,
+- document hash,
+- document type,
+- page count,
+- unavailable document provenance.
+
+No global import-history query or repository redesign is approved.
+
+---
+
+## Inline Import-Session Detail
+
+Use an inline read-only drill-in within the existing account inspector.
+
+Do not add:
+
+- a new full-screen destination,
+- a global import-session management view,
+- import editing,
+- retry,
+- reversal,
+- deletion.
+
+The detail state may show only persisted or deterministically derived values already approved for account history.
+
+---
+
+## Privacy-Safe Diagnostics
+
+Permitted events:
+
+- account display-name update requested,
+- account display-name update succeeded,
+- account display-name update failed,
+- account-detail hydration failed,
+- import-history composition failed.
+
+Do not log:
+
+- old display name,
+- new display name,
+- raw identifier,
+- source filename,
+- source fragment,
+- account number,
+- IBAN,
+- account notes,
+- repository account ID unless existing diagnostic policy explicitly permits opaque internal IDs.
+
+Diagnostics remain structured, concise, in memory, and non-authoritative.
 
 ---
 
 ## Production Scope
 
-Modify only:
+Modify only approved production files or justified new files:
 
-```text
-Services/ImportPersistenceCoordinator.swift
-Services/ImportPersistenceMapper.swift
-Services/ImportEngine.swift
-```
+    Database/Repository.swift
+    Database/InMemoryRepositoryProvider.swift
+    Database/SQLiteRepositoryProvider.swift
+    Models/Account.swift
+    Models/Transaction.swift
+    Models/ImportSession.swift        # only if required for runtime representation
+    Core/AccountStore.swift           # only if required for bounded runtime identity access
+    Core/TransactionStore.swift       # only if repository-ID filtering is required
+    Core/ImportSessionStore.swift     # if the dedicated runtime store design is used
+    Services/RepositoryStoreHydrator.swift
+    Services/AccountMetadataCoordinator.swift
+    ViewModels/AccountsViewModel.swift
+    ContentView.swift
 
-No production modification is expected in:
+DashboardViewModel.swift must remain unchanged except for unavoidable compilation compatibility caused by approved runtime-model changes. Its Dashboard-specific behaviour and three-account limit must remain unchanged.
 
-```text
-Services/IdentityResolver.swift
-Models/FinancialDocument.swift
-Database/Repository.swift
-Database/DTOs.swift
-Database/InMemoryRepositoryProvider.swift
-Database/SQLiteRepositoryProvider.swift
-Database/Migrations.swift
-Parsers/
-Readers/
-Normalizers/
-Stores/
-ViewModels/
-Views/
-LedgerForge.xcodeproj
-```
+New production files must:
+
+- be added through Xcode,
+- appear in the Xcode navigator,
+- have correct target membership,
+- avoid unrelated project-file modifications.
+
+No DTO change is expected.
+
+If DTO changes become necessary, stop and report before broadening scope.
 
 ---
 
 ## Test Scope
 
-Modify:
+Modify or add only approved test files:
 
-```text
-LedgerForgeTests/ImportRepositoryIntegrationTests.swift
-LedgerForgeTests/ConfirmationGatedImportWorkflowTests.swift
-```
+    LedgerForgeTests/RepositoryContractTests.swift
+    LedgerForgeTests/AccountIdentifierRepositoryTests.swift
+    LedgerForgeTests/IdentityResolverTests.swift
+    LedgerForgeTests/RepositoryStoreHydratorTests.swift
+    LedgerForgeTests/ImportRepositoryIntegrationTests.swift
+    LedgerForgeTests/DeveloperDiagnosticsTests.swift
+    LedgerForgeTests/AccountsViewModelTests.swift
+    LedgerForgeTests/AccountMetadataCoordinatorTests.swift
+    LedgerForgeTests/ImportSessionStoreTests.swift
+
+Create only the new test files required by the selected production design.
+
+Do not place Accounts-page behaviour tests into DashboardViewModelTests.swift.
+
+DashboardViewModelTests.swift remains Dashboard-specific regression coverage.
 
 Run unchanged regression suites including:
 
-```text
-LedgerForgeTests/IdentityResolverTests.swift
-LedgerForgeTests/AccountIdentifierRepositoryTests.swift
-LedgerForgeTests/RepositoryContractTests.swift
-LedgerForgeTests/RepositoryStoreHydratorTests.swift
-LedgerForgeTests/CSVImportRegressionTests.swift
-```
+    LedgerForgeTests/CSVImportRegressionTests.swift
+    LedgerForgeTests/ConfirmationGatedImportWorkflowTests.swift
+    LedgerForgeTests/TransactionListViewModelTests.swift
 
 Do not create a new test target.
 
-Do not change project membership unless compilation proves it unavoidable. Stop and report if required.
-
 ---
 
-## Required Tests
+## Required Automated Tests
 
-### First Verified Import
+### Repository mutation
 
-For both in-memory and SQLite-backed integration:
+1. Name update changes only AccountDTO.name.
+2. Account ID remains unchanged.
+3. Workspace remains unchanged.
+4. Institution remains unchanged.
+5. Account type remains unchanged.
+6. Currency remains unchanged.
+7. Description remains unchanged.
+8. Creation timestamp remains unchanged.
+9. SQLite name-only update leaves `closed_at` and `created_from_import_session_id` unchanged.
+10. Missing account is rejected.
+11. Workspace mismatch is rejected.
+12. Empty input is rejected.
+13. Whitespace-only input is rejected.
+14. Duplicate names are accepted.
+15. Case-only changes are accepted.
+16. In-memory and SQLite providers behave equivalently.
+17. Unrelated accounts remain unchanged.
 
-- Resolver returns `noMatch`.
-- Exactly one new account is created.
-- The account ID does not contain the filename, institution name or display name.
-- Exactly one verified strong identifier is attached.
-- Every transaction references the new account ID.
-- The import session references the expected workspace.
-- Persistence succeeds.
+### Identity and relationships
 
-### Later Import With Different Filename
+18. Identifier rows remain unchanged.
+19. Identifier provenance remains unchanged.
+20. Resolver returns the same account after rename.
+21. Transactions retain repository account ID.
+22. Transactions retain import-session ID.
+23. Import sessions remain retrievable.
+24. Later differently named imports reuse the renamed account.
+25. No duplicate account is created.
+26. No duplicate identifier is created.
+27. SQLite relaunch restores the edited name and relationships.
 
-- Seed or perform a first import with a verified Axis identifier.
-- Import a second financial document carrying the same identifier but a different filename.
-- Resolver returns the existing account ID.
-- No second account is created.
-- No second identifier is created.
-- Every second-import transaction references the original account ID.
-- The existing `AccountDTO` remains exactly unchanged.
+### Hydration
 
-### Mapper Account-ID Propagation
+28. Runtime accounts retain repository account and workspace IDs.
+29. Runtime transactions retain account and import-session IDs.
+30. Verified identifier summaries are redacted before presentation state.
+31. Referenced import sessions hydrate deterministically.
+32. Sessions are not duplicated.
+33. History is scoped by repository account ID.
+34. History counts use trusted transactions only.
+35. History date ranges are correct.
+36. History ordering is deterministic.
+37. Forced hydration updates the display name.
+38. Forced hydration does not duplicate accounts or transactions.
 
-- A supplied account ID becomes `payload.account.id`.
-- Every mapped transaction uses the same ID.
-- Filename changes do not alter the selected account ID.
+### AccountsViewModel
 
-### Missing Identifier
-
-- Empty identifier input returns `noMatch`.
-- A new unseeded account is created under current unsupported-parser behaviour.
-- No identifier is attached.
-- No identifier is derived from metadata.
-
-### Weak and Unverified Identifiers
-
-- Verified weak identifiers do not resolve.
-- Unverified strong identifiers do not resolve.
-- Neither category is attached automatically.
-
-### Ambiguous Identity
-
-- The coordinator throws before mapping writes.
-- Workspace count remains unchanged.
-- Account count remains unchanged.
-- Identifier count remains unchanged.
-- Import-session count remains unchanged.
-- Transaction count remains unchanged.
-- Runtime stores remain unchanged.
-
-### Conflicting Identity
-
-- The coordinator throws before repository writes.
-- Existing account and identifier relationships remain unchanged.
-- No import session or transaction is created.
-- Runtime stores remain unchanged.
-
-### Validation Failure
-
-- Failed validation returns `.skipped`.
-- No account-identifier repository lookup occurs.
-- No repository write occurs.
-- No runtime mutation occurs.
-
-### Persistence Failure Gating
-
-- A persistence error after confirmation does not append documents, transactions or accounts to runtime stores.
-- Existing runtime contents remain unchanged.
+39. Accounts page exposes every account, not only three.
+40. Dashboard summary remains limited to three.
+41. Initial account selection is deterministic.
+42. Selecting another account updates the inspector.
+43. Selection survives forced hydration by repository account ID.
+44. Recent activity excludes transactions belonging to other accounts.
+45. Rename does not break activity association.
+46. Empty account state is deterministic.
+47. Empty identity state is deterministic.
+48. Empty history state is deterministic.
+49. Save trims outer whitespace.
+50. Empty or whitespace-only draft performs no write.
+51. Unchanged draft performs no write.
+52. Cancel performs no write.
+53. Failed repository write leaves stores unchanged.
+54. Saved-but-refresh-failed produces a distinct state.
+55. Draft cannot silently retarget another account.
+56. Selected session drives the correct inline detail.
 
 ### Privacy
 
-- Diagnostics contain no normalized financial identifier.
-- Diagnostics contain no bounded source-fragment text.
-- Ambiguity and conflict errors describe only the outcome category.
+57. No raw identifier reaches ViewModel or View presentation state.
+58. Diagnostics contain no raw identifier.
+59. Diagnostics contain no edited display name.
+60. Diagnostics contain no new source filename or source fragment.
+
+### Regression
+
+61. Sprint 36 account resolution remains unchanged.
+62. Axis financial fixture remains 81 INR transactions with unchanged totals, ordering, balances and validation.
+63. Existing import confirmation and cancellation remain unchanged.
+64. Existing transaction search remains unchanged.
+65. Existing credit/debit filtering remains unchanged.
+66. Existing Dashboard calculations remain unchanged.
+67. Complete Xcode-native test plan passes.
 
 ---
 
@@ -530,109 +649,154 @@ For both in-memory and SQLite-backed integration:
 
 The approved Axis fixture must preserve:
 
-- Axis parser selection
-- institution attribution
-- 81 INR transactions
-- transaction ordering
-- debit total
-- credit total
-- opening balance
-- closing balance
-- validation result
-- read-only preview
-- explicit confirmation requirement
-- cancellation without persistence
-- existing dashboard presentation
-- repository hydration after successful import
+- Axis parser selection,
+- institution attribution,
+- 81 INR transactions,
+- transaction ordering,
+- debit total,
+- credit total,
+- opening balance,
+- closing balance,
+- validation result,
+- read-only preview,
+- explicit confirmation requirement,
+- cancellation without persistence,
+- existing Dashboard presentation,
+- repository hydration after successful import.
 
-Sprint 36 changes account selection and identity persistence only.
+No financial calculation or approved baseline may change.
 
 ---
 
 ## Manual Runtime Verification
 
-Using the approved Axis NRE CSV:
+Using the approved Axis NRE CSV and an existing Sprint 36 SQLite database:
 
 1. Launch the newly built application.
-2. Confirm preparation still produces the normal read-only preview.
-3. Confirm the preview contains 81 transactions and unchanged financial values.
-4. Cancel once and verify no persistence or runtime mutation.
-5. Prepare again and explicitly confirm.
-6. Verify successful persistence.
-7. Verify the dashboard and transaction views hydrate normally.
-8. Relaunch the application.
-9. Verify the account and transactions restore from SQLite.
-10. Confirm no raw account identifier appears in UI or diagnostics.
-
-Different-filename account reuse may be verified through automated integration tests when duplicate detection makes an identical manual re-import unsuitable.
+2. Open Accounts.
+3. Confirm every persisted account appears.
+4. Confirm dedicated Accounts rows contain no chevron.
+5. If multiple accounts are present, select each account and verify the inspector changes. If only one account is present, verify deterministic initial selection and rely on automated multi-account selection coverage.
+6. Verify account type is repository-backed.
+7. Verify the Status row is absent.
+8. Verify recent activity belongs only to the selected account.
+9. Verify identifier values are redacted.
+10. Begin editing and Cancel.
+11. Verify no repository or runtime change.
+12. Reject empty and whitespace-only values.
+13. Save a value containing surrounding whitespace and verify trimming.
+14. Attempt selection change during editing and verify the approved deterministic policy.
+15. Save a valid display name.
+16. Verify runtime changes only after repository persistence and hydration.
+17. Verify institution, type, currency, balance, identifiers, transactions and sessions remain unchanged.
+18. Open account import history.
+19. Verify history ordering, source summary, status, counts and covered dates.
+20. Open one inline read-only session detail.
+21. Relaunch and verify the renamed account and history restore.
+22. Import a later statement carrying the same verified identifier under a different filename.
+23. Verify the existing renamed account is reused.
+24. Verify no duplicate account or identifier appears.
+25. Verify the new session appears under the same account.
+26. Confirm Dashboard and Transactions behaviour remains unchanged.
+27. Confirm Developer Console contains no raw identifiers, display-name values or newly logged source filenames.
+28. Run the Axis CSV baseline and verify financial truth is unchanged.
 
 ---
 
 ## Explicit Exclusions
 
-Do not:
+Do not implement:
 
-- modify parser identifier extraction
-- modify parser source context
-- modify readers or normalizers
-- derive identifiers in persistence
-- use filename-derived account identity
-- use institution names or display names as identity
-- match or attach weak identifiers
-- match or attach unverified identifiers
-- attach new identifiers to resolved accounts
-- redesign repository protocols
-- modify DTO definitions
-- modify SQLite schema or migrations
-- introduce a repository unit-of-work abstraction
-- promise global rollback
-- redesign duplicate detection
-- add account merge behaviour
-- add account-selection UI
-- add identity-conflict UI
-- modify runtime-store types
-- modify ViewModels or Views
-- change financial calculations
-- implement identifier extraction for another parser
-- log raw identifiers or source fragments
-- edit `Project documents/ADR.md`
-- edit `Project documents/Implementation.md` during Codex implementation
+- account notes,
+- AccountDTO.description editing,
+- schema changes,
+- migrations,
+- account closure or lifecycle editing,
+- favourites or star behaviour,
+- account ordering,
+- colour or icon customization,
+- institution editing,
+- account-type editing,
+- currency editing,
+- verified-identifier editing,
+- identifier attachment,
+- identifier backfill,
+- identity-conflict UI,
+- account linking or unlinking,
+- account merge or split,
+- account archive,
+- account deletion,
+- global import history,
+- import retry,
+- import editing,
+- import correction,
+- import deletion,
+- import reversal,
+- validation redesign,
+- persistence-outcome redesign,
+- source-document persistence expansion,
+- transaction multi-selection,
+- transaction bulk actions,
+- transaction deletion,
+- transaction provenance UI,
+- full account transaction-history drill-down,
+- parser changes,
+- reader changes,
+- normalizer changes,
+- new import formats,
+- duplicate-detection redesign,
+- financial calculation changes,
+- general Dashboard redesign,
+- general Accounts redesign,
+- another account-detail destination.
 
 ---
 
 ## Acceptance Criteria
 
-Sprint 36 is accepted only when:
+Sprint 37 is accepted only when:
 
-- Production persistence invokes `FinancialIdentityResolver`.
-- The mapper-owned workspace ID is used consistently.
-- Only parser-produced verified strong identifiers participate.
-- Filename-derived account-ID construction is removed.
-- New candidate IDs are opaque and import-scoped.
-- A first verified import creates one account and attaches its identifier.
-- A later differently named import reuses the original account ID.
-- Resolved workspace and account records are not upserted.
-- Existing `AccountDTO` metadata remains unchanged.
-- Identifier attachment occurs only for new no-match accounts.
-- Identifier attachment remains idempotent.
-- Weak and unverified identifiers neither resolve nor attach.
-- Ambiguous and conflicting outcomes cause zero repository writes.
-- Failed validation causes zero resolver lookup and zero writes.
-- Persistence failure causes no runtime-store mutation.
-- Every persisted transaction uses the selected account ID.
-- No repository protocol, DTO, schema or migration changes.
-- No parser, reader, normalizer, UI or runtime-store type changes.
+- Dedicated Accounts rows are selectable.
+- Selection uses immutable repository account ID.
+- The Accounts page exposes the complete account collection.
+- Dashboard presentation retains its existing three-account summary limit.
+- The selected inspector displays only the selected account.
+- Account type is no longer hardcoded as Repository account.
+- The hardcoded Status row is removed.
+- Runtime accounts retain repository account and workspace IDs.
+- Runtime transactions retain repository account and import-session IDs.
+- Display-name mutation updates only the persisted account name.
+- Replacement-style account upsert is not used for rename.
+- Duplicate names and case-only changes are supported.
+- Empty and whitespace-only names are rejected.
+- Unchanged trimmed input performs no write.
+- Cancel performs no write.
+- Failed repository persistence leaves runtime state unchanged.
+- Successful persistence is followed by canonical forced hydration.
+- Hydration failure is reported distinctly and does not install optimistic state.
+- Existing identifiers and provenance remain unchanged.
+- Existing transactions remain associated with the same account.
+- Existing import sessions remain retrievable.
+- Resolver behaviour remains unchanged after rename.
+- Verified identity summaries are redacted before presentation state.
+- Account history uses only proven trusted transaction relationships.
+- Import history ordering is deterministic.
+- No invented persistence outcome, failure summary or unavailable provenance is shown.
+- No Sprint 37 diagnostic contains a raw identifier, old or new display name, source filename, or source fragment.
+- In-memory and SQLite providers behave equivalently.
+- SQLite relaunch restores renamed account metadata and relationships.
 - Existing Axis financial values remain identical.
-- Focused integration tests pass for in-memory and SQLite providers.
-- Existing identity and repository regression suites pass.
+- Existing import confirmation and cancellation remain unchanged.
+- Existing transaction search and credit/debit filtering remain unchanged.
+- Existing Dashboard calculations remain unchanged.
+- Focused tests pass.
 - Complete Xcode-native test plan passes.
 - Xcode diagnostics pass.
 - Xcode static analysis passes.
 - Xcode clean build passes.
-- `git diff --check` passes.
+- git diff --check passes.
 - Manual runtime verification passes.
-- No raw financial identifier or source-fragment text is logged.
-- Planning documents remain untouched during implementation.
+- No unapproved production, test, asset, schema, project or documentation changes are present.
 
 ---
 
@@ -640,62 +804,69 @@ Sprint 36 is accepted only when:
 
 Stop implementation and report without expanding scope if:
 
-- Identity resolution requires identifier derivation outside a parser.
-- A filename, institution name, display name, masked value or suffix is required for matching.
-- An existing account must be upserted to reuse it.
-- Ambiguous or conflicting outcomes cannot be handled before writes.
-- Runtime mutation cannot be gated on successful persistence.
-- Repository protocols, DTOs, SQLite schema or migrations must change.
-- Full atomic rollback becomes required.
-- Identifier backfill onto resolved accounts becomes required.
-- Concurrent import guarantees become required.
-- Duplicate-detection redesign becomes necessary.
-- Parser, reader, normalizer, UI or runtime-store type changes become necessary.
-- Production files outside the approved surface are required.
-- Xcode project membership must change.
-- Planning documents require modification.
+- A rename requires replacement-style account upsert.
+- Any immutable account property must be supplied by the UI.
+- Selection or filtering must use display name.
+- Repository references cannot survive hydration.
+- Runtime refresh would bypass RepositoryStoreHydrator.
+- Notes or reliable closure status become required for acceptance.
+- Raw identifier values must enter presentation state.
+- Import history requires speculative account association.
+- History requires a schema migration or broad repository-query redesign.
+- Parser, import, validation, duplicate-detection or financial-calculation changes become necessary.
+- A View or ViewModel must access repositories or SQLite directly.
+- The existing Accounts list-plus-inspector layout cannot be retained.
+- Safe Xcode target membership cannot be achieved for justified new files.
+- Files outside the approved production and test surface become necessary without explicit review.
+- Existing financial regression values change.
+- Required tests, build, diagnostics or manual verification fail.
 
 ---
 
 ## Implementation Handoff
 
-After all validation passes:
+After all implementation validation passes:
 
 1. Review the final diff.
-2. Confirm only approved production and test files changed.
-3. Commit with:
+2. Confirm only approved production, test and justified Xcode membership changes are present.
+3. Run Xcode diagnostics.
+4. Run Xcode static analysis.
+5. Run a clean build.
+6. Run focused Sprint 37 tests.
+7. Run the complete Xcode-native test plan.
+8. Run git diff --check.
+9. Complete manual runtime verification.
+10. Commit with:
 
-```text
-Implement Sprint 36 verified account resolution
-```
+        Implement Sprint 37 account detail and provenance
 
-4. Push to `origin/main`.
-5. Verify the remote `main` commit.
-6. Update only:
+11. Push to origin/main.
+12. Verify the remote main commit.
+13. Update only after successful implementation and validation:
 
-```text
-Project documents/PROJECT_STATE.md
-Project documents/Codex response.md
-```
+        Project documents/PROJECT_STATE.md
+        Project documents/Codex response.md
 
-7. Record:
+14. Record:
 
-- exact files changed
-- opaque account-ID behaviour
-- existing-account reuse behaviour
-- existing metadata preservation
-- identifier-attachment behaviour
-- ambiguous and conflict zero-write evidence
-- runtime failure-gating evidence
-- partial-write limitation
-- exact test totals
-- build result
-- static-analysis result
-- manual runtime result
-- implementation commit hash
-- remote verification
-- current phase: awaiting Sprint 37 planning
+- exact files changed,
+- repository-ID selection behaviour,
+- targeted display-name mutation evidence,
+- metadata-preservation evidence,
+- identity and relationship-preservation evidence,
+- hydration and refresh evidence,
+- import-history composition evidence,
+- privacy/redaction evidence,
+- failure-gating evidence,
+- exact test totals,
+- build result,
+- diagnostics result,
+- static-analysis result,
+- manual runtime result,
+- implementation commit SHA,
+- remote verification,
+- current phase.
 
-8. Commit and push the documentation handoff separately.
+15. Create and push a separate documentation handoff commit where required.
 
-Do not modify `Project documents/Implementation.md` during implementation or handoff.
+Codex must not edit Project documents/Implementation.md during implementation.
