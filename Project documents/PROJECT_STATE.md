@@ -14,19 +14,18 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: eab8c88 — Implement Sprint 36 verified account resolution
+* Latest Implementation Commit: e0d9440 — Implement Sprint 37 account detail and provenance
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-028 — Bounded Parser Source Evidence (Accepted)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 37 — Account Detail, Display Name & Import Provenance
-* Current Phase: Sprint 37 ready for implementation
+* Current Sprint: Sprint 37 — Account Detail, Display Name & Import Provenance (implemented)
+* Current Phase: Awaiting Sprint 38 planning
 * Build Status: Passing
-* Validation Status: Sprint 36 passed Xcode diagnostics with zero issues, static analysis and clean build; focused Sprint 36 integration/workflow tests passed (21 tests, 0 failures, 0 skipped), unchanged identity/repository regression suites passed (31 tests, 0 failures, 0 skipped), complete Xcode-native test plan passed (149 tests, 0 failures, 0 skipped), Axis CSV financial regression passed, approved implementation diff checks passed, and manual runtime verification passed
+* Validation Status: Sprint 37 passed Xcode diagnostics, static analysis and clean build; focused Sprint 37 suites passed (63 tests, 0 failures, 0 skipped), complete Xcode-native test plan passed (156 tests, 0 failures, 0 skipped), Axis CSV financial regression passed, approved diff checks passed, and manual runtime verification passed
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-* Latest Verified Implementation Remote: eab8c885431492d3092f24d1185d71d169f2b1ae
-* Latest Documentation Handoff Commit: 6ccef671a520e5d8e8bee38168dd27ab0166f4eb
+* Latest Verified Implementation Remote: e0d9440c290fd15890104a088f3c1be7936586c0
 
 ## Bootstrap
 
@@ -89,44 +88,19 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 37 — Account Detail, Display Name & Import Provenance is approved and ready for implementation.
+Active Work: Sprint 37 — Account Detail, Display Name & Import Provenance is implemented, fully tested and manually verified.
 
-Objective:
+Verified Sprint 37 state:
 
-* Implement the approved Sprint 37 ACTIVE contract in `Project documents/Implementation.md`.
-* Preserve the verified Sprint 36 implementation and financial baseline until Sprint 37 validation succeeds.
-
-Scope:
-
-* Production import persistence now resolves parser-produced verified strong financial identifiers before account creation.
-* A unique verified match reuses the existing immutable repository account ID without upserting the existing workspace or account.
-* A no-match import creates one opaque import-scoped account ID and attaches only parser-produced verified strong identifiers.
-* Missing, weak or unverified identifiers do not resolve and are not attached automatically.
-* Ambiguous and conflicting resolution outcomes throw before repository writes and do not mutate runtime financial stores.
-* Failed validation performs no identity lookup or repository write.
-* Runtime financial stores mutate only after successful persistence; skipped and failed persistence leave them unchanged.
-* The mapper accepts the coordinator-selected account ID and applies it to the account and every transaction; filename-derived durable account IDs were removed.
-* Existing sequential persistence remains non-atomic across workspace, account, identifier, import-session and transaction repositories; later failures may retain earlier successful writes.
-* Sprint 36 preserved parser selection, institution, 81 transactions, currency, transaction ordering, debit and credit totals, opening and closing balances, validation and confirmation-gated import behaviour.
-* Sprint 36 made no parser, reader, normalizer, DTO, repository protocol, schema, migration, runtime-store type, ViewModel, UI or Xcode project-file changes.
-* ADR-028 — Bounded Parser Source Evidence is Accepted.
-* `Project documents/Implementation.md` contains only the current ACTIVE sprint; completed sprint history belongs in `Project documents/PROJECT_STATE.md`.
-* Codex must never edit `Project documents/Implementation.md`.
-* Desktop ChatGPT owns ACTIVE sprint planning.
-* Repository DTO `Equatable` conformances for `WorkspaceDTO`, `TransactionRawRowDTO`, `TransactionDTO`, `AccountDTO` and `ImportSessionRecordDTO` are explicitly nonisolated.
-* The app target default actor isolation remains `MainActor`.
-* `Project documents/Codex response.md` records the latest planning or execution report produced by the executing assistant.
-* `Project documents/PROJECT_STATE.md` records verified repository facts only.
-* `Project documents/.github/Context_Manifest.yaml` is the bootstrap manifest and routing document, not a repository state database.
-* Only the ACTIVE sprint block in `Project documents/Implementation.md` should be read during sprint execution.
-* Preserve RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
-* Preserve import, parser, validation and repository semantics.
-* Preserve transaction search and credit/debit toggle behaviour.
-* Preserve the approved UI/UX v1.0 appearance.
-* Preserve durable SQLite startup persistence wiring.
-* Preserve stable repository account identifiers.
-* Preserve institution attribution through repository hydration.
-* Sprint 36 implementation commit `eab8c885431492d3092f24d1185d71d169f2b1ae` was pushed to `origin/main` and verified with `git ls-remote origin refs/heads/main`.
+* Account display-name mutation uses one targeted repository operation with In-Memory and SQLite parity; SQLite uses `UPDATE` and preserves unmodeled metadata and relationships.
+* Repository account and workspace IDs now survive canonical hydration; hydrated transactions retain repository account and import-session IDs.
+* RepositoryStoreHydrator is still the only persistence-to-runtime boundary and now supplies bounded, trusted import-session runtime state and verified-strong, redacted identity summaries.
+* AccountsViewModel owns the complete Accounts-page collection, immutable-ID selection, inspector-scoped activity and history, edit state, validation and selection restoration; Dashboard retains its existing three-account summary limit.
+* Account display-name edits are non-optimistic: target mutation succeeds before forced canonical hydration, with separate save-failed and saved-but-refresh-failed presentation states.
+* Account import history is composed only from trusted transactions carrying both immutable repository references; referenced sessions are loaded once and ordered deterministically.
+* No DTO, schema, migration, parser, reader, normalizer, validation, import-persistence, financial-calculation, duplicate-detection or repository redesign was required.
+* `Project documents/Implementation.md` remained planning-frozen and unmodified.
+* Sprint 37 implementation commit `e0d9440c290fd15890104a088f3c1be7936586c0` is pushed and verified at `origin/main`.
 
 ## Current Product Review
 
@@ -180,11 +154,10 @@ Scope:
 
 ### Current Critical Product Issues
 
-- None verified for Sprint 36.
+- None verified for Sprint 37.
 
 ### Current Important Product Issues
 
-- Dedicated Accounts rows currently contain no chevron and have no functional selection behaviour; the Accounts screen presents a list with a right-side inspector, and the inspector currently displays the first Dashboard account summary. The approved Sprint 37 scope addresses account selection and repository-backed inspector behaviour.
 - Some user-facing screens expose developer terminology such as repository or hydration language.
 - Toolbar composition varies across major screens.
 - Several user-facing controls display `Pending` or `Soon` states that add visual noise.
@@ -200,11 +173,11 @@ Scope:
 
 ### Ready for Next Feature Sprint?
 
-Sprint 37 is ready for implementation.
+Awaiting Sprint 38 planning.
 
 ### Reason
 
-Sprint 36 implementation and validation are complete. The Sprint 37 ACTIVE contract has been approved and now governs the next implementation phase.
+Sprint 37 implementation, validation and manual runtime verification are complete. Desktop ChatGPT owns the next ACTIVE sprint definition.
 
 Out of Scope:
 
@@ -231,7 +204,36 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Implement, validate and manually verify Sprint 37.
+* Define Sprint 38.
+
+---
+
+# Sprint 37
+
+## Objective
+Deliver repository-backed account detail, safe display-name editing and account-scoped import provenance without changing import, parser, validation or financial behaviour.
+
+## Status
+Implemented, fully tested and manually verified
+
+## Outcome
+- AccountRepository now exposes a targeted display-name update with In-Memory and SQLite parity; whitespace-only names are rejected, unchanged trimmed input is a no-op, duplicates and case-only changes are supported, and SQLite uses `UPDATE` rather than replacement upsert.
+- SQLite verification confirmed `closed_at` and `created_from_import_session_id`, identifier rows and import-session relationships survive a rename.
+- Canonical hydration preserves immutable repository account/workspace references, transaction account/import-session references, trusted import-session summaries and redacted verified-strong identity summaries.
+- AccountsViewModel provides complete-account presentation, immutable-ID selection and restoration, selected-account activity, deterministic trusted import history, inline import detail and edit-state protection against draft retargeting.
+- AccountMetadataCoordinator performs the target write followed by canonical forced hydration; runtime stores are not mutated optimistically.
+- Dedicated Accounts rows are selectable without chevrons; the inspector is selected-account scoped, uses repository-backed account type, omits the Status row and shows safe empty states.
+- Xcode diagnostics, static analysis and clean build passed.
+- Focused Sprint 37 suites passed: 63 tests, 0 failures, 0 skipped.
+- Complete Xcode-native test plan passed: 156 tests, 0 failures, 0 skipped.
+- Axis CSV financial regression, `git diff --check` and conflict-marker checks passed.
+- Manual runtime verification passed against the existing Sprint 36 SQLite database: one Axis account, 81 transactions, trimmed save, relaunch restoration, scoped import history/detail and original display-name restoration were verified.
+
+## Implementation Commit
+`e0d9440c290fd15890104a088f3c1be7936586c0` — Implement Sprint 37 account detail and provenance
+
+## Current Phase
+Awaiting Sprint 38 planning
 
 ---
 
