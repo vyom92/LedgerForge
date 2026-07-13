@@ -25,13 +25,17 @@ final class AxisBankAccountParser: StatementParser {
         document: NormalizedDocument
     ) throws -> FinancialDocument {
 
+        let financialIdentifiers = Self.financialIdentifiers(
+            from: document.sourceContext.preTransactionFragments
+        )
+
         guard !document.rows.isEmpty else {
             return FinancialDocument(
                 sourceDocument: document.document,
                 metadata: document.metadata,
                 parserName: name,
                 transactions: [],
-                financialIdentifiers: []
+                financialIdentifiers: financialIdentifiers
             )
         }
 
@@ -109,7 +113,75 @@ final class AxisBankAccountParser: StatementParser {
             metadata: document.metadata,
             parserName: name,
             transactions: transactions,
-            financialIdentifiers: []
+            financialIdentifiers: financialIdentifiers
         )
+    }
+
+    private static func financialIdentifiers(
+        from fragments: [NormalizedDocument.SourceFragment]
+    ) -> [FinancialIdentifier] {
+        var uniqueValues: Set<String> = []
+
+        for fragment in fragments {
+            switch statementAccountEvidence(in: fragment.text) {
+            case .unsupported:
+                continue
+            case .invalid:
+                return []
+            case .valid(let value):
+                uniqueValues.insert(value)
+            }
+        }
+
+        guard
+            uniqueValues.count == 1,
+            let value = uniqueValues.first,
+            let identifier = try? FinancialIdentifier(
+                kind: .institutionAccountId,
+                rawValue: value,
+                verificationState: .verified,
+                provenance: .institutionStructuredField
+            )
+        else {
+            return []
+        }
+
+        return [identifier]
+    }
+
+    private static func statementAccountEvidence(
+        in sourceText: String
+    ) -> StatementAccountEvidence {
+        let text = sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard text.hasPrefix(statementAccountPrefix) else {
+            return .unsupported
+        }
+
+        let remainder = text.dropFirst(statementAccountPrefix.count)
+
+        guard let periodRange = remainder.range(of: statementPeriodMarker) else {
+            return .invalid
+        }
+
+        let value = String(remainder[..<periodRange.lowerBound])
+
+        guard
+            !value.isEmpty,
+            value.allSatisfy({ $0.isASCII && $0.isNumber })
+        else {
+            return .invalid
+        }
+
+        return .valid(value)
+    }
+
+    private static let statementAccountPrefix = "Statement of Account No - "
+    private static let statementPeriodMarker = " for the period ("
+
+    private enum StatementAccountEvidence {
+        case unsupported
+        case invalid
+        case valid(String)
     }
 }

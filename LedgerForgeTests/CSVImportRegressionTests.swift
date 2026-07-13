@@ -43,7 +43,11 @@ struct CSVImportRegressionTests {
         #expect(validation.openingBalance == fixture.expected.openingBalanceDecimal)
         #expect(validation.closingBalance == fixture.expected.closingBalanceDecimal)
         #expect(validation.passed == fixture.expected.validationPassed)
-        #expect(financialDocument.financialIdentifiers.isEmpty)
+        #expect(financialDocument.financialIdentifiers.count == 1)
+        #expect(financialDocument.financialIdentifiers.first?.kind == .institutionAccountId)
+        #expect(financialDocument.financialIdentifiers.first?.strength == .strong)
+        #expect(financialDocument.financialIdentifiers.first?.verificationState == .verified)
+        #expect(financialDocument.financialIdentifiers.first?.provenance == .institutionStructuredField)
     }
 
     @Test func sourceContextPreservesExactPreTransactionFragmentsAndBoundary() {

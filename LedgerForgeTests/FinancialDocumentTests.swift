@@ -14,8 +14,106 @@ struct FinancialDocumentTests {
         #expect(parsedFixture.financialDocument.metadata == parsedFixture.normalizedDocument.metadata)
         #expect(parsedFixture.financialDocument.parserName == "Axis Bank Account")
         #expect(parsedFixture.financialDocument.transactions.count == parsedFixture.expected.transactionCount)
-        #expect(parsedFixture.financialDocument.financialIdentifiers.isEmpty)
+        #expect(parsedFixture.financialDocument.financialIdentifiers.count == 1)
         #expect(String(describing: type(of: parsedFixture.parser)) == parsedFixture.expected.expectedParser)
+    }
+
+    @Test func axisParserProducesVerifiedAccountIdentifierFromApprovedCSVFixture() async throws {
+        let parsedFixture = try await parseApprovedAxisCSVFixture()
+        let identifier = try #require(parsedFixture.financialDocument.financialIdentifiers.first)
+        let expectedValue = try expectedStatementAccountValue(
+            from: parsedFixture.normalizedDocument.sourceContext
+        )
+
+        #expect(parsedFixture.financialDocument.financialIdentifiers.count == 1)
+        #expect(identifier.kind == .institutionAccountId)
+        #expect(identifier.strength == .strong)
+        #expect(identifier.verificationState == .verified)
+        #expect(identifier.provenance == .institutionStructuredField)
+        #expect(identifier.normalizedValue == expectedValue)
+    }
+
+    @Test func axisParserWithoutSourceContextPreservesTransactionsAndProducesNoIdentifier() throws {
+        let financialDocument = try parseSyntheticAxisDocument(sourceFragments: [])
+
+        #expect(financialDocument.transactions.count == 1)
+        #expect(financialDocument.financialIdentifiers.isEmpty)
+    }
+
+    @Test func axisParserRejectsMaskedAndSuffixOnlyAccountEvidence() throws {
+        let evidenceCases = [
+            "Statement of Account No - XXXXX1234 for the period (From : 01-01-2026 To : 31-01-2026)",
+            "Account suffix - 1234"
+        ]
+
+        for evidence in evidenceCases {
+            let financialDocument = try parseSyntheticAxisDocument(sourceFragments: [evidence])
+
+            #expect(financialDocument.transactions.count == 1)
+            #expect(financialDocument.financialIdentifiers.isEmpty)
+        }
+    }
+
+    @Test func axisParserIgnoresUnrelatedStructuredHeaderValues() throws {
+        let financialDocument = try parseSyntheticAxisDocument(
+            sourceFragments: [
+                "Customer ID - 123456789",
+                "IFSC - UTIB0000001",
+                "MICR - 123456789",
+                "Mobile - 1234567890"
+            ]
+        )
+
+        #expect(financialDocument.transactions.count == 1)
+        #expect(financialDocument.financialIdentifiers.isEmpty)
+    }
+
+    @Test func axisParserDeduplicatesRepeatedFullAccountEvidence() throws {
+        let evidence = "Statement of Account No - 123456789012345 for the period (From : 01-01-2026 To : 31-01-2026)"
+        let financialDocument = try parseSyntheticAxisDocument(
+            sourceFragments: [evidence, evidence]
+        )
+
+        #expect(financialDocument.transactions.count == 1)
+        #expect(financialDocument.financialIdentifiers.count == 1)
+    }
+
+    @Test func axisParserRejectsConflictingFullAccountEvidenceWithoutAffectingTransactions() throws {
+        let financialDocument = try parseSyntheticAxisDocument(
+            sourceFragments: [
+                "Statement of Account No - 123456789012345 for the period (From : 01-01-2026 To : 31-01-2026)",
+                "Statement of Account No - 987654321098765 for the period (From : 01-01-2026 To : 31-01-2026)"
+            ]
+        )
+
+        #expect(financialDocument.transactions.count == 1)
+        #expect(financialDocument.financialIdentifiers.isEmpty)
+    }
+
+    @Test func axisParserRejectsMalformedAccountEvidenceWithoutAffectingTransactions() throws {
+        let evidenceCases = [
+            "Statement of Account No - ABC123 for the period (From : 01-01-2026 To : 31-01-2026)",
+            "Statement of Account No - 123456789012345"
+        ]
+
+        for evidence in evidenceCases {
+            let financialDocument = try parseSyntheticAxisDocument(sourceFragments: [evidence])
+
+            #expect(financialDocument.transactions.count == 1)
+            #expect(financialDocument.financialIdentifiers.isEmpty)
+        }
+    }
+
+    @Test func axisParserExtractsIdentifierWhenTransactionRowsAreEmpty() throws {
+        let financialDocument = try parseSyntheticAxisDocument(
+            sourceFragments: [
+                "Statement of Account No - 123456789012345 for the period (From : 01-01-2026 To : 31-01-2026)"
+            ],
+            includeTransaction: false
+        )
+
+        #expect(financialDocument.transactions.isEmpty)
+        #expect(financialDocument.financialIdentifiers.count == 1)
     }
 
     @Test func axisParserFinancialDocumentValidationMatchesApprovedBaseline() async throws {
@@ -102,6 +200,70 @@ struct FinancialDocumentTests {
         return formatter
     }()
 
+    private func expectedStatementAccountValue(
+        from sourceContext: NormalizedDocument.SourceContext
+    ) throws -> String {
+        let prefix = "Statement of Account No - "
+        let periodMarker = " for the period ("
+        let sourceText = try #require(
+            sourceContext.preTransactionFragments
+                .map(\.text)
+                .first { $0.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(prefix) }
+        )
+        let text = sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let remainder = text.dropFirst(prefix.count)
+        let periodRange = try #require(remainder.range(of: periodMarker))
+        let value = String(remainder[..<periodRange.lowerBound])
+
+        #expect(!value.isEmpty)
+        #expect(value.allSatisfy { $0.isASCII && $0.isNumber })
+
+        return value
+    }
+
+    private func parseSyntheticAxisDocument(
+        sourceFragments: [String],
+        includeTransaction: Bool = true
+    ) throws -> FinancialDocument {
+        let importedAt = Date(timeIntervalSince1970: 1_767_225_600)
+        let document = Document(
+            filename: "axis-parser-test.csv",
+            url: URL(fileURLWithPath: "/tmp/axis-parser-test.csv"),
+            fileType: "CSV",
+            importedAt: importedAt
+        )
+        let metadata = DocumentMetadata(
+            institution: .axis,
+            documentType: .bankAccount,
+            fileFormat: .csv,
+            confidence: 1
+        )
+        let rows = includeTransaction
+            ? [
+                NormalizedRow(
+                    rowNumber: 1,
+                    values: ["01-01-2026", "", "Opening credit", "100", "", "1100"]
+                )
+            ]
+            : []
+        let sourceContext = NormalizedDocument.SourceContext(
+            preTransactionFragments: sourceFragments.enumerated().map { index, text in
+                NormalizedDocument.SourceFragment(
+                    sourceOrdinal: index + 1,
+                    text: text
+                )
+            }
+        )
+        let normalizedDocument = NormalizedDocument(
+            document: document,
+            metadata: metadata,
+            rows: rows,
+            sourceContext: sourceContext
+        )
+
+        return try AxisBankAccountParser().parse(document: normalizedDocument)
+    }
+
     private func parseApprovedAxisCSVFixture() async throws -> ParsedAxisFixture {
         let csvURL = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
         let text = try CSVReader().read(from: csvURL)
@@ -123,11 +285,15 @@ struct FinancialDocumentTests {
             classification: classification
         )
         let parser = try #require(selection.parser)
-        let rows = CSVNormalizer().normalize(text: text, document: document)
+        let normalization = CSVNormalizer().normalizeWithSourceContext(
+            text: text,
+            document: document
+        )
         let normalizedDocument = NormalizedDocument(
             document: document,
             metadata: selection.legacyMetadata,
-            rows: rows
+            rows: normalization.rows,
+            sourceContext: normalization.sourceContext
         )
         let financialDocument = try parser.parse(document: normalizedDocument)
         let expected = try ExpectedFinancialDocumentBaseline.axisBankNREBaseline()
