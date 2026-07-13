@@ -1,6 +1,6 @@
-# =======ACTIVE SPRINT==========
+# ======= ACTIVE SPRINT =======
 
-## Sprint 35 — Verified Axis Account Identifier Extraction
+## Sprint 36 — Verified Account Resolution & Identity Seeding
 
 ### Status
 
@@ -10,71 +10,383 @@
 
 ## Objective
 
-Update `AxisBankAccountParser` so it deterministically produces one verified, strong `FinancialIdentifier` when `NormalizedDocument.sourceContext` contains one unambiguous full Axis account-number field.
+Integrate parser-produced verified financial identifiers into production import persistence so LedgerForge can:
 
-The approved flow is:
+1. Reuse an existing repository account when identity resolves uniquely.
+2. Create and seed a new repository account when no match exists.
+3. Reject ambiguous or conflicting identity before any repository write.
+4. Prevent runtime-store mutation when persistence does not succeed.
+5. Remove filenames, institution labels and display metadata from durable account-ID construction.
+
+Sprint 36 completes the first production path from:
 
 ```text
-NormalizedDocument.sourceContext
-            ↓
-AxisBankAccountParser
-            ↓
-FinancialIdentifier
-├─ kind: institutionAccountId
-├─ strength: strong
-├─ verificationState: verified
-└─ provenance: institutionStructuredField
-            ↓
+StatementParser
+      ↓
 FinancialDocument.financialIdentifiers
+      ↓
+FinancialIdentityResolver
+      ↓
+Repository account selection
+      ↓
+Confirmed persistence
 ```
-
-Sprint 35 changes Axis parser identifier output only.
-
-It must preserve all current:
-
-- parser selection
-- institution
-- transaction output and ordering
-- currency
-- debit and credit totals
-- opening and closing balances
-- financial calculations
-- validation behaviour
-- persistence behaviour
-- runtime behaviour
-- user-facing behaviour
 
 ---
 
 ## Governing Architecture
 
-Sprint 35 implements the existing decisions in:
+Sprint 36 implements existing decisions from:
 
-- ADR-012 — Separation of Readers and Parsers
+- ADR-010 — Validation Before Persistence
 - ADR-019 — Reference Fixtures Define Financial Truth
+- ADR-024 — Repository Hydration Boundary
 - ADR-025 — Stable Financial Entity Identity
+- ADR-026 — Structured Developer Diagnostics
 - ADR-027 — Parser-Owned Financial Identifier Extraction
 - ADR-028 — Bounded Parser Source Evidence
 
-Only the selected statement parser may interpret source context and classify an identifier as verified.
+No new ADR is required.
 
-Generic normalization, orchestration, validation and persistence components must not interpret financial identity.
+Only parsers may create or verify `FinancialIdentifier` values.
 
-Source context remains transient. Source-fragment text and unredacted identifiers must not be stored or logged.
+Persistence coordination may consume parser-produced identifiers to select a repository account, but it must never derive identifiers, upgrade evidence, interpret source fragments, or use presentation metadata as identity.
 
 ---
 
-## Approved Evidence
-
-The approved Axis CSV fixture contains a structured pre-transaction source line equivalent to:
+## Approved Production Flow
 
 ```text
-Statement of Account No - <full numeric account identifier> for the period (...)
+Passed validation
+      ↓
+FinancialIdentityResolver.resolve(
+    workspaceId,
+    financialDocument.financialIdentifiers
+)
+      ↓
+┌──────────────────────────────────────────────┐
+│ resolved(existingAccountId)                  │
+│   → verify existing account                  │
+│   → preserve existing account unchanged      │
+│   → persist against existing account ID      │
+│                                              │
+│ noMatch                                      │
+│   → generate opaque import-scoped account ID │
+│   → create account                           │
+│   → attach verified strong identifiers       │
+│   → persist against new account ID           │
+│                                              │
+│ ambiguous / conflict                         │
+│   → throw before every repository write      │
+│   → do not guess                             │
+└──────────────────────────────────────────────┘
+      ↓
+Successful persistence result
+      ↓
+Runtime-store mutation and hydration
 ```
 
-Use the exact fixture content present in the repository as the authoritative source.
+Validation must remain before resolution.
 
-Do not hard-code the fixture's account number.
+Runtime mutation must occur only after persistence succeeds.
+
+---
+
+## Workspace Ownership
+
+`ImportPersistenceMapper` remains the single owner of the configured persistence workspace ID.
+
+Expose that value as an internal read-only property.
+
+The coordinator must use the mapper-owned workspace ID for:
+
+- resolver lookup
+- workspace retrieval
+- account validation
+- payload mapping
+- identifier attachment
+
+Do not introduce another independently defaulted workspace ID.
+
+---
+
+## Account-ID Selection
+
+### Existing account
+
+For:
+
+```swift
+.resolved(accountId: existingAccountId)
+```
+
+the coordinator must:
+
+- Fetch the account using `accountRepo.account(id:)`.
+- Confirm the account exists.
+- Confirm it belongs to the mapper-owned workspace.
+- Use its immutable repository ID.
+- Skip `upsertAccount`.
+- Preserve the stored `AccountDTO` exactly.
+- Map every new transaction to the existing account ID.
+- Perform no identifier attachment during Sprint 36.
+
+A resolved import must not overwrite:
+
+- account name
+- institution
+- account type
+- currency
+- description
+- creation timestamp
+- existing identifiers
+
+### New account
+
+For:
+
+```swift
+.noMatch
+```
+
+create one opaque import-scoped account ID.
+
+The ID may use the import-session UUID because it is unique and unrelated to presentation metadata.
+
+The ID must not contain or derive from:
+
+- filename
+- institution name
+- display account name
+- document description
+- masked account values
+- account suffixes
+- source-context text
+
+The account display name and description may continue to use institution and filename information because those remain presentation/source metadata rather than identity.
+
+---
+
+## Mapper Contract
+
+Update `ImportPersistenceMapper` so payload mapping receives the selected account ID explicitly.
+
+Conceptually:
+
+```swift
+payload(
+    financialDocument: financialDocument,
+    importSession: importSession,
+    validation: validation,
+    accountId: selectedAccountId
+)
+```
+
+The mapper must:
+
+- construct `AccountDTO.id` using the supplied ID
+- pass that same ID to every `TransactionDTO`
+- preserve current DTO metadata mapping
+- preserve currency, dates, amounts, balances, direction and trust metadata
+- expose its configured workspace ID read-only
+
+The mapper must not:
+
+- invoke repositories
+- invoke the resolver
+- decide whether an account matches
+- inspect identifier strength or verification state
+- derive identity from the filename
+
+The coordinator selects identity.  
+The mapper constructs DTOs.  
+Apparently separation of responsibilities remains useful even after humans discover dependency injection.
+
+---
+
+## Resolver Outcome Handling
+
+### Resolved
+
+```text
+resolved(existingAccountId)
+```
+
+Required behaviour:
+
+- Validate the existing account and workspace relationship.
+- Map the payload using `existingAccountId`.
+- Do not upsert the workspace if it already exists.
+- Do not upsert the account.
+- Do not attach identifiers.
+- Persist the import session and transactions against the existing account.
+
+### No match
+
+```text
+noMatch
+```
+
+Required behaviour:
+
+1. Generate a new opaque account ID.
+2. Map the payload using that ID.
+3. Read the workspace.
+4. Create/upsert the workspace only when absent.
+5. Create the new account.
+6. Attach eligible parser identifiers.
+7. Create the import session.
+8. Replace transactions.
+9. Complete the import session.
+
+Eligible identifiers are only:
+
+```text
+strength == strong
+verificationState == verified
+```
+
+Weak and unverified identifiers must neither resolve nor attach.
+
+### Ambiguous
+
+```text
+ambiguous(candidates:)
+```
+
+Required behaviour:
+
+- Throw a concise coordination error.
+- Perform zero repository writes.
+- Perform zero runtime-store mutation.
+- Do not expose candidate identifiers.
+- Do not select an account.
+
+### Conflict
+
+```text
+conflict(candidates:)
+```
+
+Required behaviour:
+
+- Throw a concise coordination error.
+- Perform zero repository writes.
+- Perform zero runtime-store mutation.
+- Preserve every existing relationship.
+- Do not guess between accounts.
+
+---
+
+## Workspace and Account Preservation
+
+The coordinator must use read-before-create behaviour.
+
+### Workspace
+
+```text
+workspaceRepo.workspace(id: workspaceId)
+```
+
+- Existing workspace: do not upsert.
+- Missing workspace: create using the mapped candidate workspace.
+
+### Account
+
+- Resolved account: do not upsert.
+- New no-match account: upsert once using its new opaque ID.
+
+Sprint 36 must not call replacement-style upserts for existing workspace or account records.
+
+---
+
+## Identifier Attachment
+
+Identifier attachment occurs only for a newly created `noMatch` account.
+
+Order:
+
+```text
+new account creation
+      ↓
+verified strong identifier attachment
+      ↓
+import-session creation
+      ↓
+transaction persistence
+```
+
+Attachment must:
+
+- preserve the parser-produced normalized value
+- preserve kind
+- preserve strength
+- preserve verification state
+- preserve provenance
+- remain workspace-scoped
+- use the existing repository conflict enforcement
+- remain idempotent
+- never log the unredacted value
+
+Sprint 36 does not attach additional identifiers to an already resolved account.
+
+That behaviour is deferred because it introduces identifier-backfill policy rather than basic account resolution.
+
+---
+
+## Runtime Commit Gating
+
+Update `ImportEngine.commitPreparedImport` so runtime state changes only when persistence succeeds.
+
+Required rule:
+
+```text
+persistenceResult.persisted == true
+      ↓
+DocumentStore / TransactionStore / AccountStore updates permitted
+```
+
+If persistence:
+
+- throws
+- returns `.skipped`
+- is rejected because identity is ambiguous
+- is rejected because identity conflicts
+
+then runtime financial stores must remain unchanged.
+
+The import must report failure through the existing result and diagnostics path.
+
+No runtime-store type change is required.
+
+---
+
+## Partial-Write Contract
+
+Sprint 36 accepts the repository’s existing sequential persistence model.
+
+It does not introduce a cross-repository unit of work or global transaction.
+
+Guaranteed zero-write cases:
+
+- failed validation
+- resolver ambiguity
+- resolver conflict
+- invalid resolved account or workspace relationship
+- payload mapping failure
+
+Later failures may retain repository records created by earlier successful operations according to existing behaviour.
+
+Sprint 36 does not promise rollback across:
+
+- workspace creation
+- account creation
+- identifier attachment
+- import-session creation
+- transaction persistence
+- completion update
+
+Cross-repository atomic persistence is separate future architecture work.
 
 ---
 
@@ -83,156 +395,134 @@ Do not hard-code the fixture's account number.
 Modify only:
 
 ```text
-Parsers/AxisBankAccountParser.swift
+Services/ImportPersistenceCoordinator.swift
+Services/ImportPersistenceMapper.swift
+Services/ImportEngine.swift
 ```
 
-Permitted production changes:
+No production modification is expected in:
 
-- Add private Axis-specific extraction helpers.
-- Inspect only:
-
-```swift
-document.sourceContext.preTransactionFragments
+```text
+Services/IdentityResolver.swift
+Models/FinancialDocument.swift
+Database/Repository.swift
+Database/DTOs.swift
+Database/InMemoryRepositoryProvider.swift
+Database/SQLiteRepositoryProvider.swift
+Database/Migrations.swift
+Parsers/
+Readers/
+Normalizers/
+Stores/
+ViewModels/
+Views/
+LedgerForge.xcodeproj
 ```
-
-- Recognise the supported full Axis statement-account-number field.
-- Extract the complete unmasked numeric account value.
-- Construct:
-
-```swift
-FinancialIdentifier(
-    kind: .institutionAccountId,
-    rawValue: extractedValue,
-    verificationState: .verified,
-    provenance: .institutionStructuredField
-)
-```
-
-- Deduplicate repeated identical matches.
-- Reject conflicting, malformed, masked or weak evidence.
-- Return the resulting identifier collection from both parser result paths, including the empty-transaction path.
-
-Do not make identifier extraction dependent on successful transaction parsing or transaction-loop execution.
-
----
-
-## Deterministic Extraction Rules
-
-Accept evidence only when:
-
-- The source field represents the full statement account number.
-- The extracted value contains only decimal digits.
-- At least one digit is present.
-- The value is unmasked.
-- Exactly one unique valid full value exists.
-
-Required outcomes:
-
-| Evidence | Output |
-|---|---|
-| One valid full account value | One verified identifier |
-| Same valid value repeated | One deduplicated identifier |
-| No supported field | Empty collection |
-| Empty source context | Empty collection |
-| Masked or suffix-only value | Empty collection |
-| Malformed value | Empty collection |
-| Two different valid full values | Empty collection |
-| Customer ID, IFSC, MICR, PAN, mobile, email or unrelated fields | Ignore |
-
-Identity extraction must be fail-soft.
-
-Missing, unsupported or ambiguous identity evidence must never cause an otherwise valid statement import to fail.
-
-Do not throw solely because identifier extraction failed.
-
-Do not print or log source fragments or unredacted identifier values.
 
 ---
 
 ## Test Scope
 
-Modify only the necessary existing test files:
+Modify:
 
 ```text
-LedgerForgeTests/FinancialDocumentTests.swift
+LedgerForgeTests/ImportRepositoryIntegrationTests.swift
+LedgerForgeTests/ConfirmationGatedImportWorkflowTests.swift
+```
+
+Run unchanged regression suites including:
+
+```text
+LedgerForgeTests/IdentityResolverTests.swift
+LedgerForgeTests/AccountIdentifierRepositoryTests.swift
+LedgerForgeTests/RepositoryContractTests.swift
+LedgerForgeTests/RepositoryStoreHydratorTests.swift
 LedgerForgeTests/CSVImportRegressionTests.swift
 ```
 
-Do not create a new test target or change Xcode project membership unless compilation proves it unavoidable. Stop and report if that becomes necessary.
+Do not create a new test target.
 
-No fixture or expected-JSON changes are required unless implementation discovers a genuine testing need.
-
-### Fixture-Path Correction
-
-`FinancialDocumentTests` currently uses the row-only normalization compatibility path.
-
-Update its approved Axis fixture helper to use:
-
-```swift
-let normalization = CSVNormalizer().normalizeWithSourceContext(
-    text: text,
-    document: document
-)
-```
-
-Construct `NormalizedDocument` with:
-
-```swift
-rows: normalization.rows,
-sourceContext: normalization.sourceContext
-```
-
-This is required so parser-level tests exercise the actual Sprint 35 evidence path.
+Do not change project membership unless compilation proves it unavoidable. Stop and report if required.
 
 ---
 
-## Required Focused Tests
+## Required Tests
 
-Add focused tests proving:
+### First Verified Import
 
-### Approved Axis Fixture
+For both in-memory and SQLite-backed integration:
 
-- Exactly one identifier is produced.
-- Its kind is `.institutionAccountId`.
-- Its strength is `.strong`.
-- Its verification state is `.verified`.
-- Its provenance is `.institutionStructuredField`.
-- Its normalized value exactly matches the full structured account field from the fixture.
-- The full fixture account number is not printed in test names, failure messages, diagnostics or logs.
+- Resolver returns `noMatch`.
+- Exactly one new account is created.
+- The account ID does not contain the filename, institution name or display name.
+- Exactly one verified strong identifier is attached.
+- Every transaction references the new account ID.
+- The import session references the expected workspace.
+- Persistence succeeds.
 
-Direct value assertions are permitted.
+### Later Import With Different Filename
 
-### Missing Context
+- Seed or perform a first import with a verified Axis identifier.
+- Import a second financial document carrying the same identifier but a different filename.
+- Resolver returns the existing account ID.
+- No second account is created.
+- No second identifier is created.
+- Every second-import transaction references the original account ID.
+- The existing `AccountDTO` remains exactly unchanged.
 
-- Existing transaction output remains unchanged.
-- The identifier collection remains empty.
+### Mapper Account-ID Propagation
 
-### Masked or Suffix-Only Evidence
+- A supplied account ID becomes `payload.account.id`.
+- Every mapped transaction uses the same ID.
+- Filename changes do not alter the selected account ID.
 
-- A masked or suffix-only account field produces no verified identifier.
+### Missing Identifier
 
-### Unrelated Structured Fields
+- Empty identifier input returns `noMatch`.
+- A new unseeded account is created under current unsupported-parser behaviour.
+- No identifier is attached.
+- No identifier is derived from metadata.
 
-- Customer ID, IFSC, MICR and other unrelated header values are not emitted.
+### Weak and Unverified Identifiers
 
-### Duplicate Evidence
+- Verified weak identifiers do not resolve.
+- Unverified strong identifiers do not resolve.
+- Neither category is attached automatically.
 
-- Duplicate identical full account fields produce exactly one identifier.
+### Ambiguous Identity
 
-### Conflicting Evidence
+- The coordinator throws before mapping writes.
+- Workspace count remains unchanged.
+- Account count remains unchanged.
+- Identifier count remains unchanged.
+- Import-session count remains unchanged.
+- Transaction count remains unchanged.
+- Runtime stores remain unchanged.
 
-- Two different valid full account values produce no identifier.
-- Financial parsing continues normally.
+### Conflicting Identity
 
-### Malformed Evidence
+- The coordinator throws before repository writes.
+- Existing account and identifier relationships remain unchanged.
+- No import session or transaction is created.
+- Runtime stores remain unchanged.
 
-- Malformed account evidence produces no identifier.
-- No parser error occurs solely because identity extraction failed.
+### Validation Failure
 
-### Financial Parsing Independence
+- Failed validation returns `.skipped`.
+- No account-identifier repository lookup occurs.
+- No repository write occurs.
+- No runtime mutation occurs.
 
-- Financial transactions still parse when identifier extraction returns no result.
-- Identifier interpretation is exercised for both parser result paths, including the empty-transaction path.
+### Persistence Failure Gating
+
+- A persistence error after confirmation does not append documents, transactions or accounts to runtime stores.
+- Existing runtime contents remain unchanged.
+
+### Privacy
+
+- Diagnostics contain no normalized financial identifier.
+- Diagnostics contain no bounded source-fragment text.
+- Ambiguity and conflict errors describe only the outcome category.
 
 ---
 
@@ -240,186 +530,143 @@ Direct value assertions are permitted.
 
 The approved Axis fixture must preserve:
 
-- parser selection
-- institution
-- 81 transactions
-- currency
+- Axis parser selection
+- institution attribution
+- 81 INR transactions
+- transaction ordering
 - debit total
 - credit total
 - opening balance
 - closing balance
-- transaction ordering
 - validation result
-- existing import-preview behaviour
+- read-only preview
+- explicit confirmation requirement
+- cancellation without persistence
+- existing dashboard presentation
+- repository hydration after successful import
 
-Sprint 35 changes identifier output only.
+Sprint 36 changes account selection and identity persistence only.
+
+---
+
+## Manual Runtime Verification
+
+Using the approved Axis NRE CSV:
+
+1. Launch the newly built application.
+2. Confirm preparation still produces the normal read-only preview.
+3. Confirm the preview contains 81 transactions and unchanged financial values.
+4. Cancel once and verify no persistence or runtime mutation.
+5. Prepare again and explicitly confirm.
+6. Verify successful persistence.
+7. Verify the dashboard and transaction views hydrate normally.
+8. Relaunch the application.
+9. Verify the account and transactions restore from SQLite.
+10. Confirm no raw account identifier appears in UI or diagnostics.
+
+Different-filename account reuse may be verified through automated integration tests when duplicate detection makes an identical manual re-import unsuitable.
 
 ---
 
 ## Explicit Exclusions
 
-Do NOT:
+Do not:
 
-- modify `StatementParser`
-- modify `NormalizedDocument`
-- modify `CSVNormalizer`
-- modify `ImportEngine`
-- modify readers
-- modify `Document` or `DocumentMetadata`
-- modify `FinancialDocument`
-- integrate `FinancialIdentityResolver`
-- perform repository lookup
-- perform account matching or reuse
-- attach identifiers to repository records
-- modify persistence coordination
-- modify DTOs or repository protocols
-- modify SQLite or migrations
-- modify runtime stores
-- modify ViewModels
-- modify Views or UI
-- implement PDF, XLS, XLSX or TXT identifier extraction
-- emit customer IDs, IFSC, MICR, PAN, mobile numbers or email addresses
-- emit masked identifiers, account suffixes or weak identifiers
-- log source-fragment text
-- log unredacted identifiers
-- change transaction parsing
+- modify parser identifier extraction
+- modify parser source context
+- modify readers or normalizers
+- derive identifiers in persistence
+- use filename-derived account identity
+- use institution names or display names as identity
+- match or attach weak identifiers
+- match or attach unverified identifiers
+- attach new identifiers to resolved accounts
+- redesign repository protocols
+- modify DTO definitions
+- modify SQLite schema or migrations
+- introduce a repository unit-of-work abstraction
+- promise global rollback
+- redesign duplicate detection
+- add account merge behaviour
+- add account-selection UI
+- add identity-conflict UI
+- modify runtime-store types
+- modify ViewModels or Views
 - change financial calculations
+- implement identifier extraction for another parser
+- log raw identifiers or source fragments
 - edit `Project documents/ADR.md`
-- edit `Project documents/Implementation.md`
-
-The planning documents are Chat-owned and frozen before Codex implementation.
-
----
-
-## Expected Files
-
-### Production
-
-- `Parsers/AxisBankAccountParser.swift`
-
-No other production file.
-
-### Tests
-
-- `LedgerForgeTests/FinancialDocumentTests.swift`
-- `LedgerForgeTests/CSVImportRegressionTests.swift`
-
-No new test target or Xcode project-file change is expected.
-
-### Planning Documents
-
-The following Chat-owned planning documents are frozen before Codex implementation:
-
-- `Project documents/ADR.md`
-- `Project documents/Implementation.md`
-
-Codex must not modify either document during implementation.
+- edit `Project documents/Implementation.md` during Codex implementation
 
 ---
 
 ## Acceptance Criteria
 
-Sprint 35 is accepted only when all of the following are true:
+Sprint 36 is accepted only when:
 
-- The approved Axis fixture produces exactly one verified strong account identifier.
-- The identifier kind is `.institutionAccountId`.
-- The identifier strength is `.strong`.
-- The verification state is `.verified`.
-- The provenance is `.institutionStructuredField`.
-- The normalized value equals the full structured account value from the fixture.
-- Weak, masked, suffix-only, malformed and ambiguous evidence produces no identifier.
-- Duplicate identical full values produce one deduplicated identifier.
-- Unrelated structured fields are ignored.
-- Missing or empty context produces no identifier.
-- No financial import fails solely because identifier extraction fails.
-- Both parser return paths use the extracted identifier collection.
-- Existing financial values remain identical.
-- Parser selection and validation remain unchanged.
-- Focused tests pass.
-- The complete Xcode-native test plan passes.
+- Production persistence invokes `FinancialIdentityResolver`.
+- The mapper-owned workspace ID is used consistently.
+- Only parser-produced verified strong identifiers participate.
+- Filename-derived account-ID construction is removed.
+- New candidate IDs are opaque and import-scoped.
+- A first verified import creates one account and attaches its identifier.
+- A later differently named import reuses the original account ID.
+- Resolved workspace and account records are not upserted.
+- Existing `AccountDTO` metadata remains unchanged.
+- Identifier attachment occurs only for new no-match accounts.
+- Identifier attachment remains idempotent.
+- Weak and unverified identifiers neither resolve nor attach.
+- Ambiguous and conflicting outcomes cause zero repository writes.
+- Failed validation causes zero resolver lookup and zero writes.
+- Persistence failure causes no runtime-store mutation.
+- Every persisted transaction uses the selected account ID.
+- No repository protocol, DTO, schema or migration changes.
+- No parser, reader, normalizer, UI or runtime-store type changes.
+- Existing Axis financial values remain identical.
+- Focused integration tests pass for in-memory and SQLite providers.
+- Existing identity and repository regression suites pass.
+- Complete Xcode-native test plan passes.
 - Xcode diagnostics pass.
 - Xcode static analysis passes.
 - Xcode clean build passes.
 - `git diff --check` passes.
-- Manual import preview remains unchanged.
-- No raw identifier or source-fragment text is logged.
-- No resolver, persistence, account-matching or UI behaviour appears.
-- No production file outside `Parsers/AxisBankAccountParser.swift` changes.
-- No project-file change occurs.
+- Manual runtime verification passes.
+- No raw financial identifier or source-fragment text is logged.
 - Planning documents remain untouched during implementation.
-
----
-
-## Validation
-
-Run:
-
-1. Xcode diagnostics for every modified Swift file.
-2. Xcode static analysis.
-3. Xcode clean build.
-4. Focused `FinancialDocumentTests`.
-5. Focused `CSVImportRegressionTests`.
-6. Complete Xcode-native test plan.
-7. Existing Axis CSV financial regression.
-8. `git diff --check`.
-
-Inspect the final diff and confirm:
-
-- Only approved production and test files changed.
-- Identifier extraction exists only inside `AxisBankAccountParser`.
-- No generic component interprets source evidence.
-- No raw account identifier is logged.
-- Transaction parsing remains unchanged.
-- No resolver or persistence integration was introduced.
-- Planning documents remain untouched.
-- No project-file change occurred.
-
-### Manual Runtime Verification
-
-Using the approved Axis Bank NRE CSV fixture:
-
-- Launch the newly built application using the Xcode integration.
-- Prepare the import.
-- Confirm the Axis parser remains selected.
-- Confirm the read-only preview appears normally.
-- Confirm the transaction count and approved financial values remain unchanged.
-- Confirm no new financial-identity UI appears.
-- Cancel without persistence.
-- Confirm normal return to the previous application state.
-
-Do not expose the account identifier in UI or diagnostics.
 
 ---
 
 ## Stop Conditions
 
-Stop implementation and report without working around the boundary if:
+Stop implementation and report without expanding scope if:
 
-- Reliable extraction requires modifying `CSVNormalizer`, `ImportEngine`, readers or `NormalizedDocument`.
-- The source field does not contain a complete unmasked account identifier.
-- Verification requires inference from filenames, institution labels, display names, suffixes or masked values.
-- Identifier extraction would need to throw and fail an otherwise valid import.
-- Repository lookup, resolver integration or persistence is required.
-- Transaction parsing or approved financial results would change.
-- Source-fragment content must be logged.
+- Identity resolution requires identifier derivation outside a parser.
+- A filename, institution name, display name, masked value or suffix is required for matching.
+- An existing account must be upserted to reuse it.
+- Ambiguous or conflicting outcomes cannot be handled before writes.
+- Runtime mutation cannot be gated on successful persistence.
+- Repository protocols, DTOs, SQLite schema or migrations must change.
+- Full atomic rollback becomes required.
+- Identifier backfill onto resolved accounts becomes required.
+- Concurrent import guarantees become required.
+- Duplicate-detection redesign becomes necessary.
+- Parser, reader, normalizer, UI or runtime-store type changes become necessary.
 - Production files outside the approved surface are required.
-- An Xcode project-file change becomes necessary.
-- Planning documents would need modification.
-
-Do not work around these conditions.
+- Xcode project membership must change.
+- Planning documents require modification.
 
 ---
 
 ## Implementation Handoff
 
-After all validation and manual runtime verification pass:
+After all validation passes:
 
 1. Review the final diff.
-2. Confirm the working tree contains only approved Sprint 35 changes.
-3. Commit the implementation with:
+2. Confirm only approved production and test files changed.
+3. Commit with:
 
 ```text
-Implement Sprint 35 verified Axis account identifier extraction
+Implement Sprint 36 verified account resolution
 ```
 
 4. Push to `origin/main`.
@@ -432,32 +679,23 @@ Project documents/Codex response.md
 ```
 
 7. Record:
-   - files changed
-   - extraction behaviour
-   - exact test totals
-   - build result
-   - static-analysis result
-   - manual runtime result
-   - commit hash
-   - push verification
-   - deferred resolver and persistence work
-   - current phase: awaiting Sprint 36 planning
+
+- exact files changed
+- opaque account-ID behaviour
+- existing-account reuse behaviour
+- existing metadata preservation
+- identifier-attachment behaviour
+- ambiguous and conflict zero-write evidence
+- runtime failure-gating evidence
+- partial-write limitation
+- exact test totals
+- build result
+- static-analysis result
+- manual runtime result
+- implementation commit hash
+- remote verification
+- current phase: awaiting Sprint 37 planning
+
 8. Commit and push the documentation handoff separately.
 
-Do not modify `Project documents/Implementation.md` during handoff.
-
----
-
-## Completion
-
-Sprint 35 is complete only when:
-
-- the implementation remains inside the approved parser-only boundary
-- every acceptance criterion passes
-- automated validation passes
-- manual runtime verification passes
-- the implementation report identifies the exact files changed and exact validation evidence
-- the implementation commit and documentation handoff are pushed and verified
-- repository handoff records the implementation and awaits Sprint 36 planning
-
-Sprint 36 remains the earliest appropriate point for `FinancialIdentityResolver` integration.
+Do not modify `Project documents/Implementation.md` during implementation or handoff.

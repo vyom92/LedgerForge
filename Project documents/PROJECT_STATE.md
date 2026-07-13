@@ -14,18 +14,18 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: 3b682fc — Implement Sprint 35 verified Axis account identifier extraction
+* Latest Implementation Commit: eab8c88 — Implement Sprint 36 verified account resolution
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-028 — Bounded Parser Source Evidence (Accepted)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 35 — Verified Axis Account Identifier Extraction implemented and manually verified
-* Current Phase: Awaiting Sprint 36 planning
+* Current Sprint: Sprint 36 — Verified Account Resolution & Identity Seeding implemented and manually verified
+* Current Phase: Awaiting Sprint 37 planning
 * Build Status: Passing
-* Validation Status: Sprint 35 passed Xcode diagnostics with zero issues, static analysis and clean build; focused FinancialDocument tests passed (13 tests, 0 failures, 0 skipped), focused CSV import regression tests passed (5 tests, 0 failures, 0 skipped), complete Xcode-native test plan passed (140 tests, 0 failures, 0 skipped), Axis CSV financial regression passed, git diff check passed, and manual runtime verification passed
+* Validation Status: Sprint 36 passed Xcode diagnostics with zero issues, static analysis and clean build; focused Sprint 36 integration/workflow tests passed (21 tests, 0 failures, 0 skipped), unchanged identity/repository regression suites passed (31 tests, 0 failures, 0 skipped), complete Xcode-native test plan passed (149 tests, 0 failures, 0 skipped), Axis CSV financial regression passed, approved implementation diff checks passed, and manual runtime verification passed
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-* Latest Verified Implementation Remote: 3b682fc2f0b43979388196b739a38b7f350e2be7
+* Latest Verified Implementation Remote: eab8c885431492d3092f24d1185d71d169f2b1ae
 * Latest Documentation Handoff Commit: 9bdd3d6f5dc207ff554cbc410d26a9b2a8f454dc
 
 ## Bootstrap
@@ -89,22 +89,26 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 35 — Verified Axis Account Identifier Extraction is implemented, pushed and manually verified. Awaiting Sprint 36 planning.
+Active Work: Sprint 36 — Verified Account Resolution & Identity Seeding is implemented, pushed and manually verified. Awaiting Sprint 37 planning.
 
 Objective:
 
-* Preserve the verified Sprint 35 implementation baseline.
-* Await Sprint 36 planning.
+* Preserve the verified Sprint 36 implementation baseline.
+* Await Sprint 37 planning.
 
 Scope:
 
-* `AxisBankAccountParser` now interprets bounded pre-transaction source context for the supported full Axis statement-account-number field.
-* One unambiguous full numeric value produces one verified, strong `.institutionAccountId` with `.institutionStructuredField` provenance.
-* Repeated identical values are deduplicated; missing, masked, suffix-only, unrelated, malformed or conflicting evidence produces no identifier without failing financial parsing.
-* Identifier extraction executes independently of transaction parsing and applies to both parser result paths.
-* Sprint 35 preserved parser selection, institution, 81 transactions, currency, transaction ordering, debit and credit totals, opening and closing balances, validation, import-preview behaviour and runtime behaviour.
-* Sprint 35 made no normalizer, reader, schema, repository, persistence, DTO, runtime store, ViewModel, UI or Xcode project-file changes.
-* Sprint 35 did not integrate identity resolution, repository lookup, account reuse, identifier attachment or persistence.
+* Production import persistence now resolves parser-produced verified strong financial identifiers before account creation.
+* A unique verified match reuses the existing immutable repository account ID without upserting the existing workspace or account.
+* A no-match import creates one opaque import-scoped account ID and attaches only parser-produced verified strong identifiers.
+* Missing, weak or unverified identifiers do not resolve and are not attached automatically.
+* Ambiguous and conflicting resolution outcomes throw before repository writes and do not mutate runtime financial stores.
+* Failed validation performs no identity lookup or repository write.
+* Runtime financial stores mutate only after successful persistence; skipped and failed persistence leave them unchanged.
+* The mapper accepts the coordinator-selected account ID and applies it to the account and every transaction; filename-derived durable account IDs were removed.
+* Existing sequential persistence remains non-atomic across workspace, account, identifier, import-session and transaction repositories; later failures may retain earlier successful writes.
+* Sprint 36 preserved parser selection, institution, 81 transactions, currency, transaction ordering, debit and credit totals, opening and closing balances, validation and confirmation-gated import behaviour.
+* Sprint 36 made no parser, reader, normalizer, DTO, repository protocol, schema, migration, runtime-store type, ViewModel, UI or Xcode project-file changes.
 * ADR-028 — Bounded Parser Source Evidence is Accepted.
 * `Project documents/Implementation.md` contains only the current ACTIVE sprint; completed sprint history belongs in `Project documents/PROJECT_STATE.md`.
 * Codex must never edit `Project documents/Implementation.md`.
@@ -122,7 +126,7 @@ Scope:
 * Preserve durable SQLite startup persistence wiring.
 * Preserve stable repository account identifiers.
 * Preserve institution attribution through repository hydration.
-* Sprint 35 implementation commit `3b682fc2f0b43979388196b739a38b7f350e2be7` was pushed to `origin/main` and verified with `git ls-remote origin refs/heads/main`.
+* Sprint 36 implementation commit `eab8c885431492d3092f24d1185d71d169f2b1ae` was pushed to `origin/main` and verified with `git ls-remote origin refs/heads/main`.
 
 ## Current Product Review
 
@@ -169,14 +173,14 @@ Scope:
 - Workspace-scoped account identifier repository operations are implemented.
 - In-Memory and SQLite repository providers have parity for identifier operations.
 - SQLite identifier conflict prevention is transactional through repository logic.
-- Deterministic financial identity resolver is implemented and remains disconnected from production import.
+- Deterministic financial identity resolution is integrated into confirmed production import persistence for parser-produced verified strong identifiers.
 - Identity diagnostics are concise and redact identifier values.
 - Axis CSV parsing produces one verified strong account identifier only from one unambiguous full structured statement-account field.
 - Architecture v1.0 and UI/UX v1.0 remain preserved.
 
 ### Current Critical Product Issues
 
-- None verified for Sprint 35.
+- None verified for Sprint 36.
 
 ### Current Important Product Issues
 
@@ -196,22 +200,22 @@ Scope:
 
 ### Ready for Next Feature Sprint?
 
-Awaiting Sprint 36 planning.
+Awaiting Sprint 37 planning.
 
 ### Reason
 
-Sprint 35 implementation, automated validation and manual runtime verification are complete. Sprint 36 planning is the next phase.
+Sprint 36 implementation, automated validation and manual runtime verification are complete. Sprint 37 planning is the next phase.
 
 Out of Scope:
 
 * PDF support
 * OCR
-* Additional parser behaviour changes beyond approved Axis identifier extraction
+* Additional parser behaviour changes
 * Validation redesign
 * Repository redesign
 * Database schema changes
-* Automatic account matching
-* Production import integration using verified identifiers
+* Fuzzy account matching or confidence scoring
+* Account merge or conflict-resolution UI
 * Editable import preview
 * Batch import
 * Duplicate-management UI
@@ -227,7 +231,7 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Define the Sprint 36 ACTIVE sprint after Desktop ChatGPT approval.
+* Define the Sprint 37 ACTIVE sprint after Desktop ChatGPT approval.
 
 ---
 
@@ -258,8 +262,38 @@ Implemented and manually verified
 ## Implementation Commit
 `3b682fc2f0b43979388196b739a38b7f350e2be7` — Implement Sprint 35 verified Axis account identifier extraction
 
+---
+
+# Sprint 36
+
+## Objective
+Integrate parser-produced verified strong financial identifiers into confirmed production persistence for deterministic account reuse, new-account identity seeding and failure-gated runtime mutation.
+
+## Status
+Implemented and manually verified
+
+## Outcome
+- `DefaultImportPersistenceCoordinator` invokes `FinancialIdentityResolver` only after validation passes.
+- A uniquely resolved account is reused by immutable repository ID, with its existing account and workspace records preserved exactly.
+- A no-match import creates one opaque import-scoped account ID and attaches only verified strong parser-produced identifiers.
+- Missing, weak and unverified identifiers neither resolve nor attach.
+- Ambiguous and conflicting outcomes fail before repository writes and preserve existing relationships.
+- `ImportPersistenceMapper` propagates the coordinator-selected account ID to the account DTO and every transaction DTO; filename-derived account identity was removed.
+- Runtime financial-store mutation is gated on successful persistence, and queued legacy account publication completes before repository hydration.
+- Existing sequential persistence remains non-atomic; failures after early successful writes may retain those earlier records.
+- No parser, reader, normalizer, repository protocol, DTO, schema, migration, runtime-store type, ViewModel, UI or project-file changes were made.
+- Xcode diagnostics, static analysis and clean build passed.
+- Focused Sprint 36 integration/workflow tests passed: 21 tests, 0 failures, 0 skipped.
+- Unchanged identity/repository regression suites passed: 31 tests, 0 failures, 0 skipped.
+- Complete Xcode-native test plan passed: 149 tests, 0 failures, 0 skipped (`LedgerForgeTests`: 146; `LedgerForgeUITests`: 3).
+- Axis CSV financial regression and approved implementation diff checks passed.
+- Manual runtime verification passed for cancellation without persistence, confirmed import, immediate hydration and SQLite restoration after relaunch.
+
+## Implementation Commit
+`eab8c885431492d3092f24d1185d71d169f2b1ae` — Implement Sprint 36 verified account resolution
+
 ## Current Phase
-Awaiting Sprint 36 planning
+Awaiting Sprint 37 planning
 
 ---
 

@@ -199,7 +199,6 @@
 		28D8CB5E2FFD1E3C005B419A /* StatementClassificationDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementClassificationDetector.swift; sourceTree = "<group>"; };
 		28E945442FFD671F00FB69E4 /* ImportPersistenceMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPersistenceMapper.swift; sourceTree = "<group>"; };
 		28E945462FFD673000FB69E4 /* ImportPersistenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPersistenceCoordinator.swift; sourceTree = "<group>"; };
-		28ED6CBB30031E6900BE7A38 /* xcode_gpt_test.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = xcode_gpt_test.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -555,7 +554,6 @@
 				286242762FFD168100B8AA66 /* PROJECT_STATE.md */,
 				2857FA502FFEA28B00948892 /* Implementation.md */,
 				281BB1332FFC3FB5006E7424 /* Codex response.md */,
-				28ED6CBB30031E6900BE7A38 /* xcode_gpt_test.md */,
 			);
 			path = "Project documents";
 			sourceTree = "<group>";
