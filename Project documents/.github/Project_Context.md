@@ -63,6 +63,10 @@ Parser Selection
 
 ↓
 
+Statement Parser
+
+↓
+
 FinancialDocument
 
 ↓
@@ -71,11 +75,15 @@ Validation
 
 ↓
 
+User Review & Explicit Confirmation
+
+↓
+
 Fingerprinting & Duplicate Detection
 
 ↓
 
-Repository Persistence
+Repository Persistence Boundary
 
 ↓
 

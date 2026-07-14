@@ -298,7 +298,7 @@ PasswordProvider
 ↓
 ReaderRegistry
 ↓
-Document Reader
+Reader
 ↓
 RawDocument
 ↓
@@ -314,17 +314,23 @@ FinancialDocument
 ↓
 Validation
 ↓
+User Review & Explicit Confirmation
+↓
 Fingerprinting & Duplicate Detection
+↓
+Repository Persistence Boundary
 ↓
 Repositories
 ↓
 SQLite
 ↓
-Stores
+RepositoryStoreHydrator
+↓
+Runtime Stores
 ↓
 ViewModels
 ↓
-Dashboard
+Views
 
 ## Rationale
 
@@ -401,7 +407,7 @@ PasswordProvider
 ↓
 ReaderRegistry
 ↓
-Document Reader
+Reader
 ↓
 RawDocument
 ↓
@@ -417,17 +423,23 @@ FinancialDocument
 ↓
 Validation
 ↓
+User Review & Explicit Confirmation
+↓
 Fingerprinting & Duplicate Detection
+↓
+Repository Persistence Boundary
 ↓
 Repositories
 ↓
 SQLite
 ↓
-Stores
+RepositoryStoreHydrator
+↓
+Runtime Stores
 ↓
 ViewModels
 ↓
-Dashboard
+Views
 
 The migration preserved existing CSV business logic. Only orchestration changed.
 
@@ -741,7 +753,7 @@ Sprint 19, stabilised through Sprint 24
 
 RepositoryStoreHydrator is the only approved boundary for transferring persisted repository state into observable runtime stores.
 
-The approved downstream application flow is:
+The following is an abbreviated downstream summary of the canonical import pipeline:
 
 Repositories
 ↓
@@ -1023,10 +1035,10 @@ Those capabilities require future ADRs.
 
 ADR-026 was accepted after:
 
-- Sprint 31 implementation is complete
-- automated validation passes
-- manual runtime verification passes
-- Sprint 31 is recorded in `PROJECT_STATE.md`
+- Sprint 31 implementation was completed.
+- Automated validation passed.
+- Manual runtime verification passed.
+- Sprint 31 was recorded in `PROJECT_STATE.md`.
 
 ---
 

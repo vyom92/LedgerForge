@@ -24,9 +24,9 @@ Rules:
 - Work performs repository-wide investigation and explicitly approved documentation synchronization.
 - ChatGPT in Xcode may apply exact Chat-approved wording for a narrowly scoped documentation task.
 - Codex performs Swift implementation, builds, tests and implementation Git operations for the approved ACTIVE sprint.
-- Codex may update:
-  - `Project documents/Codex response.md` as the implementation execution report.
-  - `Project documents/PROJECT_STATE.md` only after successful validation.
+- During repository discovery, Work records evidence-backed findings in `Project documents/Codex response.md`.
+- During implementation, Codex records implementation execution output in `Project documents/Codex response.md`.
+- Codex may update `Project documents/PROJECT_STATE.md` only after successful validation.
 - Codex never edits `Project documents/Implementation.md`.
 
 ---
@@ -63,7 +63,7 @@ Rules:
 
 7. Work executes approved repository discovery and reports verified evidence. Chat defines or revises the ACTIVE sprint.
 
-8. Output repository-discovery findings only to:
+8. Work records repository-discovery findings only to:
 
    `Project documents/Codex response.md`
 
@@ -118,7 +118,7 @@ Every implementation must:
 - Push to the tracked branch (normally `origin/main`).
 - If a sprint tag is created, push the tag after the branch push succeeds.
 - Update `Project documents/PROJECT_STATE.md` only after a successful commit and push.
-- Update `Project documents/Codex response.md` with implementation results.
+- Codex updates `Project documents/Codex response.md` with implementation results.
 - Treat `Project documents/Codex response.md` as the authoritative implementation log for the current sprint.
 - Never modify `Project documents/Implementation.md`.
 - If the build or required tests fail, do not commit or push. Record the failure in `Project documents/Codex response.md` and stop.
@@ -170,6 +170,22 @@ Do not modify `Project documents/Implementation.md`.
 - Repository-wide documentation synchronization is performed by Work only when explicitly approved.
 - If documentation precedence conflicts with the manifest, stop and report the conflict instead of guessing.
 - If documentation conflicts with implementation, stop and report the conflict.
+
+Documentation synchronization review cycle:
+
+Chat approves documentation scope
+↓
+Work performs the approved synchronization
+↓
+Work validates consistency and pushes the commit
+↓
+Work returns the exact commit SHA
+↓
+Chat reviews the pushed commit
+↓
+Result: `PASS`, `PASS WITH CORRECTIONS` or `REJECT`
+
+Corrections return to Work. No implementation agent is involved in this documentation-only cycle.
 
 ---
 

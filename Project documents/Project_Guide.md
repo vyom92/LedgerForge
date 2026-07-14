@@ -38,7 +38,7 @@ Project Baseline:
 | Financial Identity | Parser-owned verified Axis identifier extraction and deterministic confirmed-import account resolution are production-integrated |
 | Password Management | Password-provider protocol and locked-PDF reader interface implemented; the default provider supplies no credential and no production password-entry or Keychain workflow exists |
 | Workflow | Workflow v2.1 active. Project documents/Implementation.md is the current ACTIVE sprint implementation contract. |
-| Dashboard | Deep Indigo UI foundation implemented. Repository-backed dashboard active. Continued refinement under M7. |
+| Dashboard | Deep Indigo UI foundation complete. Repository-backed dashboard active; continued core-experience refinement may remain ongoing under M7. |
 | Validation | Latest verified build and validation state is recorded in Project documents/PROJECT_STATE.md. |
 | Documentation | `Project documents/.github/Context_Manifest.yaml` and `Project documents/Project_Guide.md` provide the canonical bootstrap and routing. |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
@@ -69,7 +69,11 @@ FinancialDocument
 ↓
 Validation
 ↓
+User Review & Explicit Confirmation
+↓
 Fingerprinting & Duplicate Detection
+↓
+Repository Persistence Boundary
 ↓
 Repositories
 ↓
@@ -233,8 +237,8 @@ Additionally:
 - Add new files to the correct Xcode target.
 - Add new files to the Xcode navigator.
 - Preserve existing behaviour unless the sprint explicitly changes it.
-- Preserve the approved presentation pipeline:
-  Repository Persistence → RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
+- Preserve the approved presentation pipeline. Abbreviated summary:
+  Repository Persistence Boundary → Repositories → SQLite → RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
 - If an architectural conflict is discovered, stop implementation and document it in Project documents/Codex response.md.
 
 ## Assistant Role Boundaries
@@ -257,7 +261,7 @@ All assistants must distinguish verified repository evidence from inference and 
 - Review `Project documents/PROJECT_STATE.md`.
 - When defining the next sprint, review `Project documents/FUTURE_WORK.MD`, then the relevant architecture, ADRs, product vision, standards and fixtures.
 - Read only the ACTIVE sprint in `Project documents/Implementation.md` when one is defined.
-- Work executes approved repository discovery and records evidence in `Project documents/Codex response.md`; Chat owns the resulting sprint definition.
+- Work executes approved repository discovery and records evidence in `Project documents/Codex response.md`; Codex records implementation execution output in the same file. Chat owns the resulting sprint definition.
 - Do not modify source code.
 
 ### Phase 2 — Chat Review
@@ -292,6 +296,22 @@ All assistants must distinguish verified repository evidence from inference and 
 - Work investigates the repository, edits only approved documentation and validates the complete documentation diff.
 - Work may commit and push documentation-only changes only when explicitly authorised.
 - Documentation synchronization never modifies `Project documents/Implementation.md`, and any additional exclusions in the approved task remain absolute.
+
+Documentation synchronization review cycle:
+
+Chat approves documentation scope
+↓
+Work performs the approved synchronization
+↓
+Work validates consistency and pushes the commit
+↓
+Work returns the exact commit SHA
+↓
+Chat reviews the pushed commit
+↓
+Result: `PASS`, `PASS WITH CORRECTIONS` or `REJECT`
+
+Corrections return to Work. No implementation agent is involved.
 
 ### Phase 4 — Completion
 
@@ -372,7 +392,7 @@ Future sprint planning begins only after the current sprint has completed.
 - Deduplication
 - Audit trail
 
-### M7 – Dashboard Experience 🚧
+### M7 – Dashboard Experience — Foundation Complete; Continued Core-Experience Refinement May Remain Ongoing
 - Repository-backed startup hydration ✅
 - Accounts overview ✅
 - Recent transaction summaries ✅
@@ -453,7 +473,7 @@ This layered bootstrap minimizes context loading while preserving deterministic 
 - Never modify `Project documents/Implementation.md` unless acting as Chat within the approved sprint-planning workflow.
 - Never make changes outside the approved ACTIVE sprint.
 - Never redesign approved architecture without an approved ADR.
-- Work maintains `Project documents/Codex response.md` during approved repository discovery; Codex maintains it during implementation.
+- Work maintains `Project documents/Codex response.md` during approved repository discovery; Codex records implementation execution output there.
 - Update `Project documents/PROJECT_STATE.md` only after successful validation, required manual runtime verification, verified implementation commit and verified push.
 - Leave the repository in a buildable state.
 - Never bypass repository abstractions.

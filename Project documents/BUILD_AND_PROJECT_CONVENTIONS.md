@@ -42,9 +42,21 @@ Every new repository API should have a narrowly defined responsibility.
 
 ---
 
-## Presentation Pipeline
+## Canonical Import and Presentation Pipeline
 
-The approved presentation pipeline is:
+The approved canonical pipeline is:
+
+ImportCoordinator
+
+↓
+
+PasswordProvider
+
+↓
+
+ReaderRegistry
+
+↓
 
 Reader
 
@@ -66,6 +78,10 @@ Parser Selection
 
 ↓
 
+Statement Parser
+
+↓
+
 FinancialDocument
 
 ↓
@@ -74,11 +90,23 @@ Validation
 
 ↓
 
+User Review & Explicit Confirmation
+
+↓
+
 Fingerprinting & Duplicate Detection
 
 ↓
 
-Repository Persistence
+Repository Persistence Boundary
+
+↓
+
+Repositories
+
+↓
+
+SQLite
 
 ↓
 
@@ -143,7 +171,7 @@ Workflow responsibilities:
 - ChatGPT in Xcode may apply exact Chat-approved documentation wording during a narrowly scoped documentation task.
 - Codex executes only the approved ACTIVE sprint and owns Swift implementation validation and implementation Git operations.
 - Codex never edits `Project documents/Implementation.md`.
-- Codex maintains `Project documents/Codex response.md` as the execution log.
+- Work records repository-discovery output in `Project documents/Codex response.md`; Codex records implementation execution output there.
 - `Project documents/PROJECT_STATE.md` remains the authoritative record of verified repository state and is updated only after successful validation or an approved documentation-only factual correction.
 
 When workflow guidance appears elsewhere, these documents remain authoritative.
@@ -277,6 +305,8 @@ If architecture changed, also review:
 - Project documents/Engineering Standards.md
 
 When selecting or reprioritising future work, also review `Project documents/FUTURE_WORK.MD`. Do not load or update the backlog during routine implementation of an already-defined ACTIVE sprint unless the approved task explicitly requires it.
+
+Documentation synchronization review: Chat approves scope → Work investigates, edits, validates and pushes → Work returns the exact commit SHA → Chat proofreads the pushed commit and records `PASS`, `PASS WITH CORRECTIONS` or `REJECT`. Corrections return to Work; no implementation agent is involved.
 
 ---
 

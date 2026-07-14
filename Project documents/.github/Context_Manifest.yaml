@@ -72,6 +72,7 @@ assistants:
       - approved_documentation_execution
       - documentation_validation
       - documentation_commits_and_pushes_when_explicitly_approved
+      - discovery_output_in_Project documents/Codex response.md
     never_owns:
       - sprint_planning
       - architecture
@@ -85,8 +86,8 @@ assistants:
       - testing
       - implementation_commits
       - implementation_pushes
+      - implementation_execution_output_in_Project documents/Codex response.md
       - Project documents/PROJECT_STATE.md
-      - Project documents/Codex response.md
     never_owns:
       - planning
       - architecture
@@ -104,4 +105,5 @@ protected:
 notes:
   pipeline_rule: "Preserve ADR-016 canonical pipeline and RepositoryStoreHydrator boundary."
   backlog_rule: "FUTURE_WORK.MD contains unscheduled work only; promoted work belongs only in the ACTIVE sprint and completed work belongs in PROJECT_STATE.md."
+  documentation_sync_review: "Chat approves scope; Work synchronizes, validates, pushes and returns the SHA; Chat proofreads and records PASS, PASS WITH CORRECTIONS or REJECT; corrections return to Work without implementation-agent involvement."
 ...

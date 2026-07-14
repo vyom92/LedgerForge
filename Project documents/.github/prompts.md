@@ -122,9 +122,10 @@ Requirements:
 - No test changes.
 - Update only approved documentation.
 - Never modify `Project documents/Implementation.md`.
-- Update `Project documents/Codex response.md`.
+- Work records discovery or synchronization output in `Project documents/Codex response.md` only when that file is not excluded by the approved task.
 - Update `Project documents/PROJECT_STATE.md` only when verified repository facts change.
 - Present documentation changes for review before committing unless explicitly instructed otherwise.
+- After push, Work returns the exact commit SHA to Chat for proofreading. Chat records `PASS`, `PASS WITH CORRECTIONS` or `REJECT`; corrections return to Work and do not involve an implementation agent.
 
 ---
 
