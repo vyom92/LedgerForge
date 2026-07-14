@@ -119,6 +119,9 @@ struct ImportOutcomePresentation: Equatable {
     let allowsViewingTransactions: Bool
     let iconName: String
     let tone: ImportOutcomeTone
+    let accountId: String?
+    let importSessionId: String?
+    let redactedIdentifier: String?
 
     init(result: ImportEngineResult) {
         fileName = result.fileName
@@ -126,6 +129,9 @@ struct ImportOutcomePresentation: Equatable {
         validationStatus = result.validationPassed ? "Validation Passed" : "Validation Failed"
         allowsViewingTransactions = result.validationPassed && result.persisted
         message = result.errorMessage?.isEmpty == false ? result.errorMessage : nil
+        accountId = result.accountId
+        importSessionId = result.importSessionId
+        redactedIdentifier = result.redactedIdentifier
 
         if result.validationPassed && result.persisted {
             persistenceStatus = "Persistence Succeeded"
@@ -156,6 +162,8 @@ struct ContentView: View {
     @State private var showingImporter = false
     @State private var selectedFile = "No statement imported"
     @State private var importState: ImportPresentationState = .idle
+    @State private var importIdentityReview: ImportIdentityReview = .unavailable
+    @State private var importAccountChoice: ImportAccountChoice?
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @StateObject private var accountsViewModel = AccountsViewModel()
     @State private var selectedSection: AppShellSection = .dashboard
@@ -1328,6 +1336,35 @@ struct ContentView: View {
                     }
 
                     if outcome.allowsViewingTransactions {
+                        if let accountId = outcome.accountId,
+                           let account = accountsViewModel.accounts.first(where: { $0.id == accountId }) {
+                            LFInfoRow(title: "Verified Account", value: account.displayName)
+                        }
+                        if let redactedIdentifier = outcome.redactedIdentifier {
+                            LFInfoRow(title: "Verified Identifier", value: redactedIdentifier)
+                        }
+                        if outcome.importSessionId != nil {
+                            LFInfoRow(title: "Import Session", value: "Persisted")
+                        }
+                    }
+
+                    if outcome.allowsViewingTransactions {
+                        if let accountId = outcome.accountId {
+                            Button {
+                                accountsViewModel.selectAccount(repositoryAccountID: accountId)
+                                selectedSection = .accounts
+                            } label: {
+                                Label("View Account", systemImage: "person.crop.circle")
+                                    .font(.subheadline.weight(.semibold))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .frame(maxWidth: .infinity)
+                                    .background(LFTheme.surface)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(LFTheme.text)
+                        }
                         Button {
                             selectedSection = .transactions
                         } label: {
@@ -1377,6 +1414,54 @@ struct ContentView: View {
                 LFInfoRow(title: "Statement Period", value: statementPeriodText(preparedImport.statementPeriod))
                 LFInfoRow(title: "Opening Balance", value: balanceText(preparedImport.validation.openingBalance, currency: preparedImport.detectedCurrency))
                 LFInfoRow(title: "Closing Balance", value: balanceText(preparedImport.validation.closingBalance, currency: preparedImport.detectedCurrency))
+            }
+
+            if importIdentityReview.isAvailable {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Choose Account")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Choose where this verified identity will be attached. No account is selected automatically.")
+                        .font(.caption)
+                        .foregroundStyle(LFTheme.textSecondary)
+                    ForEach(accountsViewModel.accounts.filter { importIdentityReview.eligibleAccountIds.contains($0.id) }) { account in
+                        Button {
+                            importAccountChoice = .useExistingAccount(accountId: account.id)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(account.displayName)
+                                    Text(account.institution)
+                                        .font(.caption)
+                                        .foregroundStyle(LFTheme.textSecondary)
+                                }
+                                Spacer()
+                                Image(systemName: importAccountChoice == .useExistingAccount(accountId: account.id) ? "checkmark.circle.fill" : "circle")
+                            }
+                            .padding(10)
+                            .background(LFTheme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(LFTheme.text)
+                    }
+                    Button {
+                        importAccountChoice = .createNewAccount
+                    } label: {
+                        HStack {
+                            Text("Create New Account")
+                            Spacer()
+                            Image(systemName: importAccountChoice == .createNewAccount ? "checkmark.circle.fill" : "circle")
+                        }
+                        .padding(10)
+                        .background(LFTheme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(LFTheme.text)
+                }
+                .padding(12)
+                .background(LFTheme.primary.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -1440,6 +1525,7 @@ struct ContentView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
+                .disabled(importIdentityReview.isAvailable && importAccountChoice == nil)
             case .committing:
                 Label("Importing", systemImage: "hourglass")
                     .labelStyle(.titleAndIcon)
@@ -1797,6 +1883,10 @@ struct ContentView: View {
     private func prepareImport(from url: URL) async {
         do {
             let preparedImport = try await ImportEngine.shared.prepareImport(from: url)
+            importAccountChoice = nil
+            importIdentityReview = preparedImport.validation.passed
+                ? (try ImportEngine.shared.reviewPreparedImport(preparedImport))
+                : .unavailable
             selectedFile = preparedImport.fileName
             importState = preparedImport.validation.passed ? .previewReady(preparedImport) : .validationFailed(preparedImport)
         } catch {
@@ -1814,12 +1904,12 @@ struct ContentView: View {
         }
 
         importState = .committing(preparedImport)
-        let result = await ImportEngine.shared.commitPreparedImport(preparedImport)
-        let outcome = ImportOutcomePresentation(result: result)
-        selectedFile = result.fileName
-        importState = .completed(outcome)
+        let result = await ImportEngine.shared.commitPreparedImport(
+            preparedImport,
+            accountChoice: importAccountChoice
+        )
 
-        if outcome.allowsViewingTransactions {
+        if result.persisted {
             do {
                 let hydrationResult = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
                 dashboardViewModel.markHydrationCompleted(hydrationResult)
@@ -1829,9 +1919,14 @@ struct ContentView: View {
                 DeveloperConsole.shared.log(error.localizedDescription)
             }
         }
+        let outcome = ImportOutcomePresentation(result: result)
+        selectedFile = result.fileName
+        importState = .completed(outcome)
     }
 
     private func cancelPreparedImport() {
+        importAccountChoice = nil
+        importIdentityReview = .unavailable
         selectedFile = "No statement imported"
         importState = .idle
         selectedSection = .dashboard

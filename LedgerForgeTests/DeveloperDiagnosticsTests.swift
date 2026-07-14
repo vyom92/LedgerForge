@@ -291,7 +291,6 @@ struct DeveloperDiagnosticsTests {
             "Parser selected",
             "Validation completed",
             "Repository persistence completed",
-            "Runtime refresh completed",
             "Import completed"
         ])
         #expect(defaultVisible.allSatisfy { $0.level != .debug })

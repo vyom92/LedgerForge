@@ -25,6 +25,52 @@ protocol ImportPersistenceCoordinating {
         importSession: ImportSession,
         validation: ImportValidationResult
     ) throws -> ImportPersistenceResult
+
+    func reviewValidatedImport(
+        financialDocument: FinancialDocument,
+        validation: ImportValidationResult
+    ) throws -> ImportIdentityReview
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        accountChoice: ImportAccountChoice?
+    ) throws -> ImportPersistenceResult
+}
+
+enum ImportAccountChoice: Equatable {
+    case useExistingAccount(accountId: String)
+    case createNewAccount
+}
+
+struct ImportIdentityReview: Equatable {
+    let isAvailable: Bool
+    let eligibleAccountIds: [String]
+
+    static let unavailable = ImportIdentityReview(isAvailable: false, eligibleAccountIds: [])
+}
+
+extension ImportPersistenceCoordinating {
+    func reviewValidatedImport(
+        financialDocument: FinancialDocument,
+        validation: ImportValidationResult
+    ) throws -> ImportIdentityReview {
+        .unavailable
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        accountChoice: ImportAccountChoice?
+    ) throws -> ImportPersistenceResult {
+        try persistValidatedImport(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation
+        )
+    }
 }
 
 enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
@@ -33,6 +79,11 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
     case resolvedWorkspaceUnavailable
     case ambiguousIdentity
     case conflictingIdentity
+    case explicitChoiceRequired
+    case selectedAccountUnavailable
+    case selectedAccountWorkspaceMismatch
+    case selectedAccountAlreadyIdentified
+    case ineligibleIdentifierSet
 
     var errorDescription: String? {
         switch self {
@@ -46,6 +97,16 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
             return "Financial identity is ambiguous; import was not persisted."
         case .conflictingIdentity:
             return "Financial identity conflicts across accounts; import was not persisted."
+        case .explicitChoiceRequired:
+            return "An explicit import account choice is required."
+        case .selectedAccountUnavailable:
+            return "The selected account is no longer available."
+        case .selectedAccountWorkspaceMismatch:
+            return "The selected account does not belong to the persistence workspace."
+        case .selectedAccountAlreadyIdentified:
+            return "The selected account is no longer eligible for identifier attachment."
+        case .ineligibleIdentifierSet:
+            return "The import no longer has exactly one eligible verified identifier."
         }
     }
 }
@@ -107,15 +168,50 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         importSession: ImportSession,
         validation: ImportValidationResult
     ) throws -> ImportPersistenceResult {
+        try persistValidatedImport(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            accountChoice: nil
+        )
+    }
+
+    func reviewValidatedImport(
+        financialDocument: FinancialDocument,
+        validation: ImportValidationResult
+    ) throws -> ImportIdentityReview {
+        guard validation.passed else { return .unavailable }
+
+        let workspaceId = mapper.workspaceId
+        let resolution = try resolver().resolve(
+            workspaceId: workspaceId,
+            identifiers: financialDocument.financialIdentifiers
+        )
+        guard case .noMatch = resolution,
+              eligibleIdentifier(in: financialDocument) != nil else {
+            return .unavailable
+        }
+
+        let eligibleAccountIds = try accountRepo.accounts(workspaceId: workspaceId)
+            .filter { try accountRepo.identifiers(accountId: $0.id, workspaceId: workspaceId).isEmpty }
+            .map(\.id)
+            .sorted()
+        developerConsole?.info(.import, "Identity review available", metadata: ["eligibleAccounts": "\(eligibleAccountIds.count)"])
+        return ImportIdentityReview(isAvailable: true, eligibleAccountIds: eligibleAccountIds)
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        accountChoice: ImportAccountChoice?
+    ) throws -> ImportPersistenceResult {
         guard validation.passed else {
             return .skipped
         }
 
         let workspaceId = mapper.workspaceId
-        let resolution = try FinancialIdentityResolver(
-            accountRepository: accountRepo,
-            developerConsole: developerConsole
-        ).resolve(
+        let resolution = try resolver().resolve(
             workspaceId: workspaceId,
             identifiers: financialDocument.financialIdentifiers
         )
@@ -135,9 +231,41 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             selection = .existing(existingAccount)
 
         case .noMatch:
-            selection = .new(
-                accountId: "account-\(importSession.id.uuidString.lowercased())"
-            )
+            if let identifier = eligibleIdentifier(in: financialDocument) {
+                guard let accountChoice else {
+                    throw ImportPersistenceCoordinationError.explicitChoiceRequired
+                }
+                switch accountChoice {
+                case .useExistingAccount(let accountId):
+                    guard try workspaceRepo.workspace(id: workspaceId) != nil else {
+                        throw ImportPersistenceCoordinationError.resolvedWorkspaceUnavailable
+                    }
+                    guard let account = try accountRepo.account(id: accountId) else {
+                        throw ImportPersistenceCoordinationError.selectedAccountUnavailable
+                    }
+                    guard account.workspaceId == workspaceId else {
+                        throw ImportPersistenceCoordinationError.selectedAccountWorkspaceMismatch
+                    }
+                    guard try accountRepo.identifiers(accountId: accountId, workspaceId: workspaceId).isEmpty else {
+                        throw ImportPersistenceCoordinationError.selectedAccountAlreadyIdentified
+                    }
+                    let owners = try accountRepo.accountIds(
+                        workspaceId: workspaceId,
+                        scheme: identifier.kind.rawValue,
+                        identifier: identifier.normalizedValue
+                    )
+                    guard owners.isEmpty else {
+                        throw ImportPersistenceCoordinationError.ineligibleIdentifierSet
+                    }
+                    selection = .existing(account)
+                    developerConsole?.info(.import, "Explicit existing-account choice requested")
+                case .createNewAccount:
+                    selection = .new(accountId: "account-\(importSession.id.uuidString.lowercased())")
+                    developerConsole?.info(.import, "Explicit create-new-account choice requested")
+                }
+            } else {
+                selection = .new(accountId: "account-\(importSession.id.uuidString.lowercased())")
+            }
 
         case .ambiguous:
             throw ImportPersistenceCoordinationError.ambiguousIdentity
@@ -160,8 +288,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             _ = try accountRepo.upsertAccount(payload.account)
 
             for identifier in financialDocument.financialIdentifiers where
-                identifier.strength == .strong
-                && identifier.verificationState == .verified {
+                identifier.strength == .strong && identifier.verificationState == .verified {
                 _ = try accountRepo.attachIdentifier(
                     identifier.repositoryDTO(
                         accountId: selection.accountId,
@@ -170,6 +297,14 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                     )
                 )
             }
+        } else if let identifier = eligibleIdentifier(in: financialDocument) {
+            _ = try accountRepo.attachIdentifier(
+                identifier.repositoryDTO(
+                    accountId: selection.accountId,
+                    workspaceId: workspaceId,
+                    createdAtISO: payload.account.createdAtISO
+                )
+            )
         }
 
         _ = try importSessionRepo.createImportSession(payload.importSession)
@@ -206,5 +341,17 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             importSessionId: payload.importSession.id,
             transactionCount: payload.transactions.count
         )
+    }
+
+    private func resolver() -> FinancialIdentityResolver {
+        FinancialIdentityResolver(accountRepository: accountRepo, developerConsole: developerConsole)
+    }
+
+    private func eligibleIdentifier(in financialDocument: FinancialDocument) -> FinancialIdentifier? {
+        let identifiers = financialDocument.financialIdentifiers.filter {
+            $0.strength == .strong && $0.verificationState == .verified
+        }
+        guard identifiers.count == 1 else { return nil }
+        return identifiers[0]
     }
 }

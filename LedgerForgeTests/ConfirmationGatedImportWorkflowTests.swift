@@ -44,7 +44,7 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(TransactionStore.shared.transactions.isEmpty)
     }
 
-    @Test func confirmationCommitsUsingPreparedFinancialDocument() async throws {
+    @Test func confirmationCommitsUsingPreparedFinancialDocumentWithoutRuntimeMutation() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = ImportEngine(importPersistenceCoordinator: persistence)
@@ -58,8 +58,8 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(persistence.capturedFinancialDocument?.id == preparedImport.financialDocument.id)
         #expect(persistence.capturedImportSession?.id == preparedImport.importSession.id)
         #expect(persistence.capturedValidation?.passed == preparedImport.validation.passed)
-        #expect(TransactionStore.shared.transactions.count == preparedImport.transactionCount)
-        #expect(AccountStore.shared.accounts.count == 1)
+        #expect(TransactionStore.shared.transactions.isEmpty)
+        #expect(AccountStore.shared.accounts.isEmpty)
     }
 
     @Test func duplicateConfirmationIsRejectedWithoutSecondPersistence() async throws {

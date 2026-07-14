@@ -12,6 +12,29 @@ struct ImportEngineResult: Equatable {
     let validationPassed: Bool
     let persisted: Bool
     let errorMessage: String?
+    let accountId: String?
+    let importSessionId: String?
+    let redactedIdentifier: String?
+
+    init(
+        fileName: String,
+        transactionCount: Int,
+        validationPassed: Bool,
+        persisted: Bool,
+        errorMessage: String?,
+        accountId: String? = nil,
+        importSessionId: String? = nil,
+        redactedIdentifier: String? = nil
+    ) {
+        self.fileName = fileName
+        self.transactionCount = transactionCount
+        self.validationPassed = validationPassed
+        self.persisted = persisted
+        self.errorMessage = errorMessage
+        self.accountId = accountId
+        self.importSessionId = importSessionId
+        self.redactedIdentifier = redactedIdentifier
+    }
 
     var succeeded: Bool {
         validationPassed && persisted && errorMessage == nil
@@ -162,7 +185,10 @@ final class ImportEngine {
                 transactionCount: 0,
                 validationPassed: false,
                 persisted: false,
-                errorMessage: error.localizedDescription
+                errorMessage: error.localizedDescription,
+                accountId: nil,
+                importSessionId: nil,
+                redactedIdentifier: nil
             )
 
         }
@@ -241,6 +267,20 @@ final class ImportEngine {
     }
 
     func commitPreparedImport(_ preparedImport: PreparedImport) async -> ImportEngineResult {
+        await commitPreparedImport(preparedImport, accountChoice: nil)
+    }
+
+    func reviewPreparedImport(_ preparedImport: PreparedImport) throws -> ImportIdentityReview {
+        try importPersistenceCoordinatorFactory().reviewValidatedImport(
+            financialDocument: preparedImport.financialDocument,
+            validation: preparedImport.validation
+        )
+    }
+
+    func commitPreparedImport(
+        _ preparedImport: PreparedImport,
+        accountChoice: ImportAccountChoice?
+    ) async -> ImportEngineResult {
         guard preparedImport.validation.passed else {
             developerConsole.error(.validation, "Validation failed", metadata: ["file": preparedImport.fileName])
             return ImportEngineResult(
@@ -248,7 +288,10 @@ final class ImportEngine {
                 transactionCount: preparedImport.transactionCount,
                 validationPassed: false,
                 persisted: false,
-                errorMessage: ImportEngineCommitError.validationFailed.localizedDescription
+                errorMessage: ImportEngineCommitError.validationFailed.localizedDescription,
+                accountId: nil,
+                importSessionId: nil,
+                redactedIdentifier: nil
             )
         }
 
@@ -259,7 +302,10 @@ final class ImportEngine {
                 transactionCount: preparedImport.transactionCount,
                 validationPassed: true,
                 persisted: false,
-                errorMessage: ImportEngineCommitError.alreadyCommitted.localizedDescription
+                errorMessage: ImportEngineCommitError.alreadyCommitted.localizedDescription,
+                accountId: nil,
+                importSessionId: nil,
+                redactedIdentifier: nil
             )
         }
 
@@ -270,7 +316,8 @@ final class ImportEngine {
             persistenceResult = try importPersistenceCoordinator.persistValidatedImport(
                 financialDocument: preparedImport.financialDocument,
                 importSession: preparedImport.importSession,
-                validation: preparedImport.validation
+                validation: preparedImport.validation,
+                accountChoice: accountChoice
             )
             if persistenceResult.persisted {
                 developerConsole.info(.database, "Repository persistence completed")
@@ -283,45 +330,26 @@ final class ImportEngine {
             persistenceErrorMessage = error.localizedDescription
         }
 
-        if persistenceResult.persisted {
-            await MainActor.run {
-                AccountStore.shared.integrateImport(
-                    importSession: preparedImport.importSession,
-                    transactions: preparedImport.financialDocument.transactions
-                )
-            }
-
-            // AccountStore's legacy integration path publishes newly created accounts
-            // asynchronously. Wait for that queued publication before callers perform
-            // repository hydration, so hydration cannot be followed by a stale append.
-            await waitForPendingRuntimeStorePublication()
-
-            await MainActor.run {
-                DocumentStore.shared.update(with: preparedImport.rawContents)
-                TransactionStore.shared.replaceTransactions(
-                    preparedImport.financialDocument.transactions,
-                    validation: preparedImport.validation
-                )
-            }
-
-            developerConsole.info(.runtime, "Runtime refresh completed")
-        }
-
         return ImportEngineResult(
             fileName: preparedImport.fileName,
             transactionCount: preparedImport.transactionCount,
             validationPassed: true,
             persisted: persistenceResult.persisted,
-            errorMessage: persistenceErrorMessage
+            errorMessage: persistenceErrorMessage,
+            accountId: persistenceResult.accountId,
+            importSessionId: persistenceResult.importSessionId,
+            redactedIdentifier: persistenceResult.persisted
+                ? redactedEligibleIdentifier(in: preparedImport.financialDocument)
+                : nil
         )
     }
 
-    private func waitForPendingRuntimeStorePublication() async {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.main.async {
-                continuation.resume()
-            }
+    private func redactedEligibleIdentifier(in financialDocument: FinancialDocument) -> String? {
+        let identifiers = financialDocument.financialIdentifiers.filter {
+            $0.strength == .strong && $0.verificationState == .verified
         }
+        guard identifiers.count == 1 else { return nil }
+        return FinancialIdentifier.redacted(identifiers[0].normalizedValue)
     }
 
     private func markPreparedImportCommitted(_ id: UUID) -> Bool {

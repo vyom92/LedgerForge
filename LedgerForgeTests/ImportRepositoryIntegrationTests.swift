@@ -24,7 +24,8 @@ struct ImportRepositoryIntegrationTests {
             let result = try coordinator.persistValidatedImport(
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
-                validation: fixture.validation
+                validation: fixture.validation,
+                accountChoice: .createNewAccount
             )
 
             #expect(result.persisted)
@@ -90,7 +91,8 @@ struct ImportRepositoryIntegrationTests {
             let result = try coordinator.persistValidatedImport(
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
-                validation: fixture.validation
+                validation: fixture.validation,
+                accountChoice: .createNewAccount
             )
 
             let accountId = try #require(result.accountId)
@@ -213,6 +215,78 @@ struct ImportRepositoryIntegrationTests {
                 workspaceId: "workspace-import-integration"
             ).isEmpty)
         }
+    }
+
+    @Test func explicitExistingAccountChoiceAttachesIdentifierWithoutReplacingAccount() async throws {
+        let provider = makeInMemoryProvider()
+        let workspace = WorkspaceDTO(
+            id: "workspace-import-integration",
+            name: "Existing Workspace",
+            createdAtISO: "2026-07-13T00:00:00Z"
+        )
+        let existingAccount = AccountDTO(
+            id: "account-unseeded",
+            workspaceId: workspace.id,
+            name: "Verification Account",
+            institutionId: "Independent Credit Union",
+            accountType: "cash",
+            nativeCurrency: "INR",
+            description: "Unseeded account with unrelated presentation metadata",
+            createdAtISO: "2026-07-13T00:00:00Z"
+        )
+        _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+        _ = try provider.accountRepo.upsertAccount(existingAccount)
+        let identifier = try makeVerifiedAccountIdentifier("001234567890123")
+        let fixture = makeValidFixture(financialIdentifiers: [identifier])
+        let coordinator = makePersistenceCoordinator(provider: provider)
+
+        let review = try coordinator.reviewValidatedImport(
+            financialDocument: fixture.financialDocument,
+            validation: fixture.validation
+        )
+        #expect(review.isAvailable)
+        #expect(review.eligibleAccountIds == [existingAccount.id])
+
+        let result = try coordinator.persistValidatedImport(
+            financialDocument: fixture.financialDocument,
+            importSession: fixture.importSession,
+            validation: fixture.validation,
+            accountChoice: .useExistingAccount(accountId: existingAccount.id)
+        )
+
+        #expect(result.persisted)
+        #expect(result.accountId == existingAccount.id)
+        #expect(try provider.accountRepo.account(id: existingAccount.id) == existingAccount)
+        #expect(try provider.accountRepo.identifiers(
+            accountId: existingAccount.id,
+            workspaceId: workspace.id
+        ).count == 1)
+        #expect(try provider.transactionRepo.transactions(
+            workspaceId: workspace.id,
+            importSessionId: fixture.importSession.id.uuidString
+        ).allSatisfy { $0.accountId == existingAccount.id })
+    }
+
+    @Test func qualifyingNoMatchRejectsMissingChoiceBeforeEveryWrite() async throws {
+        let provider = makeInMemoryProvider()
+        let workspace = WorkspaceDTO(
+            id: "workspace-import-integration",
+            name: "Choice Workspace",
+            createdAtISO: "2026-07-13T00:00:00Z"
+        )
+        _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+        let fixture = makeValidFixture(financialIdentifiers: [try makeVerifiedAccountIdentifier("001234567890123")])
+
+        #expect(throws: ImportPersistenceCoordinationError.explicitChoiceRequired) {
+            try makePersistenceCoordinator(provider: provider).persistValidatedImport(
+                financialDocument: fixture.financialDocument,
+                importSession: fixture.importSession,
+                validation: fixture.validation,
+                accountChoice: nil
+            )
+        }
+        #expect(try provider.accountRepo.accounts(workspaceId: workspace.id).isEmpty)
+        #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
     }
 
     @Test func mapperRejectsUnsupportedCurrencyBeforePersistence() async throws {
@@ -361,7 +435,8 @@ struct ImportRepositoryIntegrationTests {
             let firstResult = try firstCoordinator.persistValidatedImport(
                 financialDocument: firstFixture.financialDocument,
                 importSession: firstFixture.importSession,
-                validation: firstFixture.validation
+                validation: firstFixture.validation,
+                accountChoice: .createNewAccount
             )
             let originalAccountId = try #require(firstResult.accountId)
             let originalAccountValue = try provider.accountRepo.account(id: originalAccountId)
