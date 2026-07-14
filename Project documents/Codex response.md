@@ -1,82 +1,64 @@
-# Sprint 37 Implementation and Repository Handoff Report
+# Sprint 38 Implementation and Repository Handoff Report
 
 ## Summary
 
-Sprint 37 — Account Detail, Display Name & Import Provenance was implemented within the approved production and test boundaries, fully tested, manually verified, committed and pushed to `origin/main`.
+Sprint 38 — User-Confirmed Identifier Attachment & Import Verification is implemented, validated, manually verified, committed and pushed to `origin/main`.
 
 `Project documents/Implementation.md` remained planning-frozen and was not modified.
 
 ## Implementation
 
-- Added a targeted AccountRepository display-name mutation with equivalent In-Memory and SQLite behaviour. SQLite uses `UPDATE`, rejects blank values, permits duplicate and case-only names, and treats unchanged trimmed input as a no-op.
-- Verified that rename preserves DTO metadata, `closed_at`, `created_from_import_session_id`, identifiers and import-session relationships.
-- Preserved immutable repository account/workspace references through hydration and repository account/import-session references through hydrated transactions.
-- Added bounded ImportSessionStore state, populated only through RepositoryStoreHydrator from trusted transaction references.
-- Hydration now produces only verified-strong identity summaries and redacts them before presentation state.
-- Added AccountsViewModel and AccountMetadataCoordinator. Selection, filtering and restoration use repository account IDs; display-name saves perform target persistence followed by canonical forced hydration, without optimistic runtime writes.
-- Updated the existing Accounts list-plus-inspector only: complete account list, selectable chevron-free rows, selected-account activity, type, transaction count, trusted deterministic import history and inline read-only import detail. Dashboard remains unchanged with its three-account limit.
+- Added read-only advisory identity review after successful validation. The review exposes the two explicit outcomes only for a current `.noMatch` import carrying exactly one verified strong identifier, and lists same-workspace accounts with zero identifiers without presentation-metadata filtering.
+- Added transient Import Wizard selection state. Neither outcome nor account is preselected; confirmation is disabled until the user explicitly selects Create New Account or an immutable repository account ID.
+- Added confirmation-time revalidation for identity, identifier eligibility, selected-account existence, workspace ownership, identifier-free eligibility and identifier ownership. A missing choice rejects before writes and never falls through to create-new-account.
+- Preserved the existing opaque create-new-account path as an explicit choice. The selected existing-account path attaches only the verified parser-produced identifier and does not replace the account or alter its metadata or relationships.
+- Corrected protocol-extension dispatch by making advisory review and choice-aware persistence protocol requirements. `ImportEngine` holds a protocol existential, so the earlier extension-only methods had statically dispatched to default implementations, hiding the advisory review and silently using the legacy persistence path.
+- Removed the legacy direct runtime-store mutation from `ImportEngine`. After successful persistence, `ContentView` performs exactly one canonical forced hydration through `RepositoryStoreHydrator`, then presents the bounded redacted result and selects View Account by immutable repository account ID.
 
 ## Files Modified
 
-Production and project membership:
+Implementation and focused tests:
 
 - `ContentView.swift`
-- `Core/AccountStore.swift`
-- `Core/TransactionStore.swift`
-- `Core/ImportSessionStore.swift`
-- `Database/Repository.swift`
-- `Database/InMemoryRepositoryProvider.swift`
-- `Database/SQLiteRepositoryProvider.swift`
-- `Models/Account.swift`
-- `Models/Transaction.swift`
-- `Models/ImportSession.swift`
-- `Services/RepositoryStoreHydrator.swift`
-- `Services/AccountMetadataCoordinator.swift`
-- `ViewModels/AccountsViewModel.swift`
-- `LedgerForge.xcodeproj/project.pbxproj`
-
-Tests:
-
-- `LedgerForgeTests/RepositoryContractTests.swift`
-- `LedgerForgeTests/IdentityResolverTests.swift`
-- `LedgerForgeTests/RepositoryStoreHydratorTests.swift`
+- `Services/ImportEngine.swift`
+- `Services/ImportPersistenceCoordinator.swift`
+- `LedgerForgeTests/ConfirmationGatedImportWorkflowTests.swift`
+- `LedgerForgeTests/DeveloperDiagnosticsTests.swift`
 - `LedgerForgeTests/ImportRepositoryIntegrationTests.swift`
-- `LedgerForgeTests/AccountsViewModelTests.swift`
-- `LedgerForgeTests/AccountMetadataCoordinatorTests.swift`
-- `LedgerForgeTests/ImportSessionStoreTests.swift`
 
 Documentation handoff:
 
-- `Project documents/PROJECT_STATE.md`
 - `Project documents/Codex response.md`
+- `Project documents/PROJECT_STATE.md`
 
 ## Validation
 
-- Xcode diagnostics: passed with no Sprint 37 source issues.
-- Xcode static analysis: passed.
-- Xcode clean build: passed.
-- Focused Sprint 37 suites: 63 tests, 0 failures, 0 skipped.
-- Complete Xcode-native test plan: 156 tests, 0 failures, 0 skipped; both UI test bundles passed.
-- Axis CSV regression retained 81 INR transactions and existing financial values, ordering, balances, validation, confirmation and Dashboard/Transactions behaviour.
-- `git diff --check` and conflict-marker checks passed.
-- Privacy coverage confirmed no raw identifier reaches presentation state or Sprint 37 diagnostics, and no edit-name or source-fragment values are logged.
+- Xcode 26.6 (build 17F113) diagnostics: passed with no source diagnostics.
+- Xcode static analysis: passed with no warnings or errors.
+- Clean Debug build: passed.
+- Focused Sprint 38 and regression suites: 70 tests, 0 failures, 0 skipped.
+- Complete Xcode-native test plan: 161 test cases, 0 failures, 0 skipped: `LedgerForgeTests` ran 158 tests in 25 suites; `LedgerForgeUITests` contains 3 test methods and executed 4 parameterized/performance runs, all passing.
+- Separate UI run: `LedgerForgeUITests.testExample`, `LedgerForgeUITests.testLaunchPerformance`, and `LedgerForgeUITestsLaunchTests.testLaunch` in Light and Dark all passed; 4 executions, 0 failures, 0 skipped. The regenerated runner was signed `Sign to Run Locally` and successfully launched under XCTest.
+- Axis CSV regression passed: 81 INR transactions with unchanged ordering, debit and credit totals, opening and closing balances, validation and verified identifier baseline.
+- `git diff --check` and tracked conflict-marker checks passed. A generated `TestPlan.xctestplan` parallelization edit was restored and excluded from the implementation commit.
+- Privacy review passed: Sprint 38 diagnostics contain concise outcome/count facts only; no complete identifier, source fragment, Sprint 38 filename, account display name or transaction description is introduced. Result presentation uses the existing redaction utility.
 
 ## Manual Runtime Verification
 
-Using the existing Sprint 36 SQLite database, the newly built application verified:
+- **Use Existing Account: PASS.** Both choices were shown with no automatic choice; confirmation remained disabled until explicit selection. The selected unseeded Verification Account retained its immutable ID and metadata, received the verified redacted identifier and 81 imported transactions, and no duplicate account was created. View Account selected it in Accounts; full quit and relaunch restored the account, identity, transactions and import history.
+- **Create New Account: PASS.** A clean database began with zero accounts; Create New Account required explicit selection. The explicit opaque-ID path created exactly one Axis Bank INR account, attached the verified redacted identifier and persisted 81 transactions without duplication. View Account selected it; full quit and relaunch restored the account, identity, transactions and import history.
+- The original sandbox database was restored from `/tmp/ledgerforge-sprint38-verify/container-backup-20260713-194224` with its SQLite, WAL and SHM files. Integrity checks passed before and after relaunch; the restored database retained 2 accounts, 324 transactions and 4 import sessions. Disposable verification databases remain under `/tmp/ledgerforge-sprint38-verify`, outside Git.
 
-- One persisted Axis account and 81 transactions hydrated correctly.
-- The Accounts list exposes the account with no chevron; the selected inspector uses Bank Account rather than the prior hardcoded type and has no Status row.
-- Selected-account activity, empty verified-identity state, import history and inline import detail were correctly scoped.
-- Cancel left the name unchanged; blank input was rejected with an actionable message.
-- A whitespace-padded valid name was trimmed, persisted through canonical refresh and restored after relaunch with the same transactions and import history.
-- The original display name was restored before completion. No database reset, migration or schema operation occurred.
+## Scope and Limitation
+
+- No schema, migration, DTO, parser, reader, normalizer, repository API, production repository implementation, ADR, backlog or `Implementation.md` change was made. Duplicate-transaction detection and all other Sprint 38 exclusions remain excluded.
+- The existing cross-repository persistence sequence remains non-atomic. If identifier attachment succeeds and a later import-session or transaction write fails, durable partial writes may remain; Sprint 38 reports that outcome accurately and does not introduce rollback or compensation.
 
 ## Implementation Commit and Remote Verification
 
-- Implementation commit: `e0d9440c290fd15890104a088f3c1be7936586c0` — `Implement Sprint 37 account detail and provenance`
+- Implementation commit: `11a5f47cb8e9cba683f60755be339b4feb9c851c` — `Implement Sprint 38 user-confirmed identifier attachment`
 - `origin/main` was fetched and verified at the exact same SHA before this documentation handoff.
 
 ## Current Phase
 
-Awaiting Sprint 38 planning.
+Sprint 38 is complete. No Sprint 39 work was started.

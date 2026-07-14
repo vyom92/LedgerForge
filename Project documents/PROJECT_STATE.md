@@ -14,18 +14,18 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: e0d9440 — Implement Sprint 37 account detail and provenance
+* Latest Implementation Commit: 11a5f47 — Implement Sprint 38 user-confirmed identifier attachment
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-029 — User-Confirmed Financial Identifier Attachment (Accepted)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 38 — User-Confirmed Identifier Attachment & Import Verification (planned)
-* Current Phase: Ready for Sprint 38 implementation
+* Current Sprint: Sprint 38 — User-Confirmed Identifier Attachment & Import Verification (completed)
+* Current Phase: Sprint 38 implementation complete
 * Build Status: Passing
-* Validation Status: Sprint 37 passed Xcode diagnostics, static analysis and clean build; focused Sprint 37 suites passed (63 tests, 0 failures, 0 skipped), complete Xcode-native test plan passed (156 tests, 0 failures, 0 skipped), Axis CSV financial regression passed, approved diff checks passed, and manual runtime verification passed
+* Validation Status: Sprint 38 passed Xcode 26.6 diagnostics, static analysis and clean Debug build; focused Sprint 38 suites passed (70 tests, 0 failures, 0 skipped), complete Xcode-native test plan passed (161 test cases, 0 failures, 0 skipped, including all LedgerForgeUITests methods), Axis CSV financial regression passed, approved diff and conflict checks passed, and both manual account-choice paths passed
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-* Latest Verified Implementation Remote: e0d9440c290fd15890104a088f3c1be7936586c0
+* Latest Verified Implementation Remote: 11a5f47cb8e9cba683f60755be339b4feb9c851c
 
 ## Bootstrap
 
@@ -88,16 +88,21 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 38 — User-Confirmed Identifier Attachment & Import Verification is planned and not implemented.
+Active Work: Sprint 38 — User-Confirmed Identifier Attachment & Import Verification is completed, committed and pushed.
 
-Verified planning state:
+Verified Sprint 38 state:
 
-* Sprint 37 remains completed, fully tested and manually verified.
-* Sprint 38 is limited to explicit user choice between Use Existing Account and Create New Account for a validated `noMatch` import carrying exactly one parser-produced verified strong identifier.
-* Sprint 38 requires authoritative confirmation-time identity and eligibility checks inside the existing import-persistence boundary.
-* Sprint 38 preserves immutable repository account identity, existing account metadata and financial relationships.
-* Sprint 38 does not include duplicate-transaction detection, duplicate-history repair, account merge, account split, incorrect-link recovery, identifier removal, transaction movement, schema migration, DTO redesign or cross-repository atomic persistence.
-* Sprint 38 has not been implemented, built or runtime-verified.
+* Validated `.noMatch` imports carrying exactly one parser-produced verified strong identifier receive read-only advisory review and explicit user choice between Use Existing Account and Create New Account.
+* The Import Wizard never preselects an outcome or account and disables confirmation until an explicit choice is made. Choice state is discarded on cancellation and prepared-import replacement.
+* Same-workspace accounts with zero identifiers are eligible independent of display name, institution or other presentation metadata. Internal selection uses only immutable repository account ID.
+* Confirmation re-runs resolver, identifier and selected-account eligibility checks before writes. A missing choice, stale selection, workspace mismatch, newly identified target or identifier owner change rejects before writes; no missing-choice create-new fallback remains.
+* Existing-account selection preserves immutable account ID, metadata and financial relationships, attaches only the verified parser-produced identifier and maps every new transaction to the selected account ID without replacement upsert.
+* Create-new selection retains the opaque account-ID policy and existing confirmed persistence path. Both paths present bounded redacted verification and View Account selects by immutable repository account ID.
+* `RepositoryStoreHydrator` remains the only persistence-to-runtime boundary. Runtime stores remain unchanged before complete success and one forced canonical hydration follows successful persistence.
+* Focused tests passed (70 tests, 0 failures, 0 skipped); complete Xcode-native testing passed (161 test cases, 0 failures, 0 skipped); the Axis CSV financial baseline passed unchanged; both manual account-choice paths, View Account and relaunch restoration passed.
+* No schema, migration, DTO, parser, reader, normalizer, repository API, duplicate-detection or cross-repository atomicity change was made. The existing non-atomic persistence limitation remains.
+* `Project documents/Implementation.md` remained planning-frozen and unmodified.
+* Sprint 38 implementation commit `11a5f47cb8e9cba683f60755be339b4feb9c851c` is pushed and verified at `origin/main`.
 
 Verified Sprint 37 state:
 
@@ -163,7 +168,7 @@ Verified Sprint 37 state:
 
 ### Current Critical Product Issues
 
-- None verified for Sprint 37.
+- None verified for Sprint 38.
 
 ### Current Important Product Issues
 
@@ -182,11 +187,11 @@ Verified Sprint 37 state:
 
 ### Ready for Next Feature Sprint?
 
-Ready for Sprint 38 implementation.
+Ready for Chat-approved next-sprint planning.
 
 ### Reason
 
-Sprint 37 implementation, validation and manual runtime verification are complete. Sprint 38 planning is accepted and the next action is Sprint 38 implementation through Codex.
+Sprint 38 implementation, validation, manual runtime verification, commit and push are complete. No Sprint 39 work has started.
 
 Out of Scope:
 
