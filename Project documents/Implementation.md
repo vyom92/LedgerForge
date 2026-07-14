@@ -49,6 +49,8 @@ The canonical import and runtime flow remains:
           ↓
     User Review & Explicit Confirmation
           ↓
+    Fingerprinting & Duplicate Detection
+          ↓
     ImportPersistenceCoordinator
           ↓
     Repositories
