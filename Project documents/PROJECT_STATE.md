@@ -17,11 +17,11 @@ Principles:
 * Latest Implementation Commit: 11a5f47 — Implement Sprint 38 user-confirmed identifier attachment
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
-* Latest ADR: ADR-029 — User-Confirmed Financial Identifier Attachment (Accepted)
+* Latest ADR: ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit (Accepted; Planned for Sprint 39)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 38 — User-Confirmed Identifier Attachment & Import Verification (completed)
-* Current Phase: Sprint 38 implementation complete
+* Current Sprint: Sprint 39 — Exact Statement Re-import Prevention (defined)
+* Current Phase: Ready for Sprint 39 implementation
 * Build Status: Passing
 * Validation Status: Sprint 38 passed Xcode 26.6 diagnostics, static analysis and clean Debug build; focused Sprint 38 suites passed (70 tests, 0 failures, 0 skipped), complete Xcode-native test plan passed (161 test cases, 0 failures, 0 skipped, including all LedgerForgeUITests methods), Axis CSV financial regression passed, approved diff and conflict checks passed, and both manual account-choice paths passed
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
@@ -88,7 +88,17 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 38 — User-Confirmed Identifier Attachment & Import Verification is completed, committed and pushed.
+Active Work: Sprint 39 — Exact Statement Re-import Prevention is defined and ready for implementation. Sprint 38 remains completed, committed, pushed and verified.
+
+Verified planning state:
+
+* Sprint 38 remains completed and verified; its implementation history and validation evidence are unchanged.
+* Sprint 39 is defined to prevent exact re-import of successfully imported reader-produced text using the versioned fingerprint `ledgerforge.raw-text.sha256.v1`.
+* Sprint 39 is not implemented, built, tested or manually verified.
+* Current production still permits repeated imports until Sprint 39 is implemented.
+* ADR-030 is accepted and planned for Sprint 39.
+* Sprint 39 targets same-process serialization and atomic document/fingerprint/import-session/transaction commit only; cross-process guarantees and broader cross-repository atomicity remain future work.
+* No schema migration has been approved for Sprint 39.
 
 Verified Sprint 38 state:
 
@@ -187,11 +197,11 @@ Verified Sprint 37 state:
 
 ### Ready for Next Feature Sprint?
 
-Ready for Chat-approved next-sprint planning.
+Ready for Sprint 39 implementation.
 
 ### Reason
 
-Sprint 38 implementation, validation, manual runtime verification, commit and push are complete. No Sprint 39 work has started.
+Sprint 38 implementation, validation, manual runtime verification, commit and push are complete. Sprint 39 is defined and ready for implementation; no Sprint 39 implementation work has started.
 
 Out of Scope:
 
@@ -218,7 +228,7 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Define Sprint 39.
+* Implement Sprint 39.
 
 ---
 

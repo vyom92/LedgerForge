@@ -1536,3 +1536,97 @@ This ADR does not:
 - ADR-026 — Structured Developer Diagnostics
 - ADR-027 — Parser-Owned Financial Identifier Extraction
 - ADR-028 — Bounded Parser Source Evidence
+
+# ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit
+
+## Status
+
+Accepted
+
+Planned for Sprint 39
+
+## Context
+
+LedgerForge currently permits a validated and explicitly confirmed statement to be imported again, even when the exact reader-produced text has already completed a successful import. Sprint 39 requires deterministic exact-content protection without introducing transaction-level heuristics, historical repair or a general import-history subsystem.
+
+## Decision
+
+### Exact duplicate semantics
+
+For Sprint 39, an exact duplicate is the same fingerprint algorithm identifier paired with the same deterministic digest of reader-produced source content.
+
+The initial algorithm identifier is `ledgerforge.raw-text.sha256.v1`. Its input is the exact UTF-8 byte sequence of `RawDocumentContent.text`, after successful document reading and before parsing, normalization or financial interpretation changes the content. Renaming or moving identical content must not change its fingerprint. Any change to decoded text, including line endings or whitespace, may produce a different fingerprint under version 1.
+
+The fingerprint excludes filenames, source paths, file dates, import dates, institution labels, financial identifiers, account identity, parser selection, normalized rows, parsed transactions, balances, display metadata and generated UUIDs. Sprint 39 supports the production text-import path only; binary-data fingerprint semantics remain future work.
+
+### Prospective-only compatibility
+
+Sprint 39 exact-import protection is prospective. Import sessions completed before Sprint 39 contain no durable Sprint 39 fingerprint. Existing documents, sessions, accounts, identifiers and transactions are not backfilled or heuristically fingerprinted.
+
+The first post-Sprint 39 import of content that exists only in legacy un-fingerprinted history may be treated as a new import and register the fingerprint. Subsequent imports of that exact content are blocked. Filename, path, institution, account identity, balances, transaction sets, transaction counts, dates and existing import-session metadata must not be used to reconstruct a legacy fingerprint. Historical detection and repair remain future work.
+
+### Database-wide fingerprint scope
+
+Under the existing schema, exact-content fingerprint uniqueness is database-wide. Sprint 39 operates under the current single-workspace product model and must not claim workspace-scoped fingerprint uniqueness. Independent import of identical content into multiple workspaces is not defined by Sprint 39.
+
+Supporting workspace-scoped behaviour requires a separately approved workspace-scoped schema decision and migration. No migration is authorized in Sprint 39. The digest remains solely a function of exact source text and must not be salted with workspace identity.
+
+### Ownership and lifecycle
+
+Fingerprint generation belongs to generic import orchestration over reader-produced content. It does not belong to readers, statement parsers, normalizers, identity resolution, Views, ViewModels or transaction heuristics. The fingerprint is immutable and is carried by `PreparedImport` through explicit confirmation.
+
+After validation passes, preparation may perform a read-only advisory duplicate lookup. Advisory state performs no writes, does not claim the fingerprint, is not confirmation-time authority and may display bounded prior-import information.
+
+Immediately before supported import-persistence writes, the confirmed persistence boundary must enter the same-process serialized import-confirmation boundary, recompute or verify the immutable prepared fingerprint contract, perform an authoritative durable duplicate lookup and reject an existing successful fingerprint before account, identifier, import-session or transaction writes begin.
+
+The same-process serialized confirmation boundary begins before the authoritative duplicate lookup and remains held until duplicate rejection completes, or until account and identifier persistence plus the atomic import-history commit complete or fail. It must not be released after lookup and reacquired for persistence. Account and identifier persistence remains outside the narrower atomic import-history transaction while remaining inside the same-process serialized confirmation execution; this ADR does not claim rollback of workspace, account or identifier writes.
+
+Two identical confirmations within the running LedgerForge process must not both persist financial history. Cross-process, distributed and external-writer concurrency guarantees remain future work.
+
+### Atomic import-history commit
+
+A provider-owned operation must atomically commit the integrity-bearing import-history records: document, document fingerprint, import session, imported transactions and successful import-session completion state. SQLite writes these records in one database transaction. The in-memory provider supplies equivalent serialized all-or-nothing behaviour.
+
+A failure inside this atomic operation leaves none of those records durable. The fingerprint becomes durable only as part of a successful import-history commit. Validation failure, cancellation and failed import-history commit leave no durable fingerprint.
+
+This ADR does not create a general unit-of-work across every repository operation. Existing workspace, account and identifier persistence remains governed by prior ADRs. Full atomicity covering workspace, account, identifier, document, session and transactions remains future work.
+
+### Durable duplicate result and presentation
+
+A durable fingerprint lookup may return bounded prior-import provenance: prior import-session ID internally, prior successful completion date, prior persisted transaction count, prior account ID internally and prior account display name when recoverable. The fingerprint match remains authoritative even if optional presentation metadata cannot be reconstructed; missing account presentation must not permit re-import.
+
+A duplicate is a distinct, non-error integrity outcome presented as “Previously imported” or equivalent, with prior date, transaction count and account display name when available, plus the existing View Account action when the account remains available. No new screen, import-history browser or duplicate-management workflow is authorized.
+
+Duplicate rejection performs no runtime-store mutation and no forced hydration. A genuinely new successful import continues to trigger exactly one canonical forced hydration through `RepositoryStoreHydrator`.
+
+### Privacy and diagnostics
+
+User-visible presentation and diagnostics must not contain raw source content, full fingerprint values, raw financial identifiers or parser source evidence. Diagnostics may record only bounded facts such as the fingerprint algorithm version, duplicate found, import blocked and commit succeeded or failed.
+
+## Rejected Alternatives
+
+- Filename or path matching.
+- Institution, account-name or identifier matching.
+- Transaction-level heuristics or normalized-transaction fingerprints.
+- Persisting a fingerprint reservation before the import without an atomic lifecycle.
+- Recording the fingerprint after otherwise independent successful writes.
+- Trusting advisory preparation results.
+- Historical duplicate repair.
+- Duplicate-management UI.
+- Full Candidate E cross-repository unit-of-work expansion.
+
+## Non-Goals
+
+Sprint 39 does not include transaction-level duplicate detection, overlapping-statement detection, historical duplicate repair, account merge or split, transaction movement or reversal, import-session deletion, general import-history UI, parser, reader or normalizer changes, financial-calculation changes, runtime-store or hydrator redesign, binary-document equivalence, cross-format semantic equivalence, cross-process concurrency guarantees or a schema migration unless separately approved.
+
+## Related ADRs
+
+- ADR-003 — Generic Import Engine
+- ADR-011 — Unified FinancialDocument Pipeline
+- ADR-012 — Separation of Readers and Parsers
+- ADR-016 — Universal Import Pipeline
+- ADR-024 — Repository Hydration Boundary
+- ADR-025 — Stable Financial Entity Identity
+- ADR-026 — Structured Developer Diagnostics
+- ADR-027 — Parser-Owned Financial Identifier Extraction
+- ADR-029 — User-Confirmed Financial Identifier Attachment

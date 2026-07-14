@@ -265,6 +265,10 @@ Ideas in this section may become future architecture work but are not approved i
 - Keep backlog entries independent of specific implementation details unless a verified architectural risk must be preserved.
 - Do not use this document as a substitute for repository discovery before sprint planning.
 
+### Sprint Planning Clarification
+
+Exact deterministic statement re-import prevention is governed by ACTIVE Sprint 39. Duplicate-import management UI, transaction overlap detection, historical repair and broader atomicity remain separate future work.
+
 ---
 
 ## Verification
