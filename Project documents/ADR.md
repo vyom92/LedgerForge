@@ -1390,3 +1390,137 @@ Those changes require separate implementation decisions and sprints.
 * ADR-025 — Stable Financial Entity Identity
 * ADR-026 — Structured Developer Diagnostics
 * ADR-027 — Parser-Owned Financial Identifier Extraction
+
+# ADR-029 — User-Confirmed Financial Identifier Attachment
+
+## Status
+
+Accepted
+
+## Implemented In
+
+Sprint 38 — planned; implementation pending
+
+## Context
+
+ADR-025 establishes immutable repository account identity and prohibits matching by display name, institution label or filename. ADR-027 establishes that verified financial identifiers originate exclusively inside the selected `StatementParser`. ADR-028 establishes the bounded source-evidence path that permits parsers to interpret institution-specific account fields without moving interpretation into generic import processing.
+
+Sprint 36 integrates deterministic confirmed-import resolution. A parser-produced verified strong identifier can resolve an account that already owns that identifier. A `noMatch` outcome creates a new opaque account and seeds its identity. An existing account that has no identifier cannot be selected by the resolver because no verified repository relationship connects the new identifier to that account.
+
+The missing capability is a narrowly bounded user decision for a validated, still-uncommitted import: the user may choose whether one eligible parser-produced verified strong identifier should be attached to one existing unseeded account or whether the current create-new-account path should remain in effect.
+
+This decision must not become heuristic account matching, an account merge, a transaction movement operation or a general identity-conflict workflow.
+
+## Decision
+
+1. Statement parsers remain the only components permitted to produce or verify `FinancialIdentifier` values.
+
+2. `FinancialIdentityResolver` remains deterministic and continues to return `resolved`, `noMatch`, `ambiguous` or `conflict` based only on parser-produced verified strong identifiers and workspace-scoped repository lookup.
+
+3. User confirmation is permitted only for the narrowly defined `noMatch` path after validation has passed.
+
+4. Sprint 38 applies only when exactly one parser-produced identifier is eligible, its strength is `.strong`, its verification state is `.verified`, and it originated from the selected parser under ADR-027.
+
+5. The user must choose exactly one outcome: **Use Existing Account** or **Create New Account**. No account may be selected automatically, including when only one eligible account is available.
+
+6. Pre-confirmation eligibility is advisory presentation state only. It must not attach identifiers, create accounts, persist import sessions or transactions, mutate repositories, mutate runtime stores or act as confirmation-time authority.
+
+7. Immediately before repository writes, the existing confirmed import-persistence boundary must re-run identity resolution and revalidate the identifier set, the explicit user outcome, workspace ownership, selected-account existence and selected-account eligibility.
+
+8. **Use Existing Account** requires an immutable repository account ID. The selected account must belong to the configured workspace and remain unseeded, meaning it has no stored identifier of any strength, verification state or provenance. The identifier must not already be owned by another account.
+
+9. For **Use Existing Account**, the existing account record and financial relationships must be preserved. Replacement-style account upsert must not be used for the selected account. Imported transactions must use the selected immutable account ID.
+
+10. The one eligible parser-produced verified strong identifier is attached inside the existing confirmed import-persistence boundary. Parser provenance remains unchanged; user confirmation authorizes the account association and does not re-verify or reclassify the identifier.
+
+11. **Create New Account** retains the existing opaque account-ID policy, current no-match revalidation and current account, identifier, import-session and transaction persistence workflow.
+
+12. Runtime state changes only after the complete persistence outcome succeeds. One canonical forced hydration through `RepositoryStoreHydrator` follows successful persistence. No second persistence-to-runtime path is introduced.
+
+13. The successful result may present the selected or newly created account, a safely redacted identifier, persisted transaction count, import-session result and a **View Account** action. The action selects the account by immutable repository account ID.
+
+14. Raw identifiers, raw parser source evidence, repository IDs as financial identity and unredacted identifier values in diagnostics remain prohibited.
+
+15. The existing non-atomic persistence limitation remains accepted. This ADR does not introduce rollback, compensation, cross-repository atomicity, identifier removal, account merge, account split or historical transaction movement.
+
+## Rationale
+
+The resolver cannot safely infer which unseeded account owns a newly observed identifier. User confirmation is the only additional authority permitted for this narrow case, and it is explicit, reviewable and bounded by parser verification, workspace ownership, an unseeded target and final repository revalidation.
+
+Keeping the operation inside confirmed import persistence preserves validation-before-persistence, prevents cancellation from writing identity or financial data, reuses the existing account-ID mapper path and keeps identity attachment adjacent to the import it authorizes.
+
+Using immutable repository account IDs prevents display metadata or runtime presentation identity from becoming durable account identity. Preserving parser provenance keeps identifier verification ownership unambiguous.
+
+## Consequences
+
+Positive consequences:
+
+- A user can prevent a new duplicate account when a verified import has no existing identifier match.
+- Existing accounts, identifiers, transactions and import-session relationships remain attached to their immutable repository identities.
+- Existing resolver, mapper, repository and hydration boundaries remain reusable.
+- Weak evidence cannot silently create an identity association.
+- Ambiguous and conflicting identity remains unresolved.
+- The successful account can be verified through the existing hydrated Accounts experience.
+
+Trade-offs:
+
+- A user can make an incorrect association; this ADR therefore limits the target to an unseeded account and requires explicit confirmation.
+- The current repository sequence remains non-atomic. An early successful identifier write may survive a later import-session or transaction failure.
+- Durable confirmation audit, unlinking and incorrect-link recovery are not provided by this decision.
+- The workflow prevents future duplicate accounts but does not detect or repair duplicate financial history.
+
+## Rejected Alternatives
+
+### Automatically choose the first eligible account
+
+Rejected. Eligibility does not prove ownership, and deterministic ordering is not identity evidence.
+
+### Match through display name or institution
+
+Rejected. ADR-025 reserves those values for presentation and metadata; they are not durable identity keys.
+
+### Attach before explicit confirmation
+
+Rejected. Preparation and cancellation must remain write-free, and advisory review must not become an implicit repository mutation.
+
+### Trust stale pre-confirmation eligibility
+
+Rejected. Repository state may change between review and confirmation. Current resolver and account eligibility must be authoritative immediately before writes.
+
+### Move identifier verification outside parsers
+
+Rejected. ADR-027 assigns identifier production and verification exclusively to `StatementParser` implementations.
+
+### Perform repository writes from a View or ViewModel
+
+Rejected. Repository writes remain inside the import-persistence boundary, and persistence-to-runtime updates remain behind `RepositoryStoreHydrator`.
+
+### Repair duplicate history through this workflow
+
+Rejected. Duplicate transaction detection, account merge, transaction movement, deletion and rollback require separate architecture and explicit recovery safeguards.
+
+## Non-Goals
+
+This ADR does not:
+
+- change parser inputs or parser verification rules;
+- derive identifiers from filenames, names, institutions, balances, suffixes, masked values or transactions;
+- override resolved, ambiguous or conflicting resolver outcomes;
+- implement identifier removal or editing;
+- implement manual account linking or unlinking beyond this narrow attachment;
+- implement account merge, split or incorrect-link recovery;
+- move or deduplicate historical transactions;
+- introduce duplicate-transaction detection;
+- introduce schema migrations or DTO redesign;
+- introduce cross-repository atomic persistence or rollback;
+- change validation, financial calculations or runtime-store ownership;
+- store source fragments in long-lived state, repositories, SQLite or diagnostics;
+- expose raw identifiers in presentation state.
+
+## Related ADRs
+
+- ADR-024 — Repository Hydration Boundary
+- ADR-025 — Stable Financial Entity Identity
+- ADR-026 — Structured Developer Diagnostics
+- ADR-027 — Parser-Owned Financial Identifier Extraction
+- ADR-028 — Bounded Parser Source Evidence

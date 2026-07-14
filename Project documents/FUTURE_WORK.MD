@@ -23,8 +23,8 @@ Items already promoted into the ACTIVE sprint must not remain in this backlog.
 - [ ] Broader account metadata editing beyond display names while preserving immutable identity and financial relationships
 - [ ] Identity conflict handling workflow
 - [ ] Manual identity conflict resolution
-- [ ] Explain why an imported statement matched, failed to match or conflicted
-- [ ] Manual account linking and unlinking with explicit confirmation
+- [ ] Explain why an imported statement matched, failed to match or conflicted beyond Sprint 38's bounded verification result
+- [ ] Manual account linking and unlinking beyond Sprint 38, including manual unlinking and broader linking workflows not covered by explicit verified-identifier attachment
 - [ ] Identifier backfill policy for adding newly discovered verified identifiers to an already resolved account
 - [ ] Duplicate-account review tools
 - [ ] Manual account merge with preview, validation and rollback protection
@@ -104,7 +104,7 @@ Items already promoted into the ACTIVE sprint must not remain in this backlog.
 - [ ] Multi-file drag-and-drop import center
 - [ ] Editable import preview
 - [ ] Import correction workflow before persistence
-- [ ] Account-match review and optional manual override
+- [ ] Account-match review and optional manual override beyond Sprint 38's explicit `noMatch` account choice
 - [ ] Duplicate-import review and management UI
 - [ ] Global import-session history and management, including failed and account-unassociated sessions
 - [ ] Delete or reverse an import session safely

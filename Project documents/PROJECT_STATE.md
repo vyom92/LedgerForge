@@ -17,11 +17,11 @@ Principles:
 * Latest Implementation Commit: e0d9440 — Implement Sprint 37 account detail and provenance
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
-* Latest ADR: ADR-028 — Bounded Parser Source Evidence (Accepted)
+* Latest ADR: ADR-029 — User-Confirmed Financial Identifier Attachment (Accepted)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 37 — Account Detail, Display Name & Import Provenance (implemented)
-* Current Phase: Awaiting Sprint 38 planning
+* Current Sprint: Sprint 38 — User-Confirmed Identifier Attachment & Import Verification (planned)
+* Current Phase: Ready for Sprint 38 implementation
 * Build Status: Passing
 * Validation Status: Sprint 37 passed Xcode diagnostics, static analysis and clean build; focused Sprint 37 suites passed (63 tests, 0 failures, 0 skipped), complete Xcode-native test plan passed (156 tests, 0 failures, 0 skipped), Axis CSV financial regression passed, approved diff checks passed, and manual runtime verification passed
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
@@ -88,7 +88,16 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 37 — Account Detail, Display Name & Import Provenance is implemented, fully tested and manually verified.
+Active Work: Sprint 38 — User-Confirmed Identifier Attachment & Import Verification is planned and not implemented.
+
+Verified planning state:
+
+* Sprint 37 remains completed, fully tested and manually verified.
+* Sprint 38 is limited to explicit user choice between Use Existing Account and Create New Account for a validated `noMatch` import carrying exactly one parser-produced verified strong identifier.
+* Sprint 38 requires authoritative confirmation-time identity and eligibility checks inside the existing import-persistence boundary.
+* Sprint 38 preserves immutable repository account identity, existing account metadata and financial relationships.
+* Sprint 38 does not include duplicate-transaction detection, duplicate-history repair, account merge, account split, incorrect-link recovery, identifier removal, transaction movement, schema migration, DTO redesign or cross-repository atomic persistence.
+* Sprint 38 has not been implemented, built or runtime-verified.
 
 Verified Sprint 37 state:
 
@@ -173,11 +182,11 @@ Verified Sprint 37 state:
 
 ### Ready for Next Feature Sprint?
 
-Awaiting Sprint 38 planning.
+Ready for Sprint 38 implementation.
 
 ### Reason
 
-Sprint 37 implementation, validation and manual runtime verification are complete. Desktop ChatGPT owns the next ACTIVE sprint definition.
+Sprint 37 implementation, validation and manual runtime verification are complete. Sprint 38 planning is accepted and the next action is Sprint 38 implementation through Codex.
 
 Out of Scope:
 
@@ -204,7 +213,7 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Define Sprint 38.
+* Implement Sprint 38.
 
 ---
 
