@@ -1411,7 +1411,7 @@ Accepted
 
 ## Implemented In
 
-Sprint 38 — planned; implementation pending
+Sprint 38
 
 ## Context
 

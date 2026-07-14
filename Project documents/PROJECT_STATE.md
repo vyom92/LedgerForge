@@ -218,7 +218,7 @@ Out of Scope:
 
 Next Major Milestone:
 
-* Implement Sprint 38.
+* Define Sprint 39.
 
 ---
 
