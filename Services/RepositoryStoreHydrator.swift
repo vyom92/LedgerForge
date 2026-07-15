@@ -8,17 +8,20 @@ struct RepositoryStoreHydrationResult: Equatable {
     let accountCount: Int
     let transactionCount: Int
     let importSessionCount: Int
+    let importAttemptCount: Int
 
     init(
         didHydrate: Bool,
         accountCount: Int,
         transactionCount: Int,
-        importSessionCount: Int = 0
+        importSessionCount: Int = 0,
+        importAttemptCount: Int = 0
     ) {
         self.didHydrate = didHydrate
         self.accountCount = accountCount
         self.transactionCount = transactionCount
         self.importSessionCount = importSessionCount
+        self.importAttemptCount = importAttemptCount
     }
 }
 
@@ -43,6 +46,7 @@ final class RepositoryStoreHydrator {
     private let transactionRepo: TransactionRepository
     private let accountStore: AccountStore
     private let importSessionStore: ImportSessionStore
+    private let importAttemptStore: ImportAttemptStore
     private let transactionStore: TransactionStore
     private let workspaceId: String
     private var hasHydrated = false
@@ -52,6 +56,7 @@ final class RepositoryStoreHydrator {
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
+        importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace"
     ) {
         self.init(
@@ -61,6 +66,7 @@ final class RepositoryStoreHydrator {
             accountStore: accountStore,
             transactionStore: transactionStore,
             importSessionStore: importSessionStore,
+            importAttemptStore: importAttemptStore,
             workspaceId: workspaceId
         )
     }
@@ -72,6 +78,7 @@ final class RepositoryStoreHydrator {
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
+        importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace"
     ) {
         self.accountRepo = accountRepo
@@ -80,6 +87,7 @@ final class RepositoryStoreHydrator {
         self.accountStore = accountStore
         self.transactionStore = transactionStore
         self.importSessionStore = importSessionStore
+        self.importAttemptStore = importAttemptStore
         self.workspaceId = workspaceId
     }
 
@@ -90,7 +98,8 @@ final class RepositoryStoreHydrator {
                 didHydrate: false,
                 accountCount: accountStore.accounts.count,
                 transactionCount: transactionStore.transactions.count,
-                importSessionCount: importSessionStore.importSessions.count
+                importSessionCount: importSessionStore.importSessions.count,
+                importAttemptCount: importAttemptStore.attempts.count
             )
         }
 
@@ -102,6 +111,7 @@ final class RepositoryStoreHydrator {
             }
         )
         let importSessions = try referencedImportSessions(from: transactionDTOs)
+        let importAttempts = try importSessionRepo.importAttempts(workspaceId: workspaceId).map(RepositoryImportAttempt.init)
         let transactions = try transactionDTOs.map {
             try Self.transaction(from: $0, accounts: accountDTOs)
         }
@@ -115,14 +125,23 @@ final class RepositoryStoreHydrator {
         accountStore.replaceAccounts(accounts)
         transactionStore.replaceTransactions(transactions)
         importSessionStore.replaceImportSessions(importSessions)
+        importAttemptStore.replaceAttempts(importAttempts)
         hasHydrated = true
 
         return RepositoryStoreHydrationResult(
             didHydrate: true,
             accountCount: accounts.count,
             transactionCount: transactions.count,
-            importSessionCount: importSessions.count
+            importSessionCount: importSessions.count,
+            importAttemptCount: importAttempts.count
         )
+    }
+
+    /// Refreshes only privacy-safe attempt presentation after a rejected outcome.
+    /// Financial runtime stores remain untouched.
+    func hydrateImportAttempts() throws {
+        let attempts = try importSessionRepo.importAttempts(workspaceId: workspaceId).map(RepositoryImportAttempt.init)
+        importAttemptStore.replaceAttempts(attempts)
     }
 
     private func referencedImportSessions(from transactions: [TransactionDTO]) throws -> [RepositoryImportSession] {

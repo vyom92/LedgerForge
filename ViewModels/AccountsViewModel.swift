@@ -4,6 +4,25 @@
 import Foundation
 import Combine
 
+@MainActor
+final class ImportHistoryViewModel: ObservableObject {
+    @Published private(set) var attempts: [RepositoryImportAttempt] = []
+    @Published private(set) var selectedAttempt: RepositoryImportAttempt?
+    private var cancellable: AnyCancellable?
+
+    convenience init() { self.init(store: .shared) }
+
+    init(store: ImportAttemptStore) {
+        attempts = store.attempts
+        cancellable = store.$attempts.receive(on: RunLoop.main).sink { [weak self] attempts in
+            self?.attempts = attempts
+            if let selected = self?.selectedAttempt { self?.selectedAttempt = attempts.first { $0.id == selected.id } }
+        }
+    }
+    func select(id: String) { selectedAttempt = attempts.first { $0.id == id } }
+    func clearSelection() { selectedAttempt = nil }
+}
+
 struct AccountsAccountPresentation: Identifiable, Equatable {
     let id: String
     let displayName: String

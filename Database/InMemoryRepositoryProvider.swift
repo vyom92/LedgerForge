@@ -29,6 +29,7 @@ private final class InMemoryRepositoryState {
     var importSessions: [String: ImportSessionRecordDTO] = [:]
     var transactions: [String: TransactionDTO] = [:]
     var transactionEventIdentities: [String: TransactionEventIdentityDTO] = [:]
+    var importAttempts: [String: ImportAttemptDTO] = [:]
 }
 
 private final class InMemoryWorkspaceRepo: WorkspaceRepository {
@@ -229,6 +230,26 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
         return result
     }
 
+    func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String {
+        state.importHistoryLock.lock(); defer { state.importHistoryLock.unlock() }
+        guard state.workspaces[payload.workspaceId] != nil else {
+            throw RepositoryError.relationshipViolation("Workspace does not exist for import attempt.")
+        }
+        guard state.importAttempts[payload.id] == nil else {
+            throw RepositoryError.relationshipViolation("Import attempt identifier already exists.")
+        }
+        state.importAttempts[payload.id] = payload
+        return payload.id
+    }
+
+    func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] {
+        state.importHistoryLock.lock(); defer { state.importHistoryLock.unlock() }
+        return state.importAttempts.values.filter { $0.workspaceId == workspaceId }.sorted {
+            if $0.createdAtISO == $1.createdAtISO { return $0.id > $1.id }
+            return $0.createdAtISO > $1.createdAtISO
+        }
+    }
+
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
         state.importHistoryLock.lock()
         defer { state.importHistoryLock.unlock() }
@@ -299,6 +320,7 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
         var sessions = state.importSessions
         var transactions = state.transactions
         var eventIdentities = state.transactionEventIdentities
+        var attempts = state.importAttempts
 
         documents[payload.document.id] = payload.document
         fingerprints[payload.fingerprint.id] = payload.fingerprint
@@ -317,12 +339,22 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
             transactions[transaction.id] = transaction
         }
         for event in payload.transactionEventIdentities { eventIdentities[event.id] = event }
+        guard payload.successfulAttempt.workspaceId == payload.importSession.workspaceId,
+              payload.successfulAttempt.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue,
+              payload.successfulAttempt.importSessionId == payload.importSession.id,
+              payload.successfulAttempt.documentId == payload.document.id,
+              payload.successfulAttempt.accountId == accountId,
+              attempts[payload.successfulAttempt.id] == nil else {
+            throw RepositoryError.relationshipViolation("Atomic import attempt relationships are inconsistent.")
+        }
+        attempts[payload.successfulAttempt.id] = payload.successfulAttempt
 
         state.documents = documents
         state.documentFingerprints = fingerprints
         state.importSessions = sessions
         state.transactions = transactions
         state.transactionEventIdentities = eventIdentities
+        state.importAttempts = attempts
         return .committed
     }
 

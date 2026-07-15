@@ -286,4 +286,43 @@ CREATE TABLE transaction_event_identities (
 CREATE INDEX idx_transaction_event_identities_account ON transaction_event_identities(account_id, import_session_id);
 """)
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3]
+public let migrationV4 = Migration(version: 4, name: "import_attempt_history", sql: """
+CREATE TABLE import_attempts (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  outcome_code TEXT NOT NULL,
+  coverage_code TEXT NOT NULL,
+  account_decision_code TEXT NOT NULL,
+  guidance_code TEXT NOT NULL,
+  persistence_code TEXT NOT NULL,
+  transaction_count INTEGER NOT NULL,
+  account_id TEXT,
+  import_session_id TEXT,
+  document_id TEXT,
+  related_import_session_id TEXT,
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE SET NULL,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE SET NULL,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE SET NULL,
+  FOREIGN KEY(related_import_session_id) REFERENCES import_sessions(id) ON DELETE SET NULL
+);
+CREATE INDEX idx_import_attempts_workspace_created ON import_attempts(workspace_id, created_at DESC, id DESC);
+
+INSERT INTO import_attempts (
+  id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code,
+  guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id
+)
+SELECT
+  'backfill-attempt-' || s.id, s.workspace_id, COALESCE(s.completed_at, s.started_at),
+  'successful_import', 'evaluated_supported_only', 'resolved_or_created',
+  'import_completed', 'committed',
+  (SELECT COUNT(*) FROM transactions t WHERE t.import_session_id = s.id),
+  (SELECT t.account_id FROM transactions t WHERE t.import_session_id = s.id AND t.account_id IS NOT NULL ORDER BY t.id LIMIT 1),
+  s.id,
+  (SELECT d.id FROM documents d WHERE d.import_session_id = s.id ORDER BY d.id LIMIT 1)
+FROM import_sessions s
+WHERE s.validation_status = 'passed' AND s.completed_at IS NOT NULL;
+""")
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4]

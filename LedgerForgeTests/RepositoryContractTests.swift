@@ -7,6 +7,27 @@ import Testing
 @MainActor
 struct RepositoryContractTests {
 
+    @Test func importAttemptsUseBoundedCodesAndProviderParity() async throws {
+        try runForEachProvider { provider in
+            let fixture = try seedWorkspace(provider)
+            let attempt = ImportAttemptDTO(
+                id: "attempt-contract", workspaceId: fixture.workspaceId, createdAtISO: "2026-07-16T00:00:00Z",
+                outcomeCode: ImportAttemptOutcome.validationFailure.rawValue,
+                coverageCode: ImportAttemptCoverage.unsupportedOrUnevaluated.rawValue,
+                accountDecisionCode: ImportAttemptAccountDecision.noFinancialMutation.rawValue,
+                guidanceCode: ImportAttemptGuidance.correctValidationAndRetry.rawValue,
+                persistenceCode: ImportAttemptPersistence.rejectedRecorded.rawValue,
+                transactionCount: 0
+            )
+            #expect(try provider.importSessionRepo.recordImportAttempt(attempt) == attempt.id)
+            let stored = try #require(provider.importSessionRepo.importAttempts(workspaceId: fixture.workspaceId).first)
+            #expect(stored == attempt)
+            #expect(stored.accountId == nil)
+            #expect(stored.importSessionId == nil)
+            #expect(stored.documentId == nil)
+        }
+    }
+
     @Test func accountRepositoryCanUpsertAndRetrieveAccountData() async throws {
         try runForEachProvider { provider in
             let fixture = try seedWorkspace(provider)
@@ -426,7 +447,8 @@ struct RepositoryContractTests {
                         updatedAtISO: transaction.updatedAtISO,
                         rawRows: transaction.rawRows
                     )
-                }
+                },
+                successfulAttempt: valid.successfulAttempt
             )
 
             #expect(throws: Error.self) {
@@ -467,7 +489,8 @@ struct RepositoryContractTests {
                     amountDecimal: "-5.00",
                     direction: "debit",
                     isTrusted: false
-                )]
+                )],
+                successfulAttempt: valid.successfulAttempt
             )
 
             #expect(throws: Error.self) {
@@ -761,6 +784,15 @@ private func atomicImportHistoryPayload(
                 direction: "debit",
                 isTrusted: false
             )
-        ]
+        ],
+        successfulAttempt: ImportAttemptDTO(
+            id: "attempt-atomic-\(suffix)", workspaceId: workspaceId, createdAtISO: "2026-07-14T09:01:00Z",
+            outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
+            coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+            accountDecisionCode: ImportAttemptAccountDecision.resolvedOrCreated.rawValue,
+            guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
+            persistenceCode: ImportAttemptPersistence.committed.rawValue,
+            transactionCount: 2, accountId: accountId, importSessionId: sessionId, documentId: documentId
+        )
     )
 }

@@ -339,6 +339,17 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
         return result
     }
 
+    func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String {
+        try insertImportAttempt(payload)
+        return payload.id
+    }
+
+    func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] {
+        try db.query(sql: "SELECT id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id FROM import_attempts WHERE workspace_id = ? ORDER BY created_at DESC, id DESC;", params: [workspaceId]) { row in
+            ImportAttemptDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", createdAtISO: row.string(at: 2) ?? "", outcomeCode: row.string(at: 3) ?? "", coverageCode: row.string(at: 4) ?? "", accountDecisionCode: row.string(at: 5) ?? "", guidanceCode: row.string(at: 6) ?? "", persistenceCode: row.string(at: 7) ?? "", transactionCount: Int(row.int64(at: 8) ?? 0), accountId: row.string(at: 9), importSessionId: row.string(at: 10), documentId: row.string(at: 11), relatedImportSessionId: row.string(at: 12))
+        }
+    }
+
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
         try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
         do {
@@ -439,6 +450,14 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
                 ])
             }
 
+            guard payload.successfulAttempt.workspaceId == payload.importSession.workspaceId,
+                  payload.successfulAttempt.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue,
+                  payload.successfulAttempt.importSessionId == payload.importSession.id,
+                  payload.successfulAttempt.documentId == payload.document.id else {
+                throw RepositoryError.relationshipViolation("Atomic import attempt relationships are inconsistent.")
+            }
+            try insertImportAttempt(payload.successfulAttempt)
+
             try db.executePrepared(
                 sql: "UPDATE import_sessions SET validation_status = ?, completed_at = ?, updated_at = ? WHERE id = ?;",
                 params: ["passed", payload.completedAtISO, payload.completedAtISO, payload.importSession.id]
@@ -513,6 +532,10 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
               }) else {
             throw RepositoryError.relationshipViolation("Atomic import-history transaction event identities are inconsistent.")
         }
+    }
+
+    private func insertImportAttempt(_ payload: ImportAttemptDTO) throws {
+        try db.executePrepared(sql: "INSERT INTO import_attempts (id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [payload.id, payload.workspaceId, payload.createdAtISO, payload.outcomeCode, payload.coverageCode, payload.accountDecisionCode, payload.guidanceCode, payload.persistenceCode, payload.transactionCount, payload.accountId ?? NSNull(), payload.importSessionId ?? NSNull(), payload.documentId ?? NSNull(), payload.relatedImportSessionId ?? NSNull()])
     }
 }
 

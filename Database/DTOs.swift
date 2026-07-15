@@ -3,6 +3,12 @@
 
 import Foundation
 
+nonisolated enum ImportAttemptOutcome: String, CaseIterable { case successfulImport = "successful_import", validationFailure = "validation_failure", persistenceFailure = "persistence_failure", exactStatementDuplicate = "exact_statement_duplicate", existingEligibleAxisUPIEvent = "existing_eligible_axis_upi_event", repeatedEligibleIncomingEvidence = "repeated_eligible_incoming_evidence", transactionEventOwnershipConflict = "transaction_event_ownership_conflict", repositoryIntegrityConflict = "repository_integrity_conflict" }
+nonisolated enum ImportAttemptCoverage: String { case evaluatedSupportedOnly = "evaluated_supported_only", unsupportedOrUnevaluated = "unsupported_or_unevaluated" }
+nonisolated enum ImportAttemptAccountDecision: String { case resolvedOrCreated = "resolved_or_created", selectedExisting = "selected_existing", noFinancialMutation = "no_financial_mutation", sideEffectsMayExist = "side_effects_may_exist" }
+nonisolated enum ImportAttemptGuidance: String { case importCompleted = "import_completed", reviewPriorImport = "review_prior_import", supportedEventBlocked = "supported_event_blocked", correctValidationAndRetry = "correct_validation_and_retry", persistenceUnavailable = "persistence_unavailable", integrityReviewRequired = "integrity_review_required" }
+nonisolated enum ImportAttemptPersistence: String { case committed, rejectedRecorded = "rejected_recorded", rejectedNotRecorded = "rejected_not_recorded", auditWriteUnavailable = "audit_write_unavailable" }
+
 public struct WorkspaceDTO: nonisolated Equatable {
     public let id: String
     public let name: String
@@ -336,6 +342,50 @@ public struct TransactionEventIdentityOwnerDTO: nonisolated Equatable {
     }
 }
 
+/// Privacy-safe durable record of a processing attempt. These fields are intentionally
+/// bounded codes and trusted repository relationships; source evidence never crosses
+/// this boundary.
+public struct ImportAttemptDTO: nonisolated Equatable, Identifiable {
+    public let id: String
+    public let workspaceId: String
+    public let createdAtISO: String
+    public let outcomeCode: String
+    public let coverageCode: String
+    public let accountDecisionCode: String
+    public let guidanceCode: String
+    public let persistenceCode: String
+    public let transactionCount: Int
+    public let accountId: String?
+    public let importSessionId: String?
+    public let documentId: String?
+    public let relatedImportSessionId: String?
+
+    public init(id: String = UUID().uuidString, workspaceId: String, createdAtISO: String,
+                outcomeCode: String, coverageCode: String, accountDecisionCode: String,
+                guidanceCode: String, persistenceCode: String, transactionCount: Int,
+                accountId: String? = nil, importSessionId: String? = nil,
+                documentId: String? = nil, relatedImportSessionId: String? = nil) {
+        self.id = id; self.workspaceId = workspaceId; self.createdAtISO = createdAtISO
+        self.outcomeCode = outcomeCode; self.coverageCode = coverageCode
+        self.accountDecisionCode = accountDecisionCode; self.guidanceCode = guidanceCode
+        self.persistenceCode = persistenceCode; self.transactionCount = transactionCount
+        self.accountId = accountId; self.importSessionId = importSessionId
+        self.documentId = documentId; self.relatedImportSessionId = relatedImportSessionId
+    }
+}
+
+struct RepositoryImportAttempt: nonisolated Identifiable, Equatable {
+    let id: String; let createdAtISO: String; let outcomeCode: String; let coverageCode: String
+    let accountDecisionCode: String; let guidanceCode: String; let persistenceCode: String
+    let transactionCount: Int; let accountId: String?; let importSessionId: String?
+    let documentId: String?; let relatedImportSessionId: String?
+    nonisolated init(_ dto: ImportAttemptDTO) {
+        id = dto.id; createdAtISO = dto.createdAtISO; outcomeCode = dto.outcomeCode; coverageCode = dto.coverageCode
+        accountDecisionCode = dto.accountDecisionCode; guidanceCode = dto.guidanceCode; persistenceCode = dto.persistenceCode
+        transactionCount = dto.transactionCount; accountId = dto.accountId; importSessionId = dto.importSessionId; documentId = dto.documentId; relatedImportSessionId = dto.relatedImportSessionId
+    }
+}
+
 public struct AtomicImportHistoryDTO: nonisolated Equatable {
     public let document: ImportedDocumentDTO
     public let fingerprint: DocumentFingerprintDTO
@@ -343,6 +393,7 @@ public struct AtomicImportHistoryDTO: nonisolated Equatable {
     public let completedAtISO: String
     public let transactions: [TransactionDTO]
     public let transactionEventIdentities: [TransactionEventIdentityDTO]
+    public let successfulAttempt: ImportAttemptDTO
 
     public init(
         document: ImportedDocumentDTO,
@@ -350,7 +401,8 @@ public struct AtomicImportHistoryDTO: nonisolated Equatable {
         importSession: ImportSessionDTO,
         completedAtISO: String,
         transactions: [TransactionDTO],
-        transactionEventIdentities: [TransactionEventIdentityDTO] = []
+        transactionEventIdentities: [TransactionEventIdentityDTO] = [],
+        successfulAttempt: ImportAttemptDTO
     ) {
         self.document = document
         self.fingerprint = fingerprint
@@ -358,6 +410,7 @@ public struct AtomicImportHistoryDTO: nonisolated Equatable {
         self.completedAtISO = completedAtISO
         self.transactions = transactions
         self.transactionEventIdentities = transactionEventIdentities
+        self.successfulAttempt = successfulAttempt
     }
 }
 

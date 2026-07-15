@@ -185,6 +185,7 @@ struct ContentView: View {
     @State private var importAccountChoice: ImportAccountChoice?
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @StateObject private var accountsViewModel = AccountsViewModel()
+    @StateObject private var importHistoryViewModel = ImportHistoryViewModel()
     @State private var selectedSection: AppShellSection = .dashboard
     @State private var didStartRepositoryHydration = false
     @State private var developerModeEnabled = false
@@ -524,6 +525,8 @@ struct ContentView: View {
                             .disabled(importSelectionDisabled)
 
                             importResultPanel
+
+                            importAttemptHistoryPanel
 
                             if importState.showsPreConfirmationNoWriteMessage {
                                 HStack(spacing: 10) {
@@ -1430,6 +1433,59 @@ struct ContentView: View {
         }
     }
 
+    private var importAttemptHistoryPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Import History").font(.headline)
+                Spacer()
+                Text("\(importHistoryViewModel.attempts.count)").font(.caption).foregroundStyle(LFTheme.textSecondary)
+            }
+            if importHistoryViewModel.attempts.isEmpty {
+                Text("Supported import outcomes appear here after processing.")
+                    .font(.caption).foregroundStyle(LFTheme.textSecondary)
+            } else {
+                ForEach(importHistoryViewModel.attempts.prefix(8)) { attempt in
+                    Button { importHistoryViewModel.select(id: attempt.id) } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(attemptTitle(attempt.outcomeCode)).font(.subheadline.weight(.semibold))
+                                Text(attempt.createdAtISO).font(.caption2).foregroundStyle(LFTheme.textSecondary)
+                            }
+                            Spacer()
+                            Text("\(attempt.transactionCount) transactions").font(.caption).foregroundStyle(LFTheme.textSecondary)
+                        }
+                        .padding(9).background(LFTheme.surface.opacity(0.7)).clipShape(RoundedRectangle(cornerRadius: 7))
+                    }.buttonStyle(.plain)
+                }
+            }
+            if let attempt = importHistoryViewModel.selectedAttempt {
+                Divider()
+                HStack { Text("Attempt Detail").font(.subheadline.weight(.semibold)); Spacer(); Button("Close") { importHistoryViewModel.clearSelection() }.font(.caption) }
+                LFInfoRow(title: "Outcome", value: attemptTitle(attempt.outcomeCode))
+                LFInfoRow(title: "Coverage", value: attempt.coverageCode.replacingOccurrences(of: "_", with: " "))
+                LFInfoRow(title: "Guidance", value: attempt.guidanceCode.replacingOccurrences(of: "_", with: " "))
+                if let accountID = attempt.accountId, accountsViewModel.accounts.contains(where: { $0.id == accountID }) {
+                    Button("View Account") { accountsViewModel.selectAccount(repositoryAccountID: accountID); selectedSection = .accounts }
+                        .font(.caption.weight(.semibold)).buttonStyle(.plain).foregroundStyle(LFTheme.primaryHover)
+                }
+            }
+        }
+        .padding(12).background(LFTheme.surface.opacity(0.45)).clipShape(RoundedRectangle(cornerRadius: 9))
+    }
+
+    private func attemptTitle(_ code: String) -> String {
+        switch code {
+        case ImportAttemptOutcome.successfulImport.rawValue: return "Import completed"
+        case ImportAttemptOutcome.validationFailure.rawValue: return "Validation failed"
+        case ImportAttemptOutcome.exactStatementDuplicate.rawValue: return "Previously imported"
+        case ImportAttemptOutcome.existingEligibleAxisUPIEvent.rawValue: return "Supported transaction event blocked"
+        case ImportAttemptOutcome.repeatedEligibleIncomingEvidence.rawValue: return "Repeated incoming evidence"
+        case ImportAttemptOutcome.transactionEventOwnershipConflict.rawValue: return "Transaction-event ownership conflict"
+        case ImportAttemptOutcome.repositoryIntegrityConflict.rawValue: return "Repository integrity conflict"
+        default: return "Persistence failed"
+        }
+    }
+
     private func preparedImportPreview(_ preparedImport: PreparedImport) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             importedFileRow(
@@ -1955,6 +2011,12 @@ struct ContentView: View {
                 dashboardViewModel.markHydrationFailed(error)
                 DeveloperConsole.shared.log("Dashboard Hydration Refresh: FAILED")
                 DeveloperConsole.shared.log(error.localizedDescription)
+            }
+        } else if result.requiresImportAttemptRefresh {
+            do {
+                try RepositoryStoreHydrator().hydrateImportAttempts()
+            } catch {
+                DeveloperConsole.shared.log("Import attempt history refresh failed.")
             }
         }
         let outcome = ImportOutcomePresentation(result: result)

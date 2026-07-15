@@ -11,6 +11,7 @@ struct ImportPersistenceResult: Equatable {
     let transactionCount: Int
     let previousImport: PreviouslyImportedStatement?
     let transactionEventBlock: TransactionEventBlock?
+    let importAttemptId: String?
 
     init(
         persisted: Bool,
@@ -19,7 +20,8 @@ struct ImportPersistenceResult: Equatable {
         importSessionId: String?,
         transactionCount: Int,
         previousImport: PreviouslyImportedStatement? = nil,
-        transactionEventBlock: TransactionEventBlock? = nil
+        transactionEventBlock: TransactionEventBlock? = nil,
+        importAttemptId: String? = nil
     ) {
         self.persisted = persisted
         self.workspaceId = workspaceId
@@ -28,6 +30,7 @@ struct ImportPersistenceResult: Equatable {
         self.transactionCount = transactionCount
         self.previousImport = previousImport
         self.transactionEventBlock = transactionEventBlock
+        self.importAttemptId = importAttemptId
     }
 
     static let skipped = ImportPersistenceResult(
@@ -76,6 +79,7 @@ protocol ImportPersistenceCoordinating {
     ) throws -> ImportPersistenceResult
 
     func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement?
+    func recordValidationFailure(fileName: String, transactionCount: Int) -> String?
 
     func persistValidatedImport(
         financialDocument: FinancialDocument,
@@ -99,6 +103,7 @@ struct ImportIdentityReview: Equatable {
 }
 
 extension ImportPersistenceCoordinating {
+    func recordValidationFailure(fileName: String, transactionCount: Int) -> String? { nil }
     func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
         throw ImportPersistenceCoordinationError.fingerprintRequired
     }
@@ -289,6 +294,14 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         ).map(Self.previousImport(from:))
     }
 
+    func recordValidationFailure(fileName: String, transactionCount: Int) -> String? {
+        recordAttempt(
+            outcome: .validationFailure, coverage: .unsupportedOrUnevaluated,
+            decision: .noFinancialMutation, guidance: .correctValidationAndRetry,
+            persistence: .rejectedRecorded, transactionCount: transactionCount
+        )
+    }
+
     func persistValidatedImport(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
@@ -312,13 +325,17 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 "algorithm": fingerprint.algorithm,
                 "transactions": "\(previous.transactionCount)"
             ])
+            let attemptID = recordAttempt(outcome: .exactStatementDuplicate, coverage: .evaluatedSupportedOnly,
+                                          decision: .noFinancialMutation, guidance: .reviewPriorImport,
+                                          persistence: .rejectedRecorded, transactionCount: previous.transactionCount,
+                                          accountId: previous.accountId, relatedImportSessionId: previous.importSessionId)
             return ImportPersistenceResult(
                 persisted: false,
                 workspaceId: mapper.workspaceId,
                 accountId: previous.accountId,
                 importSessionId: previous.importSessionId,
                 transactionCount: previous.transactionCount,
-                previousImport: Self.previousImport(from: previous)
+                previousImport: Self.previousImport(from: previous), importAttemptId: attemptID
             )
         }
 
@@ -391,19 +408,24 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         }
         let incomingDuplicates = TransactionEventIdentity.incomingDuplicates(in: identities)
         if !incomingDuplicates.isEmpty {
+            let attemptID = recordAttempt(outcome: .repeatedEligibleIncomingEvidence, coverage: .evaluatedSupportedOnly,
+                                          decision: .noFinancialMutation, guidance: .supportedEventBlocked,
+                                          persistence: .rejectedRecorded, transactionCount: identities.count, accountId: selection.accountId)
             return ImportPersistenceResult(
                 persisted: false, workspaceId: workspaceId, accountId: selection.accountId,
                 importSessionId: nil, transactionCount: identities.count,
-                transactionEventBlock: .repeatedIncoming(count: incomingDuplicates.count)
+                transactionEventBlock: .repeatedIncoming(count: incomingDuplicates.count), importAttemptId: attemptID
             )
         }
         let keys = Set(identities.map { TransactionEventIdentityKeyDTO(algorithm: $0.algorithmIdentifier, digest: $0.digest) })
         let owners = try importSessionRepo.transactionEventOwners(keys: keys)
         if !owners.isEmpty {
             if owners.values.contains(where: { $0.accountId != selection.accountId }) {
-                return ImportPersistenceResult(persisted: false, workspaceId: workspaceId, accountId: selection.accountId, importSessionId: nil, transactionCount: identities.count, transactionEventBlock: .ownershipConflict)
+                let attemptID = recordAttempt(outcome: .transactionEventOwnershipConflict, coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: .integrityReviewRequired, persistence: .rejectedRecorded, transactionCount: identities.count, accountId: selection.accountId)
+                return ImportPersistenceResult(persisted: false, workspaceId: workspaceId, accountId: selection.accountId, importSessionId: nil, transactionCount: identities.count, transactionEventBlock: .ownershipConflict, importAttemptId: attemptID)
             }
-            return ImportPersistenceResult(persisted: false, workspaceId: workspaceId, accountId: selection.accountId, importSessionId: nil, transactionCount: identities.count, transactionEventBlock: .existing(count: owners.count))
+            let attemptID = recordAttempt(outcome: .existingEligibleAxisUPIEvent, coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: .supportedEventBlocked, persistence: .rejectedRecorded, transactionCount: identities.count, accountId: selection.accountId)
+            return ImportPersistenceResult(persisted: false, workspaceId: workspaceId, accountId: selection.accountId, importSessionId: nil, transactionCount: identities.count, transactionEventBlock: .existing(count: owners.count), importAttemptId: attemptID)
         }
 
         let payload = try mapper.payload(
@@ -440,28 +462,44 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             )
         }
 
-        let historyResult = try importSessionRepo.commitImportHistory(
+        let successfulAttempt = ImportAttemptDTO(workspaceId: workspaceId, createdAtISO: payload.completedAtISO,
+            outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+            accountDecisionCode: {
+                if case .useExistingAccount? = accountChoice { return ImportAttemptAccountDecision.selectedExisting.rawValue }
+                return ImportAttemptAccountDecision.resolvedOrCreated.rawValue
+            }(),
+            guidanceCode: ImportAttemptGuidance.importCompleted.rawValue, persistenceCode: ImportAttemptPersistence.committed.rawValue,
+            transactionCount: payload.transactions.count, accountId: selection.accountId, importSessionId: payload.importSession.id, documentId: payload.document.id)
+        let historyResult: AtomicImportHistoryResult
+        do {
+            historyResult = try importSessionRepo.commitImportHistory(
             AtomicImportHistoryDTO(
                 document: payload.document,
                 fingerprint: payload.fingerprint,
                 importSession: payload.importSession,
                 completedAtISO: payload.completedAtISO,
                 transactions: payload.transactions,
-                transactionEventIdentities: payload.transactionEventIdentities
+                transactionEventIdentities: payload.transactionEventIdentities,
+                successfulAttempt: successfulAttempt
             )
-        )
+            )
+        } catch {
+            _ = recordAttempt(outcome: .persistenceFailure, coverage: .evaluatedSupportedOnly, decision: .sideEffectsMayExist, guidance: .persistenceUnavailable, persistence: .auditWriteUnavailable, transactionCount: payload.transactions.count, accountId: selection.accountId)
+            throw error
+        }
         if case .duplicate(let previous) = historyResult {
             developerConsole?.info(.import, "Previously imported statement blocked", metadata: [
                 "algorithm": fingerprint.algorithm,
                 "transactions": "\(previous.transactionCount)"
             ])
+            let attemptID = recordAttempt(outcome: .exactStatementDuplicate, coverage: .evaluatedSupportedOnly, decision: .sideEffectsMayExist, guidance: .reviewPriorImport, persistence: .rejectedRecorded, transactionCount: previous.transactionCount, accountId: previous.accountId, relatedImportSessionId: previous.importSessionId)
             return ImportPersistenceResult(
                 persisted: false,
                 workspaceId: workspaceId,
                 accountId: previous.accountId,
                 importSessionId: previous.importSessionId,
                 transactionCount: previous.transactionCount,
-                previousImport: Self.previousImport(from: previous)
+                previousImport: Self.previousImport(from: previous), importAttemptId: attemptID
             )
         }
 
@@ -476,7 +514,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             accountId: selection.accountId,
             importSessionId: payload.importSession.id,
             transactionCount: payload.transactions.count,
-            previousImport: nil
+            previousImport: nil, importAttemptId: successfulAttempt.id
         )
     }
 
@@ -508,5 +546,19 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         }
         guard identifiers.count == 1 else { return nil }
         return identifiers[0]
+    }
+
+    @discardableResult
+    private func recordAttempt(outcome: ImportAttemptOutcome, coverage: ImportAttemptCoverage,
+                               decision: ImportAttemptAccountDecision, guidance: ImportAttemptGuidance,
+                               persistence: ImportAttemptPersistence, transactionCount: Int,
+                               accountId: String? = nil, relatedImportSessionId: String? = nil) -> String? {
+        let payload = ImportAttemptDTO(workspaceId: mapper.workspaceId,
+            createdAtISO: ISO8601DateFormatter().string(from: Date()), outcomeCode: outcome.rawValue,
+            coverageCode: coverage.rawValue, accountDecisionCode: decision.rawValue,
+            guidanceCode: guidance.rawValue, persistenceCode: persistence.rawValue,
+            transactionCount: transactionCount, accountId: accountId,
+            relatedImportSessionId: relatedImportSessionId)
+        return try? importSessionRepo.recordImportAttempt(payload)
     }
 }

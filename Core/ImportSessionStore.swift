@@ -26,3 +26,15 @@ final class ImportSessionStore: ObservableObject {
         }
     }
 }
+
+/// Runtime destination for durable import-attempt summaries. RepositoryStoreHydrator
+/// is its only producer, preserving the persistence-to-runtime boundary.
+final class ImportAttemptStore: ObservableObject {
+    static let shared = ImportAttemptStore()
+    @Published private(set) var attempts: [RepositoryImportAttempt] = []
+    init() {}
+    func replaceAttempts(_ attempts: [RepositoryImportAttempt]) {
+        let update = { self.attempts = attempts }
+        if Thread.isMainThread { update() } else { DispatchQueue.main.async(execute: update) }
+    }
+}

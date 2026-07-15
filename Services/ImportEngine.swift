@@ -33,6 +33,7 @@ struct ImportEngineResult: Equatable {
     let redactedIdentifier: String?
     let previousImport: PreviouslyImportedStatement?
     let transactionEventBlock: TransactionEventBlock?
+    let importAttemptId: String?
 
     init(
         fileName: String,
@@ -44,7 +45,8 @@ struct ImportEngineResult: Equatable {
         importSessionId: String? = nil,
         redactedIdentifier: String? = nil,
         previousImport: PreviouslyImportedStatement? = nil,
-        transactionEventBlock: TransactionEventBlock? = nil
+        transactionEventBlock: TransactionEventBlock? = nil,
+        importAttemptId: String? = nil
     ) {
         self.fileName = fileName
         self.transactionCount = transactionCount
@@ -56,6 +58,7 @@ struct ImportEngineResult: Equatable {
         self.redactedIdentifier = redactedIdentifier
         self.previousImport = previousImport
         self.transactionEventBlock = transactionEventBlock
+        self.importAttemptId = importAttemptId
     }
 
     var succeeded: Bool {
@@ -65,6 +68,8 @@ struct ImportEngineResult: Equatable {
     var requiresHydration: Bool {
         persisted && previousImport == nil
     }
+
+    var requiresImportAttemptRefresh: Bool { importAttemptId != nil && !persisted }
 }
 
 enum ImportEngineCommitError: Error, LocalizedError, Equatable {
@@ -328,6 +333,7 @@ final class ImportEngine {
         accountChoice: ImportAccountChoice?
     ) async -> ImportEngineResult {
         guard preparedImport.validation.passed else {
+            let attemptID = importPersistenceCoordinatorFactory().recordValidationFailure(fileName: preparedImport.fileName, transactionCount: preparedImport.transactionCount)
             developerConsole.error(.validation, "Validation failed", metadata: ["file": preparedImport.fileName])
             return ImportEngineResult(
                 fileName: preparedImport.fileName,
@@ -338,7 +344,8 @@ final class ImportEngine {
                 accountId: nil,
                 importSessionId: nil,
                 redactedIdentifier: nil,
-                previousImport: nil
+                previousImport: nil,
+                importAttemptId: attemptID
             )
         }
 
@@ -411,7 +418,8 @@ final class ImportEngine {
                 ? redactedEligibleIdentifier(in: preparedImport.financialDocument)
                 : nil,
             previousImport: persistenceResult.previousImport,
-            transactionEventBlock: persistenceResult.transactionEventBlock
+            transactionEventBlock: persistenceResult.transactionEventBlock,
+            importAttemptId: persistenceResult.importAttemptId
         )
     }
 
