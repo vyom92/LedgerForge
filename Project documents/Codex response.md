@@ -65,9 +65,9 @@ Sprint 41 documentation was synchronized to the verified repository state. Repos
 
 ## Git Handoff
 
-- Documentation-sync commit SHA: pending first synchronization commit; a finalization commit will record exact commit and remote SHAs.
-- Push result: pending.
-- Clean-worktree result: pending finalization.
+- Documentation-sync commit SHA: `902c0c60383c937b99066eaf20d560eb8ddda85d` — Synchronize Sprint 41 verified documentation.
+- Push result: pushed to `origin/main`; verified remote SHA `902c0c60383c937b99066eaf20d560eb8ddda85d`.
+- Worktree was clean after the push; this report update is the only handoff-finalization change.
 
 ## Remaining Limitations
 
