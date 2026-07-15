@@ -23,8 +23,8 @@ Principles:
 * Latest ADR: ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking (Accepted; implemented in Sprint 41)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint State: Sprint 41 — Bounded Axis UPI Transaction-Event Duplicate Blocking (repository implementation and automated validation complete; manual UI/runtime verification pending)
-* Current Phase: Documentation synchronization complete; repository implementation and automated verification complete; manual UI/runtime verification remains pending; no Swift implementation or documentation synchronization is currently in progress
+* Current Sprint State: Sprint 41 — Bounded Axis UPI Transaction-Event Duplicate Blocking (complete and runtime verified)
+* Current Phase: Sprint 41 implementation, automated validation, manual runtime verification and handoff are complete; ready for the next planning cycle without a selected next sprint
 * Build Status: Passing
 * Validation Status: Sprint 41 clean Debug build passed; complete configured unit/integration plan passed (175 tests in 26 suites, 0 failures, 0 skipped). Generic `LedgerForgeUITests` remained intentionally disabled.
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
@@ -98,7 +98,7 @@ For parser-verified eligible Axis UPI rows only, confirmation canonicalizes acco
 
 ## Current Work
 
-Active Work: Documentation synchronization is complete; repository implementation and automated verification are complete; manual UI/runtime verification remains pending; no Swift implementation or documentation synchronization is currently in progress.
+Active Work: Sprint 41 implementation and verification are complete. No implementation or planning task is currently active.
 
 Verified planning state:
 
@@ -138,7 +138,10 @@ Verified planning state:
 * Migration V3 creates `transaction_event_identities`; SQLite and In-Memory providers batch-look up ownership and atomically persist accepted event records with document, import-session and transaction provenance.
 * Incoming repeated eligible identity, existing event ownership and ownership conflict block the whole statement before supported writes. Blocked imports do not hydrate runtime state and rejected attempts are not persisted.
 * Exact-content duplicate behavior remains separate. Unsupported non-UPI families remain unevaluated; no historical backfill, cross-process safety or external-writer safety is claimed.
-* Manual UI/runtime verification is pending. Automated verification passed: clean Debug build and 175 tests in 26 suites, 0 failures.
+* Manual UI/runtime verification completed on 16 July 2026 using approved sanitized fixtures and isolated development-reset SQLite providers. Baseline-first persisted 1 account and 81 transactions; exact re-import remained an ADR-030 prior-statement outcome; overlap-second was blocked with counts unchanged. Reverse order persisted 1 account and 31 transactions, then blocked the baseline with counts unchanged.
+* No partial persistence or post-rejection hydration was observed. Accepted imports hydrated runtime state, blocked outcomes remained bounded, diagnostics exposed no identity digest or canonical payload, and unsupported rows remained part of otherwise accepted statements without a universal duplicate-safety claim.
+* Provider-recreation manual verification was blocked by the documented development-reset relaunch limitation: relaunch restores the primary database instead of reopening the temporary reset provider. No production database-selection behavior was changed; durable provider recreation remains covered by the prior automated Sprint 41 verification.
+* No executable files changed during manual verification. The retained prior Sprint 41 automated result remains a clean Debug build and 175 tests in 26 suites, 0 failures; build and tests were not rerun for this documentation-only verification cycle.
 * Sprint 41 implementation commit: `0b387a6812542f41eea450aa0bcc7f9d74d077e0` — Implement Sprint 41 Axis UPI duplicate blocking. The final handoff commit `d0cd356072ad5de3ef9badc23c88039072757b7b` is pushed and verified at `origin/main`.
 
 ## Verified Sprint 39 State
@@ -258,11 +261,11 @@ Verified planning state:
 
 ### Ready for Next Feature Sprint?
 
-Not ready to select the next feature sprint until Chat resolves the pending Sprint 41 manual-verification disposition.
+Ready for the next planning cycle. No next sprint has been selected.
 
 ### Reason
 
-Sprint 41 repository implementation, automated validation, documentation synchronization, commit and push are complete. Manual UI/runtime verification remains pending. The next feature-planning cycle may begin only after Chat resolves that pending disposition.
+Sprint 41 repository implementation, automated validation, bounded manual runtime verification, documentation synchronization, commit and push are complete. The provider-recreation manual scenario remains constrained only by the documented temporary reset-provider relaunch limitation.
 
 ### Current Next-Step Boundary
 
@@ -280,7 +283,7 @@ The next implementation may use only repository-verified and ADR-approved scope.
 
 ### Next Major Milestone
 
-After Chat resolves the pending Sprint 41 manual-verification disposition, select future work from `PROJECT_STATE.md`, then `FUTURE_WORK.MD`, followed by relevant architecture evidence.
+When Chat begins the next planning cycle, select future work from `PROJECT_STATE.md`, then `FUTURE_WORK.MD`, followed by relevant architecture evidence. No next sprint is selected here.
 
 ---
 
