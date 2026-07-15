@@ -403,7 +403,19 @@ final class ImportEngine {
             }
         } catch {
             developerConsole.error(.database, "Repository persistence failed", metadata: ["error": error.localizedDescription])
-            persistenceErrorMessage = error.localizedDescription
+            if let failure = error as? ImportPersistenceCommitFailure {
+                persistenceErrorMessage = failure.originalError.localizedDescription
+                persistenceResult = ImportPersistenceResult(
+                    persisted: false,
+                    workspaceId: nil,
+                    accountId: nil,
+                    importSessionId: nil,
+                    transactionCount: preparedImport.transactionCount,
+                    importAttemptId: failure.importAttemptId
+                )
+            } else {
+                persistenceErrorMessage = error.localizedDescription
+            }
         }
 
         return ImportEngineResult(

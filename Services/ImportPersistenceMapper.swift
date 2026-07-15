@@ -53,6 +53,14 @@ struct ImportPersistenceMapper {
         self.dateFormatter = dateFormatter
     }
 
+    func workspace(createdAt: Date) -> WorkspaceDTO {
+        WorkspaceDTO(
+            id: workspaceId,
+            name: workspaceName,
+            createdAtISO: dateFormatter.string(from: createdAt)
+        )
+    }
+
     func payload(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
@@ -108,11 +116,7 @@ struct ImportPersistenceMapper {
         }
 
         return ImportPersistencePayload(
-            workspace: WorkspaceDTO(
-                id: workspaceId,
-                name: workspaceName,
-                createdAtISO: importedAtISO
-            ),
+            workspace: workspace(createdAt: importSession.importedAt),
             account: account,
             document: document,
             fingerprint: DocumentFingerprintDTO(

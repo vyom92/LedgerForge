@@ -1040,6 +1040,191 @@ struct ImportRepositoryIntegrationTests {
         #expect(try provider.importSessionRepo.importAttempts(workspaceId: workspaceID) == repositoryAttempts)
     }
 
+    @Test func productionValidationFailureRecordsAccountlessAttemptAcrossProviders() async throws {
+        try await runForEachProviderAsync { provider in
+            let workspaceID = "workspace-validation-failure-reporting"
+            let fixture = makeFailedValidationFixture()
+            let repository = FailureInjectingImportSessionRepository(base: provider.importSessionRepo)
+            let coordinator = makeFailureReportingCoordinator(
+                provider: provider,
+                importSessionRepo: repository,
+                workspaceID: workspaceID
+            )
+            let engine = ImportEngine(importPersistenceCoordinator: coordinator)
+            let prepared = makeIntegrationPreparedImport(
+                fixture: fixture,
+                rawContents: "failed-validation-fixture"
+            )
+
+            let result = await engine.commitPreparedImport(prepared)
+
+            #expect(!result.validationPassed)
+            #expect(!result.persisted)
+            #expect(result.errorMessage == ImportEngineCommitError.validationFailed.localizedDescription)
+            #expect(result.importAttemptId != nil)
+            #expect(result.requiresImportAttemptRefresh)
+            #expect(!result.requiresHydration)
+
+            let attempts = try repository.importAttempts(workspaceId: workspaceID)
+            let attempt = try #require(attempts.first)
+            #expect(attempts.count == 1)
+            #expect(attempt.id == result.importAttemptId)
+            #expect(attempt.outcomeCode == ImportAttemptOutcome.validationFailure.rawValue)
+            #expect(attempt.coverageCode == ImportAttemptCoverage.unsupportedOrUnevaluated.rawValue)
+            #expect(attempt.accountDecisionCode == ImportAttemptAccountDecision.noFinancialMutation.rawValue)
+            #expect(attempt.guidanceCode == ImportAttemptGuidance.correctValidationAndRetry.rawValue)
+            #expect(attempt.persistenceCode == ImportAttemptPersistence.rejectedRecorded.rawValue)
+            #expect(attempt.transactionCount == 0)
+            #expect(attempt.accountId == nil)
+            #expect(attempt.importSessionId == nil)
+            #expect(attempt.documentId == nil)
+            #expect(attempt.relatedImportSessionId == nil)
+            #expect(try provider.accountRepo.accounts(workspaceId: workspaceID).isEmpty)
+            #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
+            #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).isEmpty)
+            #expect(try provider.importSessionRepo.priorImportedStatement(
+                algorithm: fixture.fingerprint.algorithm,
+                fingerprint: fixture.fingerprint.digest
+            ) == nil)
+
+            let persistedText = [
+                attempt.outcomeCode, attempt.coverageCode, attempt.accountDecisionCode,
+                attempt.guidanceCode, attempt.persistenceCode
+            ].joined(separator: "|")
+            for prohibited in [prepared.fileName, prepared.rawContents, "Repository integration test parser selection", "/tmp/"] {
+                #expect(!persistedText.localizedCaseInsensitiveContains(prohibited))
+            }
+
+            let stores = ImportAttemptRecreationStores()
+            let hydrator = makeAttemptOnlyHydrator(
+                provider: provider,
+                importSessionRepo: repository,
+                stores: stores,
+                workspaceID: workspaceID
+            )
+            try hydrator.hydrateImportAttempts()
+            #expect(stores.attempts.attempts == attempts.map(RepositoryImportAttempt.init))
+            #expect(stores.accounts.accounts.isEmpty)
+            #expect(stores.transactions.transactions.isEmpty)
+            #expect(stores.importSessions.importSessions.isEmpty)
+        }
+    }
+
+    @Test func productionPersistenceFailureCarriesRecordedAttemptAcrossProviders() async throws {
+        try await runForEachProviderAsync { provider in
+            let workspaceID = "workspace-persistence-failure-recorded"
+            let rawContents = "fixture:repository-integration.csv:INR"
+            let fixture = makeValidFixture(
+                fingerprintText: rawContents,
+                includeTransactionEventEvidence: true
+            )
+            let repository = FailureInjectingImportSessionRepository(base: provider.importSessionRepo)
+            repository.commitError = ImportFailureSentinel.historyCommitFailed
+            let coordinator = makeFailureReportingCoordinator(
+                provider: provider,
+                importSessionRepo: repository,
+                workspaceID: workspaceID
+            )
+            let engine = ImportEngine(importPersistenceCoordinator: coordinator)
+            let prepared = makeIntegrationPreparedImport(fixture: fixture, rawContents: rawContents)
+
+            let result = await engine.commitPreparedImport(prepared)
+
+            #expect(result.validationPassed)
+            #expect(!result.persisted)
+            #expect(result.errorMessage == ImportFailureSentinel.historyCommitFailed.localizedDescription)
+            #expect(result.errorMessage != ImportFailureSentinel.attemptWriteFailed.localizedDescription)
+            #expect(result.importAttemptId != nil)
+            #expect(result.requiresImportAttemptRefresh)
+            #expect(!result.requiresHydration)
+
+            let attempts = try repository.importAttempts(workspaceId: workspaceID)
+            let attempt = try #require(attempts.first)
+            #expect(attempts.count == 1)
+            #expect(attempt.id == result.importAttemptId)
+            #expect(attempt.outcomeCode == ImportAttemptOutcome.persistenceFailure.rawValue)
+            #expect(attempt.coverageCode == ImportAttemptCoverage.evaluatedSupportedOnly.rawValue)
+            #expect(attempt.accountDecisionCode == ImportAttemptAccountDecision.sideEffectsMayExist.rawValue)
+            #expect(attempt.guidanceCode == ImportAttemptGuidance.persistenceUnavailable.rawValue)
+            #expect(attempt.persistenceCode == ImportAttemptPersistence.auditWriteUnavailable.rawValue)
+            #expect(attempt.transactionCount == fixture.financialDocument.transactions.count)
+            #expect(attempt.accountId != nil)
+            #expect(attempt.importSessionId == nil)
+            #expect(attempt.documentId == nil)
+            #expect(attempt.relatedImportSessionId == nil)
+            try assertNoSuccessfulImportHistory(
+                provider: provider,
+                fixture: fixture,
+                workspaceID: workspaceID
+            )
+
+            let stores = ImportAttemptRecreationStores()
+            let hydrator = makeAttemptOnlyHydrator(
+                provider: provider,
+                importSessionRepo: repository,
+                stores: stores,
+                workspaceID: workspaceID
+            )
+            try hydrator.hydrateImportAttempts()
+            #expect(stores.attempts.attempts == attempts.map(RepositoryImportAttempt.init))
+            #expect(stores.accounts.accounts.isEmpty)
+            #expect(stores.transactions.transactions.isEmpty)
+            #expect(stores.importSessions.importSessions.isEmpty)
+
+            let presentation = ImportOutcomePresentation(result: result)
+            #expect(presentation.message == "Import persistence failed. The failure was added to Import History.")
+            #expect(!presentation.message!.contains(ImportFailureSentinel.historyCommitFailed.localizedDescription))
+        }
+    }
+
+    @Test func productionPersistenceAndAuditFailurePreservesPrimaryErrorAcrossProviders() async throws {
+        try await runForEachProviderAsync { provider in
+            let workspaceID = "workspace-persistence-failure-unrecorded"
+            let rawContents = "fixture:repository-integration.csv:INR"
+            let fixture = makeValidFixture(
+                fingerprintText: rawContents,
+                includeTransactionEventEvidence: true
+            )
+            let repository = FailureInjectingImportSessionRepository(base: provider.importSessionRepo)
+            repository.commitError = ImportFailureSentinel.historyCommitFailed
+            repository.attemptError = ImportFailureSentinel.attemptWriteFailed
+            let coordinator = makeFailureReportingCoordinator(
+                provider: provider,
+                importSessionRepo: repository,
+                workspaceID: workspaceID
+            )
+            let engine = ImportEngine(importPersistenceCoordinator: coordinator)
+            let prepared = makeIntegrationPreparedImport(fixture: fixture, rawContents: rawContents)
+
+            let result = await engine.commitPreparedImport(prepared)
+
+            #expect(result.validationPassed)
+            #expect(!result.persisted)
+            #expect(result.errorMessage == ImportFailureSentinel.historyCommitFailed.localizedDescription)
+            #expect(result.errorMessage != ImportFailureSentinel.attemptWriteFailed.localizedDescription)
+            #expect(result.importAttemptId == nil)
+            #expect(!result.requiresImportAttemptRefresh)
+            #expect(!result.requiresHydration)
+            #expect(try repository.importAttempts(workspaceId: workspaceID).isEmpty)
+            try assertNoSuccessfulImportHistory(
+                provider: provider,
+                fixture: fixture,
+                workspaceID: workspaceID
+            )
+
+            let stores = ImportAttemptRecreationStores()
+            #expect(stores.accounts.accounts.isEmpty)
+            #expect(stores.transactions.transactions.isEmpty)
+            #expect(stores.importSessions.importSessions.isEmpty)
+            #expect(stores.attempts.attempts.isEmpty)
+
+            let presentation = ImportOutcomePresentation(result: result)
+            #expect(presentation.message == "Import persistence failed. The failure could not be added to Import History.")
+            #expect(!presentation.message!.contains(ImportFailureSentinel.historyCommitFailed.localizedDescription))
+            #expect(!presentation.message!.contains(ImportFailureSentinel.attemptWriteFailed.localizedDescription))
+        }
+    }
+
 }
 
 private struct SQLiteImportHistoryCounts: Equatable {
@@ -1127,6 +1312,68 @@ private struct ImportRepositoryFixture {
     let fingerprint: ExactStatementFingerprint
 }
 
+private enum ImportFailureSentinel: Error, LocalizedError {
+    case historyCommitFailed
+    case attemptWriteFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .historyCommitFailed:
+            return "Sentinel import-history commit failed."
+        case .attemptWriteFailed:
+            return "Sentinel attempt audit write failed."
+        }
+    }
+}
+
+private final class FailureInjectingImportSessionRepository: ImportSessionRepository {
+    private let base: ImportSessionRepository
+    var commitError: Error?
+    var attemptError: Error?
+
+    init(base: ImportSessionRepository) {
+        self.base = base
+    }
+
+    func createImportSession(_ payload: ImportSessionDTO) throws -> String {
+        try base.createImportSession(payload)
+    }
+
+    func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws {
+        try base.updateImportSession(id, updates: updates)
+    }
+
+    func importSession(id: String) throws -> ImportSessionRecordDTO? {
+        try base.importSession(id: id)
+    }
+
+    func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? {
+        try base.priorImportedStatement(algorithm: algorithm, fingerprint: fingerprint)
+    }
+
+    func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] {
+        try base.transactionEventOwners(keys: keys)
+    }
+
+    func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String {
+        if let attemptError {
+            throw attemptError
+        }
+        return try base.recordImportAttempt(payload)
+    }
+
+    func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] {
+        try base.importAttempts(workspaceId: workspaceId)
+    }
+
+    func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
+        if let commitError {
+            throw commitError
+        }
+        return try base.commitImportHistory(payload)
+    }
+}
+
 private final class ObservingAccountRepository: AccountRepository {
     private let base: AccountRepository
     private let forcedCandidates: [String]?
@@ -1188,6 +1435,23 @@ private func runForEachProvider(_ body: (ImportRepositoryHandles) throws -> Void
     try withTemporarySQLiteProvider(body)
 }
 
+@MainActor
+private func runForEachProviderAsync(
+    _ body: (ImportRepositoryHandles) async throws -> Void
+) async throws {
+    try await body(makeInMemoryProvider())
+
+    let folder = try temporaryFolder(named: "LedgerForgeImportRepositoryIntegrationAsyncTests")
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let provider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("integration.sqlite").path)
+    try await body(ImportRepositoryHandles(
+        workspaceRepo: provider.workspaceRepo,
+        accountRepo: provider.accountRepo,
+        importSessionRepo: provider.importSessionRepo,
+        transactionRepo: provider.transactionRepo
+    ))
+}
+
 private func makeInMemoryProvider() -> ImportRepositoryHandles {
     let provider = InMemoryRepositoryProvider()
     return ImportRepositoryHandles(
@@ -1212,6 +1476,62 @@ private func makePersistenceCoordinator(
             workspaceName: workspaceName
         )
     )
+}
+
+private func makeFailureReportingCoordinator(
+    provider: ImportRepositoryHandles,
+    importSessionRepo: ImportSessionRepository,
+    workspaceID: String
+) -> DefaultImportPersistenceCoordinator {
+    DefaultImportPersistenceCoordinator(
+        workspaceRepo: provider.workspaceRepo,
+        accountRepo: provider.accountRepo,
+        importSessionRepo: importSessionRepo,
+        transactionRepo: provider.transactionRepo,
+        mapper: ImportPersistenceMapper(
+            workspaceId: workspaceID,
+            workspaceName: "Failure Reporting Workspace"
+        )
+    )
+}
+
+private func makeAttemptOnlyHydrator(
+    provider: ImportRepositoryHandles,
+    importSessionRepo: ImportSessionRepository,
+    stores: ImportAttemptRecreationStores,
+    workspaceID: String
+) -> RepositoryStoreHydrator {
+    RepositoryStoreHydrator(
+        accountRepo: provider.accountRepo,
+        importSessionRepo: importSessionRepo,
+        transactionRepo: provider.transactionRepo,
+        accountStore: stores.accounts,
+        transactionStore: stores.transactions,
+        importSessionStore: stores.importSessions,
+        importAttemptStore: stores.attempts,
+        workspaceId: workspaceID
+    )
+}
+
+private func assertNoSuccessfulImportHistory(
+    provider: ImportRepositoryHandles,
+    fixture: ImportRepositoryFixture,
+    workspaceID: String
+) throws {
+    #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
+    #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).isEmpty)
+    #expect(try provider.importSessionRepo.priorImportedStatement(
+        algorithm: fixture.fingerprint.algorithm,
+        fingerprint: fixture.fingerprint.digest
+    ) == nil)
+    let account = try #require(try provider.accountRepo.accounts(workspaceId: workspaceID).first)
+    let eventKeys = Set(try fixture.financialDocument.transactions.compactMap { transaction in
+        try TransactionEventIdentity.make(transaction: transaction, accountID: account.id).map {
+            TransactionEventIdentityKeyDTO(algorithm: $0.algorithmIdentifier, digest: $0.digest)
+        }
+    })
+    #expect(!eventKeys.isEmpty)
+    #expect(try provider.importSessionRepo.transactionEventOwners(keys: eventKeys).isEmpty)
 }
 
 private func withTemporarySQLiteProvider<T>(_ body: (ImportRepositoryHandles) throws -> T) throws -> T {
@@ -1248,9 +1568,10 @@ private func makeValidFixture(
     importSessionId: UUID = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
     fileName: String = "repository-integration.csv",
     financialIdentifiers: [FinancialIdentifier] = [],
-    fingerprintText: String? = nil
+    fingerprintText: String? = nil,
+    includeTransactionEventEvidence: Bool = false
 ) -> ImportRepositoryFixture {
-    let transactions = [
+    var transactions = [
         makeTransaction(
             date: Date(timeIntervalSince1970: 1_804_896_000),
             description: "Opening credit",
@@ -1270,6 +1591,13 @@ private func makeValidFixture(
             currency: currency
         )
     ]
+    if includeTransactionEventEvidence {
+        transactions[0].verifiedAxisUPIEventEvidence = AxisUPITransactionEventEvidence(
+            operation: .p2a,
+            reference: "123456789012",
+            subtype: .creditAdjustment
+        )
+    }
     let financialDocument = makeFinancialDocument(
         transactions: transactions,
         fileName: fileName,
@@ -1301,6 +1629,24 @@ private func makeFailedValidationFixture() -> ImportRepositoryFixture {
         importSession: importSession,
         validation: validation,
         fingerprint: ExactStatementFingerprint(text: "failed-validation-fixture")
+    )
+}
+
+private func makeIntegrationPreparedImport(
+    fixture: ImportRepositoryFixture,
+    rawContents: String
+) -> PreparedImport {
+    PreparedImport(
+        sourceURL: fixture.financialDocument.sourceDocument.url,
+        rawContents: rawContents,
+        fileName: fixture.financialDocument.sourceDocument.filename,
+        detectedInstitution: fixture.financialDocument.metadata.institution,
+        detectedDocumentType: fixture.financialDocument.metadata.documentType,
+        parserName: fixture.financialDocument.parserName,
+        financialDocument: fixture.financialDocument,
+        validation: fixture.validation,
+        importSession: fixture.importSession,
+        fingerprint: fixture.fingerprint
     )
 }
 

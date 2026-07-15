@@ -132,7 +132,6 @@ struct ImportOutcomePresentation: Equatable {
         transactionCount = result.transactionCount
         validationStatus = result.validationPassed ? "Validation Passed" : "Validation Failed"
         allowsViewingTransactions = result.validationPassed && result.persisted
-        message = result.errorMessage?.isEmpty == false ? result.errorMessage : nil
         accountId = result.accountId
         importSessionId = result.importSessionId
         redactedIdentifier = result.redactedIdentifier
@@ -140,6 +139,16 @@ struct ImportOutcomePresentation: Equatable {
         previousAccountDisplayName = result.previousImport?.accountDisplayName
         isPreviouslyImported = result.previousImport != nil
         transactionEventBlock = result.transactionEventBlock
+
+        if result.previousImport != nil || result.transactionEventBlock != nil || result.persisted {
+            message = result.errorMessage?.isEmpty == false ? result.errorMessage : nil
+        } else {
+            let failure = result.validationPassed ? "Import persistence failed." : "Import validation failed."
+            let history = result.importAttemptId != nil
+                ? "The failure was added to Import History."
+                : "The failure could not be added to Import History."
+            message = "\(failure) \(history)"
+        }
 
         if result.previousImport != nil {
             persistenceStatus = "Previously Imported"

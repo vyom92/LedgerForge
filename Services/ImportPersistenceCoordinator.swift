@@ -183,6 +183,15 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
     }
 }
 
+struct ImportPersistenceCommitFailure: Error, LocalizedError {
+    let originalError: Error
+    let importAttemptId: String?
+
+    var errorDescription: String? {
+        originalError.localizedDescription
+    }
+}
+
 final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
 
     private static let confirmationSerializationLock = NSLock()
@@ -295,11 +304,18 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
     }
 
     func recordValidationFailure(fileName: String, transactionCount: Int) -> String? {
-        recordAttempt(
-            outcome: .validationFailure, coverage: .unsupportedOrUnevaluated,
-            decision: .noFinancialMutation, guidance: .correctValidationAndRetry,
-            persistence: .rejectedRecorded, transactionCount: transactionCount
-        )
+        do {
+            if try workspaceRepo.workspace(id: mapper.workspaceId) == nil {
+                _ = try workspaceRepo.upsertWorkspace(mapper.workspace(createdAt: Date()))
+            }
+            return recordAttempt(
+                outcome: .validationFailure, coverage: .unsupportedOrUnevaluated,
+                decision: .noFinancialMutation, guidance: .correctValidationAndRetry,
+                persistence: .rejectedRecorded, transactionCount: transactionCount
+            )
+        } catch {
+            return nil
+        }
     }
 
     func persistValidatedImport(
@@ -484,8 +500,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             )
             )
         } catch {
-            _ = recordAttempt(outcome: .persistenceFailure, coverage: .evaluatedSupportedOnly, decision: .sideEffectsMayExist, guidance: .persistenceUnavailable, persistence: .auditWriteUnavailable, transactionCount: payload.transactions.count, accountId: selection.accountId)
-            throw error
+            let attemptID = recordAttempt(outcome: .persistenceFailure, coverage: .evaluatedSupportedOnly, decision: .sideEffectsMayExist, guidance: .persistenceUnavailable, persistence: .auditWriteUnavailable, transactionCount: payload.transactions.count, accountId: selection.accountId)
+            throw ImportPersistenceCommitFailure(originalError: error, importAttemptId: attemptID)
         }
         if case .duplicate(let previous) = historyResult {
             developerConsole?.info(.import, "Previously imported statement blocked", metadata: [
