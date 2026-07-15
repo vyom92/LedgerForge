@@ -15,17 +15,19 @@ Principles:
 
 * Primary Branch: main
 * Latest Implementation Commit: 3b4b2ec — Implement Sprint 39 exact statement re-import prevention
+* Latest Evidence Commit: 416fc88 — Prepare Sprint 40 transaction-event evidence
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
-* Latest ADR: ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit (Accepted; Implemented in Sprint 39)
+* Latest ADR: ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking (Accepted; architecture prepared in Sprint 40, production implementation pending)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 39 — Exact Statement Re-import Prevention (implemented)
-* Current Phase: Awaiting next-sprint planning
+* Current Sprint: Sprint 40 — Transaction-Event Evidence Fixture and ADR Preparation (complete)
+* Current Phase: Awaiting bounded Sprint 41 production implementation planning
 * Build Status: Passing
-* Validation Status: Sprint 39 passed source diagnostics, static analysis and clean Debug build; focused Sprint 39 suites passed (45 tests, 0 failures, 0 skipped), financial regressions passed (18 tests, 0 failures, 0 skipped), DeveloperDiagnostics passed (14 tests, 0 failures, 0 skipped), and the complete configured unit/integration test plan passed (171 tests, 0 failures, 0 skipped). Generic `LedgerForgeUITests` remained intentionally disabled. Sprint 39 UI behavior was manually verified; the same-reset-database relaunch limitation remains.
+* Validation Status: Sprint 40 passed privacy and fixture-integrity inspection, source diagnostics, static analysis and clean Debug build; focused evidence and import regressions passed (54 tests in 8 suites, 0 failures, 0 skipped), and the complete configured unit/integration plan passed (175 tests in 26 suites, 0 failures, 0 skipped). Generic `LedgerForgeUITests` remained intentionally disabled.
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
 * Latest Verified Implementation Remote: 3b4b2ec76c0aca86d9e065182e201740cef829bd
+* Latest Verified Evidence Remote: 416fc884c888982f996b01256fb99b70bcae6c78
 
 ## Bootstrap
 
@@ -88,10 +90,18 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 39 — Exact Statement Re-import Prevention is implemented, validated, manually verified, committed and pushed. The repository is awaiting next-sprint planning.
+Active Work: Sprint 40 evidence and architecture preparation is complete, validated, committed and pushed. Production transaction-event extraction, persistence, lookup and duplicate blocking remain pending. The repository is awaiting bounded Sprint 41 production implementation planning.
 
 Verified planning state:
 
+* Sprint 40 verified two genuine independent overlapping Axis CSV exports with the same private structured full account identifier, 30 complete shared rows, 51 baseline-only rows and one later-only row.
+* ADR-031 accepts only account-scoped, parser-owned Axis UPI evidence under proposed algorithm `ledgerforge.transaction-event.axis-upi-reference.v1`, with deterministic operation and posting-versus-credit-adjustment subtype separation.
+* IMPS, NEFT, e-commerce, unstructured, reversal and refund event identity remains unsupported pending additional family-specific source evidence.
+* One privacy-safe 31-row overlapping Axis fixture and expected specification are tracked; the approved 81-row baseline remains byte-for-byte unchanged.
+* Sprint 40 changed no production Swift, repository API, schema, migration, Xcode project, runtime-store, ViewModel or UI file.
+* Focused evidence and regression suites passed (54 tests in 8 suites, 0 failures, 0 skipped); the complete configured unit/integration plan passed (175 tests in 26 suites, 0 failures, 0 skipped).
+* Static analysis, clean Debug build, privacy inspection, diff checks and conflict checks passed. Generic `LedgerForgeUITests` remained intentionally disabled.
+* Sprint 40 evidence commit `416fc884c888982f996b01256fb99b70bcae6c78` is pushed and verified at `origin/main`.
 * Sprint 38 remains completed and verified; its implementation history and validation evidence are unchanged.
 * Sprint 39 prevents exact re-import of successfully imported reader-produced text using the versioned fingerprint `ledgerforge.raw-text.sha256.v1`.
 * Sprint 39 is implemented with bounded prior-import provenance, same-process confirmation serialization and provider-owned atomic import-history persistence.
@@ -101,6 +111,17 @@ Verified planning state:
 * Generic `LedgerForgeUITests` remains intentionally disabled and did not execute. Sprint 39 UI behavior was manually verified; the same-reset-database UI relaunch limitation remains, with durable provider recreation covered automatically.
 * Sprint 39 targets same-process serialization and atomic document/fingerprint/import-session/transaction commit only; cross-process guarantees and broader cross-repository atomicity remain future work.
 * No schema migration was required for Sprint 39.
+
+## Verified Sprint 40 State
+
+* Both original external Axis exports were readable, structurally valid, non-identical and independently generated. Their private full account identifiers matched and their declared periods overlapped from 16 April through 03 July 2026.
+* Thirty complete original rows were shared exactly in ledger order; 51 rows were unique to the baseline and one valid event was unique to the later export.
+* Fifteen shared UPI events retained stable structured references. Recurring source patterns retained distinct references. One UPI token was reused by a posting and credit-adjustment pair, proving token-only identity unsafe and requiring deterministic source subtype.
+* The accepted ADR boundary is prospective, account-scoped Axis UPI only. Missing or malformed evidence does not prove novelty, and weak financial or presentation fields remain ineligible.
+* The sanitized derivative reuses the approved baseline's fictional metadata and 30 shared sanitized rows exactly. The one later-only row uses new fictional instrument and narration values while preserving all financial values and ordering.
+* Privacy inspection found no original account metadata, candidate references, complete long narrations, source paths or mapping material in tracked changes.
+* `FW-P0-01` remains open for bounded production implementation; Sprint 40 implements no transaction-level duplicate prevention.
+* Evidence commit: `416fc884c888982f996b01256fb99b70bcae6c78` — Prepare Sprint 40 transaction-event evidence.
 
 ## Verified Sprint 39 State
 
