@@ -1,82 +1,114 @@
-# Sprint 39 Planning Package Execution Report
+# Sprint 39 Implementation Review Corrections
 
-## Outcome
+## Overall Result
 
-The approved Sprint 39 planning package was applied as documentation only. Chat review verdict was **PASS WITH CORRECTIONS**. No production code, tests, build, application launch, commit or push was performed.
+**PASS WITH CORRECTIONS.**
 
-## Repository State
+The prior result was **BLOCKED BY APPROVED-FILE SCOPE CONFLICT**. Chat approved the minimal exception for `LedgerForgeTests/DeveloperDiagnosticsTests.swift`; the private diagnostic persistence conformer was updated without production changes. All required automated validation now passes.
 
-- Repository: `vyom92/LedgerForge`
-- Branch: `main`
-- Starting SHA: `8ecf3de0648605d2d3336b9990b22120d5adb0bf`
-- `HEAD == origin/main`: verified before editing.
-- Starting worktree: clean before editing.
+No commit, push, branch, pull request, tag, schema, migration, project, scheme, or `TestPlan.xctestplan` change occurred.
 
-## Required Bootstrap and Inspection
+## Review Corrections
 
-Inspected in the required order:
+- SQLite preserves `BEGIN IMMEDIATE`, authoritative lookup, and rollback, and now rethrows the original persistence error after rollback rather than returning a later discovered duplicate.
+- SQLite failure-injection tests seed unrelated successful fingerprint history and prove fingerprint, transaction, and completion errors remain errors.
+- The protocol no longer delegates fingerprinted persistence to the legacy passed-validation path. Unsupported fingerprinted/advisory use fails explicitly; passed legacy persistence remains rejected with `fingerprintRequired`.
+- Counting persistence coverage proves `ImportEngine.commitPreparedImport` supplies the prepared fingerprint, with algorithm `ledgerforge.raw-text.sha256.v1`, matching digest, and the fingerprinted—not legacy—call path.
+- In-memory and SQLite provenance counts all persisted transaction rows and recovers account provenance without `isTrusted` filtering.
+- Both providers require every atomic-history transaction to carry one shared existing account ID; mixed-account payloads fail without document, fingerprint, session, or transaction residue.
+- Provider parity covers a trusted and untrusted transaction on the same account, matching duplicate outcome, count `2`, account ID, and account display name.
+- Competing confirmations now use two independent coordinators and engines over one shared provider, proving one persisted history and one previously-imported result.
 
-- `Project documents/.github/Context_Manifest.yaml`
-- `AGENTS.md`
-- `Project documents/Project_Guide.md`
-- `Project documents/PROJECT_STATE.md`
-- `Project documents/FUTURE_WORK.MD`
-- `Project documents/ADR.md`
-- `Project documents/Implementation.md`
-- Existing import and persistence boundaries only as represented by the active contract and approved planning package.
+## Approved Diagnostic Exception
 
-## Planning Package
+Chat approved `LedgerForgeTests/DeveloperDiagnosticsTests.swift` solely to repair its private `DiagnosticPersistenceCoordinator` after the protocol bypass removal. The test double now:
 
-- Added **ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit** with status `Accepted` and `Planned for Sprint 39`.
-- Replaced the stale ACTIVE Sprint 38 contract with **Sprint 39 — Exact Statement Re-import Prevention**, status `Ready for Implementation`.
-- Updated `PROJECT_STATE.md` planning state: Sprint 38 remains completed and verified; Sprint 39 is defined and not implemented; the next milestone is Sprint 39 implementation; repeated imports remain possible until implementation.
-- Added prospective-only compatibility: legacy un-fingerprinted history is not backfilled or heuristically claimed; its first post-Sprint 39 import may register a fingerprint and later exact reimports are blocked.
-- Added database-wide fingerprint scope under the existing single-workspace schema; workspace-scoped uniqueness and migrations remain outside Sprint 39.
-- Added existing-schema field semantics for `documents.sha256`, `document_fingerprints.algorithm`, `document_fingerprints.fingerprint`, `fingerprint_data`, import-session linkage and transaction document IDs.
-- Clarified that same-process serialization begins before duplicate lookup and remains held through duplicate rejection or account/identifier plus atomic import-history completion or failure.
-- Added the approved Expected Test Scope and corrected manual verification to use a disposable clean database while preserving the user database.
-- Corrected the Completion Gate wording so ADR-030 remains planned until implementation, validation, manual verification and Chat review succeed.
-- The previously approved `FUTURE_WORK.MD` clarification remains unchanged. Existing backlog items for broader atomicity, partial-import recovery, concurrency beyond Sprint 39, data-integrity repair, duplicate-import management UI and duplicate-transaction review remain unchanged and unscheduled.
+- explicitly implements `priorImportedStatement(fingerprint:)` as a no-prior-history test behavior;
+- explicitly implements fingerprinted persistence, captures the supplied fingerprint, and preserves the existing diagnostic success result;
+- rejects the legacy passed-validation method with `fingerprintRequired`;
+- does not call or depend on the legacy method.
 
-## Files Modified
-
-- `Project documents/ADR.md`
-- `Project documents/Implementation.md`
-- `Project documents/PROJECT_STATE.md`
-- `Project documents/FUTURE_WORK.MD`
-- `Project documents/Codex response.md`
-
-No Swift, test, Xcode project, fixture, database or configuration file changed.
+`successfulImportLifecycleDiagnostics()` now verifies the received fingerprint uses `ledgerforge.raw-text.sha256.v1` and a lowercase 64-character hexadecimal digest. Diagnostic privacy assertions remain unchanged.
 
 ## Validation
 
-- `git diff --check`: passed.
-- Complete diff inspection: passed; changes are limited to the five permitted documentation files.
-- Conflict-marker check: passed.
-- No commit or push occurred, as required.
-- No contradiction or stop condition was encountered.
+- Source diagnostics: passed with no source warnings or errors.
+- Static analysis: `ANALYZE SUCCEEDED`.
+- Clean Debug build: `CLEAN SUCCEEDED` and `BUILD SUCCEEDED`.
+- Focused Sprint 39 suites (`ConfirmationGatedImportWorkflowTests`, `RepositoryContractTests`, `ImportRepositoryIntegrationTests`): **45 tests in 3 suites passed**, 0 failures.
+- Financial regressions (`CSVImportRegressionTests`, `FinancialDocumentTests`): **18 tests in 2 suites passed**, 0 failures.
+- `DeveloperDiagnosticsTests`: **14 tests in 1 suite passed**, 0 failures.
+- Complete currently configured test plan: **171 tests in 25 suites passed**, 0 failures.
+- Scoped `git diff --check`: passed.
+- Tracked conflict-marker inspection: passed.
+- Complete approved changed-file review: passed.
 
-## Diff Summary
+The committed baseline intentionally disables `LedgerForgeUITests`; generic UI tests did not run. Sprint 39 UI behavior was manually verified against a disposable SQLite database: new import, same-name duplicate, renamed byte-identical duplicate, visible bounded provenance, no duplicate hydration, unchanged duplicate counts, and changed-text import. The same-reset-database UI relaunch limitation remains because the development-reset path is not retained across app relaunch; durable provider recreation is covered automatically.
 
-The documentation-only diff records ADR-030, the corrected ACTIVE Sprint 39 exact-content fingerprint and atomic import-history contract, the Sprint 39 planning state, the unchanged approved backlog clarification and this execution report. Sprint 38 implementation history and validation evidence remain recorded as verified facts.
+## Changed Files
 
-Exact `git diff --stat`:
+### Production
+
+- `ContentView.swift`
+- `Database/DTOs.swift`
+- `Database/InMemoryRepositoryProvider.swift`
+- `Database/Repository.swift`
+- `Database/SQLiteRepositoryProvider.swift`
+- `Services/ImportEngine.swift`
+- `Services/ImportPersistenceCoordinator.swift`
+- `Services/ImportPersistenceMapper.swift`
+
+### Tests
+
+- `LedgerForgeTests/ConfirmationGatedImportWorkflowTests.swift`
+- `LedgerForgeTests/DeveloperDiagnosticsTests.swift`
+- `LedgerForgeTests/ImportRepositoryIntegrationTests.swift`
+- `LedgerForgeTests/RepositoryContractTests.swift`
+
+### Handoff
+
+- `Project documents/Codex response.md`
+
+`Project documents/FUTURE_WORK.MD` is unrelated pre-existing work. It remains untouched by this pass, unstaged, and excluded from the Sprint 39 review diff.
+
+## Git State
+
+Every Sprint 39 file is unstaged. No Sprint 39 implementation commit or push occurred.
+
+### Diff Stat
 
 ```text
- Project documents/ADR.md            |  94 +++++
- Project documents/Codex response.md | 108 +++---
- Project documents/FUTURE_WORK.MD    |   4 +
- Project documents/Implementation.md | 720 ++++++++++--------------------------
- Project documents/PROJECT_STATE.md  |  24 +-
- 5 files changed, 383 insertions(+), 567 deletions(-)
+ ContentView.swift                                  |  68 ++--
+ Database/DTOs.swift                                | 110 ++++++-
+ Database/InMemoryRepositoryProvider.swift          | 118 +++++++
+ Database/Repository.swift                          |  10 +
+ Database/SQLiteRepositoryProvider.swift            | 163 ++++++++++
+ .../ConfirmationGatedImportWorkflowTests.swift     | 142 +++++++++
+ LedgerForgeTests/DeveloperDiagnosticsTests.swift   |  22 +-
+ .../ImportRepositoryIntegrationTests.swift         | 351 ++++++++++++++++++++-
+ LedgerForgeTests/RepositoryContractTests.swift     | 246 ++++++++++++++
+ Project documents/Codex response.md                | 144 +++++----
+ Services/ImportEngine.swift                        |  78 ++++-
+ Services/ImportPersistenceCoordinator.swift        | 173 ++++++++--
+ Services/ImportPersistenceMapper.swift             |  33 +-
+ 13 files changed, 1530 insertions(+), 128 deletions(-)
 ```
 
-Exact `git status --short` after editing:
+### Worktree
 
 ```text
- M "Project documents/ADR.md"
+ M ContentView.swift
+ M Database/DTOs.swift
+ M Database/InMemoryRepositoryProvider.swift
+ M Database/Repository.swift
+ M Database/SQLiteRepositoryProvider.swift
+ M LedgerForgeTests/ConfirmationGatedImportWorkflowTests.swift
+ M LedgerForgeTests/DeveloperDiagnosticsTests.swift
+ M LedgerForgeTests/ImportRepositoryIntegrationTests.swift
+ M LedgerForgeTests/RepositoryContractTests.swift
  M "Project documents/Codex response.md"
  M "Project documents/FUTURE_WORK.MD"
- M "Project documents/Implementation.md"
- M "Project documents/PROJECT_STATE.md"
+ M Services/ImportEngine.swift
+ M Services/ImportPersistenceCoordinator.swift
+ M Services/ImportPersistenceMapper.swift
 ```

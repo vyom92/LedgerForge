@@ -58,6 +58,10 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(persistence.capturedFinancialDocument?.id == preparedImport.financialDocument.id)
         #expect(persistence.capturedImportSession?.id == preparedImport.importSession.id)
         #expect(persistence.capturedValidation?.passed == preparedImport.validation.passed)
+        #expect(persistence.capturedFingerprint?.algorithm == ExactStatementFingerprint.algorithm)
+        #expect(persistence.capturedFingerprint?.digest == preparedImport.fingerprint.digest)
+        #expect(persistence.fingerprintedPersistCallCount == 1)
+        #expect(persistence.legacyPersistCallCount == 0)
         #expect(TransactionStore.shared.transactions.isEmpty)
         #expect(AccountStore.shared.accounts.isEmpty)
     }
@@ -183,17 +187,153 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(persistenceFailure.persistenceStatus == "Persistence Failed")
         #expect(!persistenceFailure.allowsViewingTransactions)
     }
+
+    @Test func exactFingerprintUsesOnlyReaderProducedUTF8Text() {
+        let original = ExactStatementFingerprint(text: "Date,Amount\n2026-01-01,10\n")
+        let renamed = ExactStatementFingerprint(text: "Date,Amount\n2026-01-01,10\n")
+        let whitespaceChanged = ExactStatementFingerprint(text: "Date,Amount\n2026-01-01,10 \n")
+
+        #expect(original.algorithm == "ledgerforge.raw-text.sha256.v1")
+        #expect(original.digest.count == 64)
+        #expect(original.digest == renamed.digest)
+        #expect(original.byteCount == renamed.byteCount)
+        #expect(original.digest != whitespaceChanged.digest)
+    }
+
+    @Test func previouslyImportedOutcomeIsDistinctAndDoesNotRequireHydration() {
+        let previous = PreviouslyImportedStatement(
+            importSessionId: "prior-session",
+            completedAtISO: "2026-07-14T09:00:00Z",
+            transactionCount: 81,
+            accountId: "account-prior",
+            accountDisplayName: "Axis Bank INR"
+        )
+        let result = ImportEngineResult(
+            fileName: "renamed.csv",
+            transactionCount: 81,
+            validationPassed: true,
+            persisted: false,
+            errorMessage: nil,
+            accountId: previous.accountId,
+            importSessionId: previous.importSessionId,
+            previousImport: previous
+        )
+        let presentation = ImportOutcomePresentation(result: result)
+
+        #expect(!result.succeeded)
+        #expect(!result.requiresHydration)
+        #expect(presentation.persistenceStatus == "Previously Imported")
+        #expect(presentation.isPreviouslyImported)
+        #expect(presentation.previousImportCompletedAtISO == previous.completedAtISO)
+        #expect(presentation.previousAccountDisplayName == previous.accountDisplayName)
+        #expect(!presentation.allowsViewingTransactions)
+    }
+
+    @Test func newSuccessRequiresOneCanonicalHydrationSignal() {
+        let result = ImportEngineResult(
+            fileName: "axis.csv",
+            transactionCount: 81,
+            validationPassed: true,
+            persisted: true,
+            errorMessage: nil
+        )
+
+        #expect(result.requiresHydration)
+    }
+
+    @Test func competingSameProcessConfirmationsProduceOneFinancialHistory() async throws {
+        let provider = InMemoryRepositoryProvider()
+        let firstCoordinator = DefaultImportPersistenceCoordinator(
+            workspaceRepo: provider.workspaceRepo,
+            accountRepo: provider.accountRepo,
+            importSessionRepo: provider.importSessionRepo,
+            transactionRepo: provider.transactionRepo,
+            mapper: ImportPersistenceMapper(
+                workspaceId: "workspace-competing-confirmations",
+                workspaceName: "Competing Confirmations"
+            )
+        )
+        let secondCoordinator = DefaultImportPersistenceCoordinator(
+            workspaceRepo: provider.workspaceRepo,
+            accountRepo: provider.accountRepo,
+            importSessionRepo: provider.importSessionRepo,
+            transactionRepo: provider.transactionRepo,
+            mapper: ImportPersistenceMapper(
+                workspaceId: "workspace-competing-confirmations",
+                workspaceName: "Competing Confirmations"
+            )
+        )
+        let firstEngine = ImportEngine(importPersistenceCoordinator: firstCoordinator)
+        let secondEngine = ImportEngine(importPersistenceCoordinator: secondCoordinator)
+        let first = makePreparedImport(id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!)
+        let second = makePreparedImport(id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!)
+
+        async let firstResult = firstEngine.commitPreparedImport(first, accountChoice: .createNewAccount)
+        async let secondResult = secondEngine.commitPreparedImport(second, accountChoice: .createNewAccount)
+        let results = await [firstResult, secondResult]
+
+        #expect(results.filter(\.persisted).count == 1)
+        #expect(results.filter { $0.previousImport != nil }.count == 1)
+        #expect(try provider.accountRepo.accounts(workspaceId: "workspace-competing-confirmations").count == 1)
+        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: "workspace-competing-confirmations").count == 2)
+        let successfulSessionIDs = [first, second].compactMap { prepared in
+            try? provider.importSessionRepo.importSession(id: prepared.importSession.id.uuidString)
+        }.compactMap { $0 }.filter { $0.validationStatus == "passed" }.map(\.id)
+        #expect(successfulSessionIDs.count == 1)
+        let prior = try #require(try provider.importSessionRepo.priorImportedStatement(
+            algorithm: first.fingerprint.algorithm,
+            fingerprint: first.fingerprint.digest
+        ))
+        #expect(prior.importSessionId == successfulSessionIDs[0])
+        #expect(prior.transactionCount == 2)
+    }
 }
 
 private final class CountingPersistenceCoordinator: ImportPersistenceCoordinating {
     private(set) var persistCallCount = 0
+    private(set) var legacyPersistCallCount = 0
+    private(set) var fingerprintedPersistCallCount = 0
     private(set) var capturedFinancialDocument: FinancialDocument?
     private(set) var capturedImportSession: ImportSession?
     private(set) var capturedValidation: ImportValidationResult?
+    private(set) var capturedFingerprint: ExactStatementFingerprint?
     var errorToThrow: Error?
     var resultOverride: ImportPersistenceResult?
 
     func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult
+    ) throws -> ImportPersistenceResult {
+        legacyPersistCallCount += 1
+        return try persist(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation
+        )
+    }
+
+    func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
+        nil
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice?
+    ) throws -> ImportPersistenceResult {
+        fingerprintedPersistCallCount += 1
+        capturedFingerprint = fingerprint
+        return try persist(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation
+        )
+    }
+
+    private func persist(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
         validation: ImportValidationResult
@@ -238,6 +378,7 @@ private enum ConfirmationPersistenceError: Error, LocalizedError {
 }
 
 private func makePreparedImport(
+    id: UUID = UUID(),
     transactions: [Transaction] = [
         makeConfirmationTransaction(
             date: Date(timeIntervalSince1970: 1_804_896_000),
@@ -287,6 +428,7 @@ private func makePreparedImport(
     )
 
     return PreparedImport(
+        id: id,
         sourceURL: document.sourceDocument.url,
         rawContents: "date,description,amount",
         fileName: document.sourceDocument.filename,

@@ -25,6 +25,7 @@ struct ImportRepositoryIntegrationTests {
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
                 validation: fixture.validation,
+                fingerprint: fixture.fingerprint,
                 accountChoice: .createNewAccount
             )
 
@@ -63,7 +64,7 @@ struct ImportRepositoryIntegrationTests {
             #expect(transactions.allSatisfy { $0.workspaceId == "workspace-import-integration" })
             #expect(transactions.allSatisfy { $0.accountId == result.accountId })
             #expect(transactions.allSatisfy { $0.importSessionId == fixture.importSession.id.uuidString })
-            #expect(transactions.allSatisfy { $0.documentId == nil })
+            #expect(transactions.allSatisfy { $0.documentId != nil })
 
             let orderedTransactions = transactions.sorted {
                 if $0.postedDateISO == $1.postedDateISO {
@@ -92,6 +93,7 @@ struct ImportRepositoryIntegrationTests {
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
                 validation: fixture.validation,
+                fingerprint: fixture.fingerprint,
                 accountChoice: .createNewAccount
             )
 
@@ -146,7 +148,8 @@ struct ImportRepositoryIntegrationTests {
             let result = try coordinator.persistValidatedImport(
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
-                validation: fixture.validation
+                validation: fixture.validation,
+                fingerprint: fixture.fingerprint
             )
 
             #expect(!result.persisted)
@@ -159,6 +162,10 @@ struct ImportRepositoryIntegrationTests {
             #expect(try provider.workspaceRepo.workspace(id: "workspace-failed-import") == nil)
             #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
             #expect(try provider.transactionRepo.transactions(workspaceId: "workspace-failed-import", importSessionId: fixture.importSession.id.uuidString).isEmpty)
+            #expect(try provider.importSessionRepo.priorImportedStatement(
+                algorithm: fixture.fingerprint.algorithm,
+                fingerprint: fixture.fingerprint.digest
+            ) == nil)
         }
     }
 
@@ -168,7 +175,8 @@ struct ImportRepositoryIntegrationTests {
             let result = try makePersistenceCoordinator(provider: provider).persistValidatedImport(
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
-                validation: fixture.validation
+                validation: fixture.validation,
+                fingerprint: fixture.fingerprint
             )
 
             let accountId = try #require(result.accountId)
@@ -204,7 +212,8 @@ struct ImportRepositoryIntegrationTests {
             let result = try makePersistenceCoordinator(provider: provider).persistValidatedImport(
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
-                validation: fixture.validation
+                validation: fixture.validation,
+                fingerprint: fixture.fingerprint
             )
 
             let accountId = try #require(result.accountId)
@@ -251,6 +260,7 @@ struct ImportRepositoryIntegrationTests {
             financialDocument: fixture.financialDocument,
             importSession: fixture.importSession,
             validation: fixture.validation,
+            fingerprint: fixture.fingerprint,
             accountChoice: .useExistingAccount(accountId: existingAccount.id)
         )
 
@@ -282,6 +292,7 @@ struct ImportRepositoryIntegrationTests {
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
                 validation: fixture.validation,
+                fingerprint: fixture.fingerprint,
                 accountChoice: nil
             )
         }
@@ -301,7 +312,8 @@ struct ImportRepositoryIntegrationTests {
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
                 validation: fixture.validation,
-                accountId: "account-unsupported-currency"
+                accountId: "account-unsupported-currency",
+                fingerprint: fixture.fingerprint
             )
             Issue.record("Expected unsupported currency mapping to fail before persistence.")
         } catch let error as ImportPersistenceError {
@@ -357,7 +369,8 @@ struct ImportRepositoryIntegrationTests {
         let persistence = try coordinator.persistValidatedImport(
             financialDocument: fixture.financialDocument,
             importSession: fixture.importSession,
-            validation: fixture.validation
+            validation: fixture.validation,
+            fingerprint: fixture.fingerprint
         )
         #expect(persistence.persisted)
 
@@ -395,13 +408,15 @@ struct ImportRepositoryIntegrationTests {
             financialDocument: fixture.financialDocument,
             importSession: fixture.importSession,
             validation: fixture.validation,
-            accountId: selectedAccountId
+            accountId: selectedAccountId,
+            fingerprint: fixture.fingerprint
         )
         let renamedPayload = try mapper.payload(
             financialDocument: renamedFixture.financialDocument,
             importSession: renamedFixture.importSession,
             validation: renamedFixture.validation,
-            accountId: selectedAccountId
+            accountId: selectedAccountId,
+            fingerprint: renamedFixture.fingerprint
         )
 
         #expect(payload.account.name == "Axis Bank INR")
@@ -436,6 +451,7 @@ struct ImportRepositoryIntegrationTests {
                 financialDocument: firstFixture.financialDocument,
                 importSession: firstFixture.importSession,
                 validation: firstFixture.validation,
+                fingerprint: firstFixture.fingerprint,
                 accountChoice: .createNewAccount
             )
             let originalAccountId = try #require(firstResult.accountId)
@@ -448,7 +464,8 @@ struct ImportRepositoryIntegrationTests {
             let secondResult = try secondCoordinator.persistValidatedImport(
                 financialDocument: secondFixture.financialDocument,
                 importSession: secondFixture.importSession,
-                validation: secondFixture.validation
+                validation: secondFixture.validation,
+                fingerprint: secondFixture.fingerprint
             )
 
             #expect(firstResult.accountId == secondResult.accountId)
@@ -490,7 +507,8 @@ struct ImportRepositoryIntegrationTests {
             _ = try coordinator.persistValidatedImport(
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
-                validation: fixture.validation
+                validation: fixture.validation,
+                fingerprint: fixture.fingerprint
             )
             Issue.record("Expected ambiguous identity to reject persistence.")
         } catch let error as ImportPersistenceCoordinationError {
@@ -557,7 +575,8 @@ struct ImportRepositoryIntegrationTests {
                 _ = try makePersistenceCoordinator(provider: provider).persistValidatedImport(
                     financialDocument: fixture.financialDocument,
                     importSession: fixture.importSession,
-                    validation: fixture.validation
+                    validation: fixture.validation,
+                    fingerprint: fixture.fingerprint
                 )
                 Issue.record("Expected conflicting identity to reject persistence.")
             } catch let error as ImportPersistenceCoordinationError {
@@ -611,7 +630,8 @@ struct ImportRepositoryIntegrationTests {
             _ = try coordinator.persistValidatedImport(
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
-                validation: fixture.validation
+                validation: fixture.validation,
+                fingerprint: fixture.fingerprint
             )
         } catch {
             #expect(error.localizedDescription == "Financial identity is ambiguous; import was not persisted.")
@@ -628,6 +648,303 @@ struct ImportRepositoryIntegrationTests {
         #expect(diagnosticText.contains("Ambiguous"))
     }
 
+    @Test func exactAxisReimportIsBlockedDurablyWithBoundedProvenance() async throws {
+        let folder = try temporaryFolder(named: "LedgerForgeExactReimportTests")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let databaseURL = folder.appendingPathComponent("exact-reimport.sqlite")
+        let originalURL = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+        let renamedURL = folder.appendingPathComponent("renamed-axis-statement.csv")
+        let changedURL = folder.appendingPathComponent("changed-axis-statement.csv")
+        let exactText = try String(contentsOf: originalURL, encoding: .utf8)
+        try exactText.write(to: renamedURL, atomically: true, encoding: .utf8)
+        try (exactText + "\n").write(to: changedURL, atomically: true, encoding: .utf8)
+
+        let firstProvider = try SQLiteRepositoryProvider(path: databaseURL.path)
+        let firstCoordinator = DefaultImportPersistenceCoordinator(
+            workspaceRepo: firstProvider.workspaceRepo,
+            accountRepo: firstProvider.accountRepo,
+            importSessionRepo: firstProvider.importSessionRepo,
+            transactionRepo: firstProvider.transactionRepo,
+            mapper: ImportPersistenceMapper(
+                workspaceId: "workspace-import-integration",
+                workspaceName: "Import Integration Workspace"
+            )
+        )
+        let firstEngine = ImportEngine(importPersistenceCoordinator: firstCoordinator)
+        let firstPrepared = try await firstEngine.prepareImport(from: originalURL)
+        #expect(firstPrepared.transactionCount == 81)
+        let first = await firstEngine.commitPreparedImport(firstPrepared, accountChoice: .createNewAccount)
+        #expect(first.persisted)
+        #expect(first.transactionCount == 81)
+        #expect(first.requiresHydration)
+        let firstAccountId = try #require(first.accountId)
+        let firstSessionId = try #require(first.importSessionId)
+        let firstAccount = try #require(try firstProvider.accountRepo.account(id: firstAccountId))
+        let firstIdentifiers = try firstProvider.accountRepo.identifiers(
+            accountId: firstAccountId,
+            workspaceId: "workspace-import-integration"
+        )
+        let countsBeforeDuplicate = try sqliteImportHistoryCounts(firstProvider)
+
+        let sameNamePrepared = try await firstEngine.prepareImport(from: originalURL)
+        let sameNameDuplicate = await firstEngine.commitPreparedImport(sameNamePrepared)
+        #expect(!sameNameDuplicate.persisted)
+        #expect(sameNameDuplicate.previousImport?.importSessionId == firstSessionId)
+        #expect(try sqliteImportHistoryCounts(firstProvider) == countsBeforeDuplicate)
+
+        let relaunchedProvider = try SQLiteRepositoryProvider(path: databaseURL.path)
+        let relaunchedCoordinator = DefaultImportPersistenceCoordinator(
+            workspaceRepo: relaunchedProvider.workspaceRepo,
+            accountRepo: relaunchedProvider.accountRepo,
+            importSessionRepo: relaunchedProvider.importSessionRepo,
+            transactionRepo: relaunchedProvider.transactionRepo,
+            mapper: ImportPersistenceMapper(
+                workspaceId: "workspace-import-integration",
+                workspaceName: "Import Integration Workspace"
+            )
+        )
+        let relaunchedEngine = ImportEngine(importPersistenceCoordinator: relaunchedCoordinator)
+        let duplicatePrepared = try await relaunchedEngine.prepareImport(from: renamedURL)
+        #expect(duplicatePrepared.fingerprint == firstPrepared.fingerprint)
+        #expect(duplicatePrepared.advisoryPreviousImport?.importSessionId == firstSessionId)
+        #expect(duplicatePrepared.advisoryPreviousImport?.transactionCount == 81)
+        #expect(duplicatePrepared.advisoryPreviousImport?.accountId == firstAccountId)
+        #expect(duplicatePrepared.advisoryPreviousImport?.accountDisplayName == firstAccount.name)
+        #expect(duplicatePrepared.advisoryPreviousImport?.completedAtISO != nil)
+
+        let duplicate = await relaunchedEngine.commitPreparedImport(duplicatePrepared)
+        #expect(!duplicate.persisted)
+        #expect(duplicate.errorMessage == nil)
+        #expect(duplicate.previousImport?.importSessionId == firstSessionId)
+        #expect(duplicate.previousImport?.transactionCount == 81)
+        #expect(duplicate.previousImport?.accountDisplayName == firstAccount.name)
+        #expect(!duplicate.requiresHydration)
+        #expect(try sqliteImportHistoryCounts(relaunchedProvider) == countsBeforeDuplicate)
+        #expect(try relaunchedProvider.accountRepo.account(id: firstAccountId) == firstAccount)
+        #expect(try relaunchedProvider.accountRepo.identifiers(
+            accountId: firstAccountId,
+            workspaceId: "workspace-import-integration"
+        ) == firstIdentifiers)
+
+        let changedPrepared = try await relaunchedEngine.prepareImport(from: changedURL)
+        #expect(changedPrepared.fingerprint != firstPrepared.fingerprint)
+        #expect(changedPrepared.advisoryPreviousImport == nil)
+        let changed = await relaunchedEngine.commitPreparedImport(changedPrepared)
+        #expect(changed.persisted)
+        #expect(changed.transactionCount == 81)
+        #expect(changed.requiresHydration)
+    }
+
+    @Test func legacyUnfingerprintedHistoryIsNotBackfilledAndRegistersProspectively() async throws {
+        try runForEachProvider { provider in
+            let workspace = WorkspaceDTO(
+                id: "workspace-import-integration",
+                name: "Legacy Workspace",
+                createdAtISO: "2026-07-01T00:00:00Z"
+            )
+            let legacyAccount = makeAccountDTO(id: "account-legacy")
+            let legacySession = ImportSessionDTO(
+                id: "session-legacy",
+                workspaceId: workspace.id,
+                userVisibleName: "legacy.csv",
+                startedAtISO: "2026-07-01T00:01:00Z",
+                validationStatus: "pending"
+            )
+            _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+            _ = try provider.accountRepo.upsertAccount(legacyAccount)
+            _ = try provider.importSessionRepo.createImportSession(legacySession)
+            try provider.importSessionRepo.updateImportSession(
+                legacySession.id,
+                updates: PartialImportSessionUpdate(
+                    validationStatus: "passed",
+                    completedAtISO: "2026-07-01T00:02:00Z"
+                )
+            )
+            let prospectiveFingerprint = ExactStatementFingerprint(text: "legacy exact statement text")
+            #expect(try provider.importSessionRepo.priorImportedStatement(
+                algorithm: prospectiveFingerprint.algorithm,
+                fingerprint: prospectiveFingerprint.digest
+            ) == nil)
+
+            let firstFixture = makeValidFixture(
+                importSessionId: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+                fileName: "legacy-first-post-sprint39.csv",
+                fingerprintText: "legacy exact statement text"
+            )
+            let first = try makePersistenceCoordinator(provider: provider).persistValidatedImport(
+                financialDocument: firstFixture.financialDocument,
+                importSession: firstFixture.importSession,
+                validation: firstFixture.validation,
+                fingerprint: firstFixture.fingerprint
+            )
+            #expect(first.persisted)
+
+            let nextFixture = makeValidFixture(
+                importSessionId: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
+                fileName: "legacy-next-exact.csv",
+                fingerprintText: "legacy exact statement text"
+            )
+            let next = try makePersistenceCoordinator(provider: provider).persistValidatedImport(
+                financialDocument: nextFixture.financialDocument,
+                importSession: nextFixture.importSession,
+                validation: nextFixture.validation,
+                fingerprint: nextFixture.fingerprint
+            )
+            #expect(!next.persisted)
+            #expect(next.previousImport?.importSessionId == firstFixture.importSession.id.uuidString)
+            #expect(try provider.importSessionRepo.importSession(id: legacySession.id)?.validationStatus == "passed")
+            #expect(try provider.importSessionRepo.importSession(id: nextFixture.importSession.id.uuidString) == nil)
+        }
+    }
+
+    @Test func preparationWithoutConfirmationLeavesNoDurableFingerprint() async throws {
+        let folder = try temporaryFolder(named: "LedgerForgeCancelledPreparationTests")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let provider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("cancelled.sqlite").path)
+        let coordinator = DefaultImportPersistenceCoordinator(
+            workspaceRepo: provider.workspaceRepo,
+            accountRepo: provider.accountRepo,
+            importSessionRepo: provider.importSessionRepo,
+            transactionRepo: provider.transactionRepo
+        )
+        let engine = ImportEngine(importPersistenceCoordinator: coordinator)
+
+        let prepared = try await engine.prepareImport(
+            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+        )
+
+        #expect(prepared.validation.passed)
+        #expect(try provider.importSessionRepo.priorImportedStatement(
+            algorithm: prepared.fingerprint.algorithm,
+            fingerprint: prepared.fingerprint.digest
+        ) == nil)
+        #expect(try sqliteImportHistoryCounts(provider) == SQLiteImportHistoryCounts(
+            documents: 0,
+            fingerprints: 0,
+            sessions: 0,
+            transactions: 0
+        ))
+    }
+
+    @Test func missingPriorAccountPresentationStillBlocksExactReimport() async throws {
+        let folder = try temporaryFolder(named: "LedgerForgeMissingPriorAccountTests")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let provider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("missing-account.sqlite").path)
+        let coordinator = makeSQLitePersistenceCoordinator(provider: provider)
+        let firstFixture = makeValidFixture(
+            importSessionId: UUID(uuidString: "55555555-5555-5555-5555-555555555555")!,
+            fingerprintText: "missing account provenance exact text"
+        )
+        let first = try coordinator.persistValidatedImport(
+            financialDocument: firstFixture.financialDocument,
+            importSession: firstFixture.importSession,
+            validation: firstFixture.validation,
+            fingerprint: firstFixture.fingerprint
+        )
+        let firstAccountId = try #require(first.accountId)
+        try provider.database.executePrepared(
+            sql: "UPDATE transactions SET account_id = NULL WHERE import_session_id = ?;",
+            params: [firstFixture.importSession.id.uuidString]
+        )
+        try provider.database.executePrepared(sql: "DELETE FROM accounts WHERE id = ?;", params: [firstAccountId])
+        let countsBeforeDuplicate = try sqliteImportHistoryCounts(provider)
+
+        let secondFixture = makeValidFixture(
+            importSessionId: UUID(uuidString: "66666666-6666-6666-6666-666666666666")!,
+            fileName: "renamed-missing-account.csv",
+            fingerprintText: "missing account provenance exact text"
+        )
+        let duplicate = try coordinator.persistValidatedImport(
+            financialDocument: secondFixture.financialDocument,
+            importSession: secondFixture.importSession,
+            validation: secondFixture.validation,
+            fingerprint: secondFixture.fingerprint
+        )
+
+        #expect(!duplicate.persisted)
+        #expect(duplicate.previousImport != nil)
+        #expect(duplicate.previousImport?.accountId == nil)
+        #expect(duplicate.previousImport?.accountDisplayName == nil)
+        #expect(try sqliteImportHistoryCounts(provider) == countsBeforeDuplicate)
+    }
+
+    @Test func duplicateDiagnosticsExcludeRawContentAndFullFingerprint() async throws {
+        let developerConsole = DeveloperConsole()
+        let provider = makeInMemoryProvider()
+        let coordinator = DefaultImportPersistenceCoordinator(
+            workspaceRepo: provider.workspaceRepo,
+            accountRepo: provider.accountRepo,
+            importSessionRepo: provider.importSessionRepo,
+            transactionRepo: provider.transactionRepo,
+            mapper: ImportPersistenceMapper(
+                workspaceId: "workspace-import-integration",
+                workspaceName: "Import Integration Workspace"
+            ),
+            developerConsole: developerConsole
+        )
+        let rawContent = "private statement exact content 90210"
+        let firstFixture = makeValidFixture(
+            importSessionId: UUID(uuidString: "77777777-7777-7777-7777-777777777777")!,
+            fingerprintText: rawContent
+        )
+        _ = try coordinator.persistValidatedImport(
+            financialDocument: firstFixture.financialDocument,
+            importSession: firstFixture.importSession,
+            validation: firstFixture.validation,
+            fingerprint: firstFixture.fingerprint
+        )
+        let secondFixture = makeValidFixture(
+            importSessionId: UUID(uuidString: "88888888-8888-8888-8888-888888888888")!,
+            fileName: "renamed-private.csv",
+            fingerprintText: rawContent
+        )
+        _ = try coordinator.persistValidatedImport(
+            financialDocument: secondFixture.financialDocument,
+            importSession: secondFixture.importSession,
+            validation: secondFixture.validation,
+            fingerprint: secondFixture.fingerprint
+        )
+        let diagnostics = developerConsole.entries.map { entry in
+            entry.message + " " + (DeveloperConsole.metadataText(for: entry) ?? "")
+        }.joined(separator: "\n")
+
+        #expect(diagnostics.contains(ExactStatementFingerprint.algorithm))
+        #expect(diagnostics.contains("Previously imported"))
+        #expect(!diagnostics.contains(rawContent))
+        #expect(!diagnostics.contains(firstFixture.fingerprint.digest))
+    }
+
+}
+
+private struct SQLiteImportHistoryCounts: Equatable {
+    let documents: Int
+    let fingerprints: Int
+    let sessions: Int
+    let transactions: Int
+}
+
+private func sqliteImportHistoryCounts(_ provider: SQLiteRepositoryProvider) throws -> SQLiteImportHistoryCounts {
+    SQLiteImportHistoryCounts(
+        documents: try provider.database.queryInt("SELECT COUNT(*) FROM documents;"),
+        fingerprints: try provider.database.queryInt("SELECT COUNT(*) FROM document_fingerprints;"),
+        sessions: try provider.database.queryInt("SELECT COUNT(*) FROM import_sessions;"),
+        transactions: try provider.database.queryInt("SELECT COUNT(*) FROM transactions;")
+    )
+}
+
+private func makeSQLitePersistenceCoordinator(
+    provider: SQLiteRepositoryProvider
+) -> DefaultImportPersistenceCoordinator {
+    DefaultImportPersistenceCoordinator(
+        workspaceRepo: provider.workspaceRepo,
+        accountRepo: provider.accountRepo,
+        importSessionRepo: provider.importSessionRepo,
+        transactionRepo: provider.transactionRepo,
+        mapper: ImportPersistenceMapper(
+            workspaceId: "workspace-import-integration",
+            workspaceName: "Import Integration Workspace"
+        )
+    )
 }
 
 private struct ImportRepositoryHandles {
@@ -641,6 +958,7 @@ private struct ImportRepositoryFixture {
     let financialDocument: FinancialDocument
     let importSession: ImportSession
     let validation: ImportValidationResult
+    let fingerprint: ExactStatementFingerprint
 }
 
 private final class ObservingAccountRepository: AccountRepository {
@@ -763,7 +1081,8 @@ private func makeValidFixture(
     currency: String = "INR",
     importSessionId: UUID = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
     fileName: String = "repository-integration.csv",
-    financialIdentifiers: [FinancialIdentifier] = []
+    financialIdentifiers: [FinancialIdentifier] = [],
+    fingerprintText: String? = nil
 ) -> ImportRepositoryFixture {
     let transactions = [
         makeTransaction(
@@ -801,7 +1120,8 @@ private func makeValidFixture(
     return ImportRepositoryFixture(
         financialDocument: financialDocument,
         importSession: importSession,
-        validation: validation
+        validation: validation,
+        fingerprint: ExactStatementFingerprint(text: fingerprintText ?? "fixture:\(fileName):\(currency)")
     )
 }
 
@@ -813,7 +1133,8 @@ private func makeFailedValidationFixture() -> ImportRepositoryFixture {
     return ImportRepositoryFixture(
         financialDocument: financialDocument,
         importSession: importSession,
-        validation: validation
+        validation: validation,
+        fingerprint: ExactStatementFingerprint(text: "failed-validation-fixture")
     )
 }
 

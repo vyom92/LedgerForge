@@ -52,6 +52,8 @@ public protocol ImportSessionRepository {
     func createImportSession(_ payload: ImportSessionDTO) throws -> String
     func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws
     func importSession(id: String) throws -> ImportSessionRecordDTO?
+    func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO?
+    func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult
 }
 
 public struct PartialImportSessionUpdate {
@@ -156,6 +158,14 @@ struct PlaceholderImportSessionRepo: ImportSessionRepository {
     }
 
     func importSession(id: String) throws -> ImportSessionRecordDTO? {
+        throw RepositoryError.providerNotConfigured("ImportSessionRepository")
+    }
+
+    func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? {
+        throw RepositoryError.providerNotConfigured("ImportSessionRepository")
+    }
+
+    func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
         throw RepositoryError.providerNotConfigured("ImportSessionRepository")
     }
 }

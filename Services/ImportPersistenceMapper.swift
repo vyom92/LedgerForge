@@ -29,6 +29,8 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
 struct ImportPersistencePayload {
     let workspace: WorkspaceDTO
     let account: AccountDTO
+    let document: ImportedDocumentDTO
+    let fingerprint: DocumentFingerprintDTO
     let importSession: ImportSessionDTO
     let completedAtISO: String
     let transactions: [TransactionDTO]
@@ -54,7 +56,8 @@ struct ImportPersistenceMapper {
         financialDocument: FinancialDocument,
         importSession: ImportSession,
         validation: ImportValidationResult,
-        accountId: String
+        accountId: String,
+        fingerprint: ExactStatementFingerprint
     ) throws -> ImportPersistencePayload {
         guard validation.passed else {
             throw ImportPersistenceError.validationFailed
@@ -67,6 +70,18 @@ struct ImportPersistenceMapper {
             accountId: accountId,
             createdAtISO: importedAtISO
         )
+        let importSessionId = importSession.id.uuidString
+        let documentId = "document-\(importSession.id.uuidString.lowercased())"
+        let document = ImportedDocumentDTO(
+            id: documentId,
+            workspaceId: workspaceId,
+            importSessionId: importSessionId,
+            filename: importSession.fileName,
+            mimeType: "text/csv",
+            sizeBytes: fingerprint.byteCount,
+            sha256: fingerprint.digest,
+            createdAtISO: importedAtISO
+        )
 
         return ImportPersistencePayload(
             workspace: WorkspaceDTO(
@@ -75,8 +90,18 @@ struct ImportPersistenceMapper {
                 createdAtISO: importedAtISO
             ),
             account: account,
+            document: document,
+            fingerprint: DocumentFingerprintDTO(
+                id: "fingerprint-\(importSession.id.uuidString.lowercased())",
+                documentId: documentId,
+                importSessionId: importSessionId,
+                algorithm: fingerprint.algorithm,
+                fingerprint: fingerprint.digest,
+                fingerprintData: nil,
+                createdAtISO: importedAtISO
+            ),
             importSession: ImportSessionDTO(
-                id: importSession.id.uuidString,
+                id: importSessionId,
                 workspaceId: workspaceId,
                 userVisibleName: importSession.fileName,
                 startedAtISO: importedAtISO,
@@ -90,8 +115,8 @@ struct ImportPersistenceMapper {
                 try transactionDTO(
                     from: $0,
                     accountId: account.id,
-                    importSessionId: importSession.id.uuidString,
-                    documentId: nil,
+                    importSessionId: importSessionId,
+                    documentId: documentId,
                     createdAtISO: importedAtISO
                 )
             }

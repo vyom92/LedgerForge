@@ -283,6 +283,9 @@ struct DeveloperDiagnosticsTests {
         )
 
         #expect(result.succeeded)
+        let fingerprint = try #require(persistence.capturedFingerprint)
+        #expect(fingerprint.algorithm == ExactStatementFingerprint.algorithm)
+        #expect(fingerprint.digest.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil)
 
         let defaultVisible = DeveloperConsole.filteredEntries(console.entries, using: DeveloperConsole.Filters())
         #expect(defaultVisible.map(\.message) == [
@@ -339,12 +342,29 @@ struct DeveloperDiagnosticsTests {
 }
 
 private final class DiagnosticPersistenceCoordinator: ImportPersistenceCoordinating {
+    private(set) var capturedFingerprint: ExactStatementFingerprint?
+
     func persistValidatedImport(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
         validation: ImportValidationResult
     ) throws -> ImportPersistenceResult {
-        ImportPersistenceResult(
+        throw ImportPersistenceCoordinationError.fingerprintRequired
+    }
+
+    func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
+        nil
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice?
+    ) throws -> ImportPersistenceResult {
+        capturedFingerprint = fingerprint
+        return ImportPersistenceResult(
             persisted: validation.passed,
             workspaceId: validation.passed ? "workspace-diagnostics" : nil,
             accountId: validation.passed ? "account-diagnostics" : nil,

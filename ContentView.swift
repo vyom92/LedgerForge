@@ -122,6 +122,9 @@ struct ImportOutcomePresentation: Equatable {
     let accountId: String?
     let importSessionId: String?
     let redactedIdentifier: String?
+    let previousImportCompletedAtISO: String?
+    let previousAccountDisplayName: String?
+    let isPreviouslyImported: Bool
 
     init(result: ImportEngineResult) {
         fileName = result.fileName
@@ -132,8 +135,15 @@ struct ImportOutcomePresentation: Equatable {
         accountId = result.accountId
         importSessionId = result.importSessionId
         redactedIdentifier = result.redactedIdentifier
+        previousImportCompletedAtISO = result.previousImport?.completedAtISO
+        previousAccountDisplayName = result.previousImport?.accountDisplayName
+        isPreviouslyImported = result.previousImport != nil
 
-        if result.validationPassed && result.persisted {
+        if result.previousImport != nil {
+            persistenceStatus = "Previously Imported"
+            iconName = "doc.badge.checkmark.fill"
+            tone = .warning
+        } else if result.validationPassed && result.persisted {
             persistenceStatus = "Persistence Succeeded"
             iconName = "checkmark.circle.fill"
             tone = .success
@@ -149,6 +159,9 @@ struct ImportOutcomePresentation: Equatable {
     }
 
     var fileSubtitle: String {
+        if isPreviouslyImported {
+            return "Previously imported — no new data written"
+        }
         if allowsViewingTransactions {
             return "Imported \(transactionCount) transaction(s)"
         }
@@ -1325,6 +1338,22 @@ struct ContentView: View {
 
                     LFInfoRow(title: "Transactions", value: "\(outcome.transactionCount)")
 
+                    if outcome.isPreviouslyImported {
+                        if let completedAtISO = outcome.previousImportCompletedAtISO {
+                            LFInfoRow(title: "Prior Import", value: completedAtISO)
+                        }
+                        if let accountName = outcome.previousAccountDisplayName {
+                            LFInfoRow(title: "Account", value: accountName)
+                        }
+                        Text("This exact statement was imported previously. LedgerForge did not write another document, import session, transaction, account, or identifier.")
+                            .font(.caption)
+                            .foregroundStyle(LFTheme.textSecondary)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(LFTheme.warning.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+
                     if let message = outcome.message {
                         Text(message)
                             .font(.caption)
@@ -1348,8 +1377,9 @@ struct ContentView: View {
                         }
                     }
 
-                    if outcome.allowsViewingTransactions {
-                        if let accountId = outcome.accountId {
+                    if outcome.allowsViewingTransactions || outcome.isPreviouslyImported {
+                        if let accountId = outcome.accountId,
+                           accountsViewModel.accounts.contains(where: { $0.id == accountId }) {
                             Button {
                                 accountsViewModel.selectAccount(repositoryAccountID: accountId)
                                 selectedSection = .accounts
@@ -1365,20 +1395,22 @@ struct ContentView: View {
                             .buttonStyle(.plain)
                             .foregroundStyle(LFTheme.text)
                         }
-                        Button {
-                            selectedSection = .transactions
-                        } label: {
-                            Label("View Transactions", systemImage: "list.bullet")
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .frame(maxWidth: .infinity)
-                                .background(LFTheme.primaryGradient)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        if outcome.allowsViewingTransactions {
+                            Button {
+                                selectedSection = .transactions
+                            } label: {
+                                Label("View Transactions", systemImage: "list.bullet")
+                                    .font(.subheadline.weight(.semibold))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .frame(maxWidth: .infinity)
+                                    .background(LFTheme.primaryGradient)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.white)
+                            .contentShape(RoundedRectangle(cornerRadius: 8))
                         }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.white)
-                        .contentShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }
             case .failed(let fileName, let message):
@@ -1884,7 +1916,7 @@ struct ContentView: View {
         do {
             let preparedImport = try await ImportEngine.shared.prepareImport(from: url)
             importAccountChoice = nil
-            importIdentityReview = preparedImport.validation.passed
+            importIdentityReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
                 ? (try ImportEngine.shared.reviewPreparedImport(preparedImport))
                 : .unavailable
             selectedFile = preparedImport.fileName
@@ -1909,7 +1941,7 @@ struct ContentView: View {
             accountChoice: importAccountChoice
         )
 
-        if result.persisted {
+        if result.requiresHydration {
             do {
                 let hydrationResult = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
                 dashboardViewModel.markHydrationCompleted(hydrationResult)

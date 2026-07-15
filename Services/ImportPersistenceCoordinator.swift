@@ -9,14 +9,40 @@ struct ImportPersistenceResult: Equatable {
     let accountId: String?
     let importSessionId: String?
     let transactionCount: Int
+    let previousImport: PreviouslyImportedStatement?
+
+    init(
+        persisted: Bool,
+        workspaceId: String?,
+        accountId: String?,
+        importSessionId: String?,
+        transactionCount: Int,
+        previousImport: PreviouslyImportedStatement? = nil
+    ) {
+        self.persisted = persisted
+        self.workspaceId = workspaceId
+        self.accountId = accountId
+        self.importSessionId = importSessionId
+        self.transactionCount = transactionCount
+        self.previousImport = previousImport
+    }
 
     static let skipped = ImportPersistenceResult(
         persisted: false,
         workspaceId: nil,
         accountId: nil,
         importSessionId: nil,
-        transactionCount: 0
+        transactionCount: 0,
+        previousImport: nil
     )
+}
+
+struct PreviouslyImportedStatement: Equatable {
+    let importSessionId: String
+    let completedAtISO: String?
+    let transactionCount: Int
+    let accountId: String?
+    let accountDisplayName: String?
 }
 
 protocol ImportPersistenceCoordinating {
@@ -37,6 +63,16 @@ protocol ImportPersistenceCoordinating {
         validation: ImportValidationResult,
         accountChoice: ImportAccountChoice?
     ) throws -> ImportPersistenceResult
+
+    func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement?
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice?
+    ) throws -> ImportPersistenceResult
 }
 
 enum ImportAccountChoice: Equatable {
@@ -52,6 +88,20 @@ struct ImportIdentityReview: Equatable {
 }
 
 extension ImportPersistenceCoordinating {
+    func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
+        throw ImportPersistenceCoordinationError.fingerprintRequired
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice? = nil
+    ) throws -> ImportPersistenceResult {
+        throw ImportPersistenceCoordinationError.fingerprintRequired
+    }
+
     func reviewValidatedImport(
         financialDocument: FinancialDocument,
         validation: ImportValidationResult
@@ -84,6 +134,8 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
     case selectedAccountWorkspaceMismatch
     case selectedAccountAlreadyIdentified
     case ineligibleIdentifierSet
+    case fingerprintRequired
+    case invalidFingerprint
 
     var errorDescription: String? {
         switch self {
@@ -107,11 +159,17 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
             return "The selected account is no longer eligible for identifier attachment."
         case .ineligibleIdentifierSet:
             return "The import no longer has exactly one eligible verified identifier."
+        case .fingerprintRequired:
+            return "Confirmed import persistence requires an exact-content fingerprint."
+        case .invalidFingerprint:
+            return "The prepared exact-content fingerprint is invalid."
         }
     }
 }
 
 final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
+
+    private static let confirmationSerializationLock = NSLock()
 
     private enum AccountSelection {
         case existing(AccountDTO)
@@ -206,8 +264,51 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         validation: ImportValidationResult,
         accountChoice: ImportAccountChoice?
     ) throws -> ImportPersistenceResult {
+        guard !validation.passed else {
+            throw ImportPersistenceCoordinationError.fingerprintRequired
+        }
+        return .skipped
+    }
+
+    func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
+        try validate(fingerprint: fingerprint)
+        return try importSessionRepo.priorImportedStatement(
+            algorithm: fingerprint.algorithm,
+            fingerprint: fingerprint.digest
+        ).map(Self.previousImport(from:))
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice? = nil
+    ) throws -> ImportPersistenceResult {
         guard validation.passed else {
             return .skipped
+        }
+
+        try validate(fingerprint: fingerprint)
+        Self.confirmationSerializationLock.lock()
+        defer { Self.confirmationSerializationLock.unlock() }
+
+        if let previous = try importSessionRepo.priorImportedStatement(
+            algorithm: fingerprint.algorithm,
+            fingerprint: fingerprint.digest
+        ) {
+            developerConsole?.info(.import, "Previously imported statement blocked", metadata: [
+                "algorithm": fingerprint.algorithm,
+                "transactions": "\(previous.transactionCount)"
+            ])
+            return ImportPersistenceResult(
+                persisted: false,
+                workspaceId: mapper.workspaceId,
+                accountId: previous.accountId,
+                importSessionId: previous.importSessionId,
+                transactionCount: previous.transactionCount,
+                previousImport: Self.previousImport(from: previous)
+            )
         }
 
         let workspaceId = mapper.workspaceId
@@ -278,7 +379,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             financialDocument: financialDocument,
             importSession: importSession,
             validation: validation,
-            accountId: selection.accountId
+            accountId: selection.accountId,
+            fingerprint: fingerprint
         )
 
         if case .new = selection {
@@ -307,39 +409,60 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             )
         }
 
-        _ = try importSessionRepo.createImportSession(payload.importSession)
-
-        do {
-            try transactionRepo.replaceTransactions(
-                workspaceId: payload.workspace.id,
-                importSessionId: payload.importSession.id,
+        let historyResult = try importSessionRepo.commitImportHistory(
+            AtomicImportHistoryDTO(
+                document: payload.document,
+                fingerprint: payload.fingerprint,
+                importSession: payload.importSession,
+                completedAtISO: payload.completedAtISO,
                 transactions: payload.transactions
             )
-
-            try importSessionRepo.updateImportSession(
-                payload.importSession.id,
-                updates: PartialImportSessionUpdate(
-                    validationStatus: "passed",
-                    completedAtISO: payload.completedAtISO
-                )
+        )
+        if case .duplicate(let previous) = historyResult {
+            developerConsole?.info(.import, "Previously imported statement blocked", metadata: [
+                "algorithm": fingerprint.algorithm,
+                "transactions": "\(previous.transactionCount)"
+            ])
+            return ImportPersistenceResult(
+                persisted: false,
+                workspaceId: workspaceId,
+                accountId: previous.accountId,
+                importSessionId: previous.importSessionId,
+                transactionCount: previous.transactionCount,
+                previousImport: Self.previousImport(from: previous)
             )
-        } catch {
-            try? importSessionRepo.updateImportSession(
-                payload.importSession.id,
-                updates: PartialImportSessionUpdate(
-                    validationStatus: "failed",
-                    completedAtISO: payload.completedAtISO
-                )
-            )
-            throw error
         }
+
+        developerConsole?.info(.database, "Atomic import-history commit completed", metadata: [
+            "algorithm": fingerprint.algorithm,
+            "transactions": "\(payload.transactions.count)"
+        ])
 
         return ImportPersistenceResult(
             persisted: true,
             workspaceId: workspaceId,
             accountId: selection.accountId,
             importSessionId: payload.importSession.id,
-            transactionCount: payload.transactions.count
+            transactionCount: payload.transactions.count,
+            previousImport: nil
+        )
+    }
+
+    private func validate(fingerprint: ExactStatementFingerprint) throws {
+        guard fingerprint.algorithm == ExactStatementFingerprint.algorithm,
+              fingerprint.digest.count == 64,
+              fingerprint.digest.allSatisfy({ $0.isHexDigit && !$0.isUppercase }) else {
+            throw ImportPersistenceCoordinationError.invalidFingerprint
+        }
+    }
+
+    nonisolated private static func previousImport(from dto: PriorImportedStatementDTO) -> PreviouslyImportedStatement {
+        PreviouslyImportedStatement(
+            importSessionId: dto.importSessionId,
+            completedAtISO: dto.completedAtISO,
+            transactionCount: dto.transactionCount,
+            accountId: dto.accountId,
+            accountDisplayName: dto.accountDisplayName
         )
     }
 

@@ -320,6 +320,169 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
             )
         }.first
     }
+
+    func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? {
+        try priorImportedStatementWithoutTransaction(algorithm: algorithm, fingerprint: fingerprint)
+    }
+
+    func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
+        try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+        do {
+            if let duplicate = try priorImportedStatementWithoutTransaction(
+                algorithm: payload.fingerprint.algorithm,
+                fingerprint: payload.fingerprint.fingerprint
+            ) {
+                try db.execute(sql: "COMMIT;")
+                return .duplicate(duplicate)
+            }
+
+            try validateAtomicImportHistory(payload)
+            try db.executePrepared(
+                sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, mime_type, size_bytes, sha256, storage_path, extracted_text_snippet, page_count, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?);",
+                params: [
+                    payload.document.id,
+                    payload.document.workspaceId,
+                    payload.document.importSessionId,
+                    payload.document.filename,
+                    payload.document.mimeType ?? NSNull(),
+                    payload.document.sizeBytes ?? NSNull(),
+                    payload.document.sha256,
+                    NSNull(),
+                    NSNull(),
+                    NSNull(),
+                    payload.document.createdAtISO
+                ]
+            )
+            try db.executePrepared(
+                sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, fingerprint_data, created_at) VALUES (?,?,?,?,?,?,?);",
+                params: [
+                    payload.fingerprint.id,
+                    payload.fingerprint.documentId,
+                    payload.fingerprint.importSessionId,
+                    payload.fingerprint.algorithm,
+                    payload.fingerprint.fingerprint,
+                    payload.fingerprint.fingerprintData ?? NSNull(),
+                    payload.fingerprint.createdAtISO
+                ]
+            )
+            try db.executePrepared(
+                sql: "INSERT INTO import_sessions (id, workspace_id, user_visible_name, started_at, validation_status, created_at, reader_version, parser_version, layout_version) VALUES (?,?,?,?,?,?,?,?,?);",
+                params: [
+                    payload.importSession.id,
+                    payload.importSession.workspaceId,
+                    payload.importSession.userVisibleName ?? NSNull(),
+                    payload.importSession.startedAtISO,
+                    payload.importSession.validationStatus,
+                    payload.importSession.startedAtISO,
+                    payload.importSession.readerVersion ?? NSNull(),
+                    payload.importSession.parserVersion ?? NSNull(),
+                    payload.importSession.layoutVersion ?? NSNull()
+                ]
+            )
+
+            let insertTransaction = "INSERT INTO transactions (id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+            let insertRawRow = "INSERT INTO transaction_raw_rows (id, transaction_id, normalized_row_id, contribution_type, created_at) VALUES (?,?,?,?,?);"
+            for transaction in payload.transactions {
+                try db.executePrepared(sql: insertTransaction, params: [
+                    transaction.id,
+                    transaction.workspaceId,
+                    transaction.accountId ?? NSNull(),
+                    transaction.importSessionId ?? NSNull(),
+                    transaction.documentId ?? NSNull(),
+                    transaction.originalRowId ?? NSNull(),
+                    transaction.postedDateISO,
+                    transaction.valueDateISO ?? NSNull(),
+                    transaction.description ?? NSNull(),
+                    transaction.payee ?? NSNull(),
+                    transaction.reference ?? NSNull(),
+                    transaction.nativeCurrency,
+                    transaction.amountMinor,
+                    transaction.amountDecimal,
+                    transaction.direction,
+                    transaction.runningBalanceMinor ?? NSNull(),
+                    transaction.isReconciled ? 1 : 0,
+                    transaction.isTrusted ? 1 : 0,
+                    transaction.trustedAtISO ?? NSNull(),
+                    transaction.createdAtISO,
+                    transaction.updatedAtISO ?? NSNull()
+                ])
+                for rawRow in transaction.rawRows {
+                    try db.executePrepared(sql: insertRawRow, params: [
+                        rawRow.id,
+                        transaction.id,
+                        rawRow.normalizedRowId,
+                        rawRow.contributionType ?? NSNull(),
+                        transaction.createdAtISO
+                    ])
+                }
+            }
+
+            try db.executePrepared(
+                sql: "UPDATE import_sessions SET validation_status = ?, completed_at = ?, updated_at = ? WHERE id = ?;",
+                params: ["passed", payload.completedAtISO, payload.completedAtISO, payload.importSession.id]
+            )
+            try db.execute(sql: "COMMIT;")
+            return .committed
+        } catch {
+            try? db.execute(sql: "ROLLBACK;")
+            throw error
+        }
+    }
+
+    private func priorImportedStatementWithoutTransaction(
+        algorithm: String,
+        fingerprint: String
+    ) throws -> PriorImportedStatementDTO? {
+        let sql = """
+        SELECT
+          df.import_session_id,
+          s.completed_at,
+          (SELECT COUNT(*) FROM transactions t WHERE t.import_session_id = df.import_session_id),
+          (SELECT t.account_id FROM transactions t WHERE t.import_session_id = df.import_session_id AND t.account_id IS NOT NULL ORDER BY t.id LIMIT 1),
+          (SELECT a.name FROM accounts a WHERE a.id = (SELECT t.account_id FROM transactions t WHERE t.import_session_id = df.import_session_id AND t.account_id IS NOT NULL ORDER BY t.id LIMIT 1))
+        FROM document_fingerprints df
+        INNER JOIN import_sessions s ON s.id = df.import_session_id
+        WHERE df.algorithm = ? AND df.fingerprint = ? AND s.validation_status = 'passed'
+        LIMIT 1;
+        """
+        return try db.query(sql: sql, params: [algorithm, fingerprint]) { row in
+            PriorImportedStatementDTO(
+                importSessionId: row.string(at: 0) ?? "",
+                completedAtISO: row.string(at: 1),
+                transactionCount: Int(row.int64(at: 2) ?? 0),
+                accountId: row.string(at: 3),
+                accountDisplayName: row.string(at: 4)
+            )
+        }.first
+    }
+
+    private func validateAtomicImportHistory(_ payload: AtomicImportHistoryDTO) throws {
+        guard payload.document.importSessionId == payload.importSession.id,
+              payload.importSession.workspaceId == payload.document.workspaceId,
+              payload.fingerprint.documentId == payload.document.id,
+              payload.fingerprint.importSessionId == payload.importSession.id,
+              payload.document.sha256 == payload.fingerprint.fingerprint,
+              payload.fingerprint.fingerprintData == nil else {
+            throw RepositoryError.relationshipViolation("Atomic import-history document relationships are inconsistent.")
+        }
+        guard try db.queryInt("SELECT COUNT(*) FROM workspaces WHERE id = '\(escape(payload.document.workspaceId))';") == 1 else {
+            throw RepositoryError.relationshipViolation("Workspace does not exist for atomic import history.")
+        }
+        let accountIds = Set(payload.transactions.compactMap(\.accountId))
+        guard accountIds.count == 1,
+              payload.transactions.allSatisfy({ $0.accountId != nil }),
+              let accountId = accountIds.first,
+              try db.queryInt("SELECT COUNT(*) FROM accounts WHERE id = '\(escape(accountId))';") == 1 else {
+            throw RepositoryError.relationshipViolation("Atomic import-history transactions must use one existing account.")
+        }
+        for transaction in payload.transactions {
+            guard transaction.workspaceId == payload.document.workspaceId,
+                  transaction.importSessionId == payload.importSession.id,
+                  transaction.documentId == payload.document.id else {
+                throw RepositoryError.relationshipViolation("Atomic import-history transaction relationships are inconsistent.")
+            }
+        }
+    }
 }
 
 fileprivate final class SQLiteTransactionRepo: TransactionRepository {

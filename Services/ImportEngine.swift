@@ -4,7 +4,23 @@
 // Version: 0.1.1
 //
 
+import CryptoKit
 import Foundation
+
+struct ExactStatementFingerprint: Equatable, Sendable {
+    static let algorithm = "ledgerforge.raw-text.sha256.v1"
+
+    let algorithm: String
+    let digest: String
+    let byteCount: Int64
+
+    init(text: String) {
+        let bytes = Data(text.utf8)
+        self.algorithm = Self.algorithm
+        self.digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        self.byteCount = Int64(bytes.count)
+    }
+}
 
 struct ImportEngineResult: Equatable {
     let fileName: String
@@ -15,6 +31,7 @@ struct ImportEngineResult: Equatable {
     let accountId: String?
     let importSessionId: String?
     let redactedIdentifier: String?
+    let previousImport: PreviouslyImportedStatement?
 
     init(
         fileName: String,
@@ -24,7 +41,8 @@ struct ImportEngineResult: Equatable {
         errorMessage: String?,
         accountId: String? = nil,
         importSessionId: String? = nil,
-        redactedIdentifier: String? = nil
+        redactedIdentifier: String? = nil,
+        previousImport: PreviouslyImportedStatement? = nil
     ) {
         self.fileName = fileName
         self.transactionCount = transactionCount
@@ -34,10 +52,15 @@ struct ImportEngineResult: Equatable {
         self.accountId = accountId
         self.importSessionId = importSessionId
         self.redactedIdentifier = redactedIdentifier
+        self.previousImport = previousImport
     }
 
     var succeeded: Bool {
         validationPassed && persisted && errorMessage == nil
+    }
+
+    var requiresHydration: Bool {
+        persisted && previousImport == nil
     }
 }
 
@@ -45,6 +68,7 @@ enum ImportEngineCommitError: Error, LocalizedError, Equatable {
     case validationFailed
     case alreadyCommitted
     case persistenceSkipped
+    case fingerprintMismatch
 
     var errorDescription: String? {
         switch self {
@@ -54,6 +78,8 @@ enum ImportEngineCommitError: Error, LocalizedError, Equatable {
             return "Prepared import has already been committed."
         case .persistenceSkipped:
             return "Import persistence was skipped."
+        case .fingerprintMismatch:
+            return "Prepared statement content no longer matches its exact-content fingerprint."
         }
     }
 }
@@ -69,6 +95,8 @@ struct PreparedImport: Identifiable {
     let financialDocument: FinancialDocument
     let validation: ImportValidationResult
     let importSession: ImportSession
+    let fingerprint: ExactStatementFingerprint
+    let advisoryPreviousImport: PreviouslyImportedStatement?
 
     init(
         id: UUID = UUID(),
@@ -80,7 +108,9 @@ struct PreparedImport: Identifiable {
         parserName: String,
         financialDocument: FinancialDocument,
         validation: ImportValidationResult,
-        importSession: ImportSession
+        importSession: ImportSession,
+        fingerprint: ExactStatementFingerprint? = nil,
+        advisoryPreviousImport: PreviouslyImportedStatement? = nil
     ) {
         self.id = id
         self.sourceURL = sourceURL
@@ -92,6 +122,8 @@ struct PreparedImport: Identifiable {
         self.financialDocument = financialDocument
         self.validation = validation
         self.importSession = importSession
+        self.fingerprint = fingerprint ?? ExactStatementFingerprint(text: rawContents)
+        self.advisoryPreviousImport = advisoryPreviousImport
     }
 
     var transactionCount: Int {
@@ -169,6 +201,8 @@ final class ImportEngine {
             let result = await commitPreparedImport(preparedImport)
             if result.succeeded {
                 developerConsole.info(.`import`, "Import completed", metadata: ["file": result.fileName, "transactions": "\(result.transactionCount)"])
+            } else if result.previousImport != nil {
+                developerConsole.info(.`import`, "Previously imported statement blocked", metadata: ["transactions": "\(result.transactionCount)"])
             } else {
                 developerConsole.error(.`import`, "Import failed", metadata: ["file": result.fileName, "error": result.errorMessage ?? "Unknown error"])
             }
@@ -188,7 +222,8 @@ final class ImportEngine {
                 errorMessage: error.localizedDescription,
                 accountId: nil,
                 importSessionId: nil,
-                redactedIdentifier: nil
+                redactedIdentifier: nil,
+                previousImport: nil
             )
 
         }
@@ -197,6 +232,7 @@ final class ImportEngine {
 
     func prepareImport(from url: URL) async throws -> PreparedImport {
         let contents = try await readTextDocument(from: url)
+        let fingerprint = ExactStatementFingerprint(text: contents)
 
         guard !contents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             developerConsole.error(.`import`, "Imported document is empty.")
@@ -252,6 +288,9 @@ final class ImportEngine {
             transactionCount: financialDocument.transactions.count,
             validation: validation
         )
+        let advisoryPreviousImport = validation.passed
+            ? try importPersistenceCoordinatorFactory().priorImportedStatement(fingerprint: fingerprint)
+            : nil
 
         return PreparedImport(
             sourceURL: url,
@@ -262,7 +301,9 @@ final class ImportEngine {
             parserName: parser.name,
             financialDocument: financialDocument,
             validation: validation,
-            importSession: importSession
+            importSession: importSession,
+            fingerprint: fingerprint,
+            advisoryPreviousImport: advisoryPreviousImport
         )
     }
 
@@ -291,7 +332,23 @@ final class ImportEngine {
                 errorMessage: ImportEngineCommitError.validationFailed.localizedDescription,
                 accountId: nil,
                 importSessionId: nil,
-                redactedIdentifier: nil
+                redactedIdentifier: nil,
+                previousImport: nil
+            )
+        }
+
+        guard ExactStatementFingerprint(text: preparedImport.rawContents) == preparedImport.fingerprint else {
+            developerConsole.error(.`import`, "Prepared exact-content fingerprint verification failed")
+            return ImportEngineResult(
+                fileName: preparedImport.fileName,
+                transactionCount: preparedImport.transactionCount,
+                validationPassed: true,
+                persisted: false,
+                errorMessage: ImportEngineCommitError.fingerprintMismatch.localizedDescription,
+                accountId: nil,
+                importSessionId: nil,
+                redactedIdentifier: nil,
+                previousImport: nil
             )
         }
 
@@ -305,7 +362,8 @@ final class ImportEngine {
                 errorMessage: ImportEngineCommitError.alreadyCommitted.localizedDescription,
                 accountId: nil,
                 importSessionId: nil,
-                redactedIdentifier: nil
+                redactedIdentifier: nil,
+                previousImport: nil
             )
         }
 
@@ -317,10 +375,13 @@ final class ImportEngine {
                 financialDocument: preparedImport.financialDocument,
                 importSession: preparedImport.importSession,
                 validation: preparedImport.validation,
+                fingerprint: preparedImport.fingerprint,
                 accountChoice: accountChoice
             )
             if persistenceResult.persisted {
                 developerConsole.info(.database, "Repository persistence completed")
+            } else if persistenceResult.previousImport != nil {
+                developerConsole.info(.database, "Repository persistence blocked for previously imported statement")
             } else {
                 persistenceErrorMessage = ImportEngineCommitError.persistenceSkipped.localizedDescription
                 developerConsole.error(.database, "Repository persistence skipped")
@@ -332,7 +393,7 @@ final class ImportEngine {
 
         return ImportEngineResult(
             fileName: preparedImport.fileName,
-            transactionCount: preparedImport.transactionCount,
+            transactionCount: persistenceResult.previousImport?.transactionCount ?? preparedImport.transactionCount,
             validationPassed: true,
             persisted: persistenceResult.persisted,
             errorMessage: persistenceErrorMessage,
@@ -340,7 +401,8 @@ final class ImportEngine {
             importSessionId: persistenceResult.importSessionId,
             redactedIdentifier: persistenceResult.persisted
                 ? redactedEligibleIdentifier(in: preparedImport.financialDocument)
-                : nil
+                : nil,
+            previousImport: persistenceResult.previousImport
         )
     }
 

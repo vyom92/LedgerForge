@@ -20,9 +20,12 @@ public final class InMemoryRepositoryProvider {
 }
 
 private final class InMemoryRepositoryState {
+    let importHistoryLock = NSLock()
     var workspaces: [String: WorkspaceDTO] = [:]
     var accounts: [String: AccountDTO] = [:]
     var accountIdentifiers: [String: AccountIdentifierDTO] = [:]
+    var documents: [String: ImportedDocumentDTO] = [:]
+    var documentFingerprints: [String: DocumentFingerprintDTO] = [:]
     var importSessions: [String: ImportSessionRecordDTO] = [:]
     var transactions: [String: TransactionDTO] = [:]
 }
@@ -205,6 +208,121 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
 
     func importSession(id: String) throws -> ImportSessionRecordDTO? {
         state.importSessions[id]
+    }
+
+    func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? {
+        state.importHistoryLock.lock()
+        defer { state.importHistoryLock.unlock() }
+        return priorImportedStatementWithoutLock(algorithm: algorithm, fingerprint: fingerprint)
+    }
+
+    func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
+        state.importHistoryLock.lock()
+        defer { state.importHistoryLock.unlock() }
+
+        if let duplicate = priorImportedStatementWithoutLock(
+            algorithm: payload.fingerprint.algorithm,
+            fingerprint: payload.fingerprint.fingerprint
+        ) {
+            return .duplicate(duplicate)
+        }
+
+        guard state.workspaces[payload.document.workspaceId] != nil else {
+            throw RepositoryError.relationshipViolation("Workspace does not exist for atomic import history.")
+        }
+        guard payload.document.importSessionId == payload.importSession.id,
+              payload.importSession.workspaceId == payload.document.workspaceId,
+              payload.fingerprint.documentId == payload.document.id,
+              payload.fingerprint.importSessionId == payload.importSession.id,
+              payload.document.sha256 == payload.fingerprint.fingerprint,
+              payload.fingerprint.fingerprintData == nil else {
+            throw RepositoryError.relationshipViolation("Atomic import-history document relationships are inconsistent.")
+        }
+        guard state.documents[payload.document.id] == nil,
+              state.documentFingerprints[payload.fingerprint.id] == nil,
+              state.importSessions[payload.importSession.id] == nil else {
+            throw RepositoryError.relationshipViolation("Atomic import-history identifiers already exist.")
+        }
+        guard !state.documents.values.contains(where: { $0.sha256 == payload.document.sha256 }),
+              !state.documentFingerprints.values.contains(where: {
+                  $0.algorithm == payload.fingerprint.algorithm && $0.fingerprint == payload.fingerprint.fingerprint
+              }) else {
+            throw RepositoryError.relationshipViolation("Atomic import-history fingerprint is not unique.")
+        }
+        let transactionIds = payload.transactions.map(\.id)
+        guard Set(transactionIds).count == transactionIds.count,
+              transactionIds.allSatisfy({ state.transactions[$0] == nil }) else {
+            throw RepositoryError.relationshipViolation("Atomic import-history transaction identifiers already exist.")
+        }
+
+        let accountIds = Set(payload.transactions.compactMap(\.accountId))
+        guard accountIds.count == 1,
+              payload.transactions.allSatisfy({ $0.accountId != nil }),
+              let accountId = accountIds.first,
+              state.accounts[accountId] != nil else {
+            throw RepositoryError.relationshipViolation("Atomic import-history transactions must use one existing account.")
+        }
+
+        for transaction in payload.transactions {
+            guard transaction.workspaceId == payload.document.workspaceId,
+                  transaction.importSessionId == payload.importSession.id,
+                  transaction.documentId == payload.document.id else {
+                throw RepositoryError.relationshipViolation("Atomic import-history transaction relationships are inconsistent.")
+            }
+        }
+
+        var documents = state.documents
+        var fingerprints = state.documentFingerprints
+        var sessions = state.importSessions
+        var transactions = state.transactions
+
+        documents[payload.document.id] = payload.document
+        fingerprints[payload.fingerprint.id] = payload.fingerprint
+        sessions[payload.importSession.id] = ImportSessionRecordDTO(
+            id: payload.importSession.id,
+            workspaceId: payload.importSession.workspaceId,
+            userVisibleName: payload.importSession.userVisibleName,
+            startedAtISO: payload.importSession.startedAtISO,
+            completedAtISO: payload.completedAtISO,
+            validationStatus: "passed",
+            readerVersion: payload.importSession.readerVersion,
+            parserVersion: payload.importSession.parserVersion,
+            layoutVersion: payload.importSession.layoutVersion
+        )
+        for transaction in payload.transactions {
+            transactions[transaction.id] = transaction
+        }
+
+        state.documents = documents
+        state.documentFingerprints = fingerprints
+        state.importSessions = sessions
+        state.transactions = transactions
+        return .committed
+    }
+
+    private func priorImportedStatementWithoutLock(
+        algorithm: String,
+        fingerprint: String
+    ) -> PriorImportedStatementDTO? {
+        guard let storedFingerprint = state.documentFingerprints.values.first(where: {
+            $0.algorithm == algorithm && $0.fingerprint == fingerprint
+        }),
+        let session = state.importSessions[storedFingerprint.importSessionId],
+        session.validationStatus == "passed" else {
+            return nil
+        }
+        let importSessionId = storedFingerprint.importSessionId
+
+        let importedTransactions = state.transactions.values
+            .filter { $0.importSessionId == importSessionId }
+        let accountId = importedTransactions.compactMap(\.accountId).sorted().first
+        return PriorImportedStatementDTO(
+            importSessionId: importSessionId,
+            completedAtISO: session.completedAtISO,
+            transactionCount: importedTransactions.count,
+            accountId: accountId,
+            accountDisplayName: accountId.flatMap { state.accounts[$0]?.name }
+        )
     }
 }
 

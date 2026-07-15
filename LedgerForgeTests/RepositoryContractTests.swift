@@ -348,6 +348,188 @@ struct RepositoryContractTests {
         #expect(inMemorySnapshot == sqliteSnapshot)
     }
 
+    @Test func atomicImportHistoryCommitAndDuplicateLookupHaveProviderParity() async throws {
+        try runForEachProvider { provider in
+            let fixture = try seedWorkspace(provider)
+            let storedAccount = account(
+                id: "account-atomic",
+                workspaceId: fixture.workspaceId,
+                name: "Atomic Account",
+                currency: "INR"
+            )
+            _ = try provider.accountRepo.upsertAccount(storedAccount)
+            let payload = atomicImportHistoryPayload(
+                workspaceId: fixture.workspaceId,
+                accountId: storedAccount.id
+            )
+
+            #expect(try provider.importSessionRepo.commitImportHistory(payload) == .committed)
+            let prior = try #require(try provider.importSessionRepo.priorImportedStatement(
+                algorithm: payload.fingerprint.algorithm,
+                fingerprint: payload.fingerprint.fingerprint
+            ))
+            #expect(prior.importSessionId == payload.importSession.id)
+            #expect(prior.completedAtISO == payload.completedAtISO)
+            #expect(prior.transactionCount == payload.transactions.count)
+            #expect(prior.accountId == storedAccount.id)
+            #expect(prior.accountDisplayName == storedAccount.name)
+            #expect(try provider.importSessionRepo.commitImportHistory(payload) == .duplicate(prior))
+            #expect(try provider.transactionRepo.transactions(
+                workspaceId: fixture.workspaceId,
+                importSessionId: payload.importSession.id
+            ).map(\.id).sorted() == payload.transactions.map(\.id).sorted())
+        }
+    }
+
+    @Test func atomicImportHistoryRelationshipFailureLeavesNoDurableFingerprintSessionOrTransactions() async throws {
+        try runForEachProvider { provider in
+            let fixture = try seedWorkspace(provider)
+            let storedAccount = account(
+                id: "account-atomic-failure",
+                workspaceId: fixture.workspaceId,
+                name: "Atomic Failure Account",
+                currency: "INR"
+            )
+            _ = try provider.accountRepo.upsertAccount(storedAccount)
+            let valid = atomicImportHistoryPayload(
+                workspaceId: fixture.workspaceId,
+                accountId: storedAccount.id,
+                suffix: "failure"
+            )
+            let invalid = AtomicImportHistoryDTO(
+                document: valid.document,
+                fingerprint: valid.fingerprint,
+                importSession: valid.importSession,
+                completedAtISO: valid.completedAtISO,
+                transactions: valid.transactions.map { transaction in
+                    TransactionDTO(
+                        id: transaction.id,
+                        workspaceId: "missing-workspace",
+                        accountId: transaction.accountId,
+                        importSessionId: transaction.importSessionId,
+                        documentId: transaction.documentId,
+                        originalRowId: transaction.originalRowId,
+                        postedDateISO: transaction.postedDateISO,
+                        valueDateISO: transaction.valueDateISO,
+                        description: transaction.description,
+                        payee: transaction.payee,
+                        reference: transaction.reference,
+                        nativeCurrency: transaction.nativeCurrency,
+                        amountMinor: transaction.amountMinor,
+                        amountDecimal: transaction.amountDecimal,
+                        direction: transaction.direction,
+                        runningBalanceMinor: transaction.runningBalanceMinor,
+                        isReconciled: transaction.isReconciled,
+                        isTrusted: transaction.isTrusted,
+                        trustedAtISO: transaction.trustedAtISO,
+                        createdAtISO: transaction.createdAtISO,
+                        updatedAtISO: transaction.updatedAtISO,
+                        rawRows: transaction.rawRows
+                    )
+                }
+            )
+
+            #expect(throws: Error.self) {
+                _ = try provider.importSessionRepo.commitImportHistory(invalid)
+            }
+            #expect(try provider.importSessionRepo.importSession(id: valid.importSession.id) == nil)
+            #expect(try provider.importSessionRepo.priorImportedStatement(
+                algorithm: valid.fingerprint.algorithm,
+                fingerprint: valid.fingerprint.fingerprint
+            ) == nil)
+            #expect(try provider.transactionRepo.transactions(
+                workspaceId: fixture.workspaceId,
+                importSessionId: valid.importSession.id
+            ).isEmpty)
+        }
+    }
+
+    @Test func atomicImportHistoryRejectsMixedAccountPayloadWithoutResidue() async throws {
+        try runForEachProvider { provider in
+            let fixture = try seedWorkspace(provider)
+            let firstAccount = account(id: "account-atomic-first", workspaceId: fixture.workspaceId, name: "First Atomic Account", currency: "INR")
+            let secondAccount = account(id: "account-atomic-second", workspaceId: fixture.workspaceId, name: "Second Atomic Account", currency: "INR")
+            _ = try provider.accountRepo.upsertAccount(firstAccount)
+            _ = try provider.accountRepo.upsertAccount(secondAccount)
+            let valid = atomicImportHistoryPayload(workspaceId: fixture.workspaceId, accountId: firstAccount.id, suffix: "mixed-account")
+            let mixed = AtomicImportHistoryDTO(
+                document: valid.document,
+                fingerprint: valid.fingerprint,
+                importSession: valid.importSession,
+                completedAtISO: valid.completedAtISO,
+                transactions: valid.transactions + [transaction(
+                    id: "transaction-atomic-mixed-account-second",
+                    workspaceId: fixture.workspaceId,
+                    accountId: secondAccount.id,
+                    importSessionId: valid.importSession.id,
+                    documentId: valid.document.id,
+                    amountMinor: -500,
+                    amountDecimal: "-5.00",
+                    direction: "debit",
+                    isTrusted: false
+                )]
+            )
+
+            #expect(throws: Error.self) {
+                _ = try provider.importSessionRepo.commitImportHistory(mixed)
+            }
+            #expect(try provider.importSessionRepo.importSession(id: valid.importSession.id) == nil)
+            #expect(try provider.importSessionRepo.priorImportedStatement(
+                algorithm: valid.fingerprint.algorithm,
+                fingerprint: valid.fingerprint.fingerprint
+            ) == nil)
+            #expect(try provider.transactionRepo.transactions(
+                workspaceId: fixture.workspaceId,
+                importSessionId: valid.importSession.id
+            ).isEmpty)
+        }
+    }
+
+    @Test func sqliteAtomicImportHistoryRollsBackFingerprintTransactionAndCompletionFailures() throws {
+        let failureTriggers = [
+            "CREATE TRIGGER fail_fingerprint BEFORE INSERT ON document_fingerprints BEGIN SELECT RAISE(ABORT, 'fingerprint failure'); END;",
+            "CREATE TRIGGER fail_transaction BEFORE INSERT ON transactions BEGIN SELECT RAISE(ABORT, 'transaction failure'); END;",
+            "CREATE TRIGGER fail_completion BEFORE UPDATE OF validation_status ON import_sessions WHEN NEW.validation_status = 'passed' BEGIN SELECT RAISE(ABORT, 'completion failure'); END;"
+        ]
+
+        for (index, trigger) in failureTriggers.enumerated() {
+            let folder = FileManager.default.temporaryDirectory
+                .appendingPathComponent("LedgerForgeAtomicFailureTests")
+                .appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: folder) }
+            let provider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("failure.sqlite").path)
+            let workspace = WorkspaceDTO(id: "workspace-contract", name: "Contract Workspace", createdAtISO: "2026-07-14T00:00:00Z")
+            let storedAccount = account(id: "account-atomic", workspaceId: workspace.id, name: "Atomic Account", currency: "INR")
+            _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+            _ = try provider.accountRepo.upsertAccount(storedAccount)
+            let unrelated = atomicImportHistoryPayload(
+                workspaceId: workspace.id,
+                accountId: storedAccount.id,
+                suffix: "unrelated-\(index)"
+            )
+            #expect(try provider.importSessionRepo.commitImportHistory(unrelated) == .committed)
+            let payload = atomicImportHistoryPayload(
+                workspaceId: workspace.id,
+                accountId: storedAccount.id,
+                suffix: "trigger-\(index)"
+            )
+            try provider.database.execute(sql: trigger)
+
+            #expect(throws: Error.self) {
+                _ = try provider.importSessionRepo.commitImportHistory(payload)
+            }
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM documents;") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM document_fingerprints;") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM import_sessions;") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM transactions;") == 2)
+            #expect(try provider.importSessionRepo.priorImportedStatement(
+                algorithm: unrelated.fingerprint.algorithm,
+                fingerprint: unrelated.fingerprint.fingerprint
+            ) != nil)
+        }
+    }
+
 }
 
 private struct RepositoryHandles {
@@ -516,5 +698,69 @@ private func transaction(id: String,
         createdAtISO: "2026-07-06T12:03:00Z",
         updatedAtISO: nil,
         rawRows: []
+    )
+}
+
+private func atomicImportHistoryPayload(
+    workspaceId: String,
+    accountId: String,
+    suffix: String = "success"
+) -> AtomicImportHistoryDTO {
+    let sessionId = "session-atomic-\(suffix)"
+    let documentId = "document-atomic-\(suffix)"
+    let digest = ExactStatementFingerprint(text: "atomic history \(suffix)").digest
+    let createdAt = "2026-07-14T09:00:00Z"
+    return AtomicImportHistoryDTO(
+        document: ImportedDocumentDTO(
+            id: documentId,
+            workspaceId: workspaceId,
+            importSessionId: sessionId,
+            filename: "atomic.csv",
+            mimeType: "text/csv",
+            sizeBytes: 22,
+            sha256: digest,
+            createdAtISO: createdAt
+        ),
+        fingerprint: DocumentFingerprintDTO(
+            id: "fingerprint-atomic-\(suffix)",
+            documentId: documentId,
+            importSessionId: sessionId,
+            algorithm: ExactStatementFingerprint.algorithm,
+            fingerprint: digest,
+            fingerprintData: nil,
+            createdAtISO: createdAt
+        ),
+        importSession: ImportSessionDTO(
+            id: sessionId,
+            workspaceId: workspaceId,
+            userVisibleName: "Atomic Import",
+            startedAtISO: createdAt,
+            validationStatus: "pending"
+        ),
+        completedAtISO: "2026-07-14T09:01:00Z",
+        transactions: [
+            transaction(
+                id: "transaction-atomic-\(suffix)",
+                workspaceId: workspaceId,
+                accountId: accountId,
+                importSessionId: sessionId,
+                documentId: documentId,
+                amountMinor: 1_000,
+                amountDecimal: "10.00",
+                direction: "credit",
+                isTrusted: true
+            ),
+            transaction(
+                id: "transaction-atomic-\(suffix)-untrusted",
+                workspaceId: workspaceId,
+                accountId: accountId,
+                importSessionId: sessionId,
+                documentId: documentId,
+                amountMinor: -500,
+                amountDecimal: "-5.00",
+                direction: "debit",
+                isTrusted: false
+            )
+        ]
     )
 }

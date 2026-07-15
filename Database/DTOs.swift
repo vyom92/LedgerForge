@@ -164,7 +164,7 @@ public struct AccountIdentifierDTO: nonisolated Equatable {
     }
 }
 
-public struct ImportSessionDTO: Equatable {
+public struct ImportSessionDTO: nonisolated Equatable {
     public let id: String
     public let workspaceId: String
     public let userVisibleName: String?
@@ -223,4 +223,112 @@ public struct ImportSessionRecordDTO: nonisolated Equatable {
         self.parserVersion = parserVersion
         self.layoutVersion = layoutVersion
     }
+}
+
+public struct ImportedDocumentDTO: nonisolated Equatable {
+    public let id: String
+    public let workspaceId: String
+    public let importSessionId: String
+    public let filename: String
+    public let mimeType: String?
+    public let sizeBytes: Int64?
+    public let sha256: String
+    public let createdAtISO: String
+
+    public init(
+        id: String,
+        workspaceId: String,
+        importSessionId: String,
+        filename: String,
+        mimeType: String?,
+        sizeBytes: Int64?,
+        sha256: String,
+        createdAtISO: String
+    ) {
+        self.id = id
+        self.workspaceId = workspaceId
+        self.importSessionId = importSessionId
+        self.filename = filename
+        self.mimeType = mimeType
+        self.sizeBytes = sizeBytes
+        self.sha256 = sha256
+        self.createdAtISO = createdAtISO
+    }
+}
+
+public struct DocumentFingerprintDTO: nonisolated Equatable {
+    public let id: String
+    public let documentId: String
+    public let importSessionId: String
+    public let algorithm: String
+    public let fingerprint: String
+    public let fingerprintData: String?
+    public let createdAtISO: String
+
+    public init(
+        id: String,
+        documentId: String,
+        importSessionId: String,
+        algorithm: String,
+        fingerprint: String,
+        fingerprintData: String?,
+        createdAtISO: String
+    ) {
+        self.id = id
+        self.documentId = documentId
+        self.importSessionId = importSessionId
+        self.algorithm = algorithm
+        self.fingerprint = fingerprint
+        self.fingerprintData = fingerprintData
+        self.createdAtISO = createdAtISO
+    }
+}
+
+public struct PriorImportedStatementDTO: nonisolated Equatable {
+    public let importSessionId: String
+    public let completedAtISO: String?
+    public let transactionCount: Int
+    public let accountId: String?
+    public let accountDisplayName: String?
+
+    public init(
+        importSessionId: String,
+        completedAtISO: String?,
+        transactionCount: Int,
+        accountId: String?,
+        accountDisplayName: String?
+    ) {
+        self.importSessionId = importSessionId
+        self.completedAtISO = completedAtISO
+        self.transactionCount = transactionCount
+        self.accountId = accountId
+        self.accountDisplayName = accountDisplayName
+    }
+}
+
+public struct AtomicImportHistoryDTO: nonisolated Equatable {
+    public let document: ImportedDocumentDTO
+    public let fingerprint: DocumentFingerprintDTO
+    public let importSession: ImportSessionDTO
+    public let completedAtISO: String
+    public let transactions: [TransactionDTO]
+
+    public init(
+        document: ImportedDocumentDTO,
+        fingerprint: DocumentFingerprintDTO,
+        importSession: ImportSessionDTO,
+        completedAtISO: String,
+        transactions: [TransactionDTO]
+    ) {
+        self.document = document
+        self.fingerprint = fingerprint
+        self.importSession = importSession
+        self.completedAtISO = completedAtISO
+        self.transactions = transactions
+    }
+}
+
+public enum AtomicImportHistoryResult: nonisolated Equatable {
+    case committed
+    case duplicate(PriorImportedStatementDTO)
 }
