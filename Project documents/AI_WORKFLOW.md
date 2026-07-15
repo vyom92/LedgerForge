@@ -187,6 +187,17 @@ Result: `PASS`, `PASS WITH CORRECTIONS` or `REJECT`
 
 Corrections return to Work. No implementation agent is involved in this documentation-only cycle.
 
+### Manual Verification Status
+
+Distinguish these states in all reports:
+
+- repository implementation complete;
+- automated verification complete;
+- manual runtime verification pending;
+- fully runtime verified.
+
+A repository implementation may be committed, pushed and handed off with manual runtime verification pending only when the ACTIVE contract permits accurate deferral, the pending status is explicitly disclosed, Chat accepts the limitation and no manual result is falsely claimed. Required manual gates remain blocking unless explicitly deferred and accepted.
+
 ---
 
 # Deferred Work Rules

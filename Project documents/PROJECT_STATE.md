@@ -15,19 +15,20 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: 3b4b2ec — Implement Sprint 39 exact statement re-import prevention
+* Latest Implementation Commit: 0b387a6812542f41eea450aa0bcc7f9d74d077e0 — Implement Sprint 41 Axis UPI duplicate blocking
 * Latest Evidence Commit: 416fc88 — Prepare Sprint 40 transaction-event evidence
+* Latest Documentation Handoff Commit: d0cd356072ad5de3ef9badc23c88039072757b7b — Finalize Sprint 41 handoff
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking (Accepted; implemented in Sprint 41)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint State: Sprint 41 — Bounded Axis UPI Transaction-Event Duplicate Blocking (implementation validated; handoff pending commit)
-* Current Phase: Bounded Axis UPI transaction-event duplicate blocking implemented; unsupported families remain unevaluated
+* Current Sprint State: Sprint 41 — Bounded Axis UPI Transaction-Event Duplicate Blocking (repository implementation and automated validation complete; manual UI/runtime verification pending)
+* Current Phase: Repository implementation complete; documentation synchronization and manual verification follow-up pending; unsupported families remain unevaluated
 * Build Status: Passing
 * Validation Status: Sprint 41 clean Debug build passed; complete configured unit/integration plan passed (175 tests in 26 suites, 0 failures, 0 skipped). Generic `LedgerForgeUITests` remained intentionally disabled.
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-* Latest Verified Implementation Remote: 3b4b2ec76c0aca86d9e065182e201740cef829bd
+* Latest Verified Implementation Remote: d0cd356072ad5de3ef9badc23c88039072757b7b
 * Latest Verified Evidence Remote: 416fc884c888982f996b01256fb99b70bcae6c78
 
 ## Bootstrap
@@ -96,7 +97,7 @@ For parser-verified eligible Axis UPI rows only, confirmation canonicalizes acco
 
 ## Current Work
 
-Active Work: Sprint 41 implementation is validated and awaiting its implementation commit and push.
+Active Work: Documentation synchronization and pending manual UI/runtime verification follow-up; no Swift implementation is currently in progress.
 
 Verified planning state:
 
@@ -107,12 +108,12 @@ Verified planning state:
 * Sprint 40 changed no production Swift, repository API, schema, migration, Xcode project, runtime-store, ViewModel or UI file.
 * Focused evidence and regression suites passed (54 tests in 8 suites, 0 failures, 0 skipped); the complete configured unit/integration plan passed (175 tests in 26 suites, 0 failures, 0 skipped).
 * Static analysis, clean Debug build, privacy inspection, diff checks and conflict checks passed. Generic `LedgerForgeUITests` remained intentionally disabled.
-* Sprint 40 evidence commit `416fc884c888982f996b01256fb99b70bcae6c78` is pushed and verified at `origin/main`.
+* Sprint 40 evidence commit `416fc884c888982f996b01256fb99b70bcae6c78` is pushed and remains verified in repository history.
 * Sprint 38 remains completed and verified; its implementation history and validation evidence are unchanged.
-* Sprint 39 prevents exact re-import of successfully imported reader-produced text using the versioned fingerprint `ledgerforge.raw-text.sha256.v1`.
+* Sprint 39 prevents exact re-import of successfully imported reader-produced text using the versioned fingerprint `ledgerforge.raw-text.sha256.v1`. Changed text is not an exact-content duplicate, but remains importable only when no separate authoritative rule, including eligible Sprint 41 event ownership, blocks it.
 * Sprint 39 is implemented with bounded prior-import provenance, same-process confirmation serialization and provider-owned atomic import-history persistence.
 * ADR-030 remains Accepted and records implementation in Sprint 39.
-* Sprint 39 implementation commit `3b4b2ec76c0aca86d9e065182e201740cef829bd` is pushed and verified at `origin/main`.
+* Sprint 39 implementation commit `3b4b2ec76c0aca86d9e065182e201740cef829bd` is pushed and remains verified in repository history.
 * Focused Sprint 39 suites passed (45 tests, 0 failures, 0 skipped); financial regressions passed (18 tests, 0 failures, 0 skipped); DeveloperDiagnostics passed (14 tests, 0 failures, 0 skipped); complete configured unit/integration test plan passed (171 tests, 0 failures, 0 skipped).
 * Generic `LedgerForgeUITests` remains intentionally disabled and did not execute. Sprint 39 UI behavior was manually verified; the same-reset-database UI relaunch limitation remains, with durable provider recreation covered automatically.
 * Sprint 39 targets same-process serialization and atomic document/fingerprint/import-session/transaction commit only; cross-process guarantees and broader cross-repository atomicity remain future work.
@@ -137,11 +138,11 @@ Verified planning state:
 * Incoming repeated eligible identity, existing event ownership and ownership conflict block the whole statement before supported writes. Blocked imports do not hydrate runtime state and rejected attempts are not persisted.
 * Exact-content duplicate behavior remains separate. Unsupported non-UPI families remain unevaluated; no historical backfill, cross-process safety or external-writer safety is claimed.
 * Manual UI/runtime verification is pending. Automated verification passed: clean Debug build and 175 tests in 26 suites, 0 failures.
-* Sprint 41 implementation commit: `0b387a6` — Implement Sprint 41 Axis UPI duplicate blocking. Remote verification is recorded after the handoff-finalization push.
+* Sprint 41 implementation commit: `0b387a6812542f41eea450aa0bcc7f9d74d077e0` — Implement Sprint 41 Axis UPI duplicate blocking. The final handoff commit `d0cd356072ad5de3ef9badc23c88039072757b7b` is pushed and verified at `origin/main`.
 
 ## Verified Sprint 39 State
 
-* Exact reader-produced text fingerprinting uses `ledgerforge.raw-text.sha256.v1`; filename and path changes do not defeat duplicate detection, while changed text remains importable.
+* Exact reader-produced text fingerprinting uses `ledgerforge.raw-text.sha256.v1`; filename and path changes do not defeat duplicate detection. Changed text is not an exact-content duplicate, but remains importable only when no separate authoritative rule, including eligible Sprint 41 event ownership, blocks it.
 * Advisory duplicate lookup is read-only. Confirmation performs an authoritative duplicate recheck inside same-process serialization before account, identifier, session or transaction mutation.
 * Option 3 bounded prior-import provenance reports completion date, persisted transaction count and recoverable account presentation without exposing raw text, full fingerprints or raw identifiers.
 * SQLite and in-memory providers atomically persist documents, fingerprints, sessions, transactions and successful completion state; rollback preserves the original database error.

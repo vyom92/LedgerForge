@@ -10,7 +10,7 @@ The authoritative sources are:
 
 - **Current ACTIVE Sprint:** `Project documents/Implementation.md`
 - **Verified Repository State:** `Project documents/PROJECT_STATE.md`
-- **Latest Implementation Report:** `Project documents/Codex response.md`
+- **Latest planning, implementation, or documentation execution report:** `Project documents/Codex response.md`
 
 Project Baseline:
 
@@ -24,8 +24,8 @@ Project Baseline:
 |-----------|--------------|
 | Product Vision | Current and authoritative |
 | Architecture | Frozen v1.0 baseline active |
-| ADRs | Current through accepted ADR-028 |
-| Database | Production-ready foundation |
+| ADRs | Current through accepted ADR-031 |
+| Database | Production-ready foundation with Migration V3's bounded transaction-event ownership extension |
 | Repository Layer | Stable with contract tests |
 | Persistence | SQLite repository layer active |
 | Import Framework | Operational for the approved Axis Bank NRE CSV path; PDF reader infrastructure is foundation-only |
@@ -35,11 +35,11 @@ Project Baseline:
 | Parser Selection | Framework implemented; deterministic selector active |
 | FinancialDocument | Immutable handoff model integrated after Statement Parser and before Validation |
 | Parser Coverage | Production-verified for the approved Axis Bank NRE CSV layout only; broader Axis, HDFC and CBQ families remain planned |
-| Financial Identity | Parser-owned verified Axis identifier extraction and deterministic confirmed-import account resolution are production-integrated |
+| Financial Identity and Duplicate Handling | ADR-030 exact-content duplicate authority and ADR-031 bounded Axis UPI transaction-event authority are production-integrated; unsupported families remain outside production support |
 | Password Management | Password-provider protocol and locked-PDF reader interface implemented; the default provider supplies no credential and no production password-entry or Keychain workflow exists |
 | Workflow | Workflow v2.1 active. Project documents/Implementation.md is the current ACTIVE sprint implementation contract. |
 | Dashboard | Deep Indigo UI foundation complete. Repository-backed dashboard active; continued core-experience refinement may remain ongoing under M7. |
-| Validation | Latest verified build and validation state is recorded in Project documents/PROJECT_STATE.md. |
+| Validation | Latest verified build and validation state is recorded in Project documents/PROJECT_STATE.md; manual runtime status is distinguished from automated verification. |
 | Documentation | `Project documents/.github/Context_Manifest.yaml` and `Project documents/Project_Guide.md` provide the canonical bootstrap and routing. |
 | Import Pipeline | Production CSV routed through ImportCoordinator |
 | Repository Contract Tests | Active for InMemory and SQLite providers |
@@ -69,11 +69,17 @@ FinancialDocument
 ↓
 Validation
 ↓
+Read-Only Advisory Exact-Content Evaluation
+↓
 User Review & Explicit Confirmation
 ↓
-Fingerprinting & Duplicate Detection
+Same-Process Serialized Authoritative Exact-Content Recheck
 ↓
-Repository Persistence Boundary
+Financial Identity Resolution and Account Decision
+↓
+Bounded Eligible Transaction-Event Ownership Lookup
+↓
+Provider-Owned Atomic Import-History Persistence
 ↓
 Repositories
 ↓
@@ -109,7 +115,7 @@ Views
 | AI_WORKFLOW.md | Operational workflow for AI assistants | AI-assisted work | Medium |
 | Project documents/.github/Project_Context.md | Bootstrap summary and project snapshot | AI onboarding | Medium |
 | Project documents/.github/prompts.md | Reusable planning and implementation prompts | AI onboarding | Medium |
-| Project documents/Codex response.md | Current planning and implementation execution log | Planning and implementation review | Medium |
+| Project documents/Codex response.md | Latest planning, implementation, or documentation execution report | Planning and implementation review | Medium |
 
 Only consult the documents required by the Task Routing Guide. Avoid loading the complete documentation set unless performing a full architecture or repository review.
 
@@ -280,7 +286,7 @@ All assistants must distinguish verified repository evidence from inference and 
 - Run Xcode BuildProject.
 - Run Xcode-native `RunAllTests`.
 - Stop before commit if automated validation fails.
-- Stop before commit if required manual runtime verification has not yet been completed.
+- Stop before commit if required manual runtime verification has not yet been completed, unless the ACTIVE contract permits an accurate deferral that is explicitly disclosed and accepted by Chat.
 - Verify only sprint-related files are modified.
 - Verify `Project documents/Implementation.md` remains unchanged.
 - Verify no unresolved merge conflict markers remain.
@@ -322,7 +328,7 @@ Required completion sequence:
 1. Confirm Xcode diagnostics pass.
 2. Confirm Xcode build passes.
 3. Confirm Xcode-native RunAllTests passes.
-4. Complete required manual runtime verification.
+4. Complete required manual runtime verification, or apply an explicitly accepted ACTIVE-contract deferral with the pending status disclosed.
 5. Verify only sprint-related files are staged.
 6. Verify `Project documents/Implementation.md` remains unchanged.
 7. Verify no unresolved merge conflict markers remain.
@@ -335,7 +341,7 @@ Required completion sequence:
 14. Chat reviews and approves the completed sprint.
 15. Chat consults `Project documents/FUTURE_WORK.MD` and task-relevant evidence before defining the next ACTIVE sprint in `Project documents/Implementation.md`.
 
-Never claim a sprint is complete until both automated validation and required manual runtime verification have been successfully performed.
+Never claim a sprint is fully runtime verified until required manual runtime verification has been successfully performed. A repository implementation may be committed, pushed and handed off with manual verification pending only when the ACTIVE contract permits deferral, the pending status is explicitly disclosed, Chat accepts the limitation and no manual result is falsely claimed.
 
 ## Sprint Roadmap
 

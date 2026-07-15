@@ -121,6 +121,7 @@ RepositoryStoreHydrator is the only approved persistence-to-runtime boundary.
 - XLS, XLSX, TXT and OCR remain planned.
 - The parser registry contains the verified Axis bank-account parser used by the approved CSV fixture. Broader Axis layouts and account types, HDFC and CBQ remain planned.
 - Parser-owned verified identifier extraction and deterministic confirmed-import account resolution are implemented for the approved Axis path. This does not establish complete arbitrary multi-account, multi-format or multi-institution support.
+- Exact reader-text duplicate prevention and bounded parser-verified Axis UPI event-overlap blocking are production-integrated. Unsupported event families, cross-format identity, historical backfill and cross-process safety remain outside production support.
 
 Consult `Project documents/PROJECT_STATE.md` for the complete verified implementation record and `Project documents/FUTURE_WORK.MD` for unscheduled work.
 

@@ -2,11 +2,48 @@
 
 # LedgerForge — Database v1 Architecture (Design Baseline)
 
-Status: Database v1 design baseline, status-aligned through accepted ADR-028 and verified Sprint 37 implementation
+Status: Database v1 design baseline, status-aligned through accepted ADR-031 and verified Sprint 41 repository implementation
 
 This is an approved design baseline, not an inventory of production-supported formats or fully populated production tables. Current verified implementation state belongs in `PROJECT_STATE.md`.
 
 Production import is verified only for the approved Axis Bank NRE CSV layout. PDF reading and statement-understanding components are foundation-only; production PDF, password workflows, XLS, XLSX, TXT and OCR remain planned. Schema capacity or a reader protocol does not establish end-user format or institution support.
+
+## Verified Production Alignment
+
+This section records accepted production extensions without rewriting the frozen database baseline or claiming that every design-baseline table is currently populated.
+
+### ADR-030 exact-content duplicate authority
+
+- Algorithm: `ledgerforge.raw-text.sha256.v1`.
+- Reader-produced text is the exact authority; the digest is derived from the exact UTF-8 bytes before parsing or normalization.
+- Filename and path are excluded.
+- Exact lookup is advisory during preparation and authoritative during confirmed persistence.
+- No normalized-row, fuzzy or cross-format identity is claimed by this authority.
+
+### ADR-031 transaction-event authority
+
+- Algorithm: `ledgerforge.transaction-event.axis-upi-reference.v1`.
+- Scope is account-scoped Axis UPI P2A/P2M only.
+- Eligible references are exactly 12 ASCII digits.
+- Posting and credit-adjustment subtypes remain separate.
+- Only the privacy-safe digest paired with its algorithm persists; raw references and canonical payloads do not persist.
+
+### Migration V3
+
+Migration V3 adds the bounded `transaction_event_identities` ownership table with:
+
+- `id`
+- `transaction_id`
+- `account_id`
+- `document_id`
+- `import_session_id`
+- `algorithm`
+- `digest`
+- `created_at`
+
+The table enforces unique `(algorithm, digest)` and unique `(transaction_id, algorithm)` ownership, with restrictive foreign keys to transaction, account, document and import-session records. Indexes support account and import-session lookup. Migration V3 performs no historical backfill and leaves existing event-identity ownership empty.
+
+SQLite and In-Memory providers maintain parity. Accepted event ownership is persisted atomically with the accepted import history; rejected attempts do not create ownership records. No raw event reference, canonical payload or private financial evidence is stored.
 
 ## Summary
 
@@ -505,25 +542,11 @@ VI. Validation metadata storage & workflow (ADR-010)
 - `import_sessions.validation_summary` — aggregated counts and totals by currency for quick UI summary.
 - Transactions derived from FinancialDocument remain untrusted until validation passes. When an import passes validation, the persistence coordinator writes trusted transactions through repository protocols and records `trusted_at` where supported.
 
-VII. Statement fingerprinting to avoid duplicates
+VII. Statement fingerprinting and duplicate identity
 
-Design goals:
-- Deterministically identify exact duplicates across formats and re-exports.
-- Provide fingerprint_data to support future fuzzy-matching algorithms.
+The former normalized-row recommendation, `v1:normalized-rows-sha256`, fuzzy LSH/MinHash matching, cross-format identity and merge/ignore duplicate workflows are obsolete production recommendations. They are not implemented and must not be described as production behavior.
 
-Recommended algorithm (canonical, upgradeable):
-1. Canonical inputs: institution_code (detector), an optional parser-produced verified strong account identifier, min_date, max_date and normalized row signatures. Masked values, suffixes, filenames, display names and institution labels must not become canonical account identity inputs.
-2. Row signature: normalize whitespace, unicode normalization, lowercased description, normalize numbers into a standard decimal string using `amount_decimal` and dates to ISO format, produce `date|amount_decimal|normalized_description`.
-3. Sort row signatures deterministically (by date, amount, description) and concat them into a buffer.
-4. rows_checksum = SHA256(concat_row_signatures).
-5. fingerprint_payload = institution_code + '|' + account_identifier + '|' + min_date + '|' + max_date + '|' + row_count + '|' + rows_checksum
-6. fingerprint = SHA256(fingerprint_payload)
-
-Store the fingerprint in `document_fingerprints` with algorithm='v1:normalized-rows-sha256' and fingerprint_data includes rows_checksum and provenance.
-
-Deduplication policy:
-- If (algorithm,fingerprint) exists for a trusted import in the same workspace, mark the new import as duplicate and set `import_sessions.validation_status='failed'` (or 'warning' per UX policy) and link to original import_session. Optionally present user the option to merge/ignore.
-- For near-duplicates, implement LSH/MinHash in the app layer using `fingerprint_data` for fuzzy matching and surface as potential duplicates.
+ADR-030 is the production exact-content authority for reader-produced text. ADR-031 is the separate bounded Axis UPI transaction-event authority. Cross-format identity, normalized-row identity, fuzzy matching, merge/ignore workflows and broader duplicate management remain future, unimplemented concepts linked to their candidates in `FUTURE_WORK.MD`.
 
 VIII. Indexing & performance
 
@@ -637,7 +660,7 @@ CREATE TABLE document_fingerprints (
 XV. Testing & verification recommendations
 
 - Maintain approved fixtures for every production-supported institution and layout. The current Axis CSV fixture validates the production path; the Axis PDF fixture validates only the reader and statement-understanding foundations explicitly covered by tests until production PDF parsing and cross-format equivalence are implemented.
-- Add unit tests for fingerprinting: identical normalized inputs must produce identical fingerprints; minor benign whitespace changes should not change fingerprint if normalization rules say so.
+- Add unit tests for the accepted exact reader-text fingerprint and Migration V3 ownership constraints. Normalized-row, fuzzy and cross-format identity tests remain future work.
 - Add migration tests for every schema change using sample DBs representing previous versions.
 
 XVI. Rationale: explanation of key design decisions
@@ -646,8 +669,8 @@ XVI. Rationale: explanation of key design decisions
    - Why: To fully preserve imported financial truth (no rounding or conversion loss) and to enable efficient numeric queries.
 2. Normalized_documents + normalized_rows
    - Why: Document Readers vary by format; persisting RawDocument and row-level extraction output makes downstream detection, classification, parser selection, validation and audit workflows format-independent and maintainable (ADR-011, ADR-016).
-3. Fingerprinting based on normalized rows
-   - Why: Identifies duplicates independent of file format and minor layout differences; fingerprint_data supports fuzzy matching later.
+3. Fingerprinting and event ownership are governed by ADR-030 and ADR-031
+   - Why: Exact reader-text identity and bounded parser-verified Axis UPI event ownership preserve deterministic authority without claiming normalized-row, fuzzy or cross-format matching.
 4. Transactions can exist pre-validation but are not trusted until validation passes
    - Why: Allows UI/UX to preview parsed candidates while enforcing ADR-010: dashboards use only validated/trusted transactions.
 5. Exchange rates as an append-only versioned table
@@ -662,7 +685,7 @@ XVII. Risks and mitigations
 - Large DB size due to normalized row persistence
   - Mitigation: compression, archival policies, optional purge of raw normalized rows after a retention period while preserving transactions + essential provenance.
 - Duplicate handling and fingerprint collision
-  - Mitigation: store fingerprint_data, use deterministic normalization rules, present fuzzy-match UI for ambiguous cases.
+  - Mitigation: use versioned exact-content and bounded Axis UPI ownership algorithms; broader identity and management workflows remain future work.
 - Migration complexity for Money type introduction
   - Mitigation: keep amount_decimal as source-of-truth; backfill derived fields and migrate in background jobs.
 
@@ -695,4 +718,4 @@ End of design baseline
 
 
 --
-Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through accepted ADR-028 and verified Sprint 37 implementation without redesigning the Database v1 baseline. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.
+Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through accepted ADR-031 and verified Sprint 41 repository implementation without redesigning the Database v1 baseline. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.

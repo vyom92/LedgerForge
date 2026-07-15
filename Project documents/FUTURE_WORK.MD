@@ -210,7 +210,7 @@ The second statement becomes valid only after Chat formally defines and records 
 ## FW-P0-02 — Historical Duplicate Review and Repair
 
 **Status:** Blocked  
-**Depends on:** Successful completion and approval of Sprint 40, plus an approved reversible financial-mutation model
+**Depends on:** Completed Sprint 40 evidence and Sprint 41 bounded transaction-event ownership, plus an approved reversible financial-mutation model. Reversible financial mutation remains the controlling blocker.
 
 Provide safe review and correction for duplicate transactions already present in durable history.
 
@@ -231,8 +231,8 @@ Historical data must never be silently changed.
 
 ## FW-P0-05 — Concurrent Import Guarantees
 
-**Status:** Blocked  
-**Depends on:** Successful completion and approval of Sprints 40 and 41
+**Status:** Ready for discovery
+**Depends on:** Successful completion and approval of Sprints 40 and 41; discovery of broader cross-process, external-writer and race guarantees
 
 Define and enforce deterministic behaviour for:
 
@@ -485,6 +485,22 @@ Cross-format identity must remain deterministic, explainable and backed by appro
 It must not rely on filename similarity or silently discard an import because two transaction collections merely look alike.
 
 ---
+
+## FW-P0-20 — Additional Transaction-Event Evidence Families
+
+**Status:** Research
+**Depends on:** Approved overlapping fixtures and family-specific deterministic reference, subtype, reuse, conflict and privacy semantics
+
+Investigate additional transaction-event evidence families without expanding the bounded Axis UPI authority prematurely. Possible families include:
+
+- IMPS;
+- NEFT;
+- e-commerce or card events;
+- unstructured references;
+- reversal;
+- refund.
+
+Each family may require a separate ADR and implementation increment. No family may reuse the Axis UPI algorithm identifier. Stable-looking tokens alone are insufficient; date, amount, narration, balance, filename and row position remain weak evidence. Missing evidence does not prove novelty, and no historical backfill is implied.
 
 # P1 — Institution and Parser Expansion
 
@@ -858,8 +874,8 @@ Extend account choice beyond the bounded no-match workflow while preserving veri
 
 ## FW-P1-25 — Duplicate-Import Review and Management
 
-**Status:** Blocked  
-**Depends on:** Successful completion and approval of Sprints 39 and 40
+**Status:** Ready for discovery
+**Depends on:** Successful completion and approval of Sprints 39, 40 and 41
 
 Provide review for:
 
@@ -867,6 +883,8 @@ Provide review for:
 - overlap detection;
 - ambiguous duplicate candidates;
 - historical duplicate repair.
+
+Review, management, historical repair, override and partial-import workflows remain unimplemented.
 
 ---
 
@@ -1181,8 +1199,10 @@ Matching must be explainable and reversible.
 
 ## FW-P2-12 — Duplicate-Transaction Review
 
-**Status:** Blocked  
-**Depends on:** Successful completion and approval of Sprint 40
+**Status:** Ready for discovery
+**Depends on:** Completed Sprint 40 overlap evidence and Sprint 41 bounded transaction-event enforcement
+
+Duplicate-transaction review remains unimplemented and is separate from Sprint 41 bounded enforcement.
 
 ---
 
