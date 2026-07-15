@@ -63,7 +63,7 @@ Updated and staged for Commit 2:
 - `Project documents/FUTURE_WORK.MD` — preserves current content and adds the Sprint 39 clarification distinguishing completed exact-statement prevention from future overlapping-statement, transaction-level, historical-repair, broader-atomicity and cross-process work.
 - `Project documents/Codex response.md` — this completion handoff.
 
-Commit 2 will be created as `Complete Sprint 39 documentation handoff` and pushed after its final diff review.
+Commit 2 was created as `Complete Sprint 39 documentation handoff` and pushed as `31f674c4580184b1d4f6dd8fb0496da428b014cf`.
 
 ## Current Verified Remote State
 
