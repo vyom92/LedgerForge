@@ -41,7 +41,7 @@ Migration V3 adds the bounded `transaction_event_identities` ownership table wit
 - `digest`
 - `created_at`
 
-The table enforces unique `(algorithm, digest)` and unique `(transaction_id, algorithm)` ownership, with restrictive foreign keys to transaction, account, document and import-session records. Indexes support account and import-session lookup. Migration V3 performs no historical backfill and leaves existing event-identity ownership empty.
+The table enforces unique `(algorithm, digest)` and unique `(transaction_id, algorithm)` ownership, with restrictive foreign keys to transaction, account, document and import-session records. The composite `(account_id, import_session_id)` index supports account-scoped and account-plus-import-session lookup. Migration V3 does not create an independent import-session-only index. Migration V3 performs no historical backfill and leaves existing event-identity ownership empty.
 
 SQLite and In-Memory providers maintain parity. Accepted event ownership is persisted atomically with the accepted import history; rejected attempts do not create ownership records. No raw event reference, canonical payload or private financial evidence is stored.
 

@@ -13,7 +13,7 @@ This document does not duplicate sprint numbers, priorities, build results or co
 - Verified implementation state and completed sprint history: `Project documents/PROJECT_STATE.md`
 - ACTIVE sprint contract: `Project documents/Implementation.md` (ACTIVE section only)
 - Unscheduled backlog and research: `Project documents/FUTURE_WORK.MD`
-- Latest planning or implementation execution report: `Project documents/Codex response.md`
+- Latest planning, implementation, or documentation execution report: `Project documents/Codex response.md`
 
 ---
 

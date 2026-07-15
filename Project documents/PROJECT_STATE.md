@@ -17,19 +17,20 @@ Principles:
 * Primary Branch: main
 * Latest Implementation Commit: 0b387a6812542f41eea450aa0bcc7f9d74d077e0 — Implement Sprint 41 Axis UPI duplicate blocking
 * Latest Evidence Commit: 416fc88 — Prepare Sprint 40 transaction-event evidence
-* Latest Documentation Handoff Commit: d0cd356072ad5de3ef9badc23c88039072757b7b — Finalize Sprint 41 handoff
+* Latest Documentation Handoff Commit: 7946483f66b18e3735749069ea7ad57812a43a18 — Finalize Sprint 41 documentation handoff
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking (Accepted; implemented in Sprint 41)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
 * Current Sprint State: Sprint 41 — Bounded Axis UPI Transaction-Event Duplicate Blocking (repository implementation and automated validation complete; manual UI/runtime verification pending)
-* Current Phase: Repository implementation complete; documentation synchronization and manual verification follow-up pending; unsupported families remain unevaluated
+* Current Phase: Documentation synchronization complete; repository implementation and automated verification complete; manual UI/runtime verification remains pending; no Swift implementation or documentation synchronization is currently in progress
 * Build Status: Passing
 * Validation Status: Sprint 41 clean Debug build passed; complete configured unit/integration plan passed (175 tests in 26 suites, 0 failures, 0 skipped). Generic `LedgerForgeUITests` remained intentionally disabled.
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-* Latest Verified Implementation Remote: d0cd356072ad5de3ef9badc23c88039072757b7b
+* Latest Verified Implementation Remote: 0b387a6812542f41eea450aa0bcc7f9d74d077e0
 * Latest Verified Evidence Remote: 416fc884c888982f996b01256fb99b70bcae6c78
+* Latest Verified Repository Remote: 7946483f66b18e3735749069ea7ad57812a43a18
 
 ## Bootstrap
 
@@ -97,7 +98,7 @@ For parser-verified eligible Axis UPI rows only, confirmation canonicalizes acco
 
 ## Current Work
 
-Active Work: Documentation synchronization and pending manual UI/runtime verification follow-up; no Swift implementation is currently in progress.
+Active Work: Documentation synchronization is complete; repository implementation and automated verification are complete; manual UI/runtime verification remains pending; no Swift implementation or documentation synchronization is currently in progress.
 
 Verified planning state:
 
@@ -203,6 +204,7 @@ Verified planning state:
 - Document, fingerprint, import-session, transaction and successful completion records are committed atomically by the provider-owned import-history operation.
 - Exact-duplicate rejection performs no supported persistence write and no hydration; successful new import performs one canonical forced hydration.
 - Sprint 40 provides privacy-safe overlapping Axis evidence and accepted ADR-031 architecture for prospective account-scoped Axis UPI transaction-event identity.
+- Bounded transaction-event duplicate prevention is implemented for parser-verified Axis UPI P2A/P2M evidence; unsupported families remain unevaluated.
 - Developer Console is available behind Developer Mode.
 - Developer Console can reset the development SQLite provider without restart.
 - Runtime Inspector and Repository Summary show runtime account and transaction counts.
@@ -233,8 +235,8 @@ Verified planning state:
 
 ### Current Critical Product Issues
 
-- Transaction-level duplicate prevention is not implemented. Overlapping statements can still contain the same financial event and create duplicated transaction history.
-- Production transaction-event identity is not implemented. ADR-031 currently approves evidence only for prospective, account-scoped Axis UPI references with deterministic source subtype separation.
+- Bounded transaction-event duplicate prevention is implemented for parser-verified Axis UPI P2A/P2M evidence.
+- Unsupported event families remain unevaluated; no historical backfill, cross-format identity, duplicate-management workflow, cross-process guarantee or external-writer guarantee exists.
 - Broader atomicity across workspace, account, identifier and import-history writes remains unimplemented.
 - Cross-process and external-writer import concurrency guarantees remain unimplemented.
 
@@ -256,11 +258,11 @@ Verified planning state:
 
 ### Ready for Next Feature Sprint?
 
-Ready for bounded Sprint 41 repository discovery, planning and approval.
+Not ready to select the next feature sprint until Chat resolves the pending Sprint 41 manual-verification disposition.
 
 ### Reason
 
-Sprint 40 evidence preparation, privacy review, ADR-031 acceptance, validation, commit and push are complete. The next bounded outcome is production implementation of the approved prospective Axis UPI transaction-event evidence path. No Sprint 41 production implementation is verified or active until Chat installs the sole ACTIVE contract in `Project documents/Implementation.md`.
+Sprint 41 repository implementation, automated validation, documentation synchronization, commit and push are complete. Manual UI/runtime verification remains pending. The next feature-planning cycle may begin only after Chat resolves that pending disposition.
 
 ### Current Next-Step Boundary
 
@@ -278,7 +280,7 @@ The next implementation may use only repository-verified and ADR-approved scope.
 
 ### Next Major Milestone
 
-Define, approve and implement the bounded Sprint 41 production transaction-event path governed by ADR-031.
+After Chat resolves the pending Sprint 41 manual-verification disposition, select future work from `PROJECT_STATE.md`, then `FUTURE_WORK.MD`, followed by relevant architecture evidence.
 
 ---
 

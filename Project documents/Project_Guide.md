@@ -294,7 +294,7 @@ All assistants must distinguish verified repository evidence from inference and 
 - Push to `origin/main`.
 - Verify the remote branch directly.
 - Update `Project documents/Codex response.md` with verified implementation facts.
-- Update `Project documents/PROJECT_STATE.md` only after successful validation, verified push and required manual runtime verification.
+- Update `Project documents/PROJECT_STATE.md` only after successful validation, verified implementation commit and push, and either completed required manual runtime verification or an ACTIVE-contract deferral explicitly disclosed and accepted by Chat.
 
 ### Documentation Synchronization
 
@@ -480,7 +480,7 @@ This layered bootstrap minimizes context loading while preserving deterministic 
 - Never make changes outside the approved ACTIVE sprint.
 - Never redesign approved architecture without an approved ADR.
 - Work maintains `Project documents/Codex response.md` during approved repository discovery; Codex records implementation execution output there.
-- Update `Project documents/PROJECT_STATE.md` only after successful validation, required manual runtime verification, verified implementation commit and verified push.
+- Update `Project documents/PROJECT_STATE.md` only after successful validation, verified implementation commit and push, and either completed required manual runtime verification or an ACTIVE-contract deferral explicitly disclosed and accepted by Chat.
 - Leave the repository in a buildable state.
 - Never bypass repository abstractions.
 - Never access SQLite directly from Views, ViewModels or Runtime Stores.
