@@ -553,6 +553,116 @@ struct RepositoryContractTests {
         }
     }
 
+    @Test func sqliteV3DatabaseMigratesToV4WithAuthoritativeAttemptBackfillAndNoInventedHistory() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LedgerForgeV3ToV4MigrationTests")
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let databasePath = folder.appendingPathComponent("v3.sqlite").path
+        let v3Database = SQLiteDatabase(path: databasePath)
+        try v3Database.open()
+        try v3Database.runMigrations(Array(allMigrations.prefix(3)))
+
+        let workspaceID = "workspace-v3"
+        let accountID = "account-v3"
+        let sessionID = "session-v3-completed"
+        let documentID = "document-v3"
+        let identifierID = "identifier-v3"
+        let fingerprintID = "fingerprint-v3"
+        let eventID = "event-v3"
+        let completedAt = "2026-07-16T09:05:00Z"
+        let fingerprint = "fictional-fingerprint-v3"
+        let eventDigest = "fictional-event-digest-v3"
+
+        try v3Database.executePrepared(
+            sql: "INSERT INTO workspaces (id, name, created_at) VALUES (?,?,?);",
+            params: [workspaceID, "Migration Workspace", "2026-07-16T09:00:00Z"]
+        )
+        try v3Database.executePrepared(
+            sql: "INSERT INTO accounts (id, workspace_id, name, native_currency, created_at) VALUES (?,?,?,?,?);",
+            params: [accountID, workspaceID, "Migration Account", "INR", "2026-07-16T09:00:00Z"]
+        )
+        try v3Database.executePrepared(
+            sql: "INSERT INTO account_identifiers (id, account_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?);",
+            params: [identifierID, accountID, "institution_account_id", "fictional-verified-account", "fixture", "2026-07-16T09:00:00Z"]
+        )
+        try v3Database.executePrepared(
+            sql: "INSERT INTO import_sessions (id, workspace_id, user_visible_name, started_at, completed_at, validation_status, created_at, reader_version, parser_version, layout_version) VALUES (?,?,?,?,?,?,?,?,?,?);",
+            params: [sessionID, workspaceID, "Migration Import", "2026-07-16T09:00:00Z", completedAt, "passed", "2026-07-16T09:00:00Z", "reader-v3", "parser-v3", "layout-v3"]
+        )
+        try v3Database.executePrepared(
+            sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, sha256, storage_path, extracted_text_snippet, created_at) VALUES (?,?,?,?,?,?,?,?);",
+            params: [documentID, workspaceID, sessionID, "fictional-source.csv", fingerprint, "fictional/private/path", "fictional source fragment", "2026-07-16T09:00:00Z"]
+        )
+        try v3Database.executePrepared(
+            sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, created_at) VALUES (?,?,?,?,?,?);",
+            params: [fingerprintID, documentID, sessionID, "fictional.algorithm.v1", fingerprint, "2026-07-16T09:00:00Z"]
+        )
+        for (index, amount, balance) in [("transaction-v3-a", 2_500, 2_500), ("transaction-v3-b", -700, 1_800)] {
+            try v3Database.executePrepared(
+                sql: "INSERT INTO transactions (id, workspace_id, account_id, import_session_id, document_id, posted_date, description, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_trusted, trusted_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: [index, workspaceID, accountID, sessionID, documentID, "2026-07-16", "fictional narrative", "fictional-reference", "INR", amount, NSDecimalNumber(decimal: Decimal(amount) / 100).stringValue, amount < 0 ? "debit" : "credit", balance, 1, completedAt, "2026-07-16T09:00:00Z"]
+            )
+        }
+        try v3Database.executePrepared(
+            sql: "INSERT INTO transaction_event_identities (id, transaction_id, account_id, document_id, import_session_id, algorithm, digest, created_at) VALUES (?,?,?,?,?,?,?,?);",
+            params: [eventID, "transaction-v3-a", accountID, documentID, sessionID, "fictional.event.v1", eventDigest, "2026-07-16T09:00:00Z"]
+        )
+        #expect(try v3Database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 3)
+        #expect(try v3Database.queryInt("SELECT COUNT(*) FROM import_sessions;") == 1)
+        #expect(try v3Database.queryInt("SELECT COUNT(*) FROM transactions;") == 2)
+        v3Database.close()
+
+        let provider = try SQLiteRepositoryProvider(path: databasePath)
+        #expect(try provider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 4)
+        #expect(try provider.database.queryInt("SELECT COUNT(*) FROM import_attempts;") == 1)
+        #expect(try provider.database.query(sql: "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_import_attempts_workspace_created';") { _ in true }.count == 1)
+        let foreignKeyTables = try provider.database.query(sql: "PRAGMA foreign_key_list(import_attempts);") { $0.string(at: 2) ?? "" }
+        #expect(Set(foreignKeyTables) == ["workspaces", "accounts", "import_sessions", "documents"])
+
+        let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspaceID)
+        #expect(attempts.count == 1)
+        let attempt = try #require(attempts.first)
+        #expect(attempt.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue)
+        #expect(attempt.workspaceId == workspaceID)
+        #expect(attempt.importSessionId == sessionID)
+        #expect(attempt.documentId == documentID)
+        #expect(attempt.accountId == accountID)
+        #expect(attempt.transactionCount == 2)
+        #expect(attempt.createdAtISO == completedAt)
+        #expect(!attempts.contains { $0.outcomeCode != ImportAttemptOutcome.successfulImport.rawValue })
+
+        #expect(try provider.workspaceRepo.workspace(id: workspaceID)?.id == workspaceID)
+        #expect(try provider.accountRepo.account(id: accountID)?.id == accountID)
+        #expect(try provider.accountRepo.identifiers(accountId: accountID, workspaceId: workspaceID).map(\.id) == [identifierID])
+        #expect(try provider.importSessionRepo.importSession(id: sessionID)?.completedAtISO == completedAt)
+        let preservedTransactions = try provider.transactionRepo.transactions(workspaceId: workspaceID, importSessionId: sessionID)
+        #expect(preservedTransactions.map(\.id) == ["transaction-v3-b", "transaction-v3-a"])
+        #expect(preservedTransactions.map(\.amountMinor) == [-700, 2_500])
+        #expect(preservedTransactions.allSatisfy { $0.workspaceId == workspaceID && $0.accountId == accountID && $0.importSessionId == sessionID && $0.documentId == documentID })
+        #expect(try provider.database.queryInt("SELECT COUNT(*) FROM documents WHERE id = 'document-v3';") == 1)
+        #expect(try provider.database.queryInt("SELECT COUNT(*) FROM document_fingerprints WHERE id = 'fingerprint-v3' AND fingerprint = 'fictional-fingerprint-v3';") == 1)
+        #expect(try provider.database.queryInt("SELECT COUNT(*) FROM transaction_event_identities WHERE id = 'event-v3' AND digest = 'fictional-event-digest-v3';") == 1)
+        #expect(try provider.database.queryInt("SELECT SUM(amount_minor) FROM transactions WHERE import_session_id = 'session-v3-completed';") == 1_800)
+
+        let persistedAttemptColumns = try provider.database.query(sql: "PRAGMA table_info(import_attempts);") { $0.string(at: 1) ?? "" }
+        #expect(persistedAttemptColumns == ["id", "workspace_id", "created_at", "outcome_code", "coverage_code", "account_decision_code", "guidance_code", "persistence_code", "transaction_count", "account_id", "import_session_id", "document_id", "related_import_session_id"])
+        let persistedAttemptText = try provider.database.query(sql: "SELECT id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id FROM import_attempts;") { row in
+            (0...12).compactMap { row.string(at: Int32($0)) }.joined(separator: "|")
+        }.joined(separator: "\n")
+        for prohibited in ["fictional-source.csv", "fictional/private/path", "fictional source fragment", fingerprint, eventDigest, "fictional-reference", "fictional narrative", "fictional-verified-account"] {
+            #expect(!persistedAttemptText.contains(prohibited))
+        }
+
+        let reopenedProvider = try SQLiteRepositoryProvider(path: databasePath)
+        #expect(try reopenedProvider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 4)
+        #expect(try reopenedProvider.importSessionRepo.importAttempts(workspaceId: workspaceID) == attempts)
+        #expect(try reopenedProvider.database.queryInt("SELECT COUNT(*) FROM import_attempts;") == 1)
+        #expect(try reopenedProvider.database.queryInt("SELECT COUNT(*) FROM transactions;") == 2)
+    }
+
 }
 
 private struct RepositoryHandles {

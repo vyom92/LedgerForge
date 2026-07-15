@@ -916,6 +916,130 @@ struct ImportRepositoryIntegrationTests {
         #expect(!diagnostics.contains(firstFixture.fingerprint.digest))
     }
 
+    @Test func successfulAttemptSurvivesSQLiteProviderRecreationAndHydratesRuntimeState() throws {
+        let folder = try temporaryFolder(named: "LedgerForgeSuccessfulAttemptRecreationTests")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let databasePath = folder.appendingPathComponent("successful-attempt.sqlite").path
+        let fixture = makeValidFixture()
+        let workspaceID = "workspace-import-integration"
+
+        let successfulAttempt: ImportAttemptDTO
+        let persistedAccountID: String
+        let persistedSessionID: String
+        do {
+            let provider = try SQLiteRepositoryProvider(path: databasePath)
+            let result = try makeSQLitePersistenceCoordinator(provider: provider).persistValidatedImport(
+                financialDocument: fixture.financialDocument,
+                importSession: fixture.importSession,
+                validation: fixture.validation,
+                fingerprint: fixture.fingerprint
+            )
+            #expect(result.persisted)
+            persistedAccountID = try #require(result.accountId)
+            persistedSessionID = try #require(result.importSessionId)
+            let storedAttempts = try provider.importSessionRepo.importAttempts(workspaceId: workspaceID)
+            #expect(storedAttempts.count == 1)
+            successfulAttempt = try #require(storedAttempts.first)
+            #expect(successfulAttempt.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue)
+            #expect(successfulAttempt.accountId == persistedAccountID)
+            #expect(successfulAttempt.importSessionId == persistedSessionID)
+            #expect(successfulAttempt.documentId != nil)
+            #expect(try sqliteImportHistoryCounts(provider) == SQLiteImportHistoryCounts(documents: 1, fingerprints: 1, sessions: 1, transactions: 2))
+            try assertPersistedAttemptPrivacy(provider, attempts: [successfulAttempt])
+        }
+
+        let provider = try SQLiteRepositoryProvider(path: databasePath)
+        let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspaceID)
+        #expect(attempts == [successfulAttempt])
+        #expect(try provider.accountRepo.account(id: persistedAccountID)?.id == persistedAccountID)
+        #expect(try provider.importSessionRepo.importSession(id: persistedSessionID)?.id == persistedSessionID)
+        #expect(try provider.database.queryInt("SELECT COUNT(*) FROM documents;") == 1)
+
+        let stores = ImportAttemptRecreationStores()
+        let hydrator = makeRecreationHydrator(provider: provider, stores: stores, workspaceID: workspaceID)
+        #expect(stores.attempts.attempts.isEmpty)
+        let hydration = try hydrator.hydrateIfNeeded()
+        #expect(hydration.didHydrate)
+        #expect(hydration.accountCount == 1)
+        #expect(hydration.transactionCount == 2)
+        #expect(hydration.importAttemptCount == 1)
+        #expect(stores.attempts.attempts == attempts.map(RepositoryImportAttempt.init))
+        #expect(stores.accounts.accounts.map(\.repositoryAccountId) == [persistedAccountID])
+        #expect(stores.transactions.transactions.count == 2)
+        #expect(stores.importSessions.importSessions.map(\.id) == [persistedSessionID])
+        #expect(try provider.importSessionRepo.importAttempts(workspaceId: workspaceID) == attempts)
+    }
+
+    @Test func rejectedExactDuplicateAttemptSurvivesRecreationAndAttemptOnlyHydrationIsIdempotent() throws {
+        let folder = try temporaryFolder(named: "LedgerForgeRejectedAttemptRecreationTests")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let databasePath = folder.appendingPathComponent("rejected-attempt.sqlite").path
+        let fixture = makeValidFixture()
+        let workspaceID = "workspace-import-integration"
+        let successfulSessionID: String
+
+        do {
+            let provider = try SQLiteRepositoryProvider(path: databasePath)
+            let coordinator = makeSQLitePersistenceCoordinator(provider: provider)
+            let successful = try coordinator.persistValidatedImport(
+                financialDocument: fixture.financialDocument,
+                importSession: fixture.importSession,
+                validation: fixture.validation,
+                fingerprint: fixture.fingerprint
+            )
+            #expect(successful.persisted)
+            successfulSessionID = try #require(successful.importSessionId)
+            let duplicate = try coordinator.persistValidatedImport(
+                financialDocument: fixture.financialDocument,
+                importSession: fixture.importSession,
+                validation: fixture.validation,
+                fingerprint: fixture.fingerprint
+            )
+            #expect(!duplicate.persisted)
+            #expect(duplicate.previousImport?.importSessionId == successfulSessionID)
+            #expect(duplicate.importAttemptId != nil)
+            let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspaceID)
+            #expect(attempts.count == 2)
+            #expect(attempts.contains { $0.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue })
+            let rejected = try #require(attempts.first { $0.outcomeCode == ImportAttemptOutcome.exactStatementDuplicate.rawValue })
+            #expect(rejected.importSessionId == nil)
+            #expect(rejected.documentId == nil)
+            #expect(rejected.relatedImportSessionId == successfulSessionID)
+            #expect(try sqliteImportHistoryCounts(provider) == SQLiteImportHistoryCounts(documents: 1, fingerprints: 1, sessions: 1, transactions: 2))
+            try assertPersistedAttemptPrivacy(provider, attempts: attempts)
+        }
+
+        let provider = try SQLiteRepositoryProvider(path: databasePath)
+        let repositoryAttempts = try provider.importSessionRepo.importAttempts(workspaceId: workspaceID)
+        #expect(repositoryAttempts.count == 2)
+        #expect(repositoryAttempts.contains { $0.outcomeCode == ImportAttemptOutcome.exactStatementDuplicate.rawValue })
+        #expect(try sqliteImportHistoryCounts(provider) == SQLiteImportHistoryCounts(documents: 1, fingerprints: 1, sessions: 1, transactions: 2))
+
+        let stores = ImportAttemptRecreationStores()
+        let hydrator = makeRecreationHydrator(provider: provider, stores: stores, workspaceID: workspaceID)
+        #expect(stores.accounts.accounts.isEmpty)
+        #expect(stores.transactions.transactions.isEmpty)
+        #expect(stores.importSessions.importSessions.isEmpty)
+        #expect(stores.attempts.attempts.isEmpty)
+
+        try hydrator.hydrateImportAttempts()
+        #expect(stores.attempts.attempts == repositoryAttempts.map(RepositoryImportAttempt.init))
+        #expect(stores.accounts.accounts.isEmpty)
+        #expect(stores.transactions.transactions.isEmpty)
+        #expect(stores.importSessions.importSessions.isEmpty)
+        let attemptOnlySnapshot = stores.attempts.attempts
+        try hydrator.hydrateImportAttempts()
+        #expect(stores.attempts.attempts == attemptOnlySnapshot)
+
+        let hydration = try hydrator.hydrateIfNeeded()
+        #expect(hydration.accountCount == 1)
+        #expect(hydration.transactionCount == 2)
+        #expect(hydration.importAttemptCount == 2)
+        #expect(stores.attempts.attempts.map(\.id) == repositoryAttempts.map(\.id))
+        #expect(stores.importSessions.importSessions.map(\.id) == [successfulSessionID])
+        #expect(try provider.importSessionRepo.importAttempts(workspaceId: workspaceID) == repositoryAttempts)
+    }
+
 }
 
 private struct SQLiteImportHistoryCounts: Equatable {
@@ -932,6 +1056,46 @@ private func sqliteImportHistoryCounts(_ provider: SQLiteRepositoryProvider) thr
         sessions: try provider.database.queryInt("SELECT COUNT(*) FROM import_sessions;"),
         transactions: try provider.database.queryInt("SELECT COUNT(*) FROM transactions;")
     )
+}
+
+private struct ImportAttemptRecreationStores {
+    let accounts = AccountStore()
+    let transactions = TransactionStore()
+    let importSessions = ImportSessionStore()
+    let attempts = ImportAttemptStore()
+}
+
+private func makeRecreationHydrator(
+    provider: SQLiteRepositoryProvider,
+    stores: ImportAttemptRecreationStores,
+    workspaceID: String
+) -> RepositoryStoreHydrator {
+    RepositoryStoreHydrator(
+        accountRepo: provider.accountRepo,
+        importSessionRepo: provider.importSessionRepo,
+        transactionRepo: provider.transactionRepo,
+        accountStore: stores.accounts,
+        transactionStore: stores.transactions,
+        importSessionStore: stores.importSessions,
+        importAttemptStore: stores.attempts,
+        workspaceId: workspaceID
+    )
+}
+
+private func assertPersistedAttemptPrivacy(
+    _ provider: SQLiteRepositoryProvider,
+    attempts: [ImportAttemptDTO]
+) throws {
+    let columns = try provider.database.query(sql: "PRAGMA table_info(import_attempts);") { $0.string(at: 1) ?? "" }
+    #expect(columns == ["id", "workspace_id", "created_at", "outcome_code", "coverage_code", "account_decision_code", "guidance_code", "persistence_code", "transaction_count", "account_id", "import_session_id", "document_id", "related_import_session_id"])
+    let storedRows = try provider.database.query(sql: "SELECT id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id FROM import_attempts;") { row in
+        (0...12).compactMap { row.string(at: Int32($0)) }.joined(separator: "|")
+    }
+    #expect(storedRows.count == attempts.count)
+    let persistedText = storedRows.joined(separator: "\n")
+    for prohibited in ["repository-integration.csv", "fixture:", "Opening credit", "Card payment", "/tmp/", "raw", "password", "fingerprint", "digest"] {
+        #expect(!persistedText.localizedCaseInsensitiveContains(prohibited))
+    }
 }
 
 private func makeSQLitePersistenceCoordinator(
