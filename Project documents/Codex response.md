@@ -1,114 +1,74 @@
-# Sprint 39 Implementation Review Corrections
+# Sprint 39 Completion Handoff
 
 ## Overall Result
 
-**PASS WITH CORRECTIONS.**
+**PASS FOR COMMIT.** Sprint 39 is implemented, validated, manually verified, committed and pushed.
 
-The prior result was **BLOCKED BY APPROVED-FILE SCOPE CONFLICT**. Chat approved the minimal exception for `LedgerForgeTests/DeveloperDiagnosticsTests.swift`; the private diagnostic persistence conformer was updated without production changes. All required automated validation now passes.
+Chat’s final implementation-review verdict was `PASS FOR COMMIT`. Commit 1 is `3b4b2ec76c0aca86d9e065182e201740cef829bd` — `Implement Sprint 39 exact statement re-import prevention`. It is present at `origin/main`.
 
-No commit, push, branch, pull request, tag, schema, migration, project, scheme, or `TestPlan.xctestplan` change occurred.
+## Implementation
 
-## Review Corrections
+Option 3 exact statement re-import prevention is complete:
 
-- SQLite preserves `BEGIN IMMEDIATE`, authoritative lookup, and rollback, and now rethrows the original persistence error after rollback rather than returning a later discovered duplicate.
-- SQLite failure-injection tests seed unrelated successful fingerprint history and prove fingerprint, transaction, and completion errors remain errors.
-- The protocol no longer delegates fingerprinted persistence to the legacy passed-validation path. Unsupported fingerprinted/advisory use fails explicitly; passed legacy persistence remains rejected with `fingerprintRequired`.
-- Counting persistence coverage proves `ImportEngine.commitPreparedImport` supplies the prepared fingerprint, with algorithm `ledgerforge.raw-text.sha256.v1`, matching digest, and the fingerprinted—not legacy—call path.
-- In-memory and SQLite provenance counts all persisted transaction rows and recovers account provenance without `isTrusted` filtering.
-- Both providers require every atomic-history transaction to carry one shared existing account ID; mixed-account payloads fail without document, fingerprint, session, or transaction residue.
-- Provider parity covers a trusted and untrusted transaction on the same account, matching duplicate outcome, count `2`, account ID, and account display name.
-- Competing confirmations now use two independent coordinators and engines over one shared provider, proving one persisted history and one previously-imported result.
+- exact reader-produced text uses `ledgerforge.raw-text.sha256.v1`;
+- advisory duplicate lookup is read-only;
+- confirmation performs an authoritative duplicate recheck inside same-process serialization;
+- duplicate rejection occurs before supported account, identifier, import-session or transaction mutation and performs no hydration;
+- SQLite and in-memory providers atomically commit document, fingerprint, session, transactions and successful completion state;
+- bounded prior-import date, transaction count and account presentation are retained when recoverable;
+- changed text remains importable;
+- no schema migration was required.
 
-## Approved Diagnostic Exception
-
-Chat approved `LedgerForgeTests/DeveloperDiagnosticsTests.swift` solely to repair its private `DiagnosticPersistenceCoordinator` after the protocol bypass removal. The test double now:
-
-- explicitly implements `priorImportedStatement(fingerprint:)` as a no-prior-history test behavior;
-- explicitly implements fingerprinted persistence, captures the supplied fingerprint, and preserves the existing diagnostic success result;
-- rejects the legacy passed-validation method with `fingerprintRequired`;
-- does not call or depend on the legacy method.
-
-`successfulImportLifecycleDiagnostics()` now verifies the received fingerprint uses `ledgerforge.raw-text.sha256.v1` and a lowercase 64-character hexadecimal digest. Diagnostic privacy assertions remain unchanged.
+Review corrections included real SQLite error propagation after rollback, removal of fingerprint protocol bypasses, all-row persisted-count provenance, strict one-account payload validation, provider-parity coverage, two-coordinator serialization coverage and the approved explicit diagnostic test conformer.
 
 ## Validation
 
+- Focused Sprint 39 suites: **45 tests in 3 suites passed**, 0 failures, 0 skipped.
+- Financial regressions: **18 tests in 2 suites passed**, 0 failures, 0 skipped.
+- DeveloperDiagnostics: **14 tests in 1 suite passed**, 0 failures, 0 skipped.
+- Complete configured unit/integration test plan: **171 tests in 25 suites passed**, 0 failures, 0 skipped.
 - Source diagnostics: passed with no source warnings or errors.
 - Static analysis: `ANALYZE SUCCEEDED`.
 - Clean Debug build: `CLEAN SUCCEEDED` and `BUILD SUCCEEDED`.
-- Focused Sprint 39 suites (`ConfirmationGatedImportWorkflowTests`, `RepositoryContractTests`, `ImportRepositoryIntegrationTests`): **45 tests in 3 suites passed**, 0 failures.
-- Financial regressions (`CSVImportRegressionTests`, `FinancialDocumentTests`): **18 tests in 2 suites passed**, 0 failures.
-- `DeveloperDiagnosticsTests`: **14 tests in 1 suite passed**, 0 failures.
-- Complete currently configured test plan: **171 tests in 25 suites passed**, 0 failures.
-- Scoped `git diff --check`: passed.
-- Tracked conflict-marker inspection: passed.
-- Complete approved changed-file review: passed.
+- Scoped diff checks and tracked conflict-marker inspection: passed.
 
-The committed baseline intentionally disables `LedgerForgeUITests`; generic UI tests did not run. Sprint 39 UI behavior was manually verified against a disposable SQLite database: new import, same-name duplicate, renamed byte-identical duplicate, visible bounded provenance, no duplicate hydration, unchanged duplicate counts, and changed-text import. The same-reset-database UI relaunch limitation remains because the development-reset path is not retained across app relaunch; durable provider recreation is covered automatically.
+The committed baseline intentionally disables `LedgerForgeUITests`; generic UI tests did not execute. Sprint 39 UI behavior was manually verified against a disposable SQLite database, including first import, same-name duplicate, renamed byte-identical duplicate, bounded provenance, unchanged duplicate counts, no duplicate hydration and changed-text import. The same-reset-database UI relaunch limitation remains because the development-reset path is not retained across app relaunch; durable provider recreation passed automated coverage.
 
-## Changed Files
-
-### Production
+## Commit 1 Files
 
 - `ContentView.swift`
 - `Database/DTOs.swift`
 - `Database/InMemoryRepositoryProvider.swift`
 - `Database/Repository.swift`
 - `Database/SQLiteRepositoryProvider.swift`
-- `Services/ImportEngine.swift`
-- `Services/ImportPersistenceCoordinator.swift`
-- `Services/ImportPersistenceMapper.swift`
-
-### Tests
-
 - `LedgerForgeTests/ConfirmationGatedImportWorkflowTests.swift`
 - `LedgerForgeTests/DeveloperDiagnosticsTests.swift`
 - `LedgerForgeTests/ImportRepositoryIntegrationTests.swift`
 - `LedgerForgeTests/RepositoryContractTests.swift`
-
-### Handoff
-
 - `Project documents/Codex response.md`
+- `Project documents/FUTURE_WORK.MD`
+- `Services/ImportEngine.swift`
+- `Services/ImportPersistenceCoordinator.swift`
+- `Services/ImportPersistenceMapper.swift`
 
-`Project documents/FUTURE_WORK.MD` is unrelated pre-existing work. It remains untouched by this pass, unstaged, and excluded from the Sprint 39 review diff.
+All legitimate current repository changes were intentionally retained, including manual document edits and the authorized `FUTURE_WORK.MD` change. No manual edit was discarded.
 
-## Git State
+## Completion Documentation Handoff
 
-Every Sprint 39 file is unstaged. No Sprint 39 implementation commit or push occurred.
+Updated and staged for Commit 2:
 
-### Diff Stat
+- `Project documents/ADR.md` — ADR-030 remains Accepted and now records implementation in Sprint 39.
+- `Project documents/Implementation.md` — Sprint 39 is marked implemented, fully tested and manually verified, with verified totals and current phase awaiting next-sprint planning.
+- `Project documents/PROJECT_STATE.md` — records the verified implementation, validation, manual limitation, commit SHA and remote alignment.
+- `Project documents/FUTURE_WORK.MD` — preserves current content and adds the Sprint 39 clarification distinguishing completed exact-statement prevention from future overlapping-statement, transaction-level, historical-repair, broader-atomicity and cross-process work.
+- `Project documents/Codex response.md` — this completion handoff.
 
-```text
- ContentView.swift                                  |  68 ++--
- Database/DTOs.swift                                | 110 ++++++-
- Database/InMemoryRepositoryProvider.swift          | 118 +++++++
- Database/Repository.swift                          |  10 +
- Database/SQLiteRepositoryProvider.swift            | 163 ++++++++++
- .../ConfirmationGatedImportWorkflowTests.swift     | 142 +++++++++
- LedgerForgeTests/DeveloperDiagnosticsTests.swift   |  22 +-
- .../ImportRepositoryIntegrationTests.swift         | 351 ++++++++++++++++++++-
- LedgerForgeTests/RepositoryContractTests.swift     | 246 ++++++++++++++
- Project documents/Codex response.md                | 144 +++++----
- Services/ImportEngine.swift                        |  78 ++++-
- Services/ImportPersistenceCoordinator.swift        | 173 ++++++++--
- Services/ImportPersistenceMapper.swift             |  33 +-
- 13 files changed, 1530 insertions(+), 128 deletions(-)
-```
+Commit 2 will be created as `Complete Sprint 39 documentation handoff` and pushed after its final diff review.
 
-### Worktree
+## Current Verified Remote State
 
-```text
- M ContentView.swift
- M Database/DTOs.swift
- M Database/InMemoryRepositoryProvider.swift
- M Database/Repository.swift
- M Database/SQLiteRepositoryProvider.swift
- M LedgerForgeTests/ConfirmationGatedImportWorkflowTests.swift
- M LedgerForgeTests/DeveloperDiagnosticsTests.swift
- M LedgerForgeTests/ImportRepositoryIntegrationTests.swift
- M LedgerForgeTests/RepositoryContractTests.swift
- M "Project documents/Codex response.md"
- M "Project documents/FUTURE_WORK.MD"
- M Services/ImportEngine.swift
- M Services/ImportPersistenceCoordinator.swift
- M Services/ImportPersistenceMapper.swift
-```
+- Branch: `main`
+- Starting SHA: `c9bd8d13c3f8c1aedb72769d9e2771b293efd600`
+- Implementation SHA: `3b4b2ec76c0aca86d9e065182e201740cef829bd`
+- Implementation subject: `Implement Sprint 39 exact statement re-import prevention`
+- `HEAD == origin/main`: verified after Commit 1 push.

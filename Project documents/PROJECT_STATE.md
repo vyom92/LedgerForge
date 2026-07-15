@@ -14,18 +14,18 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: 11a5f47 — Implement Sprint 38 user-confirmed identifier attachment
+* Latest Implementation Commit: 3b4b2ec — Implement Sprint 39 exact statement re-import prevention
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
-* Latest ADR: ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit (Accepted; Planned for Sprint 39)
+* Latest ADR: ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit (Accepted; Implemented in Sprint 39)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 39 — Exact Statement Re-import Prevention (defined)
-* Current Phase: Ready for Sprint 39 implementation
+* Current Sprint: Sprint 39 — Exact Statement Re-import Prevention (implemented)
+* Current Phase: Awaiting next-sprint planning
 * Build Status: Passing
-* Validation Status: Sprint 38 passed Xcode 26.6 diagnostics, static analysis and clean Debug build; focused Sprint 38 suites passed (70 tests, 0 failures, 0 skipped), complete Xcode-native test plan passed (161 test cases, 0 failures, 0 skipped, including all LedgerForgeUITests methods), Axis CSV financial regression passed, approved diff and conflict checks passed, and both manual account-choice paths passed
+* Validation Status: Sprint 39 passed source diagnostics, static analysis and clean Debug build; focused Sprint 39 suites passed (45 tests, 0 failures, 0 skipped), financial regressions passed (18 tests, 0 failures, 0 skipped), DeveloperDiagnostics passed (14 tests, 0 failures, 0 skipped), and the complete configured unit/integration test plan passed (171 tests, 0 failures, 0 skipped). Generic `LedgerForgeUITests` remained intentionally disabled. Sprint 39 UI behavior was manually verified; the same-reset-database relaunch limitation remains.
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-* Latest Verified Implementation Remote: 11a5f47cb8e9cba683f60755be339b4feb9c851c
+* Latest Verified Implementation Remote: 3b4b2ec76c0aca86d9e065182e201740cef829bd
 
 ## Bootstrap
 
@@ -88,17 +88,29 @@ Views
 
 ## Current Work
 
-Active Work: Sprint 39 — Exact Statement Re-import Prevention is defined and ready for implementation. Sprint 38 remains completed, committed, pushed and verified.
+Active Work: Sprint 39 — Exact Statement Re-import Prevention is implemented, validated, manually verified, committed and pushed. The repository is awaiting next-sprint planning.
 
 Verified planning state:
 
 * Sprint 38 remains completed and verified; its implementation history and validation evidence are unchanged.
-* Sprint 39 is defined to prevent exact re-import of successfully imported reader-produced text using the versioned fingerprint `ledgerforge.raw-text.sha256.v1`.
-* Sprint 39 is not implemented, built, tested or manually verified.
-* Current production still permits repeated imports until Sprint 39 is implemented.
-* ADR-030 is accepted and planned for Sprint 39.
+* Sprint 39 prevents exact re-import of successfully imported reader-produced text using the versioned fingerprint `ledgerforge.raw-text.sha256.v1`.
+* Sprint 39 is implemented with bounded prior-import provenance, same-process confirmation serialization and provider-owned atomic import-history persistence.
+* ADR-030 remains Accepted and records implementation in Sprint 39.
+* Sprint 39 implementation commit `3b4b2ec76c0aca86d9e065182e201740cef829bd` is pushed and verified at `origin/main`.
+* Focused Sprint 39 suites passed (45 tests, 0 failures, 0 skipped); financial regressions passed (18 tests, 0 failures, 0 skipped); DeveloperDiagnostics passed (14 tests, 0 failures, 0 skipped); complete configured unit/integration test plan passed (171 tests, 0 failures, 0 skipped).
+* Generic `LedgerForgeUITests` remains intentionally disabled and did not execute. Sprint 39 UI behavior was manually verified; the same-reset-database UI relaunch limitation remains, with durable provider recreation covered automatically.
 * Sprint 39 targets same-process serialization and atomic document/fingerprint/import-session/transaction commit only; cross-process guarantees and broader cross-repository atomicity remain future work.
-* No schema migration has been approved for Sprint 39.
+* No schema migration was required for Sprint 39.
+
+## Verified Sprint 39 State
+
+* Exact reader-produced text fingerprinting uses `ledgerforge.raw-text.sha256.v1`; filename and path changes do not defeat duplicate detection, while changed text remains importable.
+* Advisory duplicate lookup is read-only. Confirmation performs an authoritative duplicate recheck inside same-process serialization before account, identifier, session or transaction mutation.
+* Option 3 bounded prior-import provenance reports completion date, persisted transaction count and recoverable account presentation without exposing raw text, full fingerprints or raw identifiers.
+* SQLite and in-memory providers atomically persist documents, fingerprints, sessions, transactions and successful completion state; rollback preserves the original database error.
+* Duplicate rejection creates no new supported history rows and performs no hydration. New success performs one canonical forced hydration.
+* Existing parser, validation, financial and runtime-store behavior remained covered by unchanged regressions and the configured test plan.
+* Sprint 39 has no schema, migration, parser, reader, normalizer, DTO, runtime-store, ViewModel or hydrator redesign.
 
 Verified Sprint 38 state:
 

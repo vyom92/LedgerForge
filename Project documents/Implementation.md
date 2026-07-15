@@ -4,9 +4,7 @@
 
 ### Status
 
-🟢 Ready for Implementation
-
-This implementation must begin from the future planning-package commit containing this contract. No commit SHA is specified by planning.
+✅ Implemented, fully tested and manually verified
 
 ---
 
@@ -332,3 +330,21 @@ After implementation validation passes, Codex must:
 10. Record exact test totals, validation results, manual results and commit state.
 
 Do not claim Sprint 39 implementation completion before all completion-gate requirements pass.
+
+---
+
+## Sprint 39 Completion Record
+
+- Option 3 exact statement re-import prevention is implemented with versioned fingerprint `ledgerforge.raw-text.sha256.v1`, read-only advisory lookup, authoritative confirmation-time lookup, bounded prior-import provenance and one canonical hydration only after new success.
+- SQLite and in-memory providers implement the provider-owned atomic document, fingerprint, import-session, transaction and successful-completion commit; same-process competing confirmations are serialized.
+- Focused Sprint 39 suites passed: 45 tests, 0 failures, 0 skipped.
+- Unchanged financial regressions passed: 18 tests, 0 failures, 0 skipped.
+- Developer diagnostics passed: 14 tests, 0 failures, 0 skipped.
+- Complete configured unit/integration test plan passed: 171 tests in 25 suites, 0 failures, 0 skipped. `LedgerForgeUITests` remains intentionally disabled and did not execute.
+- Static analysis, clean Debug build, scoped diff checks and conflict-marker checks passed.
+- Sprint 39 UI behavior was manually verified against a disposable SQLite database. The same-reset-database UI relaunch limitation remains; durable provider recreation passed automated coverage.
+- Implementation commit: `3b4b2ec76c0aca86d9e065182e201740cef829bd` — Implement Sprint 39 exact statement re-import prevention.
+
+### Current Phase
+
+Awaiting next-sprint planning

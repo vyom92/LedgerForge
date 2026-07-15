@@ -207,6 +207,17 @@ The second statement becomes valid only after Chat formally defines and records 
 
 # P0 — Financial Integrity and Persistence Safety
 
+## Sprint 39 Completion Clarification
+
+Sprint 39 exact-statement re-import prevention is complete and governed by ADR-030. Its versioned exact-content fingerprint, bounded duplicate provenance, same-process serialization and provider-owned import-history atomicity are implemented for the production text-import path.
+
+The following remain future work and are not implemented by Sprint 39:
+
+- overlapping-statement and transaction-level duplicate detection (`FW-P0-01`);
+- historical duplicate review and repair (`FW-P0-02` and `FW-P0-17`);
+- broader cross-repository atomicity (`FW-P0-03` and `FW-P0-04`);
+- cross-process and external-writer concurrency guarantees (`FW-P0-05`).
+
 ## FW-P0-01 — Transaction Identity and Overlapping-Statement Safety
 
 **Status:** Blocked  

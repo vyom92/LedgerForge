@@ -1543,7 +1543,7 @@ This ADR does not:
 
 Accepted
 
-Planned for Sprint 39
+Implemented in Sprint 39
 
 ## Context
 
