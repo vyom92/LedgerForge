@@ -99,7 +99,12 @@ final class AxisBankAccountParser: StatementParser {
                 currency: "INR",
                 account: document.metadata.institution.rawValue,
                 sourceBank: "Axis Bank",
-                sourceFile: document.document.filename
+                sourceFile: document.document.filename,
+                verifiedAxisUPIEventEvidence: Self.eventEvidence(
+                    narration: firstRow.values[2],
+                    debitColumn: firstRow.values[4],
+                    creditColumn: firstRow.values[3]
+                )
             )
 
             transactions.append(transaction)
@@ -178,6 +183,35 @@ final class AxisBankAccountParser: StatementParser {
 
     private static let statementAccountPrefix = "Statement of Account No - "
     private static let statementPeriodMarker = " for the period ("
+
+    private static func eventEvidence(
+        narration: String,
+        debitColumn: String,
+        creditColumn: String
+    ) -> AxisUPITransactionEventEvidence? {
+        let components = narration.split(separator: "/", omittingEmptySubsequences: false)
+        guard components.count >= 4, components[0] == "UPI" else { return nil }
+        let operation: AxisUPITransactionEventEvidence.Operation
+        switch components[1] {
+        case "P2A": operation = .p2a
+        case "P2M": operation = .p2m
+        default: return nil
+        }
+        let reference = String(components[2])
+        guard reference.count == 12,
+              reference.unicodeScalars.allSatisfy({ $0.value >= 48 && $0.value <= 57 }) else {
+            return nil
+        }
+        let hasDebit = !debitColumn.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasCredit = !creditColumn.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let subtype: AxisUPITransactionEventEvidence.LedgerSubtype
+        switch (hasDebit, hasCredit) {
+        case (true, false): subtype = .posting
+        case (false, true): subtype = .creditAdjustment
+        default: return nil
+        }
+        return AxisUPITransactionEventEvidence(operation: operation, reference: reference, subtype: subtype)
+    }
 
     private enum StatementAccountEvidence {
         case unsupported

@@ -306,25 +306,58 @@ public struct PriorImportedStatementDTO: nonisolated Equatable {
     }
 }
 
+public struct TransactionEventIdentityKeyDTO: nonisolated Hashable {
+    public let algorithm: String
+    public let digest: String
+    public init(algorithm: String, digest: String) { self.algorithm = algorithm; self.digest = digest }
+}
+
+public struct TransactionEventIdentityDTO: nonisolated Equatable {
+    public let id: String
+    public let transactionId: String
+    public let accountId: String
+    public let documentId: String
+    public let importSessionId: String
+    public let algorithm: String
+    public let digest: String
+    public let createdAtISO: String
+    public init(id: String, transactionId: String, accountId: String, documentId: String, importSessionId: String, algorithm: String, digest: String, createdAtISO: String) {
+        self.id = id; self.transactionId = transactionId; self.accountId = accountId; self.documentId = documentId; self.importSessionId = importSessionId; self.algorithm = algorithm; self.digest = digest; self.createdAtISO = createdAtISO
+    }
+}
+
+public struct TransactionEventIdentityOwnerDTO: nonisolated Equatable {
+    public let accountId: String
+    public let transactionId: String
+    public let documentId: String
+    public let importSessionId: String
+    public init(accountId: String, transactionId: String, documentId: String, importSessionId: String) {
+        self.accountId = accountId; self.transactionId = transactionId; self.documentId = documentId; self.importSessionId = importSessionId
+    }
+}
+
 public struct AtomicImportHistoryDTO: nonisolated Equatable {
     public let document: ImportedDocumentDTO
     public let fingerprint: DocumentFingerprintDTO
     public let importSession: ImportSessionDTO
     public let completedAtISO: String
     public let transactions: [TransactionDTO]
+    public let transactionEventIdentities: [TransactionEventIdentityDTO]
 
     public init(
         document: ImportedDocumentDTO,
         fingerprint: DocumentFingerprintDTO,
         importSession: ImportSessionDTO,
         completedAtISO: String,
-        transactions: [TransactionDTO]
+        transactions: [TransactionDTO],
+        transactionEventIdentities: [TransactionEventIdentityDTO] = []
     ) {
         self.document = document
         self.fingerprint = fingerprint
         self.importSession = importSession
         self.completedAtISO = completedAtISO
         self.transactions = transactions
+        self.transactionEventIdentities = transactionEventIdentities
     }
 }
 

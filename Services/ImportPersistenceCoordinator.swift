@@ -10,6 +10,7 @@ struct ImportPersistenceResult: Equatable {
     let importSessionId: String?
     let transactionCount: Int
     let previousImport: PreviouslyImportedStatement?
+    let transactionEventBlock: TransactionEventBlock?
 
     init(
         persisted: Bool,
@@ -17,7 +18,8 @@ struct ImportPersistenceResult: Equatable {
         accountId: String?,
         importSessionId: String?,
         transactionCount: Int,
-        previousImport: PreviouslyImportedStatement? = nil
+        previousImport: PreviouslyImportedStatement? = nil,
+        transactionEventBlock: TransactionEventBlock? = nil
     ) {
         self.persisted = persisted
         self.workspaceId = workspaceId
@@ -25,6 +27,7 @@ struct ImportPersistenceResult: Equatable {
         self.importSessionId = importSessionId
         self.transactionCount = transactionCount
         self.previousImport = previousImport
+        self.transactionEventBlock = transactionEventBlock
     }
 
     static let skipped = ImportPersistenceResult(
@@ -34,7 +37,15 @@ struct ImportPersistenceResult: Equatable {
         importSessionId: nil,
         transactionCount: 0,
         previousImport: nil
+        , transactionEventBlock: nil
     )
+}
+
+enum TransactionEventBlock: Equatable {
+    case existing(count: Int)
+    case repeatedIncoming(count: Int)
+    case ownershipConflict
+    case repositoryIntegrityConflict
 }
 
 struct PreviouslyImportedStatement: Equatable {
@@ -375,6 +386,26 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             throw ImportPersistenceCoordinationError.conflictingIdentity
         }
 
+        let identities = try financialDocument.transactions.compactMap {
+            try TransactionEventIdentity.make(transaction: $0, accountID: selection.accountId)
+        }
+        let incomingDuplicates = TransactionEventIdentity.incomingDuplicates(in: identities)
+        if !incomingDuplicates.isEmpty {
+            return ImportPersistenceResult(
+                persisted: false, workspaceId: workspaceId, accountId: selection.accountId,
+                importSessionId: nil, transactionCount: identities.count,
+                transactionEventBlock: .repeatedIncoming(count: incomingDuplicates.count)
+            )
+        }
+        let keys = Set(identities.map { TransactionEventIdentityKeyDTO(algorithm: $0.algorithmIdentifier, digest: $0.digest) })
+        let owners = try importSessionRepo.transactionEventOwners(keys: keys)
+        if !owners.isEmpty {
+            if owners.values.contains(where: { $0.accountId != selection.accountId }) {
+                return ImportPersistenceResult(persisted: false, workspaceId: workspaceId, accountId: selection.accountId, importSessionId: nil, transactionCount: identities.count, transactionEventBlock: .ownershipConflict)
+            }
+            return ImportPersistenceResult(persisted: false, workspaceId: workspaceId, accountId: selection.accountId, importSessionId: nil, transactionCount: identities.count, transactionEventBlock: .existing(count: owners.count))
+        }
+
         let payload = try mapper.payload(
             financialDocument: financialDocument,
             importSession: importSession,
@@ -415,7 +446,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 fingerprint: payload.fingerprint,
                 importSession: payload.importSession,
                 completedAtISO: payload.completedAtISO,
-                transactions: payload.transactions
+                transactions: payload.transactions,
+                transactionEventIdentities: payload.transactionEventIdentities
             )
         )
         if case .duplicate(let previous) = historyResult {

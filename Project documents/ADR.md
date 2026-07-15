@@ -1639,7 +1639,7 @@ Sprint 39 does not include transaction-level duplicate detection, overlapping-st
 
 Accepted
 
-Architecture prepared in Sprint 40; production implementation pending
+Architecture prepared in Sprint 40; implemented in Sprint 41
 
 ## Context
 

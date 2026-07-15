@@ -125,6 +125,7 @@ struct ImportOutcomePresentation: Equatable {
     let previousImportCompletedAtISO: String?
     let previousAccountDisplayName: String?
     let isPreviouslyImported: Bool
+    let transactionEventBlock: TransactionEventBlock?
 
     init(result: ImportEngineResult) {
         fileName = result.fileName
@@ -138,10 +139,15 @@ struct ImportOutcomePresentation: Equatable {
         previousImportCompletedAtISO = result.previousImport?.completedAtISO
         previousAccountDisplayName = result.previousImport?.accountDisplayName
         isPreviouslyImported = result.previousImport != nil
+        transactionEventBlock = result.transactionEventBlock
 
         if result.previousImport != nil {
             persistenceStatus = "Previously Imported"
             iconName = "doc.badge.checkmark.fill"
+            tone = .warning
+        } else if result.transactionEventBlock != nil {
+            persistenceStatus = "Statement Blocked"
+            iconName = "exclamationmark.triangle.fill"
             tone = .warning
         } else if result.validationPassed && result.persisted {
             persistenceStatus = "Persistence Succeeded"

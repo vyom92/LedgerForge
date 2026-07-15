@@ -9,6 +9,7 @@ Principles:
 - Repository-verifiable information only.
 - Minimal manual editing.
 - Updated only after successful build, required validation, commit, push and tag when applicable.
+
 # Current Project State
 
 ## Repository
@@ -18,13 +19,13 @@ Principles:
 * Latest Evidence Commit: 416fc88 — Prepare Sprint 40 transaction-event evidence
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
-* Latest ADR: ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking (Accepted; architecture prepared in Sprint 40, production implementation pending)
+* Latest ADR: ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking (Accepted; implemented in Sprint 41)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint: Sprint 40 — Transaction-Event Evidence Fixture and ADR Preparation (complete)
-* Current Phase: Awaiting bounded Sprint 41 production implementation planning
+* Current Sprint State: Sprint 41 — Bounded Axis UPI Transaction-Event Duplicate Blocking (implementation validated; handoff pending commit)
+* Current Phase: Bounded Axis UPI transaction-event duplicate blocking implemented; unsupported families remain unevaluated
 * Build Status: Passing
-* Validation Status: Sprint 40 passed privacy and fixture-integrity inspection, source diagnostics, static analysis and clean Debug build; focused evidence and import regressions passed (54 tests in 8 suites, 0 failures, 0 skipped), and the complete configured unit/integration plan passed (175 tests in 26 suites, 0 failures, 0 skipped). Generic `LedgerForgeUITests` remained intentionally disabled.
+* Validation Status: Sprint 41 clean Debug build passed; complete configured unit/integration plan passed (175 tests in 26 suites, 0 failures, 0 skipped). Generic `LedgerForgeUITests` remained intentionally disabled.
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
 * Latest Verified Implementation Remote: 3b4b2ec76c0aca86d9e065182e201740cef829bd
 * Latest Verified Evidence Remote: 416fc884c888982f996b01256fb99b70bcae6c78
@@ -69,11 +70,15 @@ FinancialDocument
 ↓
 Validation
 ↓
+Read-Only Advisory Exact-Statement Duplicate Evaluation
+↓
 User Review & Explicit Confirmation
 ↓
-Fingerprinting & Duplicate Detection
+Same-Process Serialized Authoritative Exact-Statement Duplicate Recheck
 ↓
-Repository Persistence Boundary
+Financial Identity Resolution and Account Decision
+↓
+Provider-Owned Atomic Import-History Persistence
 ↓
 Repositories
 ↓
@@ -87,10 +92,11 @@ ViewModels
 ↓
 Views
 
+For parser-verified eligible Axis UPI rows only, confirmation canonicalizes account-scoped event identity and authoritatively checks durable ownership before supported writes. Accepted event ownership is included in provider-owned atomic import-history persistence; exact-content duplicate handling remains a separate ADR-030 authority.
 
 ## Current Work
 
-Active Work: Sprint 40 evidence and architecture preparation is complete, validated, committed and pushed. Production transaction-event extraction, persistence, lookup and duplicate blocking remain pending. The repository is awaiting bounded Sprint 41 production implementation planning.
+Active Work: Sprint 41 implementation is validated and awaiting its implementation commit and push.
 
 Verified planning state:
 
@@ -120,8 +126,17 @@ Verified planning state:
 * The accepted ADR boundary is prospective, account-scoped Axis UPI only. Missing or malformed evidence does not prove novelty, and weak financial or presentation fields remain ineligible.
 * The sanitized derivative reuses the approved baseline's fictional metadata and 30 shared sanitized rows exactly. The one later-only row uses new fictional instrument and narration values while preserving all financial values and ordering.
 * Privacy inspection found no original account metadata, candidate references, complete long narrations, source paths or mapping material in tracked changes.
-* `FW-P0-01` remains open for bounded production implementation; Sprint 40 implements no transaction-level duplicate prevention.
+* Sprint 40 prepared the evidence and ADR boundary subsequently implemented by Sprint 41.
 * Evidence commit: `416fc884c888982f996b01256fb99b70bcae6c78` — Prepare Sprint 40 transaction-event evidence.
+
+## Verified Sprint 41 State
+
+* `AxisBankAccountParser` produces evidence only for exact `UPI/P2A|P2M/<12 ASCII digits>/...` rows, with debit-only `posting` and credit-only `credit-adjustment` subtype. Malformed or unsupported rows retain their financial transaction with no evidence.
+* `ledgerforge.transaction-event.axis-upi-reference.v1` canonically length-prefixes algorithm, immutable repository account ID, `axis-upi`, operation, reference and subtype, then persists only its lowercase SHA-256 digest with the algorithm.
+* Migration V3 creates `transaction_event_identities`; SQLite and In-Memory providers batch-look up ownership and atomically persist accepted event records with document, import-session and transaction provenance.
+* Incoming repeated eligible identity, existing event ownership and ownership conflict block the whole statement before supported writes. Blocked imports do not hydrate runtime state and rejected attempts are not persisted.
+* Exact-content duplicate behavior remains separate. Unsupported non-UPI families remain unevaluated; no historical backfill, cross-process safety or external-writer safety is claimed.
+* Manual UI/runtime verification is pending. Automated verification passed: clean Debug build and 175 tests in 26 suites, 0 failures.
 
 ## Verified Sprint 39 State
 
@@ -133,7 +148,7 @@ Verified planning state:
 * Existing parser, validation, financial and runtime-store behavior remained covered by unchanged regressions and the configured test plan.
 * Sprint 39 has no schema, migration, parser, reader, normalizer, DTO, runtime-store, ViewModel or hydrator redesign.
 
-Verified Sprint 38 state:
+## Verified Sprint 38 State
 
 * Validated `.noMatch` imports carrying exactly one parser-produced verified strong identifier receive read-only advisory review and explicit user choice between Use Existing Account and Create New Account.
 * The Import Wizard never preselects an outcome or account and disables confirmation until an explicit choice is made. Choice state is discarded on cancellation and prepared-import replacement.
@@ -147,7 +162,7 @@ Verified Sprint 38 state:
 * `Project documents/Implementation.md` remained planning-frozen and unmodified.
 * Sprint 38 implementation commit `11a5f47cb8e9cba683f60755be339b4feb9c851c` is pushed and verified at `origin/main`.
 
-Verified Sprint 37 state:
+## Verified Sprint 37 State
 
 * Account display-name mutation uses one targeted repository operation with In-Memory and SQLite parity; SQLite uses `UPDATE` and preserves unmodeled metadata and relationships.
 * Repository account and workspace IDs now survive canonical hydration; hydrated transactions retain repository account and import-session IDs.
@@ -181,6 +196,11 @@ Verified Sprint 37 state:
 - Explicit confirmation is required before financial data is written.
 - Cancellation performs no writes.
 - Import outcome visibility distinguishes validation and persistence results.
+- Exact re-import of successfully imported reader-produced text is blocked by the versioned fingerprint `ledgerforge.raw-text.sha256.v1`.
+- Same-process confirmation serialization prevents two identical confirmations in one running process from both persisting financial history.
+- Document, fingerprint, import-session, transaction and successful completion records are committed atomically by the provider-owned import-history operation.
+- Exact-duplicate rejection performs no supported persistence write and no hydration; successful new import performs one canonical forced hydration.
+- Sprint 40 provides privacy-safe overlapping Axis evidence and accepted ADR-031 architecture for prospective account-scoped Axis UPI transaction-event identity.
 - Developer Console is available behind Developer Mode.
 - Developer Console can reset the development SQLite provider without restart.
 - Runtime Inspector and Repository Summary show runtime account and transaction counts.
@@ -211,10 +231,14 @@ Verified Sprint 37 state:
 
 ### Current Critical Product Issues
 
-- None verified for Sprint 38.
+- Transaction-level duplicate prevention is not implemented. Overlapping statements can still contain the same financial event and create duplicated transaction history.
+- Production transaction-event identity is not implemented. ADR-031 currently approves evidence only for prospective, account-scoped Axis UPI references with deterministic source subtype separation.
+- Broader atomicity across workspace, account, identifier and import-history writes remains unimplemented.
+- Cross-process and external-writer import concurrency guarantees remain unimplemented.
 
 ### Current Important Product Issues
 
+- IMPS, NEFT, e-commerce, unstructured, reversal and refund transaction-event identity remains unsupported pending family-specific source evidence.
 - Some user-facing screens expose developer terminology such as repository or hydration language.
 - Toolbar composition varies across major screens.
 - Several user-facing controls display `Pending` or `Soon` states that add visual noise.
@@ -230,38 +254,29 @@ Verified Sprint 37 state:
 
 ### Ready for Next Feature Sprint?
 
-Ready for Sprint 39 implementation.
+Ready for bounded Sprint 41 repository discovery, planning and approval.
 
 ### Reason
 
-Sprint 38 implementation, validation, manual runtime verification, commit and push are complete. Sprint 39 is defined and ready for implementation; no Sprint 39 implementation work has started.
+Sprint 40 evidence preparation, privacy review, ADR-031 acceptance, validation, commit and push are complete. The next bounded outcome is production implementation of the approved prospective Axis UPI transaction-event evidence path. No Sprint 41 production implementation is verified or active until Chat installs the sole ACTIVE contract in `Project documents/Implementation.md`.
 
-Out of Scope:
+### Current Next-Step Boundary
 
-* PDF support
-* OCR
-* Additional parser behaviour changes
-* Validation redesign
-* Repository redesign
-* Database schema changes
-* Fuzzy account matching or confidence scoring
-* Account merge or conflict-resolution UI
-* Editable import preview
-* Batch import
-* Duplicate-management UI
-* Password-entry UI
-* Import correction workflow
-* Transaction extraction changes
-* Analytics
-* Budgets
-* Insights
-* Reports
-* Multi-currency
-* Investments
+The next implementation may use only repository-verified and ADR-approved scope. At the current verified baseline:
 
-Next Major Milestone:
+- prospective account-scoped Axis UPI transaction-event evidence is approved for bounded implementation;
+- operation and posting-versus-credit-adjustment subtype separation are required;
+- missing or malformed evidence must not prove novelty;
+- weak financial or presentation fields remain ineligible;
+- historical duplicate repair remains future work;
+- duplicate-management UI remains future work;
+- IMPS, NEFT, e-commerce, unstructured, reversal and refund event identity remains unsupported;
+- PDF, XLS, XLSX, OCR, additional institutions, batch import, analytics, multi-currency and investments remain unscheduled future work;
+- broader cross-repository atomicity and cross-process guarantees remain future work.
 
-* Implement Sprint 39.
+### Next Major Milestone
+
+Define, approve and implement the bounded Sprint 41 production transaction-event path governed by ADR-031.
 
 ---
 

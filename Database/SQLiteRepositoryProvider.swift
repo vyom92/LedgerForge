@@ -325,6 +325,20 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
         try priorImportedStatementWithoutTransaction(algorithm: algorithm, fingerprint: fingerprint)
     }
 
+    func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] {
+        var result: [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] = [:]
+        for key in keys {
+            let rows = try db.query(
+                sql: "SELECT account_id, transaction_id, document_id, import_session_id FROM transaction_event_identities WHERE algorithm = ? AND digest = ?;",
+                params: [key.algorithm, key.digest]
+            ) { row in
+                TransactionEventIdentityOwnerDTO(accountId: row.string(at: 0) ?? "", transactionId: row.string(at: 1) ?? "", documentId: row.string(at: 2) ?? "", importSessionId: row.string(at: 3) ?? "")
+            }
+            if let owner = rows.first { result[key] = owner }
+        }
+        return result
+    }
+
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
         try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
         do {
@@ -417,6 +431,14 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
                 }
             }
 
+            let insertEvent = "INSERT INTO transaction_event_identities (id, transaction_id, account_id, document_id, import_session_id, algorithm, digest, created_at) VALUES (?,?,?,?,?,?,?,?);"
+            for event in payload.transactionEventIdentities {
+                try db.executePrepared(sql: insertEvent, params: [
+                    event.id, event.transactionId, event.accountId, event.documentId,
+                    event.importSessionId, event.algorithm, event.digest, event.createdAtISO
+                ])
+            }
+
             try db.executePrepared(
                 sql: "UPDATE import_sessions SET validation_status = ?, completed_at = ?, updated_at = ? WHERE id = ?;",
                 params: ["passed", payload.completedAtISO, payload.completedAtISO, payload.importSession.id]
@@ -481,6 +503,15 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
                   transaction.documentId == payload.document.id else {
                 throw RepositoryError.relationshipViolation("Atomic import-history transaction relationships are inconsistent.")
             }
+        }
+        let transactionsByID = Dictionary(uniqueKeysWithValues: payload.transactions.map { ($0.id, $0) })
+        let keys = payload.transactionEventIdentities.map { TransactionEventIdentityKeyDTO(algorithm: $0.algorithm, digest: $0.digest) }
+        guard Set(keys).count == keys.count,
+              payload.transactionEventIdentities.allSatisfy({ event in
+                  transactionsByID[event.transactionId]?.accountId == event.accountId &&
+                  event.documentId == payload.document.id && event.importSessionId == payload.importSession.id
+              }) else {
+            throw RepositoryError.relationshipViolation("Atomic import-history transaction event identities are inconsistent.")
         }
     }
 }

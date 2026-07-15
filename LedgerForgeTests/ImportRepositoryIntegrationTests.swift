@@ -730,9 +730,11 @@ struct ImportRepositoryIntegrationTests {
         #expect(changedPrepared.fingerprint != firstPrepared.fingerprint)
         #expect(changedPrepared.advisoryPreviousImport == nil)
         let changed = await relaunchedEngine.commitPreparedImport(changedPrepared)
-        #expect(changed.persisted)
-        #expect(changed.transactionCount == 81)
-        #expect(changed.requiresHydration)
+        #expect(!changed.persisted)
+        #expect(changed.transactionEventBlock == .existing(count: 49))
+        #expect(changed.errorMessage == "Overlapping eligible transactions found. Statement blocked.")
+        #expect(!changed.requiresHydration)
+        #expect(try sqliteImportHistoryCounts(relaunchedProvider) == countsBeforeDuplicate)
     }
 
     @Test func legacyUnfingerprintedHistoryIsNotBackfilledAndRegistersProspectively() async throws {

@@ -34,6 +34,7 @@ struct ImportPersistencePayload {
     let importSession: ImportSessionDTO
     let completedAtISO: String
     let transactions: [TransactionDTO]
+    let transactionEventIdentities: [TransactionEventIdentityDTO]
 }
 
 struct ImportPersistenceMapper {
@@ -83,6 +84,29 @@ struct ImportPersistenceMapper {
             createdAtISO: importedAtISO
         )
 
+        let transactions = try financialDocument.transactions.map {
+            try transactionDTO(
+                from: $0,
+                accountId: account.id,
+                importSessionId: importSessionId,
+                documentId: documentId,
+                createdAtISO: importedAtISO
+            )
+        }
+        let eventIdentities = try financialDocument.transactions.compactMap { transaction -> TransactionEventIdentityDTO? in
+            guard let identity = try TransactionEventIdentity.make(transaction: transaction, accountID: accountId) else { return nil }
+            return TransactionEventIdentityDTO(
+                id: "transaction-event-\(identity.transactionID.uuidString.lowercased())",
+                transactionId: identity.transactionID.uuidString,
+                accountId: identity.accountID,
+                documentId: documentId,
+                importSessionId: importSessionId,
+                algorithm: identity.algorithmIdentifier,
+                digest: identity.digest,
+                createdAtISO: importedAtISO
+            )
+        }
+
         return ImportPersistencePayload(
             workspace: WorkspaceDTO(
                 id: workspaceId,
@@ -111,15 +135,8 @@ struct ImportPersistenceMapper {
                 layoutVersion: nil
             ),
             completedAtISO: importedAtISO,
-            transactions: try financialDocument.transactions.map {
-                try transactionDTO(
-                    from: $0,
-                    accountId: account.id,
-                    importSessionId: importSessionId,
-                    documentId: documentId,
-                    createdAtISO: importedAtISO
-                )
-            }
+            transactions: transactions,
+            transactionEventIdentities: eventIdentities
         )
     }
 

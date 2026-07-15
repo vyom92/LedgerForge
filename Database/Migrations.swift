@@ -266,4 +266,24 @@ ALTER TABLE import_sessions ADD COLUMN parser_version TEXT;
 ALTER TABLE import_sessions ADD COLUMN layout_version TEXT;
 """)
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2]
+public let migrationV3 = Migration(version: 3, name: "transaction_event_identities", sql: """
+CREATE TABLE transaction_event_identities (
+  id TEXT PRIMARY KEY,
+  transaction_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  import_session_id TEXT NOT NULL,
+  algorithm TEXT NOT NULL,
+  digest TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  UNIQUE(algorithm, digest),
+  UNIQUE(transaction_id, algorithm),
+  FOREIGN KEY(transaction_id) REFERENCES transactions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_transaction_event_identities_account ON transaction_event_identities(account_id, import_session_id);
+""")
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3]

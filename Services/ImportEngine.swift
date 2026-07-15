@@ -32,6 +32,7 @@ struct ImportEngineResult: Equatable {
     let importSessionId: String?
     let redactedIdentifier: String?
     let previousImport: PreviouslyImportedStatement?
+    let transactionEventBlock: TransactionEventBlock?
 
     init(
         fileName: String,
@@ -42,7 +43,8 @@ struct ImportEngineResult: Equatable {
         accountId: String? = nil,
         importSessionId: String? = nil,
         redactedIdentifier: String? = nil,
-        previousImport: PreviouslyImportedStatement? = nil
+        previousImport: PreviouslyImportedStatement? = nil,
+        transactionEventBlock: TransactionEventBlock? = nil
     ) {
         self.fileName = fileName
         self.transactionCount = transactionCount
@@ -53,6 +55,7 @@ struct ImportEngineResult: Equatable {
         self.importSessionId = importSessionId
         self.redactedIdentifier = redactedIdentifier
         self.previousImport = previousImport
+        self.transactionEventBlock = transactionEventBlock
     }
 
     var succeeded: Bool {
@@ -203,6 +206,8 @@ final class ImportEngine {
                 developerConsole.info(.`import`, "Import completed", metadata: ["file": result.fileName, "transactions": "\(result.transactionCount)"])
             } else if result.previousImport != nil {
                 developerConsole.info(.`import`, "Previously imported statement blocked", metadata: ["transactions": "\(result.transactionCount)"])
+            } else if result.transactionEventBlock != nil {
+                developerConsole.info(.`import`, "Verified transaction event blocked")
             } else {
                 developerConsole.error(.`import`, "Import failed", metadata: ["file": result.fileName, "error": result.errorMessage ?? "Unknown error"])
             }
@@ -382,6 +387,9 @@ final class ImportEngine {
                 developerConsole.info(.database, "Repository persistence completed")
             } else if persistenceResult.previousImport != nil {
                 developerConsole.info(.database, "Repository persistence blocked for previously imported statement")
+            } else if let block = persistenceResult.transactionEventBlock {
+                persistenceErrorMessage = Self.message(for: block)
+                developerConsole.info(.database, "Repository persistence blocked for verified transaction event")
             } else {
                 persistenceErrorMessage = ImportEngineCommitError.persistenceSkipped.localizedDescription
                 developerConsole.error(.database, "Repository persistence skipped")
@@ -402,8 +410,22 @@ final class ImportEngine {
             redactedIdentifier: persistenceResult.persisted
                 ? redactedEligibleIdentifier(in: preparedImport.financialDocument)
                 : nil,
-            previousImport: persistenceResult.previousImport
+            previousImport: persistenceResult.previousImport,
+            transactionEventBlock: persistenceResult.transactionEventBlock
         )
+    }
+
+    private static func message(for block: TransactionEventBlock) -> String {
+        switch block {
+        case .existing:
+            return "Overlapping eligible transactions found. Statement blocked."
+        case .repeatedIncoming:
+            return "Repeated verified transaction evidence found. Statement blocked."
+        case .ownershipConflict:
+            return "Transaction-event ownership conflict. No transaction history was written."
+        case .repositoryIntegrityConflict:
+            return "Repository integrity conflict. No transaction history was written."
+        }
     }
 
     private func redactedEligibleIdentifier(in financialDocument: FinancialDocument) -> String? {

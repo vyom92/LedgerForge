@@ -7,6 +7,22 @@
 
 import Foundation
 
+struct AxisUPITransactionEventEvidence: Equatable, Sendable {
+    enum Operation: String, Equatable, Sendable {
+        case p2a
+        case p2m
+    }
+
+    enum LedgerSubtype: String, Equatable, Sendable {
+        case posting
+        case creditAdjustment = "credit-adjustment"
+    }
+
+    let operation: Operation
+    let reference: String
+    let subtype: LedgerSubtype
+}
+
 struct Transaction: Identifiable {
 
     let id = UUID()
@@ -34,4 +50,5 @@ struct Transaction: Identifiable {
     /// Immutable persistence references retained exclusively through repository hydration.
     var repositoryAccountId: String? = nil
     var repositoryImportSessionId: String? = nil
+    var verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
 }

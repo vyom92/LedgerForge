@@ -28,6 +28,7 @@ private final class InMemoryRepositoryState {
     var documentFingerprints: [String: DocumentFingerprintDTO] = [:]
     var importSessions: [String: ImportSessionRecordDTO] = [:]
     var transactions: [String: TransactionDTO] = [:]
+    var transactionEventIdentities: [String: TransactionEventIdentityDTO] = [:]
 }
 
 private final class InMemoryWorkspaceRepo: WorkspaceRepository {
@@ -216,6 +217,18 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
         return priorImportedStatementWithoutLock(algorithm: algorithm, fingerprint: fingerprint)
     }
 
+    func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] {
+        state.importHistoryLock.lock(); defer { state.importHistoryLock.unlock() }
+        var result: [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] = [:]
+        for event in state.transactionEventIdentities.values {
+            let key = TransactionEventIdentityKeyDTO(algorithm: event.algorithm, digest: event.digest)
+            if keys.contains(key) {
+                result[key] = TransactionEventIdentityOwnerDTO(accountId: event.accountId, transactionId: event.transactionId, documentId: event.documentId, importSessionId: event.importSessionId)
+            }
+        }
+        return result
+    }
+
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
         state.importHistoryLock.lock()
         defer { state.importHistoryLock.unlock() }
@@ -270,11 +283,22 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
                 throw RepositoryError.relationshipViolation("Atomic import-history transaction relationships are inconsistent.")
             }
         }
+        let transactionById = Dictionary(uniqueKeysWithValues: payload.transactions.map { ($0.id, $0) })
+        let eventKeys = payload.transactionEventIdentities.map { TransactionEventIdentityKeyDTO(algorithm: $0.algorithm, digest: $0.digest) }
+        guard Set(eventKeys).count == eventKeys.count,
+              payload.transactionEventIdentities.allSatisfy({ event in
+                  transactionById[event.transactionId]?.accountId == event.accountId &&
+                  event.documentId == payload.document.id && event.importSessionId == payload.importSession.id &&
+                  state.transactionEventIdentities.values.allSatisfy { $0.algorithm != event.algorithm || $0.digest != event.digest }
+              }) else {
+            throw RepositoryError.relationshipViolation("Atomic import-history transaction event identities are inconsistent.")
+        }
 
         var documents = state.documents
         var fingerprints = state.documentFingerprints
         var sessions = state.importSessions
         var transactions = state.transactions
+        var eventIdentities = state.transactionEventIdentities
 
         documents[payload.document.id] = payload.document
         fingerprints[payload.fingerprint.id] = payload.fingerprint
@@ -292,11 +316,13 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
         for transaction in payload.transactions {
             transactions[transaction.id] = transaction
         }
+        for event in payload.transactionEventIdentities { eventIdentities[event.id] = event }
 
         state.documents = documents
         state.documentFingerprints = fingerprints
         state.importSessions = sessions
         state.transactions = transactions
+        state.transactionEventIdentities = eventIdentities
         return .committed
     }
 
