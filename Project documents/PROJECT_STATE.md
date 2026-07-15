@@ -20,11 +20,11 @@ Principles:
 * Latest Documentation Handoff Commit: 7946483f66b18e3735749069ea7ad57812a43a18 — Finalize Sprint 41 documentation handoff
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
-* Latest ADR: ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking (Accepted; implemented in Sprint 41)
+* Latest ADR: ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics (Accepted for Sprint 42; implementation not started)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint State: Sprint 41 — Bounded Axis UPI Transaction-Event Duplicate Blocking (complete and runtime verified)
-* Current Phase: Sprint 41 implementation, automated validation, manual runtime verification and handoff are complete; ready for the next planning cycle without a selected next sprint
+* Current Sprint State: Sprint 42 — Durable Import Attempt History (sole ACTIVE sprint; implementation not started)
+* Current Phase: Sprint 42 planning approved; implementation not started; Sprint 41 remains the latest completed and verified sprint
 * Build Status: Passing
 * Validation Status: Sprint 41 clean Debug build passed; complete configured unit/integration plan passed (175 tests in 26 suites, 0 failures, 0 skipped). Generic `LedgerForgeUITests` remained intentionally disabled.
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
@@ -98,7 +98,7 @@ For parser-verified eligible Axis UPI rows only, confirmation canonicalizes acco
 
 ## Current Work
 
-Active Work: Sprint 41 implementation and verification are complete. No implementation or planning task is currently active.
+Active Work: Sprint 42 planning is approved and recorded as the sole ACTIVE contract; implementation has not started.
 
 Verified planning state:
 
@@ -119,6 +119,15 @@ Verified planning state:
 * Generic `LedgerForgeUITests` remains intentionally disabled and did not execute. Sprint 39 UI behavior was manually verified; the same-reset-database UI relaunch limitation remains, with durable provider recreation covered automatically.
 * Sprint 39 targets same-process serialization and atomic document/fingerprint/import-session/transaction commit only; cross-process guarantees and broader cross-repository atomicity remain future work.
 * No schema migration was required for Sprint 39.
+
+## Approved Sprint 42 Planning State
+
+* Sprint 41 remains the latest completed and verified sprint. Its implementation history, automated validation and manual verification record remain unchanged.
+* ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics is accepted for Sprint 42 implementation.
+* Sprint 42 — Durable Import Attempt History is the sole ACTIVE sprint. It will persist and present privacy-safe, read-only supported import outcomes without treating rejected content as imported financial history or authorizing corrective mutation.
+* Core scope is `FW-P0-07` durable import audit trail and `FW-P1-26` global import-session history. Narrowed scope is read-only supported duplicate review (`FW-P1-25`), supported Axis UPI explanation (`FW-P2-12`), bounded guidance (`FW-P1-29`), import-history account-decision provenance (`FW-P0-10`) and import-attempt provenance (`FW-P2-01`). Broader candidate forms remain future work.
+* Sprint 42 implementation has not started. Build and test status remain the last verified Sprint 41 results: clean Debug build and 175 tests in 26 suites, 0 failures, 0 skipped; generic `LedgerForgeUITests` remained intentionally disabled.
+* No Sprint 42 production, test, schema, migration, fixture or Xcode change is claimed.
 
 ## Verified Sprint 40 State
 

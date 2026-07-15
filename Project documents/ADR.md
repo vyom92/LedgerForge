@@ -1793,3 +1793,48 @@ This ADR does not implement parser extraction, domain models, repository lookup,
 - ADR-027 — Parser-Owned Financial Identifier Extraction
 - ADR-029 — User-Confirmed Financial Identifier Attachment
 - ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit
+
+---
+
+# ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics
+
+## Status
+
+Accepted for Sprint 42 implementation. Implementation has not started at the time this decision is recorded.
+
+## Decision
+
+LedgerForge will maintain a separate durable `import_attempts` ledger. An attempt records that processing was attempted; a successful import session records accepted financial history. Rejected and failed attempts must never be represented as successful imported financial history.
+
+The ledger uses bounded, versionable and privacy-safe outcome, coverage, account-decision and guidance codes. Initial supported outcome families are successful import, validation failure, persistence failure, exact-statement duplicate, existing eligible Axis UPI transaction event, repeated eligible incoming evidence, transaction-event ownership conflict, and repository-integrity conflict only where an authoritative production path detects it. Unsupported or unevaluated coverage is explicit; missing Axis UPI evidence never proves novelty.
+
+ADR-031 remains limited to parser-verified Axis UPI P2A/P2M evidence. It does not generalize to IMPS, NEFT, cards or e-commerce, unstructured references, refunds, reversals or other institutions.
+
+## Privacy boundary
+
+Attempt history must not store or expose raw statement content, unrestricted source fragments, passwords, raw financial identifiers, UPI references, exact fingerprints, transaction-event digests, canonical identity payloads, unrestricted narrations, source paths, unrestricted localized errors or free-form financial validation messages. Presentation uses enumerated codes and trusted repository relationships only.
+
+## Atomicity
+
+Successful attempt persistence participates in the same provider-owned atomic operation as successful import history. Once implemented, a successful financial commit must not exist without its successful attempt record. Rejected-attempt recording cannot weaken or override the original rejection, and failure to record a rejected attempt must never convert rejection into success. An audit write may itself fail when persistence is unavailable, and that limitation must be reported truthfully.
+
+Earlier workspace, account or identifier side effects may occur before the atomic import-history operation. This ADR does not claim complete rollback or redesign broader cross-repository atomicity.
+
+## Migration and provider parity
+
+Sprint 42 may add an additive V4 migration for `import_attempts`. Existing completed successful import sessions may be backfilled only where repository evidence is authoritative. Historical rejected attempts, duplicates, validation failures and persistence failures must not be invented. The migration must not alter financial transactions, fingerprints, identifiers, event ownership, accounts, documents or import-session relationships. SQLite and In-Memory providers must enforce equivalent domain behaviour.
+
+## Presentation scope
+
+The bounded read-only experience may show immediate Import Wizard outcome status, global Imports history, selected attempt detail and trusted navigation to prior successful account/session/document relationships where available. It does not authorize duplicate override, partial import, omission, repair, deletion, reversal, account merge/split or manual identity reassignment. Development diagnostic history and a full validation timeline remain outside this decision.
+
+## Consequences
+
+Users gain durable, privacy-safe explanation of supported import outcomes without conflating rejected content with accepted financial history. The model requires additive persistence, provider parity, migration/backfill rules and bounded presentation. Unsupported families, historical reconstruction, cross-process safety and external-writer safety remain outside authority.
+
+## Related ADRs
+
+- ADR-019 — Reference Fixtures Define Financial Truth
+- ADR-029 — User-Confirmed Financial Identifier Attachment
+- ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit
+- ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking

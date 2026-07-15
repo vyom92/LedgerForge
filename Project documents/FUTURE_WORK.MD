@@ -248,26 +248,6 @@ Do not claim cross-process safety until it is implemented and tested.
 
 ---
 
-## FW-P0-07 — Durable Import Audit Trail
-
-**Status:** Candidate  
-**Depends on:** Existing import-session and provenance foundations
-
-Expand the durable data required to represent:
-
-- successful imports;
-- validation outcomes;
-- persistence failures;
-- duplicate rejection;
-- account decisions;
-- transaction counts;
-- bounded source provenance;
-- completion state.
-
-Do not persist raw statement content, passwords or unredacted financial identifiers for presentation convenience.
-
----
-
 ## FW-P0-08 — Data-Integrity Verification and Repair
 
 **Status:** Blocked  
@@ -305,6 +285,8 @@ Explain why an import:
 Presentation must remain bounded and privacy-safe.
 
 No raw financial identifier may be exposed.
+
+The approved durable-attempt-history increment promotes only account-decision provenance required inside import-attempt history. Broader identity explanation, manual linking and unlinking remain future work.
 
 ---
 
@@ -875,31 +857,11 @@ Extend account choice beyond the bounded no-match workflow while preserving veri
 ## FW-P1-25 — Duplicate-Import Review and Management
 
 **Status:** Ready for discovery
-**Depends on:** Successful completion and approval of Sprints 39, 40 and 41
+**Depends on:** Approved durable-attempt-history supported outcomes plus broader duplicate-management semantics
 
-Provide review for:
-
-- exact duplicate rejection;
-- overlap detection;
-- ambiguous duplicate candidates;
-- historical duplicate repair.
-
-Review, management, historical repair, override and partial-import workflows remain unimplemented.
+Retain future work for duplicate override, partial import, broader duplicate management, ambiguous or speculative duplicate candidates and historical duplicate repair. The approved durable-attempt-history increment covers read-only review of currently supported exact-statement and Axis UPI outcomes only.
 
 ---
-
-## FW-P1-26 — Global Import-Session History
-
-**Status:** Candidate  
-**Depends on:** Durable audit-trail support
-
-Provide the user-facing global history and management experience backed by `FW-P0-07` for:
-
-- successful imports;
-- failed imports;
-- duplicate outcomes;
-- account-associated sessions;
-- sessions without a durable account relationship.
 
 ---
 
@@ -927,6 +889,8 @@ Provide accurate progress and safe cancellation without claiming rollback beyond
 **Depends on:** Existing validation pipeline
 
 Present actionable, user-facing guidance while preserving detailed developer diagnostics separately.
+
+The approved durable-attempt-history increment promotes only bounded enumerated guidance for supported attempt outcomes. Broader validation education and unsupported-result guidance remain future work.
 
 ---
 
@@ -1036,7 +1000,7 @@ Source inspection must never expose passwords or unredacted financial identifier
 ## FW-P1-38 — Import Inspector and Validation Timeline
 
 **Status:** Blocked  
-**Depends on:** `FW-P0-07`
+**Depends on:** A separate approved diagnostic-history and timeline architecture
 
 Provide development-only inspection of an import’s progression through:
 
@@ -1061,7 +1025,7 @@ It must not expose:
 - unrestricted source fragments;
 - production-only sensitive information.
 
-This candidate complements, but does not replace, the user-facing global import history in `FW-P1-26`.
+This candidate remains separate from the user-facing durable import-attempt history and is not promoted by the approved sprint.
 
 ---
 
@@ -1116,6 +1080,8 @@ Persistent diagnostics must not become an application persistence mechanism or a
 **Depends on:** Trusted document and import-session relationships
 
 Show the account, source document and import session from which a transaction originated.
+
+The approved durable-attempt-history increment exposes trusted provenance only within import-attempt history and detail. Dedicated transaction-detail provenance and broader source-document presentation remain future work.
 
 ---
 
@@ -1202,7 +1168,7 @@ Matching must be explainable and reversible.
 **Status:** Ready for discovery
 **Depends on:** Completed Sprint 40 overlap evidence and Sprint 41 bounded transaction-event enforcement
 
-Duplicate-transaction review remains unimplemented and is separate from Sprint 41 bounded enforcement.
+Retain future work for speculative duplicate-transaction candidates, unsupported transaction-event families, historical duplicate review and repair, and workflows requiring reversible mutation. The approved durable-attempt-history increment explains supported Axis UPI transaction-event blocking only.
 
 ---
 
