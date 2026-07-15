@@ -22,4 +22,4 @@ Sprint 41 implements bounded ADR-031 Axis UPI transaction-event duplicate blocki
 
 Only parser-verified Axis UPI P2A/P2M evidence is evaluated. IMPS, NEFT, e-commerce, unstructured rows, reversals and refunds are unsupported. No historical backfill, partial import, duplicate-management UI, cross-process safety or external-writer guarantee exists.
 
-Implementation commit and remote SHA: pending final handoff.
+Implementation commit: `0b387a6` — Implement Sprint 41 Axis UPI duplicate blocking. Remote SHA verification follows the handoff-finalization push.

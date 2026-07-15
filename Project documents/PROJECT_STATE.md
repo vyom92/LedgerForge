@@ -137,6 +137,7 @@ Verified planning state:
 * Incoming repeated eligible identity, existing event ownership and ownership conflict block the whole statement before supported writes. Blocked imports do not hydrate runtime state and rejected attempts are not persisted.
 * Exact-content duplicate behavior remains separate. Unsupported non-UPI families remain unevaluated; no historical backfill, cross-process safety or external-writer safety is claimed.
 * Manual UI/runtime verification is pending. Automated verification passed: clean Debug build and 175 tests in 26 suites, 0 failures.
+* Sprint 41 implementation commit: `0b387a6` — Implement Sprint 41 Axis UPI duplicate blocking. Remote verification is recorded after the handoff-finalization push.
 
 ## Verified Sprint 39 State
 
