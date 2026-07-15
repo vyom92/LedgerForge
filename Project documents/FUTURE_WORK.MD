@@ -207,47 +207,10 @@ The second statement becomes valid only after Chat formally defines and records 
 
 # P0 — Financial Integrity and Persistence Safety
 
-## Sprint 39 Completion Clarification
-
-Sprint 39 exact-statement re-import prevention is complete and governed by ADR-030. Its versioned exact-content fingerprint, bounded duplicate provenance, same-process serialization and provider-owned import-history atomicity are implemented for the production text-import path.
-
-The following remain future work and are not implemented by Sprint 39:
-
-- overlapping-statement and transaction-level duplicate detection (`FW-P0-01`);
-- historical duplicate review and repair (`FW-P0-02` and `FW-P0-17`);
-- broader cross-repository atomicity (`FW-P0-03` and `FW-P0-04`);
-- cross-process and external-writer concurrency guarantees (`FW-P0-05`).
-
-## FW-P0-01 — Transaction Identity and Overlapping-Statement Safety
-
-**Status:** Ready for bounded implementation planning
-**Depends on:** Sprint 39 exact-content protection and Sprint 40 evidence preparation, both complete
-
-Define deterministic and explainable handling for the same financial transaction appearing in different statement files or overlapping statement periods.
-
-Sprint 40 completed the genuine overlapping-export fixture and architecture-preparation portion. ADR-031 accepts only the bounded, parser-owned, account-scoped Axis UPI reference contract `ledgerforge.transaction-event.axis-upi-reference.v1`, with deterministic UPI operation and posting-versus-credit-adjustment subtype separation.
-
-Production extraction, persistence, authoritative lookup and whole-import pre-write blocking remain future work. IMPS, NEFT, e-commerce, unstructured rows, reversal and refund semantics remain unsupported until separate source evidence establishes each family. The accepted Axis UPI boundary must not be generalized into universal overlapping-statement protection.
-
-Candidate outcomes include:
-
-- transaction-level duplicate-event semantics;
-- overlapping-statement detection;
-- protection against inflated income, expense and cash-flow totals;
-- preservation of legitimate repeated transactions;
-- handling of ambiguous duplicate candidates without silently discarding data;
-- transaction-level provenance sufficient to explain the decision.
-
-Exact-statement fingerprinting remains governed by Sprint 39 and must not be reimplemented here.
-
-**May combine with:** A bounded transaction duplicate-review outcome if discovery proves both require one shared architecture.
-
----
-
 ## FW-P0-02 — Historical Duplicate Review and Repair
 
 **Status:** Blocked  
-**Depends on:** `FW-P0-01` and an approved reversible financial-mutation model
+**Depends on:** Successful completion and approval of Sprint 40, plus an approved reversible financial-mutation model
 
 Provide safe review and correction for duplicate transactions already present in durable history.
 
@@ -266,58 +229,10 @@ Historical data must never be silently changed.
 
 ---
 
-## FW-P0-03 — Broader Atomic Import Persistence
-
-**Status:** Blocked  
-**Depends on:** Successful completion and approval of Sprint 39, including its import-history atomicity baseline
-
-Investigate a broader persistence boundary covering:
-
-- workspace;
-- account;
-- financial identifier;
-- document;
-- document fingerprint;
-- import session;
-- transactions;
-- successful completion state.
-
-Preserve:
-
-- repository ownership;
-- SQLite safety;
-- in-memory and SQLite provider parity;
-- `RepositoryStoreHydrator` as the sole persistence-to-runtime boundary.
-
-A new ADR is required if this introduces a general unit-of-work architecture.
-
-**May combine with:** `FW-P0-04` if recovery cannot be designed independently.
-
----
-
-## FW-P0-04 — Partial and Interrupted Import Recovery
-
-**Status:** Blocked  
-**Depends on:** `FW-P0-03` or an approved compensation strategy
-
-Detect and safely recover state left by interrupted or partially completed imports.
-
-Candidate outcomes include identifying:
-
-- incomplete import sessions;
-- orphaned documents;
-- orphaned fingerprints;
-- accounts or identifiers created without completed financial history;
-- repository and runtime-state inconsistencies.
-
-Recovery must be deterministic, inspectable and non-destructive by default.
-
----
-
 ## FW-P0-05 — Concurrent Import Guarantees
 
 **Status:** Blocked  
-**Depends on:** Successful completion and approval of Sprint 39, including its same-process serialization baseline
+**Depends on:** Successful completion and approval of Sprints 40 and 41
 
 Define and enforce deterministic behaviour for:
 
@@ -327,22 +242,9 @@ Define and enforce deterministic behaviour for:
 - identity-resolution races;
 - identifier-attachment races;
 - duplicate-fingerprint claims;
-- transaction-overlap races after `FW-P0-01` defines transaction identity and overlap semantics.
+- transaction-overlap races after Sprint 40 establishes transaction identity and overlap semantics.
 
 Do not claim cross-process safety until it is implemented and tested.
-
----
-
-## FW-P0-06 — Import Failure Recovery and Runtime Reconciliation
-
-**Status:** Candidate  
-**Depends on:** Clear durable persistence and hydration boundaries
-
-Ensure runtime financial state can be reconciled with durable repository state after an import failure.
-
-This candidate concerns post-failure runtime reconciliation. Durable partial-write detection and cleanup remain governed by `FW-P0-04`.
-
-The solution must preserve the rule that runtime financial state changes only after supported persistence succeeds.
 
 ---
 
@@ -382,30 +284,6 @@ Provide privacy-safe verification for:
 - inconsistent completion states.
 
 Repair actions must be explicit, previewed and recoverable.
-
----
-
-## FW-P0-09 — Statement-Period Continuity and Coverage
-
-**Status:** Blocked  
-**Depends on:** Successful completion and approval of Sprint 39
-
-Track statement-period coverage for each durable account and explain:
-
-- gaps between successive statement periods;
-- overlapping statement periods;
-- statements received out of chronological order;
-- revised or replacement statements;
-- periods represented by more than one source document;
-- the relationship between statement continuity and transaction-level duplicate evaluation.
-
-This candidate concerns statement-period history and coverage.
-
-Transaction-level duplicate-event identity remains governed by `FW-P0-01`.
-
-The solution must not infer that a missing period contains no financial activity merely because no statement has been imported.
-
-**May combine with:** `FW-P0-01` if discovery shows that continuity and overlapping-transaction safety require one shared provenance model.
 
 ---
 
@@ -590,7 +468,7 @@ The source digest must remain derived from source evidence rather than being alt
 ## FW-P0-19 — Cross-Format Statement Duplicate Identity
 
 **Status:** Blocked  
-**Depends on:** `FW-P0-01`, `FW-P1-16` and production support for at least two equivalent source formats
+**Depends on:** Successful completion and approval of Sprint 40, `FW-P1-16` and production support for at least two equivalent source formats
 
 Determine when equivalent CSV, PDF, XLS, XLSX or TXT representations describe the same statement even though their exact source bytes differ.
 
@@ -981,7 +859,7 @@ Extend account choice beyond the bounded no-match workflow while preserving veri
 ## FW-P1-25 — Duplicate-Import Review and Management
 
 **Status:** Blocked  
-**Depends on:** Exact-statement and transaction-level duplicate semantics
+**Depends on:** Successful completion and approval of Sprints 39 and 40
 
 Provide review for:
 
@@ -1286,7 +1164,7 @@ Potential actions include notes, categories, rules and safe deletion or exclusio
 ## FW-P2-10 — Transfer Matching Between Owned Accounts
 
 **Status:** Blocked  
-**Depends on:** Reliable multi-account identity and transaction duplicate semantics
+**Depends on:** Reliable multi-account identity and successful completion and approval of Sprint 40
 
 Match both sides of owned-account transfers without counting them as income or expense.
 
@@ -1304,7 +1182,7 @@ Matching must be explainable and reversible.
 ## FW-P2-12 — Duplicate-Transaction Review
 
 **Status:** Blocked  
-**Depends on:** `FW-P0-01`
+**Depends on:** Successful completion and approval of Sprint 40
 
 ---
 
@@ -1672,13 +1550,6 @@ Profiling output must remain separate from financial truth and must not retain s
 
 # P2 — Engineering Quality
 
-## FW-P2-60 — Persistence and Runtime-Gating Failure Injection
-
-**Status:** Candidate  
-**Depends on:** Existing persistence boundaries
-
----
-
 ## FW-P2-61 — Institution, Layout and Format Regression Matrix
 
 **Status:** Blocked  
@@ -1710,7 +1581,7 @@ Profiling output must remain separate from financial truth and must not retain s
 ## FW-P2-65 — Repository Corruption and Recovery Tests
 
 **Status:** Research  
-**Depends on:** Approved recovery architecture
+**Depends on:** Successful completion and approval of Sprint 41
 
 ---
 
@@ -2210,7 +2081,7 @@ The design must preserve:
 - compatibility and versioning rules;
 - isolation from repository and credential internals.
 
-Internal parser-framework expansion remains governed by `FW-P1-06`.
+Internal parser-framework expansion remains governed separately by `FW-P1-06`.
 
 No external plugin system is approved until its security, signing, compatibility and data-access boundaries are defined.
 
