@@ -1,0 +1,93 @@
+{
+  "institution": "Axis Bank",
+  "document_classification": "Bank Account",
+  "account_type": "NRE savings account",
+  "currency": "INR",
+  "expected_parser": "AxisBankAccountParser",
+  "transaction_count": 31,
+  "first_transaction_date": "16-04-2026",
+  "last_transaction_date": "04-07-2026",
+  "declared_statement_period": {
+    "start": "16-04-2026",
+    "end": "16-07-2026"
+  },
+  "opening_balance": "43756.39",
+  "closing_balance": "0.00",
+  "debit_total": "2068503.39",
+  "credit_total": "2024747.00",
+  "computed_final_balance": "0.00",
+  "validation_result": "expected valid",
+  "verified_account_identifier": {
+    "count": 1,
+    "kind": "institution_account_id",
+    "strength": "strong",
+    "verification_state": "verified",
+    "provenance": "institution_structured_field",
+    "matches_sanitized_baseline": true
+  },
+  "candidate_reference_families": [
+    {
+      "family": "axis-upi-reference",
+      "shared_event_count": 15,
+      "accepted_for_adr_031": true
+    },
+    {
+      "family": "axis-imps-reference",
+      "shared_event_count": 7,
+      "accepted_for_adr_031": false
+    },
+    {
+      "family": "axis-neft-reference",
+      "shared_event_count": 2,
+      "accepted_for_adr_031": false
+    },
+    {
+      "family": "axis-ecommerce-reference",
+      "shared_event_count": 0,
+      "accepted_for_adr_031": false
+    }
+  ],
+  "cross_fixture_relationships": {
+    "complete_rows_shared": 30,
+    "rows_unique_to_baseline": 51,
+    "rows_unique_to_overlap": 1,
+    "shared_upi_symbolic_labels": [
+      "SHARED-UPI-001",
+      "SHARED-UPI-002",
+      "SHARED-UPI-003",
+      "SHARED-UPI-004",
+      "SHARED-UPI-005",
+      "SHARED-UPI-006",
+      "SHARED-UPI-007",
+      "SHARED-UPI-008",
+      "SHARED-UPI-009",
+      "SHARED-UPI-010",
+      "SHARED-UPI-011",
+      "SHARED-UPI-012",
+      "SHARED-UPI-013",
+      "SHARED-UPI-014",
+      "SHARED-UPI-015"
+    ],
+    "new_event_symbolic_labels": [
+      "OVERLAP-ONLY-001"
+    ],
+    "recurring_patterns_separated_by_distinct_references": true,
+    "posting_adjustment_shared_reference_groups": 1,
+    "posting_adjustment_identity_outcome": "distinct events separated by deterministic source subtype",
+    "posting_adjustment_fixture_representation": "symbolic relationship verified from original source evidence because the byte-frozen baseline does not encode the original token reuse"
+  },
+  "privacy_assertions": {
+    "uses_fictional_account_identifier": true,
+    "uses_fictional_customer_metadata": true,
+    "contains_no_original_transaction_reference": true,
+    "contains_no_original_counterparty_identity": true,
+    "contains_no_private_mapping": true
+  },
+  "notes": [
+    "This fixture is a deterministic privacy-safe derivative of a genuine independent overlapping Axis Bank export.",
+    "The existing approved 81-row baseline fixture remains unchanged.",
+    "Shared rows reuse the existing baseline sanitization exactly; the one later-only row uses a new fictional instrument and narration.",
+    "The original baseline proves one UPI token reused by a posting and credit-adjustment pair; the relationship is recorded symbolically because the approved baseline fixture is byte-frozen and its earlier anonymization did not preserve that token equality.",
+    "ADR-031 accepts only account-scoped Axis UPI evidence with deterministic posting versus credit-adjustment subtype separation."
+  ]
+}

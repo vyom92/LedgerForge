@@ -220,10 +220,14 @@ The following remain future work and are not implemented by Sprint 39:
 
 ## FW-P0-01 — Transaction Identity and Overlapping-Statement Safety
 
-**Status:** Blocked  
-**Depends on:** Successful completion and approval of Sprint 39
+**Status:** Ready for bounded implementation planning
+**Depends on:** Sprint 39 exact-content protection and Sprint 40 evidence preparation, both complete
 
 Define deterministic and explainable handling for the same financial transaction appearing in different statement files or overlapping statement periods.
+
+Sprint 40 completed the genuine overlapping-export fixture and architecture-preparation portion. ADR-031 accepts only the bounded, parser-owned, account-scoped Axis UPI reference contract `ledgerforge.transaction-event.axis-upi-reference.v1`, with deterministic UPI operation and posting-versus-credit-adjustment subtype separation.
+
+Production extraction, persistence, authoritative lookup and whole-import pre-write blocking remain future work. IMPS, NEFT, e-commerce, unstructured rows, reversal and refund semantics remain unsupported until separate source evidence establishes each family. The accepted Axis UPI boundary must not be generalized into universal overlapping-statement protection.
 
 Candidate outcomes include:
 

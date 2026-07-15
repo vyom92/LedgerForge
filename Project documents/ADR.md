@@ -1630,3 +1630,166 @@ Sprint 39 does not include transaction-level duplicate detection, overlapping-st
 - ADR-026 — Structured Developer Diagnostics
 - ADR-027 — Parser-Owned Financial Identifier Extraction
 - ADR-029 — User-Confirmed Financial Identifier Attachment
+
+---
+
+# ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking
+
+## Status
+
+Accepted
+
+Architecture prepared in Sprint 40; production implementation pending
+
+## Context
+
+ADR-030 prevents exact reader-produced text from being imported twice, but intentionally does not identify the same ledger event across independently generated overlapping statements. Sprint 40 compared two original Axis Bank CSV exports directly before sanitization.
+
+The exports had the same privately verified structured full account identifier, different declared periods, a genuine overlap, 30 identical complete transaction rows and one later-only event. Shared rows retained exact source values and ledger order. Fifteen shared UPI rows retained the same structured 12-digit UPI reference without formatting changes. Recurring transaction patterns used distinct references.
+
+The baseline contained 50 UPI rows and 49 unique UPI references. One reference was reused by two distinct ledger rows: a posting and a later credit adjustment with the same amount in the opposite direction. The token alone is therefore not a transaction-event identity. Deterministic source subtype is required.
+
+IMPS references were stable in seven shared rows, and NEFT references were stable in two, but the supplied evidence did not establish sufficient subtype, reuse and format semantics to approve those families. E-commerce and unstructured rows did not expose an eligible strong reference. No genuine reversal or refund example was present.
+
+The approved sanitized baseline remains byte-for-byte unchanged. Its earlier anonymization did not preserve the original posting/credit-adjustment token equality, so Sprint 40 records that privately verified relationship symbolically in the new expected specification rather than altering historical fixture truth.
+
+## Decision
+
+### Accepted evidence family
+
+The only accepted Sprint 40 transaction-event evidence family is an Axis UPI reference produced by the Axis statement parser.
+
+The proposed versioned algorithm identifier is:
+
+`ledgerforge.transaction-event.axis-upi-reference.v1`
+
+This identifier names the canonical contract. Sprint 40 does not implement it.
+
+### Ownership
+
+Only the selected Axis `StatementParser` may classify source fields as verified Axis UPI transaction-event evidence. Readers and normalizers may preserve exact source values but must not classify event identity. `ImportEngine`, persistence coordinators, repositories, runtime stores, ViewModels and Views must not reconstruct an event reference from narration.
+
+### Required source evidence
+
+A verified version 1 event requires all of:
+
+1. a resolver-selected immutable repository account ID;
+2. parser classification of the source row as Axis UPI;
+3. an exact parser-supported UPI operation component, such as the observed person-to-account or person-to-merchant operation;
+4. exactly 12 ASCII decimal digits in the observed Axis UPI reference component;
+5. a deterministic parser-owned ledger subtype of `posting` or `credit-adjustment`.
+
+Date, amount, direction, narration, running balance, cheque field, SOL, source row, filename and path are excluded from identity. They may remain bounded provenance or corroboration only.
+
+### Scope
+
+Version 1 is scoped to the resolver-selected immutable repository account. No institution-wide, payment-network-wide or cross-account uniqueness is claimed. Account display name, institution label and raw financial identifier are not canonical scope.
+
+### Normalization and canonical serialization
+
+- The family is the lowercase ASCII literal `axis-upi`.
+- The parser-supported operation is converted to its exact lowercase ASCII enum value without fuzzy correction.
+- The reference is preserved as exactly 12 ASCII digits. Whitespace, punctuation, digit insertion, digit removal and Unicode digit conversion are not permitted.
+- The subtype is the lowercase ASCII literal `posting` or `credit-adjustment`.
+- The immutable repository account ID is preserved exactly as its UTF-8 representation.
+
+Canonical serialization is an ordered UTF-8 length-prefixed sequence of:
+
+1. algorithm identifier;
+2. immutable repository account ID;
+3. family;
+4. UPI operation;
+5. 12-digit reference;
+6. ledger subtype.
+
+Each component is encoded as its decimal UTF-8 byte count, one ASCII colon, then the exact component bytes. Components are concatenated without optional fields. The privacy-safe durable representation is the lowercase hexadecimal SHA-256 digest of that canonical byte sequence paired with the algorithm identifier. Raw account identifiers, UPI references and canonical payloads must not be persisted for event-identity lookup, presentation or diagnostics.
+
+### Missing and malformed evidence
+
+A non-UPI row, a UPI row missing any required component, an unsupported operation, an unclassified subtype or a malformed reference produces no verified version 1 event evidence. Weak fields must not fill the gap, and hashing them does not strengthen them.
+
+Absence of verified event evidence is not proof that an event is new. A later implementation must report the bounded coverage accurately and must not claim universal overlapping-statement safety.
+
+### Reused-reference and related-event behavior
+
+- The same account, operation, reference and subtype denotes the same version 1 event candidate.
+- Posting and credit-adjustment rows sharing a reference are distinct events because subtype participates in canonical identity.
+- If two distinct legitimate rows produce the same complete version 1 canonical identity, the result is a conflict. Date, amount, balance, narration or row order must not break the tie. The whole import must be blocked before writes and the family contract must return to architecture review.
+- No reversal or refund subtype is approved in version 1 because the source evidence contained no genuine example. Such rows remain ineligible until a separately verified fixture and ADR amendment define their semantics.
+- IMPS, NEFT, e-commerce, card and unstructured references are not aliases for Axis UPI evidence.
+
+### Future authoritative flow
+
+A later production sprint may implement this bounded flow:
+
+```text
+Axis StatementParser
+        ↓
+Verified Axis UPI event evidence
+        ↓
+Existing validation and explicit confirmation
+        ↓
+Resolver-selected immutable account ID
+        ↓
+Same-process serialized authoritative event lookup
+        ↓
+Whole-import duplicate or conflict decision before mutation
+        ↓
+Atomic import-history commit for accepted event provenance and transactions
+```
+
+The authoritative lookup must occur after deterministic account resolution supplies account scope and before account, identifier, document, session or transaction writes. An incoming batch must also be checked for repeated canonical identities. A duplicate or conflict blocks the whole import; no transaction rows are silently omitted.
+
+Accepted event evidence and its privacy-safe digest must eventually participate in the provider-owned atomic import-history commit established by ADR-030. The same-process serialized confirmation boundary may provide same-process safety only. Cross-process and external-writer guarantees remain future work.
+
+### Compatibility
+
+ADR-019 remains authoritative: the approved baseline financial values and byte-frozen fixture remain unchanged. The new overlapping fixture adds evidence without redefining the original statement's financial truth.
+
+ADR-030 remains authoritative for exact-content fingerprints. Transaction-event evidence neither replaces nor reconstructs `ledgerforge.raw-text.sha256.v1`, does not backfill legacy history and does not use exact-statement metadata as event identity.
+
+Version 1 is prospective only. Existing transactions are not backfilled or heuristically fingerprinted.
+
+## Consequences
+
+Positive consequences:
+
+- Genuine independent source exports support one strong, deterministic family.
+- Parser ownership prevents a second narration-parsing system.
+- Account scope and subtype prevent the observed UPI token reuse from collapsing related but distinct ledger events.
+- Canonical serialization is exact, versioned and privacy-safe to represent durably as a digest.
+- Legitimate recurring patterns remain distinct through distinct source references.
+- No schema, repository or production-code change is required for architecture preparation.
+
+Trade-offs and limitations:
+
+- Version 1 covers only parser-verified Axis UPI rows.
+- Missing or malformed evidence cannot establish novelty.
+- IMPS, NEFT, e-commerce, unstructured, reversal and refund behavior remains unapproved.
+- The frozen baseline fixture does not itself encode the original posting/credit-adjustment reference equality; the expected specification records that verified relationship symbolically.
+- A later implementation needs repository contracts and persistence reviewed against this ADR, but Sprint 40 authorizes none.
+
+## Rejected Alternatives
+
+- Date, amount, direction, narration, running balance or row-position identity.
+- A token-only UPI identity that collapses posting and credit adjustment.
+- Institution-wide or global scope unsupported by the evidence.
+- Generic narration extraction outside the parser.
+- Treating all 12-digit substrings as financial identity.
+- Promoting IMPS or NEFT based only on the small stable overlap.
+- Hashing weak or ambiguous fields and presenting the digest as strong identity.
+- Partial import that silently omits matching rows.
+- Historical transaction backfill.
+
+## Non-Goals
+
+This ADR does not implement parser extraction, domain models, repository lookup, persistence, schema changes, duplicate blocking, partial import, review UI, override, historical repair, statement continuity, global history, transaction mutation, account repair, broader atomicity, cross-process guarantees, PDF identity or cross-format identity.
+
+## Related ADRs
+
+- ADR-017 — Deterministic Before Intelligent
+- ADR-019 — Reference Fixtures Define Financial Truth
+- ADR-025 — Stable Financial Entity Identity
+- ADR-027 — Parser-Owned Financial Identifier Extraction
+- ADR-029 — User-Confirmed Financial Identifier Attachment
+- ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit
