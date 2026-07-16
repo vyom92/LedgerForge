@@ -7,7 +7,7 @@
 - Current accepted ADR: ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics.
 - Architecture baseline: Architecture v1.0 Frozen and UI/UX v1.0 Frozen.
 - Build state: clean Debug build passing for Sprint 43.
-- Latest verified automated result: 185 tests in 27 suites, 0 failures, 0 skipped. Generic `LedgerForgeUITests` remained intentionally disabled.
+- Latest verified automated result: 195 tests in 29 suites, 0 failures, 0 skipped. Generic `LedgerForgeUITests` remained intentionally disabled.
 
 ## Current Production Capability
 
