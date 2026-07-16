@@ -1076,10 +1076,12 @@ struct ContentView: View {
     }
 
     private var canCancelPreparation: Bool {
-        if case .preparing = importState {
+        switch importState {
+        case .preparing, .previewReady, .validationFailed:
             return true
+        default:
+            return false
         }
-        return false
     }
 
     private var totalAccountBalance: Decimal {
@@ -2139,10 +2141,16 @@ struct ContentView: View {
     }
 
     private func cancelPreparedImport() {
-        guard case .preparing(let fileName, _) = importState else {
+        let fileName: String
+        switch importState {
+        case .preparing(let currentFileName, _):
+            fileName = currentFileName
+            preparationOwner.cancel()
+        case .previewReady(let preparedImport), .validationFailed(let preparedImport):
+            fileName = preparedImport.fileName
+        default:
             return
         }
-        preparationOwner.cancel()
         importAccountChoice = nil
         importIdentityReview = .unavailable
         selectedFile = fileName
