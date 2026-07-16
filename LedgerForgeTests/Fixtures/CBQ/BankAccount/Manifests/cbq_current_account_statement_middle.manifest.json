@@ -1,0 +1,131 @@
+{
+  "fixture_id": "cbq_current_account_statement_middle",
+  "fixture_class": "source-faithful sanitized fixture",
+  "sanitization_method": {
+    "classification": "clean_room_pdf_reconstruction",
+    "source_page_objects_reused": false,
+    "source_content_streams_reused": false,
+    "source_images_reused": false,
+    "source_fonts_reused": false,
+    "source_metadata_reused": false,
+    "source_annotations_reused": false
+  },
+  "source_fidelity": {
+    "financial_truth": "exact",
+    "transaction_order": "exact",
+    "page_count": "preserved",
+    "page_dimensions": "preserved",
+    "table_geometry": "measured column and row geometry preserved",
+    "page_break_relationships": "preserved",
+    "private_textual_values": "replaced",
+    "source_object_identity": "not_preserved",
+    "repeated_headers": "preserved_when_present",
+    "multiline_narration_relationships": "preserved"
+  },
+  "institution": "Commercial Bank of Qatar",
+  "family": "current account statement",
+  "account_type": "current account",
+  "source_formats": [
+    "pdf"
+  ],
+  "layout_version": "CBQ-CURRENT-PDF-CLEANROOM-v1",
+  "neutral_source_label": "CBQ-CURRENT-R2-PDF",
+  "candidate_status": "validated",
+  "source_provenance": {
+    "origin": "institution_supplied",
+    "access_state": "owner_unlocked",
+    "verification": "owner_attested",
+    "password_exposed_to_automation": false
+  },
+  "privacy_assertions": {
+    "uses_fictional_customer_metadata": true,
+    "uses_fictional_account_identifier": true,
+    "contains_no_original_transaction_reference": true,
+    "contains_no_original_counterparty_identity": true,
+    "contains_no_private_mapping": true,
+    "contains_no_private_source_path_or_filename": true,
+    "contains_no_source_pdf_object": true
+  },
+  "pdf_text_boundary": {
+    "native_text_available": true,
+    "pdfkit_extraction_usable": true,
+    "pymupdf_extraction_usable": true,
+    "ocr_used": false,
+    "ocr_required_for_fixture": false
+  },
+  "ocr_boundary": {
+    "native_text_available": true,
+    "pdfkit_extraction_usable": true,
+    "pymupdf_extraction_usable": true,
+    "ocr_used": false,
+    "ocr_required_for_fixture": false,
+    "scope": "approved_fixture_layout_only"
+  },
+  "pagination_assertions": {
+    "pdf_page_count": 2,
+    "page_dimensions_points": [
+      595,
+      842
+    ],
+    "repeated_transaction_headers_preserved": true,
+    "page_breaks_preserved": true,
+    "summary_placement_preserved": true
+  },
+  "extraction_order_assertions": {
+    "ordered_financial_projection_preserved": true,
+    "coordinate_aware_extraction_required": true,
+    "multiline_narration_relationships_preserved": true
+  },
+  "positive_structural_anchors": [
+    "ACCOUNT STATEMENT",
+    "Posting Date",
+    "Transaction Description",
+    "Transaction Date",
+    "Debit",
+    "Credit",
+    "Balance",
+    "QATARI RIYAL"
+  ],
+  "negative_structural_anchors": [
+    "credit card statement",
+    "investment statement"
+  ],
+  "ignored_non_transaction_regions": [
+    "freshly reconstructed neutral information page",
+    "page numbering",
+    "statement summary label"
+  ],
+  "period_relationship": {
+    "chronology": "contiguous calendar periods",
+    "opening_closing_continuity": "matches observed adjacent source period",
+    "duplicate_financial_rows": 0
+  },
+  "account_identity_relationship": "same fictional customer and current account across all three periods",
+  "metadata_schema_version": 2,
+  "pdf_assertions": {
+    "page_count": 2,
+    "dimension_tolerance_points": 0.25,
+    "pages": [
+      {
+        "page_index": 0,
+        "width_points": 595.0,
+        "height_points": 842.0
+      },
+      {
+        "page_index": 1,
+        "width_points": 595.0,
+        "height_points": 842.0
+      }
+    ],
+    "native_selectable_text": true,
+    "annotations_present": false,
+    "forms_present": false,
+    "attachments_present": false
+  },
+  "production_support_boundary": {
+    "classification": "fixture_evidence_only",
+    "production_parser_support": false,
+    "production_pdf_support": false,
+    "production_support_claimed": false
+  }
+}

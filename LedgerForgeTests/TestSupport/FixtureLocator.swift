@@ -53,11 +53,27 @@ enum FixtureLocator {
         hdfcBankAccountRoot.appendingPathComponent("Manifests").appendingPathComponent(fileName)
     }
 
+    static func cbqBankAccountPDF(_ fileName: String) -> URL {
+        cbqBankAccountRoot.appendingPathComponent("PDF").appendingPathComponent("v1").appendingPathComponent(fileName)
+    }
+
+    static func cbqBankAccountExpected(_ fileName: String) -> URL {
+        cbqBankAccountRoot.appendingPathComponent("Expected").appendingPathComponent(fileName)
+    }
+
+    static func cbqBankAccountManifest(_ fileName: String) -> URL {
+        cbqBankAccountRoot.appendingPathComponent("Manifests").appendingPathComponent(fileName)
+    }
+
     static func fileExists(at url: URL) -> Bool {
         FileManager.default.fileExists(atPath: url.path)
     }
 
     private static var hdfcBankAccountRoot: URL {
         fixturesRoot.appendingPathComponent("HDFC").appendingPathComponent("BankAccount")
+    }
+
+    private static var cbqBankAccountRoot: URL {
+        fixturesRoot.appendingPathComponent("CBQ").appendingPathComponent("BankAccount")
     }
 }

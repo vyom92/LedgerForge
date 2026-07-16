@@ -1,0 +1,131 @@
+{
+  "fixture_id": "cbq_current_account_statement_middle",
+  "fixture_class": "source-faithful sanitized fixture",
+  "sanitization_method": {
+    "classification": "clean_room_pdf_reconstruction",
+    "source_page_objects_reused": false,
+    "source_content_streams_reused": false,
+    "source_images_reused": false,
+    "source_fonts_reused": false,
+    "source_metadata_reused": false,
+    "source_annotations_reused": false
+  },
+  "institution": "Commercial Bank of Qatar",
+  "document_family": "bank account statement",
+  "account_type": "current account",
+  "source_formats": [
+    "pdf"
+  ],
+  "layout_version": "CBQ-CURRENT-PDF-CLEANROOM-v1",
+  "statement_start_date": "2026-05-01",
+  "statement_end_date": "2026-05-31",
+  "native_currency": "QAR",
+  "transaction_count": 7,
+  "opening_balance": "8424.32",
+  "closing_balance": "7039.17",
+  "debit_total": "42885.15",
+  "credit_total": "41500.00",
+  "computed_closing_balance": "7039.17",
+  "canonical_ordered_financial_transactions": [
+    {
+      "ordinal": 1,
+      "posting_date": "21-May-26",
+      "value_date": "21-May-26",
+      "description": "CHEQUE PAYMENT REF-CHEQUE-002",
+      "debit": "7286.00",
+      "credit": "0",
+      "running_balance": "1138.32",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 2,
+      "posting_date": "24-May-26",
+      "value_date": "24-May-26",
+      "description": "SALARY TRANSFER EMPLOYER-ALPHA REF-MAY-001",
+      "debit": "0",
+      "credit": "41200.00",
+      "running_balance": "42338.32",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 3,
+      "posting_date": "25-May-26",
+      "value_date": "25-May-26",
+      "description": "CARD PURCHASE MERCHANT-ALPHA REF-MAY-002",
+      "debit": "5451.00",
+      "credit": "0",
+      "running_balance": "36887.32",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 4,
+      "posting_date": "25-May-26",
+      "value_date": "25-May-26",
+      "description": "CARD BILL PAYMENT CARD-PRIMARY REF-MAY-003",
+      "debit": "95.45",
+      "credit": "0",
+      "running_balance": "36791.87",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 5,
+      "posting_date": "25-May-26",
+      "value_date": "25-May-26",
+      "description": "CARD PURCHASE MERCHANT-BETA REF-MAY-004",
+      "debit": "29530.00",
+      "credit": "0",
+      "running_balance": "7261.87",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 6,
+      "posting_date": "28-May-26",
+      "value_date": "28-May-26",
+      "description": "CASH DEPOSIT TERMINAL-BETA REF-MAY-005",
+      "debit": "0",
+      "credit": "300.00",
+      "running_balance": "7561.87",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 7,
+      "posting_date": "31-May-26",
+      "value_date": "30-May-26",
+      "description": "CARD BILL PAYMENT CARD-PRIMARY REF-MAY-006",
+      "debit": "522.70",
+      "credit": "0",
+      "running_balance": "7039.17",
+      "source_row_relationship": "preserved"
+    }
+  ],
+  "verified_account_identifier": {
+    "value": "774200000009841",
+    "kind": "institution_account_id",
+    "strength": "strong",
+    "verification_state": "verified",
+    "provenance": "institution_structured_field"
+  },
+  "validation_expectation": "expected valid",
+  "period_relationship": {
+    "chronology": "R1 then R2 then R3",
+    "overlap": "none",
+    "calendar_relationship": "contiguous",
+    "previous_period_closing_matches_opening": true,
+    "closing_matches_next_period_opening": true,
+    "duplicate_financial_rows": 0
+  },
+  "textual_equivalence_boundary": "Financial projection and structural relationships are exact; private textual values are deterministically replaced.",
+  "ocr_boundary": {
+    "native_text_available": true,
+    "pdfkit_extraction_usable": true,
+    "pymupdf_extraction_usable": true,
+    "ocr_used": false,
+    "ocr_required_for_fixture": false,
+    "scope": "approved_fixture_layout_only"
+  },
+  "metadata_schema_version": 2,
+  "fictional_customer_identity": "cbq-current-fixture-customer-001",
+  "fictional_account_identity": "cbq-current-fixture-account-001",
+  "account_relationship": "same fictional current account across all three contiguous periods",
+  "production_support_boundary": "fixture evidence only; no production CBQ PDF parser or PDF support is established"
+}

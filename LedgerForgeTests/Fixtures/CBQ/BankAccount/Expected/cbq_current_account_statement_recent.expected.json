@@ -1,0 +1,151 @@
+{
+  "fixture_id": "cbq_current_account_statement_recent",
+  "fixture_class": "source-faithful sanitized fixture",
+  "sanitization_method": {
+    "classification": "clean_room_pdf_reconstruction",
+    "source_page_objects_reused": false,
+    "source_content_streams_reused": false,
+    "source_images_reused": false,
+    "source_fonts_reused": false,
+    "source_metadata_reused": false,
+    "source_annotations_reused": false
+  },
+  "institution": "Commercial Bank of Qatar",
+  "document_family": "bank account statement",
+  "account_type": "current account",
+  "source_formats": [
+    "pdf"
+  ],
+  "layout_version": "CBQ-CURRENT-PDF-CLEANROOM-v1",
+  "statement_start_date": "2026-06-01",
+  "statement_end_date": "2026-06-30",
+  "native_currency": "QAR",
+  "transaction_count": 9,
+  "opening_balance": "7039.17",
+  "closing_balance": "726.47",
+  "debit_total": "48385.68",
+  "credit_total": "42072.98",
+  "computed_closing_balance": "726.47",
+  "canonical_ordered_financial_transactions": [
+    {
+      "ordinal": 1,
+      "posting_date": "15-Jun-26",
+      "value_date": "15-Jun-26",
+      "description": "INCOMING TRANSFER SENDER-BETA REF-JUN-001",
+      "debit": "0",
+      "credit": "126.98",
+      "running_balance": "7166.15",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 2,
+      "posting_date": "17-Jun-26",
+      "value_date": "17-Jun-26",
+      "description": "TRANSFER FROM CARD-PRIMARY REF-JUN-002",
+      "debit": "0",
+      "credit": "120.00",
+      "running_balance": "7286.15",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 3,
+      "posting_date": "21-Jun-26",
+      "value_date": "21-Jun-26",
+      "description": "CHEQUE PAYMENT REF-CHEQUE-003",
+      "debit": "7286.00",
+      "credit": "0",
+      "running_balance": "0.15",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 4,
+      "posting_date": "25-Jun-26",
+      "value_date": "25-Jun-26",
+      "description": "SALARY TRANSFER EMPLOYER-ALPHA REF-JUN-003",
+      "debit": "0",
+      "credit": "41826.00",
+      "running_balance": "41826.15",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 5,
+      "posting_date": "25-Jun-26",
+      "value_date": "25-Jun-26",
+      "description": "CARD BILL PAYMENT CARD-PRIMARY REF-JUN-004",
+      "debit": "2057.90",
+      "credit": "0",
+      "running_balance": "39768.25",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 6,
+      "posting_date": "28-Jun-26",
+      "value_date": "28-Jun-26",
+      "description": "STATEMENT SERVICE CHARGE REF-JUN-005",
+      "debit": "40.00",
+      "credit": "0",
+      "running_balance": "39728.25",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 7,
+      "posting_date": "28-Jun-26",
+      "value_date": "28-Jun-26",
+      "description": "CARD PURCHASE MERCHANT-ALPHA REF-JUN-006",
+      "debit": "7762.00",
+      "credit": "0",
+      "running_balance": "31966.25",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 8,
+      "posting_date": "28-Jun-26",
+      "value_date": "28-Jun-26",
+      "description": "CARD PURCHASE MERCHANT-BETA REF-JUN-007",
+      "debit": "31030.00",
+      "credit": "0",
+      "running_balance": "936.25",
+      "source_row_relationship": "preserved"
+    },
+    {
+      "ordinal": 9,
+      "posting_date": "01-Jul-26",
+      "value_date": "01-Jul-26",
+      "description": "CARD BILL PAYMENT CARD-PRIMARY REF-JUL-001",
+      "debit": "209.78",
+      "credit": "0",
+      "running_balance": "726.47",
+      "source_row_relationship": "preserved"
+    }
+  ],
+  "verified_account_identifier": {
+    "value": "774200000009841",
+    "kind": "institution_account_id",
+    "strength": "strong",
+    "verification_state": "verified",
+    "provenance": "institution_structured_field"
+  },
+  "validation_expectation": "expected valid",
+  "period_relationship": {
+    "chronology": "R1 then R2 then R3",
+    "overlap": "none",
+    "calendar_relationship": "contiguous",
+    "previous_period_closing_matches_opening": true,
+    "closing_matches_next_period_opening": null,
+    "duplicate_financial_rows": 0
+  },
+  "textual_equivalence_boundary": "Financial projection and structural relationships are exact; private textual values are deterministically replaced.",
+  "ocr_boundary": {
+    "native_text_available": true,
+    "pdfkit_extraction_usable": true,
+    "pymupdf_extraction_usable": true,
+    "ocr_used": false,
+    "ocr_required_for_fixture": false,
+    "scope": "approved_fixture_layout_only"
+  },
+  "metadata_schema_version": 2,
+  "fictional_customer_identity": "cbq-current-fixture-customer-001",
+  "fictional_account_identity": "cbq-current-fixture-account-001",
+  "account_relationship": "same fictional current account across all three contiguous periods",
+  "production_support_boundary": "fixture evidence only; no production CBQ PDF parser or PDF support is established"
+}
