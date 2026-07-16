@@ -1,0 +1,182 @@
+{
+  "metadata_schema_version": 2,
+  "fixture_id": "cbq_credit_card_statement_v1_earlier",
+  "fixture_class": "source-faithful sanitized fixture",
+  "sanitization_method": {
+    "classification": "clean_room_pdf_reconstruction",
+    "source_page_objects_reused": false,
+    "source_content_streams_reused": false,
+    "source_images_reused": false,
+    "source_fonts_reused": false,
+    "source_metadata_reused": false,
+    "source_annotations_reused": false,
+    "source_xobjects_reused": false,
+    "source_font_objects_or_subsets_reused": false,
+    "source_forms_reused": false,
+    "source_attachments_reused": false,
+    "source_links_reused": false,
+    "rasterized_source_backgrounds_reused": false
+  },
+  "source_fidelity": {
+    "financial_truth": "exact",
+    "transaction_order": "exact",
+    "page_count": "preserved",
+    "page_dimensions": "preserved",
+    "table_geometry": "preserved_within_declared_tolerances",
+    "summary_region_geometry": "preserved_within_declared_tolerances",
+    "column_anchor_geometry": "preserved_within_declared_tolerances",
+    "transaction_baseline_geometry": "preserved_within_declared_tolerances",
+    "page_break_relationships": "preserved",
+    "repeated_header_relationships": "preserved",
+    "multiline_narration_relationships": "preserved_within_declared_tolerances_when_present",
+    "instrument_section_relationships": "preserved",
+    "fx_evidence_relationships": "preserved_when_present",
+    "promotional_region_content": "replaced_non_transactional",
+    "private_textual_values": "replaced",
+    "source_object_identity": "not_preserved"
+  },
+  "geometry_assertions": {
+    "coordinate_system": {
+      "origin": "top_left",
+      "x_direction": "right",
+      "y_direction": "down",
+      "unit": "pdf_point"
+    },
+    "tolerances_points": {
+      "page_dimensions": 0.25,
+      "table_region_bounds": 2.0,
+      "summary_region_bounds": 2.0,
+      "column_anchors": 1.5,
+      "header_baselines": 1.5,
+      "transaction_baselines": 2.0,
+      "amount_alignment_anchors": 1.5,
+      "multiline_indentation": 2.0,
+      "multiline_spacing": 2.0,
+      "section_bounds": 2.0,
+      "footer_region_bounds": 3.0
+    },
+    "maximum_observed_deviation_points": {
+      "page_dimensions": 0.0,
+      "table_region_bounds": 0.0,
+      "summary_region_bounds": 0.0,
+      "column_anchors": 0.0,
+      "header_baselines": 0.346,
+      "transaction_baselines": 0.957,
+      "amount_alignment_anchors": 0.0,
+      "multiline_indentation": null,
+      "multiline_spacing": null,
+      "section_bounds": 0.0,
+      "footer_region_bounds": 0.0
+    },
+    "mean_observed_deviation_points": {
+      "page_dimensions": 0.0,
+      "table_region_bounds": 0.0,
+      "summary_region_bounds": 0.0,
+      "column_anchors": 0.0,
+      "header_baselines": 0.288,
+      "transaction_baselines": 0.957,
+      "amount_alignment_anchors": 0.0,
+      "multiline_indentation": null,
+      "multiline_spacing": null,
+      "section_bounds": 0.0,
+      "footer_region_bounds": 0.0
+    },
+    "observation_counts": {
+      "page_dimensions": 6,
+      "table_region_bounds": 2,
+      "summary_region_bounds": 1,
+      "column_anchors": 10,
+      "header_baselines": 12,
+      "transaction_baselines": 28,
+      "amount_alignment_anchors": 28,
+      "multiline_indentation": 0,
+      "multiline_spacing": 0,
+      "section_bounds": 2,
+      "footer_region_bounds": 2
+    },
+    "exact_relationships": {
+      "page_assignment": true,
+      "transaction_order": true,
+      "instrument_section_assignment": true,
+      "page_break_relationships": true,
+      "repeated_headers": true,
+      "continuation_classification": true,
+      "transaction_count": true,
+      "summary_field_membership": true,
+      "transaction_vs_ignored_region_classification": true
+    },
+    "independent_comparator_passed": true,
+    "measurement_status": {
+      "page_dimensions": "measured",
+      "table_region_bounds": "measured",
+      "summary_region_bounds": "measured",
+      "column_anchors": "measured",
+      "header_baselines": "measured",
+      "transaction_baselines": "measured",
+      "amount_alignment_anchors": "measured",
+      "multiline_indentation": "not_applicable",
+      "multiline_spacing": "not_applicable",
+      "section_bounds": "measured",
+      "footer_region_bounds": "measured"
+    }
+  },
+  "pdf_assertions": {
+    "page_count": 3,
+    "dimension_tolerance_points": 0.25,
+    "pages": [
+      {
+        "page_index": 0,
+        "width_points": 595.0,
+        "height_points": 842.0
+      },
+      {
+        "page_index": 1,
+        "width_points": 595.0,
+        "height_points": 842.0
+      },
+      {
+        "page_index": 2,
+        "width_points": 595.0,
+        "height_points": 842.0
+      }
+    ],
+    "native_selectable_text": true,
+    "annotations_present": false,
+    "forms_present": false,
+    "attachments_present": false
+  },
+  "ocr_boundary": {
+    "native_text_available": true,
+    "pdfkit_extraction_usable": true,
+    "pymupdf_extraction_usable": true,
+    "ocr_used": false,
+    "ocr_required_for_fixture": false,
+    "scope": "approved_fixture_layout_only"
+  },
+  "source_provenance": {
+    "origin": "institution_supplied",
+    "access_state": "owner_unlocked",
+    "verification": "owner_attested",
+    "password_exposed_to_automation": false
+  },
+  "privacy_assertions": {
+    "uses_fictional_customer_metadata": true,
+    "uses_fictional_account_identifier": true,
+    "contains_no_original_card_identifier": true,
+    "contains_no_original_transaction_reference": true,
+    "contains_no_original_merchant_identity": true,
+    "contains_no_private_mapping": true,
+    "contains_no_private_source_path_or_filename": true,
+    "contains_no_source_pdf_object": true,
+    "uses_fictional_instrument_identities": true
+  },
+  "production_support_boundary": {
+    "classification": "fixture_evidence_only",
+    "production_parser_support": false,
+    "card_domain_semantics_finalized": false,
+    "adr_implication": false,
+    "persistence_or_migration_implication": false,
+    "ledgerforge_import_support_claimed": false,
+    "fw_p1_09_status": "blocked"
+  }
+}

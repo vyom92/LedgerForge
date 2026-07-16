@@ -7,7 +7,7 @@
 - Current accepted ADR: ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics.
 - Architecture baseline: Architecture v1.0 Frozen and UI/UX v1.0 Frozen.
 - Build state: clean Debug build passing for Sprint 43.
-- Latest verified automated result: 212 tests in 31 suites, 0 failures, 0 skipped. Generic `LedgerForgeUITests` remained intentionally disabled.
+- Latest verified automated result: 222 tests in 32 suites, 0 failures, 0 skipped. Generic `LedgerForgeUITests` remained intentionally disabled.
 
 ## Current Production Capability
 
@@ -45,6 +45,7 @@
 - Source-faithful sanitized Axis NRO CSV, PDF and XLS regression evidence is integrated across two overlapping ranges. Range 1 records institution-supplied cross-format divergence; these fixtures do not constitute Axis NRO production parser support.
 - Clean-room HDFC NRE and NRO fixture evidence is integrated for annual and recent PDF and legacy-XLS periods. Every PDF/XLS pair reconciles; the PDFs retain native selectable text without OCR and preserve the verified financial, geometric, pagination and multiline relationships while intentionally not preserving source PDF object identity. HDFC production parsing remains unsupported.
 - Clean-room CBQ current-account PDF fixture evidence is integrated for April, May and June 2026. The periods are contiguous, non-overlapping and balance-continuous with 10, 7 and 9 canonical transactions. The approved layouts retain native selectable text without OCR and preserve their declared pagination, dimensions, repeated-header and multiline relationships while intentionally not preserving source PDF object identity. CBQ production parsing remains unsupported.
+- Clean-room CBQ credit-card PDF fixture evidence is integrated for four consecutive, non-overlapping periods across the v1 legacy and v2 equation-style layouts with 28, 14, 11 and 23 canonical transactions. One fictional customer and account continue across the layout transition; primary and supplementary instrument relationships and exact transaction assignment are preserved. Posted QAR remains distinct from original merchant amount and currency evidence; missing FX rates, markup, taxes and absent aggregates were not derived, while source-observed fees remain explicit. The PDFs retain native selectable text without OCR and preserve the declared geometry, pagination, continuation, summary-membership and instrument relationships while intentionally not preserving source PDF object identity. CBQ card production parsing and card semantics remain unsupported.
 - Clean-room American Express card-statement PDF fixture evidence is integrated for two contiguous periods from 2026-04-24 through 2026-06-23 with 61 and 34 canonical transactions. One fictional customer, account and instrument relationship continues; account-level payments remain distinct from instrument transactions; posted QAR remains separate from original merchant amount and currency evidence present for 49 and 10 transactions; and missing FX rates, fees, markup and tax were not derived. The PDFs retain native selectable text without OCR and preserve the declared pagination, geometry, rewards, legal and multiline relationships while intentionally not preserving source PDF object identity. American Express production parsing and card semantics remain unsupported.
 
 ## Planning Boundary

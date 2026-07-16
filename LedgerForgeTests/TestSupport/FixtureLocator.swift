@@ -65,6 +65,18 @@ enum FixtureLocator {
         cbqBankAccountRoot.appendingPathComponent("Manifests").appendingPathComponent(fileName)
     }
 
+    static func cbqCreditCardPDF(_ fileName: String, layoutVersion: String) -> URL {
+        cbqCreditCardRoot.appendingPathComponent("PDF").appendingPathComponent(layoutVersion).appendingPathComponent(fileName)
+    }
+
+    static func cbqCreditCardExpected(_ fileName: String) -> URL {
+        cbqCreditCardRoot.appendingPathComponent("Expected").appendingPathComponent(fileName)
+    }
+
+    static func cbqCreditCardManifest(_ fileName: String) -> URL {
+        cbqCreditCardRoot.appendingPathComponent("Manifests").appendingPathComponent(fileName)
+    }
+
     static func americanExpressCardStatementPDF(_ fileName: String) -> URL {
         americanExpressCardStatementRoot.appendingPathComponent("PDF").appendingPathComponent("v1").appendingPathComponent(fileName)
     }
@@ -87,6 +99,10 @@ enum FixtureLocator {
 
     private static var cbqBankAccountRoot: URL {
         fixturesRoot.appendingPathComponent("CBQ").appendingPathComponent("BankAccount")
+    }
+
+    private static var cbqCreditCardRoot: URL {
+        fixturesRoot.appendingPathComponent("CBQ").appendingPathComponent("CreditCard")
     }
 
     private static var americanExpressCardStatementRoot: URL {
