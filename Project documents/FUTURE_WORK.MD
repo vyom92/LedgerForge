@@ -883,12 +883,16 @@ Safely reverse one import without damaging unrelated account history.
 
 ---
 
-## FW-P1-28 — Import Progress, Cancellation and Retry
+## FW-P1-28 — Confirmed-Persistence Recovery and Unsupported Retry
 
-**Status:** Ready for discovery  
-**Depends on:** Clearly defined persistence and cancellation boundaries
+**Status:** Candidate
+**Depends on:** Typed authoritative persistence-failure outcomes and repository-safe retry semantics
 
-Provide accurate progress and safe cancellation without claiming rollback beyond supported persistence guarantees.
+Preparation now has truthful named stages, one owned cancellable operation, and bounded fresh retry for typed source-reading failures. Retain only the unscheduled recovery boundary:
+
+- determine whether any confirmed persistence failure can safely start a wholly fresh preparation without weakening authoritative repository checks;
+- retain unsupported retry families as unavailable until their typed outcome and safety evidence exist;
+- do not add persistence rollback, resumable jobs, batch queues or cancellation after confirmed persistence.
 
 ---
 
@@ -1569,13 +1573,6 @@ Profiling output must remain separate from financial truth and must not retain s
 **Depends on:** Additional supported fixtures
 
 Expand currency regression coverage once a second production currency exists; do not create a separate mixed-currency regression candidate.
-
----
-
-## FW-P2-62 — Direct Cancellation-Handler Tests
-
-**Status:** Candidate  
-**Depends on:** Existing confirmation workflow
 
 ---
 
