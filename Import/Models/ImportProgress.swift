@@ -1,5 +1,5 @@
 // Import/Models/ImportProgress.swift
-// Typed progress state for future import orchestration
+// Typed, privacy-safe preparation progress for import orchestration
 
 import Foundation
 
@@ -18,10 +18,65 @@ public struct ImportProgress: Equatable, Sendable {
 }
 
 public enum ImportProgressPhase: String, Equatable, Sendable {
-    case queued
-    case selectingReader
-    case resolvingPassword
-    case readingDocument
-    case completed
-    case failed
+    case openingSource
+    case detectingInstitution
+    case classifyingStatement
+    case selectingParser
+    case parsingFinancialContent
+    case validatingPreparedContent
+    case preparingConfirmationPreview
+
+    public var userFacingTitle: String {
+        switch self {
+        case .openingSource:
+            return "Opening statement"
+        case .detectingInstitution:
+            return "Detecting institution"
+        case .classifyingStatement:
+            return "Classifying statement"
+        case .selectingParser:
+            return "Selecting parser"
+        case .parsingFinancialContent:
+            return "Parsing financial content"
+        case .validatingPreparedContent:
+            return "Validating prepared content"
+        case .preparingConfirmationPreview:
+            return "Preparing confirmation preview"
+        }
+    }
+}
+
+@MainActor
+final class ImportPreparationTaskOwner {
+    private(set) var activeOperationID: UUID?
+    private var activeTask: Task<Void, Never>?
+
+    func start(operation: @escaping @MainActor (UUID) async -> Void) -> UUID {
+        cancel()
+
+        let operationID = UUID()
+        activeOperationID = operationID
+        activeTask = Task {
+            await operation(operationID)
+        }
+        return operationID
+    }
+
+    func isCurrent(_ operationID: UUID) -> Bool {
+        activeOperationID == operationID
+    }
+
+    func finish(_ operationID: UUID) {
+        guard activeOperationID == operationID else {
+            return
+        }
+        activeOperationID = nil
+        activeTask = nil
+    }
+
+    func cancel() {
+        activeTask?.cancel()
+        activeTask = nil
+        activeOperationID = nil
+    }
 }

@@ -155,13 +155,6 @@ struct PreparedImport: Identifiable {
     }
 }
 
-private struct ImportFormatProcessingResult {
-    let document: Document
-    let metadata: DocumentMetadata
-    let normalization: CSVNormalizationResult
-    let parser: StatementParser?
-}
-
 final class ImportEngine {
 
     static let shared = ImportEngine()
@@ -240,8 +233,14 @@ final class ImportEngine {
 
     }
 
-    func prepareImport(from url: URL) async throws -> PreparedImport {
+    func prepareImport(
+        from url: URL,
+        requestId: UUID = UUID(),
+        progress: @escaping (ImportProgress) -> Void = { _ in }
+    ) async throws -> PreparedImport {
+        try publishPreparationProgress(.openingSource, requestId: requestId, progress: progress)
         let contents = try await readTextDocument(from: url)
+        try Task.checkCancellation()
         let fingerprint = ExactStatementFingerprint(text: contents)
 
         guard !contents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -249,51 +248,75 @@ final class ImportEngine {
             throw ImportError.invalidDocument(message: "Imported document is empty.")
         }
 
-        let processedDocument = processCSVDocument(contents: contents, url: url)
+        try publishPreparationProgress(.detectingInstitution, requestId: requestId, progress: progress)
+        let metadata = InstitutionDetector().detect(from: contents)
 
-        developerConsole.info(.`import`, "Institution detected", metadata: ["institution": processedDocument.metadata.institution.rawValue])
-        developerConsole.info(.`import`, "Parser selected", metadata: ["parser": processedDocument.parser?.name ?? "None"])
+        try publishPreparationProgress(.classifyingStatement, requestId: requestId, progress: progress)
+        let analyzer = CSVAnalyzer()
+        let document = analyzer.analyze(
+            text: contents,
+            fileURL: url
+        )
+
+        let normalizer = CSVNormalizer()
+        let normalization = normalizer.normalizeWithSourceContext(
+            text: contents,
+            document: document
+        )
+
+        try publishPreparationProgress(.selectingParser, requestId: requestId, progress: progress)
+        let parser = StatementParserRegistry.shared.parser(
+            for: document,
+            metadata: metadata
+        )
+
+        developerConsole.info(.`import`, "Institution detected", metadata: ["institution": metadata.institution.rawValue])
+        developerConsole.info(.`import`, "Parser selected", metadata: ["parser": parser?.name ?? "None"])
 
         // Parser internals (Debug)
         developerConsole.debug(.parser, "Detected document", metadata: [
-            "file": processedDocument.document.filename,
-            "rows": "\(processedDocument.document.rowCount)",
-            "columns": "\(processedDocument.document.columnCount)",
-            "headerRow": "\(processedDocument.document.headerRow ?? -1)",
-            "firstTxnRow": "\(processedDocument.document.firstTransactionRow ?? -1)",
-            "delimiter": String(processedDocument.document.delimiter ?? "?"),
-            "encoding": processedDocument.document.encoding ?? "Unknown"
+            "file": document.filename,
+            "rows": "\(document.rowCount)",
+            "columns": "\(document.columnCount)",
+            "headerRow": "\(document.headerRow ?? -1)",
+            "firstTxnRow": "\(document.firstTransactionRow ?? -1)",
+            "delimiter": String(document.delimiter ?? "?"),
+            "encoding": document.encoding ?? "Unknown"
         ])
         developerConsole.debug(.parser, "Normalization details", metadata: [
-            "normalizedRows": "\(processedDocument.normalization.rows.count)"
+            "normalizedRows": "\(normalization.rows.count)"
         ])
 
-        guard let parser = processedDocument.parser else {
+        guard let parser else {
             developerConsole.warning(.`import`, "No suitable parser found.")
             throw ImportError.invalidDocument(message: "No suitable parser found.")
         }
 
         let normalizedDocument = NormalizedDocument(
-            document: processedDocument.document,
-            metadata: processedDocument.metadata,
-            rows: processedDocument.normalization.rows,
-            sourceContext: processedDocument.normalization.sourceContext
+            document: document,
+            metadata: metadata,
+            rows: normalization.rows,
+            sourceContext: normalization.sourceContext
         )
 
+        try publishPreparationProgress(.parsingFinancialContent, requestId: requestId, progress: progress)
         let financialDocument = try parser.parse(
             document: normalizedDocument
         )
+        try Task.checkCancellation()
         developerConsole.debug(.parser, "Row count", metadata: ["transactions": "\(financialDocument.transactions.count)"])
 
+        try publishPreparationProgress(.validatingPreparedContent, requestId: requestId, progress: progress)
         let validation = ImportValidator.validate(
             financialDocument: financialDocument
         )
+        try Task.checkCancellation()
         developerConsole.info(.validation, "Validation completed", metadata: ["passed": validation.passed ? "true" : "false", "issues": "\(validation.issues.count)"])
 
         let importSession = ImportSession(
-            fileName: processedDocument.document.filename,
-            institution: processedDocument.metadata.institution,
-            documentType: processedDocument.metadata.documentType,
+            fileName: document.filename,
+            institution: metadata.institution,
+            documentType: metadata.documentType,
             parserName: parser.name,
             transactionCount: financialDocument.transactions.count,
             validation: validation
@@ -301,13 +324,16 @@ final class ImportEngine {
         let advisoryPreviousImport = validation.passed
             ? try importPersistenceCoordinatorFactory().priorImportedStatement(fingerprint: fingerprint)
             : nil
+        try Task.checkCancellation()
+
+        try publishPreparationProgress(.preparingConfirmationPreview, requestId: requestId, progress: progress)
 
         return PreparedImport(
             sourceURL: url,
             rawContents: contents,
-            fileName: processedDocument.document.filename,
-            detectedInstitution: processedDocument.metadata.institution,
-            detectedDocumentType: processedDocument.metadata.documentType,
+            fileName: document.filename,
+            detectedInstitution: metadata.institution,
+            detectedDocumentType: metadata.documentType,
             parserName: parser.name,
             financialDocument: financialDocument,
             validation: validation,
@@ -470,36 +496,27 @@ final class ImportEngine {
         return true
     }
 
-    private func processCSVDocument(contents: String, url: URL) -> ImportFormatProcessingResult {
-        let metadata = InstitutionDetector().detect(from: contents)
-        let analyzer = CSVAnalyzer()
-        let document = analyzer.analyze(
-            text: contents,
-            fileURL: url
-        )
-
-        let normalizer = CSVNormalizer()
-        let normalization = normalizer.normalizeWithSourceContext(
-            text: contents,
-            document: document
-        )
-
-        let parser = StatementParserRegistry.shared.parser(
-            for: document,
-            metadata: metadata
-        )
-
-        return ImportFormatProcessingResult(
-            document: document,
-            metadata: metadata,
-            normalization: normalization,
-            parser: parser
+    private func publishPreparationProgress(
+        _ phase: ImportProgressPhase,
+        requestId: UUID,
+        progress: @escaping (ImportProgress) -> Void
+    ) throws {
+        try Task.checkCancellation()
+        progress(
+            ImportProgress(
+                requestId: requestId,
+                phase: phase,
+                completedUnitCount: 0,
+                totalUnitCount: 0
+            )
         )
     }
 
     private func readTextDocument(from url: URL) async throws -> String {
+        try Task.checkCancellation()
         let request = ImportRequest(fileURL: url)
         let result = await importCoordinator.importDocument(request)
+        try Task.checkCancellation()
 
         guard result.status == .succeeded, let rawDocument = result.rawDocument else {
             throw result.error ?? ImportError.unknown(message: "Import coordinator returned no document.")

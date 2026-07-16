@@ -65,18 +65,19 @@ private enum AppShellSection: String, CaseIterable {
 
 private enum ImportPresentationState {
     case idle
-    case preparing(String)
+    case preparing(fileName: String, phase: ImportProgressPhase)
     case previewReady(PreparedImport)
     case validationFailed(PreparedImport)
     case committing(PreparedImport)
     case completed(ImportOutcomePresentation)
-    case failed(fileName: String, message: String)
+    case cancelled(fileName: String)
+    case failed(fileName: String, message: String, retrySourceURL: URL?)
 }
 
 private extension ImportPresentationState {
     var isTerminal: Bool {
         switch self {
-        case .completed, .failed:
+        case .completed, .cancelled, .failed:
             return true
         default:
             return false
@@ -190,6 +191,7 @@ struct ContentView: View {
     @State private var showingImporter = false
     @State private var selectedFile = "No statement imported"
     @State private var importState: ImportPresentationState = .idle
+    @State private var preparationOwner = ImportPreparationTaskOwner()
     @State private var importIdentityReview: ImportIdentityReview = .unavailable
     @State private var importAccountChoice: ImportAccountChoice?
     @StateObject private var dashboardViewModel = DashboardViewModel()
@@ -231,16 +233,11 @@ struct ContentView: View {
         ) { result in
             switch result {
             case .success(let url):
-                selectedFile = url.lastPathComponent
-                importState = .preparing(url.lastPathComponent)
-                selectedSection = .imports
-                Task {
-                    await prepareImport(from: url)
-                }
+                beginPreparation(from: url)
 
             case .failure(let error):
                 selectedFile = error.localizedDescription
-                importState = .failed(fileName: "Import failed", message: error.localizedDescription)
+                importState = .failed(fileName: "Import failed", message: error.localizedDescription, retrySourceURL: nil)
                 selectedSection = .imports
             }
         }
@@ -588,18 +585,28 @@ struct ContentView: View {
             .frame(maxHeight: .infinity)
 
             HStack {
-                Button {
-                    cancelPreparedImport()
-                } label: {
-                    Text("Cancel")
-                        .padding(.horizontal, 42)
+                if case .committing = importState {
+                    Label("Cancellation unavailable", systemImage: "lock.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(LFTheme.textSecondary)
+                        .padding(.horizontal, 18)
                         .padding(.vertical, 13)
-                        .background(LFTheme.surface)
+                        .background(LFTheme.surface.opacity(0.65))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    Button {
+                        cancelPreparedImport()
+                    } label: {
+                        Text("Cancel")
+                            .padding(.horizontal, 42)
+                            .padding(.vertical, 13)
+                            .background(LFTheme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .contentShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canCancelPreparation)
                 }
-                .buttonStyle(.plain)
-                .disabled(importState.isTerminal)
 
                 Spacer()
 
@@ -1054,6 +1061,8 @@ struct ContentView: View {
             return 5
         case .failed:
             return 2
+        case .cancelled:
+            return 1
         }
     }
 
@@ -1064,6 +1073,13 @@ struct ContentView: View {
         default:
             return false
         }
+    }
+
+    private var canCancelPreparation: Bool {
+        if case .preparing = importState {
+            return true
+        }
+        return false
     }
 
     private var totalAccountBalance: Decimal {
@@ -1324,19 +1340,29 @@ struct ContentView: View {
                     icon: "doc.text",
                     color: LFTheme.info
                 )
-            case .preparing(let fileName):
+            case .preparing(let fileName, let phase):
                 VStack(alignment: .leading, spacing: 12) {
                     importedFileRow(
                         name: fileName,
-                        subtitle: "Preparing read-only preview",
+                        subtitle: phase.userFacingTitle,
                         icon: "hourglass",
                         color: LFTheme.warning
                     )
                     ProgressView()
                         .controlSize(.small)
+                    Text("Preparing a read-only preview. You can cancel before confirmation.")
+                        .font(.caption)
+                        .foregroundStyle(LFTheme.textSecondary)
                 }
             case .previewReady(let preparedImport), .validationFailed(let preparedImport), .committing(let preparedImport):
-                preparedImportPreview(preparedImport)
+                VStack(alignment: .leading, spacing: 10) {
+                    preparedImportPreview(preparedImport)
+                    if case .committing = importState {
+                        Text("Importing confirmed financial data. This write cannot be cancelled safely.")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(LFTheme.warning)
+                    }
+                }
             case .completed(let outcome):
                 VStack(alignment: .leading, spacing: 12) {
                     importedFileRow(
@@ -1431,13 +1457,27 @@ struct ContentView: View {
                         }
                     }
                 }
-            case .failed(let fileName, let message):
+            case .cancelled(let fileName):
                 importedFileRow(
                     name: fileName,
-                    subtitle: message,
-                    icon: "exclamationmark.triangle.fill",
-                    color: LFTheme.danger
+                    subtitle: "Preparation cancelled. No data was written.",
+                    icon: "xmark.circle.fill",
+                    color: LFTheme.textSecondary
                 )
+            case .failed(let fileName, let message, let retrySourceURL):
+                VStack(alignment: .leading, spacing: 10) {
+                    importedFileRow(
+                        name: fileName,
+                        subtitle: message,
+                        icon: "exclamationmark.triangle.fill",
+                        color: LFTheme.danger
+                    )
+                    if retrySourceURL != nil {
+                        Text("The source could not be read. You can retry from the beginning.")
+                            .font(.caption)
+                            .foregroundStyle(LFTheme.textSecondary)
+                    }
+                }
             }
         }
     }
@@ -1638,6 +1678,23 @@ struct ContentView: View {
                     .padding(.vertical, 13)
                     .background(LFTheme.surface.opacity(0.65))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+            case .failed(_, _, let retrySourceURL) where retrySourceURL != nil:
+                Button {
+                    if let retrySourceURL {
+                        beginPreparation(from: retrySourceURL)
+                    }
+                } label: {
+                    Label("Retry Preparation", systemImage: "arrow.clockwise")
+                        .labelStyle(.titleAndIcon)
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 13)
+                        .frame(minWidth: 180)
+                        .background(LFTheme.primaryGradient)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
             case .completed(let outcome) where outcome.allowsViewingTransactions:
                 Button {
                     selectedSection = .transactions
@@ -1982,20 +2039,68 @@ struct ContentView: View {
         }
     }
 
+    private func beginPreparation(from url: URL) {
+        importAccountChoice = nil
+        importIdentityReview = .unavailable
+        selectedFile = url.lastPathComponent
+        importState = .preparing(fileName: url.lastPathComponent, phase: .openingSource)
+        selectedSection = .imports
+        _ = preparationOwner.start { operationID in
+            await prepareImport(from: url, operationID: operationID)
+        }
+    }
+
     @MainActor
-    private func prepareImport(from url: URL) async {
+    private func prepareImport(from url: URL, operationID: UUID) async {
         do {
-            let preparedImport = try await ImportEngine.shared.prepareImport(from: url)
+            let preparedImport = try await ImportEngine.shared.prepareImport(
+                from: url,
+                requestId: operationID
+            ) { progress in
+                guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
+                    return
+                }
+                importState = .preparing(fileName: url.lastPathComponent, phase: progress.phase)
+            }
+            guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
+                return
+            }
             importAccountChoice = nil
             importIdentityReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
                 ? (try ImportEngine.shared.reviewPreparedImport(preparedImport))
                 : .unavailable
+            guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
+                return
+            }
             selectedFile = preparedImport.fileName
             importState = preparedImport.validation.passed ? .previewReady(preparedImport) : .validationFailed(preparedImport)
-        } catch {
+            releasePreparationOperation(operationID)
+        } catch is CancellationError {
+            guard preparationOwner.isCurrent(operationID) else {
+                return
+            }
             selectedFile = url.lastPathComponent
-            importState = .failed(fileName: url.lastPathComponent, message: error.localizedDescription)
+            importState = .cancelled(fileName: url.lastPathComponent)
+            releasePreparationOperation(operationID)
+        } catch let error as ImportError where error == .cancelled {
+            guard preparationOwner.isCurrent(operationID) else {
+                return
+            }
+            selectedFile = url.lastPathComponent
+            importState = .cancelled(fileName: url.lastPathComponent)
+            releasePreparationOperation(operationID)
+        } catch {
+            guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
+                return
+            }
+            selectedFile = url.lastPathComponent
+            importState = .failed(
+                fileName: url.lastPathComponent,
+                message: error.localizedDescription,
+                retrySourceURL: isRetryablePreparationFailure(error) ? url : nil
+            )
             DeveloperConsole.shared.log("ERROR: \(error.localizedDescription)")
+            releasePreparationOperation(operationID)
         }
     }
 
@@ -2034,11 +2139,32 @@ struct ContentView: View {
     }
 
     private func cancelPreparedImport() {
+        guard case .preparing(let fileName, _) = importState else {
+            return
+        }
+        preparationOwner.cancel()
         importAccountChoice = nil
         importIdentityReview = .unavailable
-        selectedFile = "No statement imported"
-        importState = .idle
-        selectedSection = .dashboard
+        selectedFile = fileName
+        importState = .cancelled(fileName: fileName)
+    }
+
+    @MainActor
+    private func releasePreparationOperation(_ operationID: UUID) {
+        preparationOwner.finish(operationID)
+    }
+
+    private func isRetryablePreparationFailure(_ error: Error) -> Bool {
+        guard let importError = error as? ImportError else {
+            return false
+        }
+        switch importError {
+        case .readerFailure, .unknown:
+            return true
+        case .unsupportedFile, .passwordRequired, .incorrectPassword, .readerUnavailable,
+                .invalidDocument, .unsupportedStatement, .cancelled:
+            return false
+        }
     }
 
     private func statementPeriodText(_ period: ClosedRange<Date>?) -> String {
