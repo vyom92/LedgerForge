@@ -1,0 +1,137 @@
+{
+  "metadata_schema_version": 2,
+  "fixture_id": "amex_card_statement_20260424_to_20260523",
+  "fixture_class": "source-faithful sanitized fixture",
+  "sanitization_method": {
+    "classification": "clean_room_pdf_reconstruction",
+    "source_page_objects_reused": false,
+    "source_content_streams_reused": false,
+    "source_images_reused": false,
+    "source_fonts_reused": false,
+    "source_metadata_reused": false,
+    "source_annotations_reused": false
+  },
+  "source_fidelity": {
+    "financial_truth": "exact",
+    "transaction_order": "exact",
+    "page_count": "preserved",
+    "page_dimensions": "preserved",
+    "table_geometry": "measured transaction column and row geometry preserved",
+    "page_break_relationships": "preserved",
+    "multiline_narration_relationships": "preserved",
+    "instrument_section_relationships": "preserved",
+    "fx_evidence_relationships": "preserved_when_present",
+    "private_textual_values": "replaced",
+    "source_object_identity": "not_preserved",
+    "repeated_headers": "preserved_when_present"
+  },
+  "institution": "American Express",
+  "family": "card_statement",
+  "source_formats": [
+    "pdf"
+  ],
+  "layout_version": "AMEX-CARD-PDF-CLEANROOM-v1",
+  "neutral_source_label": "AMEX-R1-PDF",
+  "candidate_status": "validated",
+  "source_provenance": {
+    "origin": "institution_supplied",
+    "access_state": "owner_unlocked",
+    "verification": "owner_attested",
+    "password_exposed_to_automation": false
+  },
+  "privacy_assertions": {
+    "uses_fictional_customer_metadata": true,
+    "uses_fictional_account_identifier": true,
+    "uses_fictional_instrument_identifiers": true,
+    "contains_no_original_card_identifier": true,
+    "contains_no_original_transaction_reference": true,
+    "contains_no_original_merchant_identity": true,
+    "contains_no_private_mapping": true,
+    "contains_no_private_source_path_or_filename": true,
+    "contains_no_source_pdf_object": true
+  },
+  "ocr_boundary": {
+    "native_text_available": true,
+    "pdfkit_extraction_usable": true,
+    "pymupdf_extraction_usable": true,
+    "ocr_used": false,
+    "ocr_required_for_fixture": false,
+    "scope": "approved_fixture_layout_only"
+  },
+  "pdf_assertions": {
+    "page_count": 7,
+    "dimension_tolerance_points": 0.25,
+    "pages": [
+      {
+        "page_index": 0,
+        "width_points": 595.0,
+        "height_points": 842.0
+      },
+      {
+        "page_index": 1,
+        "width_points": 595.0,
+        "height_points": 842.0
+      },
+      {
+        "page_index": 2,
+        "width_points": 595.0,
+        "height_points": 842.0
+      },
+      {
+        "page_index": 3,
+        "width_points": 595.0,
+        "height_points": 842.0
+      },
+      {
+        "page_index": 4,
+        "width_points": 595.0,
+        "height_points": 842.0
+      },
+      {
+        "page_index": 5,
+        "width_points": 595.0,
+        "height_points": 842.0
+      },
+      {
+        "page_index": 6,
+        "width_points": 595.0,
+        "height_points": 842.0
+      }
+    ],
+    "native_selectable_text": true,
+    "annotations_present": false,
+    "forms_present": false,
+    "attachments_present": false
+  },
+  "pagination_assertions": {
+    "transaction_page_count": 5,
+    "rewards_page_preserved": true,
+    "legal_page_preserved": true,
+    "page_assignments_preserved": true
+  },
+  "instrument_assertions": {
+    "instrument_section_count": 1,
+    "section_order_preserved": true,
+    "account_level_payment_distinguished": true
+  },
+  "fx_assertions": {
+    "posted_statement_currency": "QAR",
+    "original_currency_evidence_preserved_separately": true,
+    "missing_rates_not_calculated": true,
+    "markup_not_invented": true
+  },
+  "period_relationship": {
+    "chronology": "R1 then R2",
+    "overlap": "none",
+    "calendar_relationship": "contiguous"
+  },
+  "account_relationship": "same account across periods",
+  "instrument_relationship": "same instrument section across periods",
+  "production_support_boundary": {
+    "classification": "fixture_evidence_only",
+    "production_parser_support": false,
+    "production_pdf_support": false,
+    "card_domain_semantics_finalized": false,
+    "production_support_claimed": false
+  }
+}
