@@ -23,7 +23,7 @@ If the answer to all five is "No", do not build it.
 1. The project must build successfully after every completed sprint.
 2. Prefer small, verifiable commits over large refactors.
 2a. Only commit after the project builds successfully and required sprint tests pass.
-2b. Before committing, verify there are no unresolved merge conflict markers and only sprint-related files are staged.
+2b. Before committing, verify there are no unresolved merge conflict markers and all staged files are legitimate, compatible work authorized by the prompt.
 2c. Successful sprint work should be pushed to `origin/main` immediately after the commit.
 3. New features should integrate with the existing architecture rather than bypass it.
 4. Avoid duplicate business logic.
@@ -114,36 +114,31 @@ ViewModels/
 
 Before implementation:
 
-1. Bootstrap using:
-   - `Project documents/.github/Context_Manifest.yaml`
-   - `AGENTS.md`
-   - `Project documents/Project_Guide.md`
-   - `Project documents/PROJECT_STATE.md`
-   - `Project documents/Implementation.md` (ACTIVE sprint only)
-2. Use the Task Routing Guide to identify any additional documentation required.
-3. When selecting the next sprint, review `Project documents/FUTURE_WORK.MD` after verified repository state.
-4. Work produces an evidence-backed repository-discovery report in `Project documents/Codex response.md`.
-5. Wait for Chat approval and an approved ACTIVE sprint before implementation.
-6. Do not modify source code during the planning phase.
+1. Read `AGENTS.md`, `Project documents/Project_Guide.md` and `Project documents/PROJECT_STATE.md`.
+2. Use the Guide to identify additional subject authorities.
+3. For planning, review `Project documents/FUTURE_WORK.MD` after verified state.
+4. The complete Chat-approved prompt supplied directly in the current conversation is the execution contract.
+5. Work discovery is read-only and reported directly in chat.
+6. Do not modify source code during discovery.
 
 ## Implementation
 
-1. Read only the approved Implementation Prompt from the ACTIVE sprint.
-2. Work only within the approved sprint scope.
+1. Read and execute only the complete approved prompt from the current conversation.
+2. Work only within its scope.
 3. Select exactly one file at a time.
 4. Verify the filename before editing.
 5. Implement one logical change.
 6. Build.
 7. Run the required sprint tests.
-8. Verify `git status` contains only sprint-related changes.
+8. Reconcile and validate the complete legitimate repository state.
 9. Verify there are no unresolved merge conflict markers.
 10. Generate a concise commit message describing the completed work.
 11. Commit.
 12. Push to the tracked branch (normally `origin/main`).
 13. Push the sprint tag if one was created.
 14. Update `Project documents/PROJECT_STATE.md` only after successful validation.
-15. Update `Project documents/Codex response.md`.
-16. Continue to the next file only after successful validation.
+15. Report execution directly in chat.
+16. Continue only after successful validation.
 # Definition of Done
 
 A task is complete only when:
@@ -159,7 +154,7 @@ A task is complete only when:
 - Approved reference fixtures continue producing identical financial truth.
 - Documentation is updated if architecture changed.
 - `Project documents/PROJECT_STATE.md` reflects the current repository state.
-- `Project documents/Codex response.md` records the completed planning or implementation cycle.
+- Verified durable facts are recorded only in their subject authorities; Git preserves detailed history.
 - The implementation follows Product Vision and Architecture.
 
 ---
@@ -177,6 +172,28 @@ Repositories persist validated financial data.
 Runtime Stores own observable application state.
 ViewModels observe stores.
 Views never coordinate business workflows.
+
+## Direct execution and reporting
+
+- The complete Chat-approved prompt supplied directly in the current conversation is the sole execution contract.
+- Work reports read-only discovery directly in chat.
+- Codex reports implementation and documentation execution directly in chat.
+- Verified durable facts go only to their subject authorities; Git preserves implementation history.
+
+## Manual runtime verification
+
+1. Automated tests prove covered data-path and financial correctness.
+2. A DEBUG-only approved-fixture launcher may verify deterministic runtime presentation and navigation.
+3. The launcher enters ordinary production preparation and preserves explicit confirmation.
+4. Native macOS file selection receives one bounded smoke test.
+5. Repeated fixture scenarios do not depend on accessibility navigation in `NSOpenPanel`.
+6. Manual intervention is limited to the exact unavoidable action.
+7. Reports distinguish passed, pending, unavailable and explicitly accepted deferral.
+8. No private fixture or alternate import path is permitted.
+
+## Documentation-only cycles
+
+A documentation-only cycle may skip full test execution only when Swift, tests, schemas, migrations, fixtures, executable build settings and assets are unchanged. A cycle that modifies `project.pbxproj` requires Xcode project-integrity validation and a clean Debug build.
 
 ---
 
@@ -218,15 +235,13 @@ The code should make adding the next financial institution easier than adding th
 
 - Never assume statement layouts.
 - Always request reference documents when required.
-- Chat owns sprint planning and approval; Work owns explicitly approved repository-wide documentation synchronization; Codex owns approved Swift implementation and implementation Git operations.
-- Read only the ACTIVE sprint in `Project documents/Implementation.md`.
-- Never modify `Project documents/Implementation.md`.
-- Archived sprint sections are historical reference only.
+- Chat owns planning and approval; Work owns read-only discovery; Codex owns authorised repository edits, validation, documentation execution and Git operations.
+- The direct Chat-approved prompt is the only execution contract.
 - Never invent financial rules.
 - Verify the filename in the header comment before editing.
 - Build after every significant change.
 - Never commit if the build or required tests fail.
-- Verify only sprint-related files are staged before committing.
+- Validate all legitimate compatible changes in the combined repository state before committing.
 - Generate commit messages from completed work rather than generic templates.
 - Report the commit hash, tag (if created) and push result after every successful automated commit.
 - Resolve compile errors before continuing.

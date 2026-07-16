@@ -2,7 +2,7 @@
 
 # LedgerForge — Database v1 Architecture (Design Baseline)
 
-Status: Database v1 design baseline, status-aligned through accepted ADR-031 and verified Sprint 41 repository implementation
+Status: Database v1 design baseline, status-aligned through accepted ADR-032 and verified Sprint 42 repository implementation
 
 This is an approved design baseline, not an inventory of production-supported formats or fully populated production tables. Current verified implementation state belongs in `PROJECT_STATE.md`.
 
@@ -44,6 +44,14 @@ Migration V3 adds the bounded `transaction_event_identities` ownership table wit
 The table enforces unique `(algorithm, digest)` and unique `(transaction_id, algorithm)` ownership, with restrictive foreign keys to transaction, account, document and import-session records. The composite `(account_id, import_session_id)` index supports account-scoped and account-plus-import-session lookup. Migration V3 does not create an independent import-session-only index. Migration V3 performs no historical backfill and leaves existing event-identity ownership empty.
 
 SQLite and In-Memory providers maintain parity. Accepted event ownership is persisted atomically with the accepted import history; rejected attempts do not create ownership records. No raw event reference, canonical payload or private financial evidence is stored.
+
+### Migration V4 and durable import attempts
+
+Migration V4 adds the bounded `import_attempts` ledger. Attempt rows carry versionable outcome, coverage, account-decision, guidance and persistence values plus trusted optional workspace, account, session and document relationships. Workspace-scoped history is read newest-first. Only authoritative completed successful sessions may be backfilled as successful attempts; rejected history is never invented.
+
+Successful attempts are persisted atomically with successful import history. Rejected attempts remain distinct from successful import sessions and may be recorded without financial mutation. Attempt history excludes raw source content, identifiers, references, fingerprints, event digests, unrestricted narration, paths and localized errors. SQLite and In-Memory providers enforce equivalent behavior.
+
+Production transaction persistence currently stores one authoritative native amount and currency pair. Original merchant amount and currency, statement conversion evidence, statement-provided FX rates and fee decomposition require a future ADR and are not production-supported.
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # LedgerForge Architecture v1.0 (Frozen)
 
-**Status:** Frozen v1.0 baseline, status-aligned through accepted ADR-028 and verified Sprint 37 implementation.
+**Status:** Frozen v1.0 baseline, status-aligned through accepted ADR-032 and verified Sprint 42 implementation.
 
 This document is the architectural baseline for LedgerForge v1.0. It remains frozen except for status-alignment updates required to reflect completed implementation milestones and approved ADRs.
 
@@ -10,7 +10,7 @@ This document is the architectural baseline for LedgerForge v1.0. It remains fro
 - PDF text extraction, institution detection, statement classification and parser selection are implemented foundations, not production PDF statement support.
 - The password-provider contract and locked-PDF reader interface exist; no production credential source, password-entry workflow or Keychain integration exists.
 - XLS, XLSX, TXT and OCR remain planned.
-- The parser registry does not provide production HDFC, CBQ, Axis credit-card, or broader Axis account-layout coverage.
+- The parser registry does not provide production HDFC bank-account, CBQ bank-account, CBQ credit-card, American Express credit-card, Axis credit-card or broader Axis account-layout coverage.
 - Parser-owned verified Axis account identifiers and deterministic confirmed-import account resolution are integrated, but arbitrary multi-institution, multi-layout and cross-format identity support remains planned.
 
 This status note does not alter the frozen architecture or imply support from the presence of a protocol, model, reader or fixture alone.
@@ -183,16 +183,18 @@ These institutions and document families are design-review targets. Listing them
 
 Every architectural decision should be reviewed against:
 
-- Axis Bank
+- Axis Bank Account
 - Axis Credit Card
-- HDFC Bank
-- CBQ Bank
+- HDFC Bank Account
+- CBQ Bank Account
 - CBQ Credit Card
-- American Express
+- American Express Credit Card
 - IBKR
 - Salary Slip
 - Mutual Fund CAS
 - AIS / Form 16
+
+Each target family requires its own approved fixture and financial baseline. Listing a target is not production support and one supported family never implies full institution support.
 
 ## Currency Architecture
 

@@ -657,6 +657,6 @@ DesignBoard_v2.0 should be revised before individual screen assets whenever a ch
 
 Minor refinements may update individual assets without requiring a new DesignBoard revision, provided the master design language remains unchanged.
 
-Workflow v2.1 requires implementation planning to reference this document and the approved UI assets before UI changes are made.
+The current Chat-approved execution prompt requires UI planning to reference this document and the approved UI assets before UI changes are made.
 
 Architecture, Product Vision and this document together define the approved implementation boundary for all future UI work.

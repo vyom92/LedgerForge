@@ -115,6 +115,10 @@ Salary & Planning becomes the user's monthly financial planning workspace.
 
 Import workflows remain temporary maintenance tasks rather than permanent destinations within the application.
 
+LedgerForge's Import Centre owns queue, preparation, validation, confirmation, outcomes and navigation; macOS grants authorization for arbitrary file and folder access. LedgerForge does not claim unrestricted filesystem access.
+
+All supported bank and card transactions belong to one global repository-backed Transactions experience. Institution-specific parsers must not create institution-specific transaction applications or stores.
+
 Every other module exists to support accurate, explainable and actionable financial insight.
 
 ---
@@ -186,6 +190,8 @@ The user should primarily experience trustworthy financial insight rather than t
 
 LedgerForge treats every imported document as structured financial evidence rather than as a file.
 
+Initial compatibility priorities include Axis bank-account statement families, HDFC bank-account statement families, CBQ bank-account and credit-card statement families, and American Express credit-card statement families. Every institution and document family is independently fixture-backed; one supported family never implies full institution support.
+
 Target source formats include:
 
 - PDF statements
@@ -193,7 +199,7 @@ Target source formats include:
 - XLS/XLSX exports
 - TXT exports (where provided by institutions)
 
-This list expresses product direction, not current production support. Verified production import is currently limited to the approved Axis Bank NRE CSV layout. PDF text extraction and statement-understanding foundations exist, while production PDF parsing, password workflows, XLS, XLSX, TXT and OCR remain planned. Broader Axis layouts and account types, HDFC and CBQ parser families also remain planned.
+This list expresses product direction, not current production support. Verified production import is currently limited to the approved Axis Bank NRE CSV layout. PDF text extraction and statement-understanding foundations exist, while production PDF parsing, password workflows, XLS, XLSX, TXT, OCR, HDFC, CBQ, American Express and production card parsing remain planned.
 
 Every import follows the same deterministic pipeline:
 Every stage preserves explainability and traceability so identical financial evidence always produces identical financial results.
@@ -220,6 +226,8 @@ The import pipeline should be format-independent. Whether data originates from P
 Reader-specific adapters (production CSV, PDF foundation, and future XLS/XLSX or other formats) are responsible only for producing equivalent financial evidence. Once a FinancialDocument has been produced, downstream validation, persistence and presentation must remain independent of the original file format.
 
 Repository persistence must never bypass validation. Dashboards, accounts and future analytics consume repository-backed runtime state rather than parser output directly.
+
+Native-currency correctness precedes the first production non-INR statement family. FX and consolidated reporting are later, derived and auditable; conversion never replaces native imported values.
 
 Importing documents should require little or no user interaction beyond selecting the file.
 

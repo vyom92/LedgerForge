@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document is the canonical planning queue for LedgerForge work that is not part of the current ACTIVE sprint.
+This document is the canonical planning queue for LedgerForge work that is not yet authorized for execution.
 
 It records:
 
@@ -25,15 +25,9 @@ Architectural decisions belong in:
 
 `Project documents/ADR.md`
 
-Only the approved ACTIVE sprint belongs in:
+Execution is authorized only by the complete Chat-approved prompt supplied directly in the current conversation. Reports are returned directly in chat; verified durable facts belong in their subject authorities and Git history.
 
-`Project documents/Implementation.md`
-
-Temporary repository-discovery and implementation reports belong in:
-
-`Project documents/Codex response.md`
-
-Items promoted into the ACTIVE sprint must be removed from this document or narrowed to the portion that remains unscheduled.
+Items selected for execution must be removed from this document or narrowed to the portion that remains unscheduled.
 
 ---
 
@@ -54,7 +48,7 @@ It does not mean that the item:
 
 No future sprint number may be assigned in this document.
 
-A sprint becomes approved only when Chat defines it and records it as the sole ACTIVE sprint in `Project documents/Implementation.md`.
+A work item becomes executable only when Chat supplies one complete approved prompt directly to Codex.
 
 ---
 
@@ -145,7 +139,7 @@ A possible future direction without planning commitment.
 
 ## Sprint Selection Procedure
 
-After the current ACTIVE sprint is completed and approved:
+After a completed increment is verified and accepted:
 
 1. Read `PROJECT_STATE.md` and establish the verified repository baseline.
 
@@ -174,7 +168,7 @@ After the current ACTIVE sprint is completed and approved:
 
 10. Create or update an ADR when the selected work requires a new architectural decision.
 
-11. Replace `Implementation.md` with the approved ACTIVE sprint contract.
+11. Chat supplies one complete execution prompt directly to Codex.
 
 12. Remove promoted work from this document.
 
@@ -186,7 +180,7 @@ No candidate is selected merely because it appears first. Dependencies, evidence
 
 When reporting future work:
 
-- identify the current ACTIVE sprint from `Implementation.md`;
+- identify the latest verified state from `PROJECT_STATE.md`;
 - describe future work only using candidates recorded here;
 - distinguish Ready for discovery, Candidate, Blocked, Bug, Maintenance, Research and Idea;
 - do not assign future sprint numbers;
@@ -201,7 +195,7 @@ An invalid statement is:
 
 > The next sprint will implement `<candidate>`.
 
-The second statement becomes valid only after Chat formally defines and records that sprint in `Implementation.md`.
+The second statement becomes valid only after Chat supplies a complete execution prompt directly to Codex.
 
 ---
 
@@ -209,7 +203,7 @@ The second statement becomes valid only after Chat formally defines and records 
 
 ## FW-P0-02 — Historical Duplicate Review and Repair
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Completed Sprint 40 evidence and Sprint 41 bounded transaction-event ownership, plus an approved reversible financial-mutation model. Reversible financial mutation remains the controlling blocker.
 
 Provide safe review and correction for duplicate transactions already present in durable history.
@@ -250,7 +244,7 @@ Do not claim cross-process safety until it is implemented and tested.
 
 ## FW-P0-08 — Data-Integrity Verification and Repair
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Approved repair and reversible-mutation contracts
 
 Provide privacy-safe verification for:
@@ -310,7 +304,7 @@ Required protections include:
 
 ## FW-P0-12 — Identifier Backfill Policy
 
-**Status:** Ready for discovery  
+**Status:** Ready for discovery
 **Depends on:** Existing verified parser identifiers and account resolution
 
 Define when newly discovered verified strong identifiers may be attached to an already resolved account.
@@ -496,7 +490,7 @@ Expand deterministic Axis coverage in dependency and fixture-readiness order:
 1. additional NRE layouts;
 2. NRO account layouts;
 3. savings and current-account layouts;
-4. credit-card statements;
+4. broader bank-account layouts; Axis cards remain separate future card-family work subject to card semantics and fixtures;
 5. historical or changed layouts.
 
 Each supported layout requires:
@@ -516,7 +510,7 @@ Do not generalize the existing parser without fixture-backed evidence.
 **Status:** Blocked  
 **Depends on:** Approved HDFC fixtures and supported source formats
 
-Support approved HDFC account and card statement families through the unified import pipeline.
+Near-term HDFC direction is bank-account statements only through the unified import pipeline. Card support remains separate future work.
 
 ---
 
@@ -525,11 +519,12 @@ Support approved HDFC account and card statement families through the unified im
 **Status:** Blocked  
 **Depends on:** Approved CBQ fixtures and supported source formats
 
-Potential document families include:
+Keep independent CBQ families:
 
-- bank accounts;
-- credit cards;
-- investment or mutual-fund statements.
+- CBQ bank-account statements;
+- CBQ credit-card statements.
+
+Each family requires independent approved fixtures and a financial baseline. QAR support depends on native multi-currency safety; card support also depends on credit-card financial semantics.
 
 Each family requires its own approved financial baseline.
 
@@ -537,12 +532,12 @@ Each family requires its own approved financial baseline.
 
 ## FW-P1-04 — Additional Credit-Card Parser Families
 
-**Status:** Idea  
-**Depends on:** Approved institution-specific fixtures
+**Status:** Blocked
+**Depends on:** Approved institution-specific fixtures, the credit-card financial-semantics foundation and the Money foundation where multi-currency evidence requires it
 
 Add card issuers only through deterministic, fixture-backed parser families.
 
-Named compatibility targets include American Express and other issuers supported by future approved fixtures.
+American Express is the priority independent credit-card issuer. Add issuers only through deterministic, fixture-backed parser families.
 
 ---
 
@@ -634,6 +629,21 @@ Any assistance must remain:
 The original source structure and every user-approved mapping must remain inspectable.
 
 ---
+
+## FW-P1-09 — Credit-Card Financial Semantics Foundation
+
+**Status:** Blocked
+**Depends on:** Approved Amex or CBQ card evidence, the Money foundation where relevant and a future accepted credit-card semantics ADR
+
+Define the financial semantics required before production credit-card parsing:
+
+- purchases, refunds, reversals, payments, fees and interest;
+- statement balance, minimum due, due date and credit balances;
+- supplementary-card attribution and liability presentation;
+- owned-account card-payment relationships;
+- posted amount, optional original merchant amount, statement FX evidence and FX markup/fees.
+
+Do not claim production card support until these semantics and fixture-backed financial baselines are accepted.
 
 # P1 — Import Format Expansion
 
@@ -766,12 +776,14 @@ Binary fingerprinting must not be inferred from parsed transactions or presentat
 
 # P1 — Import Workflow
 
-## FW-P1-19 — Complete Multi-Step Import Wizard
+## FW-P1-19 — LedgerForge Import Centre
 
 **Status:** Candidate  
 **Depends on:** Existing confirmation-gated Import Wizard foundation
 
-Complete the Import Wizard as the primary user-facing workflow for preparing, reviewing, confirming and understanding imports.
+Complete the Import Wizard as the LedgerForge Import Centre for preparing, reviewing, confirming and understanding imports.
+
+LedgerForge owns the queue, per-file state, preparation, validation, account choice, duplicate outcomes, confirmation, retry, cancellation and result navigation. macOS owns authorization for arbitrary file and folder access; LedgerForge must not claim unrestricted filesystem access.
 
 The complete workflow may incorporate selected candidates from this section, including:
 
@@ -789,7 +801,7 @@ This is an umbrella product outcome, not permission to combine every listed capa
 
 Repository discovery must determine which related candidates form each bounded implementation increment.
 
-This candidate also provides the bounded foundation for the longer-term Import Studio direction without turning importing into the application’s primary experience.
+This candidate provides the bounded foundation for the longer-term Import Studio direction without turning importing into the application’s primary experience.
 
 ---
 
@@ -798,7 +810,7 @@ This candidate also provides the bounded foundation for the longer-term Import S
 **Status:** Blocked  
 **Depends on:** Mature duplicate handling, cancellation boundaries and failure isolation
 
-Import multiple files while preserving independent:
+Import multiple files as independent jobs while preserving independent:
 
 - validation;
 - confirmation;
@@ -807,7 +819,7 @@ Import multiple files while preserving independent:
 - persistence result;
 - provenance.
 
-A failure in one file must not silently affect another.
+A failure in one file must not silently affect another. Authoritative shared-state rechecks are required; serial versus bounded parallel execution remains unresolved.
 
 ---
 
@@ -816,7 +828,7 @@ A failure in one file must not silently affect another.
 **Status:** Blocked  
 **Depends on:** `FW-P1-20`
 
-Provide queue visibility, progress, result states and navigation for multiple files.
+Provide drag-and-drop queue visibility, per-file progress and outcomes, and result navigation for multiple files.
 
 ---
 
@@ -923,9 +935,11 @@ Historical backfill must not assume that older statements are complete or that i
 **Status:** Bug  
 **Depends on:** None
 
-The development reset switches the running application to a temporary database, but startup bootstrap reconnects to the primary development database on relaunch.
+The current operation installs a UUID-named temporary SQLite provider under `Development Resets`; the canonical database remains intact and startup reconnects to canonical data on relaunch. The UI must not describe this as irreversible deletion.
 
-The correction must preserve production-database safety.
+A permanent correction requires safe provider quiescence, canonical database and SQLite sidecar coordination, a recoverable pre-reset backup, canonical database recreation using current migrations, canonical hydration, an empty state that survives relaunch and production-database safety.
+
+Distinguish `Start Temporary Empty Session`, `Reset Development Database` and optional `Restore Previous Development Database`.
 
 ---
 
@@ -1072,6 +1086,17 @@ Persistent diagnostics must not become an application persistence mechanism or a
 
 ---
 
+## FW-P1-40 — Deterministic Approved-Fixture Launcher
+
+**Status:** Ready for discovery
+**Depends on:** Existing production preparation seam and approved sanitized fixtures
+
+Provide a DEBUG-only launcher for repository-approved sanitized fixtures. It must enter the ordinary production URL-driven preparation path and preserve reader, detection, classification, parser, validation, account choice, duplicate evaluation, explicit confirmation, persistence, hydration and presentation.
+
+The launcher must not auto-confirm, inject expected results, use private statements, or create an alternate parser, import engine, repository or persistence path. It must be absent from Release builds.
+
+---
+
 # P2 — Transaction Experience and Reconciliation
 
 ## FW-P2-01 — Transaction Source and Provenance View
@@ -1098,6 +1123,8 @@ Use the available detail space more effectively and remove developer-oriented te
 
 **Status:** Candidate  
 **Depends on:** Stable transaction fields
+
+Expand future global Transactions filters for institution, account, bank/card family, currency, date and financial direction. Preserve one global repository-backed Transactions store and experience; do not claim these filters are currently implemented.
 
 ---
 
@@ -1468,6 +1495,8 @@ Define durable, privacy-safe preferences for:
 
 Preference changes must not rewrite imported financial truth.
 
+Normal regional formatting may be discovered independently. Reporting-currency preferences depend on `FW-P3-33`.
+
 ---
 
 ## FW-P2-53 — Contextual Date-Range and Filter Controls
@@ -1540,6 +1569,8 @@ Profiling output must remain separate from financial truth and must not retain s
 
 **Status:** Blocked  
 **Depends on:** Additional supported fixtures
+
+Expand currency regression coverage once a second production currency exists; do not create a separate mixed-currency regression candidate.
 
 ---
 
@@ -1958,6 +1989,8 @@ The foundation must preserve:
 
 This candidate establishes domain correctness. Exchange-rate storage and reporting remain separate candidates.
 
+It is an explicit prerequisite for the first production non-INR statement family. Required regression coverage includes exact decimal preservation, minor-unit validation, rounding, provider parity, migration compatibility and mixed-currency arithmetic rejection.
+
 ---
 
 ## FW-P3-30 — Multi-Currency Account and Transaction Presentation
@@ -1974,12 +2007,16 @@ Present native and derived monetary values using locale-aware formatting, includ
 - simultaneous base and secondary display currencies where approved;
 - visible distinction between native and converted amounts.
 
+Before QAR production support, every row must retain native currency, summaries and Dashboard balances must be grouped by currency, and no combined amount may appear without an approved conversion.
+
 ---
 
 ## FW-P3-31 — Exchange-Rate Storage
 
 **Status:** Research  
 **Depends on:** Approved rate-source and offline-cache policy
+
+Rates must be versioned and immutable, carry provider provenance and validity time, support offline cache and expose stale or missing states.
 
 ---
 
@@ -1988,6 +2025,8 @@ Present native and derived monetary values using locale-aware formatting, includ
 **Status:** Blocked  
 **Depends on:** `FW-P3-31`
 
+Provide derived historical conversion without overwriting native values.
+
 ---
 
 ## FW-P3-33 — User-Selectable Reporting Currency
@@ -1995,12 +2034,16 @@ Present native and derived monetary values using locale-aware formatting, includ
 **Status:** Blocked  
 **Depends on:** `FW-P3-31` and `FW-P3-32`
 
+Provide selectable reporting currency while preserving native imported amounts.
+
 ---
 
 ## FW-P3-34 — Currency-Aware Analytics and Net Worth
 
 **Status:** Blocked  
 **Depends on:** Analytics and reporting-currency foundations
+
+Provide current valuation conversion and consolidated reporting only from auditable derived values; native values remain authoritative.
 
 ---
 
@@ -2195,7 +2238,7 @@ When editing this document:
 - use only the defined status labels and record unmet conditions under `Depends on` rather than inventing compound status labels;
 - record verified bugs explicitly;
 - remove completed work;
-- remove work promoted into the ACTIVE sprint;
+- remove work selected for execution;
 - do not record implementation progress;
 - do not duplicate completed sprint history;
 - do not place architectural decisions here;

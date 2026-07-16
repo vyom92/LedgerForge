@@ -1,89 +1,57 @@
-# LedgerForge Agent Bootstrap
+# LedgerForge Agent Rules
 
-This file is intentionally minimal.
+LedgerForge is a private, single-user, offline-first macOS financial application. Preserve deterministic financial truth, explicit user control, native currency, privacy by default and repository-backed state.
 
-Its only purpose is to direct planning and implementation assistants to the correct repository context while minimising unnecessary reading.
+## Bootstrap and authority
 
----
+This file is the sole mandatory bootstrap entry point. Then read `Project documents/Project_Guide.md`, `Project documents/PROJECT_STATE.md`, and only the subject authorities required by the approved task. For planning, consult `Project documents/FUTURE_WORK.MD` before task-relevant architecture evidence.
 
-## Mandatory Entry Point
+The complete prompt approved by Chat and supplied directly in the current conversation is the sole execution contract. Without such a prompt, Codex must not modify the repository. There is no repository-stored active work contract.
 
-Before performing any planning, review, implementation, documentation synchronization or refactoring:
+| Question | Authority |
+|---|---|
+| What is verified now? | Repository evidence and `Project documents/PROJECT_STATE.md` |
+| What may be executed now? | The complete Chat-approved prompt in the current conversation |
+| What remains unscheduled? | `Project documents/FUTURE_WORK.MD` |
+| What architecture is permitted? | Accepted ADRs and frozen Architecture |
+| What is product direction? | `Project documents/Product Vision.md` |
+| What is database design? | Database Architecture and verified migrations |
+| What UI is approved? | Frozen UI/UX and approved assets |
+| What engineering and verification rules apply? | This file, Project Guide, Engineering Standards and Build Conventions |
 
-1. Read `Project documents/.github/Context_Manifest.yaml`.
-2. Read this repository-root `AGENTS.md`.
-3. Read `Project documents/Project_Guide.md`.
-4. Read `Project documents/PROJECT_STATE.md` to establish verified repository state.
-5. Read only the ACTIVE sprint in `Project documents/Implementation.md`.
-6. For sprint planning or backlog work, read `Project documents/FUTURE_WORK.MD` after verified repository state; do not load it for routine implementation when the ACTIVE sprint is already defined.
-7. Use the manifest and Project Guide to determine any additional documentation and source files required for the approved task.
-8. Execute only the approved Planning Prompt, Implementation Prompt or Documentation Change Package.
+## Roles
 
----
+- Chat plans, selects work, makes architecture decisions, supplies complete prompts and reviews direct reports.
+- Work performs read-only, evidence-backed discovery and reports directly in chat. Work does not edit, commit, push, plan or define architecture.
+- Codex performs authorised edits, builds, tests, documentation execution, durable-state updates and Git operations, then reports directly in chat.
+- The user may edit repository files directly; legitimate user work is preserved and reconciled.
 
-## Operating Rules
+## Architecture invariants
 
-- Read only the ACTIVE sprint in `Project documents/Implementation.md`.
-- Archived sprint sections are historical records and must not be modified except for an explicitly approved factual correction.
-- Work on one approved sprint or documentation task only.
-- Stop exactly at the approved scope boundary.
-- Do not load unrelated documentation or source files.
-- Do not redesign approved product intent, financial rules, architecture, database design or UI/UX.
-- Preserve existing user-visible behaviour unless the approved task explicitly changes it.
-- Preserve financial truth. Any change that can affect imported values, balances, identifiers, classifications or calculations must be deterministic, explainable and validated.
+Preserve:
 
-#### Planning and Documentation
+```text
+Reader → RawDocument → Institution Detection → Statement Classification
+→ Parser Selection → Statement Parser → FinancialDocument → Validation
+→ Fingerprinting & Duplicate Detection → Repository Persistence Boundary
+→ Repositories → SQLite → RepositoryStoreHydrator → Runtime Stores
+→ ViewModels → Views
+```
 
-- Chat owns the content and approval of `Project documents/Implementation.md`.
-- Chat plans sprints, reviews reports and approves documentation outcomes.
-- Work performs repository-wide investigation and approved documentation synchronization.
-- ChatGPT in Xcode may apply exact Chat-approved wording during a narrowly approved documentation task.
-- Codex performs Swift implementation, builds, tests and implementation Git operations.
-- Codex must never modify `Project documents/Implementation.md`.
-- Documentation executors must apply approved wording faithfully and must not expand scope.
-- `Project documents/Codex response.md` is the authoritative planning and implementation execution log maintained by the executing assistant.
-- `Project documents/PROJECT_STATE.md` is the authoritative record of verified repository state and is updated only after successful validation, unless an approved documentation-only task explicitly requires a factual correction.
-- If approved wording conflicts with verified repository state, stop and report the conflict instead of improvising.
-- Present exact diffs before committing unless the approved task explicitly authorizes an immediate commit.
+Readers understand formats, parsers produce `FinancialDocument`, validation precedes persistence, repositories are the only SQLite boundary, and `RepositoryStoreHydrator` is the only persistence-to-runtime boundary. Never access SQLite from Views, ViewModels or Stores, bypass repositories, or silently alter financial history.
 
-### Implementation
+## Git continuity and safety
 
-- Preserve the approved import pipeline:
+At the start of every execution cycle inspect branch, local commits, remote divergence, staged and unstaged changes, untracked files and the complete worktree. A dirty worktree is not automatically an error. Understand, preserve, validate and commit every legitimate compatible project change, then push every local commit and finish with `HEAD == origin/main`, no legitimate uncommitted changes and a clean worktree.
 
-  Reader → RawDocument → Institution Detection → Statement Classification → Parser Selection → Statement Parser → FinancialDocument → Validation → Fingerprinting & Duplicate Detection → Repositories → SQLite → RepositoryStoreHydrator → Runtime Stores → ViewModels → Views
+Never silently discard, reset, overwrite, stash-abandon, selectively push by authorship or strand legitimate work. Stop and report ambiguous, private, broken, incompatible, unexplained or unsafe material.
 
-- RepositoryStoreHydrator is the only approved persistence-to-runtime boundary.
-- Never bypass repository abstractions.
-- Never access SQLite directly from Views, ViewModels or Runtime Stores.
-- Prefer extending existing architecture over creating parallel implementations.
-- Reuse existing repository contracts where practical. Introduce new repository APIs only when existing contracts cannot express the approved behaviour cleanly.
-- Add new source files to the Xcode navigator and ensure correct target membership.
-- Prefer Xcode-safe project updates over manual `.pbxproj` edits whenever project tooling is available.
+Never commit private financial statements, credentials, passwords, local SQLite databases, DerivedData, build products, sensitive logs, temporary files or unexplained generated output. Project-file edits must be limited to authorised metadata and use Xcode-safe practices.
 
-### Validation and Git
+## Validation and stop conditions
 
-- Build continuously during implementation.
-- Run all validation required by the ACTIVE sprint.
-- If the build or required tests fail, do not commit or push.
-- Record failed implementation results in `Project documents/Codex response.md` and stop.
-- If command-line testing fails solely because of a verified Xcode tooling limitation after a successful build, run the equivalent test plan in Xcode and treat that result as authoritative.
-- Before committing, verify:
-  - `git status` contains only approved task files.
-  - no unresolved merge conflict markers remain.
-  - no unrelated source, test, asset or project-file changes are included.
-- Commit and push only when the approved task permits it.
-- Push a tag only when the approved release workflow explicitly requires one.
+Build and test according to the approved prompt and subject-specific standards. Review the complete diff, run `git diff --check`, scan conflict markers, validate privacy and references, and confirm scope before committing. Documentation-only work may skip full tests only when executable, source, tests, schemas, migrations, fixtures, build settings and assets are unchanged; project metadata changes require project-integrity validation and a clean Debug build.
 
-### Project Handoff Documents
+Do not claim completion or push failed validation. Record durable facts only in their subject authority. Manual verification must distinguish passed, pending, unavailable and explicitly accepted deferral.
 
-- Keep `Project documents/Codex response.md` as the latest planning or implementation execution report produced by the assistant performing the approved task.
-- Update `Project documents/PROJECT_STATE.md` only after successful implementation and validation, unless an approved documentation-only task explicitly requires a factual correction.
-- Use `Project documents/PROJECT_STATE.md` as the authoritative verified repository handoff.
-
----
-
-`Project documents/.github/Context_Manifest.yaml` is the canonical bootstrap manifest.
-
-`Project documents/Project_Guide.md` remains the detailed source of truth for workflow, document precedence, task routing and sprint execution.
-
-This bootstrap intentionally avoids duplicating the full workflow.
+Verified state is in `Project documents/PROJECT_STATE.md`; unscheduled work is in `Project documents/FUTURE_WORK.MD`; accepted architectural decisions are in `Project documents/ADR.md`.

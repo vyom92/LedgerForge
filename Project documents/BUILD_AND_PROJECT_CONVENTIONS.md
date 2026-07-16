@@ -11,8 +11,7 @@ It complements:
 - Project documents/ADR.md
 - Project documents/Engineering Standards.md
 - Project documents/Project_Guide.md
-- Project documents/AI_WORKFLOW.md
-- Project documents/Implementation.md
+- AGENTS.md
 
 This document focuses on build mechanics, Xcode project management, validation workflow and repository hygiene.
 
@@ -143,38 +142,11 @@ Approved UI references live under:
 
 ---
 
-## AI Workflow Document Location
-
-AI workflow prompt and context files live under:
-
-`Project documents/.github/`
-
-The repository-root `AGENTS.md` remains the authoritative agent bootstrap file. Project-specific prompt and context files live under `Project documents/.github/`.
-
----
-
 # Workflow Authority
 
-Workflow v2.1 is the approved LedgerForge development workflow.
+`AGENTS.md` is the sole mandatory bootstrap entry point. The complete Chat-approved prompt supplied directly in the current conversation is the sole execution contract. `Project_Guide.md` routes to subject authorities; `PROJECT_STATE.md` records verified state; `FUTURE_WORK.MD` records unscheduled work; this document governs build, Xcode and repository mechanics.
 
-Authoritative workflow documents:
-
-1. `Project documents/.github/Context_Manifest.yaml`
-2. `AGENTS.md`
-3. `Project documents/Project_Guide.md`
-4. `Project documents/AI_WORKFLOW.md`
-
-Workflow responsibilities:
-
-- Chat owns sprint planning, report review, documentation outcome approval and `Project documents/Implementation.md`.
-- Work performs repository-wide investigation and explicitly approved documentation synchronization.
-- ChatGPT in Xcode may apply exact Chat-approved documentation wording during a narrowly scoped documentation task.
-- Codex executes only the approved ACTIVE sprint and owns Swift implementation validation and implementation Git operations.
-- Codex never edits `Project documents/Implementation.md`.
-- Work records repository-discovery output in `Project documents/Codex response.md`; Codex records implementation execution output there.
-- `Project documents/PROJECT_STATE.md` remains the authoritative record of verified repository state and is updated only after successful validation or an approved documentation-only factual correction.
-
-When workflow guidance appears elsewhere, these documents remain authoritative.
+Work discovery is read-only and reported directly in chat. Codex owns authorised edits, validation, documentation execution and Git operations.
 
 ---
 
@@ -252,7 +224,7 @@ If blocked solely by a known toolchain issue:
 
 - run the equivalent Xcode validation
 - record that Xcode became authoritative
-- record the reason in `Project documents/Codex response.md`
+- report the reason directly in chat
 
 ---
 
@@ -273,13 +245,9 @@ Hydration should:
 
 # Git Workflow
 
-Before committing:
+At the start of every cycle inspect the branch, local commits, remote divergence, staged and unstaged changes, untracked files and complete worktree. A dirty worktree is not automatically a failure. Understand and preserve every legitimate compatible change, validate the combined state, commit all legitimate pending project work, push all local commits and finish with `HEAD == origin/main`, no legitimate uncommitted changes and a clean worktree.
 
-- verify git status
-- verify staged files belong only to the approved sprint
-- verify only the ACTIVE sprint was implemented
-- verify documentation consistency
-- verify required validation completed
+Never reset, discard, overwrite, stash-abandon or selectively push legitimate work. Stop for ambiguous, private, broken, incompatible, unexplained or unsafe material. Never commit private financial statements, credentials, passwords, local databases, DerivedData, build products, sensitive logs, temporary files or unexplained generated output.
 
 Standard verification:
 
@@ -291,12 +259,7 @@ Standard verification:
 
 # Documentation Workflow
 
-Before closing every sprint verify consistency between:
-
-- Project documents/Project_Guide.md
-- Project documents/Implementation.md
-- Project documents/PROJECT_STATE.md
-- Project documents/Codex response.md
+Verify consistency between Project Guide, PROJECT_STATE, FUTURE_WORK and the affected subject authorities. Reports return directly in chat; verified durable facts are recorded only in their subject authorities.
 
 If architecture changed, also review:
 
@@ -304,9 +267,9 @@ If architecture changed, also review:
 - Project documents/Architecture_v1.0_Frozen.md
 - Project documents/Engineering Standards.md
 
-When selecting or reprioritising future work, also review `Project documents/FUTURE_WORK.MD`. Do not load or update the backlog during routine implementation of an already-defined ACTIVE sprint unless the approved task explicitly requires it.
+When selecting or reprioritising future work, review `Project documents/FUTURE_WORK.MD`. Do not update the backlog unless the approved prompt explicitly requires it.
 
-Documentation synchronization review: Chat approves scope → Work investigates, edits, validates and pushes → Work returns the exact commit SHA → Chat proofreads the pushed commit and records `PASS`, `PASS WITH CORRECTIONS` or `REJECT`. Corrections return to Work; no implementation agent is involved.
+Documentation execution: Chat supplies the complete prompt → Codex reconciles, edits and validates → Codex commits and pushes → Codex reports directly in chat → Chat returns `PASS`, `PASS WITH CORRECTIONS` or `REJECT`.
 
 ---
 
@@ -333,7 +296,7 @@ A sprint is considered complete only when:
 - required validation passes
 - documentation synchronized
 - `Project documents/PROJECT_STATE.md` updated if required
-- `Project documents/Codex response.md` updated
+- Direct chat report returned
 - commit created
 - push completed
 - tag created when applicable

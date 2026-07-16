@@ -1800,7 +1800,11 @@ This ADR does not implement parser extraction, domain models, repository lookup,
 
 ## Status
 
-Accepted for Sprint 42 implementation. Implementation has not started at the time this decision is recorded.
+Accepted
+
+## Implemented In
+
+Sprint 42
 
 ## Decision
 
@@ -1827,6 +1831,8 @@ Sprint 42 may add an additive V4 migration for `import_attempts`. Existing compl
 ## Presentation scope
 
 The bounded read-only experience may show immediate Import Wizard outcome status, global Imports history, selected attempt detail and trusted navigation to prior successful account/session/document relationships where available. It does not authorize duplicate override, partial import, omission, repair, deletion, reversal, account merge/split or manual identity reassignment. Development diagnostic history and a full validation timeline remain outside this decision.
+
+Sprint 42 implemented Migration V4, durable bounded attempts, SQLite/In-Memory provider parity, atomic successful-attempt persistence, bounded rejected-attempt recording, attempt-history hydration and read-only Imports history/detail. It did not generalize event authority, add repair or mutation, broaden atomicity, add cross-process safety or expand unsupported families.
 
 ## Consequences
 
