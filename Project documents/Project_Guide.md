@@ -24,8 +24,8 @@ Project Baseline:
 |-----------|--------------|
 | Product Vision | Current and authoritative |
 | Architecture | Frozen v1.0 baseline active |
-| ADRs | Current through accepted ADR-032 (Sprint 42 planning; implementation not started) |
-| Database | Production-ready foundation with Migration V3's bounded transaction-event ownership extension |
+| ADRs | Current through accepted ADR-032, implemented and verified in Sprint 42 |
+| Database | Production-ready foundation with Migration V4's bounded `import_attempts` ledger and Migration V3 transaction-event ownership extension |
 | Repository Layer | Stable with contract tests |
 | Persistence | SQLite repository layer active |
 | Import Framework | Operational for the approved Axis Bank NRE CSV path; PDF reader infrastructure is foundation-only |
@@ -35,7 +35,7 @@ Project Baseline:
 | Parser Selection | Framework implemented; deterministic selector active |
 | FinancialDocument | Immutable handoff model integrated after Statement Parser and before Validation |
 | Parser Coverage | Production-verified for the approved Axis Bank NRE CSV layout only; broader Axis, HDFC and CBQ families remain planned |
-| Financial Identity and Duplicate Handling | ADR-030 exact-content and ADR-031 bounded Axis UPI transaction-event authorities are production-integrated; ADR-032 durable attempt history is accepted for Sprint 42 planning only |
+| Financial Identity and Duplicate Handling | ADR-030 exact-content, ADR-031 bounded Axis UPI transaction-event, and ADR-032 durable attempt-history authorities are production-integrated |
 | Password Management | Password-provider protocol and locked-PDF reader interface implemented; the default provider supplies no credential and no production password-entry or Keychain workflow exists |
 | Workflow | Workflow v2.1 active. Project documents/Implementation.md is the current ACTIVE sprint implementation contract. |
 | Dashboard | Deep Indigo UI foundation complete. Repository-backed dashboard active; continued core-experience refinement may remain ongoing under M7. |

@@ -15,22 +15,22 @@ Principles:
 ## Repository
 
 * Primary Branch: main
-* Latest Implementation Commit: current `main` — Implement Sprint 42 durable import attempt history
+* Latest Implementation Commit: `a9d4444079a6fe0e057301b281442473f29ea1f5` — Fix Sprint 42 failure attempt reporting
 * Latest Evidence Commit: 416fc88 — Prepare Sprint 40 transaction-event evidence
-* Latest Documentation Handoff Commit: 7946483f66b18e3735749069ea7ad57812a43a18 — Finalize Sprint 41 documentation handoff
+* Latest Documentation Handoff Commit: current `main` — Finalize Sprint 42 documentation handoff
 * Latest Tag: sprint-21
 * Sprint 26 Documentation Alignment Commit: 70a8cc1
 * Latest ADR: ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics (implemented in Sprint 42)
 * Architecture Baseline: Architecture v1.0 Frozen / UI_UX v1.0 Frozen
 * Current Milestone: M7 — Dashboard Experience
-* Current Sprint State: Sprint 42 — Durable Import Attempt History (implemented and validated)
-* Current Phase: Sprint 42 implementation validated locally; Sprint 41 remains the prior completed sprint
+* Current Sprint State: Sprint 42 — Durable Import Attempt History (closed)
+* Current Phase: Sprint 42 implementation, automated validation and supported manual runtime verification are complete; Sprint 43 has not begun
 * Build Status: Passing
-* Validation Status: Sprint 42 clean Debug build passed; complete configured unit/integration plan passed (176 tests in 26 suites, 0 failures, 0 skipped). Generic `LedgerForgeUITests` remained intentionally disabled.
+* Validation Status: Sprint 42 clean Debug build passed; complete configured unit/integration plan passed (183 tests in 26 suites, 0 failures, 0 skipped). Generic `LedgerForgeUITests` remained intentionally disabled.
 * Latest Maintenance Commit: 481185a — repository DTO Equatable conformances explicitly made nonisolated while preserving `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
-* Latest Verified Implementation Remote: current `origin/main` — Sprint 42 durable import attempt history
+* Latest Verified Implementation Remote: `a9d4444079a6fe0e057301b281442473f29ea1f5` at `origin/main` — Fix Sprint 42 failure attempt reporting
 * Latest Verified Evidence Remote: 416fc884c888982f996b01256fb99b70bcae6c78
-* Latest Verified Repository Remote: 7946483f66b18e3735749069ea7ad57812a43a18
+* Latest Verified Repository Remote: current `origin/main` — Sprint 42 final documentation handoff
 
 ## Bootstrap
 
@@ -98,7 +98,7 @@ For parser-verified eligible Axis UPI rows only, confirmation canonicalizes acco
 
 ## Current Work
 
-Active Work: Sprint 42 implementation is complete and validated locally.
+Active Work: Sprint 42 is closed. No Sprint 43 implementation or planning work is active.
 
 Verified planning state:
 
@@ -127,7 +127,9 @@ Verified planning state:
 * Rejected validation, exact-content duplicate, eligible Axis UPI duplicate, repeated incoming evidence and ownership-conflict outcomes use bounded privacy-safe codes. Attempt records contain no source text, identifiers, references, fingerprints, event digests, narration, paths or localized errors.
 * A rejected attempt refreshes only the repository-backed attempt store through `RepositoryStoreHydrator`; financial runtime stores are not hydrated or mutated. Successful imports retain exactly one canonical financial hydration.
 * The existing Imports page presents a global read-only attempt list, selected bounded detail and trusted immutable account navigation when available.
-* Clean Debug build and the complete configured unit/integration plan passed: 176 tests in 26 suites, 0 failures, 0 skipped. Generic `LedgerForgeUITests` remained intentionally disabled. The Imports empty-state and bounded history presentation were visually checked in the desktop app.
+* Clean Debug build and the complete configured unit/integration plan passed: 183 tests in 26 suites, 0 failures, 0 skipped. Zero changed-source Swift diagnostics, diff, conflict-marker, privacy and scope checks passed. Generic `LedgerForgeUITests` remained intentionally disabled.
+* Manual runtime verification on isolated disposable development SQLite providers passed: the 81-row baseline persisted once; its exact re-import produced a bounded prior-import result without further financial writes; baseline-first then overlap blocked the overlap with 1 account and 81 transactions unchanged; overlap-first persisted 1 account and 31 transactions, then blocked the baseline with those counts unchanged. Bounded successful-attempt detail and trusted View Account navigation were visible, with the verified identifier redacted.
+* Migration V3 → V4, provider recreation, injected validation failure, persistence failure with recorded audit, persistence failure with failed audit and persisted privacy are automatically verified; they are manually unavailable through current development runtime controls. The final execution report records the exact regressions and assertions.
 
 ## Verified Sprint 40 State
 
