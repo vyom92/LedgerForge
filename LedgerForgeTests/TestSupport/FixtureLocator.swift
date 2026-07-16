@@ -29,6 +29,14 @@ enum FixtureLocator {
             .appendingPathComponent(fileName)
     }
 
+    static func axisXLS(_ fileName: String) -> URL {
+        fixturesRoot.appendingPathComponent("Axis").appendingPathComponent("XLS").appendingPathComponent(fileName)
+    }
+
+    static func axisManifest(_ fileName: String) -> URL {
+        fixturesRoot.appendingPathComponent("Axis").appendingPathComponent("Manifests").appendingPathComponent(fileName)
+    }
+
     static func fileExists(at url: URL) -> Bool {
         FileManager.default.fileExists(atPath: url.path)
     }

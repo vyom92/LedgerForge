@@ -1,0 +1,47 @@
+{
+  "fixture_id": "axis-nro-r1-csv-source-truth",
+  "fixture_class": "source-faithful sanitized fixture",
+  "institution": "Axis Bank",
+  "family": "NRO bank account statement",
+  "source_formats": [
+    "csv"
+  ],
+  "neutral_private_source_labels": [
+    "AXNRO-R1-CSV"
+  ],
+  "source_truth_boundary": "Contains one legitimate CSV-only interest credit; original source remains unchanged.",
+  "cross_format_boundary": "Matching account identity and date range do not establish financial equivalence with PDF or XLS.",
+  "candidate_status": "validated",
+  "overlap_verification": {
+    "csv": {
+      "format_pair": "Range 1 CSV to Range 2 CSV",
+      "shared_complete_transaction_rows": 17,
+      "range_1_only_rows": 0,
+      "range_2_only_rows": 3,
+      "row_order_preserved_for_shared_rows": true,
+      "range_1_interest_credit_present": true,
+      "range_2_interest_credit_present": true,
+      "strict_historical_subset": true
+    },
+    "pdf": {
+      "format_pair": "Range 1 PDF to Range 2 PDF",
+      "shared_complete_transaction_rows": 16,
+      "range_1_only_rows": 0,
+      "range_2_only_rows": 4,
+      "row_order_preserved_for_shared_rows": true,
+      "range_1_interest_credit_present": false,
+      "range_2_interest_credit_present": true,
+      "strict_historical_subset": true
+    },
+    "xls": {
+      "format_pair": "Range 1 XLS to Range 2 XLS",
+      "shared_complete_transaction_rows": 16,
+      "range_1_only_rows": 0,
+      "range_2_only_rows": 4,
+      "row_order_preserved_for_shared_rows": true,
+      "range_1_interest_credit_present": false,
+      "range_2_interest_credit_present": true,
+      "strict_historical_subset": true
+    }
+  }
+}

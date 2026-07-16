@@ -1,0 +1,70 @@
+{
+  "fixture_id": "axis-nro-r1-pdf-xls-source-truth",
+  "institution": "Axis Bank",
+  "family": "NRO bank account statement",
+  "source_formats": [
+    "pdf",
+    "xls"
+  ],
+  "layout_versions": {
+    "csv": "AXIS-NRO-CSV-v1",
+    "pdf": "AXIS-NRO-PDF-v1",
+    "xls": "AXIS-NRO-XLS-v1"
+  },
+  "encryption_state": {
+    "csv": "none",
+    "pdf": "none",
+    "xls": "none"
+  },
+  "neutral_private_source_labels": [
+    "AXNRO-R1-PDF",
+    "AXNRO-R1-XLS"
+  ],
+  "pagination_assertions": {
+    "pdf_page_count": 2,
+    "repeated_headers_preserved": true
+  },
+  "extraction_order_assertions": {
+    "pdf_text_operator_order_preserved": true,
+    "statement_end_placement_preserved": true
+  },
+  "privacy_assertions": {
+    "fictional_account_identity": true,
+    "metadata_annotations_attachments_removed": true
+  },
+  "candidate_status": "validated",
+  "fixture_class": "source-faithful sanitized fixture",
+  "cross_format_boundary": "Matching account identity and date range do not establish financial equivalence with the Range 1 CSV.",
+  "overlap_verification": {
+    "csv": {
+      "format_pair": "Range 1 CSV to Range 2 CSV",
+      "shared_complete_transaction_rows": 17,
+      "range_1_only_rows": 0,
+      "range_2_only_rows": 3,
+      "row_order_preserved_for_shared_rows": true,
+      "range_1_interest_credit_present": true,
+      "range_2_interest_credit_present": true,
+      "strict_historical_subset": true
+    },
+    "pdf": {
+      "format_pair": "Range 1 PDF to Range 2 PDF",
+      "shared_complete_transaction_rows": 16,
+      "range_1_only_rows": 0,
+      "range_2_only_rows": 4,
+      "row_order_preserved_for_shared_rows": true,
+      "range_1_interest_credit_present": false,
+      "range_2_interest_credit_present": true,
+      "strict_historical_subset": true
+    },
+    "xls": {
+      "format_pair": "Range 1 XLS to Range 2 XLS",
+      "shared_complete_transaction_rows": 16,
+      "range_1_only_rows": 0,
+      "range_2_only_rows": 4,
+      "row_order_preserved_for_shared_rows": true,
+      "range_1_interest_credit_present": false,
+      "range_2_interest_credit_present": true,
+      "strict_historical_subset": true
+    }
+  }
+}
