@@ -1,0 +1,371 @@
+{
+  "metadata_schema_version": 2,
+  "fixture_id": "axis_credit_card_statement_20260417_to_20260517",
+  "fixture_class": "source-faithful sanitized fixture",
+  "candidate_status": "validated",
+  "institution": "Axis Bank",
+  "document_family": "card_statement",
+  "source_formats": [
+    "pdf",
+    "xlsx"
+  ],
+  "neutral_source_labels": {
+    "pdf": "AXIS-CARD-R1-PDF",
+    "xlsx": "AXIS-CARD-R1-XLSX"
+  },
+  "source_provenance": {
+    "origin": "institution_supplied",
+    "access_state": "owner_unlocked",
+    "verification": "owner_attested",
+    "password_exposed_to_automation": false
+  },
+  "sanitization_method": {
+    "pdf_classification": "clean_room_pdf_reconstruction",
+    "xlsx_classification": "clean_room_ooxml_reconstruction",
+    "source_page_objects_reused": false,
+    "source_content_streams_reused": false,
+    "source_images_reused": false,
+    "source_fonts_reused": false,
+    "source_pdf_metadata_reused": false,
+    "source_xlsx_package_reused": false,
+    "source_xlsx_metadata_reused": false,
+    "source_annotations_reused": false,
+    "source_logos_reused": false,
+    "source_xobjects_reused": false,
+    "source_forms_reused": false,
+    "source_attachments_reused": false,
+    "source_links_reused": false,
+    "source_accessibility_layers_reused": false,
+    "source_rasterized_backgrounds_reused": false,
+    "source_xlsx_shared_string_package_reused": false,
+    "source_xlsx_relationship_graph_reused": false,
+    "source_xlsx_custom_xml_reused": false,
+    "source_xlsx_drawings_reused": false,
+    "source_xlsx_embedded_objects_reused": false,
+    "source_xlsx_hidden_private_content_reused": false,
+    "source_xlsx_original_worksheet_identity_reused": false
+  },
+  "source_fidelity": {
+    "financial_truth": "exact",
+    "shared_transaction_order": "exact",
+    "pdf_transaction_count": "exact",
+    "xlsx_transaction_count": "exact",
+    "cross_format_shared_projection": "preserved",
+    "format_only_rows": "preserved_and_explicit",
+    "page_count": "preserved",
+    "page_dimensions": "preserved",
+    "table_geometry": "preserved_within_declared_tolerances",
+    "summary_region_geometry": "preserved_within_declared_tolerances",
+    "page_break_relationships": "preserved",
+    "repeated_header_relationships": "preserved",
+    "multiline_relationships": "preserved_within_declared_tolerances",
+    "instrument_section_relationships": "preserved",
+    "workbook_structure": "preserved_as_declared",
+    "private_textual_values": "replaced",
+    "source_pdf_object_identity": "not_preserved",
+    "source_xlsx_package_identity": "not_preserved"
+  },
+  "cross_format_fidelity": {
+    "basis": "ordered_financial_projection",
+    "compared_fields": [
+      "source_order",
+      "transaction_date",
+      "posted_statement_amount",
+      "statement_currency",
+      "explicit_debit_credit_source_marker",
+      "fictional_instrument_identity_id"
+    ],
+    "shared_ordered_row_count": 140,
+    "shared_order_preserved": true,
+    "textual_equality_required": false,
+    "narration_identity_compared": false,
+    "reconciled_with_explicit_format_only_rows": true,
+    "summary_only_evidence": [
+      "total_payment_due",
+      "minimum_payment_due",
+      "payment_due_date",
+      "credit_limit",
+      "opening_balance"
+    ],
+    "pdf_layout_only_evidence": [
+      "page_geometry",
+      "page_assignment",
+      "page_breaks",
+      "repeated_headers",
+      "multiline_relationships",
+      "ignored_footer_and_reward_regions"
+    ],
+    "xlsx_structure_only_evidence": [
+      "worksheet_dimensions",
+      "merged_ranges",
+      "package_structure"
+    ],
+    "pdf_transaction_count": 140,
+    "xlsx_transaction_count": 143,
+    "pdf_only_row_count": 0,
+    "xlsx_only_row_count": 3,
+    "xlsx_only_classification": "legitimate_source_format_evidence"
+  },
+  "debit_credit_source_marker_boundary": {
+    "retained_as_observed_source_evidence": true,
+    "universal_card_effect_contract": false,
+    "increase_decrease_amount_owed_naming_finalized": false,
+    "bank_account_income_expense_interpretation_authorized": false,
+    "production_semantics_finalized": false
+  },
+  "pdf_geometry_contract": {
+    "coordinate_system": {
+      "origin": "top_left",
+      "x_direction": "right",
+      "y_direction": "down",
+      "unit": "pdf_point"
+    },
+    "declared_tolerances_points": {
+      "page_dimensions": 0.25,
+      "table_region_bounds": 2.0,
+      "summary_region_bounds": 2.0,
+      "column_anchors": 1.5,
+      "header_baselines": 1.5,
+      "transaction_baselines": 2.0,
+      "amount_alignment_anchors": 1.5,
+      "multiline_indentation": 2.0,
+      "multiline_spacing": 2.0,
+      "section_bounds": 2.0,
+      "footer_legal_bounds": 3.0
+    },
+    "actual_maximum_deviations_points": {
+      "table_region": 6.103515625e-05,
+      "summary_region": 6.103515625e-05,
+      "column_anchor": 6.103515625e-05,
+      "transaction_baseline": 3.0517578125e-05,
+      "multiline_relationship": 3.0517578125e-05
+    },
+    "exact_relationships": {
+      "page_count": true,
+      "page_assignment": true,
+      "transaction_order": true,
+      "page_breaks": true,
+      "repeated_headers": true,
+      "instrument_section_assignment": true,
+      "summary_region_membership": true,
+      "table_region_membership": true,
+      "multiline_relationships": true,
+      "ignored_footer_and_reward_regions_classified": true
+    },
+    "independent_comparator": {
+      "used": true,
+      "passed": true,
+      "generator_helpers_reused": false
+    },
+    "page_measurements": [
+      {
+        "page_index": 0,
+        "semantic_element_count": 131,
+        "max_x_deviation": 6.103515625e-05,
+        "max_baseline_deviation": 3.0517578125e-05,
+        "mean_x_deviation": 1.6918619170443703e-05,
+        "mean_baseline_deviation": 8.38651001908397e-06
+      },
+      {
+        "page_index": 1,
+        "semantic_element_count": 172,
+        "max_x_deviation": 6.103515625e-05,
+        "max_baseline_deviation": 3.0517578125e-05,
+        "mean_x_deviation": 1.862991687863372e-05,
+        "mean_baseline_deviation": 6.209972292877907e-06
+      },
+      {
+        "page_index": 2,
+        "semantic_element_count": 172,
+        "max_x_deviation": 6.103515625e-05,
+        "max_baseline_deviation": 3.0517578125e-05,
+        "mean_x_deviation": 1.862991687863372e-05,
+        "mean_baseline_deviation": 6.209972292877907e-06
+      },
+      {
+        "page_index": 3,
+        "semantic_element_count": 172,
+        "max_x_deviation": 6.103515625e-05,
+        "max_baseline_deviation": 3.0517578125e-05,
+        "mean_x_deviation": 1.862991687863372e-05,
+        "mean_baseline_deviation": 6.209972292877907e-06
+      },
+      {
+        "page_index": 4,
+        "semantic_element_count": 108,
+        "max_x_deviation": 6.103515625e-05,
+        "max_baseline_deviation": 3.0517578125e-05,
+        "mean_x_deviation": 1.9073486328125e-05,
+        "mean_baseline_deviation": 9.889955873842592e-06
+      },
+      {
+        "page_index": 5,
+        "semantic_element_count": 33,
+        "max_x_deviation": 6.103515625e-05,
+        "max_baseline_deviation": 0.0,
+        "mean_x_deviation": 2.4968927556818183e-05,
+        "mean_baseline_deviation": 0.0
+      }
+    ]
+  },
+  "pdf_assertions": {
+    "page_count": 6,
+    "dimension_tolerance_points": 0.25,
+    "pages": [
+      {
+        "page_index": 0,
+        "width_points": 595.9199829101562,
+        "height_points": 841.9199829101562
+      },
+      {
+        "page_index": 1,
+        "width_points": 595.9199829101562,
+        "height_points": 841.9199829101562
+      },
+      {
+        "page_index": 2,
+        "width_points": 595.9199829101562,
+        "height_points": 841.9199829101562
+      },
+      {
+        "page_index": 3,
+        "width_points": 595.9199829101562,
+        "height_points": 841.9199829101562
+      },
+      {
+        "page_index": 4,
+        "width_points": 595.9199829101562,
+        "height_points": 841.9199829101562
+      },
+      {
+        "page_index": 5,
+        "width_points": 595.9199829101562,
+        "height_points": 841.9199829101562
+      }
+    ],
+    "native_selectable_text": true,
+    "annotations_present": false,
+    "forms_present": false,
+    "attachments_present": false,
+    "links_present": false,
+    "images_present": false
+  },
+  "ocr_boundary": {
+    "native_text_available": true,
+    "pdfkit_extraction_usable": true,
+    "pymupdf_extraction_usable": true,
+    "ocr_used": false,
+    "ocr_required_for_fixture": false,
+    "scope": "approved_fixture_layout_only"
+  },
+  "workbook_assertions": {
+    "container_format": "OOXML_ZIP",
+    "workbook_format": "XLSX",
+    "sheet_count": 1,
+    "dimension_definition": "one-based maximum used row and column",
+    "sheets": [
+      {
+        "sheet_index": 0,
+        "repository_safe_name": "Card Statement",
+        "max_used_row": 151,
+        "max_used_column": 6,
+        "hidden": false,
+        "hidden_row_count": 0,
+        "hidden_column_count": 0,
+        "merged_range_count": 300,
+        "filter_present": false,
+        "frozen_panes_present": false
+      }
+    ],
+    "formula_count": 0,
+    "defined_name_count": 0,
+    "external_link_count": 0,
+    "comment_count": 0,
+    "drawing_count": 0,
+    "embedded_object_count": 0,
+    "custom_xml_count": 0,
+    "macro_present": false,
+    "visible_sheet_count": 1,
+    "hidden_sheet_count": 0,
+    "document_property_part_count": 0,
+    "relationship_part_count": 2,
+    "reused_source_identity_part_count": 0
+  },
+  "xlsx_clean_room_assertions": {
+    "fresh_ooxml_reconstruction": true,
+    "source_ooxml_package_reused": false,
+    "source_metadata_reused": false,
+    "source_shared_string_package_reused": false,
+    "source_relationship_graph_reused": false,
+    "source_custom_xml_reused": false,
+    "source_drawings_reused": false,
+    "source_embedded_objects_reused": false,
+    "source_hidden_private_content_reused": false,
+    "source_original_worksheet_identity_reused": false
+  },
+  "fictional_identity_relationship": {
+    "customer_identity_id": "axis-card-fixture-customer-001",
+    "account_identity_id": "axis-card-fixture-account-001",
+    "instrument_identity_ids": [
+      "axis-card-fixture-instrument-001"
+    ],
+    "customer_shared_across_periods": true,
+    "account_shared_across_periods": true,
+    "instrument_shared_across_periods": true,
+    "account_and_instrument_ids_distinct": true,
+    "supplementary_instrument_present": false,
+    "relationship_does_not_depend_on": [
+      "display_text",
+      "filename",
+      "masked_value",
+      "card_suffix"
+    ]
+  },
+  "period_relationship": {
+    "chronology": "earlier",
+    "related_fixture_id": "axis_credit_card_statement_20260518_to_20260617",
+    "relationship": "precedes",
+    "consecutive": true,
+    "overlaps": false,
+    "customer_continues": true,
+    "account_continues": true,
+    "instrument_continues": true,
+    "continuity_basis": "owner_attested_same_source_relationship_and_stable_fictional_mapping",
+    "continuity_does_not_depend_on": [
+      "display_text",
+      "filename",
+      "masked_value",
+      "card_suffix"
+    ],
+    "balance_continuity_asserted": false,
+    "manufactured_continuity_value": false
+  },
+  "privacy_assertions": {
+    "uses_fictional_customer_metadata": true,
+    "uses_fictional_account_identifier": true,
+    "uses_fictional_instrument_identifier": true,
+    "contains_no_original_transaction_reference": true,
+    "contains_no_original_counterparty_identity": true,
+    "contains_no_private_mapping": true,
+    "contains_no_private_source_path_or_filename": true,
+    "contains_no_source_pdf_object": true,
+    "contains_no_source_xlsx_package": true,
+    "contains_no_original_card_identifier_or_suffix": true,
+    "contains_no_original_merchant_identity": true,
+    "contains_no_original_reference": true,
+    "contains_no_private_filename_or_path": true
+  },
+  "production_support_boundary": {
+    "classification": "fixture_evidence_only",
+    "axis_card_production_parser_support": false,
+    "pdf_production_support": false,
+    "xlsx_production_support": false,
+    "statement_import_supported": false,
+    "card_semantics_finalized": false,
+    "debit_credit_production_interpretation": false,
+    "adr_implication": false,
+    "persistence_implication": false,
+    "migration_implication": false,
+    "fw_p1_09_remains_blocked": true
+  }
+}

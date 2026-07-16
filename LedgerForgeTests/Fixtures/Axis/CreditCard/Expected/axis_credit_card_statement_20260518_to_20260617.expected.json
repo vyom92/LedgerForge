@@ -1,0 +1,1731 @@
+{
+  "metadata_schema_version": 2,
+  "fixture_id": "axis_credit_card_statement_20260518_to_20260617",
+  "fixture_class": "source-faithful sanitized fixture",
+  "institution": "Axis Bank",
+  "document_family": "card_statement",
+  "source_formats": [
+    "pdf",
+    "xlsx"
+  ],
+  "layout_versions": {
+    "pdf": "AXIS-CREDIT-CARD-PDF-CLEANROOM-v1",
+    "xlsx": "AXIS-CREDIT-CARD-XLSX-CLEANROOM-v1"
+  },
+  "statement_period": {
+    "start": "2026-05-18",
+    "end": "2026-06-17"
+  },
+  "statement_currency": "INR",
+  "source_format_transaction_counts": {
+    "pdf": 151,
+    "xlsx": 154
+  },
+  "canonical_shared_ordered_projection": [
+    {
+      "shared_ordinal": 1,
+      "xlsx_source_order": 0,
+      "transaction_date": "2026-06-17",
+      "posted_statement_amount": "529.96",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 2,
+      "xlsx_source_order": 1,
+      "transaction_date": "2026-06-17",
+      "posted_statement_amount": "1355.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 3,
+      "xlsx_source_order": 2,
+      "transaction_date": "2026-06-17",
+      "posted_statement_amount": "1490.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 4,
+      "xlsx_source_order": 3,
+      "transaction_date": "2026-06-17",
+      "posted_statement_amount": "105.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 5,
+      "xlsx_source_order": 4,
+      "transaction_date": "2026-06-17",
+      "posted_statement_amount": "26628.43",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 6,
+      "xlsx_source_order": 5,
+      "transaction_date": "2026-06-17",
+      "posted_statement_amount": "798.28",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 7,
+      "xlsx_source_order": 6,
+      "transaction_date": "2026-06-17",
+      "posted_statement_amount": "19.18",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 8,
+      "xlsx_source_order": 7,
+      "transaction_date": "2026-06-17",
+      "posted_statement_amount": "1690.24",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 9,
+      "xlsx_source_order": 8,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "623.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 10,
+      "xlsx_source_order": 9,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "4599.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 11,
+      "xlsx_source_order": 10,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "21.70",
+      "statement_currency": "INR",
+      "source_marker": "credit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 12,
+      "xlsx_source_order": 11,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "969.99",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 13,
+      "xlsx_source_order": 12,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "14704.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 14,
+      "xlsx_source_order": 13,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "7500.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 15,
+      "xlsx_source_order": 14,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "975.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 16,
+      "xlsx_source_order": 15,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "500.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 17,
+      "xlsx_source_order": 16,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "14995.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 18,
+      "xlsx_source_order": 17,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "8990.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 19,
+      "xlsx_source_order": 18,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "1000.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 20,
+      "xlsx_source_order": 19,
+      "transaction_date": "2026-06-16",
+      "posted_statement_amount": "21.70",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 21,
+      "xlsx_source_order": 20,
+      "transaction_date": "2026-06-15",
+      "posted_statement_amount": "1124.17",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 0
+    },
+    {
+      "shared_ordinal": 22,
+      "xlsx_source_order": 21,
+      "transaction_date": "2026-06-15",
+      "posted_statement_amount": "169.42",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 23,
+      "xlsx_source_order": 22,
+      "transaction_date": "2026-06-14",
+      "posted_statement_amount": "658.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 24,
+      "xlsx_source_order": 23,
+      "transaction_date": "2026-06-14",
+      "posted_statement_amount": "18.10",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 25,
+      "xlsx_source_order": 24,
+      "transaction_date": "2026-06-14",
+      "posted_statement_amount": "28004.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 26,
+      "xlsx_source_order": 25,
+      "transaction_date": "2026-06-13",
+      "posted_statement_amount": "180.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 27,
+      "xlsx_source_order": 26,
+      "transaction_date": "2026-06-13",
+      "posted_statement_amount": "104.97",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 28,
+      "xlsx_source_order": 27,
+      "transaction_date": "2026-06-13",
+      "posted_statement_amount": "279.39",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 29,
+      "xlsx_source_order": 28,
+      "transaction_date": "2026-06-13",
+      "posted_statement_amount": "363.31",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 30,
+      "xlsx_source_order": 29,
+      "transaction_date": "2026-06-13",
+      "posted_statement_amount": "1246.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 31,
+      "xlsx_source_order": 30,
+      "transaction_date": "2026-06-13",
+      "posted_statement_amount": "46426.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 32,
+      "xlsx_source_order": 31,
+      "transaction_date": "2026-06-13",
+      "posted_statement_amount": "224.28",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 33,
+      "xlsx_source_order": 32,
+      "transaction_date": "2026-06-12",
+      "posted_statement_amount": "9530.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 34,
+      "xlsx_source_order": 33,
+      "transaction_date": "2026-06-12",
+      "posted_statement_amount": "1600.50",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 35,
+      "xlsx_source_order": 34,
+      "transaction_date": "2026-06-12",
+      "posted_statement_amount": "1722.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 36,
+      "xlsx_source_order": 35,
+      "transaction_date": "2026-06-12",
+      "posted_statement_amount": "117.80",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 37,
+      "xlsx_source_order": 36,
+      "transaction_date": "2026-06-12",
+      "posted_statement_amount": "154.52",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 38,
+      "xlsx_source_order": 37,
+      "transaction_date": "2026-06-12",
+      "posted_statement_amount": "1496.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 39,
+      "xlsx_source_order": 38,
+      "transaction_date": "2026-06-11",
+      "posted_statement_amount": "155.96",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 40,
+      "xlsx_source_order": 39,
+      "transaction_date": "2026-06-11",
+      "posted_statement_amount": "345.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 41,
+      "xlsx_source_order": 40,
+      "transaction_date": "2026-06-10",
+      "posted_statement_amount": "787.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 42,
+      "xlsx_source_order": 41,
+      "transaction_date": "2026-06-10",
+      "posted_statement_amount": "155.67",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 43,
+      "xlsx_source_order": 42,
+      "transaction_date": "2026-06-10",
+      "posted_statement_amount": "1635.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 44,
+      "xlsx_source_order": 43,
+      "transaction_date": "2026-06-10",
+      "posted_statement_amount": "649.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 45,
+      "xlsx_source_order": 44,
+      "transaction_date": "2026-06-10",
+      "posted_statement_amount": "1397.91",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 46,
+      "xlsx_source_order": 45,
+      "transaction_date": "2026-06-10",
+      "posted_statement_amount": "116.09",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 47,
+      "xlsx_source_order": 46,
+      "transaction_date": "2026-06-10",
+      "posted_statement_amount": "213.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 48,
+      "xlsx_source_order": 47,
+      "transaction_date": "2026-06-10",
+      "posted_statement_amount": "124.99",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 49,
+      "xlsx_source_order": 48,
+      "transaction_date": "2026-06-10",
+      "posted_statement_amount": "1825.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 50,
+      "xlsx_source_order": 49,
+      "transaction_date": "2026-06-09",
+      "posted_statement_amount": "170.82",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 51,
+      "xlsx_source_order": 50,
+      "transaction_date": "2026-06-09",
+      "posted_statement_amount": "3921.10",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 52,
+      "xlsx_source_order": 51,
+      "transaction_date": "2026-06-09",
+      "posted_statement_amount": "278.97",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 53,
+      "xlsx_source_order": 52,
+      "transaction_date": "2026-06-09",
+      "posted_statement_amount": "160.32",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 54,
+      "xlsx_source_order": 53,
+      "transaction_date": "2026-06-09",
+      "posted_statement_amount": "169.06",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 1
+    },
+    {
+      "shared_ordinal": 55,
+      "xlsx_source_order": 55,
+      "transaction_date": "2026-06-08",
+      "posted_statement_amount": "1517.95",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 56,
+      "xlsx_source_order": 56,
+      "transaction_date": "2026-06-07",
+      "posted_statement_amount": "3447.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 57,
+      "xlsx_source_order": 57,
+      "transaction_date": "2026-06-07",
+      "posted_statement_amount": "747.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 58,
+      "xlsx_source_order": 58,
+      "transaction_date": "2026-06-06",
+      "posted_statement_amount": "2913.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 59,
+      "xlsx_source_order": 59,
+      "transaction_date": "2026-06-06",
+      "posted_statement_amount": "29904.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 60,
+      "xlsx_source_order": 60,
+      "transaction_date": "2026-06-06",
+      "posted_statement_amount": "707.84",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 61,
+      "xlsx_source_order": 61,
+      "transaction_date": "2026-06-06",
+      "posted_statement_amount": "1470.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 62,
+      "xlsx_source_order": 62,
+      "transaction_date": "2026-06-06",
+      "posted_statement_amount": "291.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 63,
+      "xlsx_source_order": 63,
+      "transaction_date": "2026-06-06",
+      "posted_statement_amount": "10855.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 64,
+      "xlsx_source_order": 64,
+      "transaction_date": "2026-06-06",
+      "posted_statement_amount": "15115.78",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 65,
+      "xlsx_source_order": 65,
+      "transaction_date": "2026-06-06",
+      "posted_statement_amount": "1034.95",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 66,
+      "xlsx_source_order": 66,
+      "transaction_date": "2026-06-06",
+      "posted_statement_amount": "186.29",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 67,
+      "xlsx_source_order": 67,
+      "transaction_date": "2026-06-06",
+      "posted_statement_amount": "52.38",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 68,
+      "xlsx_source_order": 68,
+      "transaction_date": "2026-06-05",
+      "posted_statement_amount": "1555.62",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 69,
+      "xlsx_source_order": 69,
+      "transaction_date": "2026-06-04",
+      "posted_statement_amount": "179.31",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 70,
+      "xlsx_source_order": 70,
+      "transaction_date": "2026-06-04",
+      "posted_statement_amount": "1121.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 71,
+      "xlsx_source_order": 71,
+      "transaction_date": "2026-06-04",
+      "posted_statement_amount": "165.15",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 72,
+      "xlsx_source_order": 72,
+      "transaction_date": "2026-06-04",
+      "posted_statement_amount": "248.57",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 73,
+      "xlsx_source_order": 73,
+      "transaction_date": "2026-06-04",
+      "posted_statement_amount": "104.19",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 74,
+      "xlsx_source_order": 74,
+      "transaction_date": "2026-06-04",
+      "posted_statement_amount": "144.68",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 75,
+      "xlsx_source_order": 75,
+      "transaction_date": "2026-06-04",
+      "posted_statement_amount": "1419.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 76,
+      "xlsx_source_order": 76,
+      "transaction_date": "2026-06-03",
+      "posted_statement_amount": "3364.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 77,
+      "xlsx_source_order": 77,
+      "transaction_date": "2026-06-03",
+      "posted_statement_amount": "3350.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 78,
+      "xlsx_source_order": 78,
+      "transaction_date": "2026-06-03",
+      "posted_statement_amount": "4404.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 79,
+      "xlsx_source_order": 79,
+      "transaction_date": "2026-06-03",
+      "posted_statement_amount": "146.85",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 80,
+      "xlsx_source_order": 80,
+      "transaction_date": "2026-06-03",
+      "posted_statement_amount": "350.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 81,
+      "xlsx_source_order": 81,
+      "transaction_date": "2026-06-03",
+      "posted_statement_amount": "10.19",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 82,
+      "xlsx_source_order": 82,
+      "transaction_date": "2026-06-03",
+      "posted_statement_amount": "1.83",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 83,
+      "xlsx_source_order": 83,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "575.95",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 84,
+      "xlsx_source_order": 84,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "104.19",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 85,
+      "xlsx_source_order": 85,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "143.29",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 86,
+      "xlsx_source_order": 86,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "104.19",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 87,
+      "xlsx_source_order": 87,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "1200.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 2
+    },
+    {
+      "shared_ordinal": 88,
+      "xlsx_source_order": 89,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "4615.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 89,
+      "xlsx_source_order": 90,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "46.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 90,
+      "xlsx_source_order": 91,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "636.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 91,
+      "xlsx_source_order": 92,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "2385.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 92,
+      "xlsx_source_order": 93,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "1188.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 93,
+      "xlsx_source_order": 94,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "1059.12",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 94,
+      "xlsx_source_order": 95,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "5188.81",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 95,
+      "xlsx_source_order": 96,
+      "transaction_date": "2026-06-02",
+      "posted_statement_amount": "9.15",
+      "statement_currency": "INR",
+      "source_marker": "credit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 96,
+      "xlsx_source_order": 97,
+      "transaction_date": "2026-06-01",
+      "posted_statement_amount": "793.49",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 97,
+      "xlsx_source_order": 98,
+      "transaction_date": "2026-06-01",
+      "posted_statement_amount": "19504.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 98,
+      "xlsx_source_order": 99,
+      "transaction_date": "2026-06-01",
+      "posted_statement_amount": "4500.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 99,
+      "xlsx_source_order": 100,
+      "transaction_date": "2026-06-01",
+      "posted_statement_amount": "924.75",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 100,
+      "xlsx_source_order": 101,
+      "transaction_date": "2026-06-01",
+      "posted_statement_amount": "1059.79",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 101,
+      "xlsx_source_order": 102,
+      "transaction_date": "2026-06-01",
+      "posted_statement_amount": "931.21",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 102,
+      "xlsx_source_order": 103,
+      "transaction_date": "2026-06-01",
+      "posted_statement_amount": "160.37",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 103,
+      "xlsx_source_order": 104,
+      "transaction_date": "2026-06-01",
+      "posted_statement_amount": "10.00",
+      "statement_currency": "INR",
+      "source_marker": "credit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 104,
+      "xlsx_source_order": 105,
+      "transaction_date": "2026-05-31",
+      "posted_statement_amount": "167.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 105,
+      "xlsx_source_order": 106,
+      "transaction_date": "2026-05-31",
+      "posted_statement_amount": "115615.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 106,
+      "xlsx_source_order": 107,
+      "transaction_date": "2026-05-31",
+      "posted_statement_amount": "525.77",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 107,
+      "xlsx_source_order": 108,
+      "transaction_date": "2026-05-31",
+      "posted_statement_amount": "60028.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 108,
+      "xlsx_source_order": 109,
+      "transaction_date": "2026-05-31",
+      "posted_statement_amount": "1656.80",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 109,
+      "xlsx_source_order": 110,
+      "transaction_date": "2026-05-30",
+      "posted_statement_amount": "613.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 110,
+      "xlsx_source_order": 111,
+      "transaction_date": "2026-05-30",
+      "posted_statement_amount": "6335.49",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 111,
+      "xlsx_source_order": 112,
+      "transaction_date": "2026-05-30",
+      "posted_statement_amount": "1273.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 112,
+      "xlsx_source_order": 113,
+      "transaction_date": "2026-05-29",
+      "posted_statement_amount": "3964.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 113,
+      "xlsx_source_order": 114,
+      "transaction_date": "2026-05-29",
+      "posted_statement_amount": "241.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 114,
+      "xlsx_source_order": 115,
+      "transaction_date": "2026-05-28",
+      "posted_statement_amount": "679.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 115,
+      "xlsx_source_order": 116,
+      "transaction_date": "2026-05-28",
+      "posted_statement_amount": "1015.90",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 116,
+      "xlsx_source_order": 117,
+      "transaction_date": "2026-05-28",
+      "posted_statement_amount": "1409.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 117,
+      "xlsx_source_order": 118,
+      "transaction_date": "2026-05-27",
+      "posted_statement_amount": "13124.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 118,
+      "xlsx_source_order": 119,
+      "transaction_date": "2026-05-27",
+      "posted_statement_amount": "1108.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 119,
+      "xlsx_source_order": 120,
+      "transaction_date": "2026-05-27",
+      "posted_statement_amount": "1595.65",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 120,
+      "xlsx_source_order": 121,
+      "transaction_date": "2026-05-27",
+      "posted_statement_amount": "937.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 3
+    },
+    {
+      "shared_ordinal": 121,
+      "xlsx_source_order": 123,
+      "transaction_date": "2026-05-27",
+      "posted_statement_amount": "120.37",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 122,
+      "xlsx_source_order": 124,
+      "transaction_date": "2026-05-27",
+      "posted_statement_amount": "668.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 123,
+      "xlsx_source_order": 125,
+      "transaction_date": "2026-05-27",
+      "posted_statement_amount": "9758.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 124,
+      "xlsx_source_order": 126,
+      "transaction_date": "2026-05-27",
+      "posted_statement_amount": "120.24",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 125,
+      "xlsx_source_order": 127,
+      "transaction_date": "2026-05-26",
+      "posted_statement_amount": "824.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 126,
+      "xlsx_source_order": 128,
+      "transaction_date": "2026-05-26",
+      "posted_statement_amount": "1637.39",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 127,
+      "xlsx_source_order": 129,
+      "transaction_date": "2026-05-26",
+      "posted_statement_amount": "150469.20",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 128,
+      "xlsx_source_order": 130,
+      "transaction_date": "2026-05-26",
+      "posted_statement_amount": "255.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 129,
+      "xlsx_source_order": 131,
+      "transaction_date": "2026-05-25",
+      "posted_statement_amount": "1896.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 130,
+      "xlsx_source_order": 132,
+      "transaction_date": "2026-05-25",
+      "posted_statement_amount": "50719.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 131,
+      "xlsx_source_order": 133,
+      "transaction_date": "2026-05-25",
+      "posted_statement_amount": "887.26",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 132,
+      "xlsx_source_order": 134,
+      "transaction_date": "2026-05-25",
+      "posted_statement_amount": "696900.54",
+      "statement_currency": "INR",
+      "source_marker": "credit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 133,
+      "xlsx_source_order": 135,
+      "transaction_date": "2026-05-23",
+      "posted_statement_amount": "676.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 134,
+      "xlsx_source_order": 136,
+      "transaction_date": "2026-05-22",
+      "posted_statement_amount": "2035.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 135,
+      "xlsx_source_order": 137,
+      "transaction_date": "2026-05-22",
+      "posted_statement_amount": "554.29",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 136,
+      "xlsx_source_order": 138,
+      "transaction_date": "2026-05-22",
+      "posted_statement_amount": "1780.58",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 137,
+      "xlsx_source_order": 139,
+      "transaction_date": "2026-05-21",
+      "posted_statement_amount": "1107.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 138,
+      "xlsx_source_order": 140,
+      "transaction_date": "2026-05-21",
+      "posted_statement_amount": "148.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 139,
+      "xlsx_source_order": 141,
+      "transaction_date": "2026-05-21",
+      "posted_statement_amount": "593.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 140,
+      "xlsx_source_order": 142,
+      "transaction_date": "2026-05-20",
+      "posted_statement_amount": "604.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 141,
+      "xlsx_source_order": 143,
+      "transaction_date": "2026-05-19",
+      "posted_statement_amount": "8006.03",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 142,
+      "xlsx_source_order": 144,
+      "transaction_date": "2026-05-19",
+      "posted_statement_amount": "2379.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 143,
+      "xlsx_source_order": 145,
+      "transaction_date": "2026-05-19",
+      "posted_statement_amount": "263.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 144,
+      "xlsx_source_order": 146,
+      "transaction_date": "2026-05-19",
+      "posted_statement_amount": "5315.50",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 145,
+      "xlsx_source_order": 147,
+      "transaction_date": "2026-05-19",
+      "posted_statement_amount": "418.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 146,
+      "xlsx_source_order": 148,
+      "transaction_date": "2026-05-19",
+      "posted_statement_amount": "2650.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 147,
+      "xlsx_source_order": 149,
+      "transaction_date": "2026-05-19",
+      "posted_statement_amount": "2775.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 148,
+      "xlsx_source_order": 150,
+      "transaction_date": "2026-05-19",
+      "posted_statement_amount": "645.52",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 149,
+      "xlsx_source_order": 151,
+      "transaction_date": "2026-05-18",
+      "posted_statement_amount": "880.98",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 150,
+      "xlsx_source_order": 152,
+      "transaction_date": "2026-05-18",
+      "posted_statement_amount": "1551.14",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    },
+    {
+      "shared_ordinal": 151,
+      "xlsx_source_order": 153,
+      "transaction_date": "2026-05-18",
+      "posted_statement_amount": "559.00",
+      "statement_currency": "INR",
+      "source_marker": "debit",
+      "fictional_instrument_identity_id": "axis-card-fixture-instrument-001",
+      "pdf_page_index": 4
+    }
+  ],
+  "format_only_rows": {
+    "pdf_only": [],
+    "xlsx_only": [
+      {
+        "classification": "legitimate_xlsx_only_source_format_evidence",
+        "xlsx_source_order": 54,
+        "xlsx_ordinal": 55,
+        "transaction_date": "2026-06-08",
+        "posted_statement_amount": "6520.00",
+        "statement_currency": "INR",
+        "source_marker": "debit",
+        "fictional_instrument_identity_id": "axis-card-fixture-instrument-001"
+      },
+      {
+        "classification": "legitimate_xlsx_only_source_format_evidence",
+        "xlsx_source_order": 88,
+        "xlsx_ordinal": 89,
+        "transaction_date": "2026-06-02",
+        "posted_statement_amount": "1414.82",
+        "statement_currency": "INR",
+        "source_marker": "debit",
+        "fictional_instrument_identity_id": "axis-card-fixture-instrument-001"
+      },
+      {
+        "classification": "legitimate_xlsx_only_source_format_evidence",
+        "xlsx_source_order": 122,
+        "xlsx_ordinal": 123,
+        "transaction_date": "2026-05-27",
+        "posted_statement_amount": "999.03",
+        "statement_currency": "INR",
+        "source_marker": "debit",
+        "fictional_instrument_identity_id": "axis-card-fixture-instrument-001"
+      }
+    ],
+    "pdf_only_count": 0,
+    "xlsx_only_count": 3,
+    "xlsx_only_classification": "legitimate_source_format_evidence",
+    "not_a_reconciliation_failure": true,
+    "not_a_duplicate_classification": true,
+    "not_a_pdf_extraction_failure": true,
+    "not_a_sanitization_omission": true,
+    "not_a_production_parser_error": true
+  },
+  "cross_format_relationship": {
+    "basis": "ordered_financial_projection",
+    "compared_fields": [
+      "source_order",
+      "transaction_date",
+      "posted_statement_amount",
+      "statement_currency",
+      "explicit_debit_credit_source_marker",
+      "fictional_instrument_identity_id"
+    ],
+    "shared_ordered_row_count": 151,
+    "shared_order_preserved": true,
+    "textual_equality_required": false,
+    "narration_identity_compared": false,
+    "reconciled_with_explicit_format_only_rows": true,
+    "summary_only_evidence": [
+      "total_payment_due",
+      "minimum_payment_due",
+      "payment_due_date",
+      "credit_limit",
+      "opening_balance"
+    ],
+    "pdf_layout_only_evidence": [
+      "page_geometry",
+      "page_assignment",
+      "page_breaks",
+      "repeated_headers",
+      "multiline_relationships",
+      "ignored_footer_and_reward_regions"
+    ],
+    "xlsx_structure_only_evidence": [
+      "worksheet_dimensions",
+      "merged_ranges",
+      "package_structure"
+    ]
+  },
+  "debit_credit_source_marker_boundary": {
+    "retained_as_observed_source_evidence": true,
+    "universal_card_effect_contract": false,
+    "increase_decrease_amount_owed_naming_finalized": false,
+    "bank_account_income_expense_interpretation_authorized": false,
+    "production_semantics_finalized": false
+  },
+  "statement_summary_evidence": {
+    "total_payment_due": {
+      "present": true,
+      "source_value": "\u20b9 7,92,418.98"
+    },
+    "minimum_payment_due": {
+      "present": true,
+      "source_value": "\u20b9 1,00,079.00"
+    },
+    "payment_due_date": {
+      "present": true,
+      "source_value": "08 Jul '26"
+    },
+    "credit_limit": {
+      "present": true,
+      "source_value": "\u20b9 10,00,000.00"
+    },
+    "opening_balance": {
+      "present": true,
+      "source_value": "\u20b9 6,96,900.54"
+    },
+    "cash_advance_summary": {
+      "present": false,
+      "source_value": null
+    },
+    "installment_summary": {
+      "present": false,
+      "source_value": null
+    },
+    "finance_charge_summary": {
+      "present": false,
+      "source_value": null
+    },
+    "unobserved_fields_are_not_invented": true
+  },
+  "original_currency_and_fx_evidence": {
+    "original_merchant_amount": null,
+    "original_merchant_currency": null,
+    "printed_conversion_rate": null,
+    "fx_markup": null,
+    "transaction_level_fee_field": null,
+    "transaction_level_tax_field": null,
+    "multi_currency_transaction_evidence_present": false,
+    "observed_statement_currencies": [
+      "INR"
+    ]
+  },
+  "fictional_identity": {
+    "customer_identity_id": "axis-card-fixture-customer-001",
+    "account_identity_id": "axis-card-fixture-account-001",
+    "instrument_identity_ids": [
+      "axis-card-fixture-instrument-001"
+    ],
+    "customer_shared_across_periods": true,
+    "account_shared_across_periods": true,
+    "instrument_shared_across_periods": true,
+    "account_and_instrument_ids_distinct": true,
+    "supplementary_instrument_present": false,
+    "relationship_does_not_depend_on": [
+      "display_text",
+      "filename",
+      "masked_value",
+      "card_suffix"
+    ]
+  },
+  "period_relationship": {
+    "chronology": "later",
+    "related_fixture_id": "axis_credit_card_statement_20260417_to_20260517",
+    "relationship": "follows",
+    "consecutive": true,
+    "overlaps": false,
+    "customer_continues": true,
+    "account_continues": true,
+    "instrument_continues": true,
+    "continuity_basis": "owner_attested_same_source_relationship_and_stable_fictional_mapping",
+    "continuity_does_not_depend_on": [
+      "display_text",
+      "filename",
+      "masked_value",
+      "card_suffix"
+    ],
+    "balance_continuity_asserted": false,
+    "manufactured_continuity_value": false
+  },
+  "validation_expectations": {
+    "metadata_valid": true,
+    "financial_evidence_reconciled": true,
+    "format_only_rows_retained": true,
+    "production_import_expected": false
+  },
+  "ocr_boundary": {
+    "native_text_available": true,
+    "ocr_used": false,
+    "ocr_required_for_fixture": false,
+    "scope": "approved_fixture_layout_only"
+  },
+  "production_support_boundary": {
+    "classification": "fixture_evidence_only",
+    "axis_card_production_parser_support": false,
+    "pdf_production_support": false,
+    "xlsx_production_support": false,
+    "statement_import_supported": false,
+    "card_semantics_finalized": false,
+    "debit_credit_production_interpretation": false,
+    "adr_implication": false,
+    "persistence_implication": false,
+    "migration_implication": false,
+    "fw_p1_09_remains_blocked": true
+  }
+}

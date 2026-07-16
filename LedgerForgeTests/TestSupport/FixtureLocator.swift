@@ -37,6 +37,22 @@ enum FixtureLocator {
         fixturesRoot.appendingPathComponent("Axis").appendingPathComponent("Manifests").appendingPathComponent(fileName)
     }
 
+    static func axisCreditCardPDF(_ fileName: String) -> URL {
+        axisCreditCardRoot.appendingPathComponent("PDF").appendingPathComponent("v1").appendingPathComponent(fileName)
+    }
+
+    static func axisCreditCardXLSX(_ fileName: String) -> URL {
+        axisCreditCardRoot.appendingPathComponent("XLSX").appendingPathComponent("v1").appendingPathComponent(fileName)
+    }
+
+    static func axisCreditCardExpected(_ fileName: String) -> URL {
+        axisCreditCardRoot.appendingPathComponent("Expected").appendingPathComponent(fileName)
+    }
+
+    static func axisCreditCardManifest(_ fileName: String) -> URL {
+        axisCreditCardRoot.appendingPathComponent("Manifests").appendingPathComponent(fileName)
+    }
+
     static func hdfcBankAccountPDF(_ fileName: String) -> URL {
         hdfcBankAccountRoot.appendingPathComponent("PDF").appendingPathComponent("v1").appendingPathComponent(fileName)
     }
@@ -95,6 +111,10 @@ enum FixtureLocator {
 
     private static var hdfcBankAccountRoot: URL {
         fixturesRoot.appendingPathComponent("HDFC").appendingPathComponent("BankAccount")
+    }
+
+    private static var axisCreditCardRoot: URL {
+        fixturesRoot.appendingPathComponent("Axis").appendingPathComponent("CreditCard")
     }
 
     private static var cbqBankAccountRoot: URL {
