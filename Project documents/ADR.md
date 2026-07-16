@@ -1975,6 +1975,10 @@ The audit performs no mutation, emits privacy-safe aggregate diagnostics only an
 
 ADR-033 does not authorize a repair or migration.
 
+### Sprint 44 implementation clarification
+
+The audit's variable-scale decimal strings belonged solely to disposable development and test databases. They are not shipped user data, production history or a permanent compatibility contract. Sprint 44 therefore requires canonical catalog-scale decimal text for all new writes and hydration, with exact decimal/minor/currency agreement. Development fixtures and databases may be recreated or reseeded to the canonical contract; no production-data migration is introduced.
+
 ### Presentation
 
 Until a separately approved FX domain exists, ViewModels expose one total per native currency, deterministically ordered by canonical code. Dashboard, Accounts and Transactions must not expose one currencyless aggregate across currencies. Mixed-currency net worth is unsupported as one native total.

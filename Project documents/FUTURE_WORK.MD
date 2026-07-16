@@ -1983,48 +1983,10 @@ Rules must be explainable and configurable rather than inferred from institution
 
 # P3 — Multi-Currency and Ecosystem
 
-## FW-P3-29A — Money Value Type and Multi-Currency Domain Foundation
-
-**Status:** Ready for planning
-**Depends on:** ADR-008 and accepted ADR-033; completed compatibility audit with requirements
-
-Define the dedicated `Money` value type and the smallest coherent production boundary required for reliable native-currency behaviour.
-
-ADR-033 accepts the implementation contract:
-
-- `Money` contains an exact `Decimal` amount and canonical native currency code;
-- one compiled, versioned offline catalog governs supported membership and fraction scale;
-- canonical persisted decimal text represents the exact numeric value at catalog scale;
-- minor units are a mandatory exact persistence and query encoding, not independent financial truth;
-- optional running balances remain exact account-currency Money evidence encoded by the existing minor-unit column;
-- malformed, unsupported, over-precision, invalid, overflowing or inconsistent values fail explicitly;
-- account, transaction, running-balance and statement booked-currency relationships are validated;
-- SQLite and In-Memory providers expose equivalent values and failures;
-- same-currency arithmetic is permitted and cross-currency arithmetic fails explicitly;
-- one native-currency total is presented per canonical code;
-- no FX conversion or valuation belongs to this increment;
-- no schema migration is authorized by ADR-033.
-
-Imported monetary values must never be implicitly rounded. Arithmetic and comparison must be same-currency only unless a separately approved conversion domain supplies an explicit derived value. Cross-currency arithmetic and comparison must fail rather than silently combine values.
-
-The read-only compatibility audit completed successfully with zero blocking findings. Existing INR values agree exactly with their stored minor units. Seventy-six legacy plain decimal strings use zero or one fractional digit; Money reads must accept zero-, one- and two-fraction-digit INR strings without rounding, verify exact minor agreement, canonicalize only in memory and for new writes, and never rewrite historical strings. Any disagreement must fail rather than guess.
-
-The smallest coherent production release boundary is:
-
-`Money domain + persistence and hydration + validation + grouped native-currency presentation`
-
-Internal checkpoints may be smaller, but production non-INR support remains closed until the complete boundary passes.
-
-This candidate does not activate exchange-rate fetching, storage, conversion, reporting-currency totals or historical valuation. Those remain governed by `FW-P3-31` through `FW-P3-34`.
-
-The compatibility audit is complete with requirements. This candidate is ready for future implementation planning after the intentional break, but passing the audit does not itself implement Money or enable non-INR production support.
-
----
-
 ## FW-P3-30 — Multi-Currency Account and Transaction Presentation
 
 **Status:** Blocked  
-**Depends on:** `FW-P3-29A`
+**Depends on:** Sprint 44 Money boundary and a separately approved display or conversion scope
 
 Present native and derived monetary values using locale-aware formatting, including:
 
@@ -2037,7 +1999,7 @@ Present native and derived monetary values using locale-aware formatting, includ
 
 Before QAR production support, every row must retain native currency, summaries and Dashboard balances must be grouped by currency, and no combined amount may appear without an approved conversion.
 
-This presentation boundary is part of the complete `FW-P3-29A` release gate. Until it passes, Dashboard, account and transaction summaries must not combine different native currencies into one amount. The minimum safe presentation produces one total per native currency. Converted, base-currency and reporting-currency totals remain outside this increment.
+Sprint 44 supplies the minimum safe grouped native-currency presentation. Converted, base-currency, reporting-currency and secondary-display totals remain outside this increment.
 
 ---
 

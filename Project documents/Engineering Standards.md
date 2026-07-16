@@ -237,8 +237,8 @@ The code should make adding the next financial institution easier than adding th
 - Never overwrite imported financial values after conversion.
 - Support multiple simultaneous display currencies.
 - Respect regional formatting conventions for each currency.
-- Canonical trusted writes use catalog scale; legacy trusted reads may accept exact plain non-exponent decimal strings with zero through catalog-scale fractional digits.
-- Legacy reads must verify exact agreement with stored minor units. Canonicalization occurs in memory and for new writes only; historical strings are not rewritten merely for formatting. Disagreement fails rather than guessing.
+- Canonical trusted writes and hydration use catalog-scale decimal text only; decimal text, minor units and canonical currency must agree exactly.
+- Development and test databases may be recreated or reseeded to this contract. Malformed, noncanonical or disagreeing persisted values fail rather than being guessed, rounded or preserved through a compatibility layer.
 
 ---
 

@@ -57,7 +57,7 @@ Production transaction persistence currently stores one authoritative native amo
 
 The `currencies` and `exchange_rates` tables are currently inactive schema capacity, not production currency or conversion authorities. Under ADR-033, one reviewed, versioned, compiled offline catalog is the sole semantic authority for supported currency membership and fraction digits. The database `currencies` table must not override or compete with that catalog. Production import mapping and hydration remain limited to the supported INR path. No production exchange-rate repository, conversion workflow or reporting-currency total is established by the presence of those tables.
 
-ADR-033 authorizes no schema migration. The read-only INR compatibility audit passed with compatibility requirements and zero blocking findings: existing exact values agree with their minor units, while 76 legacy decimal strings require backward-compatible reads. New trusted writes use canonical catalog-scale decimal text; legacy reads verify exact minor agreement before in-memory canonicalization. No migration, repair or historical rewrite is required or authorized.
+Sprint 44 implements the ADR-033 boundary without a schema migration: trusted writes and hydration require canonical catalog-scale decimal text plus exact agreeing minor units and canonical currency. Disposable development and test databases may be recreated or reseeded to the contract; this is not a production-history migration or repair.
 
 ### ADR-034 card evidence boundary
 
@@ -707,8 +707,8 @@ XVII. Risks and mitigations
   - Mitigation: compression, archival policies, optional purge of raw normalized rows after a retention period while preserving transactions + essential provenance.
 - Duplicate handling and fingerprint collision
   - Mitigation: use versioned exact-content and bounded Axis UPI ownership algorithms; broader identity and management workflows remain future work.
-- Compatibility complexity for Money type introduction
-  - Mitigation: the read-only INR compatibility audit passed with legacy-read requirements. ADR-033 authorizes no repair, backfill, catalog-table activation or schema migration.
+- Canonical Money persistence and hydration
+  - Mitigation: catalog-scale decimal text, exact minor-unit agreement and canonical currency are verified at both persistence and hydration; ADR-033 requires no schema migration.
 
 XVIII. Next steps (recommended)
 
