@@ -8,7 +8,6 @@
 - Architecture baseline: Architecture v1.0 Frozen and UI/UX v1.0 Frozen.
 - Build state: clean Debug build passing at the latest verified implementation handoff.
 - Latest verified automated result: 183 tests in 26 suites, 0 failures, 0 skipped. Generic `LedgerForgeUITests` remained intentionally disabled.
-- Current repository state at this handoff: `HEAD == origin/main == f97e243fa412816dacbdc3961fe615e9f41d82d7`.
 
 ## Current Production Capability
 

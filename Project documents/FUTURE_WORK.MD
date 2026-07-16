@@ -109,7 +109,7 @@ Analytics, investments, multi-currency and ecosystem capabilities that depend on
 
 ### Ready for discovery
 
-Dependencies appear satisfied. Work may be considered during the next sprint-planning cycle, but repository discovery is still required.
+Dependencies appear satisfied and the candidate may be considered during planning. Targeted Work discovery is used when current repository evidence is insufficient, stale or unable to establish a safe implementation boundary.
 
 ### Candidate
 
@@ -151,7 +151,7 @@ After a completed increment is verified and accepted:
 
 5. Determine whether related candidates may form one coherent sprint outcome.
 
-6. Send Work an evidence-only repository-discovery task.
+6. When repository evidence is insufficient or the candidate’s implementation boundary is uncertain, send Work a read-only evidence-discovery task.
 
 7. Work records:
 
@@ -526,7 +526,6 @@ Keep independent CBQ families:
 
 Each family requires independent approved fixtures and a financial baseline. QAR support depends on native multi-currency safety; card support also depends on credit-card financial semantics.
 
-Each family requires its own approved financial baseline.
 
 ---
 
@@ -537,7 +536,7 @@ Each family requires its own approved financial baseline.
 
 Add card issuers only through deterministic, fixture-backed parser families.
 
-American Express is the priority independent credit-card issuer. Add issuers only through deterministic, fixture-backed parser families.
+American Express is the priority independent credit-card issuer. Additional issuers may be added only through deterministic, fixture-backed parser families.
 
 ---
 
@@ -875,8 +874,6 @@ Retain future work for duplicate override, partial import, broader duplicate man
 
 ---
 
----
-
 ## FW-P1-27 — Delete or Reverse an Import Session
 
 **Status:** Blocked  
@@ -954,9 +951,10 @@ Candidate reset operations include:
 - import sessions only;
 - financial identity only;
 - repository financial data;
-- complete development factory reset.
 
 Each operation must clearly state what is retained and removed.
+
+Permanent recreation of the canonical development database remains governed by `BUG-P1-01`; this candidate covers only selective data-domain reset operations after that lifecycle is safe.
 
 ---
 
@@ -977,7 +975,7 @@ Each operation must clearly state what is retained and removed.
 ## FW-P1-33 — Import-Session Inspector
 
 **Status:** Candidate  
-**Depends on:** Durable import audit trail
+**Depends on:** Implemented durable import-attempt-history foundation and an approved developer-inspection privacy boundary
 
 ---
 

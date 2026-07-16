@@ -47,7 +47,7 @@ SQLite and In-Memory providers maintain parity. Accepted event ownership is pers
 
 ### Migration V4 and durable import attempts
 
-Migration V4 adds the bounded `import_attempts` ledger. Attempt rows carry versionable outcome, coverage, account-decision, guidance and persistence values plus trusted optional workspace, account, session and document relationships. Workspace-scoped history is read newest-first. Only authoritative completed successful sessions may be backfilled as successful attempts; rejected history is never invented.
+Migration V4 adds the bounded `import_attempts` ledger. Attempt rows are workspace-scoped and carry versionable outcome, coverage, account-decision, guidance and persistence values, plus optional trusted account, session and document relationships. Workspace-scoped history is read newest-first. Only authoritative completed successful sessions may be backfilled as successful attempts; rejected history is never invented.
 
 Successful attempts are persisted atomically with successful import history. Rejected attempts remain distinct from successful import sessions and may be recorded without financial mutation. Attempt history excludes raw source content, identifiers, references, fingerprints, event digests, unrestricted narration, paths and localized errors. SQLite and In-Memory providers enforce equivalent behavior.
 
