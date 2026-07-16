@@ -121,10 +121,10 @@ final class AccountStore: ObservableObject {
         if let existing = findAccount(institution: institutionName, name: accountName) {
             // Update balance and lastImport
             var updated = existing
+            updated.nativeCurrency = try! CurrencyCode(currency)
             if let latestBalance = latestBalance {
-                updated.currentBalance = latestBalance
+                updated.currentBalanceMoney = try! Money(amount: latestBalance, currency: updated.nativeCurrency)
             }
-            updated.currencyCode = currency
             updated.lastImport = importSession.importedAt
 
             DispatchQueue.main.async {
@@ -190,7 +190,7 @@ final class AccountStore: ObservableObject {
         DispatchQueue.main.async {
             guard let idx = self.accounts.firstIndex(where: { $0.id == id }) else { return }
             var updated = self.accounts[idx]
-            updated.currentBalance = newBalance
+            updated.currentBalanceMoney = try! Money(amount: newBalance, currency: updated.nativeCurrency)
             if let lastImport = lastImport {
                 updated.lastImport = lastImport
             }

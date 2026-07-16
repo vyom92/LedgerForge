@@ -53,6 +53,16 @@ struct DashboardTransactionSummary: Identifiable, Equatable {
     let isCredit: Bool
 }
 
+struct DashboardCurrencySummary: Identifiable, Equatable {
+    let currency: CurrencyCode
+    let balance: Money
+    let income: Money
+    let expenses: Money
+
+    var id: String { currency.code }
+    var cashFlow: Money { try! income - expenses }
+}
+
 final class DashboardViewModel: ObservableObject {
 
     @Published private(set) var snapshot: DashboardSnapshot = .empty
@@ -61,8 +71,10 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var accountSummaries: [DashboardAccountSummary] = []
     @Published private(set) var recentTransactionSummaries: [DashboardTransactionSummary] = []
     @Published private(set) var transactionCount: Int = 0
+    @Published private(set) var nativeCurrencySummaries: [DashboardCurrencySummary] = []
 
     private var cancellables = Set<AnyCancellable>()
+    private var latestTransactions: [Transaction] = []
     private let accountLimit = 3
     private let recentTransactionLimit = 3
 
@@ -108,11 +120,20 @@ final class DashboardViewModel: ObservableObject {
 
     func refresh(from transactions: [Transaction]) {
 
+        latestTransactions = transactions
         transactionCount = transactions.count
         recentTransactionSummaries = Self.recentTransactionSummaries(
             from: transactions,
             limit: recentTransactionLimit
         )
+
+        let transactionCurrencies = Set(transactions.map(\.money.currency))
+        guard transactionCurrencies.count <= 1 else {
+            snapshot = .empty
+            refreshPresentationStateIfRuntimeDataAvailable()
+            refreshNativeCurrencySummaries()
+            return
+        }
 
         let income = transactions.reduce(Decimal.zero) {
             $0 + ($1.credit ?? .zero)
@@ -132,6 +153,7 @@ final class DashboardViewModel: ObservableObject {
         )
 
         refreshPresentationStateIfRuntimeDataAvailable()
+        refreshNativeCurrencySummaries()
     }
 
     private func refresh(accounts: [Account]) {
@@ -147,6 +169,27 @@ final class DashboardViewModel: ObservableObject {
         }
 
         refreshPresentationStateIfRuntimeDataAvailable()
+        refreshNativeCurrencySummaries()
+    }
+
+    private func refreshNativeCurrencySummaries() {
+        let currencies = Set(accounts.map(\.nativeCurrency)).union(transactionsCurrencyCodes())
+        nativeCurrencySummaries = currencies.sorted().map { currency in
+            let balanceValues = accounts.filter { $0.nativeCurrency == currency }.map(\.currentBalanceMoney)
+            let incomeValues = latestTransactions.filter { $0.money.currency == currency }.compactMap(\.creditMoney)
+            let expenseValues = latestTransactions.filter { $0.money.currency == currency }.compactMap(\.debitMoney)
+            let zero = try! Money(amount: .zero, currency: currency)
+            return DashboardCurrencySummary(
+                currency: currency,
+                balance: try! Money.aggregate(balanceValues + [zero]),
+                income: try! Money.aggregate(incomeValues + [zero]),
+                expenses: try! Money.aggregate(expenseValues + [zero])
+            )
+        }
+    }
+
+    private func transactionsCurrencyCodes() -> Set<CurrencyCode> {
+        Set(latestTransactions.map(\.money.currency))
     }
     private func refreshPresentationStateIfRuntimeDataAvailable() {
         guard case .failed = presentationState else {

@@ -27,11 +27,16 @@ struct ImportValidationResult {
     let rowsRead: Int
     let transactionsParsed: Int
 
-    let debitTotal: Decimal
-    let creditTotal: Decimal
+    let statementCurrency: CurrencyCode?
+    let debitTotalMoney: Money?
+    let creditTotalMoney: Money?
+    let openingBalanceMoney: Money?
+    let closingBalanceMoney: Money?
 
-    let openingBalance: Decimal?
-    let closingBalance: Decimal?
+    var debitTotal: Decimal { debitTotalMoney?.amount ?? .zero }
+    var creditTotal: Decimal { creditTotalMoney?.amount ?? .zero }
+    var openingBalance: Decimal? { openingBalanceMoney?.amount }
+    var closingBalance: Decimal? { closingBalanceMoney?.amount }
 
     let passed: Bool
 
@@ -40,10 +45,11 @@ struct ImportValidationResult {
     static let empty = ImportValidationResult(
         rowsRead: 0,
         transactionsParsed: 0,
-        debitTotal: 0,
-        creditTotal: 0,
-        openingBalance: nil,
-        closingBalance: nil,
+        statementCurrency: nil,
+        debitTotalMoney: nil,
+        creditTotalMoney: nil,
+        openingBalanceMoney: nil,
+        closingBalanceMoney: nil,
         passed: true,
         issues: []
     )

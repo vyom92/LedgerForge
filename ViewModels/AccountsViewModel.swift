@@ -33,6 +33,11 @@ struct AccountsAccountPresentation: Identifiable, Equatable {
     let identitySummaries: [AccountIdentitySummary]
 }
 
+struct NativeAccountBalanceSummary: Identifiable, Equatable {
+    let money: Money
+    var id: String { money.currency.code }
+}
+
 struct AccountImportHistoryPresentation: Identifiable, Equatable {
     let id: String
     let sourceDocumentName: String?
@@ -83,6 +88,7 @@ final class AccountsViewModel: ObservableObject {
     @Published private(set) var recentActivity: [Transaction] = []
     @Published private(set) var transactionCount = 0
     @Published private(set) var importHistory: [AccountImportHistoryPresentation] = []
+    @Published private(set) var nativeBalanceSummaries: [NativeAccountBalanceSummary] = []
     @Published private(set) var selectedImportSession: AccountImportHistoryPresentation?
     @Published var displayNameDraft = ""
     @Published private(set) var editState: AccountDisplayNameEditState = .idle
@@ -233,6 +239,12 @@ final class AccountsViewModel: ObservableObject {
                 currentBalance: account.currentBalance,
                 identitySummaries: account.identitySummaries
             )
+        }
+
+        let balancesByCurrency = Dictionary(grouping: runtimeAccounts.map(\.0), by: { $0.nativeCurrency })
+        nativeBalanceSummaries = balancesByCurrency.keys.sorted().map { currency in
+            let balances = (balancesByCurrency[currency] ?? []).map(\.currentBalanceMoney)
+            return NativeAccountBalanceSummary(money: try! Money.aggregate(balances))
         }
 
         if let selectedRepositoryAccountID,

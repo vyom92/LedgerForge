@@ -603,7 +603,7 @@ struct RepositoryContractTests {
         for (index, amount, balance) in [("transaction-v3-a", 2_500, 2_500), ("transaction-v3-b", -700, 1_800)] {
             try v3Database.executePrepared(
                 sql: "INSERT INTO transactions (id, workspace_id, account_id, import_session_id, document_id, posted_date, description, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_trusted, trusted_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
-                params: [index, workspaceID, accountID, sessionID, documentID, "2026-07-16", "fictional narrative", "fictional-reference", "INR", amount, NSDecimalNumber(decimal: Decimal(amount) / 100).stringValue, amount < 0 ? "debit" : "credit", balance, 1, completedAt, "2026-07-16T09:00:00Z"]
+                params: [index, workspaceID, accountID, sessionID, documentID, "2026-07-16", "fictional narrative", "fictional-reference", "INR", amount, try Money.fromMinorUnits(Int64(amount), currency: "INR").canonicalDecimalString(), amount < 0 ? "debit" : "credit", balance, 1, completedAt, "2026-07-16T09:00:00Z"]
             )
         }
         try v3Database.executePrepared(

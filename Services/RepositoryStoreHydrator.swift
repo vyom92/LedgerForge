@@ -28,6 +28,10 @@ struct RepositoryStoreHydrationResult: Equatable {
 enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
     case unsupportedCurrency(String)
     case invalidPostedDate(String)
+    case malformedMoney
+    case decimalMinorMismatch
+    case accountCurrencyMismatch
+    case runningBalanceCurrencyMismatch
 
     var errorDescription: String? {
         switch self {
@@ -35,6 +39,14 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
             return "Currency \(currency) is not supported by dashboard hydration."
         case .invalidPostedDate(let value):
             return "Transaction posted date \(value) could not be read."
+        case .malformedMoney:
+            return "A persisted monetary value is malformed."
+        case .decimalMinorMismatch:
+            return "Persisted decimal and minor monetary values disagree."
+        case .accountCurrencyMismatch:
+            return "A transaction currency does not match its account."
+        case .runningBalanceCurrencyMismatch:
+            return "A running-balance currency does not match its account."
         }
     }
 }
@@ -117,7 +129,7 @@ final class RepositoryStoreHydrator {
         }
         let accounts = try Self.accounts(
             from: accountDTOs,
-            transactions: transactionDTOs,
+            transactions: transactions,
             identitiesByAccountID: identitiesByAccountID
         )
 
@@ -173,11 +185,11 @@ final class RepositoryStoreHydrator {
 
     private static func accounts(
         from accountDTOs: [AccountDTO],
-        transactions: [TransactionDTO],
+        transactions: [Transaction],
         identitiesByAccountID: [String: [AccountIdentitySummary]]
     ) throws -> [Account] {
         try accountDTOs.map { accountDTO in
-            let accountTransactions = transactions.filter { $0.accountId == accountDTO.id }
+            let accountTransactions = transactions.filter { $0.repositoryAccountId == accountDTO.id }
             let latestBalance = try latestRunningBalance(
                 from: accountTransactions,
                 currency: accountDTO.nativeCurrency
@@ -190,7 +202,7 @@ final class RepositoryStoreHydrator {
                 name: accountDTO.name,
                 type: accountType(from: accountDTO.accountType),
                 currencyCode: accountDTO.nativeCurrency,
-                currentBalance: latestBalance ?? .zero,
+                currentBalance: latestBalance?.amount ?? .zero,
                 includeInNetWorth: true,
                 lastImport: nil,
                 identitySummaries: identitiesByAccountID[accountDTO.id] ?? []
@@ -236,22 +248,47 @@ final class RepositoryStoreHydrator {
             throw RepositoryStoreHydrationError.invalidPostedDate(dto.postedDateISO)
         }
 
-        let accountDTO = accounts.first { $0.id == dto.accountId }
-        let amount = try decimal(fromMinorUnits: dto.amountMinor, currency: dto.nativeCurrency)
-        let runningBalance = try dto.runningBalanceMinor.map {
-            try decimal(fromMinorUnits: $0, currency: dto.nativeCurrency)
+        guard let accountDTO = accounts.first(where: { $0.id == dto.accountId }) else {
+            throw RepositoryStoreHydrationError.accountCurrencyMismatch
         }
+        let decimalMoney: Money
+        let minorMoney: Money
+        do {
+            decimalMoney = try Money(canonicalDecimal: dto.amountDecimal, currency: dto.nativeCurrency)
+            minorMoney = try Money.fromMinorUnits(dto.amountMinor, currency: dto.nativeCurrency)
+        } catch {
+            throw RepositoryStoreHydrationError.malformedMoney
+        }
+        guard decimalMoney == minorMoney else {
+            throw RepositoryStoreHydrationError.decimalMinorMismatch
+        }
+        guard decimalMoney.currency.code == accountDTO.nativeCurrency else {
+            throw RepositoryStoreHydrationError.accountCurrencyMismatch
+        }
+        let runningBalanceMoney = try dto.runningBalanceMinor.map { minor in
+            do {
+                let money = try Money.fromMinorUnits(minor, currency: dto.nativeCurrency)
+                guard money.currency.code == accountDTO.nativeCurrency else {
+                    throw RepositoryStoreHydrationError.runningBalanceCurrencyMismatch
+                }
+                return money
+            } catch let error as RepositoryStoreHydrationError {
+                throw error
+            } catch {
+                throw RepositoryStoreHydrationError.malformedMoney
+            }
+        }
+        let absoluteAmount = try Money(amount: abs(decimalMoney.amount), currency: decimalMoney.currency)
 
         return Transaction(
             date: postedDate,
             description: dto.description ?? "",
-            debit: dto.direction == "debit" ? abs(amount) : nil,
-            credit: dto.direction == "credit" ? amount : nil,
-            amount: amount,
-            balance: runningBalance,
-            currency: dto.nativeCurrency,
-            account: accountDTO?.name ?? dto.accountId ?? "",
-            sourceBank: accountDTO?.institutionId ?? "",
+            debitMoney: dto.direction == "debit" ? absoluteAmount : nil,
+            creditMoney: dto.direction == "credit" ? absoluteAmount : nil,
+            money: decimalMoney,
+            runningBalanceMoney: runningBalanceMoney,
+            account: accountDTO.name,
+            sourceBank: accountDTO.institutionId ?? "",
             sourceFile: dto.importSessionId ?? "",
             repositoryAccountId: dto.accountId,
             repositoryImportSessionId: dto.importSessionId
@@ -273,34 +310,12 @@ final class RepositoryStoreHydrator {
         }
     }
 
-    private static func decimal(fromMinorUnits value: Int64, currency: String) throws -> Decimal {
-        guard let scale = minorUnitScale(for: currency) else {
-            throw RepositoryStoreHydrationError.unsupportedCurrency(currency)
-        }
-
-        var divisor = Decimal(1)
-        for _ in 0..<scale {
-            divisor *= 10
-        }
-
-        return Decimal(value) / divisor
-    }
-
-    private static func minorUnitScale(for currency: String) -> Int? {
-        switch currency.uppercased() {
-        case "INR":
-            return 2
-        default:
-            return nil
-        }
-    }
-
-    private static func latestRunningBalance(from transactions: [TransactionDTO], currency: String) throws -> Decimal? {
+    private static func latestRunningBalance(from transactions: [Transaction], currency: String) throws -> Money? {
         let latest = transactions
             .enumerated()
-            .compactMap { offset, transaction -> (offset: Int, date: Date?, balanceMinor: Int64)? in
-                guard let balanceMinor = transaction.runningBalanceMinor else { return nil }
-                return (offset, dayFormatter.date(from: transaction.postedDateISO), balanceMinor)
+            .compactMap { offset, transaction -> (offset: Int, date: Date?, balance: Money)? in
+                guard let balance = transaction.runningBalanceMoney else { return nil }
+                return (offset, transaction.date, balance)
             }
             .sorted { lhs, rhs in
                 switch (lhs.date, rhs.date) {
@@ -317,7 +332,10 @@ final class RepositoryStoreHydrator {
             .first
 
         guard let latest else { return nil }
-        return try decimal(fromMinorUnits: latest.balanceMinor, currency: currency)
+        guard latest.balance.currency.code == currency else {
+            throw RepositoryStoreHydrationError.runningBalanceCurrencyMismatch
+        }
+        return latest.balance
     }
 
     private static let dayFormatter: DateFormatter = {

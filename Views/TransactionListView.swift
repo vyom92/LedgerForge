@@ -46,9 +46,11 @@ struct TransactionListView: View {
 
                 Spacer()
 
-                transactionSummaryCard("Total Inflow", value: format(viewModel.totalCredits), color: LFTheme.success)
-                transactionSummaryCard("Total Outflow", value: format(viewModel.totalDebits), color: LFTheme.danger)
-                transactionSummaryCard("Net Flow", value: format(viewModel.totalCredits - viewModel.totalDebits), color: LFTheme.success)
+                ForEach(viewModel.currencySummaries) { summary in
+                    transactionSummaryCard("\(summary.currency.code) Inflow", value: MoneyFormatting.display(summary.inflow), color: LFTheme.success)
+                    transactionSummaryCard("\(summary.currency.code) Outflow", value: MoneyFormatting.display(summary.outflow), color: LFTheme.danger)
+                    transactionSummaryCard("\(summary.currency.code) Net", value: MoneyFormatting.display(summary.net), color: LFTheme.success)
+                }
                 transactionSummaryCard("Transactions", value: "\(viewModel.transactions.count)", color: LFTheme.info)
             }
         }
@@ -206,7 +208,7 @@ struct TransactionListView: View {
                     LFInfoRow(title: "Type", value: selected.credit != nil ? "Credit" : "Debit", titleWidth: 86, verticalPadding: 0)
                     LFInfoRow(title: "Description", value: selected.description, titleWidth: 86, verticalPadding: 0)
                     LFInfoRow(title: "Source", value: selected.sourceBank, titleWidth: 86, verticalPadding: 0)
-                    LFInfoRow(title: "Balance After", value: selected.balance.map(format) ?? "—", titleWidth: 86, verticalPadding: 0)
+                    LFInfoRow(title: "Balance After", value: selected.runningBalanceMoney.map { MoneyFormatting.display($0) } ?? "—", titleWidth: 86, verticalPadding: 0)
 
                     Divider().overlay(LFTheme.divider)
 
@@ -272,7 +274,7 @@ struct TransactionListView: View {
                     .frame(width: 120, alignment: .trailing)
                 LFStatusBadge(title: viewModel.validationPassed ? "Cleared" : "Review", color: viewModel.validationPassed ? LFTheme.success : LFTheme.warning)
                     .frame(width: 96, alignment: .leading)
-                Text(transaction.balance.map(format) ?? "—")
+                Text(transaction.runningBalanceMoney.map { MoneyFormatting.display($0) } ?? "—")
                     .monospacedDigit()
                     .frame(width: 112, alignment: .trailing)
                 Image(systemName: "ellipsis")
@@ -357,13 +359,7 @@ struct TransactionListView: View {
     }
 
     private func formatSigned(_ transaction: Transaction) -> String {
-        let prefix = transaction.credit != nil ? "+" : "-"
-        let magnitude = transaction.amount < .zero ? -transaction.amount : transaction.amount
-        return "\(prefix)₹ \(format(magnitude))"
-    }
-
-    private func format(_ value: Decimal) -> String {
-        Self.currencyFormatter.string(from: NSDecimalNumber(decimal: value)) ?? "\(value)"
+        MoneyFormatting.signedDisplay(transaction.money, isCredit: transaction.creditMoney != nil)
     }
 
     private static let dateFormatter: DateFormatter = {
@@ -372,13 +368,6 @@ struct TransactionListView: View {
         return formatter
     }()
 
-    private static let currencyFormatter: NumberFormatter = {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = 2
-        formatter.maximumFractionDigits = 2
-        return formatter
-    }()
 }
 
 struct TransactionListView_Previews: PreviewProvider {

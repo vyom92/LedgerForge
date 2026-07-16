@@ -5,21 +5,21 @@ import Foundation
 
 enum ImportPersistenceError: Error, LocalizedError, Equatable {
     case validationFailed
+    case missingDocumentCurrency
+    case currencyRelationshipInvalid
     case missingTransactionDate(UUID)
-    case unsupportedCurrency(String)
-    case nonIntegralMinorAmount(Decimal, currency: String)
     case missingTransactionDirection(UUID)
 
     var errorDescription: String? {
         switch self {
         case .validationFailed:
             return "Import persistence requires a passed validation result."
+        case .missingDocumentCurrency:
+            return "Import persistence requires an explicit statement currency."
+        case .currencyRelationshipInvalid:
+            return "Import persistence requires matching validated monetary currencies."
         case .missingTransactionDate(let id):
             return "Transaction \(id) is missing a posted date."
-        case .unsupportedCurrency(let currency):
-            return "Currency \(currency) is not supported by import persistence mapping."
-        case .nonIntegralMinorAmount(let amount, let currency):
-            return "Amount \(amount) cannot be represented exactly in minor units for \(currency)."
         case .missingTransactionDirection(let id):
             return "Transaction \(id) is missing a debit or credit direction."
         }
@@ -73,7 +73,8 @@ struct ImportPersistenceMapper {
         }
 
         let importedAtISO = dateFormatter.string(from: importSession.importedAt)
-        let account = accountDTO(
+        let documentCurrency = try requiredCurrency(financialDocument)
+        let account = try accountDTO(
             financialDocument: financialDocument,
             importSession: importSession,
             accountId: accountId,
@@ -98,7 +99,8 @@ struct ImportPersistenceMapper {
                 accountId: account.id,
                 importSessionId: importSessionId,
                 documentId: documentId,
-                createdAtISO: importedAtISO
+                createdAtISO: importedAtISO,
+                documentCurrency: documentCurrency
             )
         }
         let eventIdentities = try financialDocument.transactions.compactMap { transaction -> TransactionEventIdentityDTO? in
@@ -149,13 +151,13 @@ struct ImportPersistenceMapper {
         importSession: ImportSession,
         accountId: String,
         createdAtISO: String
-    ) -> AccountDTO {
+    ) throws -> AccountDTO {
         let institutionName = importSession.institution?.rawValue ?? "Unknown"
         let institutionId = Self.institutionId(for: importSession.institution)
         let accountName = Self.displayAccountName(
             institutionName: institutionName,
             documentType: importSession.documentType,
-            currency: financialDocument.transactions.first?.currency,
+            currency: financialDocument.bookedCurrency?.code,
             fallbackFileName: importSession.fileName
         )
         let accountType: String? = {
@@ -175,7 +177,7 @@ struct ImportPersistenceMapper {
             name: accountName,
             institutionId: institutionId,
             accountType: accountType,
-            nativeCurrency: financialDocument.transactions.first?.currency ?? "INR",
+            nativeCurrency: try requiredCurrency(financialDocument),
             description: "Imported from \(importSession.fileName)",
             createdAtISO: createdAtISO
         )
@@ -229,19 +231,27 @@ struct ImportPersistenceMapper {
         accountId: String,
         importSessionId: String,
         documentId: String?,
-        createdAtISO: String
+        createdAtISO: String,
+        documentCurrency: String
     ) throws -> TransactionDTO {
         guard let postedDate = transaction.date else {
             throw ImportPersistenceError.missingTransactionDate(transaction.id)
         }
 
         let direction: String
-        if transaction.debit != nil {
+        if transaction.debitMoney != nil {
             direction = "debit"
-        } else if transaction.credit != nil {
+        } else if transaction.creditMoney != nil {
             direction = "credit"
         } else {
             throw ImportPersistenceError.missingTransactionDirection(transaction.id)
+        }
+
+        guard transaction.money.currency.code == documentCurrency,
+              transaction.debitMoney?.currency == nil || transaction.debitMoney?.currency.code == documentCurrency,
+              transaction.creditMoney?.currency == nil || transaction.creditMoney?.currency.code == documentCurrency,
+              transaction.runningBalanceMoney?.currency == nil || transaction.runningBalanceMoney?.currency.code == documentCurrency else {
+            throw ImportPersistenceError.currencyRelationshipInvalid
         }
 
         return TransactionDTO(
@@ -256,13 +266,11 @@ struct ImportPersistenceMapper {
             description: transaction.description,
             payee: nil,
             reference: nil,
-            nativeCurrency: transaction.currency,
-            amountMinor: try minorUnits(for: transaction.amount, currency: transaction.currency),
-            amountDecimal: decimalString(transaction.amount),
+            nativeCurrency: transaction.money.currency.code,
+            amountMinor: try transaction.money.minorUnits(),
+            amountDecimal: try transaction.money.canonicalDecimalString(),
             direction: direction,
-            runningBalanceMinor: try transaction.balance.map {
-                try minorUnits(for: $0, currency: transaction.currency)
-            },
+            runningBalanceMinor: try transaction.runningBalanceMoney.map { try $0.minorUnits() },
             isReconciled: false,
             isTrusted: true,
             trustedAtISO: createdAtISO,
@@ -272,39 +280,11 @@ struct ImportPersistenceMapper {
         )
     }
 
-    private func minorUnits(for amount: Decimal, currency: String) throws -> Int64 {
-        guard let scale = minorUnitScale(for: currency) else {
-            throw ImportPersistenceError.unsupportedCurrency(currency)
+    private func requiredCurrency(_ financialDocument: FinancialDocument) throws -> String {
+        guard let currency = financialDocument.bookedCurrency else {
+            throw ImportPersistenceError.missingDocumentCurrency
         }
-
-        var multiplier = Decimal(1)
-        for _ in 0..<scale {
-            multiplier *= 10
-        }
-
-        let scaled = amount * multiplier
-        var mutableScaled = scaled
-        var rounded = Decimal()
-        NSDecimalRound(&rounded, &mutableScaled, 0, .plain)
-
-        guard rounded == scaled else {
-            throw ImportPersistenceError.nonIntegralMinorAmount(amount, currency: currency)
-        }
-
-        return NSDecimalNumber(decimal: rounded).int64Value
-    }
-
-    private func minorUnitScale(for currency: String) -> Int? {
-        switch currency.uppercased() {
-        case "INR":
-            return 2
-        default:
-            return nil
-        }
-    }
-
-    private func decimalString(_ amount: Decimal) -> String {
-        NSDecimalNumber(decimal: amount).stringValue
+        return currency.code
     }
 
     private static let dayFormatter: DateFormatter = {

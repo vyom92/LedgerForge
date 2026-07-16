@@ -134,6 +134,74 @@ struct RepositoryStoreHydratorTests {
         #expect(stores.transactions.transactions.first?.description == "Trusted credit")
         #expect(stores.transactions.transactions.last?.balance == Decimal(1_075))
     }
+
+    @Test func hydratorRejectsNoncanonicalPersistedINRTextWithoutMutatingStores() throws {
+        let provider = try seededProvider()
+        let stores = RuntimeStores()
+        let hydrator = makeHydrator(provider: provider, stores: stores)
+        var malformed = trustedTransaction()
+        malformed = TransactionDTO(
+            id: malformed.id,
+            workspaceId: malformed.workspaceId,
+            accountId: malformed.accountId,
+            importSessionId: malformed.importSessionId,
+            postedDateISO: malformed.postedDateISO,
+            description: malformed.description,
+            nativeCurrency: malformed.nativeCurrency,
+            amountMinor: malformed.amountMinor,
+            amountDecimal: "100",
+            direction: malformed.direction,
+            runningBalanceMinor: malformed.runningBalanceMinor,
+            isTrusted: malformed.isTrusted,
+            trustedAtISO: malformed.trustedAtISO,
+            createdAtISO: malformed.createdAtISO
+        )
+        try provider.transactionRepo.replaceTransactions(
+            workspaceId: "workspace-dashboard",
+            importSessionId: "import-dashboard",
+            transactions: [malformed]
+        )
+
+        #expect(throws: RepositoryStoreHydrationError.self) {
+            try hydrator.hydrateIfNeeded()
+        }
+        #expect(stores.accounts.accounts.isEmpty)
+        #expect(stores.transactions.transactions.isEmpty)
+    }
+
+    @Test func hydratorRejectsDecimalMinorDisagreementWithoutMutatingStores() throws {
+        let provider = try seededProvider()
+        let stores = RuntimeStores()
+        let hydrator = makeHydrator(provider: provider, stores: stores)
+        var mismatched = trustedTransaction()
+        mismatched = TransactionDTO(
+            id: mismatched.id,
+            workspaceId: mismatched.workspaceId,
+            accountId: mismatched.accountId,
+            importSessionId: mismatched.importSessionId,
+            postedDateISO: mismatched.postedDateISO,
+            description: mismatched.description,
+            nativeCurrency: mismatched.nativeCurrency,
+            amountMinor: mismatched.amountMinor,
+            amountDecimal: "99.99",
+            direction: mismatched.direction,
+            runningBalanceMinor: mismatched.runningBalanceMinor,
+            isTrusted: mismatched.isTrusted,
+            trustedAtISO: mismatched.trustedAtISO,
+            createdAtISO: mismatched.createdAtISO
+        )
+        try provider.transactionRepo.replaceTransactions(
+            workspaceId: "workspace-dashboard",
+            importSessionId: "import-dashboard",
+            transactions: [mismatched]
+        )
+
+        #expect(throws: RepositoryStoreHydrationError.self) {
+            try hydrator.hydrateIfNeeded()
+        }
+        #expect(stores.accounts.accounts.isEmpty)
+        #expect(stores.transactions.transactions.isEmpty)
+    }
 }
 
 private struct RuntimeStores {
@@ -190,7 +258,7 @@ private func seededProvider() throws -> InMemoryRepositoryProvider {
         description: "Untrusted debit",
         nativeCurrency: "INR",
         amountMinor: -50_00,
-        amountDecimal: "-50",
+        amountDecimal: "-50.00",
         direction: "debit",
         runningBalanceMinor: 1_000_00,
         isTrusted: false,
@@ -225,7 +293,7 @@ private func trustedTransaction(
         description: "Trusted credit",
         nativeCurrency: "INR",
         amountMinor: amountMinor,
-        amountDecimal: "\(Decimal(amountMinor) / Decimal(100))",
+        amountDecimal: try! Money.fromMinorUnits(amountMinor, currency: "INR").canonicalDecimalString(),
         direction: "credit",
         runningBalanceMinor: runningBalanceMinor,
         isTrusted: true,

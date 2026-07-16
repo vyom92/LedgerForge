@@ -412,6 +412,7 @@ private func makePreparedImport(
             confidence: 1.0
         ),
         parserName: "Axis Bank Account",
+        bookedCurrency: try! CurrencyCode("INR"),
         transactions: transactions,
         selectionReasons: ["Confirmation workflow test parser selection."],
         createdAt: Date(timeIntervalSince1970: 1_804_896_000)

@@ -232,7 +232,7 @@ private func seedSprint30Repository(_ provider: DatabaseProvider) throws {
         description: "Sprint 30 credit",
         nativeCurrency: "INR",
         amountMinor: 100_00,
-        amountDecimal: "100",
+        amountDecimal: "100.00",
         direction: "credit",
         runningBalanceMinor: 100_00,
         isTrusted: true,

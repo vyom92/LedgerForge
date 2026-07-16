@@ -10,6 +10,8 @@ struct FinancialDocument: Identifiable {
     let sourceDocument: Document
     let metadata: DocumentMetadata
     let parserName: String
+    /// Parser-owned booked currency; never inferred from only one transaction.
+    let bookedCurrency: CurrencyCode?
     let transactions: [Transaction]
     let financialIdentifiers: [FinancialIdentifier]
     let selectionReasons: [String]
@@ -20,6 +22,7 @@ struct FinancialDocument: Identifiable {
         sourceDocument: Document,
         metadata: DocumentMetadata,
         parserName: String,
+        bookedCurrency: CurrencyCode? = nil,
         transactions: [Transaction],
         financialIdentifiers: [FinancialIdentifier] = [],
         selectionReasons: [String] = [],
@@ -29,6 +32,7 @@ struct FinancialDocument: Identifiable {
         self.sourceDocument = sourceDocument
         self.metadata = metadata
         self.parserName = parserName
+        self.bookedCurrency = bookedCurrency
         self.transactions = transactions
         self.financialIdentifiers = financialIdentifiers
         self.selectionReasons = selectionReasons

@@ -139,7 +139,7 @@ struct PreparedImport: Identifiable {
     }
 
     var detectedCurrency: String? {
-        financialDocument.transactions.first?.currency
+        financialDocument.bookedCurrency?.code ?? validation.statementCurrency?.code
     }
 
     var statementPeriod: ClosedRange<Date>? {

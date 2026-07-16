@@ -74,7 +74,7 @@ struct ImportRepositoryIntegrationTests {
             }
 
             #expect(orderedTransactions.map(\.amountMinor) == [10_000, -5_000])
-            #expect(orderedTransactions.map(\.amountDecimal) == ["100", "-50"])
+            #expect(orderedTransactions.map(\.amountDecimal) == ["100.00", "-50.00"])
             #expect(orderedTransactions.map(\.direction) == ["credit", "debit"])
             #expect(orderedTransactions.map(\.runningBalanceMinor) == [110_000, 105_000])
         }
@@ -300,23 +300,11 @@ struct ImportRepositoryIntegrationTests {
         #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
     }
 
-    @Test func mapperRejectsUnsupportedCurrencyBeforePersistence() async throws {
-        let fixture = makeValidFixture(currency: "JPY")
-        let mapper = ImportPersistenceMapper(
-            workspaceId: "workspace-unsupported-currency",
-            workspaceName: "Unsupported Currency Workspace"
-        )
-
+    @Test func unsupportedCurrencyCannotReachPersistenceConstruction() async throws {
         do {
-            _ = try mapper.payload(
-                financialDocument: fixture.financialDocument,
-                importSession: fixture.importSession,
-                validation: fixture.validation,
-                accountId: "account-unsupported-currency",
-                fingerprint: fixture.fingerprint
-            )
-            Issue.record("Expected unsupported currency mapping to fail before persistence.")
-        } catch let error as ImportPersistenceError {
+            _ = try Money(amount: 1, currency: "JPY")
+            Issue.record("Expected unsupported currency construction to fail before persistence.")
+        } catch let error as MoneyError {
             #expect(error == .unsupportedCurrency("JPY"))
         }
     }
@@ -1669,6 +1657,7 @@ private func makeFinancialDocument(
             confidence: 1.0
         ),
         parserName: "Axis Bank Account",
+        bookedCurrency: try! CurrencyCode(transactions.first?.currency ?? "INR"),
         transactions: transactions,
         financialIdentifiers: financialIdentifiers,
         selectionReasons: ["Repository integration test parser selection."],

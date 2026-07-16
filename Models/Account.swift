@@ -37,14 +37,18 @@ struct Account: Identifiable, Codable {
 
     var type: AccountType
 
-    /// ISO-4217 currency code (e.g. INR, USD, QAR)
-    var currencyCode: String
+    /// Canonical native account currency.
+    var nativeCurrency: CurrencyCode
 
     /// Time zone associated with the account's institution.
     var timeZoneIdentifier: String
 
     /// Current balance in the account's native currency.
-    var currentBalance: Decimal
+    var currentBalanceMoney: Money
+
+    /// Transitional display accessors. Money remains the source of truth.
+    var currencyCode: String { nativeCurrency.code }
+    var currentBalance: Decimal { currentBalanceMoney.amount }
 
     /// Indicates whether the balance should contribute to overall net worth.
     var includeInNetWorth: Bool
@@ -85,9 +89,9 @@ struct Account: Identifiable, Codable {
         self.name = name
         self.nickname = nickname
         self.type = type
-        self.currencyCode = currencyCode
+        self.nativeCurrency = try! CurrencyCode(currencyCode)
         self.timeZoneIdentifier = timeZoneIdentifier
-        self.currentBalance = currentBalance
+        self.currentBalanceMoney = try! Money(amount: currentBalance, currency: self.nativeCurrency)
         self.includeInNetWorth = includeInNetWorth
         self.baseCurrencyBalance = baseCurrencyBalance
         self.exchangeRateToBaseCurrency = exchangeRateToBaseCurrency

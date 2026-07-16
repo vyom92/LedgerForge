@@ -218,6 +218,7 @@ struct ImportValidatorTests {
                 confidence: 1.0
             ),
             parserName: "Validation Test Parser",
+            bookedCurrency: try! CurrencyCode("INR"),
             transactions: transactions,
             financialIdentifiers: financialIdentifiers,
             selectionReasons: selectionReasons,

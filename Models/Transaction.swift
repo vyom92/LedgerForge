@@ -31,15 +31,17 @@ struct Transaction: Identifiable {
 
     var description: String
 
-    var debit: Decimal?
+    let debitMoney: Money?
+    let creditMoney: Money?
+    let money: Money
+    let runningBalanceMoney: Money?
 
-    var credit: Decimal?
-
-    var amount: Decimal
-
-    var balance: Decimal?
-
-    var currency: String
+    /// Transitional presentation accessors. Money remains the sole authority.
+    var debit: Decimal? { debitMoney?.amount }
+    var credit: Decimal? { creditMoney?.amount }
+    var amount: Decimal { money.amount }
+    var balance: Decimal? { runningBalanceMoney?.amount }
+    var currency: String { money.currency.code }
 
     var account: String
 
@@ -51,4 +53,64 @@ struct Transaction: Identifiable {
     var repositoryAccountId: String? = nil
     var repositoryImportSessionId: String? = nil
     var verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
+
+    init(
+        date: Date?,
+        description: String,
+        debitMoney: Money?,
+        creditMoney: Money?,
+        money: Money,
+        runningBalanceMoney: Money?,
+        account: String,
+        sourceBank: String,
+        sourceFile: String,
+        repositoryAccountId: String? = nil,
+        repositoryImportSessionId: String? = nil,
+        verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
+    ) {
+        self.date = date
+        self.description = description
+        self.debitMoney = debitMoney
+        self.creditMoney = creditMoney
+        self.money = money
+        self.runningBalanceMoney = runningBalanceMoney
+        self.account = account
+        self.sourceBank = sourceBank
+        self.sourceFile = sourceFile
+        self.repositoryAccountId = repositoryAccountId
+        self.repositoryImportSessionId = repositoryImportSessionId
+        self.verifiedAxisUPIEventEvidence = verifiedAxisUPIEventEvidence
+    }
+
+    init(
+        date: Date?,
+        description: String,
+        debit: Decimal?,
+        credit: Decimal?,
+        amount: Decimal,
+        balance: Decimal?,
+        currency: String,
+        account: String,
+        sourceBank: String,
+        sourceFile: String,
+        repositoryAccountId: String? = nil,
+        repositoryImportSessionId: String? = nil,
+        verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
+    ) {
+        let postedMoney = try! Money(amount: amount, currency: currency)
+        self.init(
+            date: date,
+            description: description,
+            debitMoney: try! debit.map { try Money(amount: $0, currency: currency) },
+            creditMoney: try! credit.map { try Money(amount: $0, currency: currency) },
+            money: postedMoney,
+            runningBalanceMoney: try! balance.map { try Money(amount: $0, currency: currency) },
+            account: account,
+            sourceBank: sourceBank,
+            sourceFile: sourceFile,
+            repositoryAccountId: repositoryAccountId,
+            repositoryImportSessionId: repositoryImportSessionId,
+            verifiedAxisUPIEventEvidence: verifiedAxisUPIEventEvidence
+        )
+    }
 }

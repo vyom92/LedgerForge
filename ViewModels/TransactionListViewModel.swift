@@ -8,6 +8,15 @@
 import Foundation
 import Combine
 
+struct TransactionCurrencySummary: Identifiable, Equatable {
+    let currency: CurrencyCode
+    let inflow: Money
+    let outflow: Money
+
+    var id: String { currency.code }
+    var net: Money { try! inflow - outflow }
+}
+
 final class TransactionListViewModel: ObservableObject {
 
     @Published private(set) var transactions: [Transaction] = []
@@ -41,16 +50,22 @@ final class TransactionListViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    var totalDebits: Decimal {
-        transactions.compactMap(\.debit).reduce(0, +)
+    var currencySummaries: [TransactionCurrencySummary] {
+        let grouped = Dictionary(grouping: transactions, by: { $0.money.currency })
+        return grouped.keys.sorted().map { currency in
+            let values = grouped[currency] ?? []
+            let inflow = try! Money.aggregate(values.compactMap(\.creditMoney) + [try! Money(amount: .zero, currency: currency)])
+            let outflow = try! Money.aggregate(values.compactMap(\.debitMoney) + [try! Money(amount: .zero, currency: currency)])
+            return TransactionCurrencySummary(currency: currency, inflow: inflow, outflow: outflow)
+        }
     }
 
-    var totalCredits: Decimal {
-        transactions.compactMap(\.credit).reduce(0, +)
-    }
-
+    /// Compatibility accessors for single-currency consumers. Mixed values never combine.
+    var totalDebits: Decimal { currencySummaries.count == 1 ? currencySummaries[0].outflow.amount : .zero }
+    var totalCredits: Decimal { currencySummaries.count == 1 ? currencySummaries[0].inflow.amount : .zero }
     var closingBalance: Decimal? {
-        transactions.last?.balance
+        guard Set(transactions.map(\.money.currency)).count <= 1 else { return nil }
+        return transactions.last?.runningBalanceMoney?.amount
     }
 
     var filteredTransactions: [Transaction] {

@@ -25,6 +25,8 @@ final class AxisBankAccountParser: StatementParser {
         document: NormalizedDocument
     ) throws -> FinancialDocument {
 
+        let currency = try CurrencyCode("INR")
+
         let financialIdentifiers = Self.financialIdentifiers(
             from: document.sourceContext.preTransactionFragments
         )
@@ -34,6 +36,7 @@ final class AxisBankAccountParser: StatementParser {
                 sourceDocument: document.document,
                 metadata: document.metadata,
                 parserName: name,
+                bookedCurrency: currency,
                 transactions: [],
                 financialIdentifiers: financialIdentifiers
             )
@@ -89,14 +92,14 @@ final class AxisBankAccountParser: StatementParser {
                 amount = credit ?? 0
             }
 
+            let postedMoney = try Money(amount: amount, currency: currency)
             let transaction = Transaction(
                 date: parsedDate,
                 description: description,
-                debit: debit,
-                credit: credit,
-                amount: amount,
-                balance: balance,
-                currency: "INR",
+                debitMoney: try debit.map { try Money(amount: $0, currency: currency) },
+                creditMoney: try credit.map { try Money(amount: $0, currency: currency) },
+                money: postedMoney,
+                runningBalanceMoney: try balance.map { try Money(amount: $0, currency: currency) },
                 account: document.metadata.institution.rawValue,
                 sourceBank: "Axis Bank",
                 sourceFile: document.document.filename,
@@ -117,6 +120,7 @@ final class AxisBankAccountParser: StatementParser {
             sourceDocument: document.document,
             metadata: document.metadata,
             parserName: name,
+            bookedCurrency: currency,
             transactions: transactions,
             financialIdentifiers: financialIdentifiers
         )

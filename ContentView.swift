@@ -378,34 +378,12 @@ struct ContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 14) {
-                    metricCard(
-                        title: "Net Worth",
-                        value: formatCurrency(dashboardViewModel.snapshot.netWorth),
-                        trend: "Repository-backed balance",
-                        trendColor: LFTheme.success,
-                        systemImage: "chart.line.uptrend.xyaxis"
-                    )
-                    metricCard(
-                        title: "Income",
-                        value: formatCurrency(dashboardViewModel.snapshot.income),
-                        trend: "Credited transactions",
-                        trendColor: LFTheme.success,
-                        systemImage: "arrow.down.circle"
-                    )
-                    metricCard(
-                        title: "Expenses",
-                        value: formatCurrency(dashboardViewModel.snapshot.expenses),
-                        trend: "Debited transactions",
-                        trendColor: LFTheme.danger,
-                        systemImage: "arrow.up.circle"
-                    )
-                    metricCard(
-                        title: "Cash Flow",
-                        value: formatCurrency(dashboardViewModel.snapshot.cashFlow),
-                        trend: dashboardViewModel.snapshot.cashFlow >= .zero ? "Positive flow" : "Needs review",
-                        trendColor: dashboardViewModel.snapshot.cashFlow >= .zero ? LFTheme.success : LFTheme.danger,
-                        systemImage: "waveform.path.ecg"
-                    )
+                    ForEach(dashboardViewModel.nativeCurrencySummaries) { summary in
+                        metricCard(title: "\(summary.currency.code) Balance", value: MoneyFormatting.display(summary.balance), trend: "Repository-backed native balance", trendColor: LFTheme.success, systemImage: "chart.line.uptrend.xyaxis")
+                        metricCard(title: "\(summary.currency.code) Inflow", value: MoneyFormatting.display(summary.income), trend: "Credited transactions", trendColor: LFTheme.success, systemImage: "arrow.down.circle")
+                        metricCard(title: "\(summary.currency.code) Outflow", value: MoneyFormatting.display(summary.expenses), trend: "Debited transactions", trendColor: LFTheme.danger, systemImage: "arrow.up.circle")
+                        metricCard(title: "\(summary.currency.code) Cash Flow", value: MoneyFormatting.display(summary.cashFlow), trend: summary.cashFlow.amount >= .zero ? "Positive flow" : "Needs review", trendColor: summary.cashFlow.amount >= .zero ? LFTheme.success : LFTheme.danger, systemImage: "waveform.path.ecg")
+                    }
                 }
 
                 HStack(alignment: .top, spacing: 14) {
@@ -439,9 +417,10 @@ struct ContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 14) {
-                    accountMetric("Total Balance", value: formatCurrency(totalAccountBalance), detail: "Across \(accountsViewModel.accounts.count) account(s)", icon: "wallet.pass")
-                    accountMetric("Cash & Bank", value: formatCurrency(totalAccountBalance), detail: "\(accountsViewModel.accounts.count) linked account(s)", icon: "building.columns")
-                    accountMetric("Credit Cards", value: formatCurrency(.zero), detail: "Planned module", icon: "creditcard", tint: LFTheme.danger)
+                    ForEach(accountsViewModel.nativeBalanceSummaries) { summary in
+                        accountMetric("\(summary.money.currency.code) Balance", value: MoneyFormatting.display(summary.money), detail: "Native total across \(accountsViewModel.accounts.count) account(s)", icon: "wallet.pass")
+                    }
+                    accountMetric("Credit Cards", value: "Not enabled", detail: "Planned module", icon: "creditcard", tint: LFTheme.danger)
                     accountMetric("Investments", value: "Future", detail: "Out of Sprint 22 scope", icon: "chart.bar.xaxis", tint: LFTheme.primaryHover)
                 }
 
@@ -2215,15 +2194,17 @@ struct ContentView: View {
         return Self.dateFormatter.string(from: date)
     }
 
-    private func formatCurrency(_ value: Decimal, currencyCode: String = "₹") -> String {
-        let number = NSDecimalNumber(decimal: value)
-        return "\(currencyCode == "INR" ? "₹" : currencyCode) \(Self.numberFormatter.string(from: number) ?? "\(number)")"
+    private func formatCurrency(_ value: Decimal, currencyCode: String = "INR") -> String {
+        guard let money = try? Money(amount: value, currency: currencyCode) else {
+            return "\(currencyCode) \(value)"
+        }
+        return MoneyFormatting.display(money)
     }
 
     private func formatSignedCurrency(_ value: Decimal, isCredit: Bool) -> String {
         let prefix = isCredit ? "+" : "-"
         let magnitude = value < .zero ? -value : value
-        return "\(prefix)\(formatCurrency(magnitude))"
+        return "\(prefix)\(formatCurrency(magnitude, currencyCode: "INR"))"
     }
 
     private static let dateFormatter: DateFormatter = {

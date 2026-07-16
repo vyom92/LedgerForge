@@ -11,10 +11,18 @@ import Foundation
 final class ImportValidator {
 
     static func validate(financialDocument: FinancialDocument) -> ImportValidationResult {
-        validate(transactions: financialDocument.transactions)
+        validate(transactions: financialDocument.transactions, statementCurrency: financialDocument.bookedCurrency)
     }
 
     static func validate(transactions: [Transaction]) -> ImportValidationResult {
+        let currencies = Set(transactions.map(\.money.currency))
+        return validate(transactions: transactions, statementCurrency: currencies.count == 1 ? currencies.first : nil)
+    }
+
+    private static func validate(
+        transactions: [Transaction],
+        statementCurrency: CurrencyCode?
+    ) -> ImportValidationResult {
 
         var issues: [ValidationIssue] = []
 
@@ -28,7 +36,31 @@ final class ImportValidator {
             )
         }
 
+        if !transactions.isEmpty, statementCurrency == nil {
+            issues.append(ValidationIssue(
+                severity: .error,
+                rowNumber: nil,
+                message: "Statement currency is missing or transactions use mixed currencies."
+            ))
+        }
+
         for transaction in transactions {
+            if let statementCurrency, transaction.money.currency != statementCurrency {
+                issues.append(ValidationIssue(
+                    severity: .error,
+                    rowNumber: nil,
+                    message: "Transaction currency does not match statement currency."
+                ))
+            }
+            if transaction.debitMoney?.currency != nil && transaction.debitMoney?.currency != transaction.money.currency {
+                issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Transaction debit currency does not match posted currency."))
+            }
+            if transaction.creditMoney?.currency != nil && transaction.creditMoney?.currency != transaction.money.currency {
+                issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Transaction credit currency does not match posted currency."))
+            }
+            if transaction.runningBalanceMoney?.currency != nil && transaction.runningBalanceMoney?.currency != transaction.money.currency {
+                issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Running-balance currency does not match posted currency."))
+            }
             if transaction.debit == nil && transaction.credit == nil {
                 issues.append(
                     ValidationIssue(
@@ -50,55 +82,58 @@ final class ImportValidator {
             }
         }
 
-        let debitTotal = transactions.reduce(.zero) { $0 + ($1.debit ?? .zero) }
-        let creditTotal = transactions.reduce(.zero) { $0 + ($1.credit ?? .zero) }
+        let debitTotalMoney = try? moneySum(transactions.compactMap(\.debitMoney), currency: statementCurrency)
+        let creditTotalMoney = try? moneySum(transactions.compactMap(\.creditMoney), currency: statementCurrency)
 
         let firstTransaction = transactions.first
-        let openingBalance: Decimal? = {
+        let openingBalanceMoney: Money? = {
             guard let first = firstTransaction,
-                  let firstBalance = first.balance else {
+                  let firstBalance = first.runningBalanceMoney else {
                 return nil
             }
-
-            return firstBalance + (first.debit ?? .zero) - (first.credit ?? .zero)
+            var opening = firstBalance
+            if let debit = first.debitMoney { opening = (try? opening + debit) ?? opening }
+            if let credit = first.creditMoney { opening = (try? opening - credit) ?? opening }
+            return opening
         }()
 
-        let closingBalance = transactions.last?.balance
+        let closingBalanceMoney = transactions.last?.runningBalanceMoney
 
         if transactions.count > 1 {
             for index in 1..<transactions.count {
                 let previous = transactions[index - 1]
                 let current = transactions[index]
 
-                guard let previousBalance = previous.balance,
-                      let currentBalance = current.balance else {
+                guard let previousBalance = previous.runningBalanceMoney,
+                      let currentBalance = current.runningBalanceMoney else {
                     continue
                 }
 
                 var expectedBalance = previousBalance
-                if let debit = current.debit { expectedBalance -= debit }
-                if let credit = current.credit { expectedBalance += credit }
+                if let debit = current.debitMoney { expectedBalance = (try? expectedBalance - debit) ?? expectedBalance }
+                if let credit = current.creditMoney { expectedBalance = (try? expectedBalance + credit) ?? expectedBalance }
 
                 if expectedBalance != currentBalance {
                     issues.append(
                         ValidationIssue(
                             severity: .error,
                             rowNumber: index + 1,
-                            message: "Balance reconciliation failed on \(current.description). Expected \(expectedBalance), found \(currentBalance)."
+                            message: "Balance reconciliation failed on \(current.description). Expected \(expectedBalance.amount), found \(currentBalance.amount)."
                         )
                     )
                 }
             }
         }
 
-        if let openingBalance, let closingBalance {
-            let expectedClosingBalance = openingBalance + creditTotal - debitTotal
-            if expectedClosingBalance != closingBalance {
+        if let openingBalanceMoney, let closingBalanceMoney,
+           let debitTotalMoney, let creditTotalMoney,
+           let expectedClosingBalance = try? (try openingBalanceMoney + creditTotalMoney) - debitTotalMoney {
+            if expectedClosingBalance != closingBalanceMoney {
                 issues.append(
                     ValidationIssue(
                         severity: .error,
                         rowNumber: nil,
-                        message: "Statement totals do not reconcile. Expected closing balance \(expectedClosingBalance), found \(closingBalance)."
+                        message: "Statement totals do not reconcile. Expected closing balance \(expectedClosingBalance.amount), found \(closingBalanceMoney.amount)."
                     )
                 )
             }
@@ -107,12 +142,19 @@ final class ImportValidator {
         return ImportValidationResult(
             rowsRead: transactions.count,
             transactionsParsed: transactions.count,
-            debitTotal: debitTotal,
-            creditTotal: creditTotal,
-            openingBalance: openingBalance,
-            closingBalance: closingBalance,
+            statementCurrency: statementCurrency,
+            debitTotalMoney: debitTotalMoney,
+            creditTotalMoney: creditTotalMoney,
+            openingBalanceMoney: openingBalanceMoney,
+            closingBalanceMoney: closingBalanceMoney,
             passed: issues.isEmpty,
             issues: issues
         )
+    }
+
+    private static func moneySum(_ values: [Money], currency: CurrencyCode?) throws -> Money? {
+        guard let currency else { return nil }
+        guard !values.isEmpty else { return try Money(amount: .zero, currency: currency) }
+        return try Money.aggregate(values)
     }
 }
