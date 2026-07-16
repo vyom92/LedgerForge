@@ -632,17 +632,32 @@ The original source structure and every user-approved mapping must remain inspec
 ## FW-P1-09 — Credit-Card Financial Semantics Foundation
 
 **Status:** Blocked
-**Depends on:** Approved Amex or CBQ card evidence, the Money foundation where relevant and a future accepted credit-card semantics ADR
+**Depends on:** Integrated and approved American Express, CBQ and Axis card fixture evidence; a final cross-family card-evidence review; `FW-P3-29A`; and a future accepted card-semantics ADR
 
-Define the financial semantics required before production credit-card parsing:
+Define the smallest document-scoped evidence contract required before production card parsing.
 
-- purchases, refunds, reversals, payments, fees and interest;
-- statement balance, minimum due, due date and credit balances;
-- supplementary-card attribution and liability presentation;
-- owned-account card-payment relationships;
-- posted amount, optional original merchant amount, statement FX evidence and FX markup/fees.
+The cross-family review must determine whether `FinancialDocument` needs a card-statement evidence envelope capable of preserving, only where source-supported:
 
-Do not claim production card support until these semantics and fixture-backed financial baselines are accepted.
+- authoritative posted statement amount and statement currency;
+- optional source-proven effect on the amount owed;
+- source classification without claiming a universal accounting taxonomy;
+- account-level versus instrument-level row scope;
+- document-scoped instrument-section identity;
+- optional original merchant amount and currency;
+- independently optional printed FX-rate, fee, markup and tax evidence;
+- source-specific statement-summary components and reconciliation evidence.
+
+The review and ADR must resolve card-liability effects without forcing them into bank-account debit/credit semantics. A card instrument must not become an independent financial account merely because the statement presents a separate instrument section. Original merchant evidence must not replace the posted statement amount or currency.
+
+Missing FX rates, fees, markup, tax, statement aggregates or other financial evidence must not be calculated merely to populate a common model.
+
+Payment allocation, rewards accounting, reversal matching, universal card taxonomy and institution-independent balance formulas remain outside this candidate unless separately approved.
+
+Card persistence remains blocked until the Money foundation and a card-semantics ADR establish the required domain, validation and persistence contracts. Institution-specific production parsers remain independently gated after the shared foundation is accepted.
+
+Final vocabulary, persistence fields and migration shape must wait for the completed American Express, CBQ and Axis evidence comparison.
+
+Do not claim production card support from fixture integration, schema capacity, statement classification or parser candidates.
 
 # P1 — Import Format Expansion
 
@@ -1966,25 +1981,38 @@ Rules must be explainable and configurable rather than inferred from institution
 
 ## FW-P3-29A — Money Value Type and Multi-Currency Domain Foundation
 
-**Status:** Ready for discovery  
-**Depends on:** Existing native-currency preservation and ADR-008
+**Status:** Blocked
+**Depends on:** ADR-008, a future accepted Money implementation-contract ADR and a passing read-only existing-data compatibility audit
 
-Define the dedicated `Money` value type and supporting domain contracts required for reliable multi-currency behaviour.
+Define the dedicated `Money` value type and the smallest coherent production boundary required for reliable native-currency behaviour.
 
-The foundation must preserve:
+The future ADR must decide:
 
-- native amount and currency;
-- deterministic arithmetic rules;
-- prevention of accidental cross-currency arithmetic;
-- locale-independent stored values;
-- locale-aware presentation;
-- derived rather than destructive conversion;
-- provider and test compatibility;
-- migration strategy for existing models where required.
+- whether `Money` contains an exact `Decimal` amount and canonical native currency code;
+- how canonical currency codes and fraction scales are governed by one versioned offline catalog;
+- whether persisted minor units are a mandatory exact encoding of the authoritative value;
+- whether `amount_decimal` preserves source lexical evidence or a canonical exact numeric representation;
+- where original lexical evidence remains available;
+- how trailing zeroes are treated;
+- how transaction running balances are represented and checked;
+- how malformed, unsupported, over-precision, invalid and overflowing values fail explicitly;
+- how account, transaction and statement currency relationships are validated;
+- how SQLite and In-Memory providers preserve equivalent behaviour;
+- whether the existing schema requires migration.
 
-This candidate establishes domain correctness. Exchange-rate storage and reporting remain separate candidates.
+Imported monetary values must never be implicitly rounded. Arithmetic and comparison must be same-currency only unless a separately approved conversion domain supplies an explicit derived value. Cross-currency arithmetic and comparison must fail rather than silently combine values.
 
-It is an explicit prerequisite for the first production non-INR statement family. Required regression coverage includes exact decimal preservation, minor-unit validation, rounding, provider parity, migration compatibility and mixed-currency arithmetic rejection.
+Before rollout, execute a read-only compatibility audit over existing account and transaction evidence. The audit must verify canonical currency codes, catalog membership, exact decimal/minor agreement, running-balance interpretation, fraction scale, overflow and account/transaction currency consistency. It must produce privacy-safe aggregate diagnostics, perform no mutation and block rollout on any value requiring guessing or silent repair.
+
+The smallest coherent production release boundary is:
+
+`Money domain + persistence and hydration + validation + grouped native-currency presentation`
+
+Internal checkpoints may be smaller, but production non-INR support remains closed until the complete boundary passes.
+
+This candidate does not activate exchange-rate fetching, storage, conversion, reporting-currency totals or historical valuation. Those remain governed by `FW-P3-31` through `FW-P3-34`.
+
+This entry records required decisions and stop conditions. It does not accept the recommended Money representation.
 
 ---
 
@@ -2004,6 +2032,8 @@ Present native and derived monetary values using locale-aware formatting, includ
 
 Before QAR production support, every row must retain native currency, summaries and Dashboard balances must be grouped by currency, and no combined amount may appear without an approved conversion.
 
+This presentation boundary is part of the complete `FW-P3-29A` release gate. Until it passes, Dashboard, account and transaction summaries must not combine different native currencies into one amount. The minimum safe presentation produces one total per native currency. Converted, base-currency and reporting-currency totals remain outside this increment.
+
 ---
 
 ## FW-P3-31 — Exchange-Rate Storage
@@ -2012,6 +2042,8 @@ Before QAR production support, every row must retain native currency, summaries 
 **Depends on:** Approved rate-source and offline-cache policy
 
 Rates must be versioned and immutable, carry provider provenance and validity time, support offline cache and expose stale or missing states.
+
+The presence of an `exchange_rates` table in the database design does not activate production exchange-rate storage. This candidate remains separate from the Money increment and requires an approved source, provenance, validity, offline-cache, stale-state and missing-rate contract before any production write or conversion path is enabled.
 
 ---
 

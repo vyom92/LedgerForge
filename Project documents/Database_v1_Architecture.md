@@ -53,6 +53,10 @@ Successful attempts are persisted atomically with successful import history. Rej
 
 Production transaction persistence currently stores one authoritative native amount and currency pair. Original merchant amount and currency, statement conversion evidence, statement-provided FX rates and fee decomposition require a future ADR and are not production-supported.
 
+### Currency and exchange-rate schema capacity
+
+The `currencies` and `exchange_rates` tables are currently schema capacity, not activated production currency or conversion authorities. Production import mapping and hydration remain limited to the supported INR path. No production exchange-rate repository, conversion workflow or reporting-currency total is established by the presence of those tables.
+
 ## Summary
 
 This document defines the LedgerForge Database v1 architecture. It is a vendor-neutral, SQLite-targeted design that fulfills the project's ADRs, Architecture_v1.0, Product Vision and Engineering Standards. The design prioritizes:
@@ -726,4 +730,4 @@ End of design baseline
 
 
 --
-Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through accepted ADR-031 and verified Sprint 41 repository implementation without redesigning the Database v1 baseline. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.
+Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through accepted ADR-032 and verified Sprint 42 repository implementation without redesigning the Database v1 baseline. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.

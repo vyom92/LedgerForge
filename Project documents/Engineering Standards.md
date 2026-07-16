@@ -231,6 +231,21 @@ The code should make adding the next financial institution easier than adding th
 
 ---
 
+# Financial Statement Fixture Evidence Standards
+
+- Private-statement-derived fixtures may enter Git only through an approved repository-safe sanitized or clean-room evidence package.
+- For packages classified as clean-room reconstructions, source pages, content streams, images, XObjects, font objects, metadata, annotations, forms, attachments and rasterized source backgrounds must not be reused.
+- New evidence packages that use expected metadata and manifests must use the repository-approved metadata schema and a neutral document-family classification. Older integrated fixtures must not be rewritten solely to enforce later metadata uniformity.
+- Fixture evidence must preserve exact source-supported financial values, native currencies, source order and declared structural relationships.
+- When original-currency, FX, fee, markup or tax information exists as distinct source evidence, it must remain separate from the posted statement amount. Missing values must not be calculated merely to populate common metadata.
+- Geometry claims must use explicit measured tolerances where preservation is tolerance-qualified. Visual review cannot override a numeric failure.
+- Native-text and OCR boundaries must be stated explicitly. OCR must not be used when reliable native extraction is available.
+- Fictional identity continuity must be deterministic and must not expose original identifiers, suffixes, merchants, references, paths or private mappings.
+- Repository tests must verify positive metadata assertions and forbidden private surfaces.
+- Fixture integration proves only the evidence declared by its tests and metadata. It does not establish production parsing, persistence support or finalized domain semantics.
+
+---
+
 # AI Development Standards
 
 - Never assume statement layouts.
