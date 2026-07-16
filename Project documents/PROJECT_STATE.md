@@ -43,6 +43,7 @@
 - Sprint 42 implemented Migration V4, durable attempt history, bounded rejected outcomes, provider parity, attempt-only hydration and read-only Imports history/detail.
 - Sprint 43 implemented truthful preparation progress, cancellation ownership and bounded fresh source-reading retry without a schema migration or ADR change.
 - Source-faithful sanitized Axis NRO CSV, PDF and XLS regression evidence is integrated across two overlapping ranges. Range 1 records institution-supplied cross-format divergence; these fixtures do not constitute Axis NRO production parser support.
+- Clean-room HDFC NRE and NRO fixture evidence is integrated for annual and recent PDF and legacy-XLS periods. Every PDF/XLS pair reconciles; the PDFs retain native selectable text without OCR and preserve the verified financial, geometric, pagination and multiline relationships while intentionally not preserving source PDF object identity. HDFC production parsing remains unsupported.
 
 ## Planning Boundary
 

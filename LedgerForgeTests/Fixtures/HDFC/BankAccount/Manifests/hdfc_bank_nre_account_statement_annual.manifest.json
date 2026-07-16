@@ -1,0 +1,141 @@
+{
+  "metadata_schema_version": 2,
+  "account_identity_relationship": {
+    "account_stable_across_periods": true,
+    "customer_shared_across_all_fixtures": true,
+    "nre_and_nro_accounts_distinct": true
+  },
+  "account_type": "NRE",
+  "candidate_status": "validated",
+  "extraction_order_assertions": {
+    "selectable_text": true,
+    "spatial_financial_order_preserved": true
+  },
+  "family": "bank account statement",
+  "financial_equivalence_basis": {
+    "classification": "ordered_financial_projection",
+    "compared_fields": [
+      "transaction_date",
+      "value_date",
+      "debit",
+      "credit",
+      "running_balance"
+    ]
+  },
+  "fixture_class": "source-faithful sanitized fixture",
+  "fixture_id": "hdfc_bank_nre_account_statement_annual",
+  "ignored_non_transaction_regions": [
+    "fictional identity block",
+    "generic statement summary",
+    "sanitized footer"
+  ],
+  "institution": "HDFC Bank",
+  "layout_versions": {
+    "pdf": "HDFC-NRE-PDF-CLEANROOM-v1",
+    "xls": "HDFC-NRE-XLS-v1"
+  },
+  "ocr_boundary": {
+    "native_text_available": true,
+    "pdfkit_extraction_usable": true,
+    "pymupdf_extraction_usable": true,
+    "ocr_used": false,
+    "ocr_required_for_fixture": false,
+    "scope": "approved_fixture_layout_only"
+  },
+  "pdf_assertions": {
+    "page_count": 5,
+    "dimension_tolerance_points": 0.25,
+    "pages": [
+      { "page_index": 0, "width_points": 638.0, "height_points": 842.0 },
+      { "page_index": 1, "width_points": 638.0, "height_points": 842.0 },
+      { "page_index": 2, "width_points": 638.0, "height_points": 842.0 },
+      { "page_index": 3, "width_points": 638.0, "height_points": 842.0 },
+      { "page_index": 4, "width_points": 638.0, "height_points": 842.0 }
+    ],
+    "native_selectable_text": true,
+    "annotations_present": false,
+    "forms_present": false,
+    "attachments_present": false
+  },
+  "negative_structural_anchors": [
+    "no source PDF objects",
+    "no source images",
+    "no OCR",
+    "no private source text"
+  ],
+  "neutral_source_labels": [
+    "HDFC-NRE-R1-PDF",
+    "HDFC-NRE-R1-XLS"
+  ],
+  "pagination_assertions": {
+    "page_break_relationships_preserved": true,
+    "page_count": 5,
+    "repeated_headers_preserved": true
+  },
+  "positive_structural_anchors": [
+    "HDFC BANK",
+    "SANITIZED ACCOUNT STATEMENT",
+    "DATE",
+    "NARRATION",
+    "REFERENCE",
+    "VALUE DATE",
+    "DEBIT",
+    "CREDIT",
+    "RUNNING BALANCE"
+  ],
+  "privacy_assertions": {
+    "contains_no_original_counterparty_identity": true,
+    "contains_no_original_transaction_reference": true,
+    "contains_no_private_mapping": true,
+    "contains_no_private_source_path_or_filename": true,
+    "contains_no_source_pdf_object": true,
+    "uses_fictional_account_identifier": true,
+    "uses_fictional_customer_metadata": true
+  },
+  "sanitization_method": {
+    "classification": "clean_room_pdf_reconstruction",
+    "source_annotations_reused": false,
+    "source_content_streams_reused": false,
+    "source_fonts_reused": false,
+    "source_images_reused": false,
+    "source_metadata_reused": false,
+    "source_page_objects_reused": false
+  },
+  "source_fidelity": {
+    "financial_truth": "exact",
+    "multiline_narration_relationships": "preserved",
+    "page_break_relationships": "preserved",
+    "page_count": "preserved",
+    "page_dimensions": "preserved",
+    "source_object_identity": "not_preserved",
+    "table_geometry": "preserved",
+    "textual_private_values": "replaced",
+    "transaction_order": "exact"
+  },
+  "source_formats": [
+    "pdf",
+    "xls"
+  ],
+  "source_provenance": {
+    "access_state": "owner_unlocked",
+    "origin": "institution_supplied",
+    "password_exposed_to_automation": false,
+    "verification": "owner_attested"
+  },
+  "textual_equivalence_boundary": {
+    "fictional_narration_and_reference_equality_required": false,
+    "source_narration_or_reference_retained": false
+  },
+  "workbook_assertions": {
+    "container_format": "OLE2",
+    "workbook_format": "BIFF8",
+    "sheet_count": 1,
+    "dimension_definition": "one-based maximum used row and column",
+    "sheets": [
+      { "sheet_index": 0, "max_used_row": 110, "max_used_column": 7, "hidden": false, "hidden_row_count": 0, "hidden_column_count": 0, "merged_range_count": 0 }
+    ],
+    "formula_count": 0,
+    "defined_name_count": 0,
+    "external_link_count": 0
+  }
+}

@@ -1,0 +1,669 @@
+{
+  "metadata_schema_version": 2,
+  "account_type": "NRO",
+  "fictional_identity": {
+    "customer_identity_id": "hdfc-fixture-customer-001",
+    "account_identity_id": "hdfc-fixture-nro-account-001",
+    "account_type": "NRO"
+  },
+  "canonical_ordered_financial_transactions": [
+    {
+      "credit": null,
+      "debit": "7996.94",
+      "ordinal": 1,
+      "running_balance": "100000.00",
+      "transaction_date": "2025-04-01",
+      "value_date": "2025-04-01"
+    },
+    {
+      "credit": "7996.94",
+      "debit": null,
+      "ordinal": 2,
+      "running_balance": "107996.94",
+      "transaction_date": "2025-04-01",
+      "value_date": "2025-04-01"
+    },
+    {
+      "credit": null,
+      "debit": "150.00",
+      "ordinal": 3,
+      "running_balance": "107846.94",
+      "transaction_date": "2025-04-10",
+      "value_date": "2025-04-10"
+    },
+    {
+      "credit": "3.00",
+      "debit": null,
+      "ordinal": 4,
+      "running_balance": "107849.94",
+      "transaction_date": "2025-04-10",
+      "value_date": "2025-04-10"
+    },
+    {
+      "credit": null,
+      "debit": "100.00",
+      "ordinal": 5,
+      "running_balance": "107749.94",
+      "transaction_date": "2025-04-11",
+      "value_date": "2025-04-11"
+    },
+    {
+      "credit": null,
+      "debit": "500.00",
+      "ordinal": 6,
+      "running_balance": "107249.94",
+      "transaction_date": "2025-04-21",
+      "value_date": "2025-04-21"
+    },
+    {
+      "credit": "2.00",
+      "debit": null,
+      "ordinal": 7,
+      "running_balance": "107251.94",
+      "transaction_date": "2025-04-21",
+      "value_date": "2025-04-21"
+    },
+    {
+      "credit": "3.00",
+      "debit": null,
+      "ordinal": 8,
+      "running_balance": "107254.94",
+      "transaction_date": "2025-04-23",
+      "value_date": "2025-04-23"
+    },
+    {
+      "credit": null,
+      "debit": "5000.00",
+      "ordinal": 9,
+      "running_balance": "102254.94",
+      "transaction_date": "2025-04-25",
+      "value_date": "2025-04-25"
+    },
+    {
+      "credit": "3.00",
+      "debit": null,
+      "ordinal": 10,
+      "running_balance": "102257.94",
+      "transaction_date": "2025-04-26",
+      "value_date": "2025-04-26"
+    },
+    {
+      "credit": null,
+      "debit": "200.00",
+      "ordinal": 11,
+      "running_balance": "102057.94",
+      "transaction_date": "2025-04-26",
+      "value_date": "2025-04-26"
+    },
+    {
+      "credit": "3.00",
+      "debit": null,
+      "ordinal": 12,
+      "running_balance": "102060.94",
+      "transaction_date": "2025-04-26",
+      "value_date": "2025-04-26"
+    },
+    {
+      "credit": "3.00",
+      "debit": null,
+      "ordinal": 13,
+      "running_balance": "102063.94",
+      "transaction_date": "2025-04-27",
+      "value_date": "2025-04-27"
+    },
+    {
+      "credit": "3.00",
+      "debit": null,
+      "ordinal": 14,
+      "running_balance": "102066.94",
+      "transaction_date": "2025-04-27",
+      "value_date": "2025-04-27"
+    },
+    {
+      "credit": null,
+      "debit": "113.00",
+      "ordinal": 15,
+      "running_balance": "101953.94",
+      "transaction_date": "2025-04-28",
+      "value_date": "2025-04-28"
+    },
+    {
+      "credit": "6.00",
+      "debit": null,
+      "ordinal": 16,
+      "running_balance": "101959.94",
+      "transaction_date": "2025-04-28",
+      "value_date": "2025-04-28"
+    },
+    {
+      "credit": null,
+      "debit": "1000.00",
+      "ordinal": 17,
+      "running_balance": "100959.94",
+      "transaction_date": "2025-04-28",
+      "value_date": "2025-04-28"
+    },
+    {
+      "credit": "5.00",
+      "debit": null,
+      "ordinal": 18,
+      "running_balance": "100964.94",
+      "transaction_date": "2025-04-28",
+      "value_date": "2025-04-28"
+    },
+    {
+      "credit": null,
+      "debit": "180.00",
+      "ordinal": 19,
+      "running_balance": "100784.94",
+      "transaction_date": "2025-04-28",
+      "value_date": "2025-04-28"
+    },
+    {
+      "credit": null,
+      "debit": "120.00",
+      "ordinal": 20,
+      "running_balance": "100664.94",
+      "transaction_date": "2025-04-28",
+      "value_date": "2025-04-28"
+    },
+    {
+      "credit": null,
+      "debit": "261.00",
+      "ordinal": 21,
+      "running_balance": "100403.94",
+      "transaction_date": "2025-05-03",
+      "value_date": "2025-05-03"
+    },
+    {
+      "credit": "2580.00",
+      "debit": null,
+      "ordinal": 22,
+      "running_balance": "102983.94",
+      "transaction_date": "2025-05-03",
+      "value_date": "2025-05-03"
+    },
+    {
+      "credit": "3.00",
+      "debit": null,
+      "ordinal": 23,
+      "running_balance": "102986.94",
+      "transaction_date": "2025-05-06",
+      "value_date": "2025-05-06"
+    },
+    {
+      "credit": null,
+      "debit": "20000.00",
+      "ordinal": 24,
+      "running_balance": "82986.94",
+      "transaction_date": "2025-05-07",
+      "value_date": "2025-05-07"
+    },
+    {
+      "credit": null,
+      "debit": "20000.00",
+      "ordinal": 25,
+      "running_balance": "62986.94",
+      "transaction_date": "2025-05-07",
+      "value_date": "2025-05-07"
+    },
+    {
+      "credit": null,
+      "debit": "10000.00",
+      "ordinal": 26,
+      "running_balance": "52986.94",
+      "transaction_date": "2025-05-07",
+      "value_date": "2025-05-07"
+    },
+    {
+      "credit": null,
+      "debit": "2902.00",
+      "ordinal": 27,
+      "running_balance": "50084.94",
+      "transaction_date": "2025-05-23",
+      "value_date": "2025-05-23"
+    },
+    {
+      "credit": "2902.00",
+      "debit": null,
+      "ordinal": 28,
+      "running_balance": "52986.94",
+      "transaction_date": "2025-05-23",
+      "value_date": "2025-05-23"
+    },
+    {
+      "credit": "47013.06",
+      "debit": null,
+      "ordinal": 29,
+      "running_balance": "100000.00",
+      "transaction_date": "2025-05-26",
+      "value_date": "2025-05-26"
+    },
+    {
+      "credit": null,
+      "debit": "3436.00",
+      "ordinal": 30,
+      "running_balance": "96564.00",
+      "transaction_date": "2025-05-31",
+      "value_date": "2025-05-31"
+    },
+    {
+      "credit": "3.00",
+      "debit": null,
+      "ordinal": 31,
+      "running_balance": "96567.00",
+      "transaction_date": "2025-06-06",
+      "value_date": "2025-06-06"
+    },
+    {
+      "credit": null,
+      "debit": "150.00",
+      "ordinal": 32,
+      "running_balance": "96417.00",
+      "transaction_date": "2025-06-14",
+      "value_date": "2025-06-14"
+    },
+    {
+      "credit": "2.00",
+      "debit": null,
+      "ordinal": 33,
+      "running_balance": "96419.00",
+      "transaction_date": "2025-06-14",
+      "value_date": "2025-06-14"
+    },
+    {
+      "credit": null,
+      "debit": "120.00",
+      "ordinal": 34,
+      "running_balance": "96299.00",
+      "transaction_date": "2025-06-14",
+      "value_date": "2025-06-14"
+    },
+    {
+      "credit": null,
+      "debit": "20.00",
+      "ordinal": 35,
+      "running_balance": "96279.00",
+      "transaction_date": "2025-06-15",
+      "value_date": "2025-06-15"
+    },
+    {
+      "credit": null,
+      "debit": "40.00",
+      "ordinal": 36,
+      "running_balance": "96239.00",
+      "transaction_date": "2025-06-15",
+      "value_date": "2025-06-15"
+    },
+    {
+      "credit": null,
+      "debit": "95.00",
+      "ordinal": 37,
+      "running_balance": "96144.00",
+      "transaction_date": "2025-06-16",
+      "value_date": "2025-06-16"
+    },
+    {
+      "credit": null,
+      "debit": "50.00",
+      "ordinal": 38,
+      "running_balance": "96094.00",
+      "transaction_date": "2025-06-16",
+      "value_date": "2025-06-16"
+    },
+    {
+      "credit": null,
+      "debit": "70.00",
+      "ordinal": 39,
+      "running_balance": "96024.00",
+      "transaction_date": "2025-06-16",
+      "value_date": "2025-06-16"
+    },
+    {
+      "credit": "1.00",
+      "debit": null,
+      "ordinal": 40,
+      "running_balance": "96025.00",
+      "transaction_date": "2025-06-16",
+      "value_date": "2025-06-16"
+    },
+    {
+      "credit": "3975.00",
+      "debit": null,
+      "ordinal": 41,
+      "running_balance": "100000.00",
+      "transaction_date": "2025-06-18",
+      "value_date": "2025-06-18"
+    },
+    {
+      "credit": null,
+      "debit": "270.00",
+      "ordinal": 42,
+      "running_balance": "99730.00",
+      "transaction_date": "2025-06-18",
+      "value_date": "2025-06-18"
+    },
+    {
+      "credit": "84430.65",
+      "debit": null,
+      "ordinal": 43,
+      "running_balance": "184160.65",
+      "transaction_date": "2025-06-26",
+      "value_date": "2025-06-26"
+    },
+    {
+      "credit": null,
+      "debit": "84430.65",
+      "ordinal": 44,
+      "running_balance": "99730.00",
+      "transaction_date": "2025-06-26",
+      "value_date": "2025-06-26"
+    },
+    {
+      "credit": "632.00",
+      "debit": null,
+      "ordinal": 45,
+      "running_balance": "100362.00",
+      "transaction_date": "2025-07-01",
+      "value_date": "2025-06-30"
+    },
+    {
+      "credit": null,
+      "debit": "197.18",
+      "ordinal": 46,
+      "running_balance": "100164.82",
+      "transaction_date": "2025-07-01",
+      "value_date": "2025-06-30"
+    },
+    {
+      "credit": null,
+      "debit": "111.00",
+      "ordinal": 47,
+      "running_balance": "100053.82",
+      "transaction_date": "2025-07-11",
+      "value_date": "2025-07-11"
+    },
+    {
+      "credit": null,
+      "debit": "50.00",
+      "ordinal": 48,
+      "running_balance": "100003.82",
+      "transaction_date": "2025-07-12",
+      "value_date": "2025-07-12"
+    },
+    {
+      "credit": null,
+      "debit": "102.00",
+      "ordinal": 49,
+      "running_balance": "99901.82",
+      "transaction_date": "2025-07-12",
+      "value_date": "2025-07-12"
+    },
+    {
+      "credit": null,
+      "debit": "522.00",
+      "ordinal": 50,
+      "running_balance": "99379.82",
+      "transaction_date": "2025-07-13",
+      "value_date": "2025-07-13"
+    },
+    {
+      "credit": null,
+      "debit": "584.93",
+      "ordinal": 51,
+      "running_balance": "98794.89",
+      "transaction_date": "2025-07-16",
+      "value_date": "2025-07-16"
+    },
+    {
+      "credit": "966.00",
+      "debit": null,
+      "ordinal": 52,
+      "running_balance": "99760.89",
+      "transaction_date": "2025-07-29",
+      "value_date": "2025-07-29"
+    },
+    {
+      "credit": "241.00",
+      "debit": null,
+      "ordinal": 53,
+      "running_balance": "100001.89",
+      "transaction_date": "2025-07-29",
+      "value_date": "2025-07-29"
+    },
+    {
+      "credit": "629.00",
+      "debit": null,
+      "ordinal": 54,
+      "running_balance": "100630.89",
+      "transaction_date": "2025-10-01",
+      "value_date": "2025-09-30"
+    },
+    {
+      "credit": null,
+      "debit": "196.25",
+      "ordinal": 55,
+      "running_balance": "100434.64",
+      "transaction_date": "2025-10-01",
+      "value_date": "2025-09-30"
+    },
+    {
+      "credit": null,
+      "debit": "11.82",
+      "ordinal": 56,
+      "running_balance": "100422.82",
+      "transaction_date": "2025-10-17",
+      "value_date": "2025-10-17"
+    },
+    {
+      "credit": "633.00",
+      "debit": null,
+      "ordinal": 57,
+      "running_balance": "101055.82",
+      "transaction_date": "2026-01-01",
+      "value_date": "2025-12-31"
+    },
+    {
+      "credit": null,
+      "debit": "197.50",
+      "ordinal": 58,
+      "running_balance": "100858.32",
+      "transaction_date": "2026-01-01",
+      "value_date": "2025-12-31"
+    },
+    {
+      "credit": null,
+      "debit": "100000.00",
+      "ordinal": 59,
+      "running_balance": "858.32",
+      "transaction_date": "2026-02-01",
+      "value_date": "2026-02-01"
+    },
+    {
+      "credit": "100000.00",
+      "debit": null,
+      "ordinal": 60,
+      "running_balance": "100858.32",
+      "transaction_date": "2026-02-01",
+      "value_date": "2026-02-01"
+    },
+    {
+      "credit": null,
+      "debit": "151.00",
+      "ordinal": 61,
+      "running_balance": "100707.32",
+      "transaction_date": "2026-02-08",
+      "value_date": "2026-02-08"
+    },
+    {
+      "credit": null,
+      "debit": "100000.00",
+      "ordinal": 62,
+      "running_balance": "707.32",
+      "transaction_date": "2026-02-10",
+      "value_date": "2026-02-10"
+    },
+    {
+      "credit": null,
+      "debit": "80.00",
+      "ordinal": 63,
+      "running_balance": "627.32",
+      "transaction_date": "2026-02-13",
+      "value_date": "2026-02-13"
+    },
+    {
+      "credit": null,
+      "debit": "20.00",
+      "ordinal": 64,
+      "running_balance": "607.32",
+      "transaction_date": "2026-02-13",
+      "value_date": "2026-02-13"
+    },
+    {
+      "credit": null,
+      "debit": "80.00",
+      "ordinal": 65,
+      "running_balance": "527.32",
+      "transaction_date": "2026-02-14",
+      "value_date": "2026-02-14"
+    },
+    {
+      "credit": null,
+      "debit": "120.00",
+      "ordinal": 66,
+      "running_balance": "407.32",
+      "transaction_date": "2026-02-14",
+      "value_date": "2026-02-14"
+    },
+    {
+      "credit": null,
+      "debit": "210.00",
+      "ordinal": 67,
+      "running_balance": "197.32",
+      "transaction_date": "2026-02-14",
+      "value_date": "2026-02-14"
+    },
+    {
+      "credit": null,
+      "debit": "120.00",
+      "ordinal": 68,
+      "running_balance": "77.32",
+      "transaction_date": "2026-02-14",
+      "value_date": "2026-02-15"
+    },
+    {
+      "credit": null,
+      "debit": "60.00",
+      "ordinal": 69,
+      "running_balance": "17.32",
+      "transaction_date": "2026-02-15",
+      "value_date": "2026-02-15"
+    },
+    {
+      "credit": "100000.00",
+      "debit": null,
+      "ordinal": 70,
+      "running_balance": "100017.32",
+      "transaction_date": "2026-02-27",
+      "value_date": "2026-02-27"
+    },
+    {
+      "credit": null,
+      "debit": "4500.00",
+      "ordinal": 71,
+      "running_balance": "95517.32",
+      "transaction_date": "2026-03-14",
+      "value_date": "2026-03-14"
+    },
+    {
+      "credit": null,
+      "debit": "1000.00",
+      "ordinal": 72,
+      "running_balance": "94517.32",
+      "transaction_date": "2026-03-24",
+      "value_date": "2026-03-24"
+    },
+    {
+      "credit": null,
+      "debit": "408.00",
+      "ordinal": 73,
+      "running_balance": "94109.32",
+      "transaction_date": "2026-03-24",
+      "value_date": "2026-03-24"
+    },
+    {
+      "credit": "5891.00",
+      "debit": null,
+      "ordinal": 74,
+      "running_balance": "100000.32",
+      "transaction_date": "2026-03-24",
+      "value_date": "2026-03-24"
+    },
+    {
+      "credit": "499.00",
+      "debit": null,
+      "ordinal": 75,
+      "running_balance": "100499.32",
+      "transaction_date": "2026-04-01",
+      "value_date": "2026-03-31"
+    },
+    {
+      "credit": null,
+      "debit": "155.69",
+      "ordinal": 76,
+      "running_balance": "100343.63",
+      "transaction_date": "2026-04-01",
+      "value_date": "2026-03-31"
+    }
+  ],
+  "closing_balance": "100343.63",
+  "computed_final_balance": "100343.63",
+  "credit_total": "358428.65",
+  "currency": "INR",
+  "debit_total": "366081.96",
+  "family": "bank account statement",
+  "fictional_verified_identifier_expectation": {
+    "kind": "institution_account_id",
+    "value": "00012345000002",
+    "verification_state": "verified"
+  },
+  "fixture_class": "source-faithful sanitized fixture",
+  "fixture_id": "hdfc_bank_nro_account_statement_annual",
+  "institution": "HDFC Bank",
+  "layout_versions": {
+    "pdf": "HDFC-NRO-PDF-CLEANROOM-v1",
+    "xls": "HDFC-NRO-XLS-v1"
+  },
+  "opening_balance": "107996.94",
+  "pdf_xls_financial_equivalence": {
+    "basis": "ordered_financial_projection",
+    "fields": [
+      "transaction_date",
+      "value_date",
+      "debit",
+      "credit",
+      "running_balance"
+    ],
+    "matches": true
+  },
+  "sanitization_method": {
+    "classification": "clean_room_pdf_reconstruction",
+    "source_annotations_reused": false,
+    "source_content_streams_reused": false,
+    "source_fonts_reused": false,
+    "source_images_reused": false,
+    "source_metadata_reused": false,
+    "source_page_objects_reused": false
+  },
+  "source_formats": [
+    "pdf",
+    "xls"
+  ],
+  "statement_period": {
+    "end": "2026-03-31",
+    "start": "2025-04-01"
+  },
+  "textual_equivalence_boundary": "Narration and reference values are deterministic fictional mappings and are not source-equality fields.",
+  "transaction_count": 76,
+  "validation_expectation": "expected valid"
+}

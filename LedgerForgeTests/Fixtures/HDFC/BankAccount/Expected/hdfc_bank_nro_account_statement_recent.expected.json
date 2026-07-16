@@ -1,0 +1,117 @@
+{
+  "metadata_schema_version": 2,
+  "account_type": "NRO",
+  "fictional_identity": {
+    "customer_identity_id": "hdfc-fixture-customer-001",
+    "account_identity_id": "hdfc-fixture-nro-account-001",
+    "account_type": "NRO"
+  },
+  "canonical_ordered_financial_transactions": [
+    {
+      "credit": null,
+      "debit": "708.00",
+      "ordinal": 1,
+      "running_balance": "99635.63",
+      "transaction_date": "2026-04-07",
+      "value_date": "2026-04-07"
+    },
+    {
+      "credit": "500.00",
+      "debit": null,
+      "ordinal": 2,
+      "running_balance": "100135.63",
+      "transaction_date": "2026-04-07",
+      "value_date": "2026-04-07"
+    },
+    {
+      "credit": "624.00",
+      "debit": null,
+      "ordinal": 3,
+      "running_balance": "100759.63",
+      "transaction_date": "2026-07-01",
+      "value_date": "2026-06-30"
+    },
+    {
+      "credit": null,
+      "debit": "194.69",
+      "ordinal": 4,
+      "running_balance": "100564.94",
+      "transaction_date": "2026-07-01",
+      "value_date": "2026-06-30"
+    },
+    {
+      "credit": null,
+      "debit": "8740.00",
+      "ordinal": 5,
+      "running_balance": "91824.94",
+      "transaction_date": "2026-07-04",
+      "value_date": "2026-07-04"
+    },
+    {
+      "credit": "8740.00",
+      "debit": null,
+      "ordinal": 6,
+      "running_balance": "100564.94",
+      "transaction_date": "2026-07-04",
+      "value_date": "2026-07-04"
+    },
+    {
+      "credit": null,
+      "debit": "8740.00",
+      "ordinal": 7,
+      "running_balance": "91824.94",
+      "transaction_date": "2026-07-04",
+      "value_date": "2026-07-04"
+    }
+  ],
+  "closing_balance": "91824.94",
+  "computed_final_balance": "91824.94",
+  "credit_total": "9864.00",
+  "currency": "INR",
+  "debit_total": "18382.69",
+  "family": "bank account statement",
+  "fictional_verified_identifier_expectation": {
+    "kind": "institution_account_id",
+    "value": "00012345000002",
+    "verification_state": "verified"
+  },
+  "fixture_class": "source-faithful sanitized fixture",
+  "fixture_id": "hdfc_bank_nro_account_statement_recent",
+  "institution": "HDFC Bank",
+  "layout_versions": {
+    "pdf": "HDFC-NRO-PDF-CLEANROOM-v1",
+    "xls": "HDFC-NRO-XLS-v1"
+  },
+  "opening_balance": "100343.63",
+  "pdf_xls_financial_equivalence": {
+    "basis": "ordered_financial_projection",
+    "fields": [
+      "transaction_date",
+      "value_date",
+      "debit",
+      "credit",
+      "running_balance"
+    ],
+    "matches": true
+  },
+  "sanitization_method": {
+    "classification": "clean_room_pdf_reconstruction",
+    "source_annotations_reused": false,
+    "source_content_streams_reused": false,
+    "source_fonts_reused": false,
+    "source_images_reused": false,
+    "source_metadata_reused": false,
+    "source_page_objects_reused": false
+  },
+  "source_formats": [
+    "pdf",
+    "xls"
+  ],
+  "statement_period": {
+    "end": "2026-06-30",
+    "start": "2026-04-01"
+  },
+  "textual_equivalence_boundary": "Narration and reference values are deterministic fictional mappings and are not source-equality fields.",
+  "transaction_count": 7,
+  "validation_expectation": "expected valid"
+}
