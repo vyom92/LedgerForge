@@ -55,7 +55,9 @@ Production transaction persistence currently stores one authoritative native amo
 
 ### Currency and exchange-rate schema capacity
 
-The `currencies` and `exchange_rates` tables are currently schema capacity, not activated production currency or conversion authorities. Production import mapping and hydration remain limited to the supported INR path. No production exchange-rate repository, conversion workflow or reporting-currency total is established by the presence of those tables.
+The `currencies` and `exchange_rates` tables are currently inactive schema capacity, not production currency or conversion authorities. Under ADR-033, one reviewed, versioned, compiled offline catalog is the sole semantic authority for supported currency membership and fraction digits. The database `currencies` table must not override or compete with that catalog. Production import mapping and hydration remain limited to the supported INR path. No production exchange-rate repository, conversion workflow or reporting-currency total is established by the presence of those tables.
+
+ADR-033 authorizes no schema migration. A separate read-only compatibility audit must pass before Money implementation alters trusted persistence or hydration behaviour. The audit performs no repair or mutation and blocks rollout when historical values would require guessing or reinterpretation.
 
 ## Summary
 
@@ -139,7 +141,7 @@ Checklist — what this design baseline contains
 ## Important design conventions
 
 - Use UUID (TEXT) primary keys for domain entities for offline-first portability and easier sync/merge later.
-- Preserve exact imported values: store amount_decimal (TEXT) for audit and amount_minor (INTEGER) for efficient numeric queries. The conversion uses currencies.minor_unit.
+- Preserve exact imported values: `amount_decimal` stores the canonical locale-independent, non-exponent numeric value at the compiled catalog's fraction scale; `amount_minor` stores its mandatory exact integer encoding for efficient queries. The representations must agree. Original lexical source text remains in raw or normalized source evidence where available.
 - Use JSON columns for flexible structured metadata where schema evolution or vendor-specific data is expected (normalized_json, profile metadata, validation_summary).
 - Immutable, append-only patterns for exchange_rates, import_sessions and fingerprints to preserve audit history.
 
@@ -339,10 +341,10 @@ These traceability columns (`reader_version`, `parser_version`, `layout_version`
   - payee TEXT
   - reference TEXT
   - native_currency TEXT NOT NULL REFERENCES currencies(code)
-  - amount_minor INTEGER NOT NULL -- signed (minor units)
-  - amount_decimal TEXT NOT NULL -- exact imported decimal
+  - amount_minor INTEGER NOT NULL -- mandatory exact signed encoding at compiled-catalog scale; not independent financial truth
+  - amount_decimal TEXT NOT NULL -- canonical locale-independent, non-exponent exact numeric value at compiled-catalog scale
   - direction TEXT NOT NULL CHECK (direction IN ('credit','debit'))
-  - running_balance_minor INTEGER
+  - running_balance_minor INTEGER -- optional exact account-currency running-balance encoding; no decimal companion is required by ADR-033
   - is_reconciled INTEGER DEFAULT 0
   - is_trusted INTEGER DEFAULT 0 -- set only after import_session validation passes
   - trusted_at DATETIME
@@ -398,14 +400,14 @@ These traceability columns (`reader_version`, `parser_version`, `layout_version`
 - Notes: Immutable; insert-only for version history.
 
 15) currencies
-- Purpose: ISO 4217 metadata and minor unit exponent
+- Purpose: inactive schema capacity for currency reference metadata; ADR-033 keeps the compiled offline catalog as the sole semantic authority
 - Columns:
   - code TEXT PRIMARY KEY -- e.g., 'INR'
   - numeric_code INTEGER
   - name TEXT
   - minor_unit INTEGER NOT NULL -- exponent (2 for cents)
   - decimal_places INTEGER NOT NULL
-- Notes: Used to convert amount_decimal ↔ amount_minor.
+- Notes: Inactive in the ADR-033 increment. It must not override or compete with the compiled catalog. Activation or metadata seeding requires a separately reviewed migration decision.
 
 16) account_balance_snapshots
 - Purpose: snapshot account balances for quick historical queries
@@ -490,9 +492,12 @@ III. How imported documents map into accounts & transactions (traceability)
 IV. Multi-currency support
 
 - Every monetary value retains its native currency (`transactions.native_currency`, `accounts.native_currency`).
-- Store `amount_decimal` (TEXT) exactly as parsed for audit and `amount_minor` (INTEGER) for efficient arithmetic using `currencies.minor_unit`.
-- Exchange rates are stored in `exchange_rates` and are versioned and time-bound (valid_at). Conversion is a presentation concern: reports query the appropriate rate at the relevant historical timestamp.
-- For aggregate multi-currency reports, the system groups by `native_currency` and uses `exchange_rates` to compute converted values at display time.
+- For trusted transactions, store `amount_decimal` as the canonical locale-independent, non-exponent exact numeric value at compiled-catalog scale and `amount_minor` as its mandatory exact integer encoding. Neither may silently override the other when they disagree.
+- Source lexical amount and running-balance text remains in raw or normalized source evidence where available; canonical transaction columns preserve numeric financial truth rather than lexical formatting.
+- Optional `running_balance_minor` remains an exact encoding governed by the transaction and account native currency. ADR-033 requires no `running_balance_decimal` column.
+- Mapping and hydration use the same compiled catalog and exact conversion contract. Excess precision, overflow, malformed or unsupported codes and inconsistent account, transaction or running-balance currency relationships fail explicitly.
+- Aggregate presentation produces one total per `native_currency`, deterministically ordered by canonical code. No currencyless combined total is permitted without a separately approved FX domain.
+- `currencies` and `exchange_rates` remain inactive schema capacity. ADR-033 neither activates them nor authorizes conversion, exchange-rate persistence or reporting-currency totals.
 
 ## Password Resolution
 
@@ -677,8 +682,8 @@ XV. Testing & verification recommendations
 
 XVI. Rationale: explanation of key design decisions
 
-1. Preserve native values and store amount_decimal (TEXT) + amount_minor (INTEGER)
-   - Why: To fully preserve imported financial truth (no rounding or conversion loss) and to enable efficient numeric queries.
+1. Preserve native values and store canonical amount_decimal (TEXT) + exact amount_minor (INTEGER)
+   - Why: The exact numeric amount plus canonical native currency is authoritative financial truth. The decimal text is its canonical audit representation and the minor integer is its mandatory checked query encoding; disagreement is an integrity failure.
 2. Normalized_documents + normalized_rows
    - Why: Document Readers vary by format; persisting RawDocument and row-level extraction output makes downstream detection, classification, parser selection, validation and audit workflows format-independent and maintainable (ADR-011, ADR-016).
 3. Fingerprinting and event ownership are governed by ADR-030 and ADR-031
@@ -698,8 +703,8 @@ XVII. Risks and mitigations
   - Mitigation: compression, archival policies, optional purge of raw normalized rows after a retention period while preserving transactions + essential provenance.
 - Duplicate handling and fingerprint collision
   - Mitigation: use versioned exact-content and bounded Axis UPI ownership algorithms; broader identity and management workflows remain future work.
-- Migration complexity for Money type introduction
-  - Mitigation: keep amount_decimal as source-of-truth; backfill derived fields and migrate in background jobs.
+- Compatibility complexity for Money type introduction
+  - Mitigation: run the separately authorized read-only compatibility audit before rollout. ADR-033 authorizes no repair, backfill, catalog-table activation or schema migration.
 
 XVIII. Next steps (recommended)
 
@@ -714,7 +719,7 @@ XIX. Appendix: canonical fields and conventions
 
 - ID convention: all domain IDs are UUID v4 stored as TEXT.
 - Timestamps: store in UTC in ISO-8601 strings (DATETIME). Use created_at/updated_at on all persistent rows.
-- Currency minor unit: use `currencies.minor_unit` to derive minor units. Example: INR minor_unit=2 (paise), USD=2 (cents).
+- Currency fraction scale: use only the reviewed, versioned, compiled offline catalog. The database `currencies` table is inactive schema capacity under ADR-033.
 - Amount sign convention: amount_minor positive for credit into account, negative for debit (application must choose and document a consistent convention). Store explicit `direction` for clarity.
 - Validation policy: only `is_trusted=1` transactions are included in dashboard calculations. `is_trusted` is set in one atomic step after import validation completes successfully.
 

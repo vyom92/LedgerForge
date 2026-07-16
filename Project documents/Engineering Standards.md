@@ -224,7 +224,16 @@ The code should make adding the next financial institution easier than adding th
 # Currency Standards
 
 - Preserve native currency.
+- Represent authoritative domain money as an exact numeric amount plus one canonical native currency code.
+- Normalize valid three-letter ASCII currency codes to uppercase; reject malformed or unsupported codes through the accepted offline catalog contract.
+- Derive currency fraction scale only from the reviewed, versioned, compiled offline catalog; callers must not override it.
+- Never implicitly round, clamp or truncate imported values, Money construction, persistence, hydration or same-currency arithmetic.
+- Persist minor units only as an exact encoding of the canonical native amount; decimal and minor representations must agree.
+- Permit arithmetic and checked comparison only for matching currencies; reject cross-currency operations explicitly.
+- Require SQLite and In-Memory providers to expose equivalent Money values and equivalent failures.
+- Present one deterministically ordered total per native currency; never expose one currencyless aggregate across currencies without an approved conversion domain.
 - Store exchange rates separately from monetary values.
+- Do not activate exchange-rate or currency-table schema capacity merely because those tables exist.
 - Never overwrite imported financial values after conversion.
 - Support multiple simultaneous display currencies.
 - Respect regional formatting conventions for each currency.

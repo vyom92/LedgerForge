@@ -632,11 +632,11 @@ The original source structure and every user-approved mapping must remain inspec
 ## FW-P1-09 — Credit-Card Financial Semantics Foundation
 
 **Status:** Blocked
-**Depends on:** Integrated and approved American Express, CBQ and Axis card fixture evidence; a final cross-family card-evidence review; `FW-P3-29A`; and a future accepted card-semantics ADR
+**Depends on:** `FW-P3-29A` and a future accepted card-semantics ADR
 
 Define the smallest document-scoped evidence contract required before production card parsing.
 
-The cross-family review must determine whether `FinancialDocument` needs a card-statement evidence envelope capable of preserving, only where source-supported:
+The American Express, CBQ and Axis card fixture integrations and final cross-family evidence review are complete. The completed review recommends that a future card-semantics ADR decide whether `FinancialDocument` needs a card-statement evidence envelope capable of preserving, only where source-supported:
 
 - authoritative posted statement amount and statement currency;
 - optional source-proven effect on the amount owed;
@@ -655,7 +655,7 @@ Payment allocation, rewards accounting, reversal matching, universal card taxono
 
 Card persistence remains blocked until the Money foundation and a card-semantics ADR establish the required domain, validation and persistence contracts. Institution-specific production parsers remain independently gated after the shared foundation is accepted.
 
-Final vocabulary, persistence fields and migration shape must wait for the completed American Express, CBQ and Axis evidence comparison.
+The integrated evidence and completed review satisfy the discovery dependency but do not accept card architecture. Final vocabulary, persistence fields and migration shape remain blocked on the future card-semantics ADR.
 
 Do not claim production card support from fixture integration, schema capacity, statement classification or parser candidates.
 
@@ -1982,23 +1982,24 @@ Rules must be explainable and configurable rather than inferred from institution
 ## FW-P3-29A — Money Value Type and Multi-Currency Domain Foundation
 
 **Status:** Blocked
-**Depends on:** ADR-008, a future accepted Money implementation-contract ADR and a passing read-only existing-data compatibility audit
+**Depends on:** ADR-008, accepted ADR-033 and a passing read-only existing-data compatibility audit
 
 Define the dedicated `Money` value type and the smallest coherent production boundary required for reliable native-currency behaviour.
 
-The future ADR must decide:
+ADR-033 accepts the implementation contract:
 
-- whether `Money` contains an exact `Decimal` amount and canonical native currency code;
-- how canonical currency codes and fraction scales are governed by one versioned offline catalog;
-- whether persisted minor units are a mandatory exact encoding of the authoritative value;
-- whether `amount_decimal` preserves source lexical evidence or a canonical exact numeric representation;
-- where original lexical evidence remains available;
-- how trailing zeroes are treated;
-- how transaction running balances are represented and checked;
-- how malformed, unsupported, over-precision, invalid and overflowing values fail explicitly;
-- how account, transaction and statement currency relationships are validated;
-- how SQLite and In-Memory providers preserve equivalent behaviour;
-- whether the existing schema requires migration.
+- `Money` contains an exact `Decimal` amount and canonical native currency code;
+- one compiled, versioned offline catalog governs supported membership and fraction scale;
+- canonical persisted decimal text represents the exact numeric value at catalog scale;
+- minor units are a mandatory exact persistence and query encoding, not independent financial truth;
+- optional running balances remain exact account-currency Money evidence encoded by the existing minor-unit column;
+- malformed, unsupported, over-precision, invalid, overflowing or inconsistent values fail explicitly;
+- account, transaction, running-balance and statement booked-currency relationships are validated;
+- SQLite and In-Memory providers expose equivalent values and failures;
+- same-currency arithmetic is permitted and cross-currency arithmetic fails explicitly;
+- one native-currency total is presented per canonical code;
+- no FX conversion or valuation belongs to this increment;
+- no schema migration is authorized by ADR-033.
 
 Imported monetary values must never be implicitly rounded. Arithmetic and comparison must be same-currency only unless a separately approved conversion domain supplies an explicit derived value. Cross-currency arithmetic and comparison must fail rather than silently combine values.
 
@@ -2012,7 +2013,7 @@ Internal checkpoints may be smaller, but production non-INR support remains clos
 
 This candidate does not activate exchange-rate fetching, storage, conversion, reporting-currency totals or historical valuation. Those remain governed by `FW-P3-31` through `FW-P3-34`.
 
-This entry records required decisions and stop conditions. It does not accept the recommended Money representation.
+The immediate blocker is the separate read-only compatibility audit. Passing that audit does not itself implement Money or enable non-INR production support.
 
 ---
 

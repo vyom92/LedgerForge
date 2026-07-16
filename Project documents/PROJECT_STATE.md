@@ -4,7 +4,7 @@
 - Latest verified completed increment: Sprint 43 — Honest Import Lifecycle.
 - Latest relevant implementation commit: `4f120d18e406f1b06675397c269fa90e4fd80e09` — Preserve pre-confirmation cancellation in Sprint 43.
 - Current migration: V4, including the bounded `import_attempts` ledger.
-- Current accepted ADR: ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics.
+- Current accepted ADR: ADR-033 — Deterministic Money and Native-Currency Integrity.
 - Architecture baseline: Architecture v1.0 Frozen and UI/UX v1.0 Frozen.
 - Build state: clean Debug build passing for Sprint 43.
 - Latest verified automated result: 229 tests in 33 suites, 0 failures, 0 skipped. Generic `LedgerForgeUITests` remained intentionally disabled.
@@ -27,6 +27,7 @@
 - No production password-entry or Keychain workflow exists.
 - XLS, XLSX, TXT and OCR are not production-supported.
 - Credit-card financial semantics and production card parsing are not implemented.
+- ADR-033 accepts the deterministic Money and native-currency integrity architecture, but the required read-only compatibility audit, Money implementation, grouped native-currency presentation and production non-INR support remain pending.
 - Mixed-currency totals and summaries are not safe for production use; the current persisted transaction model carries one authoritative native amount/currency pair.
 - Development reset installs a temporary provider while the canonical database remains intact; relaunch reconnects to canonical data. A permanent recoverable reset contract is future work.
 - Cross-process and external-writer import guarantees are not implemented.

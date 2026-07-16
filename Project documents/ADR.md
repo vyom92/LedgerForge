@@ -1844,3 +1844,211 @@ Users gain durable, privacy-safe explanation of supported import outcomes withou
 - ADR-029 — User-Confirmed Financial Identifier Attachment
 - ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit
 - ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking
+
+---
+
+# ADR-033 — Deterministic Money and Native-Currency Integrity
+
+## Status
+
+Accepted
+
+## Context
+
+ADR-008 requires every monetary value to retain its native currency, treats conversion as derived presentation and prohibits destructive replacement of imported values. The current production path preserves one native amount/currency pair but represents amounts and currency through separate primitives. Persistence stores both `amount_decimal` and `amount_minor`, while import mapping and hydration independently implement an INR-only fraction-scale rule. Dashboard, Accounts and Transactions also contain currencyless aggregate paths that are unsafe once more than one native currency becomes production-supported.
+
+Approved INR and QAR fixture evidence, the completed American Express, CBQ and Axis card cross-family review and the Money architecture discovery establish the required compatibility boundary. They do not establish production non-INR, PDF, XLS/XLSX, card or institution-parser support.
+
+ADR-033 extends ADR-008. It does not replace or weaken ADR-008's native-value, derived-conversion or non-destructive-conversion principles.
+
+## Decision
+
+### Money authority
+
+A domain `Money` value consists of an exact `Decimal` amount and one canonical native currency code. The imported exact numeric amount plus native currency is the authoritative financial value.
+
+An implementation may cache or derive minor units, but minor units are not independent financial truth.
+
+### Currency identity and normalization
+
+Currency codes use exactly three ASCII letters. Valid ingestion input is normalized to uppercase. Persisted and exposed codes are uppercase. Malformed codes fail.
+
+Persisted historical lowercase or otherwise noncanonical codes are compatibility-audit findings and are not silently rewritten.
+
+Currency membership comes from one reviewed, versioned, offline catalog. Catalog membership does not imply production parser or institution support.
+
+### Currency catalog
+
+The compiled, versioned offline catalog is the sole semantic authority for supported currency membership and currency fraction digits. Callers cannot override fraction scale.
+
+The existing database `currencies` table remains inactive schema capacity in this increment and must not override or compete with the compiled catalog.
+
+The initial implementation catalog must cover currencies required by approved evidence and tests, including representative zero-, two- and three-fraction-digit behaviour. Exact membership is implementation-reviewed and does not establish import support.
+
+### Canonical decimal representation
+
+For trusted persisted transactions, `amount_decimal` stores a canonical, locale-independent, non-exponent decimal representation. It represents the exact numeric value, not the original lexical source token, and uses the currency's catalog fraction scale. Negative zero is normalized to zero.
+
+For a two-decimal currency:
+
+```text
+120   -> 120.00
+120.5 -> 120.50
+-0.00 -> 0.00
+```
+
+Source lexical text remains in raw or normalized source evidence where available. ADR-033 does not authorize rewriting historical rows.
+
+### Minor-unit encoding
+
+Minor units are a mandatory exact persistence and query encoding for trusted transaction amounts. Scale comes only from the catalog.
+
+Decimal-to-minor conversion must be exact. Excess precision and `Int64` overflow fail. Values are never clamped or truncated.
+
+Persisted decimal and minor transaction representations must agree. New disagreement blocks persistence. Historical disagreement blocks affected hydration and Money rollout pending explicit review. Neither representation is silently selected over the other.
+
+### Rounding
+
+No implicit rounding is allowed for Money construction, imported values, persistence, hydration or same-currency arithmetic.
+
+Future derived calculations requiring rounding need a separately approved explicit policy. Scalar multiplication and division are outside the first Money increment.
+
+### Running balances
+
+A transaction running balance is optional `Money` evidence governed by the transaction and account native currency. Domain validation treats it as an exact value.
+
+Existing persistence may continue storing `running_balance_minor` as its exact trusted encoding. ADR-033 requires no `running_balance_decimal` column. Original lexical running-balance evidence remains in raw or normalized source evidence where available.
+
+Exact representability and account-currency consistency are mandatory. Any future dual representation requires a separate schema decision.
+
+### Equality, hashing and encoding
+
+Equality and hashing use canonical currency plus exact canonical value. For catalog-supported representable values, canonical minor units may implement equality and hashing.
+
+`Money` must not conform to an unconditional cross-currency `Comparable`. Checked comparison is allowed only for matching currencies.
+
+`Codable` uses a keyed canonical currency code and canonical decimal string. Decoding reconstructs and validates `Money`.
+
+### Arithmetic
+
+The initial Money contract permits negation, equality, checked comparison, addition, subtraction and aggregation. All arithmetic requires matching currencies.
+
+Cross-currency arithmetic or comparison fails explicitly. No conversion operation belongs to `Money`.
+
+### Account, transaction and statement currency
+
+The initial foundation requires:
+
+- one native currency per account;
+- trusted transaction booked currency matching its account;
+- running-balance currency matching its account;
+- parser output establishing an explicit statement or booked currency, or deterministic uniform booked-row currency;
+- no first-row-only currency inference.
+
+Secondary original merchant currency remains distinct evidence. A statement with mixed booked or native transaction currencies for one account is blocked from initial trusted persistence.
+
+### Persistence and provider parity
+
+Mapping and hydration use the same catalog and exact conversion contract. SQLite and In-Memory providers expose equivalent successful values and equivalent failures.
+
+Invalid Money or currency relationships fail atomically. Failed mapping or hydration must not partially mutate trusted repository or runtime state.
+
+Existing INR financial behaviour remains unchanged. QAR exact round trips may be tested without enabling QAR production import.
+
+### Existing-data compatibility gate
+
+Before Money implementation may alter trusted persistence or hydration behaviour, a separate explicit read-only compatibility audit must check:
+
+- schema and migration versions;
+- account and transaction currencies;
+- canonical code form;
+- catalog membership;
+- deterministic decimal parsing;
+- scale and excess precision;
+- exact decimal and minor agreement;
+- overflow;
+- running-balance representability;
+- account and transaction currency consistency;
+- account-balance snapshot consistency where relevant.
+
+The audit performs no mutation, emits privacy-safe aggregate diagnostics only and never reports raw amounts, descriptions, references, account identifiers or database rows. It blocks rollout when any financial value requires guessing, automatic repair or reinterpretation.
+
+ADR-033 does not authorize a repair or migration.
+
+### Presentation
+
+Until a separately approved FX domain exists, ViewModels expose one total per native currency, deterministically ordered by canonical code. Dashboard, Accounts and Transactions must not expose one currencyless aggregate across currencies. Mixed-currency net worth is unsupported as one native total.
+
+Formatting uses `Money`, locale and catalog metadata. Locale affects presentation only. Accessibility output includes an unambiguous currency name or code. Direction or financial effect must not depend only on symbol, colour or sign.
+
+### No-FX boundary
+
+ADR-033 does not read or write exchange rates, activate the `exchange_rates` table, fetch rates, convert values, calculate card FX, compute reporting-currency totals, perform historical or current valuation or overwrite native `Money`.
+
+Future converted values require a separate provenance-bearing derived-value model and a future ADR.
+
+### Release boundary
+
+The smallest coherent production release boundary is:
+
+```text
+Money domain
++ exact persistence and hydration
++ currency relationship validation
++ grouped native-currency presentation
+```
+
+Internal checkpoints may be implemented separately, but production non-INR support remains closed until the complete boundary passes.
+
+### Schema and migration decision
+
+ADR-033 authorizes no schema migration. The existing transaction decimal, minor-unit and running-balance columns are provisionally sufficient for the accepted contract, subject to the compatibility audit and implementation validation.
+
+Any new constraint, catalog-table activation, metadata seed, decimal column, repair, backfill or durable audit marker requires a separately reviewed migration decision.
+
+## Consequences
+
+Positive consequences:
+
+- Native monetary truth has one deterministic domain authority.
+- Persistence retains exact financial values and a checked query encoding.
+- Currency mismatches and unsafe arithmetic fail explicitly.
+- SQLite and In-Memory behaviour must remain equivalent.
+- Native-currency grouping prevents false cross-currency totals.
+- The compiled catalog preserves deterministic offline-first operation.
+
+Costs and constraints:
+
+- The smallest coherent implementation spans domain, persistence, hydration, validation and presentation.
+- A passing compatibility audit is required before trusted persistence or hydration changes.
+- Production non-INR rollout remains blocked until every layer passes.
+- The offline catalog requires explicit versioned maintenance.
+- Previously tolerated malformed or inconsistent data will fail more strictly.
+
+## Rejected Alternatives
+
+- Treating minor units as independent financial truth.
+- Allowing the database `currencies` table to compete with the compiled catalog.
+- Caller-supplied fraction scales.
+- Implicit rounding, clamping or truncation.
+- Silently preferring decimal or minor representation when they disagree.
+- First-row-only statement-currency inference.
+- Automatic historical normalization, repair or reinterpretation.
+- Unconditional cross-currency comparison or arithmetic.
+- Currencyless aggregation across native currencies.
+- Embedding conversion or exchange-rate access in `Money`.
+- Shipping persistence and hydration without validation and grouped presentation.
+
+## Non-Goals
+
+ADR-033 does not establish QAR production support, PDF or XLS/XLSX support, card semantics, card persistence, institution parser support, FX conversion, investment valuation or reporting-currency analytics. It does not implement `Money`, run the compatibility audit, change schemas, migrate data or repair historical records.
+
+## Related ADRs
+
+- ADR-008 — Multi-Currency Domain Model
+- ADR-009 — Reactive Store Architecture
+- ADR-010 — Validation Before Persistence
+- ADR-016 — Universal Import Pipeline
+- ADR-019 — Reference Fixtures Define Financial Truth
+- ADR-024 — Repository Hydration Boundary
+- ADR-025 — Stable Financial Entity Identity
