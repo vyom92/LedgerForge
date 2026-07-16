@@ -4,7 +4,7 @@
 - Latest verified completed increment: Sprint 43 — Honest Import Lifecycle.
 - Latest relevant implementation commit: `4f120d18e406f1b06675397c269fa90e4fd80e09` — Preserve pre-confirmation cancellation in Sprint 43.
 - Current migration: V4, including the bounded `import_attempts` ledger.
-- Current accepted ADR: ADR-033 — Deterministic Money and Native-Currency Integrity.
+- Current accepted ADR: ADR-034 — Document-Scoped Card Statement Evidence.
 - Architecture baseline: Architecture v1.0 Frozen and UI/UX v1.0 Frozen.
 - Build state: clean Debug build passing for Sprint 43.
 - Latest verified automated result: 229 tests in 33 suites, 0 failures, 0 skipped. Generic `LedgerForgeUITests` remained intentionally disabled.
@@ -27,7 +27,8 @@
 - No production password-entry or Keychain workflow exists.
 - XLS, XLSX, TXT and OCR are not production-supported.
 - Credit-card financial semantics and production card parsing are not implemented.
-- ADR-033 accepts the deterministic Money and native-currency integrity architecture, but the required read-only compatibility audit, Money implementation, grouped native-currency presentation and production non-INR support remain pending.
+- ADR-033 accepts the deterministic Money and native-currency integrity architecture. The read-only INR compatibility audit passed with compatibility requirements: zero blocking findings, exact decimal/minor agreement and 76 legacy decimal strings requiring exact backward-compatible reading. No migration or repair is required. Money implementation is ready for future planning but has not started; grouped native-currency presentation and production non-INR support remain pending.
+- ADR-034 accepts document-scoped card-statement evidence subordinate to ADR-033. Card evidence, persistence, production parsing and institution support remain unimplemented and independently gated.
 - Mixed-currency totals and summaries are not safe for production use; the current persisted transaction model carries one authoritative native amount/currency pair.
 - Development reset installs a temporary provider while the canonical database remains intact; relaunch reconnects to canonical data. A permanent recoverable reset contract is future work.
 - Cross-process and external-writer import guarantees are not implemented.
@@ -43,6 +44,8 @@
 - Sprint 41 implemented parser-owned Axis UPI event ownership, pre-write blocking and Migration V3.
 - Sprint 42 implemented Migration V4, durable attempt history, bounded rejected outcomes, provider parity, attempt-only hydration and read-only Imports history/detail.
 - Sprint 43 implemented truthful preparation progress, cancellation ownership and bounded fresh source-reading retry without a schema migration or ADR change.
+- The read-only INR compatibility audit passed against the canonical V4 database with 2 accounts, 81 trusted transactions, INR-only booked currency, zero blocking findings and unchanged database, WAL and SHM surfaces. Of 81 decimal strings, 5 use canonical two-fraction-digit formatting, 73 omit the fractional separator, 3 use one fractional digit and 0 are negative zero; decimal/minor disagreements are 0. Legacy plain decimal strings remain readable only with exact minor-unit agreement; no migration, repair or historical rewrite is authorized.
+- ADR-034 accepted the document-scoped card-statement evidence boundary after integrated American Express, CBQ and Axis fixture evidence and the completed cross-family review. It does not establish card persistence, production parsing, or card semantics beyond source-owned evidence.
 - Source-faithful sanitized Axis NRO CSV, PDF and XLS regression evidence is integrated across two overlapping ranges. Range 1 records institution-supplied cross-format divergence; these fixtures do not constitute Axis NRO production parser support.
 - Clean-room Axis credit-card PDF and XLSX fixture evidence is integrated for two consecutive, non-overlapping periods. The PDFs contain 140 and 151 canonical transaction rows; the XLSX workbooks contain 143 and 154, including three legitimate XLSX-only source-format rows per period and no PDF-only rows. One fictional customer, account and instrument continue with no supplementary-instrument evidence. Statement currency is INR; Debit/Credit remains an observed source marker only, and no original-currency or FX evidence was introduced. The PDFs retain native selectable text without OCR, and the declared PDF geometry and workbook structures are preserved while PDF object and OOXML package identity are intentionally not preserved. Axis card PDF/XLSX production parsing and card semantics remain unsupported.
 - Clean-room HDFC NRE and NRO fixture evidence is integrated for annual and recent PDF and legacy-XLS periods. Every PDF/XLS pair reconciles; the PDFs retain native selectable text without OCR and preserve the verified financial, geometric, pagination and multiline relationships while intentionally not preserving source PDF object identity. HDFC production parsing remains unsupported.

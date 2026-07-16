@@ -2,7 +2,7 @@
 
 # LedgerForge — Database v1 Architecture (Design Baseline)
 
-Status: Database v1 design baseline, status-aligned through accepted ADR-032 and verified Sprint 42 repository implementation
+Status: Database v1 design baseline, status-aligned through accepted ADR-034 and verified Sprint 42 repository implementation; later ADRs authorize no schema migration
 
 This is an approved design baseline, not an inventory of production-supported formats or fully populated production tables. Current verified implementation state belongs in `PROJECT_STATE.md`.
 
@@ -51,13 +51,17 @@ Migration V4 adds the bounded `import_attempts` ledger. Attempt rows are workspa
 
 Successful attempts are persisted atomically with successful import history. Rejected attempts remain distinct from successful import sessions and may be recorded without financial mutation. Attempt history excludes raw source content, identifiers, references, fingerprints, event digests, unrestricted narration, paths and localized errors. SQLite and In-Memory providers enforce equivalent behavior.
 
-Production transaction persistence currently stores one authoritative native amount and currency pair. Original merchant amount and currency, statement conversion evidence, statement-provided FX rates and fee decomposition require a future ADR and are not production-supported.
+Production transaction persistence currently stores one authoritative native amount and currency pair. Original merchant amount and currency, statement conversion evidence, statement-provided FX rates and fee decomposition remain unpersisted card evidence under ADR-034 and require the completed ADR-033 Money boundary plus later persistence design; they are not production-supported.
 
 ### Currency and exchange-rate schema capacity
 
 The `currencies` and `exchange_rates` tables are currently inactive schema capacity, not production currency or conversion authorities. Under ADR-033, one reviewed, versioned, compiled offline catalog is the sole semantic authority for supported currency membership and fraction digits. The database `currencies` table must not override or compete with that catalog. Production import mapping and hydration remain limited to the supported INR path. No production exchange-rate repository, conversion workflow or reporting-currency total is established by the presence of those tables.
 
-ADR-033 authorizes no schema migration. A separate read-only compatibility audit must pass before Money implementation alters trusted persistence or hydration behaviour. The audit performs no repair or mutation and blocks rollout when historical values would require guessing or reinterpretation.
+ADR-033 authorizes no schema migration. The read-only INR compatibility audit passed with compatibility requirements and zero blocking findings: existing exact values agree with their minor units, while 76 legacy decimal strings require backward-compatible reads. New trusted writes use canonical catalog-scale decimal text; legacy reads verify exact minor agreement before in-memory canonicalization. No migration, repair or historical rewrite is required or authorized.
+
+### ADR-034 card evidence boundary
+
+Card evidence remains unpersisted. The current database schema establishes no persistence contract for card evidence, instrument sections, summaries, original Money, printed FX, fee, markup or tax components. ADR-034 authorizes no migration, JSON persistence decision, durable card-instrument table, card summary table or transaction schema change. Persistence shape waits for the completed Money implementation and concrete card query and hydration requirements with SQLite/In-Memory parity.
 
 ## Summary
 
@@ -704,7 +708,7 @@ XVII. Risks and mitigations
 - Duplicate handling and fingerprint collision
   - Mitigation: use versioned exact-content and bounded Axis UPI ownership algorithms; broader identity and management workflows remain future work.
 - Compatibility complexity for Money type introduction
-  - Mitigation: run the separately authorized read-only compatibility audit before rollout. ADR-033 authorizes no repair, backfill, catalog-table activation or schema migration.
+  - Mitigation: the read-only INR compatibility audit passed with legacy-read requirements. ADR-033 authorizes no repair, backfill, catalog-table activation or schema migration.
 
 XVIII. Next steps (recommended)
 
@@ -735,4 +739,4 @@ End of design baseline
 
 
 --
-Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through accepted ADR-032 and verified Sprint 42 repository implementation without redesigning the Database v1 baseline. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.
+Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through accepted ADR-034 and verified Sprint 42 repository implementation without redesigning the Database v1 baseline; later ADRs authorize no schema migration. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.

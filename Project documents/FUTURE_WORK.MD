@@ -119,6 +119,10 @@ Recorded and potentially valuable, but not necessarily the next planning target.
 
 A named dependency, architecture decision, fixture or preceding capability is missing.
 
+### Ready for planning
+
+The named dependencies and architecture are accepted, and the candidate may be prepared for a future implementation prompt after any explicit break or sequencing boundary. This status does not authorize implementation or assign a sprint.
+
 ### Bug
 
 Verified behaviour that is incorrect and should be corrected.
@@ -632,11 +636,11 @@ The original source structure and every user-approved mapping must remain inspec
 ## FW-P1-09 — Credit-Card Financial Semantics Foundation
 
 **Status:** Blocked
-**Depends on:** `FW-P3-29A` and a future accepted card-semantics ADR
+**Depends on:** `FW-P3-29A` and later card implementation and persistence planning
 
 Define the smallest document-scoped evidence contract required before production card parsing.
 
-The American Express, CBQ and Axis card fixture integrations and final cross-family evidence review are complete. The completed review recommends that a future card-semantics ADR decide whether `FinancialDocument` needs a card-statement evidence envelope capable of preserving, only where source-supported:
+The American Express, CBQ and Axis card fixture integrations and final cross-family evidence review are complete. ADR-034 accepts a future-implementation boundary in which `FinancialDocument` may carry a parser-owned card-statement evidence envelope capable of preserving, only where source-supported:
 
 - authoritative posted statement amount and statement currency;
 - optional source-proven effect on the amount owed;
@@ -647,15 +651,15 @@ The American Express, CBQ and Axis card fixture integrations and final cross-fam
 - independently optional printed FX-rate, fee, markup and tax evidence;
 - source-specific statement-summary components and reconciliation evidence.
 
-The review and ADR must resolve card-liability effects without forcing them into bank-account debit/credit semantics. A card instrument must not become an independent financial account merely because the statement presents a separate instrument section. Original merchant evidence must not replace the posted statement amount or currency.
+ADR-034 requires card-liability effects to remain separate from bank-account debit/credit semantics. A card instrument must not become an independent financial account merely because the statement presents a separate instrument section. Original merchant evidence must not replace the posted statement amount or currency.
 
 Missing FX rates, fees, markup, tax, statement aggregates or other financial evidence must not be calculated merely to populate a common model.
 
 Payment allocation, rewards accounting, reversal matching, universal card taxonomy and institution-independent balance formulas remain outside this candidate unless separately approved.
 
-Card persistence remains blocked until the Money foundation and a card-semantics ADR establish the required domain, validation and persistence contracts. Institution-specific production parsers remain independently gated after the shared foundation is accepted.
+Card persistence remains blocked until the Money foundation and later card implementation and persistence planning establish the required domain, validation and persistence contracts. Institution-specific production parsers remain independently gated after the shared foundation is accepted.
 
-The integrated evidence and completed review satisfy the discovery dependency but do not accept card architecture. Final vocabulary, persistence fields and migration shape remain blocked on the future card-semantics ADR.
+The integrated evidence and completed review satisfy the discovery dependency. Final vocabulary, persistence fields and migration shape remain blocked on the Money implementation, concrete card validation requirements and later persistence planning.
 
 Do not claim production card support from fixture integration, schema capacity, statement classification or parser candidates.
 
@@ -1981,8 +1985,8 @@ Rules must be explainable and configurable rather than inferred from institution
 
 ## FW-P3-29A — Money Value Type and Multi-Currency Domain Foundation
 
-**Status:** Blocked
-**Depends on:** ADR-008, accepted ADR-033 and a passing read-only existing-data compatibility audit
+**Status:** Ready for planning
+**Depends on:** ADR-008 and accepted ADR-033; completed compatibility audit with requirements
 
 Define the dedicated `Money` value type and the smallest coherent production boundary required for reliable native-currency behaviour.
 
@@ -2003,7 +2007,7 @@ ADR-033 accepts the implementation contract:
 
 Imported monetary values must never be implicitly rounded. Arithmetic and comparison must be same-currency only unless a separately approved conversion domain supplies an explicit derived value. Cross-currency arithmetic and comparison must fail rather than silently combine values.
 
-Before rollout, execute a read-only compatibility audit over existing account and transaction evidence. The audit must verify canonical currency codes, catalog membership, exact decimal/minor agreement, running-balance interpretation, fraction scale, overflow and account/transaction currency consistency. It must produce privacy-safe aggregate diagnostics, perform no mutation and block rollout on any value requiring guessing or silent repair.
+The read-only compatibility audit completed successfully with zero blocking findings. Existing INR values agree exactly with their stored minor units. Seventy-six legacy plain decimal strings use zero or one fractional digit; Money reads must accept zero-, one- and two-fraction-digit INR strings without rounding, verify exact minor agreement, canonicalize only in memory and for new writes, and never rewrite historical strings. Any disagreement must fail rather than guess.
 
 The smallest coherent production release boundary is:
 
@@ -2013,7 +2017,7 @@ Internal checkpoints may be smaller, but production non-INR support remains clos
 
 This candidate does not activate exchange-rate fetching, storage, conversion, reporting-currency totals or historical valuation. Those remain governed by `FW-P3-31` through `FW-P3-34`.
 
-The immediate blocker is the separate read-only compatibility audit. Passing that audit does not itself implement Money or enable non-INR production support.
+The compatibility audit is complete with requirements. This candidate is ready for future implementation planning after the intentional break, but passing the audit does not itself implement Money or enable non-INR production support.
 
 ---
 

@@ -2052,3 +2052,122 @@ ADR-033 does not establish QAR production support, PDF or XLS/XLSX support, card
 - ADR-019 — Reference Fixtures Define Financial Truth
 - ADR-024 — Repository Hydration Boundary
 - ADR-025 — Stable Financial Entity Identity
+
+---
+
+# ADR-034 — Document-Scoped Card Statement Evidence
+
+## Status
+
+Accepted
+
+## Context
+
+American Express, CBQ and Axis card fixture evidence is integrated, and the final cross-family review is complete. The families share authoritative posted amount and booked/statement currency but differ in source classification, row scope, instrument sections, original-currency evidence, fees, summaries, layouts, rewards, reconciliation and cross-format behaviour.
+
+Generic bank debit/credit semantics cannot safely represent card-liability effects. Fixture integration does not establish production parsing or persistence support. ADR-034 remains subordinate to ADR-033 for monetary representation, currency validation, persistence, hydration and presentation.
+
+## Decision
+
+### Document-owned evidence envelope
+
+`FinancialDocument` may optionally carry parser-owned document-scoped card evidence:
+
+```text
+FinancialDocument
+└── optional CardStatementEvidence
+    ├── statement-level evidence
+    ├── document-scoped instrument sections
+    ├── transaction annotations keyed by canonical transaction ID
+    ├── summary components
+    ├── reconciliation evidence
+    └── optional non-cash metadata
+```
+
+This accepts the boundary, not an implementation.
+
+### Posted Money and parser ownership
+
+The canonical posted amount and booked/statement currency remain authoritative. Card evidence references the canonical transaction and never duplicates or replaces its posted Money. Separately printed monetary evidence remains distinct.
+
+Only the selected Statement Parser may create source classification, source marker, row scope, instrument-section assignment, amount-owed effect, original merchant evidence, printed FX evidence, fee, markup or tax evidence, summary components, reconciliation evidence, rewards and other non-cash source evidence. Readers extract; orchestration, persistence, hydration and UI do not invent omissions.
+
+### Classification, markers and amount-owed effect
+
+Source classification is one stable parser-owned code with an optional display label; arbitrary printed text is not durable identity. Institution-specific or unknown classifications may remain unnormalized. No universal card taxonomy is required.
+
+Observed markers such as Axis Debit/Credit remain exact source evidence and do not imply card effect, bank direction, income, expense or amount owed. The only initial optional source-proven effect values are `increasesAmountOwed` and `decreasesAmountOwed`. Absence means no effect was source-proven. No `noAmountOwedEffect`, `unknownOrUnproven`, debit/credit aliases or inferred effects are added. Classification and effect remain independent.
+
+### Row scope and instruments
+
+Rows may be `accountLevel` or `instrument(documentScopedSectionID)`. Section IDs are opaque, deterministic within the document, parser-owned and independent of labels, narration, masked values, suffixes and filenames. Primary/supplementary roles are preserved only when source-proven. A document-scoped section is not an account.
+
+No durable card-instrument entity or cross-statement identity is created. Fixture continuity remains evidence only. Durable identity requires a separate decision with strong verified identifiers and persistence requirements.
+
+### Original, FX, fee, markup and tax evidence
+
+Original merchant amount and currency are an optional complete Money pair; both must be present together, never replace posted Money, and are never derived. Persistence remains blocked until Money is implemented.
+
+Printed FX evidence is independently optional and preserves exact source value, numerator/denominator currency identities, source/layout provenance and required lexical representation. Layout context may establish currency identity. It causes no conversion, does not activate exchange-rate storage and missing rates are never calculated.
+
+Fee, markup and tax are independently optional. Each component carries a complete Money value or an identity reference to the authoritative posted transaction when the source proves the entire row represents that component. Missing components are never inferred.
+
+### Summaries, reconciliation and continuity
+
+Summaries use a hybrid typed component model: bounded shared keys for genuinely recurring concepts and namespaced source/layout components for irreducible evidence. Shared concepts may include previous/opening balance, closing/statement balance, full or minimum payment due, due date, credit limit and available credit. Evidence state is `observed(value)`, `explicitlyAbsent`, `notApplicable` or no entry; `notApplicable` requires explicit source/layout proof, and observed zero remains observed zero.
+
+Parsers provide a closed, versioned reconciliation-rule identifier, typed operand references and provenance. Validators evaluate deterministically. Parsers do not provide executable formulas or open-ended expressions; one universal card formula is rejected.
+
+Inter-document balance continuity is separate optional evidence, not per-document reconciliation and not mandatory for every family. Axis's explicit absence of a continuity claim remains preserved.
+
+### Payments, refunds, reversals, rewards and duplicate identity
+
+Payment classification does not allocate payments to instruments. Refund and reversal classification does not automatically match or mutate earlier transactions. Matching and allocation require future authority and decisions. Rewards remain document-scoped non-cash metadata, not Money, transactions, income or accounting value.
+
+ADR-031 card-event identity is not established. No card duplicate identity is derived from date, amount, narration, classification, instrument section or layout position. Existing exact-content authority remains separate; new card-event identity requires strong source evidence and a future ADR.
+
+### Validation ownership
+
+A future card-aware validator must verify without inference: transaction references; statement currency; account/instrument row scope; section references; original Money pair completeness; printed-rate currency completeness; fee/markup/tax completeness; evidence-state validity; typed reconciliation inputs; and Money representability and currency relationships after Money implementation.
+
+### Persistence and production boundary
+
+ADR-034 authorizes no persistence implementation, schema migration, JSON persistence decision, durable instrument table, card summary table or transaction schema change. Persistence waits for the complete ADR-033 Money boundary, concrete card domain and validation requirements, known query/hydration needs and SQLite/In-Memory parity.
+
+American Express, CBQ and Axis production support remain independently gated. ADR-034 does not enable PDF, XLS/XLSX, QAR, card parsing, card persistence, institution support or UI presentation.
+
+## Consequences
+
+- Source-faithful card evidence is preserved without universal false semantics.
+- Statement context remains available while posted Money retains one authority.
+- Instruments remain distinct from accounts and missing evidence remains missing.
+- Institution/layout differences remain preservable and production support remains gated.
+- The FinancialDocument handoff and future validation/component governance become larger.
+- Persistence and institution-specific parser work remain future work after Money.
+
+## Rejected Alternatives
+
+- Adding card fields directly to every generic transaction initially.
+- Treating bank debit/credit as card effect.
+- Mandatory universal taxonomy or one fixed summary formula.
+- Representing missing evidence as zero.
+- Durable instrument identity from weak labels or suffixes.
+- Calculated FX, markup, tax or fees.
+- Automatic payment allocation or refund/reversal matching.
+- Weak card duplicate identity.
+- Production support inferred from fixtures or schema presence.
+
+## Non-Goals
+
+ADR-034 does not implement card evidence models, parsers, persistence, migrations, Money, FX conversion, payment allocation, rewards accounting, reversal matching, durable instrument identity, card duplicate identity, UI or production format/institution support.
+
+## Related ADRs
+
+- ADR-008 — Multi-Currency Domain Model
+- ADR-010 — Validation Before Persistence
+- ADR-016 — Universal Import Pipeline
+- ADR-019 — Reference Fixtures Define Financial Truth
+- ADR-024 — Repository Hydration Boundary
+- ADR-025 — Stable Financial Entity Identity
+- ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking
+- ADR-033 — Deterministic Money and Native-Currency Integrity

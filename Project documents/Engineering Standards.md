@@ -237,6 +237,21 @@ The code should make adding the next financial institution easier than adding th
 - Never overwrite imported financial values after conversion.
 - Support multiple simultaneous display currencies.
 - Respect regional formatting conventions for each currency.
+- Canonical trusted writes use catalog scale; legacy trusted reads may accept exact plain non-exponent decimal strings with zero through catalog-scale fractional digits.
+- Legacy reads must verify exact agreement with stored minor units. Canonicalization occurs in memory and for new writes only; historical strings are not rewritten merely for formatting. Disagreement fails rather than guessing.
+
+---
+
+# Card Evidence Standards
+
+- Card-statement evidence is document-scoped and owned exclusively by the selected Statement Parser.
+- The canonical posted Money amount and booked/statement currency remain authoritative; card evidence must reference them rather than create competing posted values.
+- Source classification is a stable parser-owned code with an optional display label; it is independent from source markers and amount-owed effect.
+- An increase or decrease in amount owed may be recorded only when source evidence proves it. Observed markers such as Axis Debit/Credit do not establish that effect.
+- Document-scoped instrument sections are not financial accounts, and durable instrument identity remains a separate future decision.
+- Original-currency, FX, fee, markup and tax evidence is optional, distinct and never derived when absent.
+- Reconciliation uses closed, versioned parser-owned rule identifiers and typed operands; no universal formula or executable parser expression is persisted.
+- Fixture or schema presence does not establish production card parsing, persistence, institution support or finalized card semantics.
 
 ---
 
