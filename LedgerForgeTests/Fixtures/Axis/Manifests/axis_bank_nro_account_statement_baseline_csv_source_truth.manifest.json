@@ -9,13 +9,15 @@
   "neutral_private_source_labels": [
     "AXNRO-R1-CSV"
   ],
+  "source_provenance": { "origin": "institution_supplied", "acquisition": "user_downloaded", "verification": "owner_attested" },
+  "privacy_assertions": { "uses_fictional_customer_metadata": true, "uses_fictional_account_identifier": true, "contains_no_original_transaction_reference": true, "contains_no_original_counterparty_identity": true, "contains_no_private_mapping": true, "contains_no_private_source_path_or_filename": true },
   "source_truth_boundary": "Contains one legitimate CSV-only interest credit; original source remains unchanged.",
   "cross_format_boundary": "Matching account identity and date range do not establish financial equivalence with PDF or XLS.",
   "candidate_status": "validated",
   "overlap_verification": {
     "csv": {
       "format_pair": "Range 1 CSV to Range 2 CSV",
-      "shared_complete_transaction_rows": 17,
+      "shared_financial_transaction_rows": 17,
       "range_1_only_rows": 0,
       "range_2_only_rows": 3,
       "row_order_preserved_for_shared_rows": true,
@@ -25,7 +27,7 @@
     },
     "pdf": {
       "format_pair": "Range 1 PDF to Range 2 PDF",
-      "shared_complete_transaction_rows": 16,
+      "shared_financial_transaction_rows": 16,
       "range_1_only_rows": 0,
       "range_2_only_rows": 4,
       "row_order_preserved_for_shared_rows": true,
@@ -35,7 +37,7 @@
     },
     "xls": {
       "format_pair": "Range 1 XLS to Range 2 XLS",
-      "shared_complete_transaction_rows": 16,
+      "shared_financial_transaction_rows": 16,
       "range_1_only_rows": 0,
       "range_2_only_rows": 4,
       "row_order_preserved_for_shared_rows": true,
@@ -43,5 +45,6 @@
       "range_2_interest_credit_present": true,
       "strict_historical_subset": true
     }
-  }
+  },
+  "overlap_basis": { "classification": "financial_projection", "compared_fields": ["transaction_date", "debit", "credit", "running_balance", "sol"], "independently_sanitized_fields": ["cheque_or_reference", "particulars"], "textual_equality_required": false }
 }
