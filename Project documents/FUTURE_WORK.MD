@@ -950,23 +950,10 @@ Historical backfill must not assume that older statements are complete or that i
 
 # P1 — Verified Bugs and Developer Maintenance
 
-## BUG-P1-01 — Development Database Reset Does Not Persist Across Relaunch
-
-**Status:** Bug  
-**Depends on:** None
-
-The current operation installs a UUID-named temporary SQLite provider under `Development Resets`; the canonical database remains intact and startup reconnects to canonical data on relaunch. The UI must not describe this as irreversible deletion.
-
-A permanent correction requires safe provider quiescence, canonical database and SQLite sidecar coordination, a recoverable pre-reset backup, canonical database recreation using current migrations, canonical hydration, an empty state that survives relaunch and production-database safety.
-
-Distinguish `Start Temporary Empty Session`, `Reset Development Database` and optional `Restore Previous Development Database`.
-
----
-
 ## FW-P1-30 — Granular Development Database Reset
 
 **Status:** Blocked  
-**Depends on:** `BUG-P1-01`
+**Depends on:** Separate approved selective-mutation semantics built on ADR-035
 
 Candidate reset operations include:
 
@@ -977,7 +964,7 @@ Candidate reset operations include:
 
 Each operation must clearly state what is retained and removed.
 
-Permanent recreation of the canonical development database remains governed by `BUG-P1-01`; this candidate covers only selective data-domain reset operations after that lifecycle is safe.
+ADR-035 and Sprint 45 Phase A provide the reusable canonical lifecycle, activity-gate, provider-generation, backup and recovery boundary. This candidate covers only selective data-domain mutations, which remain unapproved and must not be inferred from whole-database reset.
 
 ---
 
@@ -1067,7 +1054,7 @@ This candidate remains separate from the user-facing durable import-attempt hist
 ## FW-P1-39 — Development Database Maintenance Utilities
 
 **Status:** Research  
-**Depends on:** Stable database lifecycle, backup and integrity-verification boundaries
+**Depends on:** Separate safety, mutation and validation contracts for each maintenance operation
 
 Investigate safe development-only utilities for:
 
@@ -1079,6 +1066,8 @@ Investigate safe development-only utilities for:
 - search reindexing.
 
 Each operation requires an explicit safety contract, scope description and validation strategy.
+
+ADR-035 and Sprint 45 Phase A already own canonical Debug identity, exclusive lifecycle activity, provider generations, checked close, coordinated SQLite/WAL/SHM handling, verified lifecycle backup and automatic recovery. Those delivered lifecycle responsibilities are not part of this research item; no snapshot export, vacuum, optimization, repository rebuild, recalculation, reindexing or repair utility was implemented.
 
 No maintenance operation may silently alter trusted financial history or run against an active import without safe coordination.
 
