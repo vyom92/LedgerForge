@@ -389,15 +389,17 @@ All conflicts must be surfaced before any write.
 
 ## FW-P0-16 — Reversible Financial-Mutation Foundation
 
-**Status:** Ready for planning
+**Status:** Candidate
 **Discovery:** Complete
-**Planning state:** Ready for Chat architecture planning
+**ADR-037:** Accepted
+**Post-Sprint-45 lifecycle revalidation:** Complete
+**Planning state:** Architecture accepted
 **Implementation state:** Gated
 **Selected strategy:** Strategy A — contract-first architecture
 **Schema state:** No migration authorized
-**Depends on:** Accepted ADR-037, focused post-Sprint-45 provider-lifecycle revalidation, and independent selection of a concrete mutation family before source-level contracts
+**Depends on:** Independent selection of a concrete mutation family before source-level contracts
 
-Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` with a clean worktree and no repository changes. General architecture discovery is complete. Provider-lifecycle conclusions require focused revalidation against the final Sprint 45 design.
+Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` with a clean worktree and no repository changes. General architecture discovery is complete. Focused provider-lifecycle revalidation against the final Sprint 45 design is complete, and ADR-037 is Accepted. No executable mutation is authorized.
 
 ### Executive planning verdict
 
@@ -427,17 +429,19 @@ Each concrete mutation family still owns affected records, financial meaning, co
 
 ### Mandatory implementation prerequisites
 
-1. ADR-037 must be Accepted.
-2. Sprint 45 must be complete or its final provider-lifecycle design known.
-3. Provider generation, quiescence, replacement, reset/restore invalidation and hydration ownership must be revalidated.
-4. A concrete mutation family must be independently selected.
-5. The family must define exact affected records and conflict scope.
-6. Exact native-currency impact must be computable.
-7. Family writes and successful audit must share one provider transaction.
-8. SQLite and In-Memory parity must be provable.
-9. Family-specific reversal, compensation or irreversibility must be explicit.
-10. Privacy-safe audit and restoration material must be approved.
-11. Family migration and UI contracts must be independently approved.
+1. A production-capable opaque provider generation must exist.
+2. Planning/read activity leasing must exist.
+3. A process-local authorization lifecycle must be approved.
+4. One provider-owned atomic financial-mutation executor must exist.
+5. A concrete mutation family must be independently selected.
+6. The family must define exact affected state and conflict scope.
+7. Exact native-currency impact must be computable.
+8. Family writes and successful audit must share one provider transaction.
+9. `reconciliation-blocked` behavior and a hydration-retry path must exist.
+10. SQLite and In-Memory parity must be provable.
+11. Family-specific reversal, compensation or irreversibility must be explicit.
+12. Privacy-safe family audit and restoration material must be approved.
+13. Family schema, migration and UI contracts must be independently approved.
 
 ### Stop conditions
 
@@ -464,7 +468,7 @@ Each concrete mutation family still owns affected records, financial meaning, co
 
 ### Sprint 45 relationship
 
-Sprint 45 may provide reusable provider generation, quiescence, provider replacement, backup, migration recreation and forced-hydration infrastructure. That infrastructure remains outside financial-mutation semantics. Database reset or restore invalidates outstanding plans and authorizations; backup and restore are not record-level reversal. Focused post-Sprint-45 revalidation is required before ADR-037 can be Accepted or source-level contracts planned.
+Sprint 45 delivered Debug-only activity exclusion, provider-wrapper invalidation, provider replacement, backup, migration recreation, recovery and forced-hydration infrastructure. Focused revalidation is complete. That infrastructure informs but remains outside production financial-mutation semantics. Database reset or restore invalidates outstanding plans and authorizations; backup and restore are not record-level reversal.
 
 ---
 
@@ -1280,11 +1284,13 @@ Retain future work for speculative duplicate-transaction candidates, unsupported
 
 **Status:** Candidate
 **Discovery:** Complete
+**ADR-036:** Accepted
+**Post-Sprint-45 lifecycle revalidation:** Complete
 **Planning state:** Ready for Chat planning
 **Implementation state:** Gated
-**Depends on:** Stable transaction model, Accepted ADR-036, known post-Sprint-45 repository state and approved category UI behavior
+**Depends on:** Stable transaction model, durable repository transaction identity and approved category UI behavior
 
-Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` with a clean worktree and no implementation. Provider, migration and hydration assumptions require targeted revalidation after Sprint 45.
+Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` with a clean worktree and no implementation. Provider, migration and hydration assumptions were revalidated after Sprint 45, and ADR-036 is Accepted. Source implementation remains gated.
 
 ### Planning direction
 
@@ -1306,17 +1312,19 @@ Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` wi
 
 ### Implementation prerequisites
 
-1. ADR-036 must be Accepted.
-2. Sprint 45 must be complete or its final repository state must be known.
-3. Provider installation, migration registration and hydration ownership must be revalidated against the post-Sprint-45 HEAD.
-4. Hydrated transactions must expose stable persisted repository transaction identity.
-5. The category UI behavior supplement must be approved.
-6. SQLite and In-Memory provider parity must be demonstrable.
+1. Hydrated transactions must expose stable persisted repository transaction identity.
+2. The category UI behavior supplement must be approved.
+3. `CategoryRepository` must participate in installed-provider generation protection.
+4. One repository-write activity lease must cover provider resolution, persistence and canonical reconciliation.
+5. SQLite and In-Memory provider parity must be demonstrable.
+6. Category hydration must publish one observer-consistent runtime snapshot.
 7. The migration number must be selected from the then-current migration chain.
+8. Lifecycle backup verification must cover the category schema.
+9. Focused category lifecycle and recovery tests must be approved.
 
 ### Stop condition
 
-> Never implement category assignment using the regenerated runtime `Transaction.id`. Stop unless the immutable persisted transaction ID survives forced hydration, provider reconstruction, and relaunch.
+> Never implement category assignment using regenerated runtime `Transaction.id`. Stop unless the immutable persisted transaction ID survives forced hydration, provider reconstruction, and relaunch.
 
 ### Bounded first implementation scope
 

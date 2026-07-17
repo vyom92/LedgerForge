@@ -2284,11 +2284,13 @@ ADR-035 does not authorize Release or production reset, arbitrary database delet
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
 2026-07-17
+
+Accepted after Sprint 45 lifecycle revalidation on 2026-07-17.
 
 ## Decision Owners
 
@@ -2629,6 +2631,8 @@ Single category CRUD operations and single-transaction assignment changes are ta
 
 They do not modify imported financial truth and do not require the complete `FW-P0-16` reversible financial-mutation foundation.
 
+They do not require ADR-037 financial-mutation planning or authorization.
+
 They must still provide:
 
 - workspace validation;
@@ -2644,6 +2648,8 @@ Bulk reassignment, category merge, delete-with-replacement, and global undo rema
 ### 13. Repository ownership
 
 A dedicated category repository contract will own category and assignment persistence.
+
+Category repository access must participate in the currently installed provider generation and the same lifecycle activity gate as other provider-owned repositories. A category-management operation must acquire its activity lease before resolving the current provider and must not retain repository references across provider generations.
 
 It will govern:
 
@@ -2713,6 +2719,8 @@ Existing transactions remain Uncategorized.
 
 The expected migration is V5 only if no earlier accepted work consumes that version.
 
+Once the category schema exists, lifecycle backup verification must validate its registered migration state and the required category and assignment structures.
+
 ### 16. Runtime category state
 
 A dedicated category store will own:
@@ -2731,6 +2739,8 @@ Assignment counts are derived, not initially persisted.
 
 `RepositoryStoreHydrator` remains the sole repository-to-runtime authority.
 
+Transactions, categories, assignments, and referenced archived categories must be read and mapped under one installed provider generation and one lifecycle lease. The resulting runtime snapshot must be published as one observer-consistent unit after every required read and mapping succeeds.
+
 Hydration must:
 
 - preserve durable repository transaction identity;
@@ -2744,6 +2754,8 @@ Hydration must:
 Hydration must not leave partial transaction/category/assignment combinations.
 
 Assignments must never target transient runtime UUIDs.
+
+Reset, restore, temporary-session transitions, recovery, and relaunch must reconcile `CategoryStore` through this same authoritative boundary once the category domain exists.
 
 ### 18. Category mutation coordination
 
@@ -2761,7 +2773,15 @@ return structured result
 
 The coordinator must not manually mutate stores.
 
-Persistence success followed by hydration failure must be reported as an unreconciled state, not full success.
+One repository-write activity lease must cover current-provider resolution, category persistence, and forced canonical reconciliation. The operation must resolve generation-bound repositories only after acquiring that lease and must not retain them across provider generations.
+
+Nested lifecycle acquisition must be avoided. Implementation may allow the coordinator-owned lease to cover hydration or use another evidence-backed equivalent that preserves one lifecycle exclusion boundary.
+
+A committed category mutation followed by hydration failure produces a `committed but reconciliation failed` result and enters a `reconciliation-blocked` state. Further category mutations remain unavailable until canonical hydration succeeds.
+
+`reconciliation-blocked` is distinct from the Sprint 45 `lifecycle-unavailable` state. `lifecycle-unavailable` remains reserved for failed provider or database recovery.
+
+Reset, restore, temporary-session transition, recovery, or provider replacement must invalidate category operation state and repositories from the previous provider generation.
 
 ### 19. UI boundary
 
@@ -2915,15 +2935,18 @@ This ADR does not authorize:
 
 ## Implementation Prerequisites
 
-Implementation must not begin until:
+Before acceptance, Sprint 45 Phase A was completed, provider lifecycle behavior was revalidated, Migration V4 was confirmed as current, and provider replacement and stale-reference behavior were established.
 
-1. this ADR is Accepted;
-2. Sprint 45 has completed or its final repository state is known;
-3. provider and hydration ownership are revalidated against the post-Sprint-45 HEAD;
-4. durable persisted transaction identity can be exposed during hydration;
-5. category UI behavior is approved;
-6. provider parity can be tested;
-7. the next migration number is confirmed.
+Source implementation must not begin until:
+
+1. durable persisted transaction identity can be exposed during hydration;
+2. the category UI behavior supplement is approved;
+3. `CategoryRepository` participates in installed-provider generation protection;
+4. SQLite and In-Memory parity can be tested;
+5. category hydration provides observer-consistent publication;
+6. the next migration number is confirmed;
+7. lifecycle backup verification covers the category schema;
+8. focused lifecycle and recovery tests are approved.
 
 Exact stop condition:
 
@@ -2976,11 +2999,13 @@ This ADR must be marked **Accepted** before category implementation begins.
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
 2026-07-17
+
+Accepted after Sprint 45 lifecycle revalidation on 2026-07-17.
 
 ## Decision Owners
 
@@ -3177,6 +3202,10 @@ The planning read must include every record and query set relevant to the family
 
 A plan generated from incomplete authoritative scope is not executable.
 
+Planning reads must acquire a planning/read activity lease while producing the authoritative snapshot. The plan may outlive that lease, but execution must revalidate the installed provider generation and scoped preconditions.
+
+Reset may proceed after planning finishes. A later reset, restore, temporary-session transition, recovery, or provider replacement makes the plan non-executable. Planning must reject `lifecycle-unavailable` and `reconciliation-blocked` states. Concurrent authoritative writes invalidate the plan when they change its scoped precondition state.
+
 ### 4. Immutable deterministic plan
 
 Every proposed mutation must be represented by an immutable typed plan.
@@ -3320,7 +3349,7 @@ Alternative terminal states include:
 - conflicted;
 - rejected;
 - failed;
-- committed but unreconciled.
+- committed but reconciliation failed.
 
 Confirmation produces a single-use typed authorization.
 
@@ -3341,6 +3370,8 @@ Authorization must not execute another plan.
 Authorization must not survive provider replacement.
 
 Authorization must not bypass transaction-time revalidation.
+
+Authorizations are process-local and must not be persisted. They do not survive application relaunch, reset, restore, temporary-session transition, recovery, or provider replacement. Lifecycle transitions must eagerly clear or invalidate coordinator-held authorizations, and execution must independently reject stale generation binding.
 
 Withdrawing authorization prevents future execution but does not reverse a committed mutation.
 
@@ -3371,11 +3402,13 @@ A relevant inserted, deleted, or changed record must make the plan stale or conf
 
 ### 10. Provider generation
 
-Every mutation plan and authorization must be bound to the installed provider generation.
+Provider generation is an opaque, process-local identity for one installed provider instance. Every mutation plan and authorization must be bound to that installed provider generation.
 
-Provider replacement, database reset, database restore, or another lifecycle transition must invalidate all outstanding plans and authorizations from the previous generation.
+Provider generation is not necessarily the Sprint 45 Debug activity gate's integer and is not a durable database identity. Canonical database identity remains a lifecycle safety concern, not mutation authorization identity. No filesystem-path binding is required.
 
-The exact provider-generation mechanism must be revalidated after Sprint 45.
+Production and In-Memory equivalents are required before any financial mutation becomes executable. Plans and authorizations must not persist across application relaunch.
+
+Provider replacement, database reset, database restore, temporary-session transition, recovery, or another lifecycle transition must invalidate all outstanding plans and authorizations from the previous generation. Lifecycle transitions must eagerly clear or invalidate coordinator-held plans and authorizations. Execution must independently reject generation mismatch; lazy generation rejection remains mandatory even when eager invalidation exists.
 
 No mutation may execute when:
 
@@ -3408,21 +3441,31 @@ The UI, view models, runtime stores, and mutation coordinator must not coordinat
 
 For SQLite, execution must occur in one provider-owned database transaction.
 
-The required logical sequence is:
+The required acquisition and execution order is:
 
-1. acquire provider-scoped serialization;
-2. begin an immediate write transaction or approved equivalent;
-3. verify provider generation;
-4. re-read authoritative scoped state;
-5. recompute the precondition token;
-6. recompute conflicts;
-7. recompute exact impact;
-8. verify reversal or compensation eligibility;
-9. reject stale or changed plans before writes;
-10. apply the complete family-specific write set;
-11. insert successful audit evidence;
-12. verify affected-record counts and constraints;
-13. commit.
+```text
+acquire lifecycle activity lease
+    ↓
+resolve current generation-bound mutation repository
+    ↓
+consume authorization for the first execution attempt
+    ↓
+enter provider serialization and SQLite BEGIN IMMEDIATE
+    ↓
+verify generation and scoped authoritative state
+    ↓
+apply family writes and successful audit
+    ↓
+commit
+    ↓
+force canonical reconciliation
+    ↓
+release the lifecycle activity lease
+```
+
+Lifecycle lease acquisition must precede provider or repository lock acquisition. Repository or provider lock acquisition must not precede the lifecycle lease; this ordering prevents lifecycle-operation deadlock. The repository is resolved only after lease acquisition, and the lease spans durable execution and canonical reconciliation.
+
+Authorization is single-use and process-local. The first execution attempt consumes it. Transaction-time generation, precondition, conflict, impact, and reversal or compensation eligibility checks remain mandatory before writes. The provider must reject stale or changed plans, apply the complete family-specific write set and successful audit, verify affected-record counts and constraints, and commit atomically.
 
 Any failure before commit must roll back all family writes, successful audit evidence, and mutation-state changes.
 
@@ -3630,6 +3673,8 @@ Required generic results include:
 
 Hydration failure after a durable commit must not be reported as an uncommitted mutation.
 
+A committed financial mutation whose canonical reconciliation fails produces a `committed but reconciliation failed` result and enters a distinct `reconciliation-blocked` state.
+
 The system must report:
 
 - the mutation committed;
@@ -3639,10 +3684,12 @@ The system must report:
 
 The system must:
 
-- prevent stale runtime state from authorizing another mutation;
+- prevent further financial-mutation planning, authorization, or execution based on stale runtime state;
 - retry canonical hydration;
 - avoid manually editing stores;
 - preserve the committed mutation and successful audit.
+
+`reconciliation-blocked` is distinct from the Sprint 45 `lifecycle-unavailable` state. `lifecycle-unavailable` remains reserved for failed provider or database lifecycle recovery. Mutation reconciliation failure must not automatically invalidate an otherwise healthy provider. Each executable family must provide a bounded recovery path before another mutation can proceed.
 
 Automatic financial rollback solely because runtime hydration failed is prohibited.
 
@@ -3664,6 +3711,10 @@ A future executable mutation boundary must provide equivalent SQLite and In-Memo
 - reversal eligibility;
 - failure classifications;
 - atomic failure residue.
+
+Parity prerequisites also include opaque provider-generation behavior, lifecycle-lease participation, stale-repository rejection, authorization invalidation, transaction-time generation checks, `reconciliation-blocked` behavior, and hydration-retry outcomes.
+
+Current standard In-Memory providers do not yet provide these financial-mutation lifecycle semantics. Sprint 45 does not establish them as delivered behavior.
 
 Provider-specific implementation errors must map into shared domain-level outcomes.
 
@@ -3792,20 +3843,11 @@ Diagnostics must not contain prohibited audit or source values.
 
 ### 29. Development database lifecycle relationship
 
-Sprint 45 may introduce reusable low-level infrastructure for:
+Sprint 45 delivered Debug-only activity exclusion, provider-wrapper invalidation, provider replacement, migration recreation, verified backup, recovery, and forced canonical hydration.
 
-- provider quiescence;
-- provider generation;
-- provider replacement;
-- migration recreation;
-- verified backup;
-- forced hydration.
+These mechanisms inform the future production mutation contract. They do not themselves constitute production provider-generation identity, mutation authorization, family-specific atomic audit, or mutation reconciliation blocking.
 
-That infrastructure remains outside the financial-mutation contract.
-
-Provider reset or restore must invalidate all outstanding mutation plans and authorizations.
-
-Database backup must not become the reversal implementation for a financial mutation.
+Provider reset or restore must invalidate all outstanding mutation plans and authorizations. Database backup and restore remain database lifecycle operations and must not become the reversal implementation for a financial mutation.
 
 ### 30. Implementation stop conditions
 
@@ -3902,19 +3944,22 @@ This ADR does not authorize:
 
 ## Implementation prerequisites
 
+Before architecture acceptance, Sprint 45 lifecycle implementation and its Debug mechanisms were revalidated, same-process lifecycle exclusion and stale-wrapper behavior were established, and Strategy A remained supported.
+
 Before source-level mutation contracts or an operation family are implemented:
 
-1. this ADR must be Accepted;
-2. Sprint 45 provider-lifecycle changes must be known;
-3. provider generation and quiescence must be revalidated;
-4. provider replacement must invalidate old plans and authorizations;
+1. a production-capable opaque provider generation must exist;
+2. planning/read activity leasing must exist;
+3. a process-local authorization owner must be approved;
+4. one provider-owned financial-mutation transaction boundary must exist;
 5. a concrete mutation family must be selected independently;
-6. that family must define affected records, conflicts, write set, audit, and inverse or compensation;
-7. SQLite and In-Memory parity must be demonstrable;
-8. exact Money impact must be defined;
-9. privacy-safe audit evidence must be defined;
-10. family schema and migration requirements must be approved;
-11. family UI review and authorization behavior must be approved.
+6. that family must define affected state, conflicts, write set, audit, and inverse, compensation, or irreversibility;
+7. exact native-currency `Money` impact must be defined;
+8. family writes and successful audit must commit atomically;
+9. `reconciliation-blocked` behavior and a hydration-retry path must exist;
+10. SQLite and In-Memory parity must be demonstrable;
+11. privacy-safe family audit and restoration material must be approved;
+12. family schema, migration, and UI requirements must be approved.
 
 ## Verification requirements
 
