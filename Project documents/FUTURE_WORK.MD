@@ -208,7 +208,7 @@ The second statement becomes valid only after Chat supplies a complete execution
 ## FW-P0-02 — Historical Duplicate Review and Repair
 
 **Status:** Blocked
-**Depends on:** Completed Sprint 40 evidence and Sprint 41 bounded transaction-event ownership, plus an approved reversible financial-mutation model. Reversible financial mutation remains the controlling blocker.
+**Depends on:** Completed Sprint 40 evidence and Sprint 41 bounded transaction-event ownership, Accepted ADR-037, post-Sprint-45 revalidation, and an independently approved duplicate-repair family contract
 
 Provide safe review and correction for duplicate transactions already present in durable history.
 
@@ -222,6 +222,8 @@ Candidate outcomes include:
 - rollback or undo protection.
 
 Historical data must never be silently changed.
+
+ADR-037 acceptance would reduce the shared architecture blocker. Duplicate-repair discovery, family-specific policy and a separate ADR would still be required before implementation.
 
 **May combine with:** `FW-P1-25` and `FW-P2-12` if discovery shows that review and repair form one bounded outcome.
 
@@ -244,12 +246,14 @@ Define and enforce deterministic behaviour for:
 
 Do not claim cross-process safety until it is implemented and tested.
 
+ADR-037 requires same-process provider-scoped serialization and transaction-time stale-state checks, but does not complete this broader cross-process and external-writer candidate.
+
 ---
 
 ## FW-P0-08 — Data-Integrity Verification and Repair
 
 **Status:** Blocked
-**Depends on:** Approved repair and reversible-mutation contracts
+**Depends on:** Accepted ADR-037, post-Sprint-45 revalidation, and an independently approved data-integrity repair-family contract
 
 Provide privacy-safe verification for:
 
@@ -262,6 +266,8 @@ Provide privacy-safe verification for:
 - inconsistent completion states.
 
 Repair actions must be explicit, previewed and recoverable.
+
+After ADR-037 acceptance and lifecycle revalidation, this candidate may proceed to narrower repair-family discovery. It is not implementation-ready.
 
 ---
 
@@ -291,7 +297,7 @@ The approved durable-attempt-history increment promotes only account-decision pr
 ## FW-P0-11 — Manual Account Linking and Unlinking
 
 **Status:** Blocked  
-**Depends on:** `FW-P0-10` and an approved identifier-ownership mutation contract
+**Depends on:** `FW-P0-10`, Accepted ADR-037, and independently approved linking, unlinking and identifier-detachment semantics
 
 Allow explicit manual linking and unlinking beyond the current bounded account-choice workflow.
 
@@ -327,7 +333,7 @@ The policy must address:
 ## FW-P0-13 — Incorrect-Link Recovery and Account Split
 
 **Status:** Blocked  
-**Depends on:** `FW-P0-11` and reversible financial mutations
+**Depends on:** `FW-P0-11`, Accepted ADR-037, and independently approved split and relationship-movement rules
 
 Recover when transactions, import sessions or identifiers were attached to the wrong account.
 
@@ -364,7 +370,7 @@ Weak evidence must never establish identity automatically.
 ## FW-P0-15 — Manual Account Merge
 
 **Status:** Blocked  
-**Depends on:** `FW-P0-14`, reversible mutations and conflict-safe identifier reassignment
+**Depends on:** `FW-P0-14`, Accepted ADR-037, and independently approved survivor-identity, conflict and merge policy
 
 Provide a previewed manual merge that preserves:
 
@@ -383,25 +389,82 @@ All conflicts must be surfaced before any write.
 
 ## FW-P0-16 — Reversible Financial-Mutation Foundation
 
-**Status:** Ready for discovery  
-**Depends on:** Stable repository identity, provenance and persistence boundaries
+**Status:** Ready for planning
+**Discovery:** Complete
+**Planning state:** Ready for Chat architecture planning
+**Implementation state:** Gated
+**Selected strategy:** Strategy A — contract-first architecture
+**Schema state:** No migration authorized
+**Depends on:** Accepted ADR-037, focused post-Sprint-45 provider-lifecycle revalidation, and independent selection of a concrete mutation family before source-level contracts
 
-Define the shared architecture required for explicit, reviewable and reversible changes to trusted financial history.
+Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` with a clean worktree and no repository changes. General architecture discovery is complete. Provider-lifecycle conclusions require focused revalidation against the final Sprint 45 design.
 
-Candidate outcomes include:
+### Executive planning verdict
 
-- mutation plans that identify every affected durable record;
-- financial-impact previews before destructive action;
-- explicit user confirmation;
-- audit records describing what changed and why;
-- compensation or restoration semantics;
-- provider parity between In-Memory and SQLite implementations;
-- canonical runtime reconciliation after successful mutation;
-- failure behaviour that never leaves silently half-applied financial changes.
+- GO for architecture planning.
+- NO-GO for financial-mutation implementation.
+- Strategy A is selected: architecture and domain contracts first.
+- No executable mutation is authorized.
+- No generic audit ledger is authorized.
+- No schema migration is authorized.
+- No source-level placeholder protocol is required merely to record the architecture.
 
-This foundation must not itself authorize any particular merge, split, deletion, reversal or repair workflow.
+### Approved shared architecture direction
 
-Those product operations remain governed by their own candidates.
+1. authoritative repository snapshot;
+2. immutable deterministic typed mutation plan;
+3. read-only review;
+4. single-use authorization bound to plan digest, scoped precondition token and provider generation;
+5. transaction-time authoritative revalidation;
+6. one provider-owned atomic execution boundary;
+7. family writes and successful audit committed together;
+8. one forced canonical `RepositoryStoreHydrator` reconciliation;
+9. reversal as a new family-specific authorized mutation, compensation, or explicit irreversibility.
+
+The shared foundation owns lifecycle, plan envelope, determinism, digest and precondition binding, provider-generation binding, authorization lifecycle, the atomic-execution requirement, successful-audit atomicity, reconciliation outcomes, privacy boundaries, provider parity and reversal classification.
+
+Each concrete mutation family still owns affected records, financial meaning, conflict policy, write set, exact impact, audit payload, inverse or compensation, schema, UI and family-specific tests. The shared architecture does not authorize any family.
+
+### Mandatory implementation prerequisites
+
+1. ADR-037 must be Accepted.
+2. Sprint 45 must be complete or its final provider-lifecycle design known.
+3. Provider generation, quiescence, replacement, reset/restore invalidation and hydration ownership must be revalidated.
+4. A concrete mutation family must be independently selected.
+5. The family must define exact affected records and conflict scope.
+6. Exact native-currency impact must be computable.
+7. Family writes and successful audit must share one provider transaction.
+8. SQLite and In-Memory parity must be provable.
+9. Family-specific reversal, compensation or irreversibility must be explicit.
+10. Privacy-safe audit and restoration material must be approved.
+11. Family migration and UI contracts must be independently approved.
+
+### Stop conditions
+
+> No financial mutation may become executable unless one provider-owned transaction can revalidate the exact reviewed plan, apply every family-specific write, atomically record successful audit evidence, return provider-equivalent outcomes, and support a proven family-specific inverse, compensation contract, or explicit irreversibility.
+
+> If affected records, exact impact, precondition scope, identity provenance, provider generation, privacy-safe audit evidence, or canonical reconciliation cannot be proven, the operation remains non-executable. Best-effort financial mutation is prohibited.
+
+### Explicit exclusions
+
+`FW-P0-16` does not implement or authorize:
+
+- account merge or split;
+- identifier detachment or reassignment;
+- transaction deletion or movement;
+- import-session reversal;
+- duplicate or historical repair;
+- bulk transaction mutation;
+- generic or backup-based undo;
+- mutation UI;
+- a generic mutation ledger or arbitrary JSON audit;
+- persistent mutation diagnostics;
+- a migration;
+- an executable repository protocol.
+
+### Sprint 45 relationship
+
+Sprint 45 may provide reusable provider generation, quiescence, provider replacement, backup, migration recreation and forced-hydration infrastructure. That infrastructure remains outside financial-mutation semantics. Database reset or restore invalidates outstanding plans and authorizations; backup and restore are not record-level reversal. Focused post-Sprint-45 revalidation is required before ADR-037 can be Accepted or source-level contracts planned.
 
 ---
 
@@ -896,9 +959,11 @@ Retain future work for duplicate override, partial import, broader duplicate man
 ## FW-P1-27 — Delete or Reverse an Import Session
 
 **Status:** Blocked  
-**Depends on:** Reversible financial mutations and impact preview
+**Depends on:** Accepted ADR-037, post-Sprint-45 revalidation, and an independently approved import-session reversal family contract and impact preview
 
 Safely reverse one import without damaging unrelated account history.
+
+ADR-037 acceptance may make this candidate eligible for separate discovery. It does not authorize reversal implementation.
 
 ---
 
@@ -1155,7 +1220,7 @@ Expand future global Transactions filters for institution, account, bank/card fa
 ## FW-P2-06 — Bulk Transaction Actions
 
 **Status:** Blocked  
-**Depends on:** `FW-P2-05` and reversible mutation support
+**Depends on:** `FW-P2-05`, Accepted ADR-037, and an independently approved contract for each concrete bulk-action family
 
 Potential actions include notes, categories, rules and safe deletion or exclusion.
 
@@ -1164,14 +1229,14 @@ Potential actions include notes, categories, rules and safe deletion or exclusio
 ## FW-P2-07 — Delete Transactions by Import Session
 
 **Status:** Blocked  
-**Depends on:** Safe import-session reversal
+**Depends on:** Approved `FW-P1-27` import-session reversal
 
 ---
 
 ## FW-P2-08 — Undo Support
 
 **Status:** Research  
-**Depends on:** Reversible repository history
+**Depends on:** Family-specific reversible repository history; ADR-037 rejects universal application undo
 
 ---
 
@@ -2275,7 +2340,7 @@ Items in this section are not implementation candidates until promoted into a pr
 
 ## Persistence Research
 
-- long-term mutation-history compaction and archival after `FW-P0-16`.
+- long-term mutation-history compaction and archival after `FW-P0-16` and a concrete durable mutation history exist; compaction cannot precede family-specific retention, privacy and reversibility policy.
 
 ## Financial Intelligence Research
 

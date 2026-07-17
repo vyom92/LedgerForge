@@ -2969,3 +2969,996 @@ After verified implementation:
 - update `PROJECT_STATE.md` only with verified results.
 
 This ADR must be marked **Accepted** before category implementation begins.
+
+---
+
+# ADR-037 — Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal
+
+## Status
+
+Proposed
+
+## Date
+
+2026-07-17
+
+## Decision Owners
+
+LedgerForge architecture
+
+## Related Work
+
+- `FW-P0-16 — Reversible Financial-Mutation Foundation`
+
+## Extends
+
+- ADR-013 — Store Ownership
+- ADR-024 — Repository Hydration Boundary
+- ADR-025 — Stable Financial Entity Identity
+- ADR-027 — Parser-Owned Financial Identifier Extraction
+- ADR-029 — User-Confirmed Financial Identifier Attachment
+- ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit
+- ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking
+- ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics
+- ADR-033 — Deterministic Money and Native-Currency Integrity
+
+## Supersedes
+
+None
+
+## Context
+
+LedgerForge persists trusted financial history through repository-owned storage.
+
+Current production mutations include:
+
+- workspace creation;
+- account creation;
+- verified identifier attachment;
+- successful import-session persistence;
+- trusted transaction insertion;
+- exact-statement fingerprint registration;
+- transaction-event identity claims;
+- import-attempt recording;
+- account display-name updates.
+
+The current architecture provides narrow atomicity for successful import history. It does not provide a general-purpose financial-mutation transaction.
+
+During a confirmed import, workspace, account, institution, and identifier writes may occur before the atomic import-history transaction begins. Those earlier side effects may survive a later import-history failure.
+
+Existing repository protocols also expose partial mutation capabilities such as workspace upsert, account upsert, identifier attachment, session creation and update, attempt recording, and transaction replacement.
+
+These APIs are not a safe cross-domain correction or reversal mechanism.
+
+LedgerForge currently has no approved architecture for:
+
+- correcting trusted financial history;
+- reversing a completed import;
+- moving transactions between accounts;
+- detaching or reassigning financial identifiers;
+- merging or splitting accounts;
+- deleting trusted transactions;
+- repairing historical duplicate decisions;
+- undoing completed financial mutations;
+- recording mutation-specific successful audit evidence;
+- proving that a completed mutation can be reversed or compensated.
+
+Ordinary database transaction rollback protects against failure before commit. It does not reverse a completed mutation.
+
+Database backup and restore may recover an entire database lifecycle failure. They do not provide record-level authorization, review, audit, or selective reversal.
+
+`FW-P0-16` exists to establish the shared architecture required by future mutation families.
+
+This ADR defines that shared architecture.
+
+It does not authorize any concrete financial mutation.
+
+## Decision drivers
+
+The architecture must:
+
+- preserve immutable financial identity;
+- preserve parser-owned identifier provenance;
+- preserve source-document and import-session provenance;
+- preserve exact-statement fingerprint authority;
+- preserve transaction-event identity authority;
+- preserve exact `Money` and native-currency integrity;
+- derive plans from authoritative repository state;
+- make review read-only;
+- reject stale plans;
+- bind authorization to the exact reviewed plan;
+- execute all family-specific writes atomically;
+- commit successful audit evidence with financial writes;
+- preserve SQLite and In-Memory provider parity;
+- reconcile runtime state only through `RepositoryStoreHydrator`;
+- distinguish rollback, reversal, compensation, and backup restoration;
+- avoid claiming universal undo;
+- avoid creating a speculative generic mutation schema;
+- keep every concrete operation family independently governed.
+
+## Decision
+
+LedgerForge will adopt an eight-stage financial-mutation lifecycle:
+
+```text
+authoritative snapshot
+    ↓
+deterministic mutation plan
+    ↓
+read-only review
+    ↓
+single-use authorization
+    ↓
+transaction-time revalidation
+    ↓
+provider-owned atomic execution and successful audit
+    ↓
+canonical runtime reconciliation
+    ↓
+family-specific reversal, compensation, or explicit irreversibility
+```
+
+The shared architecture defines the lifecycle and generic envelope.
+
+Each concrete mutation family owns its financial meaning, affected-record rules, conflict policy, write set, audit requirements, and reversal or compensation semantics.
+
+### 1. Architecture-only initial strategy
+
+`FW-P0-16` will initially establish architecture contracts only.
+
+The initial increment will not introduce:
+
+- an executable financial mutation;
+- a generic mutation repository implementation;
+- a mutation database table;
+- a generic audit ledger;
+- a schema migration;
+- mutation UI;
+- account merge;
+- account split;
+- import reversal;
+- transaction deletion;
+- identifier detachment;
+- historical repair;
+- application-wide undo.
+
+Source-level protocols and persistence schemas must wait until one independently approved mutation family provides concrete requirements.
+
+### 2. Generic lifecycle versus family ownership
+
+The shared financial-mutation architecture owns:
+
+- lifecycle states;
+- immutable plan-envelope requirements;
+- deterministic encoding;
+- plan-digest binding;
+- scoped-precondition binding;
+- provider-generation binding;
+- review and authorization separation;
+- single-use authorization;
+- provider-owned atomic execution;
+- successful-audit atomicity;
+- runtime-reconciliation outcomes;
+- privacy boundaries;
+- provider-parity requirements;
+- reversal classification.
+
+A concrete mutation family owns:
+
+- eligible source records;
+- affected durable record types;
+- before and after relationships;
+- financial-impact calculation;
+- identifier impact;
+- import-session impact;
+- transaction impact;
+- conflicts;
+- warnings;
+- validation;
+- durable writes;
+- successful audit payload;
+- inverse operation;
+- compensation behavior;
+- irreversibility conditions;
+- family-specific UI;
+- family-specific migration requirements.
+
+The generic layer must not infer family behavior.
+
+### 3. Authoritative planning state
+
+Mutation planning must read authoritative durable state through a dedicated repository boundary.
+
+Planning must not use runtime stores as mutation authority.
+
+Runtime stores may support presentation, but a mutation plan must be generated from repository state.
+
+The planning read must include every record and query set relevant to the family, including records whose later insertion could create a conflict.
+
+A plan generated from incomplete authoritative scope is not executable.
+
+### 4. Immutable deterministic plan
+
+Every proposed mutation must be represented by an immutable typed plan.
+
+The minimum generic plan envelope must contain:
+
+- opaque plan identity;
+- closed operation-family code;
+- operation-family version;
+- planning-algorithm version;
+- bounded reason code;
+- actor classification;
+- provider generation;
+- scoped precondition token;
+- deterministically ordered affected durable-record identities;
+- typed before relationships;
+- typed proposed after relationships;
+- exact financial impact grouped by native currency;
+- identifier-impact summary;
+- import and provenance-impact summary;
+- transaction-impact summary;
+- expected runtime-store impact;
+- typed preconditions;
+- typed blocking conflicts;
+- typed non-blocking warnings;
+- reversibility classification;
+- canonical plan digest.
+
+The plan must be:
+
+- immutable;
+- equatable;
+- sendable where applicable;
+- canonically encodable;
+- independent of dictionary iteration;
+- independent of repository query ordering;
+- independent of locale;
+- independent of display-name changes;
+- independent of filenames;
+- independent of presentation-only runtime identity.
+
+The plan digest must bind every execution-relevant field.
+
+A digest is a staleness and authorization mechanism. It is not financial-identity evidence.
+
+### 5. Durable record identities
+
+Affected records must be addressed only through durable repository identities.
+
+The architecture must not establish or infer identity using:
+
+- display name;
+- filename;
+- institution label;
+- masked account number;
+- last four digits;
+- suffix;
+- narration;
+- amount;
+- transaction date;
+- transaction similarity;
+- runtime presentation UUID;
+- other weak evidence.
+
+Repository account identity remains immutable.
+
+Parser-produced verified financial identifiers remain parser-owned evidence.
+
+Transaction-event identity, exact-statement fingerprints, import sessions, import attempts, and source-document relationships remain distinct authorities.
+
+The generic mutation envelope must not collapse these concepts into one generic history ID.
+
+### 6. Exact financial impact
+
+Every mutation family affecting financial records must calculate impact using exact `Money`.
+
+Financial impact must be:
+
+- grouped by canonical native currency;
+- deterministically ordered;
+- scale-consistent;
+- free from binary floating-point reconstruction;
+- explicit when no financial-value change occurs.
+
+Cross-currency totals must not be silently combined.
+
+A plan requiring unsupported currency conversion remains non-executable until a separately approved reporting-currency or FX architecture exists.
+
+Unknown financial impact is a blocking condition.
+
+### 7. Read-only preview
+
+Mutation review is read-only.
+
+Preview generation must not:
+
+- modify durable records;
+- reserve identities;
+- reserve fingerprints;
+- reserve transaction-event claims;
+- create audit rows;
+- change runtime stores;
+- create an executable mutation merely by displaying it.
+
+The preview must present:
+
+- affected record types and counts;
+- relevant before and proposed after relationships;
+- exact native-currency impact;
+- provenance impact;
+- identifier impact;
+- blocking conflicts;
+- warnings;
+- reversibility or compensation classification;
+- unsupported or unknown effects.
+
+Unknown or unsupported execution-critical impact blocks authorization.
+
+### 8. Authorization
+
+Planning, reviewing, authorizing, and executing are distinct states.
+
+The minimum lifecycle is:
+
+```text
+planned
+    ↓
+reviewed
+    ↓
+confirmed
+    ↓
+executing
+    ↓
+committed
+```
+
+Alternative terminal states include:
+
+- withdrawn;
+- stale;
+- conflicted;
+- rejected;
+- failed;
+- committed but unreconciled.
+
+Confirmation produces a single-use typed authorization.
+
+Authorization must bind:
+
+- plan identity;
+- exact plan digest;
+- provider generation;
+- scoped precondition token;
+- operation-family code and version;
+- confirming actor classification;
+- confirmation time.
+
+Authorization must not be reusable.
+
+Authorization must not execute another plan.
+
+Authorization must not survive provider replacement.
+
+Authorization must not bypass transaction-time revalidation.
+
+Withdrawing authorization prevents future execution but does not reverse a committed mutation.
+
+### 9. Scoped precondition token
+
+Every plan must include a versioned scoped precondition token.
+
+The token must represent all authoritative state relevant to execution, including:
+
+- expected record existence;
+- expected record ownership;
+- expected relationships;
+- expected family-specific state;
+- relevant conflict-query membership;
+- relevant uniqueness claims;
+- relevant identifier ownership;
+- relevant fingerprint or transaction-event relationships;
+- expected native currencies;
+- expected provider generation.
+
+The token may use a canonical snapshot digest.
+
+The initial architecture does not require a global database revision column.
+
+Execution must re-read the same authoritative scope inside the durable transaction and recompute the token.
+
+A relevant inserted, deleted, or changed record must make the plan stale or conflicted.
+
+### 10. Provider generation
+
+Every mutation plan and authorization must be bound to the installed provider generation.
+
+Provider replacement, database reset, database restore, or another lifecycle transition must invalidate all outstanding plans and authorizations from the previous generation.
+
+The exact provider-generation mechanism must be revalidated after Sprint 45.
+
+No mutation may execute when:
+
+- provider generation is unknown;
+- provider identity changed;
+- repositories belong to another provider generation;
+- lifecycle quiescence is incomplete;
+- the mutation coordinator holds stale repository references.
+
+### 11. Provider-owned execution boundary
+
+A future executable implementation must introduce one provider-owned financial-mutation boundary.
+
+The exact Swift protocol and method names remain implementation decisions.
+
+The boundary must own:
+
+- authoritative mutation snapshots;
+- transaction-time precondition revalidation;
+- conflict recalculation;
+- financial-impact recalculation;
+- family-specific writes;
+- successful audit insertion;
+- affected-record verification;
+- commit or rollback.
+
+The UI, view models, runtime stores, and mutation coordinator must not coordinate several existing repository APIs to simulate one mutation transaction.
+
+### 12. Atomic execution
+
+For SQLite, execution must occur in one provider-owned database transaction.
+
+The required logical sequence is:
+
+1. acquire provider-scoped serialization;
+2. begin an immediate write transaction or approved equivalent;
+3. verify provider generation;
+4. re-read authoritative scoped state;
+5. recompute the precondition token;
+6. recompute conflicts;
+7. recompute exact impact;
+8. verify reversal or compensation eligibility;
+9. reject stale or changed plans before writes;
+10. apply the complete family-specific write set;
+11. insert successful audit evidence;
+12. verify affected-record counts and constraints;
+13. commit.
+
+Any failure before commit must roll back all family writes, successful audit evidence, and mutation-state changes.
+
+For the In-Memory provider, equivalent behavior requires:
+
+1. one mutation-state lock;
+2. copying every affected collection;
+3. identical revalidation;
+4. identical conflict calculation;
+5. identical writes to the copies;
+6. identical successful-audit creation;
+7. publishing all copies together.
+
+SQLite and In-Memory must return equivalent observable outcomes.
+
+### 13. Successful audit atomicity
+
+A successful financial mutation must not commit without successful audit evidence.
+
+The audit and family-specific writes must commit in the same provider-owned transaction.
+
+The minimum successful audit evidence must include:
+
+- mutation identity;
+- operation-family code and version;
+- planning-algorithm version;
+- committed time;
+- bounded reason code;
+- bounded actor classification;
+- confirmed plan digest;
+- precondition-token version;
+- deterministically ordered affected record types and durable IDs;
+- typed before and after relationship summaries;
+- exact native-currency impact;
+- identifier, import, and transaction-impact summaries;
+- reversal or compensation classification;
+- original mutation reference when applicable;
+- schema or payload version needed to interpret the record;
+- successful outcome classification.
+
+A committed financial mutation without its required successful audit is prohibited.
+
+### 14. Audit privacy
+
+Generic audit evidence must not contain:
+
+- passwords;
+- credentials;
+- raw financial identifier values;
+- unrestricted source-document content;
+- source fragments;
+- unrestricted transaction narration;
+- unrestricted payee or reference text;
+- filenames;
+- filesystem paths;
+- raw exact-statement fingerprints;
+- raw transaction-event digests;
+- unrestricted database rows;
+- arbitrary serialized domain objects;
+- arbitrary JSON payloads;
+- unrestricted localized errors.
+
+A concrete family may request additional restoration material only through its own approved ADR and privacy review.
+
+The generic architecture must not presume that an audit row can recreate a deleted record.
+
+### 15. Failure attempts
+
+A failed execution attempt is not a successful mutation audit.
+
+A family may record a bounded failure attempt separately when infrastructure permits.
+
+Failure-attempt recording must not:
+
+- convert failure into success;
+- prevent rollback;
+- expose prohibited sensitive values;
+- become a substitute for successful-audit atomicity.
+
+If the database is unavailable, recording the failed attempt may itself be impossible.
+
+The original mutation failure remains authoritative.
+
+### 16. Rollback, reversal, compensation, and restoration
+
+The architecture distinguishes four concepts.
+
+#### Rollback before commit
+
+A provider transaction fails before commit.
+
+No completed mutation exists.
+
+All family writes and successful audit evidence are rolled back.
+
+#### Reversal after commit
+
+A reversal is a new mutation.
+
+It must:
+
+- have its own plan;
+- have its own review;
+- have its own authorization;
+- revalidate current state;
+- reference the original mutation;
+- use family-specific inverse semantics;
+- create its own successful audit.
+
+The original mutation remains part of history.
+
+#### Compensation
+
+Compensation creates a new provenance-bearing effect that offsets a prior result without pretending the original result never occurred.
+
+Compensation semantics are family-specific.
+
+#### Database restoration
+
+Database backup restore is a database-lifecycle recovery operation.
+
+It is not selective financial reversal, mutation preview, record-level audit, authorization, or family-specific compensation.
+
+### 17. No universal undo
+
+LedgerForge will not provide generic application-wide undo for trusted financial mutations through this foundation.
+
+Each mutation family must classify itself as:
+
+- reversible;
+- compensatable;
+- irreversible;
+- unsupported.
+
+A reversible family must prove:
+
+- what is restored;
+- what remains preserved;
+- what new audit evidence is created;
+- which later changes can block reversal;
+- how conflicts are reported;
+- how the original mutation remains represented.
+
+A family that cannot prove its inverse must not be labelled reversible.
+
+### 18. Family-specific execution requirement
+
+No operation family may become executable based only on this ADR.
+
+Before implementation, each family requires an independently approved decision defining:
+
+- operation meaning;
+- eligible records;
+- affected-record discovery;
+- conflict policy;
+- impact calculation;
+- immutable records;
+- permitted new records;
+- exact durable write set;
+- successful audit payload;
+- reversal or compensation behavior;
+- privacy requirements;
+- schema requirements;
+- hydration impact;
+- UI and confirmation behavior;
+- provider-parity tests;
+- migration and rollback tests.
+
+Examples include account merge, account split, identifier detachment, import-session reversal, transaction deletion, duplicate repair, and historical correction.
+
+### 19. Runtime reconciliation
+
+After a durable mutation commits, LedgerForge must perform one forced canonical reconciliation through `RepositoryStoreHydrator`.
+
+The acceptable sequence is:
+
+```text
+provider-owned durable commit
+    ↓
+forced RepositoryStoreHydrator reconciliation
+    ↓
+canonical runtime stores
+    ↓
+view models
+    ↓
+views
+```
+
+Runtime stores must not be manually patched to simulate mutation completion.
+
+The repository and successful audit prove durable completion.
+
+Required generic results include:
+
+- committed and reconciled;
+- committed but reconciliation failed;
+- not committed;
+- stale;
+- conflicted;
+- provider mismatch;
+- unauthorized;
+- unsupported.
+
+### 20. Reconciliation failure after commit
+
+Hydration failure after a durable commit must not be reported as an uncommitted mutation.
+
+The system must report:
+
+- the mutation committed;
+- runtime reconciliation failed;
+- the durable mutation identity;
+- a bounded recovery action.
+
+The system must:
+
+- prevent stale runtime state from authorizing another mutation;
+- retry canonical hydration;
+- avoid manually editing stores;
+- preserve the committed mutation and successful audit.
+
+Automatic financial rollback solely because runtime hydration failed is prohibited.
+
+### 21. Provider parity
+
+A future executable mutation boundary must provide equivalent SQLite and In-Memory behavior for:
+
+- canonical plan contents;
+- affected-record ordering;
+- precondition tokens;
+- provider-generation checks;
+- conflict sets;
+- warning sets;
+- exact impact summaries;
+- stale-plan outcomes;
+- authorization outcomes;
+- execution results;
+- audit results;
+- reversal eligibility;
+- failure classifications;
+- atomic failure residue.
+
+Provider-specific implementation errors must map into shared domain-level outcomes.
+
+### 22. Concurrency boundary
+
+The minimum architecture requires:
+
+- same-process provider-scoped serialization;
+- provider-generation validation;
+- transaction-time scoped-state revalidation;
+- database constraints as final integrity guards;
+- deterministic stale and conflict outcomes.
+
+This ADR does not claim to solve:
+
+- all existing writes from multiple application processes;
+- arbitrary external SQLite writers;
+- malicious file modification;
+- lock-bypassing code;
+- global serialization across every legacy write path.
+
+A concrete family must stop if its correctness depends on guarantees beyond the implemented concurrency boundary.
+
+### 23. Source truth and provenance preservation
+
+A generic mutation must not rewrite immutable imported source truth merely to simplify reversal.
+
+Normally preserved records include:
+
+- repository account identity;
+- parser-produced identifier provenance;
+- imported documents;
+- exact fingerprints;
+- successful import sessions;
+- import attempts;
+- transaction-event identity claims;
+- trusted transaction/source relationships.
+
+A family may introduce typed relationship history, tombstones, supersession records, exclusion records, compensating entries, or other immutable history only through family-specific approval.
+
+### 24. Planning and execution errors
+
+The shared architecture must distinguish typed failures such as:
+
+- unsupported family;
+- planning-read failure;
+- incomplete affected-record scope;
+- unknown impact;
+- invalid native-currency impact;
+- blocking conflict;
+- stale plan;
+- provider mismatch;
+- authorization withdrawn;
+- authorization already consumed;
+- plan-digest mismatch;
+- precondition-token mismatch;
+- family validation failure;
+- family write failure;
+- successful-audit failure;
+- commit failure;
+- committed reconciliation failure;
+- reversal unavailable;
+- compensation unavailable.
+
+Raw SQLite errors and unrestricted localized messages must not become the public mutation contract.
+
+### 25. Determinism
+
+For the same authoritative state and request, both providers must produce the same canonical plan.
+
+Plan contents must not vary because of:
+
+- dictionary order;
+- repository query order;
+- locale;
+- timezone formatting;
+- display-name ordering;
+- filenames;
+- view sort order;
+- transient runtime UUIDs;
+- diagnostic timestamps;
+- memory addresses.
+
+Affected records, conflicts, warnings, and currency impacts must be deterministically ordered.
+
+### 26. Schema strategy
+
+This ADR adopts a contract-first schema strategy.
+
+No generic financial-mutation schema is introduced by `FW-P0-16`.
+
+No generic audit ledger is introduced.
+
+No migration is required for the architecture-only foundation.
+
+A later operation family may require a migration after proving:
+
+- exact audit fields;
+- inverse or compensation material;
+- privacy-safe payload;
+- retention requirements;
+- query requirements;
+- hydration requirements;
+- provider parity;
+- migration safety.
+
+A generic arbitrary JSON mutation payload is rejected.
+
+### 27. UI boundary
+
+This ADR does not approve a generic mutation UI.
+
+Every mutation family must define its own review and confirmation surface.
+
+No financial mutation may execute directly from a context menu, table action, or developer tool without the family’s approved review and authorization contract.
+
+### 28. Diagnostics
+
+Financial-mutation diagnostics remain governed by ADR-026.
+
+Diagnostics must remain structured, deterministic, bounded, privacy-safe, and in memory unless another ADR explicitly permits persistence.
+
+Generic diagnostics may contain family code, lifecycle state, result classification, provider-generation classification, affected-record counts, conflict counts, and approved bounded impact summaries.
+
+Diagnostics must not contain prohibited audit or source values.
+
+### 29. Development database lifecycle relationship
+
+Sprint 45 may introduce reusable low-level infrastructure for:
+
+- provider quiescence;
+- provider generation;
+- provider replacement;
+- migration recreation;
+- verified backup;
+- forced hydration.
+
+That infrastructure remains outside the financial-mutation contract.
+
+Provider reset or restore must invalidate all outstanding mutation plans and authorizations.
+
+Database backup must not become the reversal implementation for a financial mutation.
+
+### 30. Implementation stop conditions
+
+No financial mutation may become executable when any of the following is true:
+
+- affected durable records cannot be enumerated deterministically;
+- before and after relationships are incomplete;
+- exact financial impact is unknown;
+- native-currency effects cannot be represented safely;
+- relevant state changes cannot invalidate the plan;
+- provider generation cannot be verified;
+- transaction-time revalidation cannot occur;
+- family writes and successful audit cannot share one provider transaction;
+- SQLite and In-Memory outcomes cannot be made equivalent;
+- reversal or compensation semantics are undefined;
+- required restoration material would violate privacy;
+- immutable identity or provenance would need to be rewritten;
+- canonical hydration cannot reconstruct runtime state;
+- the family depends on unsupported concurrency guarantees.
+
+At any stop condition, the operation remains non-executable.
+
+Best-effort financial mutation is prohibited.
+
+## Consequences
+
+### Positive consequences
+
+- Mutation planning is separated from execution.
+- User review is bound to the exact executable plan.
+- Stale previews cannot silently execute.
+- Cross-domain writes cannot be coordinated through UI or partial repositories.
+- Successful financial changes cannot commit without successful audit evidence.
+- Runtime state remains subordinate to durable repository state.
+- Reversal is explicit and family-specific.
+- Compensation and irreversibility remain honest outcomes.
+- Exact native-currency impact is preserved.
+- Weak identity evidence remains excluded.
+- Future mutation families can share one lifecycle without sharing incorrect semantics.
+- No speculative mutation schema is introduced.
+
+### Negative consequences
+
+- No financial mutation becomes immediately executable.
+- Every family still requires its own discovery and ADR.
+- Plan and authorization models require substantial deterministic testing.
+- Provider generation and transaction-time stale checks become mandatory.
+- SQLite and In-Memory parity requirements become stricter.
+- Successful audit must participate in the same durable transaction.
+- Hydration failure after commit requires a distinct recovery state.
+- Generic undo remains unavailable.
+- A later concrete family is still required to prove completed reversal end to end.
+
+## Rejected alternatives
+
+Reject:
+
+- using existing partial repository APIs as a mutation coordinator;
+- treating ordinary rollback as completed reversal;
+- treating database restore as selective undo;
+- adding a generic mutation ledger immediately;
+- storing arbitrary JSON before/after snapshots;
+- pairing the foundation with an arbitrary demonstration operation;
+- allowing a coordinator to call multiple repositories to simulate atomicity;
+- using runtime stores as mutation authority;
+- implementing universal undo;
+- requiring a global revision counter before concrete evidence requires it.
+
+## Non-goals
+
+This ADR does not authorize:
+
+- account merge;
+- account split;
+- account deletion;
+- identifier detachment;
+- identifier reassignment;
+- transaction deletion;
+- transaction movement;
+- import-session deletion;
+- import-session reversal;
+- duplicate repair;
+- historical correction;
+- bulk transaction actions;
+- application-wide undo;
+- persistent mutation diagnostics;
+- cloud synchronization;
+- backup-based financial undo;
+- automatic repair;
+- AI-selected financial mutation;
+- Developer Console mutation execution;
+- a generic mutation schema;
+- a schema migration.
+
+## Implementation prerequisites
+
+Before source-level mutation contracts or an operation family are implemented:
+
+1. this ADR must be Accepted;
+2. Sprint 45 provider-lifecycle changes must be known;
+3. provider generation and quiescence must be revalidated;
+4. provider replacement must invalidate old plans and authorizations;
+5. a concrete mutation family must be selected independently;
+6. that family must define affected records, conflicts, write set, audit, and inverse or compensation;
+7. SQLite and In-Memory parity must be demonstrable;
+8. exact Money impact must be defined;
+9. privacy-safe audit evidence must be defined;
+10. family schema and migration requirements must be approved;
+11. family UI review and authorization behavior must be approved.
+
+## Verification requirements
+
+A future implementation must verify at minimum:
+
+- identical plans under SQLite and In-Memory;
+- canonical encoding and stable digest;
+- deterministic affected-record ordering;
+- relevant changes and inserted conflicts invalidate plans;
+- provider replacement invalidates plans;
+- withdrawn and consumed authorizations cannot execute;
+- authorization cannot execute another digest;
+- transaction-time precondition revalidation;
+- write failures roll back family writes and successful audit;
+- successful-audit failure rolls back family writes;
+- write and successful audit cannot commit separately;
+- irreversible families cannot claim reversal;
+- reversal is a new linked mutation;
+- reversal failure preserves the original mutation;
+- exact native-currency impact;
+- cross-currency aggregation rejection;
+- immutable account identity;
+- parser-owned identifier provenance;
+- fingerprint and event-identity preservation;
+- import-session and attempt provenance;
+- committed reconciliation failure remains distinct from non-commit;
+- deterministic hydration retry;
+- stale runtime state cannot authorize another mutation;
+- provider-equivalent typed failures and failure injection;
+- privacy checks for plans, audits, diagnostics, and errors;
+- same-process serialization;
+- bounded two-connection SQLite stale-state testing without claiming complete external-writer safety.
+
+## Documentation impact
+
+After this architecture decision is accepted:
+
+- update `FW-P0-16` to record discovery complete and planning approved;
+- record Strategy A as contract-first;
+- record that no migration or executable mutation is authorized;
+- record post-Sprint-45 provider-lifecycle revalidation;
+- retain every concrete mutation family as separate work;
+- use the current import-session reversal candidate ID, `FW-P1-27`;
+- do not mark downstream mutation candidates implementation-ready;
+- update `PROJECT_STATE.md` only after a verified implementation increment.
+
+This ADR must be marked **Accepted** before source-level financial-mutation contracts or an executable mutation family are implemented.
