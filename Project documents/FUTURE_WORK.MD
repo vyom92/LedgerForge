@@ -1224,18 +1224,94 @@ Retain future work for speculative duplicate-transaction candidates, unsupported
 
 ## FW-P2-20 — Category Model and Management
 
-**Status:** Ready for discovery  
-**Depends on:** Stable transaction model
+**Status:** Candidate
+**Discovery:** Complete
+**Planning state:** Ready for Chat planning
+**Implementation state:** Gated
+**Depends on:** Stable transaction model, Accepted ADR-036, known post-Sprint-45 repository state and approved category UI behavior
 
-Define:
+Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` with a clean worktree and no implementation. Provider, migration and hydration assumptions require targeted revalidation after Sprint 45.
 
-- category identity;
-- hierarchy;
-- user-created categories;
-- uncategorized state;
-- deletion and reassignment behaviour.
+### Planning direction
 
-This must precede automatic categorization.
+- workspace-owned durable categories;
+- a separate current transaction-category assignment relationship;
+- Uncategorized represented by no assignment;
+- one current category per transaction;
+- user-created categories only;
+- root categories plus one child level;
+- deterministic alphabetical ordering by normalized name and immutable category ID;
+- manual single-transaction assignment, change and clearing;
+- archival for assigned categories;
+- hard deletion only for unused, childless categories;
+- durable repository transaction identity exposed during hydration;
+- a dedicated category repository with SQLite and In-Memory parity;
+- a dedicated category store;
+- repository mutation followed by canonical `RepositoryStoreHydrator` refresh;
+- an additive migration after the then-current migration version.
+
+### Implementation prerequisites
+
+1. ADR-036 must be Accepted.
+2. Sprint 45 must be complete or its final repository state must be known.
+3. Provider installation, migration registration and hydration ownership must be revalidated against the post-Sprint-45 HEAD.
+4. Hydrated transactions must expose stable persisted repository transaction identity.
+5. The category UI behavior supplement must be approved.
+6. SQLite and In-Memory provider parity must be demonstrable.
+7. The migration number must be selected from the then-current migration chain.
+
+### Stop condition
+
+> Never implement category assignment using the regenerated runtime `Transaction.id`. Stop unless the immutable persisted transaction ID survives forced hydration, provider reconstruction, and relaunch.
+
+### Bounded first implementation scope
+
+- category domain;
+- durable transaction identity exposure;
+- category and assignment persistence;
+- category repository;
+- SQLite/In-Memory parity;
+- category store;
+- category-management coordinator;
+- canonical hydration;
+- Settings category management;
+- transaction category display;
+- transaction-detail assign, change and clear;
+- archive and restore;
+- delete-unused only;
+- two-level hierarchy;
+- deterministic ordering.
+
+### Explicit exclusions
+
+The first increment excludes:
+
+- automatic categorization;
+- deterministic categorization rules;
+- AI categorization;
+- merchant or payee normalization;
+- recurring detection;
+- analytics;
+- budgets;
+- multiple categories;
+- tags;
+- transaction splits;
+- category filtering;
+- custom ordering;
+- bulk assignment;
+- bulk reassignment;
+- delete-with-replacement;
+- category merge;
+- assignment history;
+- global undo.
+
+### Mutation boundary and downstream effects
+
+Individual category CRUD and single-transaction assignment are targeted metadata mutations. They do not depend on the complete `FW-P0-16` reversible financial-mutation foundation. Bulk reassignment, merge, delete-with-replacement and multi-operation undo remain dependent on `FW-P0-16` or an equivalent separately approved reversible metadata-mutation contract.
+
+`FW-P2-21` does not become implementation-ready from discovery alone. After `FW-P2-20` is implemented and verified, `FW-P2-21` becomes eligible for its own discovery. `FW-P2-22` through `FW-P2-29` retain their existing dependencies. Spending analytics, budgets and Transaction Notes remain independently gated future work.
+
+This work must precede automatic categorization.
 
 ---
 
