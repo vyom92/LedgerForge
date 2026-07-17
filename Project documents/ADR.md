@@ -2175,3 +2175,105 @@ ADR-034 does not implement card evidence models, parsers, persistence, migration
 - ADR-025 — Stable Financial Entity Identity
 - ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking
 - ADR-033 — Deterministic Money and Native-Currency Integrity
+
+---
+
+# ADR-035 — Development Database Lifecycle and Recoverable Reset
+
+## Status
+
+Accepted
+
+## Date
+
+2026-07-17
+
+## Related Work
+
+- BUG-P1-01 — Development Database Reset Does Not Persist Across Relaunch
+- Sprint 45
+
+## Context
+
+The existing Developer Console reset installs a UUID-named temporary SQLite provider while leaving the canonical database intact. Runtime hydration therefore appears empty only for the current process, and the next launch reconnects to the unchanged canonical data. The operation also lacks one owner for database identity, provider quiescence, SQLite sidecars, recoverable backup, provider publication, hydration and failure recovery.
+
+Debug and Release previously resolved the same canonical filename. Runtime hiding alone cannot prove that a destructive development action is unable to affect non-development data. Replacing `DatabaseProvider.shared` also cannot invalidate repository objects already captured by an active import, hydration or repository operation.
+
+## Decision
+
+### Dedicated lifecycle ownership
+
+One dedicated `DevelopmentDatabaseLifecycleCoordinator` owns the development database lifecycle. It owns canonical and temporary development database identities, lifecycle-owned backup identity, lifecycle-operation serialization, active-operation exclusion, provider quiescence, SQLite checkpoint and checked close, backup creation and verification, canonical database-set replacement, provider recreation and publication, canonical hydration, automatic recovery and lifecycle-unavailable state.
+
+`LedgerForgeApp` may bootstrap this coordinator but does not own destructive reset logic. The Developer Console may request lifecycle operations but does not manipulate providers, repositories or database paths directly.
+
+### Development database identity
+
+The canonical development database uses one centrally defined, application-owned, stable path selected only in DEBUG builds. Its identity is distinct from the non-development/Release database. Authorization for destructive work requires equality with the standardized, symlink-resolved canonical development URL. Path-prefix containment is insufficient and arbitrary caller-provided paths are never authorized.
+
+This decision introduces no schema migration solely for database identity. The registered migration chain remains the schema authority.
+
+### Build safety
+
+Permanent reset, restore and approved-fixture-launcher APIs, UI and resources are absent from Release builds. Runtime hiding is not a safety boundary. DEBUG code must still verify the exact canonical development identity before destructive work.
+
+### Three lifecycle meanings
+
+1. `Start Temporary Empty Session` creates a UUID-named temporary SQLite database for the current process. It leaves the canonical development database unchanged, and relaunch reconnects to canonical data.
+2. `Reset Development Database` creates and verifies a lifecycle-owned backup, replaces only the canonical development database set, recreates the same canonical identity through the registered migration chain and canonically hydrates empty runtime stores. The empty state survives relaunch.
+3. `Restore Previous Development Database`, when presented, may use only a lifecycle-owned verified backup. No arbitrary file picker or database path is accepted. Automatic recovery from failed reset is mandatory even when visible restore is omitted.
+
+### Exclusive lifecycle and repository activity gate
+
+One centralized gate coordinates provider-backed activity and exclusive lifecycle operations. Reset rejects or safely waits while import preparation, prepared confirmation, confirmed persistence, repository writes, hydration, Developer Console reload, temporary-session creation, reset, restore or provider replacement is active. View-local flags and the existing confirmation lock are not lifecycle authority.
+
+Provider-backed work obtains a generation-bound operation lease before capturing repositories. Exclusive lifecycle work stops new leases and waits for existing leases to finish. A provider generation change invalidates later use of repositories captured from the previous generation.
+
+### Provider quiescence and SQLite database set
+
+Before canonical replacement, the coordinator stops new provider operations, waits for active leases, checkpoints WAL, closes the active SQLite provider and checks the SQLite close result. Replacing `DatabaseProvider.shared` alone is insufficient.
+
+The database main file, `-wal` file and `-shm` file form one coordinated lifecycle set. No member is destructively replaced while the provider is live or while unmanaged committed WAL data may remain.
+
+### Verified backup
+
+Before destructive replacement, the coordinator creates a lifecycle-owned recoverable backup. Verification opens the backup, confirms a valid LedgerForge schema, confirms a supported migration state from the registered migration chain and proves that committed WAL data is represented. Backup failure or verification failure prevents canonical replacement.
+
+Backup identity and diagnostics are bounded and contain no financial content, identifiers, source fragments or unrestricted filesystem paths.
+
+### Canonical recreation and runtime reconciliation
+
+After backup verification, only the exact canonical development database set may be isolated or removed. `SQLiteRepositoryProvider` recreates the database at the same canonical identity and runs the registered migration chain. The coordinator publishes the provider only after construction and migrations succeed.
+
+`RepositoryStoreHydrator` remains the sole repository-to-runtime authority. Reset success requires one forced canonical hydration of accounts, transactions, successful import sessions and import attempts. Stores are never manually cleared to simulate success.
+
+### Recovery and unavailable state
+
+A failure before canonical replacement leaves the original provider and database untouched. After replacement begins, failure in recreation, migration, provider installation or hydration closes the incomplete provider, isolates the incomplete database set, restores the verified backup, reopens and republishes the restored provider, forces canonical hydration and reports reset failure.
+
+If recovery fails, the coordinator enters an explicit lifecycle-unavailable state. Imports, repository mutations and further lifecycle operations are disabled except for an explicitly safe recovery path. Runtime state is not presented as synchronized, and only a bounded privacy-safe error is exposed. Partial reset is never reported as success.
+
+### Structured results and diagnostics
+
+Lifecycle operations return structured deterministic results that distinguish temporary-session success, permanent-reset success, restored backup, activity rejection, unsafe identity, quiescence failure, backup failure, recreation or migration failure, hydration failure with successful recovery, recovery failure and lifecycle-unavailable state.
+
+Diagnostics remain governed by ADR-026: structured, deterministic, in-memory and privacy-safe, using only approved operation, phase, result and count metadata. Persistent diagnostics and general export are not introduced.
+
+## Consequences
+
+- Development database mutation has one owner and one testable safety boundary.
+- Temporary emptiness and persistent reset are no longer conflated.
+- Debug and non-development database identities are distinct.
+- Provider-backed work must participate in the lifecycle activity gate.
+- Reset becomes more complex because backup, sidecars, provider generations, hydration and recovery are one atomic operational contract.
+- Failure may make the lifecycle explicitly unavailable rather than preserving a misleading partially synchronized UI.
+
+## Non-Goals
+
+ADR-035 does not authorize Release or production reset, arbitrary database deletion or restore, account or transaction deletion, import-session reversal, historical or duplicate repair, account merge or split, record-level undo, SQL browsing or editing, general repository inspection, persistent diagnostic history, general database maintenance, performance profiling or cloud backup.
+
+## Related ADRs
+
+- ADR-013 — Store Ownership
+- ADR-024 — Repository Hydration Boundary
+- ADR-026 — Structured Developer Diagnostics
