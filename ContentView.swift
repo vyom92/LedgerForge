@@ -2127,6 +2127,9 @@ struct ContentView: View {
             preparationOwner.cancel()
         case .previewReady(let preparedImport), .validationFailed(let preparedImport):
             fileName = preparedImport.fileName
+#if DEBUG
+            ImportEngine.shared.cancelPreparedImport(preparedImport)
+#endif
         default:
             return
         }

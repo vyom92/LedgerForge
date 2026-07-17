@@ -90,6 +90,7 @@ enum ImportEngineCommitError: Error, LocalizedError, Equatable {
             return "Prepared statement content no longer matches its exact-content fingerprint."
         }
     }
+
 }
 
 struct PreparedImport: Identifiable {
@@ -153,6 +154,7 @@ struct PreparedImport: Identifiable {
     var accountMetadata: String? {
         financialDocument.transactions.first?.account
     }
+
 }
 
 final class ImportEngine {
@@ -164,6 +166,9 @@ final class ImportEngine {
     private let developerConsole: DeveloperConsole
     private let committedPreparedImportLock = NSLock()
     private var committedPreparedImportIDs: Set<UUID> = []
+#if DEBUG
+    private var lifecycleLeases: [UUID: DevelopmentDatabaseActivityLease] = [:]
+#endif
 
     init(
         importCoordinator: any ImportFramework.ImportCoordinator = DefaultImportCoordinator(
@@ -238,6 +243,13 @@ final class ImportEngine {
         requestId: UUID = UUID(),
         progress: @escaping (ImportProgress) -> Void = { _ in }
     ) async throws -> PreparedImport {
+#if DEBUG
+        let lifecycleLease = try DevelopmentDatabaseActivityGate.shared.begin(.importPreparation)
+        var transfersLifecycleLease = false
+        defer {
+            if !transfersLifecycleLease { lifecycleLease.finish() }
+        }
+#endif
         try publishPreparationProgress(.openingSource, requestId: requestId, progress: progress)
         let contents = try await readTextDocument(from: url)
         try Task.checkCancellation()
@@ -328,7 +340,7 @@ final class ImportEngine {
 
         try publishPreparationProgress(.preparingConfirmationPreview, requestId: requestId, progress: progress)
 
-        return PreparedImport(
+        let preparedImport = PreparedImport(
             sourceURL: url,
             rawContents: contents,
             fileName: document.filename,
@@ -341,6 +353,12 @@ final class ImportEngine {
             fingerprint: fingerprint,
             advisoryPreviousImport: advisoryPreviousImport
         )
+#if DEBUG
+        lifecycleLease.transition(to: .preparedAwaitingConfirmation)
+        lifecycleLeases[preparedImport.id] = lifecycleLease
+        transfersLifecycleLease = true
+#endif
+        return preparedImport
     }
 
     func commitPreparedImport(_ preparedImport: PreparedImport) async -> ImportEngineResult {
@@ -358,6 +376,14 @@ final class ImportEngine {
         _ preparedImport: PreparedImport,
         accountChoice: ImportAccountChoice?
     ) async -> ImportEngineResult {
+#if DEBUG
+        let lifecycleLease = lifecycleLeases[preparedImport.id]
+        lifecycleLease?.transition(to: .confirmedPersistence)
+        defer {
+            lifecycleLease?.finish()
+            lifecycleLeases.removeValue(forKey: preparedImport.id)
+        }
+#endif
         guard preparedImport.validation.passed else {
             let attemptID = importPersistenceCoordinatorFactory().recordValidationFailure(fileName: preparedImport.fileName, transactionCount: preparedImport.transactionCount)
             developerConsole.error(.validation, "Validation failed", metadata: ["file": preparedImport.fileName])
@@ -495,6 +521,12 @@ final class ImportEngine {
         committedPreparedImportIDs.insert(id)
         return true
     }
+
+#if DEBUG
+    func cancelPreparedImport(_ preparedImport: PreparedImport) {
+        lifecycleLeases.removeValue(forKey: preparedImport.id)?.finish()
+    }
+#endif
 
     private func publishPreparationProgress(
         _ phase: ImportProgressPhase,

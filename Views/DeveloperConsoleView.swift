@@ -57,6 +57,7 @@ struct DeveloperConsoleView: View {
         }
         .padding(28)
         .background(LFTheme.backgroundGradient)
+#if DEBUG
         .confirmationDialog(
             "Reset Development Database?",
             isPresented: $showsResetConfirmation,
@@ -67,8 +68,9 @@ struct DeveloperConsoleView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This irreversible development action removes all imported financial data and import history by switching to a fresh SQLite database. Application preferences, appearance and Developer Mode are preserved.")
+            Text("Only the canonical Debug development database is replaced. A verified lifecycle-owned backup is created first. Non-development and Release data are excluded, and the empty database remains empty after relaunch.")
         }
+#endif
         .onChange(of: selectedLevel) { _, _ in
             applyLevelFilter()
         }
@@ -286,9 +288,6 @@ struct DeveloperConsoleView: View {
                 LFInfoRow(title: "Latest Refresh", value: runtimeSnapshot.latestRefreshResult, verticalPadding: 5)
                 LFInfoRow(title: "Accounts", value: "\(runtimeSnapshot.accountCount)", verticalPadding: 5)
                 LFInfoRow(title: "Transactions", value: "\(runtimeSnapshot.transactionCount)", verticalPadding: 5)
-                if let databasePath = runtimeSnapshot.databasePath {
-                    LFInfoRow(title: "SQLite Path", value: databasePath, verticalPadding: 5)
-                }
             }
         }
     }
@@ -315,6 +314,17 @@ struct DeveloperConsoleView: View {
                     reloadData()
                 }
 
+#if DEBUG
+                LFConsoleButton(
+                    title: "Start Temporary Empty Session",
+                    systemImage: "sparkles",
+                    fill: LFTheme.surfaceRaised.opacity(0.65),
+                    isFullWidth: true,
+                    isDisabled: isRunningRepositoryAction || DevelopmentDatabaseLifecycleCoordinator.shared.isOperationInProgress
+                ) {
+                    startTemporaryEmptySession()
+                }
+
                 LFConsoleButton(
                     title: "Reset Development Database",
                     systemImage: "exclamationmark.triangle",
@@ -322,10 +332,11 @@ struct DeveloperConsoleView: View {
                     foreground: .white,
                     isFullWidth: true,
                     showsBorder: false,
-                    isDisabled: isRunningRepositoryAction
+                    isDisabled: isRunningRepositoryAction || DevelopmentDatabaseLifecycleCoordinator.shared.isOperationInProgress
                 ) {
                     showsResetConfirmation = true
                 }
+#endif
 
                 if let actionError {
                     Text(actionError)
@@ -388,22 +399,43 @@ struct DeveloperConsoleView: View {
         isRunningRepositoryAction = false
     }
 
+#if DEBUG
     private func resetDevelopmentDatabase() {
         isRunningRepositoryAction = true
         actionError = nil
-        do {
-            let result = try LedgerForgeApp.resetDevelopmentDatabase()
+        let lifecycleResult = LedgerForgeApp.resetDevelopmentDatabase()
+        switch lifecycleResult {
+        case .permanentResetCompleted(let result):
             hydrationStatus = "Reset hydration completed"
             latestRefreshResult = "\(result.accountCount) account(s), \(result.transactionCount) transaction(s)"
             DeveloperConsole.shared.info(.database, "Development database reset", metadata: ["accounts": "\(result.accountCount)", "transactions": "\(result.transactionCount)"])
-        } catch {
+        default:
             hydrationStatus = "Reset failed"
             latestRefreshResult = "Reset failed"
-            actionError = error.localizedDescription
-            DeveloperConsole.shared.error(.database, "Development database reset failed", metadata: ["error": error.localizedDescription])
+            actionError = "The development database lifecycle operation could not complete (\(lifecycleResult.description))."
+            DeveloperConsole.shared.error(.database, "Development database reset failed", metadata: ["result": lifecycleResult.description])
         }
         isRunningRepositoryAction = false
     }
+
+    private func startTemporaryEmptySession() {
+        isRunningRepositoryAction = true
+        actionError = nil
+        let lifecycleResult = LedgerForgeApp.startTemporaryEmptySession()
+        switch lifecycleResult {
+        case .temporarySessionStarted(let result):
+            hydrationStatus = "Temporary session hydration completed"
+            latestRefreshResult = "\(result.accountCount) account(s), \(result.transactionCount) transaction(s)"
+            DeveloperConsole.shared.info(.database, "Temporary empty session started", metadata: ["accounts": "\(result.accountCount)", "transactions": "\(result.transactionCount)"])
+        default:
+            hydrationStatus = "Temporary session failed"
+            latestRefreshResult = "Temporary session failed"
+            actionError = "The temporary development session could not start (\(lifecycleResult.description))."
+            DeveloperConsole.shared.error(.database, "Temporary empty session failed", metadata: ["result": lifecycleResult.description])
+        }
+        isRunningRepositoryAction = false
+    }
+#endif
 
     private func copyAllLogs() {
         let text = console.completeLogText

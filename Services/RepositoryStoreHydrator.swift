@@ -62,6 +62,9 @@ final class RepositoryStoreHydrator {
     private let transactionStore: TransactionStore
     private let workspaceId: String
     private var hasHydrated = false
+#if DEBUG
+    private let participatesInLifecycleGate: Bool
+#endif
 
     convenience init(
         databaseProvider: DatabaseProvider = .shared,
@@ -69,7 +72,8 @@ final class RepositoryStoreHydrator {
         transactionStore: TransactionStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
-        workspaceId: String = "default-workspace"
+        workspaceId: String = "default-workspace",
+        participatesInLifecycleGate: Bool = true
     ) {
         self.init(
             accountRepo: databaseProvider.accountRepo,
@@ -79,7 +83,8 @@ final class RepositoryStoreHydrator {
             transactionStore: transactionStore,
             importSessionStore: importSessionStore,
             importAttemptStore: importAttemptStore,
-            workspaceId: workspaceId
+            workspaceId: workspaceId,
+            participatesInLifecycleGate: participatesInLifecycleGate
         )
     }
 
@@ -91,7 +96,8 @@ final class RepositoryStoreHydrator {
         transactionStore: TransactionStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
-        workspaceId: String = "default-workspace"
+        workspaceId: String = "default-workspace",
+        participatesInLifecycleGate: Bool = true
     ) {
         self.accountRepo = accountRepo
         self.importSessionRepo = importSessionRepo
@@ -101,10 +107,22 @@ final class RepositoryStoreHydrator {
         self.importSessionStore = importSessionStore
         self.importAttemptStore = importAttemptStore
         self.workspaceId = workspaceId
+#if DEBUG
+        self.participatesInLifecycleGate = participatesInLifecycleGate
+#endif
     }
 
     @discardableResult
     func hydrateIfNeeded(forceRefresh: Bool = false) throws -> RepositoryStoreHydrationResult {
+#if DEBUG
+        let lifecycleLease: DevelopmentDatabaseActivityLease?
+        if participatesInLifecycleGate {
+            lifecycleLease = try DevelopmentDatabaseActivityGate.shared.begin(.hydration)
+        } else {
+            lifecycleLease = nil
+        }
+        defer { lifecycleLease?.finish() }
+#endif
         guard forceRefresh || !hasHydrated else {
             return RepositoryStoreHydrationResult(
                 didHydrate: false,

@@ -9,6 +9,9 @@ private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.sel
 public enum SQLiteDatabaseError: Error, LocalizedError {
     case databaseNotOpen
     case prepareFailed(sql: String, message: String)
+    case backupFailed(String)
+    case checkpointFailed(Int32)
+    case closeFailed(Int32)
 
     public var errorDescription: String? {
         switch self {
@@ -16,6 +19,12 @@ public enum SQLiteDatabaseError: Error, LocalizedError {
             return "SQLite database is not open."
         case .prepareFailed(let sql, let message):
             return "Failed to prepare SQLite statement: \(message). SQL: \(sql)"
+        case .backupFailed:
+            return "SQLite backup could not be completed."
+        case .checkpointFailed:
+            return "SQLite checkpoint could not be completed."
+        case .closeFailed:
+            return "SQLite close could not be completed."
         }
     }
 }
@@ -78,6 +87,46 @@ public final class SQLiteDatabase {
             sqlite3_close(db)
             self.db = nil
         }
+    }
+
+    public func createBackup(at destinationPath: String) throws {
+        guard let db else { throw SQLiteDatabaseError.databaseNotOpen }
+        var destination: OpaquePointer?
+        guard sqlite3_open_v2(destinationPath, &destination, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK,
+              let destination else {
+            if let destination { sqlite3_close(destination) }
+            throw SQLiteDatabaseError.backupFailed("destination-open")
+        }
+        defer { sqlite3_close(destination) }
+        guard let backup = sqlite3_backup_init(destination, "main", db, "main") else {
+            throw SQLiteDatabaseError.backupFailed("initialization")
+        }
+        let stepResult = sqlite3_backup_step(backup, -1)
+        let finishResult = sqlite3_backup_finish(backup)
+        guard stepResult == SQLITE_DONE, finishResult == SQLITE_OK else {
+            throw SQLiteDatabaseError.backupFailed("copy")
+        }
+    }
+
+    public func checkpointAndClose() throws {
+        guard let db else { throw SQLiteDatabaseError.databaseNotOpen }
+        var logFrames: Int32 = 0
+        var checkpointedFrames: Int32 = 0
+        let checkpointResult = sqlite3_wal_checkpoint_v2(
+            db,
+            nil,
+            SQLITE_CHECKPOINT_TRUNCATE,
+            &logFrames,
+            &checkpointedFrames
+        )
+        guard checkpointResult == SQLITE_OK else {
+            throw SQLiteDatabaseError.checkpointFailed(checkpointResult)
+        }
+        let closeResult = sqlite3_close(db)
+        guard closeResult == SQLITE_OK else {
+            throw SQLiteDatabaseError.closeFailed(closeResult)
+        }
+        self.db = nil
     }
 
     public func execute(sql: String) throws {

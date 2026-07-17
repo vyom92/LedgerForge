@@ -32,7 +32,6 @@ struct LedgerForgeTests {
         }
 
         let originalPath = folder.appendingPathComponent("original.sqlite").path
-        let resetPath = folder.appendingPathComponent("reset.sqlite").path
         #expect(LedgerForgeApp.configurePersistence(path: originalPath))
         try seedSprint30Repository(DatabaseProvider.shared)
 
@@ -43,7 +42,11 @@ struct LedgerForgeTests {
         #expect(TransactionStore.shared.transactions.count == 1)
 
         UserDefaults.standard.set("preserved", forKey: "Sprint30PreferencePreservation")
-        let resetHydration = try LedgerForgeApp.resetDevelopmentDatabase(path: resetPath)
+        let lifecycleResult = LedgerForgeApp.startTemporaryEmptySession()
+        guard case .temporarySessionStarted(let resetHydration) = lifecycleResult else {
+            Issue.record("Expected a temporary empty session, received \(lifecycleResult)")
+            return
+        }
 
         #expect(resetHydration.didHydrate)
         #expect(resetHydration.accountCount == 0)
@@ -52,7 +55,6 @@ struct LedgerForgeTests {
         #expect(TransactionStore.shared.transactions.isEmpty)
         #expect(try DatabaseProvider.shared.accountRepo.accounts(workspaceId: sprint30WorkspaceId).isEmpty)
         #expect(try DatabaseProvider.shared.transactionRepo.trustedTransactions(workspaceId: sprint30WorkspaceId).isEmpty)
-        #expect(LedgerForgeApp.currentSQLiteDatabasePath() == resetPath)
         #expect(FileManager.default.fileExists(atPath: originalPath))
         #expect(UserDefaults.standard.string(forKey: "Sprint30PreferencePreservation") == "preserved")
 
@@ -183,9 +185,11 @@ struct LedgerForgeTests {
 
 private let sprint30WorkspaceId = "default-workspace"
 
+@MainActor
 private func resetSprint30RuntimeState() {
     AccountStore.shared.replaceAccounts([])
     TransactionStore.shared.replaceTransactions([])
+    DevelopmentDatabaseActivityGate.shared.resetForTesting()
 }
 
 private func sprint30TemporaryFolder(named name: String) throws -> URL {

@@ -26,9 +26,8 @@ struct LedgerForgeApp: App {
     @discardableResult
     static func configurePersistence(path: String? = nil) -> Bool {
         do {
-            let provider = try installSQLiteProvider(path: path)
+            _ = try installSQLiteProvider(path: path)
             DeveloperConsole.shared.log("Persistence bootstrap connected to SQLite.")
-            DeveloperConsole.shared.log(provider.databasePath)
             return true
         } catch {
             DatabaseProvider.shared = DatabaseProvider(inMemory: true)
@@ -56,15 +55,15 @@ struct LedgerForgeApp: App {
         configuredDatabasePath
     }
 
-    @discardableResult
-    static func resetDevelopmentDatabase(path: String? = nil) throws -> RepositoryStoreHydrationResult {
-        let provider = try installSQLiteProvider(path: path ?? freshDevelopmentDatabasePath())
-        DeveloperConsole.shared.log("Development database reset connected to fresh SQLite provider.")
-        DeveloperConsole.shared.log(provider.databasePath)
-        let result = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
-        DeveloperConsole.shared.log("Development database reset hydrated \(result.accountCount) account(s), \(result.transactionCount) transaction(s).")
-        return result
+#if DEBUG
+    static func startTemporaryEmptySession() -> DevelopmentDatabaseLifecycleResult {
+        DevelopmentDatabaseLifecycleCoordinator.shared.startTemporaryEmptySession()
     }
+
+    static func resetDevelopmentDatabase() -> DevelopmentDatabaseLifecycleResult {
+        DevelopmentDatabaseLifecycleCoordinator.shared.resetDevelopmentDatabase()
+    }
+#endif
 
     @discardableResult
     private static func installSQLiteProvider(path: String? = nil) throws -> SQLiteRepositoryProvider {
@@ -78,23 +77,9 @@ struct LedgerForgeApp: App {
         sqliteProvider = provider
         configuredProviderState = "SQLite repository provider"
         configuredDatabasePath = provider.databasePath
+#if DEBUG
+        DevelopmentDatabaseLifecycleCoordinator.shared.installInitialProvider(provider)
+#endif
         return provider
-    }
-
-    private static func freshDevelopmentDatabasePath() throws -> String {
-        let fileManager = FileManager.default
-        let appSupport = try fileManager.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        let folder = appSupport
-            .appendingPathComponent("LedgerForge", isDirectory: true)
-            .appendingPathComponent("Development Resets", isDirectory: true)
-        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder
-            .appendingPathComponent("ledgerforge-reset-\(UUID().uuidString).sqlite")
-            .path
     }
 }

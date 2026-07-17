@@ -3,6 +3,68 @@
 
 import Foundation
 import SQLite3
+#if DEBUG
+import Combine
+#endif
+
+#if DEBUG
+struct DevelopmentDatabaseIdentity: Equatable {
+    let canonicalDevelopmentURL: URL
+    let nonDevelopmentURL: URL
+    let backupURL: URL
+    let temporaryDirectoryURL: URL
+
+    private let authorizedResolvedDevelopmentURL: URL
+
+    init(applicationSupportDirectory: URL) {
+        let applicationDirectory = applicationSupportDirectory
+            .appendingPathComponent("LedgerForge", isDirectory: true)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        let developmentDirectory = applicationDirectory
+            .appendingPathComponent("Development", isDirectory: true)
+        let canonical = developmentDirectory
+            .appendingPathComponent("ledgerforge-development.sqlite")
+            .standardizedFileURL
+
+        canonicalDevelopmentURL = canonical
+        nonDevelopmentURL = applicationDirectory
+            .appendingPathComponent("ledgerforge.sqlite")
+            .standardizedFileURL
+        backupURL = developmentDirectory
+            .appendingPathComponent("Lifecycle Backups", isDirectory: true)
+            .appendingPathComponent("previous-development.sqlite")
+            .standardizedFileURL
+        temporaryDirectoryURL = developmentDirectory
+            .appendingPathComponent("Temporary Sessions", isDirectory: true)
+            .standardizedFileURL
+        authorizedResolvedDevelopmentURL = canonical
+    }
+
+    static func applicationOwned() -> DevelopmentDatabaseIdentity {
+        let fileManager = FileManager.default
+        let applicationSupport = (try? fileManager.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )) ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+        return DevelopmentDatabaseIdentity(applicationSupportDirectory: applicationSupport)
+    }
+
+    func authorizesDestructiveWork(at candidate: URL) -> Bool {
+        candidate.standardizedFileURL.resolvingSymlinksInPath() == authorizedResolvedDevelopmentURL
+    }
+
+    func databaseSet(at mainURL: URL) -> [URL] {
+        [
+            mainURL,
+            URL(fileURLWithPath: mainURL.path + "-wal"),
+            URL(fileURLWithPath: mainURL.path + "-shm")
+        ]
+    }
+}
+#endif
 
 /// SQLite-backed provider that runs migrations and exposes repository implementations.
 public final class SQLiteRepositoryProvider {
@@ -30,14 +92,364 @@ public final class SQLiteRepositoryProvider {
     public static func defaultDBPath() -> String {
         let fm = FileManager.default
         let appSupport = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+#if DEBUG
+        if let appSupport {
+            let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: appSupport)
+            try? fm.createDirectory(
+                at: identity.canonicalDevelopmentURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            return identity.canonicalDevelopmentURL.path
+        }
+        return "ledgerforge-development.sqlite"
+#else
         let folder = appSupport?.appendingPathComponent("LedgerForge")
         if let folder = folder {
             try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
             return folder.appendingPathComponent("ledgerforge.sqlite").path
         }
         return "ledgerforge.sqlite"
+#endif
     }
 }
+
+#if DEBUG
+enum DevelopmentDatabaseActivity: String, Equatable {
+    case importPreparation
+    case preparedAwaitingConfirmation
+    case confirmedPersistence
+    case hydration
+    case repositoryWrite
+    case developerReload
+}
+
+enum DevelopmentDatabaseActivityError: Error, LocalizedError {
+    case lifecycleOperationInProgress
+    case lifecycleUnavailable
+
+    var errorDescription: String? {
+        "Database activity is unavailable while the development database lifecycle is changing."
+    }
+}
+
+@MainActor
+final class DevelopmentDatabaseActivityLease {
+    private weak var gate: DevelopmentDatabaseActivityGate?
+    fileprivate let id: UUID
+    fileprivate(set) var activity: DevelopmentDatabaseActivity
+    private(set) var generation: Int
+    private var isFinished = false
+
+    fileprivate init(gate: DevelopmentDatabaseActivityGate, activity: DevelopmentDatabaseActivity, generation: Int) {
+        self.gate = gate
+        self.id = UUID()
+        self.activity = activity
+        self.generation = generation
+    }
+
+    func transition(to activity: DevelopmentDatabaseActivity) {
+        guard !isFinished else { return }
+        self.activity = activity
+        gate?.update(self)
+    }
+
+    func finish() {
+        guard !isFinished else { return }
+        isFinished = true
+        gate?.finish(self)
+    }
+}
+
+@MainActor
+final class DevelopmentDatabaseActivityGate {
+    static let shared = DevelopmentDatabaseActivityGate()
+
+    private var leases: [UUID: DevelopmentDatabaseActivity] = [:]
+    private(set) var generation = 1
+    private(set) var hasExclusiveOperation = false
+    private(set) var isUnavailable = false
+
+    var hasActiveOperations: Bool { !leases.isEmpty }
+
+    func begin(_ activity: DevelopmentDatabaseActivity) throws -> DevelopmentDatabaseActivityLease {
+        guard !isUnavailable else { throw DevelopmentDatabaseActivityError.lifecycleUnavailable }
+        guard !hasExclusiveOperation else { throw DevelopmentDatabaseActivityError.lifecycleOperationInProgress }
+        let lease = DevelopmentDatabaseActivityLease(gate: self, activity: activity, generation: generation)
+        leases[lease.id] = activity
+        return lease
+    }
+
+    func beginExclusive() -> Bool {
+        guard !isUnavailable, !hasExclusiveOperation, leases.isEmpty else { return false }
+        hasExclusiveOperation = true
+        return true
+    }
+
+    func finishExclusive(providerChanged: Bool) {
+        if providerChanged { generation += 1 }
+        hasExclusiveOperation = false
+    }
+
+    func enterUnavailable() {
+        isUnavailable = true
+        hasExclusiveOperation = false
+    }
+
+    fileprivate func update(_ lease: DevelopmentDatabaseActivityLease) {
+        guard leases[lease.id] != nil else { return }
+        leases[lease.id] = lease.activity
+    }
+
+    fileprivate func finish(_ lease: DevelopmentDatabaseActivityLease) {
+        leases.removeValue(forKey: lease.id)
+    }
+
+    func resetForTesting() {
+        leases.removeAll()
+        hasExclusiveOperation = false
+        isUnavailable = false
+    }
+}
+
+enum DevelopmentDatabaseLifecycleResult: Equatable, CustomStringConvertible {
+    case temporarySessionStarted(RepositoryStoreHydrationResult)
+    case permanentResetCompleted(RepositoryStoreHydrationResult)
+    case previousDatabaseRestored(RepositoryStoreHydrationResult)
+    case rejectedActivityInProgress
+    case rejectedUnsafeIdentity
+    case providerQuiescenceFailed
+    case backupFailed
+    case recreationFailed
+    case migrationFailed
+    case providerInstallationFailed
+    case hydrationFailedRecoverySucceeded
+    case recoveryFailed
+    case lifecycleUnavailable
+
+    var description: String {
+        switch self {
+        case .temporarySessionStarted: return "temporary-session-started"
+        case .permanentResetCompleted: return "permanent-reset-completed"
+        case .previousDatabaseRestored: return "previous-database-restored"
+        case .rejectedActivityInProgress: return "activity-in-progress"
+        case .rejectedUnsafeIdentity: return "unsafe-identity"
+        case .providerQuiescenceFailed: return "provider-quiescence-failed"
+        case .backupFailed: return "backup-failed"
+        case .recreationFailed: return "recreation-failed"
+        case .migrationFailed: return "migration-failed"
+        case .providerInstallationFailed: return "provider-installation-failed"
+        case .hydrationFailedRecoverySucceeded: return "hydration-failed-recovery-succeeded"
+        case .recoveryFailed: return "recovery-failed"
+        case .lifecycleUnavailable: return "lifecycle-unavailable"
+        }
+    }
+}
+
+enum DevelopmentDatabaseLifecycleFailurePoint: Hashable {
+    case backupCreation
+    case backupVerification
+    case providerQuiescence
+    case recreation
+    case migration
+    case providerInstallation
+    case hydration
+    case recovery
+}
+
+@MainActor
+final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
+    static let shared = DevelopmentDatabaseLifecycleCoordinator(identity: .applicationOwned())
+
+    let identity: DevelopmentDatabaseIdentity
+    @Published private(set) var isOperationInProgress = false
+    @Published private(set) var isUnavailable = false
+    private(set) var currentDatabaseURL: URL?
+    private var sqliteProvider: SQLiteRepositoryProvider?
+    private let activityGate: DevelopmentDatabaseActivityGate
+    private let injectedFailures: Set<DevelopmentDatabaseLifecycleFailurePoint>
+
+    convenience init(identity: DevelopmentDatabaseIdentity) {
+        self.init(identity: identity, activityGate: .shared, injectedFailures: [])
+    }
+
+    convenience init(identity: DevelopmentDatabaseIdentity, activityGate: DevelopmentDatabaseActivityGate) {
+        self.init(identity: identity, activityGate: activityGate, injectedFailures: [])
+    }
+
+    init(
+        identity: DevelopmentDatabaseIdentity,
+        activityGate: DevelopmentDatabaseActivityGate,
+        injectedFailures: Set<DevelopmentDatabaseLifecycleFailurePoint>
+    ) {
+        self.identity = identity
+        self.activityGate = activityGate
+        self.injectedFailures = injectedFailures
+    }
+
+    func installInitialProvider(_ provider: SQLiteRepositoryProvider) {
+        publish(provider)
+    }
+
+    func startTemporaryEmptySession() -> DevelopmentDatabaseLifecycleResult {
+        guard !isUnavailable else { return .lifecycleUnavailable }
+        guard activityGate.beginExclusive() else { return .rejectedActivityInProgress }
+        isOperationInProgress = true
+        var providerChanged = false
+        defer {
+            isOperationInProgress = false
+            activityGate.finishExclusive(providerChanged: providerChanged)
+        }
+        do {
+            try FileManager.default.createDirectory(at: identity.temporaryDirectoryURL, withIntermediateDirectories: true)
+            let url = identity.temporaryDirectoryURL
+                .appendingPathComponent("temporary-\(UUID().uuidString).sqlite")
+            let provider = try SQLiteRepositoryProvider(path: url.path)
+            publish(provider)
+            providerChanged = true
+            let hydration = try RepositoryStoreHydrator(databaseProvider: DatabaseProvider.shared, participatesInLifecycleGate: false)
+                .hydrateIfNeeded(forceRefresh: true)
+            return .temporarySessionStarted(hydration)
+        } catch {
+            return .recreationFailed
+        }
+    }
+
+    func resetDevelopmentDatabase() -> DevelopmentDatabaseLifecycleResult {
+        guard !isUnavailable else { return .lifecycleUnavailable }
+        guard identity.authorizesDestructiveWork(at: identity.canonicalDevelopmentURL),
+              currentDatabaseURL == identity.canonicalDevelopmentURL,
+              let originalProvider = sqliteProvider else {
+            return .rejectedUnsafeIdentity
+        }
+        guard activityGate.beginExclusive() else { return .rejectedActivityInProgress }
+        isOperationInProgress = true
+        var providerChanged = false
+        defer {
+            isOperationInProgress = false
+            activityGate.finishExclusive(providerChanged: providerChanged)
+        }
+
+        do {
+            try createAndVerifyBackup(from: originalProvider)
+        } catch {
+            return .backupFailed
+        }
+
+        do {
+            try failIfInjected(.providerQuiescence)
+            try originalProvider.database.checkpointAndClose()
+        } catch {
+            return .providerQuiescenceFailed
+        }
+
+        do {
+            try removeDatabaseSet(at: identity.canonicalDevelopmentURL)
+            if injectedFailures.contains(.recreation) {
+                return recover(afterHydrationFailure: false, originalFailure: .recreationFailed)
+            }
+            let replacement = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
+            if injectedFailures.contains(.migration) {
+                try? replacement.database.checkpointAndClose()
+                return recover(afterHydrationFailure: false, originalFailure: .migrationFailed)
+            }
+            if injectedFailures.contains(.providerInstallation) {
+                try? replacement.database.checkpointAndClose()
+                return recover(afterHydrationFailure: false, originalFailure: .providerInstallationFailed)
+            }
+            publish(replacement)
+            providerChanged = true
+            do {
+                try failIfInjected(.hydration)
+                let hydration = try RepositoryStoreHydrator(databaseProvider: DatabaseProvider.shared, participatesInLifecycleGate: false)
+                    .hydrateIfNeeded(forceRefresh: true)
+                return .permanentResetCompleted(hydration)
+            } catch {
+                return recover(afterHydrationFailure: true, originalFailure: .hydrationFailedRecoverySucceeded)
+            }
+        } catch {
+            return recover(afterHydrationFailure: false, originalFailure: .recreationFailed)
+        }
+    }
+
+    private func recover(
+        afterHydrationFailure: Bool,
+        originalFailure: DevelopmentDatabaseLifecycleResult
+    ) -> DevelopmentDatabaseLifecycleResult {
+        do {
+            try failIfInjected(.recovery)
+            try? sqliteProvider?.database.checkpointAndClose()
+            try removeDatabaseSet(at: identity.canonicalDevelopmentURL)
+            try FileManager.default.copyItem(at: identity.backupURL, to: identity.canonicalDevelopmentURL)
+            let restored = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
+            publish(restored)
+            _ = try RepositoryStoreHydrator(databaseProvider: DatabaseProvider.shared, participatesInLifecycleGate: false)
+                .hydrateIfNeeded(forceRefresh: true)
+            return afterHydrationFailure ? .hydrationFailedRecoverySucceeded : originalFailure
+        } catch {
+            isUnavailable = true
+            activityGate.enterUnavailable()
+            DatabaseProvider.shared.invalidateGeneration()
+            return .recoveryFailed
+        }
+    }
+
+    private func createAndVerifyBackup(from provider: SQLiteRepositoryProvider) throws {
+        try failIfInjected(.backupCreation)
+        try FileManager.default.createDirectory(
+            at: identity.backupURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try removeDatabaseSet(at: identity.backupURL)
+        try provider.database.createBackup(at: identity.backupURL.path)
+        try failIfInjected(.backupVerification)
+        let verification = SQLiteDatabase(path: identity.backupURL.path)
+        try verification.open()
+        defer { verification.close() }
+        let version = try verification.queryInt("SELECT COALESCE(MAX(version), 0) FROM schema_migrations;")
+        guard version == allMigrations.map(\.version).max() else {
+            throw SQLiteDatabaseError.backupFailed("migration-state")
+        }
+        let requiredTables = ["accounts", "transactions", "import_sessions", "import_attempts"]
+        for table in requiredTables {
+            let count = try verification.queryInt(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '\(table)';"
+            )
+            guard count == 1 else {
+                throw SQLiteDatabaseError.backupFailed("schema")
+            }
+        }
+    }
+
+    private func failIfInjected(_ point: DevelopmentDatabaseLifecycleFailurePoint) throws {
+        if injectedFailures.contains(point) {
+            throw SQLiteDatabaseError.backupFailed("injected-\(point)")
+        }
+    }
+
+    private func publish(_ provider: SQLiteRepositoryProvider) {
+#if DEBUG
+        DatabaseProvider.shared.invalidateGeneration()
+#endif
+        DatabaseProvider.shared = DatabaseProvider(
+            workspaceRepo: provider.workspaceRepo,
+            transactionRepo: provider.transactionRepo,
+            accountRepo: provider.accountRepo,
+            importSessionRepo: provider.importSessionRepo,
+            protectsGeneration: true
+        )
+        sqliteProvider = provider
+        currentDatabaseURL = URL(fileURLWithPath: provider.databasePath).standardizedFileURL
+    }
+
+    private func removeDatabaseSet(at url: URL) throws {
+        for member in identity.databaseSet(at: url) {
+            if FileManager.default.fileExists(atPath: member.path) {
+                try FileManager.default.removeItem(at: member)
+            }
+        }
+    }
+}
+#endif
 
 // MARK: - Repo implementations (minimal for Phase 2B)
 fileprivate final class SQLiteWorkspaceRepo: WorkspaceRepository {
