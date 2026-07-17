@@ -271,6 +271,105 @@ After ADR-037 acceptance and lifecycle revalidation, this candidate may proceed 
 
 ---
 
+# P0 — Immediate Stability and Financial-Presentation Safety
+
+## FW-P0-21 — Persistence Bootstrap Must Fail Closed
+
+**Status:** Bug  
+**Depends on:** Existing provider-bootstrap and database-lifecycle boundaries
+
+Prevent production use when durable SQLite initialization, opening or migration fails.
+
+Required outcomes include:
+
+- no silent substitution of an in-memory provider in production;
+- one application-wide persistence lifecycle state;
+- explicit distinction between durable SQLite, unavailable persistence and intentionally selected development or test memory storage;
+- import preparation, confirmation and every repository mutation blocked while durable persistence is unavailable;
+- Settings and other status surfaces reporting the actual provider type and a truthful, privacy-safe persistence state;
+- clear recovery guidance without exposing sensitive file paths or financial source content;
+- in-memory providers limited to tests and explicitly selected development sessions.
+
+A successfully launched interface must never imply durable storage when the active provider is non-durable.
+
+---
+
+## FW-P0-22 — Safe SQLite Upsert Semantics and Provider Parity
+
+**Status:** Bug  
+**Depends on:** Existing repository contracts and SQLite/In-Memory provider-parity infrastructure
+
+Replace parent-record `INSERT OR REPLACE` operations with true update or SQLite UPSERT semantics that preserve existing records and relationships.
+
+Required outcomes include:
+
+- same-ID workspace updates that do not delete and recreate the workspace row;
+- same-ID account updates that do not delete and recreate the account row;
+- preservation of account identifiers;
+- preservation of transactions and account relationships;
+- preservation of import sessions and provenance;
+- preservation of lifecycle metadata;
+- preservation of columns not owned by the narrow update operation;
+- equivalent observable behaviour from SQLite and In-Memory providers.
+
+Focused parity tests must prove that advertised repository upsert operations behave as updates and cannot cascade-delete, detach or invalidate related financial records.
+
+---
+
+## FW-P0-23 — Financial Presentation Truth and Provenance
+
+**Status:** Bug  
+**Depends on:** Existing Money foundation, durable import-session history and transaction-provenance boundaries
+
+Correct verified presentation defects where the application displays a financial value, workflow result or transaction status using the wrong authority.
+
+Required outcomes include:
+
+- every displayed transaction amount using that transaction’s authoritative `Money` value and native currency;
+- no financial amount rendered through a default-currency helper when the authoritative currency is available;
+- import success, failure, cancellation, duplicate and persistence outcomes derived from the authoritative workflow result rather than filename or selection state;
+- transaction validation or review badges derived from durable transaction-specific or import-session-specific evidence;
+- unsupported transaction status omitted rather than inferred from one global latest-import result;
+- correct behaviour after hydration, provider reconstruction and relaunch.
+
+This item does not include:
+
+- decorative or unsupported dashboard analytics;
+- general placeholder cleanup;
+- imported-file counts in Settings;
+- visual polish unrelated to financial truth.
+
+Those concerns remain governed by their P2 candidates.
+
+---
+
+## FW-P0-24 — Migration-Chain Integrity Verification
+
+**Status:** Maintenance  
+**Depends on:** Existing migration framework
+
+Verify the complete ordered migration history whenever a durable provider starts.
+
+Verification must cover:
+
+- migration version;
+- migration name;
+- stored checksum;
+- uniqueness of every version;
+- continuity of the supported migration chain;
+- missing lower migrations;
+- duplicate migration records;
+- edited previously applied migrations;
+- incomplete migration records;
+- unsupported future migration versions;
+- valid upgrades from every supported prior schema version.
+
+A migration-history mismatch must fail closed with privacy-safe diagnostics and recovery guidance.
+
+Focused implementation tests belong with this item. Broader corruption and recovery regression coverage remains governed by `FW-P2-65`.
+
+---
+
 # P0 — Financial Identity Safety
 
 ## FW-P0-10 — Explain Account Match, No-Match and Conflict Outcomes
@@ -734,17 +833,26 @@ Do not claim production card support from fixture integration, schema capacity, 
 
 ## FW-P1-10 — Production PDF Statement Support
 
+## FW-P1-10 — Production PDF Statement Support
+
 **Status:** Ready for discovery  
 **Depends on:** Approved PDF fixture and existing extraction foundation
 
 Promote PDF from extraction foundation to a production-supported import source.
 
-Required outcome:
+Required outcomes include:
 
-- approved PDF content enters the unified pipeline;
-- institution detection and classification remain deterministic;
-- parser output matches approved financial truth;
-- equivalent statements preserve equivalent financial results.
+- approved PDF content entering the unified import pipeline;
+- picker, source-format registry and reader support remaining consistent;
+- security-scoped URL access beginning and ending correctly for sandbox-authorized files;
+- sandboxed PDF opening verified through the production URL-driven preparation path;
+- institution detection and classification remaining deterministic;
+- parser output matching approved financial truth;
+- equivalent statements preserving equivalent financial results;
+- Debug and Release build validation;
+- no alternate PDF-only parser, validation, repository or persistence path.
+
+PDF support must not be presented as production-ready merely because extraction code or dormant reader infrastructure exists.
 
 ---
 
@@ -1557,6 +1665,22 @@ Support user-defined or deterministic grouping while preserving immutable accoun
 **Status:** Candidate  
 **Depends on:** None
 
+Remove or replace user-facing elements that imply functionality or state that does not exist.
+
+Candidate cleanup includes:
+
+- pending and soon labels that provide no actionable information;
+- drag-and-drop wording where no drop interaction exists;
+- search-shaped presentation that is not an interactive search control;
+- buttons or actions that navigate only to unrelated placeholders;
+- controls that appear enabled but cannot complete their described outcome;
+- status language unsupported by repository or workflow state.
+
+Financial values, import outcomes and transaction-status defects remain governed by `FW-P0-23`.
+
+Unsupported dashboard analytics remain governed by `FW-P2-46`.
+
+
 ---
 
 ## FW-P2-43 — Better Account Icons
@@ -1586,6 +1710,20 @@ Improve default account iconography. User customization remains governed by `FW-
 
 **Status:** Candidate  
 **Depends on:** Reliable analytical data sources
+
+Provide interactive dashboard charts only after their underlying analytical values are derived from authoritative repository-backed financial data.
+
+Until reliable analytics exist:
+
+- hardcoded spending percentages must not be presented as user financial facts;
+- decorative cash-flow values must not be presented beside real balances or expenses as though they were calculated;
+- unsupported trends must be removed or shown through an explicit unavailable state;
+- chart labels must not imply categorization, transfer matching, forecasting or historical analysis that has not been implemented;
+- sample or preview data must be unmistakably separated from the user’s repository data.
+
+Future charts must preserve native-currency safety, provenance, deterministic calculations and the dependency boundaries of `FW-P3-10` and related analytical candidates.
+
+---
 
 ---
 
@@ -1750,7 +1888,32 @@ Expand currency regression coverage once a second production currency exists; do
 ## FW-P2-65 — Repository Corruption and Recovery Tests
 
 **Status:** Research  
-**Depends on:** Successful completion and approval of Sprint 41
+**Depends on:** Successful completion and approval of Sprint 41, plus approved persistence-bootstrap and migration-integrity behaviour
+
+Define a broader repository corruption and recovery regression matrix beyond the focused tests required by individual implementation candidates.
+
+Coverage should include:
+
+- SQLite opening or initialization failure;
+- migration checksum tampering;
+- edited previously applied migrations;
+- missing lower migrations;
+- duplicated migration versions;
+- incomplete migration records;
+- unsupported future migration versions;
+- corrupted or missing repository relationships;
+- interrupted lifecycle operations;
+- fail-closed production behaviour;
+- recovery without silent substitution of an in-memory provider;
+- privacy-safe diagnostics;
+- valid upgrades from every supported prior schema version;
+- preservation of trusted financial history during recovery.
+
+This item does not authorize automated repair.
+
+Production repair remains governed by `FW-P0-08`. Focused implementation tests for fail-closed startup and migration-chain verification remain governed by `FW-P0-21` and `FW-P0-24`.
+
+---
 
 ---
 
@@ -1760,6 +1923,128 @@ Expand currency regression coverage once a second production currency exists; do
 **Depends on:** None
 
 Protect against raw identifiers, passwords and source fragments entering presentation or diagnostics.
+
+---
+
+## FW-P2-67 — App Shell and Workflow Decomposition
+
+**Status:** Maintenance  
+**Depends on:** Stable current navigation, window structure and import behaviour
+
+Decompose the monolithic SwiftUI application shell while preserving approved financial behaviour and the current product design.
+
+Required direction includes:
+
+- the root scene owning structural composition rather than financial workflows;
+- purpose-owned views for major presentation domains;
+- import preparation, confirmation and result coordination moved out of presentation-only views;
+- persistence lifecycle and provider state coordinated outside ordinary view rendering;
+- repository hydration coordination moved behind an explicit workflow or application boundary;
+- repository, provider and `RepositoryStoreHydrator` authority preserved;
+- existing navigation, keyboard behaviour, accessibility and window behaviour retained unless separately approved;
+- no financial-domain redesign merely to complete the structural refactor.
+
+The exact file names, scene hierarchy and coordinator types require implementation planning. This candidate does not authorize an application architecture rewrite.
+
+---
+
+## FW-P2-68 — Repository-Backed Settings and Import-History Counts
+
+**Status:** Bug  
+**Depends on:** Existing durable import-session and import-attempt history
+
+Replace current-session or selected-file-derived Settings counts with truthful repository-backed values.
+
+Required outcomes include:
+
+- persisted import counts derived from durable repository history;
+- correct values after hydration and relaunch;
+- failed, cancelled and rejected attempts not counted as completed persisted imports;
+- exact duplicates distinguished from newly persisted imports;
+- no binary zero-or-one count derived from the currently selected filename;
+- an explicit unavailable state when a requested count cannot be derived from the current durable model.
+
+Persistence-provider status remains governed by `FW-P0-21`.
+
+---
+
+## FW-P2-69 — macOS Build, CI and UI Smoke Validation
+
+**Status:** Maintenance  
+**Depends on:** None
+
+Establish one reproducible macOS validation workflow for local development, ChatGPT execution environments and continuous integration.
+
+Candidate outcomes include:
+
+- one repository-owned canonical build and test entry point;
+- deterministic Debug and Release builds;
+- focused and full test execution;
+- a configured run or verification action for supported ChatGPT development environments;
+- privacy-safe access to relevant build and runtime logs;
+- minimal macOS UI smoke coverage for:
+  - application launch;
+  - persistence-unavailable gating;
+  - import confirmation;
+  - import cancellation;
+  - truthful import-result presentation;
+  - transaction currency rendering;
+  - transaction-status rendering;
+  - sidebar and primary-window navigation;
+  - Settings truthfulness;
+- continuous-integration checks for the approved build and test matrix;
+- commit-status protection where repository policy supports it.
+
+The exact script names, CI provider and command interface require discovery. This candidate must not create an alternate build configuration that diverges from Xcode project truth.
+
+---
+
+## FW-P2-70 — macOS Target, Bundle and Runtime-Metadata Hardening
+
+**Status:** Maintenance  
+**Depends on:** A stable application target
+
+Harden the macOS application target and built bundle without expanding product scope.
+
+Candidate outcomes include:
+
+- supported-platform settings restricted to platforms LedgerForge genuinely supports;
+- application resources audited against actual target build phases;
+- internal governance or development documents excluded from the product bundle unless explicitly required;
+- version and build values derived from application bundle metadata rather than duplicated UI constants;
+- App Sandbox and selected-file entitlements validated against production import behaviour;
+- Debug and Release configuration parity where required;
+- Release build inspection for unexpected resources or configuration residue.
+
+Final Developer ID distribution, notarization, Gatekeeper acceptance, DMG packaging and release-channel design remain deferred until external distribution becomes an approved product objective.
+
+No bundle-inclusion defect may be claimed solely from Xcode navigator visibility. Target build phases or an inspected built application must provide the evidence.
+
+---
+
+## FW-P2-71 — Repository and Xcode Metadata Hygiene
+
+**Status:** Maintenance  
+**Depends on:** None
+
+Remove user-specific and generated development state from repository history and prevent its reintroduction.
+
+Candidate outcomes include:
+
+- tracked `xcuserdata` removed from the Git index;
+- user-specific breakpoint and workspace state excluded;
+- ignore and repository checks covering:
+  - derived build products;
+  - local databases;
+  - temporary SQLite files;
+  - user-specific IDE state;
+  - generated files;
+  - sensitive diagnostics;
+  - exported private fixtures;
+- repository checks that fail when prohibited metadata is introduced;
+- privacy-safe cleanup guidance for already tracked local-development files.
+
+Repository hygiene checks must distinguish source-controlled shared Xcode configuration from personal IDE state.
 
 ---
 
