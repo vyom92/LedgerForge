@@ -35,8 +35,23 @@ struct ImportValidationResult {
 
     var debitTotal: Decimal { debitTotalMoney?.amount ?? .zero }
     var creditTotal: Decimal { creditTotalMoney?.amount ?? .zero }
-    var openingBalance: Decimal? { openingBalanceMoney?.amount }
-    var closingBalance: Decimal? { closingBalanceMoney?.amount }
+    var openingBalance: Decimal? {
+        switch openingBalanceMoney {
+        case .some(let money):
+            return money.amount
+        case .none:
+            return nil
+        }
+    }
+
+    var closingBalance: Decimal? {
+        switch closingBalanceMoney {
+        case .some(let money):
+            return money.amount
+        case .none:
+            return nil
+        }
+    }
 
     let passed: Bool
 
