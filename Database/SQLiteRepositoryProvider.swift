@@ -66,6 +66,26 @@ struct DevelopmentDatabaseIdentity: Equatable {
 }
 #endif
 
+enum SQLiteRepositoryProviderError: Error, Equatable, LocalizedError {
+    case databaseOpenFailed
+    case databaseInitializationFailed
+    case migrationIntegrityFailed(MigrationIntegrityError)
+    case migrationFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .databaseOpenFailed:
+            return "The durable database could not be opened."
+        case .databaseInitializationFailed:
+            return "The durable database could not be initialized safely."
+        case .migrationIntegrityFailed:
+            return "The database migration history did not pass integrity verification."
+        case .migrationFailed:
+            return "The required database migrations could not be completed."
+        }
+    }
+}
+
 /// SQLite-backed provider that runs migrations and exposes repository implementations.
 public final class SQLiteRepositoryProvider {
     public let databasePath: String
@@ -75,13 +95,41 @@ public final class SQLiteRepositoryProvider {
     public let accountRepo: AccountRepository
     public let importSessionRepo: ImportSessionRepository
 
-    public init(path: String? = nil) throws {
+    public convenience init(path: String? = nil) throws {
+        try self.init(path: path, migrations: allMigrations)
+    }
+
+    init(path: String?, migrations: [Migration]) throws {
+        do {
+            try MigrationChainValidator.validateRegistered(migrations)
+        } catch let error as MigrationIntegrityError {
+            throw SQLiteRepositoryProviderError.migrationIntegrityFailed(error)
+        }
         let dbPath = path ?? Self.defaultDBPath()
         self.databasePath = dbPath
-        self.database = SQLiteDatabase(path: dbPath)
-        try database.open()
-        try database.runMigrations(allMigrations)
-        try database.execute(sql: "PRAGMA foreign_keys = ON;")
+        let database = SQLiteDatabase(path: dbPath)
+        do {
+            try database.open()
+        } catch {
+            database.close()
+            throw SQLiteRepositoryProviderError.databaseOpenFailed
+        }
+        do {
+            try database.runMigrations(migrations)
+        } catch let error as MigrationIntegrityError {
+            database.close()
+            throw SQLiteRepositoryProviderError.migrationIntegrityFailed(error)
+        } catch {
+            database.close()
+            throw SQLiteRepositoryProviderError.migrationFailed
+        }
+        do {
+            try database.execute(sql: "PRAGMA foreign_keys = ON;")
+        } catch {
+            database.close()
+            throw SQLiteRepositoryProviderError.databaseInitializationFailed
+        }
+        self.database = database
 
         self.workspaceRepo = SQLiteWorkspaceRepo(db: database)
         self.transactionRepo = SQLiteTransactionRepo(db: database)
@@ -304,7 +352,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             let url = identity.temporaryDirectoryURL
                 .appendingPathComponent("temporary-\(UUID().uuidString).sqlite")
             let provider = try SQLiteRepositoryProvider(path: url.path)
-            publish(provider)
+            publish(provider, state: .intentionalNonDurable(.debugTemporarySQLite))
             providerChanged = true
             let hydration = try RepositoryStoreHydrator(databaseProvider: DatabaseProvider.shared, participatesInLifecycleGate: false)
                 .hydrateIfNeeded(forceRefresh: true)
@@ -356,7 +404,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
                 try? replacement.database.checkpointAndClose()
                 return recover(afterHydrationFailure: false, originalFailure: .providerInstallationFailed)
             }
-            publish(replacement)
+            publish(replacement, state: .verifiedSQLite)
             providerChanged = true
             do {
                 try failIfInjected(.hydration)
@@ -381,7 +429,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             try removeDatabaseSet(at: identity.canonicalDevelopmentURL)
             try FileManager.default.copyItem(at: identity.backupURL, to: identity.canonicalDevelopmentURL)
             let restored = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
-            publish(restored)
+            publish(restored, state: .verifiedSQLite)
             _ = try RepositoryStoreHydrator(databaseProvider: DatabaseProvider.shared, participatesInLifecycleGate: false)
                 .hydrateIfNeeded(forceRefresh: true)
             return afterHydrationFailure ? .hydrationFailedRecoverySucceeded : originalFailure
@@ -389,6 +437,8 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             isUnavailable = true
             activityGate.enterUnavailable()
             DatabaseProvider.shared.invalidateGeneration()
+            DatabaseProvider.shared = .unavailable(reason: .lifecycleUnavailable)
+            sqliteProvider = nil
             return .recoveryFailed
         }
     }
@@ -405,10 +455,10 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
         let verification = SQLiteDatabase(path: identity.backupURL.path)
         try verification.open()
         defer { verification.close() }
-        let version = try verification.queryInt("SELECT COALESCE(MAX(version), 0) FROM schema_migrations;")
-        guard version == allMigrations.map(\.version).max() else {
-            throw SQLiteDatabaseError.backupFailed("migration-state")
-        }
+        _ = try verification.validatedMigrationHistory(
+            against: allMigrations,
+            requiresCompleteChain: true
+        )
         let requiredTables = ["accounts", "transactions", "import_sessions", "import_attempts"]
         for table in requiredTables {
             let count = try verification.queryInt(
@@ -426,7 +476,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
         }
     }
 
-    private func publish(_ provider: SQLiteRepositoryProvider) {
+    private func publish(_ provider: SQLiteRepositoryProvider, state: PersistenceState = .verifiedSQLite) {
 #if DEBUG
         DatabaseProvider.shared.invalidateGeneration()
 #endif
@@ -435,6 +485,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             transactionRepo: provider.transactionRepo,
             accountRepo: provider.accountRepo,
             importSessionRepo: provider.importSessionRepo,
+            persistenceState: state,
             protectsGeneration: true
         )
         sqliteProvider = provider

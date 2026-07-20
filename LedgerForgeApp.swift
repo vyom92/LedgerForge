@@ -10,8 +10,6 @@ import SwiftUI
 @main
 struct LedgerForgeApp: App {
     private static var sqliteProvider: SQLiteRepositoryProvider?
-    private static var configuredProviderState = "In-memory repository provider"
-    private static var configuredDatabasePath: String?
 
     init() {
         Self.configurePersistence()
@@ -25,34 +23,31 @@ struct LedgerForgeApp: App {
 
     @discardableResult
     static func configurePersistence(path: String? = nil) -> Bool {
+#if DEBUG
+        DatabaseProvider.shared.invalidateGeneration()
+#endif
+        DatabaseProvider.shared = .unavailable(reason: .notInitialized)
+        sqliteProvider = nil
         do {
             _ = try installSQLiteProvider(path: path)
-            DeveloperConsole.shared.log("Persistence bootstrap connected to SQLite.")
+            DeveloperConsole.shared.info(.database, "Persistence bootstrap verified")
             return true
         } catch {
-            DatabaseProvider.shared = DatabaseProvider(inMemory: true)
-            sqliteProvider = nil
-            configuredProviderState = "In-memory repository provider"
-            configuredDatabasePath = nil
-            DeveloperConsole.shared.log("Persistence bootstrap failed. Falling back to in-memory repositories.")
-            DeveloperConsole.shared.log(error.localizedDescription)
+            let reason = PersistenceFailureClassifier.classify(error)
+            DatabaseProvider.shared = .unavailable(reason: reason)
+            DeveloperConsole.shared.error(
+                .database,
+                "Persistence bootstrap unavailable",
+                metadata: ["reason": reason.rawValue]
+            )
             return false
         }
     }
 
     static func configureInMemoryPersistenceForTesting() {
-        DatabaseProvider.shared = DatabaseProvider(inMemory: true)
+        sqliteProvider?.database.close()
+        DatabaseProvider.shared = .intentionalNonDurable(.testMemory)
         sqliteProvider = nil
-        configuredProviderState = "In-memory repository provider"
-        configuredDatabasePath = nil
-    }
-
-    static func currentProviderState() -> String {
-        configuredProviderState
-    }
-
-    static func currentSQLiteDatabasePath() -> String? {
-        configuredDatabasePath
     }
 
 #if DEBUG
@@ -68,17 +63,11 @@ struct LedgerForgeApp: App {
     @discardableResult
     private static func installSQLiteProvider(path: String? = nil) throws -> SQLiteRepositoryProvider {
         let provider = try SQLiteRepositoryProvider(path: path)
-        DatabaseProvider.shared = DatabaseProvider(
-            workspaceRepo: provider.workspaceRepo,
-            transactionRepo: provider.transactionRepo,
-            accountRepo: provider.accountRepo,
-            importSessionRepo: provider.importSessionRepo
-        )
         sqliteProvider = provider
-        configuredProviderState = "SQLite repository provider"
-        configuredDatabasePath = provider.databasePath
 #if DEBUG
         DevelopmentDatabaseLifecycleCoordinator.shared.installInitialProvider(provider)
+#else
+        DatabaseProvider.shared = .verifiedSQLite(provider)
 #endif
         return provider
     }

@@ -1,18 +1,22 @@
 # Repository State
 
 - Primary branch: `main`.
-- Latest verified completed increment: Sprint 46 — Parent-Record Upsert Safety and SQLite/In-Memory Parity.
-- Latest relevant implementation commits: `d9009fb` — Preserve parent state during upsert; `b9e68ce` — Stabilize import-lifecycle cancellation synchronization; `f288834` — Apply approved macOS permission settings.
+- Latest verified completed increment: Sprint 47 — Verified Persistence Startup and Migration Integrity.
+- Sprint 47 implementation commit: the single Sprint 47 commit containing this state update; its exact SHA is recorded by Git and the completion report.
+- Earlier relevant implementation commits: `d9009fb` — Preserve parent state during upsert; `b9e68ce` — Stabilize import-lifecycle cancellation synchronization; `f288834` — Apply approved macOS permission settings.
 - Current migration: V4, including the bounded `import_attempts` ledger.
 - Current accepted ADR: ADR-035 — Development Database Lifecycle and Recoverable Reset.
 - Architecture baseline: Architecture v1.0 Frozen and UI/UX v1.0 Frozen.
-- Build state: clean Debug and normal optimized Release builds pass for Sprint 46; static analysis passes. Both builds emitted four existing `AccountStore` actor-isolation warnings; no warning is attributable to Sprint 46.
-- Latest verified automated result: 249 executed test cases, 0 failures, 0 skipped. Generic `LedgerForgeUITests` remained intentionally disabled.
+- Build state: Debug and normal optimized Release builds pass for Sprint 47; static analysis passes. Debug emitted no source warnings. Optimized Release emitted the same four existing `AccountStore` actor-isolation warnings; no warning is attributable to Sprint 47.
+- Latest verified automated result: 284 executed test cases across 37 suites, 0 failures and no unexpected skips. Generic `LedgerForgeUITests` remained intentionally disabled.
 
 ## Current Production Capability
 
 - Production import is verified for the approved Axis Bank NRE CSV path through the unified import framework.
 - The pipeline performs reader, institution detection, statement classification, parser selection, immutable `FinancialDocument`, validation, duplicate evaluation, explicit confirmation and repository-owned persistence.
+- Sprint 47 makes `DatabaseProvider` the atomic authority for active repositories and typed persistence state. Production publishes verified SQLite repositories only after open, complete V1-V4 history validation, pending migration execution and final-chain revalidation all succeed.
+- Open, initialization, migration-integrity or migration-execution failure installs centrally rejecting unavailable repositories rather than an in-memory substitute. Import preparation and confirmation, hydration and account metadata mutation gate early, while every repository operation remains centrally fail-closed.
+- Settings and Developer Console distinguish verified durable SQLite, unavailable persistence and explicitly selected non-durable test or Debug providers without exposing database paths, raw SQL or raw SQLite errors.
 - Parser-owned verified identity resolution supports the approved Axis account path and explicit existing-account or create-account decisions.
 - Exact reader-content duplicate protection uses the versioned ADR-030 authority.
 - Bounded parser-verified Axis UPI transaction-event blocking uses the ADR-031 authority; blocked imports do not silently omit transactions.
@@ -41,7 +45,6 @@
 - Unsupported transaction-event families, including IMPS, NEFT, e-commerce, refunds, reversals and unstructured references, remain unevaluated.
 - Generic UI tests remain intentionally disabled; supported runtime behavior is covered by the documented manual and automated boundaries.
 - No rollback, resumable import job, batch queue or cancellation after confirmed persistence exists. Confirmed-persistence failure retry remains unsupported pending typed authoritative safety evidence.
-- `FW-P0-21` persistence-bootstrap fail-closed behavior and `FW-P0-24` migration-chain integrity verification remain unimplemented.
 
 ## Recent Verified Changes
 
@@ -53,6 +56,7 @@
 - Sprint 44 implemented validated Money parser output, canonical catalog-scale writes, strict decimal/minor/currency hydration and grouped native-currency presentation without a schema migration. Development and test databases may be recreated or reseeded rather than retaining obsolete lexical decimal forms.
 - Sprint 45 Phase A accepted ADR-035 and implemented recoverable permanent reset of the canonical Debug development database, distinct temporary-session semantics, verified backup and automatic recovery, provider-generation invalidation, exclusive activity leases and canonical hydration without a schema migration. Temporary-session and permanent-reset relaunch behavior, backup contents and all four active-state exclusions were directly verified. Phase B (`FW-P1-37` and `FW-P1-40`) was not started.
 - Sprint 46 replaced destructive SQLite workspace/account parent replacement with explicit in-place conflict updates, preserving dependent durable graphs, immutable IDs and unowned account lifecycle/provenance fields. SQLite-specific foreign-key checks and SQLite/In-Memory parity coverage pass without a migration or ADR change. The import-lifecycle cancellation test now uses a deterministic test-only start/cancellation handshake; production import behavior is unchanged. The approved macOS permission settings build and launch in both Debug and optimized Release.
+- Sprint 47 implemented one shared migration-chain validator for startup and Debug backup verification, provider-owned typed persistence state, fail-closed production bootstrap, centrally unavailable repositories, early import/hydration/metadata gates and truthful path-free status presentation. Fresh databases, every V1-V4 upgrade/reopen path, malformed histories, bootstrap failures, unavailable enforcement and intentional memory providers are covered without Migration V5 or an ADR change.
 - ADR-034 accepted the document-scoped card-statement evidence boundary after integrated American Express, CBQ and Axis fixture evidence and the completed cross-family review. It does not establish card persistence, production parsing, or card semantics beyond source-owned evidence.
 - Source-faithful sanitized Axis NRO CSV, PDF and XLS regression evidence is integrated across two overlapping ranges. Range 1 records institution-supplied cross-format divergence; these fixtures do not constitute Axis NRO production parser support.
 - Clean-room Axis credit-card PDF and XLSX fixture evidence is integrated for two consecutive, non-overlapping periods. The PDFs contain 140 and 151 canonical transaction rows; the XLSX workbooks contain 143 and 154, including three legitimate XLSX-only source-format rows per period and no PDF-only rows. One fictional customer, account and instrument continue with no supplementary-instrument evidence. Statement currency is INR; Debit/Credit remains an observed source marker only, and no original-currency or FX evidence was introduced. The PDFs retain native selectable text without OCR, and the declared PDF geometry and workbook structures are preserved while PDF object and OOXML package identity are intentionally not preserved. Axis card PDF/XLSX production parsing and card semantics remain unsupported.

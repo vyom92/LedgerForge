@@ -641,7 +641,11 @@ struct ContentView: View {
                     LFPanel(title: "System Information") {
                         LFInfoRow(title: "Version", value: "1.0.0")
                         LFInfoRow(title: "Environment", value: "Local")
-                        LFInfoRow(title: "Database", value: "SQLite")
+                        LFInfoRow(title: "Persistence", value: DatabaseProvider.shared.persistenceState.displayName)
+                        LFInfoRow(title: "Persistence Status", value: DatabaseProvider.shared.persistenceState.statusMessage)
+                        if let guidance = DatabaseProvider.shared.persistenceState.recoveryGuidance {
+                            LFInfoRow(title: "Recovery", value: guidance)
+                        }
                         LFInfoRow(title: "Runtime State", value: dashboardViewModel.presentationState.message)
                     }
 

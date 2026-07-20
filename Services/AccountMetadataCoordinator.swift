@@ -4,6 +4,7 @@
 import Foundation
 
 enum AccountMetadataCoordinatorError: Error, Equatable {
+    case persistenceUnavailable
     case saveFailed
     case savedButRefreshFailed
 }
@@ -19,6 +20,7 @@ final class AccountMetadataCoordinator: AccountMetadataCoordinating {
     private let accountRepository: AccountRepository
     private let hydrator: RepositoryStoreHydrator
     private let developerConsole: DeveloperConsole?
+    private let persistenceState: PersistenceState
 
     convenience init(
         databaseProvider: DatabaseProvider = .shared,
@@ -28,21 +30,28 @@ final class AccountMetadataCoordinator: AccountMetadataCoordinating {
         self.init(
             accountRepository: databaseProvider.accountRepo,
             hydrator: RepositoryStoreHydrator(databaseProvider: databaseProvider, workspaceId: workspaceId),
-            developerConsole: developerConsole
+            developerConsole: developerConsole,
+            persistenceState: databaseProvider.persistenceState
         )
     }
 
     init(
         accountRepository: AccountRepository,
         hydrator: RepositoryStoreHydrator,
-        developerConsole: DeveloperConsole? = .shared
+        developerConsole: DeveloperConsole? = .shared,
+        persistenceState: PersistenceState = .intentionalNonDurable(.testMemory)
     ) {
         self.accountRepository = accountRepository
         self.hydrator = hydrator
         self.developerConsole = developerConsole
+        self.persistenceState = persistenceState
     }
 
     func updateDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool {
+        guard persistenceState.isUsable else {
+            developerConsole?.error(.runtime, "Account display-name update blocked because persistence is unavailable")
+            throw AccountMetadataCoordinatorError.persistenceUnavailable
+        }
         developerConsole?.info(.runtime, "Account display-name update requested")
 
         let didUpdate: Bool

@@ -163,6 +163,7 @@ final class ImportEngine {
 
     private let importCoordinator: any ImportFramework.ImportCoordinator
     private let importPersistenceCoordinatorFactory: () -> ImportPersistenceCoordinating
+    private let persistenceStateProvider: () -> PersistenceState
     private let developerConsole: DeveloperConsole
     private let committedPreparedImportLock = NSLock()
     private var committedPreparedImportIDs: Set<UUID> = []
@@ -176,10 +177,12 @@ final class ImportEngine {
             passwordProvider: DefaultPasswordProvider()
         ),
         importPersistenceCoordinator: ImportPersistenceCoordinating? = nil,
-        developerConsole: DeveloperConsole = .shared
+        developerConsole: DeveloperConsole = .shared,
+        persistenceStateProvider: @escaping () -> PersistenceState = { DatabaseProvider.shared.persistenceState }
     ) {
         self.importCoordinator = importCoordinator
         self.developerConsole = developerConsole
+        self.persistenceStateProvider = persistenceStateProvider
         if let importPersistenceCoordinator {
             self.importPersistenceCoordinatorFactory = {
                 importPersistenceCoordinator
@@ -243,6 +246,9 @@ final class ImportEngine {
         requestId: UUID = UUID(),
         progress: @escaping (ImportProgress) -> Void = { _ in }
     ) async throws -> PreparedImport {
+        guard persistenceStateProvider().isUsable else {
+            throw PersistenceWorkflowError.unavailable
+        }
 #if DEBUG
         let lifecycleLease = try DevelopmentDatabaseActivityGate.shared.begin(.importPreparation)
         var transfersLifecycleLease = false
@@ -366,7 +372,10 @@ final class ImportEngine {
     }
 
     func reviewPreparedImport(_ preparedImport: PreparedImport) throws -> ImportIdentityReview {
-        try importPersistenceCoordinatorFactory().reviewValidatedImport(
+        guard persistenceStateProvider().isUsable else {
+            throw PersistenceWorkflowError.unavailable
+        }
+        return try importPersistenceCoordinatorFactory().reviewValidatedImport(
             financialDocument: preparedImport.financialDocument,
             validation: preparedImport.validation
         )
@@ -384,6 +393,16 @@ final class ImportEngine {
             lifecycleLeases.removeValue(forKey: preparedImport.id)
         }
 #endif
+        guard persistenceStateProvider().isUsable else {
+            developerConsole.error(.database, "Import blocked because persistence is unavailable")
+            return ImportEngineResult(
+                fileName: preparedImport.fileName,
+                transactionCount: preparedImport.transactionCount,
+                validationPassed: preparedImport.validation.passed,
+                persisted: false,
+                errorMessage: PersistenceWorkflowError.unavailable.localizedDescription
+            )
+        }
         guard preparedImport.validation.passed else {
             let attemptID = importPersistenceCoordinatorFactory().recordValidationFailure(fileName: preparedImport.fileName, transactionCount: preparedImport.transactionCount)
             developerConsole.error(.validation, "Validation failed", metadata: ["file": preparedImport.fileName])

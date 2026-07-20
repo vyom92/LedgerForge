@@ -7,7 +7,11 @@ import Testing
 struct ImportLifecycleTests {
 
     @Test func approvedAxisPreparationEmitsOrderedNamedStagesWithoutSourceEvidence() async throws {
-        let engine = ImportEngine(importPersistenceCoordinator: PreparationOnlyPersistenceCoordinator())
+        LedgerForgeApp.configureInMemoryPersistenceForTesting()
+        let engine = ImportEngine(
+            importPersistenceCoordinator: PreparationOnlyPersistenceCoordinator(),
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+        )
         let requestID = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
         var progress: [ImportProgress] = []
 

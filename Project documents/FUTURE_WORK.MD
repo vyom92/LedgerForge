@@ -273,27 +273,6 @@ After ADR-037 acceptance and lifecycle revalidation, this candidate may proceed 
 
 # P0 — Immediate Stability and Financial-Presentation Safety
 
-## FW-P0-21 — Persistence Bootstrap Must Fail Closed
-
-**Status:** Bug  
-**Depends on:** Existing provider-bootstrap and database-lifecycle boundaries
-
-Prevent production use when durable SQLite initialization, opening or migration fails.
-
-Required outcomes include:
-
-- no silent substitution of an in-memory provider in production;
-- one application-wide persistence lifecycle state;
-- explicit distinction between durable SQLite, unavailable persistence and intentionally selected development or test memory storage;
-- import preparation, confirmation and every repository mutation blocked while durable persistence is unavailable;
-- Settings and other status surfaces reporting the actual provider type and a truthful, privacy-safe persistence state;
-- clear recovery guidance without exposing sensitive file paths or financial source content;
-- in-memory providers limited to tests and explicitly selected development sessions.
-
-A successfully launched interface must never imply durable storage when the active provider is non-durable.
-
----
-
 ## FW-P0-23 — Financial Presentation Truth and Provenance
 
 **Status:** Bug  
@@ -318,33 +297,6 @@ This item does not include:
 - visual polish unrelated to financial truth.
 
 Those concerns remain governed by their P2 candidates.
-
----
-
-## FW-P0-24 — Migration-Chain Integrity Verification
-
-**Status:** Maintenance  
-**Depends on:** Existing migration framework
-
-Verify the complete ordered migration history whenever a durable provider starts.
-
-Verification must cover:
-
-- migration version;
-- migration name;
-- stored checksum;
-- uniqueness of every version;
-- continuity of the supported migration chain;
-- missing lower migrations;
-- duplicate migration records;
-- edited previously applied migrations;
-- incomplete migration records;
-- unsupported future migration versions;
-- valid upgrades from every supported prior schema version.
-
-A migration-history mismatch must fail closed with privacy-safe diagnostics and recovery guidance.
-
-Focused implementation tests belong with this item. Broader corruption and recovery regression coverage remains governed by `FW-P2-65`.
 
 ---
 
@@ -1866,7 +1818,7 @@ Expand currency regression coverage once a second production currency exists; do
 ## FW-P2-65 — Repository Corruption and Recovery Tests
 
 **Status:** Research  
-**Depends on:** Successful completion and approval of Sprint 41, plus approved persistence-bootstrap and migration-integrity behaviour
+**Depends on:** Successful completion and approval of Sprint 47, plus an approved broader corruption-recovery test boundary
 
 Define a broader repository corruption and recovery regression matrix beyond the focused tests required by individual implementation candidates.
 
@@ -1889,7 +1841,7 @@ Coverage should include:
 
 This item does not authorize automated repair.
 
-Production repair remains governed by `FW-P0-08`. Focused implementation tests for fail-closed startup and migration-chain verification remain governed by `FW-P0-21` and `FW-P0-24`.
+Production repair remains governed by `FW-P0-08`. Sprint 47 completed focused fail-closed startup and migration-chain verification tests; this candidate remains limited to the broader corruption and recovery regression matrix.
 
 ---
 
@@ -1942,7 +1894,7 @@ Required outcomes include:
 - no binary zero-or-one count derived from the currently selected filename;
 - an explicit unavailable state when a requested count cannot be derived from the current durable model.
 
-Persistence-provider status remains governed by `FW-P0-21`.
+Persistence-provider status was completed by Sprint 47; this candidate remains limited to repository-backed counts.
 
 ---
 

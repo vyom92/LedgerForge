@@ -184,28 +184,56 @@ public final class SQLiteDatabase {
     }
 
     public func runMigrations(_ migrations: [Migration]) throws {
+        try MigrationChainValidator.validateRegistered(migrations)
         try open()
-        // Ensure schema_migrations exists
+
+        let hasMigrationTable = try tableExists("schema_migrations")
+        let hasApplicationSchema = try querySingleInt(sql: """
+            SELECT COUNT(*) FROM sqlite_master
+            WHERE type = 'table'
+              AND name NOT IN ('schema_migrations', 'sqlite_sequence');
+            """) > 0
+
+        if !hasMigrationTable, hasApplicationSchema {
+            throw MigrationIntegrityError.missingPersistedVersion(1)
+        }
+
+        var persistedRecords = hasMigrationTable ? try migrationRecords() : []
+        if persistedRecords.isEmpty, hasApplicationSchema {
+            throw MigrationIntegrityError.missingPersistedVersion(1)
+        }
+        if !persistedRecords.isEmpty {
+            try MigrationChainValidator.validatePersisted(
+                persistedRecords,
+                against: migrations,
+                requiresCompleteChain: false
+            )
+        }
+
         try execute(sql: "CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, version INTEGER NOT NULL, name TEXT, applied_at DATETIME NOT NULL, checksum TEXT);")
 
-        // Find current max version
-        let currentVersion = try querySingleInt(sql: "SELECT COALESCE(MAX(version),0) FROM schema_migrations;")
-
-        for migration in migrations.sorted(by: { $0.version < $1.version }) {
-            if migration.version <= currentVersion { continue }
+        for migration in migrations.dropFirst(persistedRecords.count) {
             try beginTransaction()
             do {
                 try execute(sql: migration.sql)
-                let checksum = sha256(migration.sql)
                 let now = iso8601Now()
-                let insert = "INSERT INTO schema_migrations(version,name,applied_at,checksum) VALUES(\(migration.version),'\(escape(migration.name))','\(now)','\(checksum)');"
-                try execute(sql: insert)
+                try executePrepared(
+                    sql: "INSERT INTO schema_migrations(version, name, applied_at, checksum) VALUES(?, ?, ?, ?);",
+                    params: [migration.version, migration.name, now, migration.checksum]
+                )
                 try commit()
             } catch {
-                try rollback()
+                try? rollback()
                 throw error
             }
         }
+
+        persistedRecords = try migrationRecords()
+        try MigrationChainValidator.validatePersisted(
+            persistedRecords,
+            against: migrations,
+            requiresCompleteChain: true
+        )
     }
 
     // MARK: - Helpers
@@ -235,6 +263,23 @@ public final class SQLiteDatabase {
 
     public func queryInt(_ sql: String) throws -> Int {
         return try querySingleInt(sql: sql)
+    }
+
+    func validatedMigrationHistory(
+        against migrations: [Migration],
+        requiresCompleteChain: Bool
+    ) throws -> [PersistedMigrationRecord] {
+        try MigrationChainValidator.validateRegistered(migrations)
+        guard try tableExists("schema_migrations") else {
+            throw MigrationIntegrityError.missingPersistedVersion(1)
+        }
+        let records = try migrationRecords()
+        try MigrationChainValidator.validatePersisted(
+            records,
+            against: migrations,
+            requiresCompleteChain: requiresCompleteChain
+        )
+        return records
     }
 
     private func bind(_ params: [Any?], to stmt: OpaquePointer?) {
@@ -267,19 +312,26 @@ public final class SQLiteDatabase {
         return f.string(from: Date())
     }
 
-    private func sha256(_ s: String) -> String {
-        guard let data = s.data(using: .utf8) else { return "" }
-        var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
-        data.withUnsafeBytes { ptr in
-            _ = CC_SHA256(ptr.baseAddress, CC_LONG(data.count), &hash)
-        }
-        return hash.map { String(format: "%02x", $0) }.joined()
+    private func tableExists(_ name: String) throws -> Bool {
+        try querySingleInt(
+            sql: "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '\(name)';"
+        ) == 1
     }
 
-    private func escape(_ s: String) -> String {
-        return s.replacingOccurrences(of: "'", with: "''")
+    private func migrationRecords() throws -> [PersistedMigrationRecord] {
+        do {
+            return try query(sql: "SELECT version, name, checksum, applied_at FROM schema_migrations ORDER BY id;") { row in
+                PersistedMigrationRecord(
+                    version: row.int64(at: 0).map(Int.init),
+                    name: row.string(at: 1),
+                    checksum: row.string(at: 2),
+                    appliedAt: row.string(at: 3)
+                )
+            }
+        } catch let error as MigrationIntegrityError {
+            throw error
+        } catch {
+            throw MigrationIntegrityError.persistedRecordIncomplete(nil)
+        }
     }
 }
-
-// Import CommonCrypto SHA256 symbol
-import CommonCrypto

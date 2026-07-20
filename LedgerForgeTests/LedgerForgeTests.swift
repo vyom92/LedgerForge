@@ -120,16 +120,16 @@ struct LedgerForgeTests {
         ])
 
         let snapshot = DeveloperConsole.runtimeSnapshot(
-            providerState: "SQLite repository provider",
-            databasePath: "/tmp/sprint30.sqlite",
+            persistenceState: .verifiedSQLite,
             hydrationStatus: "Forced refresh completed",
             latestRefreshResult: "1 account(s), 1 transaction(s)"
         )
 
         #expect(snapshot.accountCount == 1)
         #expect(snapshot.transactionCount == 1)
-        #expect(snapshot.providerState == "SQLite repository provider")
-        #expect(snapshot.databasePath == "/tmp/sprint30.sqlite")
+        #expect(snapshot.persistenceState == .verifiedSQLite)
+        #expect(snapshot.persistenceState.displayName == "Verified SQLite")
+        #expect(snapshot.persistenceState.recoveryGuidance == nil)
     }
 
     @Test func logSearchCopyAndClearUseStructuredDiagnosticEntries() async {

@@ -277,7 +277,11 @@ struct DeveloperDiagnosticsTests {
         }
 
         let persistence = DiagnosticPersistenceCoordinator()
-        let engine = ImportEngine(importPersistenceCoordinator: persistence, developerConsole: console)
+        let engine = ImportEngine(
+            importPersistenceCoordinator: persistence,
+            developerConsole: console,
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+        )
         let result = await engine.importFileAndReturnResult(
             from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
         )
@@ -327,7 +331,11 @@ struct DeveloperDiagnosticsTests {
         }
 
         let persistence = DiagnosticPersistenceCoordinator()
-        let engine = ImportEngine(importPersistenceCoordinator: persistence, developerConsole: console)
+        let engine = ImportEngine(
+            importPersistenceCoordinator: persistence,
+            developerConsole: console,
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+        )
         let result = await engine.importFileAndReturnResult(from: url)
 
         #expect(!result.succeeded)

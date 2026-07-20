@@ -212,6 +212,27 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(setup.coordinator.startTemporaryEmptySession() == .lifecycleUnavailable)
     }
 
+    @Test func backupVerificationRejectsTamperedLowerMigrationMetadataEvenWhenHighestVersionIsCurrent() throws {
+        let setup = try makeSeededCoordinator(named: "TamperedBackup", failures: [])
+        defer { try? FileManager.default.removeItem(at: setup.root) }
+        try DatabaseProvider.shared.workspaceRepo.workspace(id: "workspace-lifecycle").map { _ in }
+        guard let provider = try? SQLiteRepositoryProvider(path: setup.identity.canonicalDevelopmentURL.path) else {
+            Issue.record("Expected canonical provider")
+            return
+        }
+        provider.database.close()
+
+        let tamper = SQLiteDatabase(path: setup.identity.canonicalDevelopmentURL.path)
+        try tamper.open()
+        try tamper.executePrepared(
+            sql: "UPDATE schema_migrations SET name = ? WHERE version = ?;",
+            params: ["tampered", 2]
+        )
+        tamper.close()
+
+        #expect(setup.coordinator.resetDevelopmentDatabase() == .backupFailed)
+    }
+
     private func makeSeededCoordinator(
         named name: String,
         failures: Set<DevelopmentDatabaseLifecycleFailurePoint>

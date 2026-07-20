@@ -658,7 +658,10 @@ struct ImportRepositoryIntegrationTests {
                 workspaceName: "Import Integration Workspace"
             )
         )
-        let firstEngine = ImportEngine(importPersistenceCoordinator: firstCoordinator)
+        let firstEngine = ImportEngine(
+            importPersistenceCoordinator: firstCoordinator,
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+        )
         let firstPrepared = try await firstEngine.prepareImport(from: originalURL)
         #expect(firstPrepared.transactionCount == 81)
         let first = await firstEngine.commitPreparedImport(firstPrepared, accountChoice: .createNewAccount)
@@ -691,7 +694,10 @@ struct ImportRepositoryIntegrationTests {
                 workspaceName: "Import Integration Workspace"
             )
         )
-        let relaunchedEngine = ImportEngine(importPersistenceCoordinator: relaunchedCoordinator)
+        let relaunchedEngine = ImportEngine(
+            importPersistenceCoordinator: relaunchedCoordinator,
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+        )
         let duplicatePrepared = try await relaunchedEngine.prepareImport(from: renamedURL)
         #expect(duplicatePrepared.fingerprint == firstPrepared.fingerprint)
         #expect(duplicatePrepared.advisoryPreviousImport?.importSessionId == firstSessionId)
@@ -797,7 +803,10 @@ struct ImportRepositoryIntegrationTests {
             importSessionRepo: provider.importSessionRepo,
             transactionRepo: provider.transactionRepo
         )
-        let engine = ImportEngine(importPersistenceCoordinator: coordinator)
+        let engine = ImportEngine(
+            importPersistenceCoordinator: coordinator,
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+        )
 
         let prepared = try await engine.prepareImport(
             from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
@@ -1038,7 +1047,10 @@ struct ImportRepositoryIntegrationTests {
                 importSessionRepo: repository,
                 workspaceID: workspaceID
             )
-            let engine = ImportEngine(importPersistenceCoordinator: coordinator)
+            let engine = ImportEngine(
+                importPersistenceCoordinator: coordinator,
+                persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+            )
             let prepared = makeIntegrationPreparedImport(
                 fixture: fixture,
                 rawContents: "failed-validation-fixture"
@@ -1113,7 +1125,10 @@ struct ImportRepositoryIntegrationTests {
                 importSessionRepo: repository,
                 workspaceID: workspaceID
             )
-            let engine = ImportEngine(importPersistenceCoordinator: coordinator)
+            let engine = ImportEngine(
+                importPersistenceCoordinator: coordinator,
+                persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+            )
             let prepared = makeIntegrationPreparedImport(fixture: fixture, rawContents: rawContents)
 
             let result = await engine.commitPreparedImport(prepared)
@@ -1181,7 +1196,10 @@ struct ImportRepositoryIntegrationTests {
                 importSessionRepo: repository,
                 workspaceID: workspaceID
             )
-            let engine = ImportEngine(importPersistenceCoordinator: coordinator)
+            let engine = ImportEngine(
+                importPersistenceCoordinator: coordinator,
+                persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+            )
             let prepared = makeIntegrationPreparedImport(fixture: fixture, rawContents: rawContents)
 
             let result = await engine.commitPreparedImport(prepared)

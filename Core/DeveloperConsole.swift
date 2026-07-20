@@ -35,12 +35,11 @@ struct DeveloperLogEntry: Identifiable, Equatable, Codable {
 }
 
 struct DeveloperConsoleSnapshot: Equatable {
-    let providerState: String
+    let persistenceState: PersistenceState
     let hydrationStatus: String
     let latestRefreshResult: String
     let accountCount: Int
     let transactionCount: Int
-    let databasePath: String?
 }
 
 // MARK: - Console
@@ -202,20 +201,18 @@ final class DeveloperConsole: ObservableObject {
     // MARK: - Runtime Snapshot
 
     static func runtimeSnapshot(
-        providerState: String,
-        databasePath: String?,
+        persistenceState: PersistenceState,
         hydrationStatus: String,
         latestRefreshResult: String,
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared
     ) -> DeveloperConsoleSnapshot {
         DeveloperConsoleSnapshot(
-            providerState: providerState,
+            persistenceState: persistenceState,
             hydrationStatus: hydrationStatus,
             latestRefreshResult: latestRefreshResult,
             accountCount: accountStore.accounts.count,
-            transactionCount: transactionStore.transactions.count,
-            databasePath: databasePath
+            transactionCount: transactionStore.transactions.count
         )
     }
 }

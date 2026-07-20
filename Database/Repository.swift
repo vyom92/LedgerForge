@@ -6,6 +6,7 @@ import Foundation
 
 public enum RepositoryError: Error, LocalizedError {
     case providerNotConfigured(String)
+    case persistenceUnavailable
     case recordNotFound(String)
     case relationshipViolation(String)
     case staleProviderGeneration
@@ -15,6 +16,8 @@ public enum RepositoryError: Error, LocalizedError {
         switch self {
         case .providerNotConfigured(let repositoryName):
             return "\(repositoryName) is not configured. Install a concrete DatabaseProvider before using repository APIs."
+        case .persistenceUnavailable:
+            return "Persistence is unavailable. No repository data was read or changed."
         case .recordNotFound(let message):
             return message
         case .relationshipViolation(let message):
@@ -24,6 +27,97 @@ public enum RepositoryError: Error, LocalizedError {
         case .conflictingAccountIdentifier(let workspaceId, let scheme, _, let existingAccountId, let attemptedAccountId):
             return "Identifier \(scheme) is already assigned in workspace \(workspaceId) to account \(existingAccountId), not \(attemptedAccountId)."
         }
+    }
+}
+
+public enum PersistenceUnavailableReason: String, Equatable {
+    case notInitialized
+    case databaseOpenFailed
+    case databaseInitializationFailed
+    case migrationIntegrityFailed
+    case migrationFailed
+    case lifecycleUnavailable
+    case unknown
+}
+
+enum PersistenceFailureClassifier {
+    static func classify(_ error: Error) -> PersistenceUnavailableReason {
+        switch error {
+        case SQLiteRepositoryProviderError.databaseOpenFailed:
+            return .databaseOpenFailed
+        case SQLiteRepositoryProviderError.databaseInitializationFailed:
+            return .databaseInitializationFailed
+        case SQLiteRepositoryProviderError.migrationIntegrityFailed:
+            return .migrationIntegrityFailed
+        case SQLiteRepositoryProviderError.migrationFailed:
+            return .migrationFailed
+        case is MigrationIntegrityError:
+            return .migrationIntegrityFailed
+        default:
+            return .unknown
+        }
+    }
+}
+
+enum PersistenceWorkflowError: Error, Equatable, LocalizedError {
+    case unavailable
+
+    var errorDescription: String? {
+        "Persistence is unavailable. The statement was not processed or saved."
+    }
+}
+
+public enum PersistenceNonDurablePurpose: String, Equatable {
+    case testMemory
+    case debugMemory
+    case debugTemporarySQLite
+}
+
+public enum PersistenceState: Equatable {
+    case verifiedSQLite
+    case unavailable(PersistenceUnavailableReason)
+    case intentionalNonDurable(PersistenceNonDurablePurpose)
+
+    var isUsable: Bool {
+        if case .unavailable = self { return false }
+        return true
+    }
+
+    var isDurable: Bool { self == .verifiedSQLite }
+
+    var displayName: String {
+        switch self {
+        case .verifiedSQLite:
+            return "Verified SQLite"
+        case .unavailable:
+            return "Persistence Unavailable"
+        case .intentionalNonDurable(.testMemory):
+            return "Intentional Test Memory"
+        case .intentionalNonDurable(.debugMemory):
+            return "Intentional Debug Memory"
+        case .intentionalNonDurable(.debugTemporarySQLite):
+            return "Temporary Debug SQLite"
+        }
+    }
+
+    var statusMessage: String {
+        switch self {
+        case .verifiedSQLite:
+            return "Durable persistence is verified and available."
+        case .unavailable:
+            return "Durable persistence is unavailable. Imports and saved-data operations are disabled."
+        case .intentionalNonDurable(.testMemory):
+            return "An explicitly selected in-memory test provider is active."
+        case .intentionalNonDurable(.debugMemory):
+            return "An explicitly selected in-memory Debug provider is active."
+        case .intentionalNonDurable(.debugTemporarySQLite):
+            return "An explicitly selected temporary Debug database is active for this process."
+        }
+    }
+
+    var recoveryGuidance: String? {
+        guard case .unavailable = self else { return nil }
+        return "Quit and reopen LedgerForge. If persistence remains unavailable, preserve the database and seek support; do not reset or replace it."
     }
 }
 
@@ -75,8 +169,9 @@ public struct PartialImportSessionUpdate {
 /// DatabaseProvider exposes repository implementations. Set the shared
 /// provider at application startup to swap implementations.
 public final class DatabaseProvider {
-    public static var shared: DatabaseProvider = DatabaseProvider(inMemory: true)
+    public static var shared: DatabaseProvider = .unavailable(reason: .notInitialized)
 
+    public let persistenceState: PersistenceState
     public let workspaceRepo: WorkspaceRepository
     public let transactionRepo: TransactionRepository
     public let accountRepo: AccountRepository
@@ -85,7 +180,15 @@ public final class DatabaseProvider {
     private let generationValidity: ProviderGenerationValidity?
 #endif
 
-    public init(workspaceRepo: WorkspaceRepository, transactionRepo: TransactionRepository, accountRepo: AccountRepository, importSessionRepo: ImportSessionRepository, protectsGeneration: Bool = false) {
+    public init(
+        workspaceRepo: WorkspaceRepository,
+        transactionRepo: TransactionRepository,
+        accountRepo: AccountRepository,
+        importSessionRepo: ImportSessionRepository,
+        persistenceState: PersistenceState = .intentionalNonDurable(.testMemory),
+        protectsGeneration: Bool = false
+    ) {
+        self.persistenceState = persistenceState
 #if DEBUG
         if protectsGeneration {
             let validity = ProviderGenerationValidity()
@@ -108,6 +211,7 @@ public final class DatabaseProvider {
     /// intended for contract tests and non-persistent development fixtures.
     public init(inMemory: Bool) {
         let provider = InMemoryRepositoryProvider()
+        self.persistenceState = .intentionalNonDurable(.testMemory)
         self.workspaceRepo = provider.workspaceRepo
         self.transactionRepo = provider.transactionRepo
         self.accountRepo = provider.accountRepo
@@ -115,6 +219,38 @@ public final class DatabaseProvider {
 #if DEBUG
         self.generationValidity = nil
 #endif
+    }
+
+    static func unavailable(reason: PersistenceUnavailableReason) -> DatabaseProvider {
+        DatabaseProvider(
+            workspaceRepo: PlaceholderWorkspaceRepo(),
+            transactionRepo: PlaceholderTransactionRepo(),
+            accountRepo: PlaceholderAccountRepo(),
+            importSessionRepo: PlaceholderImportSessionRepo(),
+            persistenceState: .unavailable(reason)
+        )
+    }
+
+    static func intentionalNonDurable(_ purpose: PersistenceNonDurablePurpose) -> DatabaseProvider {
+        let provider = InMemoryRepositoryProvider()
+        return DatabaseProvider(
+            workspaceRepo: provider.workspaceRepo,
+            transactionRepo: provider.transactionRepo,
+            accountRepo: provider.accountRepo,
+            importSessionRepo: provider.importSessionRepo,
+            persistenceState: .intentionalNonDurable(purpose)
+        )
+    }
+
+    static func verifiedSQLite(_ provider: SQLiteRepositoryProvider, protectsGeneration: Bool = false) -> DatabaseProvider {
+        DatabaseProvider(
+            workspaceRepo: provider.workspaceRepo,
+            transactionRepo: provider.transactionRepo,
+            accountRepo: provider.accountRepo,
+            importSessionRepo: provider.importSessionRepo,
+            persistenceState: .verifiedSQLite,
+            protectsGeneration: protectsGeneration
+        )
     }
 
 #if DEBUG
@@ -177,80 +313,80 @@ private struct GenerationCheckedImportSessionRepository: ImportSessionRepository
 // MARK: - Placeholder repos
 struct PlaceholderWorkspaceRepo: WorkspaceRepository {
     func upsertWorkspace(_ workspace: WorkspaceDTO) throws -> String {
-        throw RepositoryError.providerNotConfigured("WorkspaceRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 
     func workspace(id: String) throws -> WorkspaceDTO? {
-        throw RepositoryError.providerNotConfigured("WorkspaceRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 }
 
 struct PlaceholderTransactionRepo: TransactionRepository {
     func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws {
-        throw RepositoryError.providerNotConfigured("TransactionRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 
     func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO] {
-        throw RepositoryError.providerNotConfigured("TransactionRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 
     func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] {
-        throw RepositoryError.providerNotConfigured("TransactionRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 }
 
 struct PlaceholderAccountRepo: AccountRepository {
     func upsertAccount(_ account: AccountDTO) throws -> String {
-        throw RepositoryError.providerNotConfigured("AccountRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 
     func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool {
-        throw RepositoryError.providerNotConfigured("AccountRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 
     func account(id: String) throws -> AccountDTO? {
-        throw RepositoryError.providerNotConfigured("AccountRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 
     func accounts(workspaceId: String) throws -> [AccountDTO] {
-        throw RepositoryError.providerNotConfigured("AccountRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 
     func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String {
-        throw RepositoryError.providerNotConfigured("AccountRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 
     func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO] {
-        throw RepositoryError.providerNotConfigured("AccountRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 
     func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String] {
-        throw RepositoryError.providerNotConfigured("AccountRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 }
 
 struct PlaceholderImportSessionRepo: ImportSessionRepository {
     func createImportSession(_ payload: ImportSessionDTO) throws -> String {
-        throw RepositoryError.providerNotConfigured("ImportSessionRepository")
+        throw RepositoryError.persistenceUnavailable
     }
     func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws {
-        throw RepositoryError.providerNotConfigured("ImportSessionRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 
     func importSession(id: String) throws -> ImportSessionRecordDTO? {
-        throw RepositoryError.providerNotConfigured("ImportSessionRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 
     func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? {
-        throw RepositoryError.providerNotConfigured("ImportSessionRepository")
+        throw RepositoryError.persistenceUnavailable
     }
     func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] {
-        throw RepositoryError.providerNotConfigured("ImportSessionRepository")
+        throw RepositoryError.persistenceUnavailable
     }
-    func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String { throw RepositoryError.providerNotConfigured("ImportSessionRepository") }
-    func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] { throw RepositoryError.providerNotConfigured("ImportSessionRepository") }
+    func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String { throw RepositoryError.persistenceUnavailable }
+    func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] { throw RepositoryError.persistenceUnavailable }
 
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
-        throw RepositoryError.providerNotConfigured("ImportSessionRepository")
+        throw RepositoryError.persistenceUnavailable
     }
 }

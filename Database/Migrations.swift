@@ -1,6 +1,7 @@
 // Database/Migrations.swift
 // Migration definitions for LedgerForge SQLite schema (Sprint 10 Phase 2B)
 
+import CommonCrypto
 import Foundation
 
 public struct Migration {
@@ -326,3 +327,128 @@ WHERE s.validation_status = 'passed' AND s.completed_at IS NOT NULL;
 """)
 
 public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4]
+
+enum MigrationIntegrityError: Error, Equatable, LocalizedError {
+    case emptyRegisteredChain
+    case duplicateRegisteredVersion(Int)
+    case registeredOrderInvalid
+    case missingRegisteredVersion(Int)
+    case duplicatePersistedVersion(Int)
+    case missingPersistedVersion(Int)
+    case persistedRecordIncomplete(Int?)
+    case persistedNameMismatch(Int)
+    case persistedChecksumMismatch(Int)
+    case unsupportedFutureVersion(Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyRegisteredChain: return "No application migrations are registered."
+        case .duplicateRegisteredVersion: return "The registered migration chain contains a duplicate version."
+        case .registeredOrderInvalid: return "The registered migration chain is not in deterministic order."
+        case .missingRegisteredVersion: return "The registered migration chain is incomplete."
+        case .duplicatePersistedVersion: return "The persisted migration history contains a duplicate version."
+        case .missingPersistedVersion: return "The persisted migration history is incomplete."
+        case .persistedRecordIncomplete: return "The persisted migration history contains an incomplete record."
+        case .persistedNameMismatch: return "A persisted migration name does not match the application migration chain."
+        case .persistedChecksumMismatch: return "A persisted migration checksum does not match the application migration chain."
+        case .unsupportedFutureVersion: return "The database was created by an unsupported future migration chain."
+        }
+    }
+}
+
+struct PersistedMigrationRecord: Equatable {
+    let version: Int?
+    let name: String?
+    let checksum: String?
+    let appliedAt: String?
+}
+
+enum MigrationChainValidator {
+    static func validateRegistered(_ migrations: [Migration]) throws {
+        guard !migrations.isEmpty else {
+            throw MigrationIntegrityError.emptyRegisteredChain
+        }
+
+        var seen = Set<Int>()
+        for migration in migrations {
+            guard seen.insert(migration.version).inserted else {
+                throw MigrationIntegrityError.duplicateRegisteredVersion(migration.version)
+            }
+        }
+
+        guard migrations.map(\.version) == migrations.map(\.version).sorted() else {
+            throw MigrationIntegrityError.registeredOrderInvalid
+        }
+
+        for (offset, migration) in migrations.enumerated() {
+            let expectedVersion = offset + 1
+            guard migration.version == expectedVersion else {
+                throw MigrationIntegrityError.missingRegisteredVersion(expectedVersion)
+            }
+        }
+    }
+
+    static func validatePersisted(
+        _ records: [PersistedMigrationRecord],
+        against migrations: [Migration],
+        requiresCompleteChain: Bool
+    ) throws {
+        try validateRegistered(migrations)
+
+        let completeRecords = try records.map { record -> (version: Int, name: String, checksum: String) in
+            guard let version = record.version,
+                  let name = record.name,
+                  !name.isEmpty,
+                  let checksum = record.checksum,
+                  !checksum.isEmpty,
+                  let appliedAt = record.appliedAt,
+                  !appliedAt.isEmpty else {
+                throw MigrationIntegrityError.persistedRecordIncomplete(record.version)
+            }
+            return (version, name, checksum)
+        }
+
+        var seen = Set<Int>()
+        for record in completeRecords {
+            guard seen.insert(record.version).inserted else {
+                throw MigrationIntegrityError.duplicatePersistedVersion(record.version)
+            }
+        }
+
+        let latestSupportedVersion = migrations[migrations.count - 1].version
+        if let futureVersion = completeRecords.map(\.version).filter({ $0 > latestSupportedVersion }).min() {
+            throw MigrationIntegrityError.unsupportedFutureVersion(futureVersion)
+        }
+
+        let sortedRecords = completeRecords.sorted { $0.version < $1.version }
+        for (offset, record) in sortedRecords.enumerated() {
+            let expectedVersion = offset + 1
+            guard record.version == expectedVersion else {
+                throw MigrationIntegrityError.missingPersistedVersion(expectedVersion)
+            }
+
+            let migration = migrations[offset]
+            guard record.name == migration.name else {
+                throw MigrationIntegrityError.persistedNameMismatch(record.version)
+            }
+            guard record.checksum == migration.checksum else {
+                throw MigrationIntegrityError.persistedChecksumMismatch(record.version)
+            }
+        }
+
+        if requiresCompleteChain, sortedRecords.count != migrations.count {
+            throw MigrationIntegrityError.missingPersistedVersion(sortedRecords.count + 1)
+        }
+    }
+}
+
+extension Migration {
+    var checksum: String {
+        guard let data = sql.data(using: .utf8) else { return "" }
+        var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        data.withUnsafeBytes { bytes in
+            _ = CC_SHA256(bytes.baseAddress, CC_LONG(data.count), &hash)
+        }
+        return hash.map { String(format: "%02x", $0) }.joined()
+    }
+}

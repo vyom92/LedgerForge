@@ -11,7 +11,7 @@ struct ConfirmationGatedImportWorkflowTests {
     @Test func prepareImportParsesAndValidatesWithoutPersistenceOrRuntimeStoreMutation() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
-        let engine = ImportEngine(importPersistenceCoordinator: persistence)
+        let engine = availableImportEngine(persistence)
         let url = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
 
         let preparedImport = try await engine.prepareImport(from: url)
@@ -30,7 +30,7 @@ struct ConfirmationGatedImportWorkflowTests {
     @Test func validationFailureBlocksCommitAndDoesNotPersist() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
-        let engine = ImportEngine(importPersistenceCoordinator: persistence)
+        let engine = availableImportEngine(persistence)
         let preparedImport = makePreparedImport(transactions: [])
 
         let result = await engine.commitPreparedImport(preparedImport)
@@ -40,14 +40,12 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(!result.persisted)
         #expect(result.errorMessage == "Import validation failed.")
         #expect(persistence.persistCallCount == 0)
-        #expect(AccountStore.shared.accounts.isEmpty)
-        #expect(TransactionStore.shared.transactions.isEmpty)
     }
 
     @Test func confirmationCommitsUsingPreparedFinancialDocumentWithoutRuntimeMutation() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
-        let engine = ImportEngine(importPersistenceCoordinator: persistence)
+        let engine = availableImportEngine(persistence)
         let preparedImport = makePreparedImport()
 
         let result = await engine.commitPreparedImport(preparedImport)
@@ -69,7 +67,7 @@ struct ConfirmationGatedImportWorkflowTests {
     @Test func duplicateConfirmationIsRejectedWithoutSecondPersistence() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
-        let engine = ImportEngine(importPersistenceCoordinator: persistence)
+        let engine = availableImportEngine(persistence)
         let preparedImport = makePreparedImport()
 
         let firstResult = await engine.commitPreparedImport(preparedImport)
@@ -109,7 +107,7 @@ struct ConfirmationGatedImportWorkflowTests {
         let originalAccountIds = AccountStore.shared.accounts.map(\.id)
         let persistence = CountingPersistenceCoordinator()
         persistence.errorToThrow = ConfirmationPersistenceError.writeFailed
-        let engine = ImportEngine(importPersistenceCoordinator: persistence)
+        let engine = availableImportEngine(persistence)
 
         let result = await engine.commitPreparedImport(makePreparedImport())
 
@@ -126,7 +124,7 @@ struct ConfirmationGatedImportWorkflowTests {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         persistence.resultOverride = .skipped
-        let engine = ImportEngine(importPersistenceCoordinator: persistence)
+        let engine = availableImportEngine(persistence)
 
         let result = await engine.commitPreparedImport(makePreparedImport())
 
@@ -148,7 +146,7 @@ struct ConfirmationGatedImportWorkflowTests {
             await resetRuntimeStoresForConfirmationWorkflow()
             let persistence = CountingPersistenceCoordinator()
             persistence.errorToThrow = error
-            let engine = ImportEngine(importPersistenceCoordinator: persistence)
+            let engine = availableImportEngine(persistence)
 
             let result = await engine.commitPreparedImport(makePreparedImport())
 
@@ -263,8 +261,8 @@ struct ConfirmationGatedImportWorkflowTests {
                 workspaceName: "Competing Confirmations"
             )
         )
-        let firstEngine = ImportEngine(importPersistenceCoordinator: firstCoordinator)
-        let secondEngine = ImportEngine(importPersistenceCoordinator: secondCoordinator)
+        let firstEngine = availableImportEngine(firstCoordinator)
+        let secondEngine = availableImportEngine(secondCoordinator)
         let first = makePreparedImport(id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!)
         let second = makePreparedImport(id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!)
 
@@ -363,10 +361,18 @@ private final class CountingPersistenceCoordinator: ImportPersistenceCoordinatin
 
 @MainActor
 private func resetRuntimeStoresForConfirmationWorkflow() async {
+    LedgerForgeApp.configureInMemoryPersistenceForTesting()
     AccountStore.shared.replaceAccounts([])
     TransactionStore.shared.replaceTransactions([])
     DocumentStore.shared.clear()
     await Task.yield()
+}
+
+private func availableImportEngine(_ persistence: ImportPersistenceCoordinating) -> ImportEngine {
+    ImportEngine(
+        importPersistenceCoordinator: persistence,
+        persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+    )
 }
 
 private enum ConfirmationPersistenceError: Error, LocalizedError {

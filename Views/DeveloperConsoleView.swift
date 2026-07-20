@@ -30,7 +30,7 @@ struct DeveloperConsoleView: View {
         VStack(spacing: 14) {
             HStack(spacing: 12) {
                 LFInlineBadge(title: "Environment: Local", color: LFTheme.success)
-                LFInlineBadge(title: LedgerForgeApp.currentProviderState(), color: LFTheme.info)
+                LFInlineBadge(title: DatabaseProvider.shared.persistenceState.displayName, color: LFTheme.info)
 
                 Spacer()
 
@@ -81,8 +81,7 @@ struct DeveloperConsoleView: View {
 
     private var runtimeSnapshot: DeveloperConsoleSnapshot {
         DeveloperConsole.runtimeSnapshot(
-            providerState: LedgerForgeApp.currentProviderState(),
-            databasePath: LedgerForgeApp.currentSQLiteDatabasePath(),
+            persistenceState: DatabaseProvider.shared.persistenceState,
             hydrationStatus: hydrationStatus,
             latestRefreshResult: latestRefreshResult,
             accountStore: accountStore,
@@ -283,7 +282,11 @@ struct DeveloperConsoleView: View {
     private var runtimeInspectorPanel: some View {
         LFPanel(title: "Runtime Inspector") {
             VStack(spacing: 0) {
-                LFInfoRow(title: "Provider", value: runtimeSnapshot.providerState, verticalPadding: 5)
+                LFInfoRow(title: "Persistence", value: runtimeSnapshot.persistenceState.displayName, verticalPadding: 5)
+                LFInfoRow(title: "Status", value: runtimeSnapshot.persistenceState.statusMessage, verticalPadding: 5)
+                if let guidance = runtimeSnapshot.persistenceState.recoveryGuidance {
+                    LFInfoRow(title: "Recovery", value: guidance, verticalPadding: 5)
+                }
                 LFInfoRow(title: "Hydration", value: runtimeSnapshot.hydrationStatus, verticalPadding: 5)
                 LFInfoRow(title: "Latest Refresh", value: runtimeSnapshot.latestRefreshResult, verticalPadding: 5)
                 LFInfoRow(title: "Accounts", value: "\(runtimeSnapshot.accountCount)", verticalPadding: 5)

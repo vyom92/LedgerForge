@@ -26,6 +26,7 @@ struct RepositoryStoreHydrationResult: Equatable {
 }
 
 enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
+    case persistenceUnavailable
     case unsupportedCurrency(String)
     case invalidPostedDate(String)
     case malformedMoney
@@ -35,6 +36,8 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
+        case .persistenceUnavailable:
+            return "Persistence is unavailable. Runtime data was not replaced."
         case .unsupportedCurrency(let currency):
             return "Currency \(currency) is not supported by dashboard hydration."
         case .invalidPostedDate(let value):
@@ -61,6 +64,7 @@ final class RepositoryStoreHydrator {
     private let importAttemptStore: ImportAttemptStore
     private let transactionStore: TransactionStore
     private let workspaceId: String
+    private let persistenceState: PersistenceState
     private var hasHydrated = false
 #if DEBUG
     private let participatesInLifecycleGate: Bool
@@ -84,6 +88,7 @@ final class RepositoryStoreHydrator {
             importSessionStore: importSessionStore,
             importAttemptStore: importAttemptStore,
             workspaceId: workspaceId,
+            persistenceState: databaseProvider.persistenceState,
             participatesInLifecycleGate: participatesInLifecycleGate
         )
     }
@@ -97,6 +102,7 @@ final class RepositoryStoreHydrator {
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace",
+        persistenceState: PersistenceState = .intentionalNonDurable(.testMemory),
         participatesInLifecycleGate: Bool = true
     ) {
         self.accountRepo = accountRepo
@@ -107,6 +113,7 @@ final class RepositoryStoreHydrator {
         self.importSessionStore = importSessionStore
         self.importAttemptStore = importAttemptStore
         self.workspaceId = workspaceId
+        self.persistenceState = persistenceState
 #if DEBUG
         self.participatesInLifecycleGate = participatesInLifecycleGate
 #endif
@@ -114,6 +121,9 @@ final class RepositoryStoreHydrator {
 
     @discardableResult
     func hydrateIfNeeded(forceRefresh: Bool = false) throws -> RepositoryStoreHydrationResult {
+        guard persistenceState.isUsable else {
+            throw RepositoryStoreHydrationError.persistenceUnavailable
+        }
 #if DEBUG
         let lifecycleLease: DevelopmentDatabaseActivityLease?
         if participatesInLifecycleGate {
@@ -170,6 +180,9 @@ final class RepositoryStoreHydrator {
     /// Refreshes only privacy-safe attempt presentation after a rejected outcome.
     /// Financial runtime stores remain untouched.
     func hydrateImportAttempts() throws {
+        guard persistenceState.isUsable else {
+            throw RepositoryStoreHydrationError.persistenceUnavailable
+        }
         let attempts = try importSessionRepo.importAttempts(workspaceId: workspaceId).map(RepositoryImportAttempt.init)
         importAttemptStore.replaceAttempts(attempts)
     }
