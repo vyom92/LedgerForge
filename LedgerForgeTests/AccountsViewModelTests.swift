@@ -97,6 +97,31 @@ struct AccountsViewModelTests {
         #expect(viewModel.selectedImportSession?.sourceDocumentName == "old.csv")
         #expect(viewModel.selectedImportSession?.transactionCount == 1)
     }
+
+    @Test func recentActivityRetainsNativeMoneyForSignedPresentation() throws {
+        let stores = PresentationStores()
+        stores.accounts.replaceAccounts([runtimeAccount(repositoryID: "account-qar", name: "Qatar", balance: 100)])
+        stores.transactions.replaceTransactions([
+            Transaction(
+                date: date("2026-07-02"),
+                description: "QAR activity",
+                debit: nil,
+                credit: Decimal(string: "123.45")!,
+                amount: Decimal(string: "123.45")!,
+                balance: Decimal(string: "123.45")!,
+                currency: "QAR",
+                account: "Presentation only",
+                sourceBank: "CBQ",
+                sourceFile: "Presentation only",
+                repositoryAccountId: "account-qar",
+                repositoryImportSessionId: "session-qar"
+            )
+        ])
+
+        let viewModel = makeViewModel(coordinator: RecordingMetadataCoordinator(), stores: stores)
+
+        #expect(viewModel.recentActivity.first?.signedAmountDisplay == "+QAR 123.45")
+    }
 }
 
 @MainActor

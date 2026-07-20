@@ -76,7 +76,7 @@ struct DashboardViewModelTests {
         #expect(viewModel.accountSummaries.first?.currentBalance == Decimal(1_050))
     }
 
-    @Test func transactionSummaryAndSnapshotUseRuntimeStoreTransactions() {
+    @Test func transactionSummaryAndSnapshotUseRuntimeStoreTransactions() throws {
         resetDashboardStores()
         let older = makeTransaction(
             date: makeDate(year: 2026, month: 7, day: 1),
@@ -105,8 +105,32 @@ struct DashboardViewModelTests {
         #expect(viewModel.snapshot.netWorth == Decimal(1_080))
         #expect(viewModel.recentTransactionSummaries.count == 2)
         #expect(viewModel.recentTransactionSummaries.first?.description == "Salary credit")
-        #expect(viewModel.recentTransactionSummaries.first?.amount == Decimal(100))
+        let expectedMoney = try Money(amount: Decimal(100), currency: "INR")
+        #expect(viewModel.recentTransactionSummaries.first?.amount == expectedMoney)
         #expect(viewModel.recentTransactionSummaries.first?.isCredit == true)
+    }
+
+    @Test func recentTransactionSummaryPreservesNativeMoneyForDisplay() throws {
+        resetDashboardStores()
+        TransactionStore.shared.replaceTransactions([
+            Transaction(
+                date: makeDate(year: 2026, month: 7, day: 8),
+                description: "Qatari salary",
+                debit: nil,
+                credit: Decimal(123.45),
+                amount: Decimal(123.45),
+                balance: Decimal(123.45),
+                currency: "QAR",
+                account: "CBQ",
+                sourceBank: "CBQ",
+                sourceFile: "repository"
+            )
+        ])
+
+        let viewModel = DashboardViewModel()
+
+        let expectedMoney = try Money(amount: Decimal(string: "123.45")!, currency: "QAR")
+        #expect(viewModel.recentTransactionSummaries.first?.amount == expectedMoney)
     }
 
     @Test func hydrationPresentationStateRecordsLoadedAndFailedResults() {

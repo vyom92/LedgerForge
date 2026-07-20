@@ -42,4 +42,21 @@ struct MoneyTests {
             Issue.record("Expected MoneyError, got \(error)")
         }
     }
+
+    @Test func transactionPreviewPresentationUsesTransactionNativeMoneyAndDirection() throws {
+        let transaction = Transaction(
+            date: nil,
+            description: "Kuwaiti debit",
+            debit: Decimal(string: "4.125")!,
+            credit: nil,
+            amount: Decimal(string: "-4.125")!,
+            balance: nil,
+            currency: "KWD",
+            account: "Account",
+            sourceBank: "Bank",
+            sourceFile: "Preview"
+        )
+
+        #expect(transaction.signedAmountDisplay == "-KWD 4.125")
+    }
 }

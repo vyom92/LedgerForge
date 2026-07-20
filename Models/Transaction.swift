@@ -42,6 +42,9 @@ struct Transaction: Identifiable {
     var amount: Decimal { money.amount }
     var balance: Decimal? { runningBalanceMoney?.amount }
     var currency: String { money.currency.code }
+    var signedAmountDisplay: String {
+        MoneyFormatting.signedDisplay(money, isCredit: creditMoney != nil)
+    }
 
     var account: String
 

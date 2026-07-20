@@ -815,7 +815,7 @@ struct ContentView: View {
                             Text(transaction.isCredit ? "Credit" : "Debit")
                                 .foregroundStyle(transaction.isCredit ? LFTheme.success : LFTheme.danger)
                                 .frame(width: 68, alignment: .leading)
-                            Text(formatSignedCurrency(transaction.amount, isCredit: transaction.isCredit))
+                            Text(MoneyFormatting.signedDisplay(transaction.amount, isCredit: transaction.isCredit))
                                 .foregroundStyle(transaction.isCredit ? LFTheme.success : LFTheme.danger)
                                 .monospacedDigit()
                                 .frame(width: 112, alignment: .trailing)
@@ -941,7 +941,7 @@ struct ContentView: View {
                             Text(transaction.description)
                                 .lineLimit(1)
                             Spacer()
-                            Text(formatSignedCurrency(transaction.amount, isCredit: transaction.credit != nil))
+                            Text(transaction.signedAmountDisplay)
                                 .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
                                 .monospacedDigit()
                         }
@@ -1619,7 +1619,7 @@ struct ContentView: View {
             Text(transaction.credit != nil ? "Credit" : "Debit")
                 .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
                 .frame(width: 68, alignment: .leading)
-            Text(formatSignedCurrency(transaction.amount, isCredit: transaction.credit != nil))
+            Text(transaction.signedAmountDisplay)
                 .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
                 .monospacedDigit()
                 .frame(width: 112, alignment: .trailing)
@@ -2206,12 +2206,6 @@ struct ContentView: View {
             return "\(currencyCode) \(value)"
         }
         return MoneyFormatting.display(money)
-    }
-
-    private func formatSignedCurrency(_ value: Decimal, isCredit: Bool) -> String {
-        let prefix = isCredit ? "+" : "-"
-        let magnitude = value < .zero ? -value : value
-        return "\(prefix)\(formatCurrency(magnitude, currencyCode: "INR"))"
     }
 
     private static let dateFormatter: DateFormatter = {

@@ -48,7 +48,7 @@ struct DashboardTransactionSummary: Identifiable, Equatable {
     let id: UUID
     let date: Date?
     let description: String
-    let amount: Decimal
+    let amount: Money
     let currency: String
     let isCredit: Bool
 }
@@ -248,7 +248,7 @@ final class DashboardViewModel: ObservableObject {
                     id: transaction.id,
                     date: transaction.date,
                     description: transaction.description,
-                    amount: transaction.amount,
+                    amount: transaction.money,
                     currency: transaction.currency,
                     isCredit: transaction.credit != nil
                 )
