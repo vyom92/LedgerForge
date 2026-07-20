@@ -148,6 +148,7 @@ Checklist — what this design baseline contains
 - Preserve exact imported values: `amount_decimal` stores the canonical locale-independent, non-exponent numeric value at the compiled catalog's fraction scale; `amount_minor` stores its mandatory exact integer encoding for efficient queries. The representations must agree. Original lexical source text remains in raw or normalized source evidence where available.
 - Use JSON columns for flexible structured metadata where schema evolution or vendor-specific data is expected (normalized_json, profile metadata, validation_summary).
 - Immutable, append-only patterns for exchange_rates, import_sessions and fingerprints to preserve audit history.
+- Parent repository writes with an existing immutable workspace or account ID update only their DTO-owned columns in place. They must not emulate replacement through delete-and-insert behavior: dependent durable rows remain intact, and account columns outside `AccountDTO` ownership, including lifecycle and provenance fields, remain preserved. SQLite and In-Memory providers expose equivalent observable parent-write behavior.
 
 I. Schema (tables, columns, PKs, FKs, indexes)
 
@@ -739,4 +740,4 @@ End of design baseline
 
 
 --
-Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through accepted ADR-034 and verified Sprint 42 repository implementation without redesigning the Database v1 baseline; later ADRs authorize no schema migration. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.
+Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through accepted ADR-034, verified Sprint 42 repository implementation and Sprint 46 parent-write safety without redesigning the Database v1 baseline; later ADRs authorize no schema migration. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.

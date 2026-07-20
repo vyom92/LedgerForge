@@ -1,13 +1,13 @@
 # Repository State
 
 - Primary branch: `main`.
-- Latest verified completed increment: Sprint 45 Phase A — Recoverable Development Database Lifecycle.
-- Latest relevant implementation commits: `9359bde30892ef275cd699269b2ce2bf7c5402ee` — Implement recoverable development database reset; `87f8e7958b89bd13baa167fc594c467fc44fd53c` — Fix optimized Release import preview build.
+- Latest verified completed increment: Sprint 46 — Parent-Record Upsert Safety and SQLite/In-Memory Parity.
+- Latest relevant implementation commits: `d9009fb` — Preserve parent state during upsert; `b9e68ce` — Stabilize import-lifecycle cancellation synchronization; `f288834` — Apply approved macOS permission settings.
 - Current migration: V4, including the bounded `import_attempts` ledger.
 - Current accepted ADR: ADR-035 — Development Database Lifecycle and Recoverable Reset.
 - Architecture baseline: Architecture v1.0 Frozen and UI/UX v1.0 Frozen.
-- Build state: clean Debug and normal optimized Release builds passing for Sprint 45 Phase A; static analysis passes.
-- Latest verified automated result: 256 executed cases across 246 test definitions in 35 suites, 0 failures, 0 skipped. Generic `LedgerForgeUITests` remained intentionally disabled.
+- Build state: clean Debug and normal optimized Release builds pass for Sprint 46; static analysis passes. Both builds emitted four existing `AccountStore` actor-isolation warnings; no warning is attributable to Sprint 46.
+- Latest verified automated result: 249 executed test cases, 0 failures, 0 skipped. Generic `LedgerForgeUITests` remained intentionally disabled.
 
 ## Current Production Capability
 
@@ -22,6 +22,7 @@
 - Permanent Debug reset checkpoints and closes the provider, creates and verifies the lifecycle-owned `Development/Lifecycle Backups/previous-development.sqlite` backup, coordinates the main SQLite, WAL and SHM set, recreates the same canonical identity through the registered migration chain and forces `RepositoryStoreHydrator` reconciliation. Provider generations invalidate stale repositories.
 - Temporary empty sessions use UUID databases under `Development/Temporary Sessions`, affect only the current process and reconnect to canonical data on relaunch. Permanent reset recreates the canonical database and remains empty after relaunch. Automatic recovery restores the verified backup; failed recovery enters lifecycle-unavailable state.
 - Dashboard, Accounts, Transactions and Imports are repository-backed experiences. `RepositoryStoreHydrator` is the only persistence-to-runtime boundary.
+- Sprint 46 uses in-place SQLite conflict updates for same-ID workspace and account writes. DTO-owned fields update without parent recreation, while dependent durable records and account lifecycle/provenance columns outside `AccountDTO` ownership remain preserved; SQLite and In-Memory observable repository behavior matches.
 
 ## Current Verified Limitations
 
@@ -40,6 +41,7 @@
 - Unsupported transaction-event families, including IMPS, NEFT, e-commerce, refunds, reversals and unstructured references, remain unevaluated.
 - Generic UI tests remain intentionally disabled; supported runtime behavior is covered by the documented manual and automated boundaries.
 - No rollback, resumable import job, batch queue or cancellation after confirmed persistence exists. Confirmed-persistence failure retry remains unsupported pending typed authoritative safety evidence.
+- `FW-P0-21` persistence-bootstrap fail-closed behavior and `FW-P0-24` migration-chain integrity verification remain unimplemented.
 
 ## Recent Verified Changes
 
@@ -50,6 +52,7 @@
 - Sprint 43 implemented truthful preparation progress, cancellation ownership and bounded fresh source-reading retry without a schema migration or ADR change.
 - Sprint 44 implemented validated Money parser output, canonical catalog-scale writes, strict decimal/minor/currency hydration and grouped native-currency presentation without a schema migration. Development and test databases may be recreated or reseeded rather than retaining obsolete lexical decimal forms.
 - Sprint 45 Phase A accepted ADR-035 and implemented recoverable permanent reset of the canonical Debug development database, distinct temporary-session semantics, verified backup and automatic recovery, provider-generation invalidation, exclusive activity leases and canonical hydration without a schema migration. Temporary-session and permanent-reset relaunch behavior, backup contents and all four active-state exclusions were directly verified. Phase B (`FW-P1-37` and `FW-P1-40`) was not started.
+- Sprint 46 replaced destructive SQLite workspace/account parent replacement with explicit in-place conflict updates, preserving dependent durable graphs, immutable IDs and unowned account lifecycle/provenance fields. SQLite-specific foreign-key checks and SQLite/In-Memory parity coverage pass without a migration or ADR change. The import-lifecycle cancellation test now uses a deterministic test-only start/cancellation handshake; production import behavior is unchanged. The approved macOS permission settings build and launch in both Debug and optimized Release.
 - ADR-034 accepted the document-scoped card-statement evidence boundary after integrated American Express, CBQ and Axis fixture evidence and the completed cross-family review. It does not establish card persistence, production parsing, or card semantics beyond source-owned evidence.
 - Source-faithful sanitized Axis NRO CSV, PDF and XLS regression evidence is integrated across two overlapping ranges. Range 1 records institution-supplied cross-format divergence; these fixtures do not constitute Axis NRO production parser support.
 - Clean-room Axis credit-card PDF and XLSX fixture evidence is integrated for two consecutive, non-overlapping periods. The PDFs contain 140 and 151 canonical transaction rows; the XLSX workbooks contain 143 and 154, including three legitimate XLSX-only source-format rows per period and no PDF-only rows. One fictional customer, account and instrument continue with no supplementary-instrument evidence. Statement currency is INR; Debit/Credit remains an observed source marker only, and no original-currency or FX evidence was introduced. The PDFs retain native selectable text without OCR, and the declared PDF geometry and workbook structures are preserved while PDF object and OOXML package identity are intentionally not preserved. Axis card PDF/XLSX production parsing and card semantics remain unsupported.
