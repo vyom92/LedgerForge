@@ -227,6 +227,11 @@ public final class SQLiteDatabase {
         for migration in migrations.dropFirst(persistedRecords.count) {
             try beginTransaction()
             do {
+                for check in migration.preflightChecks {
+                    guard try check.run(self) else {
+                        throw MigrationPreflightError.failed(issueCode: check.issueCode)
+                    }
+                }
                 try execute(sql: migration.sql)
                 let now = iso8601Now()
                 try executePrepared(

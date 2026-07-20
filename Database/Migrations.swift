@@ -8,12 +8,23 @@ public struct Migration {
     public let version: Int
     public let name: String
     public let sql: String
+    let preflightChecks: [MigrationPreflightCheck]
 
     public init(version: Int, name: String, sql: String) {
+        self.init(version: version, name: name, sql: sql, preflightChecks: [])
+    }
+
+    init(version: Int, name: String, sql: String, preflightChecks: [MigrationPreflightCheck]) {
         self.version = version
         self.name = name
         self.sql = sql
+        self.preflightChecks = preflightChecks
     }
+}
+
+struct MigrationPreflightCheck {
+    let issueCode: String
+    let run: (SQLiteDatabase) throws -> Bool
 }
 
 public let migrationV1 = Migration(version: 1, name: "initial_schema_v1", sql: """
@@ -444,7 +455,8 @@ enum MigrationChainValidator {
 
 extension Migration {
     var checksum: String {
-        guard let data = sql.data(using: .utf8) else { return "" }
+        let source = preflightChecks.isEmpty ? sql : preflightChecks.map(\.issueCode).joined(separator: "\n") + "\n" + sql
+        guard let data = source.data(using: .utf8) else { return "" }
         var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
         data.withUnsafeBytes { bytes in
             _ = CC_SHA256(bytes.baseAddress, CC_LONG(data.count), &hash)

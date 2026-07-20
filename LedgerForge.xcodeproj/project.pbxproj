@@ -14,7 +14,6 @@
 		281BB15C2FFC4879006E7424 /* SQLiteRepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1382FFC41A3006E7424 /* SQLiteRepositoryProvider.swift */; };
 		281BB15D2FFC4881006E7424 /* Migrations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1392FFC41CB006E7424 /* Migrations.swift */; };
 		281BB15E2FFC4886006E7424 /* DTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB13A2FFC4260006E7424 /* DTOs.swift */; };
-		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		281BB1612FFC4A84006E7424 /* InMemoryRepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */; };
 		281BB17C2FFC4D1C006E7424 /* ImportFramework.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB17B2FFC4D1C006E7424 /* ImportFramework.swift */; };
 		281BB17E2FFC4D26006E7424 /* ImportRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB17D2FFC4D26006E7424 /* ImportRequest.swift */; };
@@ -92,6 +91,8 @@
 		3A4400023004000000000001 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400013004000000000001 /* Money.swift */; };
 		3A4400043004000000000001 /* MoneyFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400033004000000000001 /* MoneyFormatting.swift */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
+		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
+		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -120,7 +121,6 @@
 		281BB1382FFC41A3006E7424 /* SQLiteRepositoryProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteRepositoryProvider.swift; sourceTree = "<group>"; };
 		281BB1392FFC41CB006E7424 /* Migrations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Migrations.swift; sourceTree = "<group>"; };
 		281BB13A2FFC4260006E7424 /* DTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DTOs.swift; sourceTree = "<group>"; };
-		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InMemoryRepositoryProvider.swift; sourceTree = "<group>"; };
 		281BB1782FFC4CDA006E7424 /* Project_Guide.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Project_Guide.md; sourceTree = "<group>"; };
 		281BB17B2FFC4D1C006E7424 /* ImportFramework.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFramework.swift; sourceTree = "<group>"; };
@@ -210,6 +210,8 @@
 		3A4400013004000000000001 /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Money.swift; sourceTree = "<group>"; };
 		3A4400033004000000000001 /* MoneyFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyFormatting.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
+		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
+		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -496,6 +498,7 @@
 				281BB1392FFC41CB006E7424 /* Migrations.swift */,
 				281BB13A2FFC4260006E7424 /* DTOs.swift */,
 				B50000003050000000000001 /* ConfirmedImport.swift */,
+				B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */,
 				281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */,
 			);
 			path = Database;
@@ -762,6 +765,7 @@
 				288EB0F12FF7B29300F09BC9 /* Document.swift in Sources */,
 				281BB15E2FFC4886006E7424 /* DTOs.swift in Sources */,
 				B50000013050000000000001 /* ConfirmedImport.swift in Sources */,
+				B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */,
 				28B87B262FFB24CD009BEE8C /* TransactionListView.swift in Sources */,
 				281BB18C2FFC4D55006E7424 /* PasswordProvider.swift in Sources */,
 				2862426F2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift in Sources */,
