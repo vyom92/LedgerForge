@@ -33,11 +33,52 @@ public struct ConfirmedImportIdentifierCandidateDTO: Equatable, Sendable {
     }
 }
 
+/// Parser-produced, transient evidence transported only until the confirmed
+/// provider has selected the final durable account. It is deliberately not a
+/// persistence DTO and must never be serialized into history or diagnostics.
+public enum ConfirmedImportTransactionEventEvidenceDTO: Equatable, Sendable {
+    case axisUPI(ConfirmedImportAxisUPIEventEvidenceDTO)
+}
+
+public struct ConfirmedImportAxisUPIEventEvidenceDTO: Equatable, Sendable {
+    public enum Operation: String, Equatable, Sendable {
+        case p2a
+        case p2m
+    }
+
+    public enum LedgerSubtype: String, Equatable, Sendable {
+        case posting
+        case creditAdjustment = "credit-adjustment"
+    }
+
+    public let operation: Operation
+    public let reference: String
+    public let subtype: LedgerSubtype
+
+    public init(operation: Operation, reference: String, subtype: LedgerSubtype) {
+        self.operation = operation
+        self.reference = reference
+        self.subtype = subtype
+    }
+}
+
 /// Account-independent input. The provider assigns the final account before it
 /// derives any event identity.
 public struct ConfirmedImportTransactionTemplateDTO: Equatable, Sendable {
     public let transaction: TransactionDTO
-    public init(transaction: TransactionDTO) { self.transaction = transaction }
+    public let eventEvidence: ConfirmedImportTransactionEventEvidenceDTO?
+
+    public init(
+        transaction: TransactionDTO,
+        eventEvidence: ConfirmedImportTransactionEventEvidenceDTO? = nil
+    ) {
+        self.transaction = transaction
+        self.eventEvidence = eventEvidence
+    }
+
+    /// Providers reject preassigned transactions instead of accepting a
+    /// caller-supplied durable account or an already-derived event identity.
+    public var isAccountIndependent: Bool { transaction.accountId == nil }
 }
 
 public struct IdentifierObservationDTO: Equatable, Sendable {
@@ -58,6 +99,31 @@ public struct IdentifierObservationDTO: Equatable, Sendable {
     }
 }
 
+/// Account-independent history inputs. The provider composes the final
+/// `AtomicImportHistoryDTO` only after it has resolved an account and derived
+/// final transaction-event identities.
+public struct ConfirmedImportHistoryTemplateDTO: Equatable, Sendable {
+    public let document: ImportedDocumentDTO
+    public let fingerprint: DocumentFingerprintDTO
+    public let importSession: ImportSessionDTO
+    public let completedAtISO: String
+    public let successfulAttempt: ImportAttemptDTO
+
+    public init(
+        document: ImportedDocumentDTO,
+        fingerprint: DocumentFingerprintDTO,
+        importSession: ImportSessionDTO,
+        completedAtISO: String,
+        successfulAttempt: ImportAttemptDTO
+    ) {
+        self.document = document
+        self.fingerprint = fingerprint
+        self.importSession = importSession
+        self.completedAtISO = completedAtISO
+        self.successfulAttempt = successfulAttempt
+    }
+}
+
 public struct ConfirmedImportPlanDTO: Equatable, Sendable {
     public let providerGeneration: ProviderGenerationToken
     public let workspace: WorkspaceDTO
@@ -65,17 +131,17 @@ public struct ConfirmedImportPlanDTO: Equatable, Sendable {
     public let accountChoice: ConfirmedImportAccountChoiceDTO
     public let advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO
     public let identifiers: [ConfirmedImportIdentifierCandidateDTO]
-    public let history: AtomicImportHistoryDTO
+    public let historyTemplate: ConfirmedImportHistoryTemplateDTO
     public let transactionTemplates: [ConfirmedImportTransactionTemplateDTO]
 
-    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], history: AtomicImportHistoryDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO]) {
+    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], historyTemplate: ConfirmedImportHistoryTemplateDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO]) {
         self.providerGeneration = providerGeneration
         self.workspace = workspace
         self.proposedAccount = proposedAccount
         self.accountChoice = accountChoice
         self.advisoryIdentity = advisoryIdentity
         self.identifiers = identifiers
-        self.history = history
+        self.historyTemplate = historyTemplate
         self.transactionTemplates = transactionTemplates
     }
 }

@@ -8,19 +8,49 @@ public final class InMemoryRepositoryProvider {
     public let transactionRepo: TransactionRepository
     public let accountRepo: AccountRepository
     public let importSessionRepo: ImportSessionRepository
+    public let generationToken: ProviderGenerationToken
+    public let confirmedImportRepo: ConfirmedImportRepository
 
     private let state = InMemoryRepositoryState()
 
     public init() {
+        let generationToken = ProviderGenerationToken()
+        self.generationToken = generationToken
         self.workspaceRepo = InMemoryWorkspaceRepo(state: state)
         self.transactionRepo = InMemoryTransactionRepo(state: state)
         self.accountRepo = InMemoryAccountRepo(state: state)
         self.importSessionRepo = InMemoryImportSessionRepo(state: state)
+        self.confirmedImportRepo = InMemoryConfirmedImportRepo(state: state, generationToken: generationToken)
+    }
+
+    /// Test-only deterministic failure boundary for proving that an accepted
+    /// confirmed import never publishes a partial graph.
+    func injectConfirmedImportFailure(after point: ConfirmedImportFailureInjectionPoint?) {
+        state.stateLock.lock()
+        state.confirmedImportFailureInjection = point
+        state.stateLock.unlock()
     }
 }
 
+enum ConfirmedImportFailureInjectionPoint: CaseIterable {
+    case workspace
+    case account
+    case identifierOwnership
+    case observation
+    case document
+    case fingerprint
+    case importSession
+    case transactions
+    case eventIdentities
+    case successfulAttempt
+    case sessionCompletion
+}
+
 private final class InMemoryRepositoryState {
-    let importHistoryLock = NSLock()
+    /// One lock serializes every durable-state observation and mutation. The
+    /// confirmed provider uses it once while preparing and publishing a full
+    /// copy-on-write accepted graph.
+    let stateLock = NSRecursiveLock()
     var workspaces: [String: WorkspaceDTO] = [:]
     var accounts: [String: AccountDTO] = [:]
     var accountIdentifiers: [String: AccountIdentifierDTO] = [:]
@@ -30,6 +60,8 @@ private final class InMemoryRepositoryState {
     var transactions: [String: TransactionDTO] = [:]
     var transactionEventIdentities: [String: TransactionEventIdentityDTO] = [:]
     var importAttempts: [String: ImportAttemptDTO] = [:]
+    var identifierObservations: [String: IdentifierObservationDTO] = [:]
+    var confirmedImportFailureInjection: ConfirmedImportFailureInjectionPoint?
 }
 
 private final class InMemoryWorkspaceRepo: WorkspaceRepository {
@@ -40,12 +72,14 @@ private final class InMemoryWorkspaceRepo: WorkspaceRepository {
     }
 
     func upsertWorkspace(_ workspace: WorkspaceDTO) throws -> String {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
         state.workspaces[workspace.id] = workspace
         return workspace.id
     }
 
     func workspace(id: String) throws -> WorkspaceDTO? {
-        state.workspaces[id]
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.workspaces[id]
     }
 }
 
@@ -57,6 +91,7 @@ private final class InMemoryAccountRepo: AccountRepository {
     }
 
     func upsertAccount(_ account: AccountDTO) throws -> String {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
         guard state.workspaces[account.workspaceId] != nil else {
             throw RepositoryError.relationshipViolation("Workspace \(account.workspaceId) does not exist for account \(account.id).")
         }
@@ -65,6 +100,7 @@ private final class InMemoryAccountRepo: AccountRepository {
     }
 
     func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
         let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedDisplayName.isEmpty else {
             throw RepositoryError.relationshipViolation("Account display name cannot be empty.")
@@ -93,11 +129,13 @@ private final class InMemoryAccountRepo: AccountRepository {
     }
 
     func account(id: String) throws -> AccountDTO? {
-        state.accounts[id]
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.accounts[id]
     }
 
     func accounts(workspaceId: String) throws -> [AccountDTO] {
-        state.accounts.values
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.accounts.values
             .filter { $0.workspaceId == workspaceId }
             .sorted { lhs, rhs in
                 if lhs.name == rhs.name {
@@ -108,6 +146,7 @@ private final class InMemoryAccountRepo: AccountRepository {
     }
 
     func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
         guard let account = state.accounts[identifier.accountId] else {
             throw RepositoryError.relationshipViolation("Account \(identifier.accountId) does not exist for identifier \(identifier.id).")
         }
@@ -135,7 +174,8 @@ private final class InMemoryAccountRepo: AccountRepository {
     }
 
     func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO] {
-        state.accountIdentifiers.values
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.accountIdentifiers.values
             .filter { $0.accountId == accountId && $0.workspaceId == workspaceId }
             .sorted { lhs, rhs in
                 if lhs.scheme == rhs.scheme {
@@ -149,7 +189,8 @@ private final class InMemoryAccountRepo: AccountRepository {
     }
 
     func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String] {
-        matchingIdentifiers(workspaceId: workspaceId, scheme: scheme, identifier: identifier)
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return matchingIdentifiers(workspaceId: workspaceId, scheme: scheme, identifier: identifier)
             .map(\.accountId)
             .sorted()
     }
@@ -172,6 +213,7 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
     }
 
     func createImportSession(_ payload: ImportSessionDTO) throws -> String {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
         guard state.workspaces[payload.workspaceId] != nil else {
             throw RepositoryError.relationshipViolation("Workspace \(payload.workspaceId) does not exist for import session \(payload.id).")
         }
@@ -191,6 +233,7 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
     }
 
     func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
         guard let existing = state.importSessions[id] else {
             throw RepositoryError.recordNotFound("Import session \(id) does not exist.")
         }
@@ -209,17 +252,18 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
     }
 
     func importSession(id: String) throws -> ImportSessionRecordDTO? {
-        state.importSessions[id]
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.importSessions[id]
     }
 
     func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? {
-        state.importHistoryLock.lock()
-        defer { state.importHistoryLock.unlock() }
+        state.stateLock.lock()
+        defer { state.stateLock.unlock() }
         return priorImportedStatementWithoutLock(algorithm: algorithm, fingerprint: fingerprint)
     }
 
     func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] {
-        state.importHistoryLock.lock(); defer { state.importHistoryLock.unlock() }
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
         var result: [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] = [:]
         for event in state.transactionEventIdentities.values {
             let key = TransactionEventIdentityKeyDTO(algorithm: event.algorithm, digest: event.digest)
@@ -231,7 +275,7 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
     }
 
     func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String {
-        state.importHistoryLock.lock(); defer { state.importHistoryLock.unlock() }
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
         guard state.workspaces[payload.workspaceId] != nil else {
             throw RepositoryError.relationshipViolation("Workspace does not exist for import attempt.")
         }
@@ -243,7 +287,7 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
     }
 
     func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] {
-        state.importHistoryLock.lock(); defer { state.importHistoryLock.unlock() }
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
         return state.importAttempts.values.filter { $0.workspaceId == workspaceId }.sorted {
             if $0.createdAtISO == $1.createdAtISO { return $0.id > $1.id }
             return $0.createdAtISO > $1.createdAtISO
@@ -251,8 +295,8 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
     }
 
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
-        state.importHistoryLock.lock()
-        defer { state.importHistoryLock.unlock() }
+        state.stateLock.lock()
+        defer { state.stateLock.unlock() }
 
         if let duplicate = priorImportedStatementWithoutLock(
             algorithm: payload.fingerprint.algorithm,
@@ -384,6 +428,180 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
     }
 }
 
+/// Dormant provider implementation used by contract and concurrency tests.
+/// It deliberately publishes a complete accepted graph only after every
+/// validation succeeds on local copies.
+private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
+    private let state: InMemoryRepositoryState
+    private let generationToken: ProviderGenerationToken
+
+    init(state: InMemoryRepositoryState, generationToken: ProviderGenerationToken) {
+        self.state = state
+        self.generationToken = generationToken
+    }
+
+    func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
+        state.stateLock.lock()
+        defer { state.stateLock.unlock() }
+
+        guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+        guard plan.transactionTemplates.allSatisfy(\.isAccountIndependent),
+              plan.historyTemplate.document.workspaceId == plan.workspace.id,
+              plan.historyTemplate.document.importSessionId == plan.historyTemplate.importSession.id,
+              plan.historyTemplate.importSession.workspaceId == plan.workspace.id,
+              plan.historyTemplate.fingerprint.documentId == plan.historyTemplate.document.id,
+              plan.historyTemplate.fingerprint.importSessionId == plan.historyTemplate.importSession.id,
+              plan.historyTemplate.successfulAttempt.workspaceId == plan.workspace.id else {
+            return .repositoryIntegrityConflict
+        }
+        guard !state.documentFingerprints.values.contains(where: {
+            $0.algorithm == plan.historyTemplate.fingerprint.algorithm &&
+            $0.fingerprint == plan.historyTemplate.fingerprint.fingerprint
+        }) else { return .exactDuplicate }
+
+        var workspaces = state.workspaces
+        var accounts = state.accounts
+        var identifiers = state.accountIdentifiers
+        var documents = state.documents
+        var fingerprints = state.documentFingerprints
+        var sessions = state.importSessions
+        var transactions = state.transactions
+        var eventIdentities = state.transactionEventIdentities
+        var attempts = state.importAttempts
+        var observations = state.identifierObservations
+        let injectedFailure = state.confirmedImportFailureInjection
+
+        let account: AccountDTO
+        switch plan.accountChoice {
+        case .createProposedAccount:
+            guard plan.proposedAccount.workspaceId == plan.workspace.id else { return .repositoryIntegrityConflict }
+            workspaces[plan.workspace.id] = plan.workspace
+            if injectedFailure == .workspace { return .repositoryIntegrityConflict }
+            guard accounts[plan.proposedAccount.id] == nil else { return .repositoryIntegrityConflict }
+            accounts[plan.proposedAccount.id] = plan.proposedAccount
+            if injectedFailure == .account { return .repositoryIntegrityConflict }
+            account = plan.proposedAccount
+        case .useExistingAccount(let accountID):
+            guard let existing = accounts[accountID] else { return .selectedAccountUnavailable }
+            guard existing.workspaceId == plan.workspace.id else { return .selectedAccountWorkspaceMismatch }
+            account = existing
+        }
+
+        switch plan.advisoryIdentity {
+        case .resolved(let accountID) where accountID != account.id:
+            return .staleIdentityDecision
+        case .ambiguous:
+            return .identityAmbiguous
+        case .conflict:
+            return .identityConflict
+        default:
+            break
+        }
+
+        for candidate in plan.identifiers {
+            let matching = identifiers.values.filter {
+                $0.workspaceId == plan.workspace.id && $0.scheme == candidate.scheme && $0.identifier == candidate.normalizedValue
+            }
+            if matching.contains(where: { $0.accountId != account.id }) { return .identifierOwnershipConflict }
+            let ownership = matching.first ?? AccountIdentifierDTO(
+                accountId: account.id,
+                workspaceId: plan.workspace.id,
+                scheme: candidate.scheme,
+                identifier: candidate.normalizedValue,
+                strength: "strong",
+                verificationState: "verified",
+                provenance: candidate.provenanceCode,
+                createdAtISO: plan.historyTemplate.completedAtISO
+            )
+            identifiers[ownership.id] = ownership
+            if injectedFailure == .identifierOwnership { return .repositoryIntegrityConflict }
+            let observation = IdentifierObservationDTO(
+                ownershipId: ownership.id,
+                importSessionId: plan.historyTemplate.importSession.id,
+                documentId: plan.historyTemplate.document.id,
+                parserProvenanceCode: candidate.provenanceCode,
+                associationAuthorityCode: "confirmed-import",
+                createdAtISO: plan.historyTemplate.completedAtISO
+            )
+            observations["\(ownership.id)|\(observation.importSessionId)|\(observation.documentId)"] = observation
+            if injectedFailure == .observation { return .repositoryIntegrityConflict }
+        }
+
+        var finalTransactions = [TransactionDTO]()
+        var finalEvents = [TransactionEventIdentityDTO]()
+        for template in plan.transactionTemplates {
+            let transaction = withFinalRelationships(
+                template.transaction,
+                accountID: account.id,
+                importSessionID: plan.historyTemplate.importSession.id,
+                documentID: plan.historyTemplate.document.id
+            )
+            guard transactions[transaction.id] == nil else { return .repositoryIntegrityConflict }
+            finalTransactions.append(transaction)
+            if let evidence = template.eventEvidence {
+                let identity: TransactionEventIdentity
+                do {
+                    identity = try TransactionEventIdentity.make(transactionID: transaction.id, evidence: evidence, accountID: account.id)
+                } catch { return .repositoryIntegrityConflict }
+                let keyMatches = finalEvents.contains { $0.algorithm == identity.algorithmIdentifier && $0.digest == identity.digest }
+                if keyMatches { return .repeatedIncomingEventEvidence }
+                if eventIdentities.values.contains(where: { $0.algorithm == identity.algorithmIdentifier && $0.digest == identity.digest }) {
+                    return .existingEventDuplicate
+                }
+                finalEvents.append(TransactionEventIdentityDTO(
+                    id: UUID().uuidString,
+                    transactionId: transaction.id,
+                    accountId: account.id,
+                    documentId: plan.historyTemplate.document.id,
+                    importSessionId: plan.historyTemplate.importSession.id,
+                    algorithm: identity.algorithmIdentifier,
+                    digest: identity.digest,
+                    createdAtISO: plan.historyTemplate.completedAtISO
+                ))
+            }
+        }
+
+        let history = plan.historyTemplate
+        guard documents[history.document.id] == nil,
+              fingerprints[history.fingerprint.id] == nil,
+              sessions[history.importSession.id] == nil,
+              attempts[history.successfulAttempt.id] == nil,
+              history.successfulAttempt.accountId == account.id,
+              history.successfulAttempt.importSessionId == history.importSession.id,
+              history.successfulAttempt.documentId == history.document.id else { return .repositoryIntegrityConflict }
+
+        documents[history.document.id] = history.document
+        if injectedFailure == .document { return .repositoryIntegrityConflict }
+        fingerprints[history.fingerprint.id] = history.fingerprint
+        if injectedFailure == .fingerprint { return .repositoryIntegrityConflict }
+        sessions[history.importSession.id] = ImportSessionRecordDTO(
+            id: history.importSession.id, workspaceId: history.importSession.workspaceId,
+            userVisibleName: history.importSession.userVisibleName, startedAtISO: history.importSession.startedAtISO,
+            completedAtISO: history.completedAtISO, validationStatus: "passed",
+            readerVersion: history.importSession.readerVersion, parserVersion: history.importSession.parserVersion,
+            layoutVersion: history.importSession.layoutVersion
+        )
+        if injectedFailure == .importSession { return .repositoryIntegrityConflict }
+        finalTransactions.forEach { transactions[$0.id] = $0 }
+        if injectedFailure == .transactions { return .repositoryIntegrityConflict }
+        finalEvents.forEach { eventIdentities[$0.id] = $0 }
+        if injectedFailure == .eventIdentities { return .repositoryIntegrityConflict }
+        attempts[history.successfulAttempt.id] = history.successfulAttempt
+        if injectedFailure == .successfulAttempt { return .repositoryIntegrityConflict }
+        if injectedFailure == .sessionCompletion { return .repositoryIntegrityConflict }
+
+        state.workspaces = workspaces; state.accounts = accounts; state.accountIdentifiers = identifiers
+        state.identifierObservations = observations; state.documents = documents; state.documentFingerprints = fingerprints
+        state.importSessions = sessions; state.transactions = transactions; state.transactionEventIdentities = eventIdentities
+        state.importAttempts = attempts
+        return .committed(ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id))
+    }
+
+    private func withFinalRelationships(_ template: TransactionDTO, accountID: String, importSessionID: String, documentID: String) -> TransactionDTO {
+        TransactionDTO(id: template.id, workspaceId: template.workspaceId, accountId: accountID, importSessionId: importSessionID, documentId: documentID, originalRowId: template.originalRowId, postedDateISO: template.postedDateISO, valueDateISO: template.valueDateISO, description: template.description, payee: template.payee, reference: template.reference, nativeCurrency: template.nativeCurrency, amountMinor: template.amountMinor, amountDecimal: template.amountDecimal, direction: template.direction, runningBalanceMinor: template.runningBalanceMinor, isReconciled: template.isReconciled, isTrusted: template.isTrusted, trustedAtISO: template.trustedAtISO, createdAtISO: template.createdAtISO, updatedAtISO: template.updatedAtISO, rawRows: template.rawRows)
+    }
+}
+
 private final class InMemoryTransactionRepo: TransactionRepository {
     private let state: InMemoryRepositoryState
 
@@ -392,6 +610,7 @@ private final class InMemoryTransactionRepo: TransactionRepository {
     }
 
     func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
         try validate(workspaceId: workspaceId, importSessionId: importSessionId, transactions: transactions)
 
         if let importSessionId {
@@ -409,7 +628,8 @@ private final class InMemoryTransactionRepo: TransactionRepository {
     }
 
     func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO] {
-        state.transactions.values
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.transactions.values
             .filter { transaction in
                 transaction.workspaceId == workspaceId && (importSessionId == nil || transaction.importSessionId == importSessionId)
             }

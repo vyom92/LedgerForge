@@ -87,13 +87,14 @@ public final class SQLiteDatabase {
             let msg = String(cString: sqlite3_errmsg(db))
             throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: msg])
         }
+        // Protect every startup statement from concurrent openers, including
+        // the first WAL-mode pragma used by independent providers.
+        sqlite3_busy_timeout(db, 5000)
         // Configure recommended PRAGMAs for production-safe defaults
         // Enable write-ahead logging for concurrency
         try execute(sql: "PRAGMA journal_mode = WAL;")
         // Enable foreign keys enforcement
         try execute(sql: "PRAGMA foreign_keys = ON;")
-        // Set busy timeout (ms)
-        sqlite3_busy_timeout(db, 5000)
         // Use NORMAL synchronous for balanced durability/performance
         try execute(sql: "PRAGMA synchronous = NORMAL;")
     }
@@ -148,10 +149,10 @@ public final class SQLiteDatabase {
     public func execute(sql: String) throws {
         guard let db = db else { throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: "DB not open"]) }
         var errMsg: UnsafeMutablePointer<Int8>? = nil
-        if sqlite3_exec(db, sql, nil, nil, &errMsg) != SQLITE_OK {
-            let message = errMsg.flatMap { String(cString: $0) } ?? "unknown"
+        let result = sqlite3_exec(db, sql, nil, nil, &errMsg)
+        if result != SQLITE_OK {
             sqlite3_free(errMsg)
-            throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+            throw executionError(resultCode: result, operation: operation(for: sql))
         }
     }
 

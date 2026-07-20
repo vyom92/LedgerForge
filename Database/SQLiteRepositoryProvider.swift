@@ -94,6 +94,8 @@ public final class SQLiteRepositoryProvider {
     public let transactionRepo: TransactionRepository
     public let accountRepo: AccountRepository
     public let importSessionRepo: ImportSessionRepository
+    public let generationToken: ProviderGenerationToken
+    public let confirmedImportRepo: ConfirmedImportRepository
 
     public convenience init(path: String? = nil) throws {
         try self.init(path: path, migrations: allMigrations)
@@ -129,12 +131,23 @@ public final class SQLiteRepositoryProvider {
             database.close()
             throw SQLiteRepositoryProviderError.databaseInitializationFailed
         }
+        let generationToken = ProviderGenerationToken()
+        let supportsConfirmedImport = (try? database.query(
+            sql: "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'account_identifier_observations';",
+            params: []
+        ) { _ in true }.isEmpty == false) ?? false
         self.database = database
+        self.generationToken = generationToken
 
         self.workspaceRepo = SQLiteWorkspaceRepo(db: database)
         self.transactionRepo = SQLiteTransactionRepo(db: database)
         self.accountRepo = SQLiteAccountRepo(db: database)
         self.importSessionRepo = SQLiteImportSessionRepo(db: database)
+        // V5 remains dormant in normal application startup. A V5-aware
+        // confirmed provider is installed only by the Task 3 test harness.
+        self.confirmedImportRepo = supportsConfirmedImport
+            ? SQLiteConfirmedImportRepository(db: database, generationToken: generationToken)
+            : PlaceholderConfirmedImportRepo()
     }
 
     public static func defaultDBPath() -> String {
@@ -640,7 +653,7 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
                 try db.execute(sql: "COMMIT;")
                 DeveloperConsole.shared.info(.database, "Existing account identifier reused", metadata: [
                     "scheme": identifier.scheme,
-                    "identifier": FinancialIdentifier.redacted(identifier.identifier)
+                    "identifier": "[redacted]"
                 ])
                 return current.id
             }
@@ -657,15 +670,15 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
             try db.execute(sql: "COMMIT;")
             DeveloperConsole.shared.info(.database, "Account identifier attached", metadata: [
                 "scheme": identifier.scheme,
-                "identifier": FinancialIdentifier.redacted(identifier.identifier)
+                "identifier": "[redacted]"
             ])
             return identifier.id
         } catch {
             try? db.execute(sql: "ROLLBACK;")
-            if case RepositoryError.conflictingAccountIdentifier(_, let scheme, let identifierValue, _, _) = error {
+            if case RepositoryError.conflictingAccountIdentifier(_, let scheme, _, _, _) = error {
                 DeveloperConsole.shared.warning(.database, "Conflicting account identifier rejected", metadata: [
                     "scheme": scheme,
-                    "identifier": FinancialIdentifier.redacted(identifierValue)
+                    "identifier": "[redacted]"
                 ])
             }
             throw error

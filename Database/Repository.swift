@@ -182,6 +182,10 @@ public final class DatabaseProvider {
     public let transactionRepo: TransactionRepository
     public let accountRepo: AccountRepository
     public let importSessionRepo: ImportSessionRepository
+    /// Captured by a prepared import and compared only by the dormant
+    /// confirmed-import provider. It is never presented or logged.
+    public let generationToken: ProviderGenerationToken
+    public let confirmedImportRepo: ConfirmedImportRepository
 #if DEBUG
     private let generationValidity: ProviderGenerationValidity?
 #endif
@@ -191,10 +195,14 @@ public final class DatabaseProvider {
         transactionRepo: TransactionRepository,
         accountRepo: AccountRepository,
         importSessionRepo: ImportSessionRepository,
+        confirmedImportRepo: ConfirmedImportRepository = PlaceholderConfirmedImportRepo(),
+        generationToken: ProviderGenerationToken = ProviderGenerationToken(),
         persistenceState: PersistenceState = .intentionalNonDurable(.testMemory),
         protectsGeneration: Bool = false
     ) {
         self.persistenceState = persistenceState
+        self.generationToken = generationToken
+        self.confirmedImportRepo = confirmedImportRepo
 #if DEBUG
         if protectsGeneration {
             let validity = ProviderGenerationValidity()
@@ -222,6 +230,8 @@ public final class DatabaseProvider {
         self.transactionRepo = provider.transactionRepo
         self.accountRepo = provider.accountRepo
         self.importSessionRepo = provider.importSessionRepo
+        self.generationToken = provider.generationToken
+        self.confirmedImportRepo = provider.confirmedImportRepo
 #if DEBUG
         self.generationValidity = nil
 #endif
@@ -233,6 +243,7 @@ public final class DatabaseProvider {
             transactionRepo: PlaceholderTransactionRepo(),
             accountRepo: PlaceholderAccountRepo(),
             importSessionRepo: PlaceholderImportSessionRepo(),
+            confirmedImportRepo: PlaceholderConfirmedImportRepo(),
             persistenceState: .unavailable(reason)
         )
     }
@@ -244,6 +255,8 @@ public final class DatabaseProvider {
             transactionRepo: provider.transactionRepo,
             accountRepo: provider.accountRepo,
             importSessionRepo: provider.importSessionRepo,
+            confirmedImportRepo: provider.confirmedImportRepo,
+            generationToken: provider.generationToken,
             persistenceState: .intentionalNonDurable(purpose)
         )
     }
@@ -254,6 +267,8 @@ public final class DatabaseProvider {
             transactionRepo: provider.transactionRepo,
             accountRepo: provider.accountRepo,
             importSessionRepo: provider.importSessionRepo,
+            confirmedImportRepo: provider.confirmedImportRepo,
+            generationToken: provider.generationToken,
             persistenceState: .verifiedSQLite,
             protectsGeneration: protectsGeneration
         )
@@ -394,5 +409,13 @@ struct PlaceholderImportSessionRepo: ImportSessionRepository {
 
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
         throw RepositoryError.persistenceUnavailable
+    }
+}
+
+public struct PlaceholderConfirmedImportRepo: ConfirmedImportRepository {
+    public init() {}
+
+    public func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
+        .persistenceUnavailable
     }
 }

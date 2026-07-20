@@ -34,6 +34,31 @@ struct TransactionEventIdentity: Equatable, Sendable {
         return TransactionEventIdentity(transactionID: transactionID, accountID: accountID, algorithmIdentifier: algorithm, digest: digest)
     }
 
+    /// The confirmed-import transport contains parser-produced evidence but no
+    /// account. This adapter validates and canonicalizes it only after the
+    /// provider has selected the final durable account.
+    static func make(
+        transactionID: String,
+        evidence: ConfirmedImportTransactionEventEvidenceDTO,
+        accountID: String
+    ) throws -> TransactionEventIdentity {
+        guard let transactionUUID = UUID(uuidString: transactionID) else {
+            throw TransactionEventIdentityError.invalidEvidence
+        }
+
+        let domainEvidence: AxisUPITransactionEventEvidence
+        switch evidence {
+        case .axisUPI(let axis):
+            domainEvidence = AxisUPITransactionEventEvidence(
+                operation: AxisUPITransactionEventEvidence.Operation(rawValue: axis.operation.rawValue)!,
+                reference: axis.reference,
+                subtype: AxisUPITransactionEventEvidence.LedgerSubtype(rawValue: axis.subtype.rawValue)!
+            )
+        }
+
+        return try make(transactionID: transactionUUID, evidence: domainEvidence, accountID: accountID)
+    }
+
     static func canonicalPayload(
         evidence: AxisUPITransactionEventEvidence,
         accountID: String,
