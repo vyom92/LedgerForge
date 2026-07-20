@@ -298,7 +298,9 @@ This item does not include:
 
 Those concerns remain governed by their P2 candidates.
 
-Completed from `ea64c685f584ccba94e5b9e29666519837758312` through `4877b05` (native `Money` amount presentation), `b8e4444` (per-transaction import-session validation provenance) and `71f1edf` (workflow and durable-attempt import activity presentation). Verification passed with 294 tests across 37 suites, Debug and optimized Release builds, and static analysis. Schema remains V4; no migration or ADR changed.
+Completed from `ea64c685f584ccba94e5b9e29666519837758312` through `4877b05` (native `Money` amount presentation), `b8e4444` (per-transaction import-session validation provenance) and `71f1edf` (workflow and durable-attempt import activity presentation). Bounded hardening from `334a9e209e12fac0b67f6e79ce264945fdf5def8` adds `5d0eebd` (explicit durable persistence failure, neutral unknown outcomes and deterministic valid-date/stable-ID durable-attempt selection) and `530e897` (independent multi-session validation provenance across later imports and global validation changes). Verification passed with 298 tests across 37 suites plus fresh Debug/optimized Release builds and analysis; Release retains four pre-existing `AccountStore` actor-isolation warnings. Schema remains V4; no migration or ADR changed.
+
+The recorded manual production presentation check is INR through the approved Axis NRE CSV path only. QAR Dashboard and Account Recent Activity coverage is automated with constructed data, and Import Preview coverage is automated with constructed `PreparedImport` and transaction data. QAR production import, CBQ, Axis NRO, PDF, XLS, XLSX and card-statement production support remain outside this completed item.
 
 This completion does not authorize dashboard analytics (`FW-P2-46`), general placeholder cleanup (`FW-P2-42`), category implementation (`FW-P2-20`), or Axis NRO parser-family work (`FW-P1-01`). No production support was added for PDF, XLS, XLSX, card statements or additional currencies through parser expansion.
 
