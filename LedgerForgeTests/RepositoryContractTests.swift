@@ -204,6 +204,187 @@ struct RepositoryContractTests {
         #expect(try provider.importSessionRepo.importSession(id: session.id)?.id == session.id)
     }
 
+    @Test func sqliteSameIDWorkspaceUpsertPreservesDurableGraph() throws {
+        try withTemporarySQLiteParentUpsertProvider { provider in
+            let graph = try seedParentUpsertGraph(in: provider)
+            let updatedWorkspace = WorkspaceDTO(
+                id: graph.workspace.id,
+                name: "Updated Parent Workspace",
+                createdAtISO: "2026-07-18T10:00:00Z",
+                updatedAtISO: "2026-07-18T10:05:00Z"
+            )
+
+            #expect(try provider.workspaceRepo.upsertWorkspace(updatedWorkspace) == updatedWorkspace.id)
+
+            #expect(try provider.workspaceRepo.workspace(id: graph.workspace.id) == updatedWorkspace)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM accounts WHERE workspace_id = 'workspace-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM account_identifiers WHERE account_id = 'account-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM documents WHERE workspace_id = 'workspace-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM import_sessions WHERE workspace_id = 'workspace-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM normalized_documents WHERE import_session_id = 'session-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM normalized_rows WHERE normalized_document_id = 'normalized-document-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM transactions WHERE workspace_id = 'workspace-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM transaction_raw_rows WHERE transaction_id = 'transaction-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM import_attempts WHERE workspace_id = 'workspace-parent-upsert';") == 1)
+            #expect(try provider.accountRepo.account(id: graph.account.id) == graph.account)
+            #expect(try provider.accountRepo.identifiers(accountId: graph.account.id, workspaceId: graph.workspace.id) == [graph.identifier])
+            #expect(try provider.transactionRepo.transactions(workspaceId: graph.workspace.id, importSessionId: graph.importSession.id) == [graph.transaction])
+            #expect(try provider.importSessionRepo.importSession(id: graph.importSession.id)?.id == graph.importSession.id)
+            #expect(try provider.importSessionRepo.importAttempts(workspaceId: graph.workspace.id) == [graph.importAttempt])
+            #expect(try foreignKeyViolations(in: provider.database).isEmpty)
+        }
+    }
+
+    @Test func sqliteSameIDAccountUpsertPreservesDurableGraphAndUnownedColumns() throws {
+        try withTemporarySQLiteParentUpsertProvider { provider in
+            let graph = try seedParentUpsertGraph(in: provider)
+            let closedAt = "2026-07-18T10:10:00Z"
+            try provider.database.executePrepared(
+                sql: "UPDATE accounts SET closed_at = ?, created_from_import_session_id = ? WHERE id = ?;",
+                params: [closedAt, graph.importSession.id, graph.account.id]
+            )
+            let updatedAccount = AccountDTO(
+                id: graph.account.id,
+                workspaceId: graph.workspace.id,
+                name: "Updated Parent Account",
+                institutionId: "Updated Institution",
+                accountType: "bank",
+                nativeCurrency: "INR",
+                description: "Updated DTO-owned metadata",
+                createdAtISO: "2026-07-18T10:15:00Z"
+            )
+
+            #expect(try provider.accountRepo.upsertAccount(updatedAccount) == updatedAccount.id)
+
+            #expect(try provider.accountRepo.account(id: graph.account.id) == updatedAccount)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM accounts WHERE id = 'account-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM account_identifiers WHERE account_id = 'account-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM transactions WHERE account_id = 'account-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM transaction_raw_rows WHERE transaction_id = 'transaction-parent-upsert';") == 1)
+            #expect(try provider.database.queryInt("SELECT COUNT(*) FROM import_attempts WHERE account_id = 'account-parent-upsert';") == 1)
+            #expect(try provider.accountRepo.identifiers(accountId: graph.account.id, workspaceId: graph.workspace.id) == [graph.identifier])
+            #expect(try provider.transactionRepo.transactions(workspaceId: graph.workspace.id, importSessionId: graph.importSession.id) == [graph.transaction])
+            #expect(try provider.importSessionRepo.importAttempts(workspaceId: graph.workspace.id) == [graph.importAttempt])
+            let unownedColumns = try provider.database.query(
+                sql: "SELECT closed_at, created_from_import_session_id FROM accounts WHERE id = ?;",
+                params: [graph.account.id]
+            ) { row in
+                [row.string(at: 0), row.string(at: 1)]
+            }.first
+            #expect(unownedColumns?[0] == closedAt)
+            #expect(unownedColumns?[1] == graph.importSession.id)
+            #expect(try foreignKeyViolations(in: provider.database).isEmpty)
+        }
+    }
+
+    @Test func sameIDParentUpsertsPreserveRepositoryGraphWithProviderParity() throws {
+        try runForEachProvider { provider in
+            let workspace = WorkspaceDTO(
+                id: "workspace-parent-parity",
+                name: "Parent Parity Workspace",
+                createdAtISO: "2026-07-18T11:00:00Z"
+            )
+            let account = AccountDTO(
+                id: "account-parent-parity",
+                workspaceId: workspace.id,
+                name: "Parent Parity Account",
+                institutionId: "Parity Institution",
+                accountType: "bank",
+                nativeCurrency: "INR",
+                description: "Original parity metadata",
+                createdAtISO: "2026-07-18T11:01:00Z"
+            )
+            let session = ImportSessionDTO(
+                id: "session-parent-parity",
+                workspaceId: workspace.id,
+                userVisibleName: "Parent Parity Import",
+                startedAtISO: "2026-07-18T11:02:00Z",
+                validationStatus: "passed"
+            )
+            let identifier = AccountIdentifierDTO(
+                id: "identifier-parent-parity",
+                accountId: account.id,
+                workspaceId: workspace.id,
+                scheme: FinancialIdentifierKind.institutionAccountId.rawValue,
+                identifier: "parent-parity-identifier",
+                strength: FinancialIdentifierStrength.strong.rawValue,
+                verificationState: FinancialIdentifierVerificationState.verified.rawValue,
+                provenance: FinancialIdentifierProvenance.institutionStructuredField.rawValue,
+                createdAtISO: "2026-07-18T11:03:00Z"
+            )
+            let transaction = transaction(
+                id: "transaction-parent-parity",
+                workspaceId: workspace.id,
+                accountId: account.id,
+                importSessionId: session.id,
+                documentId: "document-parent-parity",
+                amountMinor: 1_300,
+                amountDecimal: "13.00",
+                direction: "credit"
+            )
+            let attempt = ImportAttemptDTO(
+                id: "attempt-parent-parity",
+                workspaceId: workspace.id,
+                createdAtISO: "2026-07-18T11:04:00Z",
+                outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
+                coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+                accountDecisionCode: ImportAttemptAccountDecision.resolvedOrCreated.rawValue,
+                guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
+                persistenceCode: ImportAttemptPersistence.committed.rawValue,
+                transactionCount: 1,
+                accountId: account.id,
+                importSessionId: session.id,
+                documentId: nil
+            )
+
+            _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+            _ = try provider.accountRepo.upsertAccount(account)
+            _ = try provider.importSessionRepo.createImportSession(session)
+            _ = try provider.accountRepo.attachIdentifier(identifier)
+            try provider.transactionRepo.replaceTransactions(
+                workspaceId: workspace.id,
+                importSessionId: session.id,
+                transactions: [transaction]
+            )
+            _ = try provider.importSessionRepo.recordImportAttempt(attempt)
+
+            let updatedWorkspace = WorkspaceDTO(
+                id: workspace.id,
+                name: "Updated Parent Parity Workspace",
+                createdAtISO: "2026-07-18T11:05:00Z",
+                updatedAtISO: "2026-07-18T11:06:00Z"
+            )
+            _ = try provider.workspaceRepo.upsertWorkspace(updatedWorkspace)
+            _ = try provider.workspaceRepo.upsertWorkspace(updatedWorkspace)
+
+            #expect(try provider.workspaceRepo.workspace(id: workspace.id) == updatedWorkspace)
+            #expect(try provider.accountRepo.account(id: account.id) == account)
+            #expect(try provider.accountRepo.identifiers(accountId: account.id, workspaceId: workspace.id) == [identifier])
+            #expect(try provider.importSessionRepo.importSession(id: session.id)?.id == session.id)
+            #expect(try provider.transactionRepo.transactions(workspaceId: workspace.id, importSessionId: session.id) == [transaction])
+            #expect(try provider.importSessionRepo.importAttempts(workspaceId: workspace.id) == [attempt])
+
+            let updatedAccount = AccountDTO(
+                id: account.id,
+                workspaceId: workspace.id,
+                name: "Updated Parent Parity Account",
+                institutionId: "Updated Parity Institution",
+                accountType: "bank",
+                nativeCurrency: "QAR",
+                description: "Updated parity metadata",
+                createdAtISO: "2026-07-18T11:07:00Z"
+            )
+            _ = try provider.accountRepo.upsertAccount(updatedAccount)
+            _ = try provider.accountRepo.upsertAccount(updatedAccount)
+
+            #expect(try provider.accountRepo.account(id: account.id) == updatedAccount)
+            #expect(try provider.accountRepo.identifiers(accountId: account.id, workspaceId: workspace.id) == [identifier])
+            #expect(try provider.importSessionRepo.importSession(id: session.id)?.id == session.id)
+            #expect(try provider.transactionRepo.transactions(workspaceId: workspace.id, importSessionId: session.id) == [transaction])
+            #expect(try provider.importSessionRepo.importAttempts(workspaceId: workspace.id) == [attempt])
+        }
+    }
+
     @Test func importSessionRepositoryCanCreateUpdateAndRetrieveSessionData() async throws {
         try runForEachProvider { provider in
             let fixture = try seedWorkspace(provider)
@@ -720,6 +901,143 @@ private func withTemporarySQLiteProvider<T>(_ body: (RepositoryHandles) throws -
         transactionRepo: provider.transactionRepo
     )
     return try body(handles)
+}
+
+private struct ParentUpsertGraph {
+    let workspace: WorkspaceDTO
+    let account: AccountDTO
+    let importSession: ImportSessionDTO
+    let transaction: TransactionDTO
+    let identifier: AccountIdentifierDTO
+    let importAttempt: ImportAttemptDTO
+}
+
+private func withTemporarySQLiteParentUpsertProvider<T>(_ body: (SQLiteRepositoryProvider) throws -> T) throws -> T {
+    let folder = FileManager.default.temporaryDirectory
+        .appendingPathComponent("LedgerForgeParentUpsertTests")
+        .appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+
+    return try body(SQLiteRepositoryProvider(path: folder.appendingPathComponent("parent-upsert.sqlite").path))
+}
+
+private func seedParentUpsertGraph(in provider: SQLiteRepositoryProvider) throws -> ParentUpsertGraph {
+    let workspace = WorkspaceDTO(
+        id: "workspace-parent-upsert",
+        name: "Parent Upsert Workspace",
+        createdAtISO: "2026-07-18T09:00:00Z"
+    )
+    let account = AccountDTO(
+        id: "account-parent-upsert",
+        workspaceId: workspace.id,
+        name: "Parent Upsert Account",
+        institutionId: "Original Institution",
+        accountType: "bank",
+        nativeCurrency: "INR",
+        description: "Original DTO-owned metadata",
+        createdAtISO: "2026-07-18T09:01:00Z"
+    )
+    let importSession = ImportSessionDTO(
+        id: "session-parent-upsert",
+        workspaceId: workspace.id,
+        userVisibleName: "Parent Upsert Import",
+        startedAtISO: "2026-07-18T09:02:00Z",
+        validationStatus: "passed"
+    )
+    let identifier = AccountIdentifierDTO(
+        id: "identifier-parent-upsert",
+        accountId: account.id,
+        workspaceId: workspace.id,
+        scheme: FinancialIdentifierKind.institutionAccountId.rawValue,
+        identifier: "parent-upsert-identifier",
+        strength: FinancialIdentifierStrength.strong.rawValue,
+        verificationState: FinancialIdentifierVerificationState.verified.rawValue,
+        provenance: FinancialIdentifierProvenance.institutionStructuredField.rawValue,
+        createdAtISO: "2026-07-18T09:03:00Z"
+    )
+    let transaction = TransactionDTO(
+        id: "transaction-parent-upsert",
+        workspaceId: workspace.id,
+        accountId: account.id,
+        importSessionId: importSession.id,
+        documentId: "document-parent-upsert",
+        originalRowId: nil,
+        postedDateISO: "2026-07-18",
+        valueDateISO: nil,
+        description: "Parent upsert transaction",
+        payee: "Parent upsert payee",
+        reference: "PARENT-UPSERT",
+        nativeCurrency: "INR",
+        amountMinor: 1_250,
+        amountDecimal: "12.50",
+        direction: "credit",
+        runningBalanceMinor: 1_250,
+        isReconciled: false,
+        isTrusted: true,
+        trustedAtISO: "2026-07-18T09:04:00Z",
+        createdAtISO: "2026-07-18T09:04:00Z",
+        updatedAtISO: nil,
+        rawRows: [
+            TransactionRawRowDTO(
+                id: "raw-parent-upsert",
+                normalizedRowId: "normalized-row-parent-upsert",
+                contributionType: "transaction"
+            )
+        ]
+    )
+    let importAttempt = ImportAttemptDTO(
+        id: "attempt-parent-upsert",
+        workspaceId: workspace.id,
+        createdAtISO: "2026-07-18T09:05:00Z",
+        outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
+        coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+        accountDecisionCode: ImportAttemptAccountDecision.resolvedOrCreated.rawValue,
+        guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
+        persistenceCode: ImportAttemptPersistence.committed.rawValue,
+        transactionCount: 1,
+        accountId: account.id,
+        importSessionId: importSession.id,
+        documentId: "document-parent-upsert"
+    )
+
+    _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+    _ = try provider.accountRepo.upsertAccount(account)
+    _ = try provider.importSessionRepo.createImportSession(importSession)
+    try provider.database.executePrepared(
+        sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, sha256, created_at) VALUES (?,?,?,?,?,?);",
+        params: ["document-parent-upsert", workspace.id, importSession.id, "parent-upsert.csv", "parent-upsert-sha", "2026-07-18T09:02:00Z"]
+    )
+    try provider.database.executePrepared(
+        sql: "INSERT INTO normalized_documents (id, import_session_id, document_id, normalized_json, created_at) VALUES (?,?,?,?,?);",
+        params: ["normalized-document-parent-upsert", importSession.id, "document-parent-upsert", "{}", "2026-07-18T09:03:00Z"]
+    )
+    try provider.database.executePrepared(
+        sql: "INSERT INTO normalized_rows (id, normalized_document_id, row_index, row_original, created_at) VALUES (?,?,?,?,?);",
+        params: ["normalized-row-parent-upsert", "normalized-document-parent-upsert", 0, "parent-upsert-row", "2026-07-18T09:03:00Z"]
+    )
+    _ = try provider.accountRepo.attachIdentifier(identifier)
+    try provider.transactionRepo.replaceTransactions(
+        workspaceId: workspace.id,
+        importSessionId: importSession.id,
+        transactions: [transaction]
+    )
+    _ = try provider.importSessionRepo.recordImportAttempt(importAttempt)
+
+    return ParentUpsertGraph(
+        workspace: workspace,
+        account: account,
+        importSession: importSession,
+        transaction: transaction,
+        identifier: identifier,
+        importAttempt: importAttempt
+    )
+}
+
+private func foreignKeyViolations(in database: SQLiteDatabase) throws -> [String] {
+    try database.query(sql: "PRAGMA foreign_key_check;") { row in
+        (0...3).compactMap { row.string(at: Int32($0)) }.joined(separator: "|")
+    }
 }
 
 private func seedWorkspace(_ provider: RepositoryHandles) throws -> RepositoryFixture {

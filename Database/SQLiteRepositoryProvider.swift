@@ -457,7 +457,13 @@ fileprivate final class SQLiteWorkspaceRepo: WorkspaceRepository {
     init(db: SQLiteDatabase) { self.db = db }
 
     func upsertWorkspace(_ workspace: WorkspaceDTO) throws -> String {
-        let sql = "INSERT OR REPLACE INTO workspaces (id, name, created_at, updated_at) VALUES (?,?,?,?);"
+        let sql = """
+        INSERT INTO workspaces (id, name, created_at, updated_at) VALUES (?,?,?,?)
+        ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            created_at = excluded.created_at,
+            updated_at = excluded.updated_at;
+        """
         try db.executePrepared(sql: sql, params: [workspace.id, workspace.name, workspace.createdAtISO, workspace.updatedAtISO ?? NSNull()])
         return workspace.id
     }
@@ -483,8 +489,19 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
         try ensureInstitutionExists(id: account.institutionId, createdAtISO: account.createdAtISO)
 
         let now = account.createdAtISO
-        let sql = "INSERT OR REPLACE INTO accounts (id, workspace_id, name, institution_id, account_type, native_currency, description, created_at, closed_at, created_from_import_session_id) VALUES (?,?,?,?,?,?,?,?,?,?);"
-        try db.executePrepared(sql: sql, params: [account.id, account.workspaceId, account.name, account.institutionId ?? NSNull(), account.accountType ?? NSNull(), account.nativeCurrency, account.description ?? NSNull(), now, NSNull(), NSNull()])
+        let sql = """
+        INSERT INTO accounts (id, workspace_id, name, institution_id, account_type, native_currency, description, created_at)
+        VALUES (?,?,?,?,?,?,?,?)
+        ON CONFLICT(id) DO UPDATE SET
+            workspace_id = excluded.workspace_id,
+            name = excluded.name,
+            institution_id = excluded.institution_id,
+            account_type = excluded.account_type,
+            native_currency = excluded.native_currency,
+            description = excluded.description,
+            created_at = excluded.created_at;
+        """
+        try db.executePrepared(sql: sql, params: [account.id, account.workspaceId, account.name, account.institutionId ?? NSNull(), account.accountType ?? NSNull(), account.nativeCurrency, account.description ?? NSNull(), now])
         return account.id
     }
 
