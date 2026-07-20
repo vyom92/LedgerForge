@@ -96,6 +96,82 @@ struct TransactionListViewModelTests {
     }
 
     @MainActor
+    @Test
+    func transactionValidationPresentationUsesItsReferencedImportSessionOnly() {
+        let transactionStore = TransactionStore()
+        let importSessionStore = ImportSessionStore()
+        let passed = Transaction(
+            date: Date(timeIntervalSince1970: 1_700_000_000),
+            description: "Persisted passed transaction",
+            debit: nil,
+            credit: 10,
+            amount: 10,
+            balance: 10,
+            currency: "QAR",
+            account: "CBQ",
+            sourceBank: "CBQ",
+            sourceFile: "passed.csv",
+            repositoryImportSessionId: "session-passed"
+        )
+        let withoutSession = Transaction(
+            date: Date(timeIntervalSince1970: 1_700_000_001),
+            description: "No provenance",
+            debit: 10,
+            credit: nil,
+            amount: -10,
+            balance: 0,
+            currency: "QAR",
+            account: "CBQ",
+            sourceBank: "CBQ",
+            sourceFile: "unknown.csv"
+        )
+        transactionStore.replaceTransactions([passed, withoutSession])
+        importSessionStore.replaceImportSessions([
+            RepositoryImportSession(
+                id: "session-passed",
+                workspaceId: "workspace",
+                sourceDocumentName: "passed.csv",
+                startedAtISO: "2026-07-20T00:00:00Z",
+                completedAtISO: "2026-07-20T00:01:00Z",
+                validationStatus: "passed",
+                parserVersion: "Parser"
+            )
+        ])
+
+        let viewModel = TransactionListViewModel(
+            transactionStore: transactionStore,
+            importSessionStore: importSessionStore
+        )
+
+        #expect(viewModel.validationPresentation(for: passed)?.title == "Passed")
+        #expect(viewModel.validationPresentation(for: withoutSession) == nil)
+    }
+
+    @MainActor
+    @Test
+    func transactionValidationPresentationFailsClosedForUnknownOrMissingSessionStatus() {
+        let transactionStore = TransactionStore()
+        let importSessionStore = ImportSessionStore()
+        let known = transactionForValidationPresentation(sessionID: "session-passed", description: "Known")
+        let unknown = transactionForValidationPresentation(sessionID: "session-unknown", description: "Unknown")
+        let missing = transactionForValidationPresentation(sessionID: "session-missing", description: "Missing")
+        transactionStore.replaceTransactions([known, unknown, missing], validation: .empty)
+        importSessionStore.replaceImportSessions([
+            validationSession(id: "session-passed", status: "passed"),
+            validationSession(id: "session-unknown", status: "unrecognized")
+        ])
+
+        let viewModel = TransactionListViewModel(
+            transactionStore: transactionStore,
+            importSessionStore: importSessionStore
+        )
+
+        #expect(viewModel.validationPresentation(for: known)?.title == "Passed")
+        #expect(viewModel.validationPresentation(for: unknown) == nil)
+        #expect(viewModel.validationPresentation(for: missing) == nil)
+    }
+
+    @MainActor
     private func waitForViewModelUpdate() async {
         await withCheckedContinuation { continuation in
             DispatchQueue.main.async {
@@ -130,4 +206,32 @@ struct TransactionListViewModelTests {
             sourceFile: "rent.csv"
         )
     ]
+}
+
+private func transactionForValidationPresentation(sessionID: String, description: String) -> Transaction {
+    Transaction(
+        date: Date(timeIntervalSince1970: 1_700_000_000),
+        description: description,
+        debit: nil,
+        credit: 10,
+        amount: 10,
+        balance: 10,
+        currency: "QAR",
+        account: "CBQ",
+        sourceBank: "CBQ",
+        sourceFile: "presentation.csv",
+        repositoryImportSessionId: sessionID
+    )
+}
+
+private func validationSession(id: String, status: String) -> RepositoryImportSession {
+    RepositoryImportSession(
+        id: id,
+        workspaceId: "workspace",
+        sourceDocumentName: "presentation.csv",
+        startedAtISO: "2026-07-20T00:00:00Z",
+        completedAtISO: "2026-07-20T00:01:00Z",
+        validationStatus: status,
+        parserVersion: "Parser"
+    )
 }

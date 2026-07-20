@@ -198,7 +198,12 @@ struct TransactionListView: View {
                             .foregroundStyle(LFTheme.textSecondary)
                     }
 
-                    LFStatusBadge(title: viewModel.validationPassed ? "Cleared" : "Needs Review", color: viewModel.validationPassed ? LFTheme.success : LFTheme.warning)
+                    if let validation = viewModel.validationPresentation(for: selected) {
+                        LFStatusBadge(
+                            title: validation.title,
+                            color: validation.isPassed ? LFTheme.success : LFTheme.warning
+                        )
+                    }
 
                     Divider().overlay(LFTheme.divider)
 
@@ -212,11 +217,13 @@ struct TransactionListView: View {
 
                     Divider().overlay(LFTheme.divider)
 
-                    Text("Validation")
-                        .font(.headline)
-                    Text(viewModel.validationPassed ? "Latest import validation passed." : "Latest import needs review or has not run.")
-                        .font(.caption)
-                        .foregroundStyle(LFTheme.textSecondary)
+                    if let validation = viewModel.validationPresentation(for: selected) {
+                        Text("Validation")
+                            .font(.headline)
+                        Text(validation.detail)
+                            .font(.caption)
+                            .foregroundStyle(LFTheme.textSecondary)
+                    }
                 } else {
                     VStack(spacing: 12) {
                         Image(systemName: "cursorarrow.click")
@@ -272,8 +279,15 @@ struct TransactionListView: View {
                     .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
                     .monospacedDigit()
                     .frame(width: 120, alignment: .trailing)
-                LFStatusBadge(title: viewModel.validationPassed ? "Cleared" : "Review", color: viewModel.validationPassed ? LFTheme.success : LFTheme.warning)
+                if let validation = viewModel.validationPresentation(for: transaction) {
+                    LFStatusBadge(
+                        title: validation.title,
+                        color: validation.isPassed ? LFTheme.success : LFTheme.warning
+                    )
                     .frame(width: 96, alignment: .leading)
+                } else {
+                    Color.clear.frame(width: 96, height: 1)
+                }
                 Text(transaction.runningBalanceMoney.map { MoneyFormatting.display($0) } ?? "—")
                     .monospacedDigit()
                     .frame(width: 112, alignment: .trailing)

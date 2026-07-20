@@ -30,6 +30,13 @@ struct RepositoryStoreHydratorTests {
         #expect(stores.transactions.transactions.first?.repositoryAccountId == "account-dashboard")
         #expect(stores.transactions.transactions.first?.repositoryImportSessionId == "import-dashboard")
         #expect(stores.importSessions.importSessions.map(\.id) == ["import-dashboard"])
+
+        let viewModel = TransactionListViewModel(
+            transactionStore: stores.transactions,
+            importSessionStore: stores.importSessions
+        )
+        let transaction = try #require(stores.transactions.transactions.first)
+        #expect(viewModel.validationPresentation(for: transaction)?.title == "Passed")
     }
 
     @Test func hydratorRedactsOnlyVerifiedStrongIdentifiersBeforeRuntimePresentation() throws {

@@ -17,37 +17,64 @@ struct TransactionCurrencySummary: Identifiable, Equatable {
     var net: Money { try! inflow - outflow }
 }
 
+struct TransactionValidationPresentation: Equatable {
+    let validationStatus: String
+
+    var title: String { validationStatus.localizedCapitalized }
+    var isPassed: Bool { validationStatus == "passed" }
+    var detail: String { "Persisted import-session validation status: \(title)." }
+
+    init?(validationStatus: String) {
+        guard ["pending", "passed", "warning", "failed"].contains(validationStatus) else {
+            return nil
+        }
+        self.validationStatus = validationStatus
+    }
+}
+
 final class TransactionListViewModel: ObservableObject {
 
     @Published private(set) var transactions: [Transaction] = []
-    @Published private(set) var validationPassed: Bool = false
-    @Published private(set) var validationIssues: [ValidationIssue] = []
 
     @Published var searchText: String = ""
     @Published var showOnlyCredits: Bool = false
     @Published var showOnlyDebits: Bool = false
 
+    private let transactionStore: TransactionStore
+    private let importSessionStore: ImportSessionStore
+    private var importSessions: [RepositoryImportSession] = []
     private var cancellables = Set<AnyCancellable>()
 
-    init() {
-        transactions = TransactionStore.shared.transactions
-        validationPassed = TransactionStore.shared.lastValidation?.passed ?? false
-        validationIssues = TransactionStore.shared.lastValidation?.issues ?? []
+    init(
+        transactionStore: TransactionStore = .shared,
+        importSessionStore: ImportSessionStore = .shared
+    ) {
+        self.transactionStore = transactionStore
+        self.importSessionStore = importSessionStore
+        transactions = transactionStore.transactions
+        importSessions = importSessionStore.importSessions
 
-        TransactionStore.shared.$transactions
+        transactionStore.$transactions
             .receive(on: RunLoop.main)
             .sink { [weak self] tx in
                 self?.transactions = tx
             }
             .store(in: &cancellables)
 
-        TransactionStore.shared.$lastValidation
+        importSessionStore.$importSessions
             .receive(on: RunLoop.main)
-            .sink { [weak self] validation in
-                self?.validationPassed = validation?.passed ?? false
-                self?.validationIssues = validation?.issues ?? []
+            .sink { [weak self] sessions in
+                self?.importSessions = sessions
             }
             .store(in: &cancellables)
+    }
+
+    func validationPresentation(for transaction: Transaction) -> TransactionValidationPresentation? {
+        guard let sessionID = transaction.repositoryImportSessionId,
+              let session = importSessions.first(where: { $0.id == sessionID }) else {
+            return nil
+        }
+        return TransactionValidationPresentation(validationStatus: session.validationStatus)
     }
 
     var currencySummaries: [TransactionCurrencySummary] {
