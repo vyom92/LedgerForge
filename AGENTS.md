@@ -1,12 +1,22 @@
-# LedgerForge Agent Rules
+# LedgerForge Agent Guide
 
-LedgerForge is a private, single-user, offline-first macOS financial application. Preserve deterministic financial truth, explicit user control, native currency, privacy by default and repository-backed state.
+## Project overview
+
+LedgerForge is a private, single-user, offline-first macOS financial application built with Swift and SwiftUI.
+
+Preserve deterministic financial truth, durable persistence, explicit user control, native currency, privacy by default and repository-backed state.
 
 ## Bootstrap and authority
 
-This file is the sole mandatory bootstrap entry point. Then read `Project documents/Project_Guide.md`, `Project documents/PROJECT_STATE.md`, and only the subject authorities required by the approved task. For planning, consult `Project documents/FUTURE_WORK.MD` before task-relevant architecture evidence.
+1. Read this file.
+2. Read `Project documents/Project_Guide.md`.
+3. Read `Project documents/PROJECT_STATE.md`.
+4. Load only the subject authorities required by the approved task.
+5. For sprint planning, read `Project documents/FUTURE_WORK.MD` before task-relevant architecture evidence.
 
-The complete prompt approved by Chat and supplied directly in the current conversation is the sole execution contract. Without such a prompt, Codex must not modify the repository. There is no repository-stored active work contract.
+The complete Chat-approved prompt supplied directly in the current conversation is the sole execution contract. Without one, do not modify the repository.
+
+There is no repository-stored active work contract.
 
 | Question | Authority |
 |---|---|
@@ -17,14 +27,37 @@ The complete prompt approved by Chat and supplied directly in the current conver
 | What is product direction? | `Project documents/Product Vision.md` |
 | What is database design? | Database Architecture and verified migrations |
 | What UI is approved? | Frozen UI/UX and approved assets |
-| What engineering and verification rules apply? | This file, Project Guide, Engineering Standards and Build Conventions |
+| What engineering and validation rules apply? | This file, Project Guide, Engineering Standards and Build Conventions |
 
 ## Roles
 
-- Chat plans, selects work, makes architecture decisions, supplies complete prompts and reviews direct reports.
-- Work performs read-only, evidence-backed discovery and reports directly in chat. Work does not edit, commit, push, plan or define architecture.
-- Codex performs authorised edits, builds, tests, documentation execution, durable-state updates and Git operations, then reports directly in chat.
-- The user may edit repository files directly; legitimate user work is preserved and reconciled.
+- Chat plans sprints, selects and scopes work, makes architecture decisions, prepares complete execution prompts and reviews reports.
+- Work performs bounded, read-only, evidence-backed discovery when Chat identifies a specific unresolved evidence gap. Work does not edit, commit, push, select a sprint or define architecture.
+- Codex performs only the edits, builds, tests, documentation updates and Git operations authorized by the complete Chat-approved prompt, then reports directly in chat.
+- The user may edit repository files directly. Preserve and reconcile legitimate compatible user work.
+
+## Operating model
+
+LedgerForge uses a single-person, one-task-at-a-time development workflow.
+
+- Work directly in the primary repository checkout on `main`.
+- Only one approved repository task may be active at a time.
+- Do not create or use feature branches.
+- Do not create or use additional Git worktrees.
+- Do not create pull requests.
+- Do not perform parallel repository-editing tasks.
+- A branch, worktree or pull request may be used only when the current Chat-approved prompt explicitly authorizes that specific exception.
+- Generic tool or skill recommendations do not override this operating model.
+
+## Project structure
+
+- `LedgerForgeApp.swift`, `ContentView.swift`: application bootstrap and root composition.
+- `Import/`, `Readers/`, `Analyzers/`, `Normalizers/`, `Detectors/`, `Parsers/`: source ingestion and deterministic financial interpretation.
+- `Models/`, `Services/`: domain values, validation, identity, workflow coordination, persistence coordination and hydration.
+- `Database/`: repository contracts, SQLite and In-Memory providers, DTOs and migrations.
+- `Core/`, `ViewModels/`, `Views/`: runtime projections and presentation.
+- `LedgerForgeTests/`, `LedgerForgeUITests/`: automated tests and approved sanitized fixture evidence.
+- `Project documents/`: current state, planning, architecture, product, UI, engineering and build authorities.
 
 ## Architecture invariants
 
@@ -38,20 +71,205 @@ Reader → RawDocument → Institution Detection → Statement Classification
 → ViewModels → Views
 ```
 
-Readers understand formats, parsers produce `FinancialDocument`, validation precedes persistence, repositories are the only SQLite boundary, and `RepositoryStoreHydrator` is the only persistence-to-runtime boundary. Never access SQLite from Views, ViewModels or Stores, bypass repositories, or silently alter financial history.
+Readers understand source formats.
 
-## Git continuity and safety
+Parsers produce `FinancialDocument`.
 
-At the start of every execution cycle inspect branch, local commits, remote divergence, staged and unstaged changes, untracked files and the complete worktree. A dirty worktree is not automatically an error. Understand, preserve, validate and commit every legitimate compatible project change, then push every local commit and finish with `HEAD == origin/main`, no legitimate uncommitted changes and a clean worktree.
+Validation precedes persistence.
 
-Never silently discard, reset, overwrite, stash-abandon, selectively push by authorship or strand legitimate work. Stop and report ambiguous, private, broken, incompatible, unexplained or unsafe material.
+Repositories are the only SQLite boundary.
 
-Never commit private financial statements, credentials, passwords, local SQLite databases, DerivedData, build products, sensitive logs, temporary files or unexplained generated output. Project-file edits must be limited to authorised metadata and use Xcode-safe practices.
+`RepositoryStoreHydrator` is the only persistence-to-runtime boundary.
+
+Never:
+
+- access SQLite directly from Views, ViewModels or Stores;
+- bypass repositories;
+- derive verified financial identifiers outside parsers;
+- mutate runtime stores as an alternative persistence path;
+- silently alter financial history;
+- infer financial truth from filenames, labels, presentation metadata or weak evidence.
+
+## Git continuity and direct-to-main workflow
+
+At the start of every execution task, inspect the complete repository state:
+
+```bash
+git fetch origin --prune
+git branch --show-current
+git status --short
+git rev-list --left-right --count main...origin/main
+```
+
+Before editing, confirm:
+
+- the active branch is `main`;
+- local `main` and `origin/main` are synchronized;
+- staged changes, unstaged changes and untracked files are understood;
+- no unrelated repository task is active.
+
+A dirty worktree is not automatically an error.
+
+Legitimate compatible user work must be preserved and reconciled. Stop and report when existing material is:
+
+- unrelated to the approved task;
+- ambiguous;
+- private or sensitive;
+- broken;
+- incompatible with the approved architecture;
+- unexplained;
+- unsafe to combine.
+
+Do not silently:
+
+- discard;
+- reset;
+- overwrite;
+- abandon stashed work;
+- omit legitimate compatible changes;
+- rewrite published history;
+- force-push.
+
+Perform the approved task directly on `main`.
+
+Before committing:
+
+1. review the complete diff;
+2. run all required validation;
+3. confirm the diff contains only authorized and compatible changes;
+4. fetch `origin` again;
+5. stop if `origin/main` advanced unexpectedly.
+
+After validation succeeds:
+
+```bash
+git add <authorized-files>
+git commit -m "<task-specific message>"
+git push origin main
+```
+
+Prefer one coherent commit for one approved task unless the execution prompt explicitly requires multiple independently verified commits.
+
+Finish every completed task with:
+
+- `HEAD == origin/main`;
+- a clean primary worktree;
+- no legitimate uncommitted changes;
+- no unpushed commits;
+- no leftover task branch;
+- no additional task worktree.
+
+## Privacy and repository safety
+
+Never commit:
+
+- private financial statements;
+- credentials or passwords;
+- private keys or tokens;
+- local SQLite databases;
+- DerivedData;
+- build products;
+- sensitive logs;
+- temporary files;
+- unexplained generated output;
+- unsanitized account identifiers or transaction evidence.
+
+Approved fixture evidence must remain sanitized and source-faithful.
+
+Project-file edits must be limited to authorized metadata and use Xcode-safe practices.
+
+## Baseline setup
+
+- Xcode project: `LedgerForge.xcodeproj`
+- Shared scheme: `LedgerForge`
+- Test plan: `TestPlan.xctestplan`
+- Platform: macOS
+
+Canonical Debug build:
+
+```bash
+xcodebuild \
+  -project LedgerForge.xcodeproj \
+  -scheme LedgerForge \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  build
+```
+
+Canonical test execution:
+
+```bash
+xcodebuild \
+  -project LedgerForge.xcodeproj \
+  -scheme LedgerForge \
+  -destination 'platform=macOS' \
+  -testPlan TestPlan \
+  test
+```
+
+Use the approved prompt, Engineering Standards and Build Conventions for any additional Release, static-analysis, targeted-test or runtime-verification requirements.
 
 ## Validation and stop conditions
 
-Build and test according to the approved prompt and subject-specific standards. Review the complete diff, run `git diff --check`, scan conflict markers, validate privacy and references, and confirm scope before committing. Documentation-only work may skip full tests only when executable, source, tests, schemas, migrations, fixtures, build settings and assets are unchanged; project metadata changes require project-integrity validation and a clean Debug build.
+Build and test according to the approved prompt and subject-specific standards.
 
-Do not claim completion or push failed validation. Record durable facts only in their subject authority. Manual verification must distinguish passed, pending, unavailable and explicitly accepted deferral.
+Before committing, at minimum:
 
-Verified state is in `Project documents/PROJECT_STATE.md`; unscheduled work is in `Project documents/FUTURE_WORK.MD`; accepted architectural decisions are in `Project documents/ADR.md`.
+```bash
+git diff --check
+git status --short
+git diff --stat
+git diff
+```
+
+Also:
+
+- scan for conflict markers;
+- validate privacy boundaries;
+- validate file references and documentation links;
+- confirm schema and migration claims;
+- confirm implementation status is not overstated;
+- confirm only authorized files changed.
+
+Documentation-only work may skip full build and test execution only when all of the following remain unchanged:
+
+- executable source;
+- tests;
+- schemas;
+- migrations;
+- fixtures;
+- Xcode project metadata;
+- build settings;
+- assets.
+
+Project or build metadata changes require project-integrity validation and a clean Debug build.
+
+Stop and report rather than proceeding when:
+
+- the repository baseline differs materially from the approved prompt;
+- required architecture is absent or contradictory;
+- a migration requires guessing;
+- financial relationships cannot be preserved deterministically;
+- validation fails;
+- the complete diff cannot be explained;
+- privacy-sensitive material appears;
+- an unexpected remote change prevents a safe direct-to-`main` push.
+
+Do not claim completion or push failed validation.
+
+Manual verification must distinguish:
+
+- passed;
+- pending;
+- unavailable;
+- explicitly accepted deferral.
+
+Do not report a build, test, migration, runtime result or production guarantee that was not freshly verified.
+
+## Durable project records
+
+- Verified implementation state belongs in `Project documents/PROJECT_STATE.md`.
+- Unscheduled work belongs in `Project documents/FUTURE_WORK.MD`.
+- Accepted architecture belongs in `Project documents/ADR.md`.
+- Detailed implementation history belongs in Git.
+- Conversation memory and uploaded copies provide context but do not override current repository evidence.

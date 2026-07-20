@@ -231,7 +231,9 @@ ADR-037 acceptance would reduce the shared architecture blocker. Duplicate-repai
 
 ## FW-P0-05 — Concurrent Import Guarantees
 
-**Status:** Architecture complete; implementation pending
+**Status:** Ready for planning
+**Architecture:** ADR-038 accepted in Sprint 49
+**Implementation:** Pending separate Chat-approved execution prompt
 **Depends on:** Separate implementation approval for ADR-038, likely Migration V5, and same-process, SQLite cross-process and provider-parity acceptance verification
 
 Sprint 49 approved a bounded provider-owned atomic confirmed-import operation. The future operation begins its authoritative transaction before duplicate, identity, ownership or event lookup, revalidates the confirmed plan against current repository state and commits the complete accepted financial graph together or leaves no financial side effects.
@@ -352,7 +354,9 @@ Required protections include:
 
 ## FW-P0-12 — Identifier Backfill Policy
 
-**Status:** Architecture complete; implementation pending
+**Status:** Ready for planning
+**Architecture:** ADR-038 accepted in Sprint 49
+**Implementation:** Pending separate Chat-approved execution prompt
 **Depends on:** Separate implementation approval for ADR-038 and likely Migration V5; separate future decisions for identifier correction and historical repair
 
 Sprint 49 approved the confirmed-import portion of identifier enrichment. When parser-produced strong verified identifiers uniquely resolve one existing account, existing same-account identifiers are idempotently accepted and additional eligible identifiers may be attached automatically only when each is unowned or already owned by that resolved account. Conflicting ownership rejects the complete import, and attachment occurs only as part of a successful provider-owned atomic confirmed import.
