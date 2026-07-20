@@ -280,6 +280,29 @@ struct ImportActivityPresentation: Equatable {
         }
     }
 
+    nonisolated static func latestDurableAttempt(from attempts: [RepositoryImportAttempt]) -> RepositoryImportAttempt? {
+        attempts.max(by: isEarlier)
+    }
+
+    private nonisolated static func isEarlier(_ lhs: RepositoryImportAttempt, _ rhs: RepositoryImportAttempt) -> Bool {
+        switch (createdAt(from: lhs.createdAtISO), createdAt(from: rhs.createdAtISO)) {
+        case let (lhsDate?, rhsDate?) where lhsDate != rhsDate:
+            return lhsDate < rhsDate
+        case (.some, nil):
+            return false
+        case (nil, .some):
+            return true
+        default:
+            return lhs.id < rhs.id
+        }
+    }
+
+    private nonisolated static func createdAt(from value: String) -> Date? {
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractionalFormatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+    }
+
     private init(durableAttempt: RepositoryImportAttempt) {
         switch durableAttempt.outcomeCode {
         case ImportAttemptOutcome.successfulImport.rawValue:
@@ -297,6 +320,14 @@ struct ImportActivityPresentation: Equatable {
                 status: "Validation failed",
                 iconName: "xmark.octagon.fill",
                 tone: .danger
+            )
+        case ImportAttemptOutcome.persistenceFailure.rawValue:
+            self.init(
+                title: "Latest durable import",
+                subtitle: "Persistence failed after validation",
+                status: "Persistence failed",
+                iconName: "exclamationmark.triangle.fill",
+                tone: .warning
             )
         case ImportAttemptOutcome.exactStatementDuplicate.rawValue:
             self.init(
@@ -320,9 +351,9 @@ struct ImportActivityPresentation: Equatable {
         default:
             self.init(
                 title: "Latest durable import",
-                subtitle: "Import outcome recorded in Import History",
-                status: "Persistence failed",
-                iconName: "exclamationmark.triangle.fill",
+                subtitle: "A durable import outcome is unavailable",
+                status: "Outcome unavailable",
+                iconName: "questionmark.circle.fill",
                 tone: .warning
             )
         }
@@ -2032,7 +2063,7 @@ struct ContentView: View {
     private var importActivityPresentation: ImportActivityPresentation {
         ImportActivityPresentation(
             importState: importState,
-            latestDurableAttempt: importHistoryViewModel.attempts.first
+            latestDurableAttempt: ImportActivityPresentation.latestDurableAttempt(from: importHistoryViewModel.attempts)
         )
     }
 

@@ -185,6 +185,51 @@ struct ImportOutcomePresentationTests {
         #expect(blockedPresentation.status == "Statement blocked")
         #expect(![duplicatePresentation.subtitle, blockedPresentation.subtitle].joined().contains("UPI"))
     }
+
+    @Test func durablePersistenceFailureAndUnknownOutcomeRemainDistinctAndPrivacySafe() {
+        let persistenceFailure = durableAttempt(outcome: .persistenceFailure, transactionCount: 2)
+        let unknown = durableAttempt(
+            id: "attempt-unknown",
+            createdAtISO: "2026-07-20T00:00:01Z",
+            outcomeCode: "future_outcome_private-123",
+            transactionCount: 0
+        )
+
+        let failurePresentation = ImportActivityPresentation(importState: .idle, latestDurableAttempt: persistenceFailure)
+        let unknownPresentation = ImportActivityPresentation(importState: .idle, latestDurableAttempt: unknown)
+
+        #expect(failurePresentation.status == "Persistence failed")
+        #expect(failurePresentation.subtitle == "Persistence failed after validation")
+        #expect(unknownPresentation.status == "Outcome unavailable")
+        #expect(unknownPresentation.subtitle == "A durable import outcome is unavailable")
+        #expect(![unknownPresentation.title, unknownPresentation.subtitle, unknownPresentation.status].joined().contains("future_outcome_private-123"))
+    }
+
+    @Test func latestDurableAttemptUsesValidTimestampThenStableIDAndHandlesMalformedDates() {
+        let older = durableAttempt(id: "older", createdAtISO: "2026-07-20T00:00:00Z", outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, transactionCount: 1)
+        let newest = durableAttempt(id: "newest", createdAtISO: "2026-07-20T00:02:00Z", outcomeCode: ImportAttemptOutcome.validationFailure.rawValue, transactionCount: 0)
+        let malformed = durableAttempt(id: "zz-malformed", createdAtISO: "not-a-date", outcomeCode: ImportAttemptOutcome.persistenceFailure.rawValue, transactionCount: 0)
+        let equalTimestampLowerID = durableAttempt(id: "attempt-a", createdAtISO: "2026-07-20T00:03:00Z", outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, transactionCount: 1)
+        let equalTimestampHigherID = durableAttempt(id: "attempt-b", createdAtISO: "2026-07-20T00:03:00Z", outcomeCode: ImportAttemptOutcome.validationFailure.rawValue, transactionCount: 0)
+        let malformedLowerID = durableAttempt(id: "malformed-a", createdAtISO: "", outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, transactionCount: 1)
+        let malformedHigherID = durableAttempt(id: "malformed-b", createdAtISO: "invalid", outcomeCode: ImportAttemptOutcome.validationFailure.rawValue, transactionCount: 0)
+
+        #expect(ImportActivityPresentation.latestDurableAttempt(from: [older, malformed, newest])?.id == "newest")
+        #expect(ImportActivityPresentation.latestDurableAttempt(from: [equalTimestampLowerID, equalTimestampHigherID])?.id == "attempt-b")
+        #expect(ImportActivityPresentation.latestDurableAttempt(from: [malformedLowerID, malformedHigherID])?.id == "malformed-b")
+    }
+
+    @Test func currentWorkflowStateOverridesHydratedDurableHistory() {
+        let latestDurableAttempt = durableAttempt(outcome: .successfulImport, transactionCount: 3)
+
+        let presentation = ImportActivityPresentation(
+            importState: .preparing(fileName: "current.csv", phase: .openingSource),
+            latestDurableAttempt: latestDurableAttempt
+        )
+
+        #expect(presentation.title == "current.csv")
+        #expect(presentation.status == "Preparing")
+    }
 }
 
 private func activityPreparedImport(fileName: String, validationPassed: Bool) throws -> PreparedImport {
@@ -238,12 +283,26 @@ private func activityPreparedImport(fileName: String, validationPassed: Bool) th
 }
 
 private func durableAttempt(outcome: ImportAttemptOutcome, transactionCount: Int) -> RepositoryImportAttempt {
+    durableAttempt(
+        id: "attempt-\(outcome.rawValue)",
+        createdAtISO: "2026-07-20T00:00:00Z",
+        outcomeCode: outcome.rawValue,
+        transactionCount: transactionCount
+    )
+}
+
+private func durableAttempt(
+    id: String,
+    createdAtISO: String,
+    outcomeCode: String,
+    transactionCount: Int
+) -> RepositoryImportAttempt {
     RepositoryImportAttempt(
         ImportAttemptDTO(
-            id: "attempt-\(outcome.rawValue)",
+            id: id,
             workspaceId: "workspace",
-            createdAtISO: "2026-07-20T00:00:00Z",
-            outcomeCode: outcome.rawValue,
+            createdAtISO: createdAtISO,
+            outcomeCode: outcomeCode,
             coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
             accountDecisionCode: ImportAttemptAccountDecision.noFinancialMutation.rawValue,
             guidanceCode: ImportAttemptGuidance.integrityReviewRequired.rawValue,
