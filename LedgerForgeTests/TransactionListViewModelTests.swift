@@ -172,6 +172,41 @@ struct TransactionListViewModelTests {
     }
 
     @MainActor
+    @Test
+    func transactionValidationPresentationRetainsEachSessionAcrossLaterImportsAndGlobalValidationChanges() async {
+        let transactionStore = TransactionStore()
+        let importSessionStore = ImportSessionStore()
+        let transactionA = transactionForValidationPresentation(sessionID: "session-a", description: "A")
+        let transactionB = transactionForValidationPresentation(sessionID: "session-b", description: "B")
+        let transactionC = transactionForValidationPresentation(sessionID: "session-c", description: "C")
+
+        transactionStore.replaceTransactions([transactionA, transactionB], validation: ImportValidationResult.empty)
+        importSessionStore.replaceImportSessions([
+            validationSession(id: "session-a", status: "passed"),
+            validationSession(id: "session-b", status: "failed")
+        ])
+        let viewModel = TransactionListViewModel(
+            transactionStore: transactionStore,
+            importSessionStore: importSessionStore
+        )
+
+        #expect(viewModel.validationPresentation(for: transactionA)?.title == "Passed")
+        #expect(viewModel.validationPresentation(for: transactionB)?.title == "Failed")
+
+        transactionStore.replaceTransactions([transactionA, transactionB, transactionC], validation: ImportValidationResult.empty)
+        importSessionStore.replaceImportSessions([
+            validationSession(id: "session-a", status: "passed"),
+            validationSession(id: "session-b", status: "failed"),
+            validationSession(id: "session-c", status: "warning")
+        ])
+        await waitForViewModelUpdate()
+
+        #expect(viewModel.validationPresentation(for: transactionA)?.title == "Passed")
+        #expect(viewModel.validationPresentation(for: transactionB)?.title == "Failed")
+        #expect(viewModel.validationPresentation(for: transactionC)?.title == "Warning")
+    }
+
+    @MainActor
     private func waitForViewModelUpdate() async {
         await withCheckedContinuation { continuation in
             DispatchQueue.main.async {
