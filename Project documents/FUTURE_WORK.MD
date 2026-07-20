@@ -294,28 +294,6 @@ A successfully launched interface must never imply durable storage when the acti
 
 ---
 
-## FW-P0-22 — Safe SQLite Upsert Semantics and Provider Parity
-
-**Status:** Bug  
-**Depends on:** Existing repository contracts and SQLite/In-Memory provider-parity infrastructure
-
-Replace parent-record `INSERT OR REPLACE` operations with true update or SQLite UPSERT semantics that preserve existing records and relationships.
-
-Required outcomes include:
-
-- same-ID workspace updates that do not delete and recreate the workspace row;
-- same-ID account updates that do not delete and recreate the account row;
-- preservation of account identifiers;
-- preservation of transactions and account relationships;
-- preservation of import sessions and provenance;
-- preservation of lifecycle metadata;
-- preservation of columns not owned by the narrow update operation;
-- equivalent observable behaviour from SQLite and In-Memory providers.
-
-Focused parity tests must prove that advertised repository upsert operations behave as updates and cannot cascade-delete, detach or invalidate related financial records.
-
----
-
 ## FW-P0-23 — Financial Presentation Truth and Provenance
 
 **Status:** Bug  
