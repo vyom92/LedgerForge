@@ -63,7 +63,7 @@ private enum AppShellSection: String, CaseIterable {
     }
 }
 
-private enum ImportPresentationState {
+enum ImportPresentationState {
     case idle
     case preparing(fileName: String, phase: ImportProgressPhase)
     case previewReady(PreparedImport)
@@ -183,6 +183,149 @@ struct ImportOutcomePresentation: Equatable {
         }
 
         return "Processed \(transactionCount) transaction(s)"
+    }
+}
+
+struct ImportActivityPresentation: Equatable {
+    let title: String
+    let subtitle: String
+    let status: String
+    let iconName: String
+    let tone: ImportOutcomeTone
+
+    private init(
+        title: String,
+        subtitle: String,
+        status: String,
+        iconName: String,
+        tone: ImportOutcomeTone
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.status = status
+        self.iconName = iconName
+        self.tone = tone
+    }
+
+    init(importState: ImportPresentationState, latestDurableAttempt: RepositoryImportAttempt?) {
+        switch importState {
+        case .idle:
+            if let latestDurableAttempt {
+                self.init(durableAttempt: latestDurableAttempt)
+            } else {
+                self.init(
+                    title: "No recent import",
+                    subtitle: "No durable import activity",
+                    status: "Idle",
+                    iconName: "tray",
+                    tone: .warning
+                )
+            }
+        case .preparing(let fileName, let phase):
+            self.init(
+                title: fileName,
+                subtitle: phase.userFacingTitle,
+                status: "Preparing",
+                iconName: "hourglass",
+                tone: .warning
+            )
+        case .previewReady(let preparedImport):
+            self.init(
+                title: preparedImport.fileName,
+                subtitle: "Prepared for confirmation",
+                status: "Ready to Import",
+                iconName: "doc.text.magnifyingglass",
+                tone: .warning
+            )
+        case .validationFailed(let preparedImport):
+            self.init(
+                title: preparedImport.fileName,
+                subtitle: "Validation failed before persistence",
+                status: "Validation Failed",
+                iconName: "xmark.octagon.fill",
+                tone: .danger
+            )
+        case .committing(let preparedImport):
+            self.init(
+                title: preparedImport.fileName,
+                subtitle: "Persisting confirmed financial data",
+                status: "Persisting",
+                iconName: "arrow.triangle.2.circlepath",
+                tone: .warning
+            )
+        case .completed(let outcome):
+            self.init(
+                title: outcome.fileName,
+                subtitle: outcome.fileSubtitle,
+                status: outcome.persistenceStatus,
+                iconName: outcome.iconName,
+                tone: outcome.tone
+            )
+        case .cancelled(let fileName):
+            self.init(
+                title: fileName,
+                subtitle: "Preparation cancelled. No data was written.",
+                status: "Cancelled",
+                iconName: "xmark.circle.fill",
+                tone: .warning
+            )
+        case .failed(let fileName, _, _):
+            self.init(
+                title: fileName,
+                subtitle: "Import preparation failed",
+                status: "Preparation Failed",
+                iconName: "exclamationmark.triangle.fill",
+                tone: .danger
+            )
+        }
+    }
+
+    private init(durableAttempt: RepositoryImportAttempt) {
+        switch durableAttempt.outcomeCode {
+        case ImportAttemptOutcome.successfulImport.rawValue:
+            self.init(
+                title: "Latest durable import",
+                subtitle: "Persisted \(durableAttempt.transactionCount) transaction(s)",
+                status: "Import completed",
+                iconName: "checkmark.circle.fill",
+                tone: .success
+            )
+        case ImportAttemptOutcome.validationFailure.rawValue:
+            self.init(
+                title: "Latest durable import",
+                subtitle: "Validation failed before persistence",
+                status: "Validation failed",
+                iconName: "xmark.octagon.fill",
+                tone: .danger
+            )
+        case ImportAttemptOutcome.exactStatementDuplicate.rawValue:
+            self.init(
+                title: "Latest durable import",
+                subtitle: "Previously imported — no new data written",
+                status: "Previously imported",
+                iconName: "doc.badge.checkmark.fill",
+                tone: .warning
+            )
+        case ImportAttemptOutcome.existingEligibleAxisUPIEvent.rawValue,
+             ImportAttemptOutcome.repeatedEligibleIncomingEvidence.rawValue,
+             ImportAttemptOutcome.transactionEventOwnershipConflict.rawValue,
+             ImportAttemptOutcome.repositoryIntegrityConflict.rawValue:
+            self.init(
+                title: "Latest durable import",
+                subtitle: "Import outcome recorded in Import History",
+                status: "Statement blocked",
+                iconName: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
+        default:
+            self.init(
+                title: "Latest durable import",
+                subtitle: "Import outcome recorded in Import History",
+                status: "Persistence failed",
+                iconName: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
+        }
     }
 }
 
@@ -762,12 +905,15 @@ struct ContentView: View {
     }
 
     private var importActivityCard: some View {
-        LFPanel(title: "Import Activity", trailing: AnyView(linkButton("View all imports") { selectedSection = .imports })) {
+        let activity = importActivityPresentation
+        return LFPanel(title: "Import Activity", trailing: AnyView(linkButton("View all imports") { selectedSection = .imports })) {
             VStack(spacing: 12) {
                 importActivityRow(
-                    title: selectedFile,
-                    subtitle: selectedFile == "No statement imported" ? "No recent imports" : "Imported through current pipeline",
-                    status: selectedFile == "No statement imported" ? "Idle" : "Success"
+                    title: activity.title,
+                    subtitle: activity.subtitle,
+                    status: activity.status,
+                    iconName: activity.iconName,
+                    tone: activity.tone
                 )
                 importActivityRow(title: "Repository Hydration", subtitle: dashboardViewModel.presentationState.message, status: dashboardHydrationStatus)
             }
@@ -1103,17 +1249,18 @@ struct ContentView: View {
     }
 
     private var sidebarFooter: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let activity = importActivityPresentation
+        return VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
                 Text("Last import")
                     .font(.caption)
                     .foregroundStyle(LFTheme.textSecondary)
-                Text(selectedFile == "No statement imported" ? "No recent import" : selectedFile)
+                Text(activity.title)
                     .font(.caption.weight(.semibold))
                     .lineLimit(2)
-                Label(dashboardViewModel.presentationState.message, systemImage: dashboardStatusIcon)
+                Label(activity.status, systemImage: activity.iconName)
                     .font(.caption2)
-                    .foregroundStyle(dashboardStatusColor)
+                    .foregroundStyle(activity.tone.color)
                     .lineLimit(2)
             }
 
@@ -1882,12 +2029,25 @@ struct ContentView: View {
             .foregroundStyle(LFTheme.primaryHover)
     }
 
-    private func importActivityRow(title: String, subtitle: String, status: String) -> some View {
+    private var importActivityPresentation: ImportActivityPresentation {
+        ImportActivityPresentation(
+            importState: importState,
+            latestDurableAttempt: importHistoryViewModel.attempts.first
+        )
+    }
+
+    private func importActivityRow(
+        title: String,
+        subtitle: String,
+        status: String,
+        iconName: String = "doc.text",
+        tone: ImportOutcomeTone = .warning
+    ) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "doc.text")
-                .foregroundStyle(LFTheme.info)
+            Image(systemName: iconName)
+                .foregroundStyle(tone.color)
                 .frame(width: 34, height: 34)
-                .background(LFTheme.info.opacity(0.10))
+                .background(tone.color.opacity(0.10))
                 .clipShape(RoundedRectangle(cornerRadius: 7))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
@@ -1899,7 +2059,7 @@ struct ContentView: View {
                     .lineLimit(1)
             }
             Spacer()
-            LFStatusBadge(title: status, color: status == "Success" || status == "Loaded" ? LFTheme.success : LFTheme.textSecondary)
+            LFStatusBadge(title: status, color: tone.color)
         }
     }
 
@@ -1982,30 +2142,6 @@ struct ContentView: View {
             return "Idle"
         case .failed:
             return "Review"
-        }
-    }
-
-    private var dashboardStatusIcon: String {
-        switch dashboardViewModel.presentationState {
-        case .loading:
-            return "hourglass"
-        case .empty:
-            return "tray"
-        case .loaded:
-            return "checkmark.circle.fill"
-        case .failed:
-            return "exclamationmark.triangle.fill"
-        }
-    }
-
-    private var dashboardStatusColor: Color {
-        switch dashboardViewModel.presentationState {
-        case .loading, .empty:
-            return LFTheme.textSecondary
-        case .loaded:
-            return LFTheme.success
-        case .failed:
-            return LFTheme.warning
         }
     }
 
