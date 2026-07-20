@@ -275,7 +275,7 @@ After ADR-037 acceptance and lifecycle revalidation, this candidate may proceed 
 
 ## FW-P0-23 — Financial Presentation Truth and Provenance
 
-**Status:** Bug  
+**Status:** Completed 2026-07-20
 **Depends on:** Existing Money foundation, durable import-session history and transaction-provenance boundaries
 
 Correct verified presentation defects where the application displays a financial value, workflow result or transaction status using the wrong authority.
@@ -297,6 +297,10 @@ This item does not include:
 - visual polish unrelated to financial truth.
 
 Those concerns remain governed by their P2 candidates.
+
+Completed from `ea64c685f584ccba94e5b9e29666519837758312` through `4877b05` (native `Money` amount presentation), `b8e4444` (per-transaction import-session validation provenance) and `71f1edf` (workflow and durable-attempt import activity presentation). Verification passed with 294 tests across 37 suites, Debug and optimized Release builds, and static analysis. Schema remains V4; no migration or ADR changed.
+
+This completion does not authorize dashboard analytics (`FW-P2-46`), general placeholder cleanup (`FW-P2-42`), category implementation (`FW-P2-20`), or Axis NRO parser-family work (`FW-P1-01`). No production support was added for PDF, XLS, XLSX, card statements or additional currencies through parser expansion.
 
 ---
 
