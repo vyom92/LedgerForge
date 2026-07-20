@@ -7,6 +7,15 @@ import Testing
 @MainActor
 struct IdentityResolverTests {
 
+    @Test func deterministicDecisionSortsStrongVerifiedIdentifiersBySchemeAndValue() throws {
+        let zed = try financialIdentifier(kind: .institutionAccountId, value: "ZED-001")
+        let alpha = try financialIdentifier(kind: .institutionAccountId, value: "ALPHA-001")
+        let iban = try financialIdentifier(kind: .iban, value: "QA12LEDGERFORGE1234567890")
+        let weak = try financialIdentifier(kind: .displayName, value: "Ignored")
+
+        #expect(FinancialIdentityResolver.strongVerifiedIdentifiers(from: [zed, weak, alpha, iban]).map(\.normalizedValue) == ["QA12LEDGERFORGE1234567890", "ALPHA-001", "ZED-001"])
+    }
+
     @Test func verifiedStrongIdentifierResolvesSingleAccount() async throws {
         let provider = InMemoryRepositoryProvider()
         let fixture = try seedResolverWorkspace(provider)

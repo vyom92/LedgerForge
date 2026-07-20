@@ -6,9 +6,23 @@ import SQLite3
 
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
+public enum SQLiteOperation: String, Equatable, Sendable { case open, transaction, statement, query, migration, backup, checkpoint, close }
+
+public struct SQLiteExecutionError: Error, Equatable, Sendable, CustomStringConvertible {
+    public let primaryCode: Int32
+    public let extendedCode: Int32
+    public let operation: SQLiteOperation
+    public init(primaryCode: Int32, extendedCode: Int32, operation: SQLiteOperation) { self.primaryCode = primaryCode; self.extendedCode = extendedCode; self.operation = operation }
+    public var isRetryableContention: Bool { primaryCode == SQLITE_BUSY || primaryCode == SQLITE_LOCKED }
+    // SQLITE_CONSTRAINT_UNIQUE is a C macro that Swift does not import.
+    public var isUniqueConstraint: Bool { primaryCode == SQLITE_CONSTRAINT && extendedCode == 2067 }
+    public var description: String { "SQLite \(operation.rawValue) failed (\(primaryCode)/\(extendedCode))." }
+}
+
 public enum SQLiteDatabaseError: Error, LocalizedError {
     case databaseNotOpen
-    case prepareFailed(sql: String, message: String)
+    case prepareFailed(operation: SQLiteOperation)
+    case execution(SQLiteExecutionError)
     case backupFailed(String)
     case checkpointFailed(Int32)
     case closeFailed(Int32)
@@ -17,8 +31,10 @@ public enum SQLiteDatabaseError: Error, LocalizedError {
         switch self {
         case .databaseNotOpen:
             return "SQLite database is not open."
-        case .prepareFailed(let sql, let message):
-            return "Failed to prepare SQLite statement: \(message). SQL: \(sql)"
+        case .prepareFailed(let operation):
+            return "SQLite \(operation.rawValue) could not be prepared."
+        case .execution(let error):
+            return error.description
         case .backupFailed:
             return "SQLite backup could not be completed."
         case .checkpointFailed:
@@ -145,16 +161,14 @@ public final class SQLiteDatabase {
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) != SQLITE_OK {
-            let msg = String(cString: sqlite3_errmsg(db))
-            throw SQLiteDatabaseError.prepareFailed(sql: sql, message: msg)
+            throw SQLiteDatabaseError.prepareFailed(operation: operation(for: sql))
         }
 
         bind(params, to: stmt)
 
         let rc = sqlite3_step(stmt)
         if rc != SQLITE_DONE && rc != SQLITE_ROW {
-            let msg = String(cString: sqlite3_errmsg(db))
-            throw NSError(domain: "SQLite", code: Int(rc), userInfo: [NSLocalizedDescriptionKey: msg])
+            throw executionError(resultCode: rc, operation: operation(for: sql))
         }
     }
 
@@ -163,8 +177,7 @@ public final class SQLiteDatabase {
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) != SQLITE_OK {
-            let msg = String(cString: sqlite3_errmsg(db))
-            throw SQLiteDatabaseError.prepareFailed(sql: sql, message: msg)
+            throw SQLiteDatabaseError.prepareFailed(operation: .query)
         }
 
         bind(params, to: stmt)
@@ -177,8 +190,7 @@ public final class SQLiteDatabase {
             } else if rc == SQLITE_DONE {
                 return rows
             } else {
-                let msg = String(cString: sqlite3_errmsg(db))
-                throw NSError(domain: "SQLite", code: Int(rc), userInfo: [NSLocalizedDescriptionKey: msg])
+                throw executionError(resultCode: rc, operation: .query)
             }
         }
     }
@@ -252,8 +264,7 @@ public final class SQLiteDatabase {
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) != SQLITE_OK {
-            let msg = String(cString: sqlite3_errmsg(db))
-            throw SQLiteDatabaseError.prepareFailed(sql: sql, message: msg)
+            throw SQLiteDatabaseError.prepareFailed(operation: .query)
         }
         if sqlite3_step(stmt) == SQLITE_ROW {
             return Int(sqlite3_column_int64(stmt, 0))
@@ -305,6 +316,18 @@ public final class SQLiteDatabase {
                 sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
             }
         }
+    }
+
+    private func executionError(resultCode: Int32, operation: SQLiteOperation) -> SQLiteDatabaseError {
+        let extended = db.map(sqlite3_extended_errcode) ?? resultCode
+        return .execution(SQLiteExecutionError(primaryCode: resultCode & 0xFF, extendedCode: extended, operation: operation))
+    }
+
+    private func operation(for sql: String) -> SQLiteOperation {
+        let verb = sql.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if verb.hasPrefix("BEGIN") || verb.hasPrefix("COMMIT") || verb.hasPrefix("ROLLBACK") { return .transaction }
+        if verb.hasPrefix("SELECT") || verb.hasPrefix("PRAGMA") { return .query }
+        return .statement
     }
 
     private func iso8601Now() -> String {

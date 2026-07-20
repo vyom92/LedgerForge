@@ -219,53 +219,47 @@ struct FinancialIdentityResolver {
     }
 
     func resolve(workspaceId: String, identifiers: [FinancialIdentifier]) throws -> IdentityResolutionOutcome {
-        let strongVerifiedIdentifiers = identifiers
-            .filter { $0.strength == .strong && $0.verificationState == .verified }
-            .sorted { lhs, rhs in
-                if lhs.kind.rawValue == rhs.kind.rawValue {
-                    return lhs.normalizedValue < rhs.normalizedValue
-                }
-                return lhs.kind.rawValue < rhs.kind.rawValue
-            }
+        let strongVerifiedIdentifiers = Self.strongVerifiedIdentifiers(from: identifiers)
 
         guard !strongVerifiedIdentifiers.isEmpty else {
             logOutcome(.noMatch)
             return .noMatch
         }
 
-        var matchedAccountsByIdentifier: [[String]] = []
+        var candidatesByIdentifier: [[String]] = []
         for identifier in strongVerifiedIdentifiers {
             let candidates = try accountRepository.accountIds(
                 workspaceId: workspaceId,
                 scheme: identifier.kind.rawValue,
                 identifier: identifier.normalizedValue
             )
-            if candidates.count > 1 {
-                let outcome: IdentityResolutionOutcome = .ambiguous(candidates: candidates)
-                logOutcome(outcome)
-                return outcome
-            }
-            if !candidates.isEmpty {
-                matchedAccountsByIdentifier.append(candidates)
-            }
+            candidatesByIdentifier.append(candidates)
         }
 
-        let matchedAccountIds = matchedAccountsByIdentifier.flatMap { $0 }.sorted()
+        let outcome = Self.decision(for: candidatesByIdentifier)
+        logOutcome(outcome)
+        return outcome
+    }
+
+    static func strongVerifiedIdentifiers(from identifiers: [FinancialIdentifier]) -> [FinancialIdentifier] {
+        identifiers.filter { $0.strength == .strong && $0.verificationState == .verified }
+            .sorted { ($0.kind.rawValue, $0.normalizedValue) < ($1.kind.rawValue, $1.normalizedValue) }
+    }
+
+    static func decision(for candidatesByIdentifier: [[String]]) -> IdentityResolutionOutcome {
+        if let ambiguous = candidatesByIdentifier.first(where: { $0.count > 1 }) {
+            return .ambiguous(candidates: ambiguous.sorted())
+        }
+        let matchedAccountIds = candidatesByIdentifier.flatMap { $0 }.sorted()
         let uniqueAccountIds = Array(Set(matchedAccountIds)).sorted()
 
         if uniqueAccountIds.count > 1 {
-            let outcome: IdentityResolutionOutcome = .conflict(candidates: uniqueAccountIds)
-            logOutcome(outcome)
-            return outcome
+            return .conflict(candidates: uniqueAccountIds)
         }
 
         if let accountId = uniqueAccountIds.first {
-            let outcome: IdentityResolutionOutcome = .resolved(accountId: accountId)
-            logOutcome(outcome)
-            return outcome
+            return .resolved(accountId: accountId)
         }
-
-        logOutcome(.noMatch)
         return .noMatch
     }
 

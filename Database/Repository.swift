@@ -156,6 +156,12 @@ public protocol ImportSessionRepository {
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult
 }
 
+/// This deliberately does not expose a generic transaction closure. Providers
+/// own the full accepted-import graph and may only return bounded outcomes.
+public protocol ConfirmedImportRepository {
+    func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult
+}
+
 public struct PartialImportSessionUpdate {
     public var validationStatus: String?
     public var completedAtISO: String?
