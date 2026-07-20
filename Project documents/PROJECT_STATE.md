@@ -2,10 +2,11 @@
 
 - Primary branch: `main`.
 - Latest verified completed increment: Sprint 48 — truthful Settings surface, repository-backed completed-import count and bundle-derived version/build presentation.
+- Latest architecture increment: Sprint 49 — Atomic Confirmed Import and Identifier Ownership. ADR-038 is accepted; production implementation remains pending.
 - Sprint 47 implementation commit: the single Sprint 47 commit containing this state update; its exact SHA is recorded by Git and the completion report.
 - Earlier relevant implementation commits: `d9009fb` — Preserve parent state during upsert; `b9e68ce` — Stabilize import-lifecycle cancellation synchronization; `f288834` — Apply approved macOS permission settings.
-- Current migration: V4, including the bounded `import_attempts` ledger.
-- Current accepted ADR: ADR-035 — Development Database Lifecycle and Recoverable Reset.
+- Current migration: V4, including the bounded `import_attempts` ledger. Migration V5 is proposed by ADR-038 but is not implemented.
+- Current accepted ADR: ADR-038 — Atomic Confirmed Import and Durable Identifier Ownership.
 - Architecture baseline: Architecture v1.0 Frozen and UI/UX v1.0 Frozen.
 - Build state: Fresh Debug build and static analysis pass with no source warnings. Fresh optimized Release build and static analysis pass with the same four existing `AccountStore` actor-isolation warnings; no warning is attributable to Sprint 48.
 - Latest verified automated result: 304 executed test cases across 38 suites, 0 failures and no unexpected skips. Generic `LedgerForgeUITests` remained intentionally disabled.
@@ -44,14 +45,16 @@
 - Mixed-currency totals and summaries are not presented as one aggregate; Dashboard, Accounts and Transactions group values by native currency. FX conversion remains unimplemented.
 - Development lifecycle operations are excluded while import preparation, prepared confirmation, confirmed persistence, hydration/reload, repository writes or another lifecycle operation is active. Direct Sprint 45 runtime checks observed the bounded `activity-in-progress` result for preparation, awaiting confirmation, confirmed persistence and hydration.
 - Permanent reset, temporary-session and restore capabilities are compile-time absent from non-Debug builds. Isolated optimized Release runtime inspection exposed no destructive lifecycle or approved-fixture controls; Release symbol, constant-string and resource scans found no such capability or fixture resources.
-- Cross-process and external-writer import guarantees are not implemented.
-- Broader workspace/account/identifier atomicity remains incomplete; earlier side effects may precede the atomic import-history operation.
+- Cross-process atomic confirmed import is not a production capability. Same-process, SQLite cross-process and provider-parity acceptance required by ADR-038 have not been implemented or verified.
+- Broader workspace/account/identifier atomicity remains incomplete; earlier side effects may precede the atomic import-history operation. Resolved-account identifier enrichment and accepted-import identifier-observation provenance are not implemented.
+- Migration V5 remains an architectural proposal only. Production continues to use Migration V4 and the current production limitations remain unchanged.
 - Unsupported transaction-event families, including IMPS, NEFT, e-commerce, refunds, reversals and unstructured references, remain unevaluated.
 - Generic UI tests remain intentionally disabled; supported runtime behavior is covered by the documented manual and automated boundaries.
 - No rollback, resumable import job, batch queue or cancellation after confirmed persistence exists. Confirmed-persistence failure retry remains unsupported pending typed authoritative safety evidence.
 
 ## Recent Verified Changes
 
+- Sprint 49 accepted ADR-038 and recorded the architecture for a bounded provider-owned atomic confirmed-import operation, deterministic transaction-time identity and ownership revalidation, resolved-account identifier enrichment, separate accepted-import observation provenance, likely Migration V5 direction and post-commit canonical hydration. This is an architecture increment only: Sprint 48 remains the latest verified implementation, Migration V4 remains current and no new production concurrency or identifier-enrichment guarantee is claimed.
 - Sprint 39 added versioned exact-content duplicate prevention, same-process confirmation serialization and atomic successful import-history persistence.
 - Sprint 40 established sanitized overlapping Axis evidence and the bounded transaction-event identity contract.
 - Sprint 41 implemented parser-owned Axis UPI event ownership, pre-write blocking and Migration V3.

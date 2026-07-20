@@ -231,22 +231,25 @@ ADR-037 acceptance would reduce the shared architecture blocker. Duplicate-repai
 
 ## FW-P0-05 — Concurrent Import Guarantees
 
-**Status:** Ready for discovery
-**Depends on:** Successful completion and approval of Sprints 40 and 41; discovery of broader cross-process, external-writer and race guarantees
+**Status:** Architecture complete; implementation pending
+**Depends on:** Separate implementation approval for ADR-038, likely Migration V5, and same-process, SQLite cross-process and provider-parity acceptance verification
 
-Define and enforce deterministic behaviour for:
+Sprint 49 approved a bounded provider-owned atomic confirmed-import operation. The future operation begins its authoritative transaction before duplicate, identity, ownership or event lookup, revalidates the confirmed plan against current repository state and commits the complete accepted financial graph together or leaves no financial side effects.
+
+Implementation must define and verify deterministic behaviour for:
 
 - simultaneous confirmations in one process;
 - multiple application processes;
-- external database writers;
 - identity-resolution races;
 - identifier-attachment races;
 - duplicate-fingerprint claims;
-- transaction-overlap races after Sprint 40 establishes transaction identity and overlap semantics.
+- transaction-event identity and ownership claims;
+- SQLite lock contention;
+- stale account choices and stale identity resolution.
 
-Do not claim cross-process safety until it is implemented and tested.
+Acceptance requires same-process competition, multiple LedgerForge processes using the same SQLite database and equivalent In-Memory-provider serialization to produce provider-equivalent outcomes. Database constraints and transaction-time authoritative revalidation remain the correctness authority; the existing process-local lock may remain only as an optimization or user-experience guard.
 
-ADR-037 requires same-process provider-scoped serialization and transaction-time stale-state checks, but does not complete this broader cross-process and external-writer candidate.
+The bounded guarantee applies to approved writers using the expected schema. Writers that disable constraints, alter the schema or corrupt the database remain outside it. Cross-process safety must not be claimed until ADR-038 is implemented and its SQLite, In-Memory and subprocess acceptance tests pass.
 
 ---
 
@@ -349,19 +352,24 @@ Required protections include:
 
 ## FW-P0-12 — Identifier Backfill Policy
 
-**Status:** Ready for discovery
-**Depends on:** Existing verified parser identifiers and account resolution
+**Status:** Architecture complete; implementation pending
+**Depends on:** Separate implementation approval for ADR-038 and likely Migration V5; separate future decisions for identifier correction and historical repair
 
-Define when newly discovered verified strong identifiers may be attached to an already resolved account.
+Sprint 49 approved the confirmed-import portion of identifier enrichment. When parser-produced strong verified identifiers uniquely resolve one existing account, existing same-account identifiers are idempotently accepted and additional eligible identifiers may be attached automatically only when each is unowned or already owned by that resolved account. Conflicting ownership rejects the complete import, and attachment occurs only as part of a successful provider-owned atomic confirmed import.
 
-The policy must address:
+ADR-029 remains authoritative for `noMatch`: the user must explicitly choose an eligible unseeded existing account or creation of a new account, no account may be selected automatically, and the choice must be revalidated inside the provider transaction.
 
-- identifier ownership;
-- conflict handling;
-- idempotency;
-- provenance;
-- automatic versus user-confirmed attachment;
-- recovery from incorrect attachment.
+Sprint 49 also separates durable identifier ownership from accepted-import observation provenance. A future bounded observation record may relate one identifier ownership to an accepted import session, accepted document, parser provenance and account-association authority. Transaction-time ownership enforcement is required, and historical observations must not be invented.
+
+The following work remains open and separately gated:
+
+- unlinking;
+- reassignment;
+- incorrect-link recovery;
+- historical backfill;
+- repair of contradictory existing ownership.
+
+`FW-P0-05` and this confirmed-import slice were combined only because they share one atomic confirmation boundary. Identifier-management workflows outside successful confirmed import do not become part of that operation and remain independently governed.
 
 ---
 

@@ -4007,3 +4007,253 @@ After this architecture decision is accepted:
 - update `PROJECT_STATE.md` only after a verified implementation increment.
 
 This ADR must be marked **Accepted** before source-level financial-mutation contracts or an executable mutation family are implemented.
+
+---
+
+# ADR-038 — Atomic Confirmed Import and Durable Identifier Ownership
+
+## Status
+
+Accepted
+
+## Architecture Approved In
+
+Sprint 49 — Atomic Confirmed Import and Identifier Ownership
+
+This ADR records an approved architecture. Production implementation remains pending.
+
+## Context
+
+LedgerForge currently has narrow provider-owned atomicity for accepted import history, but workspace, account and identifier writes may occur before that transaction begins. A later failure can therefore leave financial identity residue even though the confirmed import did not complete. The existing same-process confirmation lock narrows races inside one running process, but it is not a correctness boundary across multiple LedgerForge processes using the same SQLite database.
+
+The current identity flow also resolves parser-produced strong verified identifiers without an approved rule for enriching an already uniquely resolved account with additional eligible identifiers. ADR-029 governs explicit user choice for `noMatch`, while identifier unlinking, reassignment, incorrect-link recovery and historical repair remain separate mutation problems.
+
+`FW-P0-05 — Concurrent Import Guarantees` and the confirmed-import enrichment portion of `FW-P0-12 — Identifier Backfill Policy` share one correctness boundary: a confirmed import must either commit its complete accepted financial graph atomically or produce no financial side effects.
+
+## Decision
+
+LedgerForge will implement one bounded provider-owned confirmed-import operation. It is specific to accepted import confirmation and does not create a generic repository transaction closure, a general financial mutation engine or an implementation of ADR-037.
+
+The future operation must:
+
+1. begin its authoritative SQLite transaction before the first authoritative duplicate, identity, ownership or event lookup;
+2. revalidate the confirmed plan against current repository state;
+3. create or preserve the workspace and account;
+4. attach every eligible identifier and record its accepted-import observation provenance;
+5. commit the document, exact fingerprint, import session, trusted transactions, transaction-event identities and successful attempt;
+6. complete the successful import session; and
+7. commit all accepted financial effects together.
+
+Any failure before commit must roll back the complete accepted financial graph. No accepted account, identifier, observation, document, fingerprint, import session, transaction, event identity or successful attempt may remain as residue.
+
+## Confirmed-Import Atomic Boundary
+
+The provider-owned transaction begins before confirmation-time authoritative state is consulted. Advisory preparation results remain read-only and cannot reserve an account, identifier, fingerprint or event identity.
+
+Inside the transaction, the provider revalidates:
+
+- the immutable prepared fingerprint contract and exact-statement ownership;
+- parser-produced identifier eligibility and current identity resolution;
+- the explicit ADR-029 account choice when the result is `noMatch`;
+- workspace and account existence and relationships;
+- identifier ownership;
+- supported transaction-event identities and ownership;
+- every accepted record and relationship needed for the complete financial graph.
+
+An exact-statement duplicate, supported transaction-event duplicate or event-ownership conflict rejects the complete import. Rejection must not create an account, attach an identifier, record an identifier observation or create accepted import history.
+
+The operation is deliberately bounded. It must not expose a generic closure that permits arbitrary repository writes to share a transaction, and it must not become a general cross-domain mutation coordinator.
+
+## Identity Resolution and Identifier Enrichment
+
+When incoming parser-produced strong verified identifiers uniquely resolve one existing account:
+
+- existing identifiers already owned by that account are accepted idempotently;
+- additional parser-produced strong verified identifiers may be attached automatically;
+- every additional identifier must be unowned or already owned by the resolved account;
+- ownership by another account rejects the complete import; and
+- attachment occurs only within a successful accepted import.
+
+When identity resolution returns `noMatch`, ADR-029 remains authoritative. The user must explicitly choose an eligible unseeded existing account or creation of a new account. LedgerForge must not select an account automatically, even when only one account appears eligible. The provider transaction must revalidate the choice, account existence, workspace relationship, unseeded eligibility and identifier ownership before any accepted write.
+
+Ambiguous or conflicting identity rejects the complete import with no financial side effects. Weak evidence, filenames, labels, display metadata, masked identifiers and transaction similarity must not resolve or enrich an account.
+
+## Identifier Ownership and Observation Provenance
+
+Identifier ownership and accepted-import observation are distinct durable concepts.
+
+Identifier ownership remains attached to exactly one account within its workspace scope. An observation records that an accepted import supplied trusted evidence for an identifier already owned by, or atomically attached to, that account. Observation does not create a second owner and does not replace parser-owned verification provenance.
+
+A future identifier-observation record may contain only bounded trusted relationships and codes, including:
+
+- identifier ownership ID;
+- accepted import-session ID;
+- accepted document ID;
+- parser provenance;
+- account-association authority; and
+- creation timestamp.
+
+It must not contain:
+
+- raw source fragments;
+- unrestricted parser text;
+- filenames as identity evidence;
+- unredacted identifier presentation; or
+- unrestricted diagnostics.
+
+Existing identifier ownership may migrate without an invented historical observation. Historical observation records must not be reconstructed from incomplete repository or presentation evidence.
+
+## Concurrency Guarantees
+
+Correctness comes from the provider-owned transaction, database constraints, transaction-time authoritative revalidation and equivalent In-Memory-provider serialization. The existing same-process lock may remain as an optimization or user-experience guard, but it is not correctness authority.
+
+The future implementation must return deterministic outcomes for:
+
+- same-process competing confirmations;
+- multiple LedgerForge processes using the same database;
+- competing exact-fingerprint claims;
+- competing transaction-event identity claims;
+- competing identifier-ownership claims;
+- SQLite lock contention;
+- a stale explicit account choice; and
+- stale identity resolution.
+
+For approved writers using the expected schema, a losing operation must leave no account or identifier residue and no partial accepted financial graph. SQLite lock contention must resolve through a bounded typed result or successful serialization; it must not permit a partial commit.
+
+This guarantee does not cover a writer that disables constraints, alters the schema or corrupts the database. It does not claim protection from malicious file modification or unsupported schema-bypassing access.
+
+The In-Memory provider must serialize the same complete operation, perform equivalent revalidation and publish every accepted collection together. SQLite and In-Memory must expose equivalent domain outcomes.
+
+## Migration Direction
+
+Migration V5 is the likely schema direction. It is proposed only and is not implemented by Sprint 49.
+
+The proposed direction includes:
+
+- explicit workspace-scoped identifier ownership;
+- durable uniqueness for `(workspace_id, scheme, identifier)`;
+- same-account idempotency;
+- enforced account/workspace relationships;
+- a separate identifier-observation table; and
+- a read-only compatibility audit before schema rebuilding.
+
+Migration must stop rather than guess when existing data contains:
+
+- contradictory ownership;
+- duplicate mappings requiring survivor selection;
+- missing account parents;
+- account/workspace disagreement;
+- an unsupported future schema; or
+- relationships that cannot be interpreted deterministically.
+
+The compatibility audit must not mutate trusted history. Existing ownership may migrate without invented historical observation provenance.
+
+## Rejected-Attempt Auditing
+
+Successful attempt history participates in the atomic accepted import and must not commit separately from the accepted financial graph.
+
+Rejected attempts remain bounded best-effort audit writes after financial rollback or rejection. A rejected-attempt write must not occur inside the accepted transaction in a way that prevents full financial rollback. Failure to record a rejected attempt must never convert rejection into success or create accepted financial history. Persistence unavailability may make rejected-attempt auditing impossible, and that limitation must remain truthful.
+
+## Runtime Hydration
+
+After a successful repository commit, LedgerForge performs one canonical forced hydration through `RepositoryStoreHydrator`.
+
+Runtime state remains a projection of durable repository truth. Stores, ViewModels and Views must not be patched as an alternate completion path.
+
+Hydration failure after commit does not undo, reinterpret or report the successful financial commit as uncommitted. Presentation must distinguish committed persistence from hydration failure and provide a bounded recovery path based on canonical hydration.
+
+## Consequences
+
+Positive consequences:
+
+- accepted imports gain one all-or-nothing financial boundary;
+- account creation and identifier enrichment cannot survive a losing or failed accepted import;
+- duplicate, identity and ownership decisions are revalidated against transaction-time authority;
+- multiple approved LedgerForge writers rely on database integrity rather than process-local coordination;
+- ownership remains singular while accepted observation provenance becomes explicit;
+- ADR-029 explicit user control remains intact for `noMatch`;
+- successful attempts remain atomic with accepted history; and
+- runtime state remains subordinate to durable repository state.
+
+Trade-offs and limitations:
+
+- the provider must own a broader import-specific operation rather than composing independent repository writes;
+- likely Migration V5 requires a fail-closed compatibility audit and provider-parity work;
+- SQLite contention and subprocess acceptance require explicit typed outcomes and tests;
+- rejected-attempt audit remains best effort after rollback or rejection;
+- hydration failure after commit requires truthful committed-but-not-hydrated presentation; and
+- identifier correction and historical repair remain independently gated.
+
+## Rejected Alternatives
+
+### Process-local locking as correctness authority
+
+Rejected. It cannot govern another LedgerForge process using the same SQLite database and cannot replace durable constraints or transaction-time revalidation.
+
+### Independent account and identifier writes before import-history persistence
+
+Rejected. Those writes can survive a later failure and violate the complete accepted-graph invariant.
+
+### Generic repository transaction closure
+
+Rejected. An arbitrary closure would broaden write authority, obscure the exact import invariant and permit unrelated repository operations to coordinate outside approved domain contracts.
+
+### Generic ADR-037 mutation framework
+
+Rejected for this operation. Confirmed import already has a bounded domain lifecycle and accepted write graph. Sprint 49 does not implement a general mutation engine, authorization framework, mutation ledger or family-specific reversal system.
+
+### Automatic account selection for `noMatch`
+
+Rejected. Eligibility is not identity evidence; ADR-029 requires explicit user control.
+
+### Identifier enrichment outside a successful import
+
+Rejected. It would detach ownership changes from the accepted evidence and atomic confirmation boundary that authorizes them.
+
+### Invented historical identifier observations
+
+Rejected. Existing ownership does not prove which historical import observed or established it.
+
+## Non-Goals
+
+This ADR does not authorize or implement:
+
+- production code;
+- Migration V5;
+- a generic repository transaction API;
+- ADR-037 source-level mutation contracts or execution;
+- identifier unlinking, detachment or reassignment;
+- incorrect-link recovery;
+- repair of contradictory ownership;
+- historical identifier backfill or invented observation provenance;
+- account merge or split;
+- duplicate override, partial import or historical duplicate repair;
+- new transaction-event evidence families;
+- protection from constraint-disabled, schema-altering or corrupting writers;
+- runtime-store mutation outside `RepositoryStoreHydrator`; or
+- a new production concurrency claim before acceptance verification passes.
+
+## Implementation Gate
+
+Sprint 49 authorizes architecture only. Implementation requires a separately approved sprint and complete execution prompt.
+
+Migration V5 is not implemented. No production atomicity, cross-process safety, resolved-account identifier enrichment or identifier-observation provenance guarantee may be claimed until the future implementation passes:
+
+- SQLite acceptance tests covering complete rollback, constraints, contention and competing claims;
+- In-Memory acceptance tests proving equivalent serialized all-or-nothing behavior and typed outcomes; and
+- subprocess acceptance tests covering multiple LedgerForge processes using the same SQLite database.
+
+The acceptance suite must cover successful commits, injected failure at every accepted-write stage, exact-fingerprint competition, event-identity competition, identifier-ownership competition, stale account choice, stale identity resolution, rejected-attempt failure and committed hydration failure. It must prove that losing accepted operations leave no account or identifier residue.
+
+No production guarantee may be recorded until implementation, migration safety where required, provider parity and the complete acceptance boundary are verified.
+
+## Related ADRs
+
+- ADR-024 — Repository Hydration Boundary
+- ADR-026 — Structured Developer Diagnostics
+- ADR-027 — Parser-Owned Financial Identifier Extraction
+- ADR-029 — User-Confirmed Financial Identifier Attachment
+- ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit
+- ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking
+- ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics
+- ADR-037 — Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal
