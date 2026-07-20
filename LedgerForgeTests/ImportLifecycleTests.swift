@@ -37,26 +37,26 @@ struct ImportLifecycleTests {
 
     @Test func taskOwnerSupersedesReleasesAndCancelsOnlyTheCurrentPreparation() async {
         let owner = ImportPreparationTaskOwner()
-        var firstCancellationObserved = false
+        let probe = ImportLifecycleCancellationProbe()
 
         let firstID = owner.start { _ in
+            await probe.markFirstOperationReadyToObserveCancellation()
             do {
                 try await Task.sleep(for: .seconds(10))
             } catch is CancellationError {
-                firstCancellationObserved = true
+                await probe.markFirstCancellationObserved()
             } catch {
                 Issue.record("Unexpected preparation task error: \(error.localizedDescription)")
             }
         }
-        await Task.yield()
+        await probe.waitForFirstOperationToBeReady()
 
         let secondID = owner.start { _ in }
-        await Task.yield()
+        await probe.waitForFirstCancellation()
 
         #expect(firstID != secondID)
         #expect(!owner.isCurrent(firstID))
         #expect(owner.isCurrent(secondID))
-        #expect(firstCancellationObserved)
 
         owner.finish(firstID)
         #expect(owner.isCurrent(secondID))
@@ -67,6 +67,39 @@ struct ImportLifecycleTests {
         owner.cancel()
         owner.cancel()
         #expect(owner.activeOperationID == nil)
+    }
+}
+
+private actor ImportLifecycleCancellationProbe {
+    private var firstOperationReady = false
+    private var firstCancellationObserved = false
+    private var firstOperationReadyContinuation: CheckedContinuation<Void, Never>?
+    private var firstCancellationContinuation: CheckedContinuation<Void, Never>?
+
+    func markFirstOperationReadyToObserveCancellation() {
+        firstOperationReady = true
+        firstOperationReadyContinuation?.resume()
+        firstOperationReadyContinuation = nil
+    }
+
+    func waitForFirstOperationToBeReady() async {
+        guard !firstOperationReady else { return }
+        await withCheckedContinuation { continuation in
+            firstOperationReadyContinuation = continuation
+        }
+    }
+
+    func markFirstCancellationObserved() {
+        firstCancellationObserved = true
+        firstCancellationContinuation?.resume()
+        firstCancellationContinuation = nil
+    }
+
+    func waitForFirstCancellation() async {
+        guard !firstCancellationObserved else { return }
+        await withCheckedContinuation { continuation in
+            firstCancellationContinuation = continuation
+        }
     }
 }
 
