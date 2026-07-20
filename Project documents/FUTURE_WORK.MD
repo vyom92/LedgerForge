@@ -1601,6 +1601,8 @@ Support user-defined or deterministic grouping while preserving immutable accoun
 **Status:** Candidate  
 **Depends on:** None
 
+**Settings-only portion completed 2026-07-20:** removed the inactive Settings section list, unbacked default-preference rows and future-only Danger Zone actions. Functional Developer Mode and authoritative persistence, recovery, runtime and data information remain. The broader candidate stays open for non-Settings surfaces.
+
 Remove or replace user-facing elements that imply functionality or state that does not exist.
 
 Candidate cleanup includes:
@@ -1886,8 +1888,10 @@ The exact file names, scene hierarchy and coordinator types require implementati
 
 ## FW-P2-68 — Repository-Backed Settings and Import-History Counts
 
-**Status:** Bug  
+**Status:** Completed 2026-07-20
 **Depends on:** Existing durable import-session and import-attempt history
+
+Completed without a schema migration: Settings `Completed Imports` projects the canonical hydrated import-attempt store only when persistence is durable. It counts only committed `successful_import` attempts linked to both a durable import session and document; exact duplicates, failures, rejections and cancelled preparation do not increment it. Non-durable or unavailable history presents `Unavailable`. Focused tests and a recoverable Debug reset with sanitized approved-fixture import, relaunch and exact re-import verified `0 → 1 → 1`.
 
 Replace current-session or selected-file-derived Settings counts with truthful repository-backed values.
 
@@ -1939,6 +1943,8 @@ The exact script names, CI provider and command interface require discovery. Thi
 
 **Status:** Maintenance  
 **Depends on:** A stable application target
+
+**Version/build presentation slice completed 2026-07-20:** Settings now derives `CFBundleShortVersionString` and `CFBundleVersion` from the application bundle, presents them as `version (build)`, and falls back deterministically when metadata is unavailable. Debug and Release built bundles both expose `1.0 (1)`. All other target and bundle hardening remains open.
 
 Harden the macOS application target and built bundle without expanding product scope.
 

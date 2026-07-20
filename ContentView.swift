@@ -5,6 +5,55 @@
 //
 
 import SwiftUI
+
+enum SettingsCompletedImportsPresentation: Equatable {
+    case available(Int)
+    case unavailable
+
+    var displayValue: String {
+        switch self {
+        case .available(let count):
+            return "\(count)"
+        case .unavailable:
+            return "Unavailable"
+        }
+    }
+}
+
+enum SettingsPresentation {
+    static func completedImports(
+        from attempts: [RepositoryImportAttempt],
+        persistenceState: PersistenceState
+    ) -> SettingsCompletedImportsPresentation {
+        guard persistenceState.isDurable else {
+            return .unavailable
+        }
+
+        let completedCount = attempts.count {
+            $0.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue &&
+            $0.persistenceCode == ImportAttemptPersistence.committed.rawValue &&
+            $0.importSessionId != nil &&
+            $0.documentId != nil
+        }
+        return .available(completedCount)
+    }
+
+    static func applicationVersion(infoDictionary: [String: Any]?) -> String {
+        let version = infoDictionary?["CFBundleShortVersionString"] as? String
+        let build = infoDictionary?["CFBundleVersion"] as? String
+
+        switch (version, build) {
+        case let (.some(version), .some(build)):
+            return "\(version) (\(build))"
+        case let (.some(version), nil):
+            return version
+        case let (nil, .some(build)):
+            return "Build \(build)"
+        case (nil, nil):
+            return "Unavailable"
+        }
+    }
+}
 import UniformTypeIdentifiers
 
 private enum AppShellSection: String, CaseIterable {
@@ -371,6 +420,7 @@ struct ContentView: View {
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @StateObject private var accountsViewModel = AccountsViewModel()
     @StateObject private var importHistoryViewModel = ImportHistoryViewModel()
+    @ObservedObject private var importAttemptStore: ImportAttemptStore = .shared
     @State private var selectedSection: AppShellSection = .dashboard
     @State private var didStartRepositoryHydration = false
     @State private var developerModeEnabled = false
@@ -772,49 +822,25 @@ struct ContentView: View {
     }
 
     private var settingsContent: some View {
-        ScrollView {
-            HStack(alignment: .top, spacing: 18) {
-                LFPanel {
-                    VStack(alignment: .leading, spacing: 12) {
-                        settingsCategory("General", icon: "gearshape", selected: true)
-                        settingsCategory("Database", icon: "cylinder")
-                        settingsCategory("Import", icon: "square.and.arrow.down")
-                        settingsCategory("Parsing & Detection", icon: "gauge.with.dots.needle.50percent")
-                        settingsCategory("Accounts & Categories", icon: "wallet.pass")
-                        settingsCategory("Transactions", icon: "creditcard")
-                        settingsCategory("Security & Privacy", icon: "shield")
-                        settingsCategory("Appearance", icon: "paintbrush")
-                        settingsCategory("Notifications", icon: "bell")
-                    }
-                }
-                .frame(width: 230)
+        let completedImports = SettingsPresentation.completedImports(
+            from: importAttemptStore.attempts,
+            persistenceState: DatabaseProvider.shared.persistenceState
+        )
 
+        return ScrollView {
+            HStack(alignment: .top, spacing: 18) {
                 VStack(spacing: 18) {
                     LFPanel(title: "Application") {
                         VStack(spacing: 0) {
-                            settingsPendingRow("Startup Behaviour", value: "Open Dashboard", icon: "macwindow")
-                            settingsPendingRow("Default Landing Page", value: "Dashboard", icon: "house")
-                            settingsPendingRow("Currency", value: "INR (₹)", icon: "indianrupeesign")
-                            settingsPendingRow("Date Format", value: "DD MMM YYYY", icon: "calendar")
-                            settingsPendingRow("Number Format", value: "Indian (12,34,567.89)", icon: "textformat.123")
                             settingsToggleRow("Developer Mode", icon: "chevron.left.forwardslash.chevron.right", isOn: $developerModeEnabled)
                         }
                     }
-
-                    LFPanel(title: "Default Settings") {
-                        VStack(spacing: 0) {
-                            settingsPendingRow("Default Account Type", value: "Savings Account", icon: "wallet.pass")
-                            settingsPendingRow("Default Transaction Status", value: "Cleared", icon: "checkmark.circle")
-                            settingsPendingRow("Default Category", value: "Uncategorized", icon: "tag")
-                            settingsPendingRow("Items Per Page", value: "25", icon: "tablecells")
-                        }
-                    }
                 }
+                .frame(width: 330)
 
                 VStack(spacing: 18) {
                     LFPanel(title: "System Information") {
-                        LFInfoRow(title: "Version", value: "1.0.0")
-                        LFInfoRow(title: "Environment", value: "Local")
+                        LFInfoRow(title: "Version", value: SettingsPresentation.applicationVersion(infoDictionary: Bundle.main.infoDictionary))
                         LFInfoRow(title: "Persistence", value: DatabaseProvider.shared.persistenceState.displayName)
                         LFInfoRow(title: "Persistence Status", value: DatabaseProvider.shared.persistenceState.statusMessage)
                         if let guidance = DatabaseProvider.shared.persistenceState.recoveryGuidance {
@@ -826,13 +852,7 @@ struct ContentView: View {
                     LFPanel(title: "Data Summary") {
                         LFInfoRow(title: "Accounts", value: "\(dashboardViewModel.accounts.count)")
                         LFInfoRow(title: "Transactions", value: "\(dashboardViewModel.transactionCount)")
-                        LFInfoRow(title: "Imported Files", value: selectedFile == "No statement imported" ? "0" : "1")
-                    }
-
-                    LFPanel(title: "Danger Zone") {
-                        dangerRow("Rebuild Search Index", action: "Future")
-                        dangerRow("Clear Cached Data", action: "Future")
-                        dangerRow("Reset Application", action: "Future")
+                        LFInfoRow(title: "Completed Imports", value: completedImports.displayValue)
                     }
                 }
                 .frame(width: 330)
@@ -1991,33 +2011,6 @@ struct ContentView: View {
                 .toggleStyle(.switch)
         }
         .padding(.vertical, 11)
-    }
-
-    private func settingsCategory(_ title: String, icon: String, selected: Bool = false) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .frame(width: 20)
-            Text(title)
-            Spacer()
-        }
-        .font(.subheadline)
-        .foregroundStyle(selected ? .white : LFTheme.textSecondary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
-        .background(selected ? AnyShapeStyle(LFTheme.primaryGradient) : AnyShapeStyle(Color.clear))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
-    }
-
-    private func dangerRow(_ title: String, action: String) -> some View {
-        HStack {
-            Label(title, systemImage: "exclamationmark.triangle")
-                .font(.caption)
-            Spacer()
-            Text(action)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(LFTheme.warning)
-        }
-        .padding(.vertical, 8)
     }
 
     private func tableHeader(_ titles: [String]) -> some View {
