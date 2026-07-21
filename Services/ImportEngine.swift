@@ -345,6 +345,7 @@ final class ImportEngine {
             document: document,
             metadata: metadata,
             rows: normalization.rows,
+            header: normalization.header,
             sourceContext: normalization.sourceContext
         )
 

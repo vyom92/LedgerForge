@@ -18,6 +18,8 @@ struct CSVNormalizationResult {
 
     let rows: [NormalizedRow]
 
+    let header: NormalizedRow?
+
     let sourceContext: NormalizedDocument.SourceContext
 
 }
@@ -51,9 +53,26 @@ final class CSVNormalizer {
         else {
             return CSVNormalizationResult(
                 rows: [],
+                header: nil,
                 sourceContext: .empty
             )
         }
+
+        let header: NormalizedRow? = {
+            guard
+                let headerRow = document.headerRow,
+                headerRow > 0,
+                headerRow < firstRow,
+                lines.indices.contains(headerRow - 1)
+            else {
+                return nil
+            }
+
+            return NormalizedRow(
+                rowNumber: headerRow,
+                values: values(in: lines[headerRow - 1], delimiter: delimiter)
+            )
+        }()
 
         let preTransactionFragments = lines
             .prefix(firstRow - 1)
@@ -79,22 +98,28 @@ final class CSVNormalizer {
                 continue
             }
 
-            let values = line
-                .split(separator: delimiter, omittingEmptySubsequences: false)
-                .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-
             rows.append(
                 NormalizedRow(
                     rowNumber: index + 1,
-                    values: values
+                    values: values(in: line, delimiter: delimiter)
                 )
             )
         }
 
         return CSVNormalizationResult(
             rows: rows,
+            header: header,
             sourceContext: sourceContext
         )
+    }
+
+    private func values(
+        in line: String,
+        delimiter: Character
+    ) -> [String] {
+        line
+            .split(separator: delimiter, omittingEmptySubsequences: false)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
     }
 
 }

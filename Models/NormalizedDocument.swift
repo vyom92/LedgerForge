@@ -38,17 +38,21 @@ struct NormalizedDocument {
 
     let rows: [NormalizedRow]
 
+    let header: NormalizedRow?
+
     let sourceContext: SourceContext
 
     init(
         document: Document,
         metadata: DocumentMetadata,
         rows: [NormalizedRow],
+        header: NormalizedRow? = nil,
         sourceContext: SourceContext = .empty
     ) {
         self.document = document
         self.metadata = metadata
         self.rows = rows
+        self.header = header
         self.sourceContext = sourceContext
     }
 

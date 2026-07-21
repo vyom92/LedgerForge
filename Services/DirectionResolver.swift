@@ -28,6 +28,11 @@ struct DirectionResult {
     let transactionType: TransactionType
 }
 
+enum DirectionResolutionError: Error, Equatable {
+    case missingDebitAndCredit
+    case populatedDebitAndCredit
+}
+
 /// Resolves transaction direction independently of any financial institution.
 final class DirectionResolver {
 
@@ -37,13 +42,13 @@ final class DirectionResolver {
         credit: Decimal?,
         amount: Decimal?,
         direction: String?
-    ) -> DirectionResult {
+    ) throws -> DirectionResult {
 
         switch strategy {
 
         case .debitCreditColumns:
 
-            if let debit {
+            if let debit, credit == nil {
                 return DirectionResult(
                     debit: debit,
                     credit: nil,
@@ -51,7 +56,7 @@ final class DirectionResolver {
                 )
             }
 
-            if let credit {
+            if let credit, debit == nil {
                 return DirectionResult(
                     debit: nil,
                     credit: credit,
@@ -59,11 +64,11 @@ final class DirectionResolver {
                 )
             }
 
-            return DirectionResult(
-                debit: nil,
-                credit: nil,
-                transactionType: .debit
-            )
+            if debit != nil, credit != nil {
+                throw DirectionResolutionError.populatedDebitAndCredit
+            }
+
+            throw DirectionResolutionError.missingDebitAndCredit
 
         case .amountAndDrCr,
              .signedAmount,

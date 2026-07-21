@@ -242,7 +242,7 @@ struct FinancialDocumentTests {
             ? [
                 NormalizedRow(
                     rowNumber: 1,
-                    values: ["01-01-2026", "", "Opening credit", "100", "", "1100"]
+                    values: ["01-01-2026", "", "Opening credit", "", "100", "1100", "4437"]
                 )
             ]
             : []
@@ -258,6 +258,10 @@ struct FinancialDocumentTests {
             document: document,
             metadata: metadata,
             rows: rows,
+            header: NormalizedRow(
+                rowNumber: 1,
+                values: ["Tran Date", "CHQNO", "PARTICULARS", "DR", "CR", "BAL", "SOL"]
+            ),
             sourceContext: sourceContext
         )
 
@@ -293,6 +297,7 @@ struct FinancialDocumentTests {
             document: document,
             metadata: selection.legacyMetadata,
             rows: normalization.rows,
+            header: normalization.header,
             sourceContext: normalization.sourceContext
         )
         let financialDocument = try parser.parse(document: normalizedDocument)
