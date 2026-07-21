@@ -232,29 +232,45 @@ final class ImportEngine {
 
     func importFileAndReturnResult(from url: URL) async -> ImportEngineResult {
         let entryCountBeforeImport = developerConsole.entries.count
-        developerConsole.info(.`import`, "Import started", metadata: ["file": url.lastPathComponent])
+        developerConsole.info(.`import`, "Import started")
 
         do {
             let preparedImport = try await prepareImport(from: url)
 
             let result = await commitPreparedImport(preparedImport)
             if result.succeeded {
-                developerConsole.info(.`import`, "Import completed", metadata: ["file": result.fileName, "transactions": "\(result.transactionCount)"])
+                developerConsole.info(.`import`, "Import completed", metadata: ["transactions": "\(result.transactionCount)"])
             } else if result.previousImport != nil {
                 developerConsole.info(.`import`, "Previously imported statement blocked", metadata: ["transactions": "\(result.transactionCount)"])
             } else if result.transactionEventBlock != nil {
                 developerConsole.info(.`import`, "Verified transaction event blocked")
             } else {
-                developerConsole.error(.`import`, "Import failed", metadata: ["file": result.fileName, "error": result.errorMessage ?? "Unknown error"])
+                developerConsole.error(.`import`, "Import failed", metadata: [
+                    "error": Self.privacySafeDiagnosticText(
+                        result.errorMessage ?? "Unknown error",
+                        selectedSourceURL: url
+                    )
+                ])
             }
             return result
 
         } catch {
 
             if developerConsole.entries.count == entryCountBeforeImport + 1 {
-                developerConsole.error(.`import`, error.localizedDescription, metadata: ["file": url.lastPathComponent])
+                developerConsole.error(
+                    .`import`,
+                    Self.privacySafeDiagnosticText(
+                        error.localizedDescription,
+                        selectedSourceURL: url
+                    )
+                )
             }
-            developerConsole.error(.`import`, "Import failed", metadata: ["file": url.lastPathComponent, "error": error.localizedDescription])
+            developerConsole.error(.`import`, "Import failed", metadata: [
+                "error": Self.privacySafeDiagnosticText(
+                    error.localizedDescription,
+                    selectedSourceURL: url
+                )
+            ])
             return ImportEngineResult(
                 fileName: url.lastPathComponent,
                 transactionCount: 0,
@@ -324,7 +340,6 @@ final class ImportEngine {
 
         // Parser internals (Debug)
         developerConsole.debug(.parser, "Detected document", metadata: [
-            "file": document.filename,
             "rows": "\(document.rowCount)",
             "columns": "\(document.columnCount)",
             "headerRow": "\(document.headerRow ?? -1)",
@@ -449,7 +464,7 @@ final class ImportEngine {
         }
         guard preparedImport.validation.passed else {
             let attemptID = importPersistenceCoordinatorFactory().recordValidationFailure(fileName: preparedImport.fileName, transactionCount: preparedImport.transactionCount)
-            developerConsole.error(.validation, "Validation failed", metadata: ["file": preparedImport.fileName])
+            developerConsole.error(.validation, "Validation failed")
             return ImportEngineResult(
                 fileName: preparedImport.fileName,
                 transactionCount: preparedImport.transactionCount,
@@ -480,7 +495,7 @@ final class ImportEngine {
         }
 
         guard markPreparedImportCommitted(preparedImport.id) else {
-            developerConsole.warning(.`import`, "Prepared import already committed", metadata: ["file": preparedImport.fileName])
+            developerConsole.warning(.`import`, "Prepared import already committed")
             return ImportEngineResult(
                 fileName: preparedImport.fileName,
                 transactionCount: preparedImport.transactionCount,
@@ -518,7 +533,12 @@ final class ImportEngine {
                 developerConsole.error(.database, "Repository persistence skipped")
             }
         } catch {
-            developerConsole.error(.database, "Repository persistence failed", metadata: ["error": error.localizedDescription])
+            developerConsole.error(.database, "Repository persistence failed", metadata: [
+                "error": Self.privacySafeDiagnosticText(
+                    error.localizedDescription,
+                    selectedSourceURL: preparedImport.sourceURL
+                )
+            ])
             if let failure = error as? ImportPersistenceCommitFailure {
                 persistenceErrorMessage = failure.originalError.localizedDescription
                 persistenceResult = ImportPersistenceResult(
@@ -593,6 +613,24 @@ final class ImportEngine {
         case .repositoryIntegrityConflict:
             return "Repository integrity conflict. No transaction history was written."
         }
+    }
+
+    private static func privacySafeDiagnosticText(
+        _ text: String,
+        selectedSourceURL: URL
+    ) -> String {
+        let sourceRepresentations = [
+            selectedSourceURL.lastPathComponent,
+            selectedSourceURL.path,
+            selectedSourceURL.absoluteString
+        ].filter { !$0.isEmpty }
+
+        guard !sourceRepresentations.contains(where: {
+            text.localizedCaseInsensitiveContains($0)
+        }) else {
+            return "Selected source details are unavailable."
+        }
+        return text
     }
 
     private func redactedEligibleIdentifier(in financialDocument: FinancialDocument) -> String? {

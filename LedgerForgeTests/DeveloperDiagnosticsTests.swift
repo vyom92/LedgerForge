@@ -347,10 +347,139 @@ struct DeveloperDiagnosticsTests {
         ])
         #expect(visible.map(\.level) == [.info, .error, .error])
     }
+
+    @Test("Selected source filename is absent from successful and parser-failure diagnostics")
+    func selectedSourceFilenameIsPrivateAcrossPreparationOutcomes() async throws {
+        let sensitiveFileName = "Fictional_Person_000000000_Private_Statement.csv"
+
+        let successfulURL = try copiedAxisFixture(named: sensitiveFileName)
+        defer { try? FileManager.default.removeItem(at: successfulURL.deletingLastPathComponent()) }
+        let successConsole = DeveloperConsole()
+        let successEngine = diagnosticEngine(
+            persistence: DiagnosticPersistenceCoordinator(),
+            console: successConsole
+        )
+
+        let successfulResult = await successEngine.importFileAndReturnResult(from: successfulURL)
+
+        #expect(successfulResult.succeeded)
+        #expect(successfulResult.fileName == sensitiveFileName)
+        expectSelectedSourceNameAbsent(
+            sensitiveFileName,
+            from: successConsole
+        )
+
+        let parserFailureURL = try writeDiagnosticCSV(
+            named: sensitiveFileName,
+            text: """
+            AXIS BANK
+            Statement of Account No - 123456789012345 for the period (From : 01-01-2026 To : 31-01-2026)
+            Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL
+            invalid-date,-,Recognized debit,10.00,,90.00,4437
+            """
+        )
+        defer { try? FileManager.default.removeItem(at: parserFailureURL.deletingLastPathComponent()) }
+        let failureConsole = DeveloperConsole()
+        let failureEngine = diagnosticEngine(
+            persistence: DiagnosticPersistenceCoordinator(),
+            console: failureConsole
+        )
+
+        let failedResult = await failureEngine.importFileAndReturnResult(from: parserFailureURL)
+
+        #expect(!failedResult.succeeded)
+        #expect(failedResult.fileName == sensitiveFileName)
+        expectSelectedSourceNameAbsent(
+            sensitiveFileName,
+            from: failureConsole
+        )
+    }
+
+    @Test("Selected source filename is absent from validation, duplicate, event and persistence diagnostics")
+    func selectedSourceFilenameIsPrivateAcrossCommitOutcomes() async throws {
+        let sensitiveFileName = "Fictional_Person_000000000_Private_Statement.csv"
+
+        let validationConsole = DeveloperConsole()
+        let validationEngine = diagnosticEngine(
+            persistence: DiagnosticPersistenceCoordinator(),
+            console: validationConsole
+        )
+        let validationResult = await validationEngine.commitPreparedImport(
+            diagnosticPreparedImport(fileName: sensitiveFileName, transactions: [])
+        )
+        #expect(!validationResult.validationPassed)
+        expectSelectedSourceNameAbsent(sensitiveFileName, from: validationConsole)
+
+        let scenarios: [(name: String, coordinator: DiagnosticPersistenceCoordinator)] = [
+            (
+                "duplicate",
+                DiagnosticPersistenceCoordinator(
+                    resultOverride: ImportPersistenceResult(
+                        persisted: false,
+                        workspaceId: nil,
+                        accountId: "fictional-account",
+                        importSessionId: "fictional-prior-session",
+                        transactionCount: 81,
+                        previousImport: PreviouslyImportedStatement(
+                            importSessionId: "fictional-prior-session",
+                            completedAtISO: "2026-07-21T00:00:00Z",
+                            transactionCount: 81,
+                            accountId: "fictional-account",
+                            accountDisplayName: "Fictional Axis Account"
+                        )
+                    )
+                )
+            ),
+            (
+                "event",
+                DiagnosticPersistenceCoordinator(
+                    resultOverride: ImportPersistenceResult(
+                        persisted: false,
+                        workspaceId: nil,
+                        accountId: nil,
+                        importSessionId: nil,
+                        transactionCount: 81,
+                        transactionEventBlock: .existing(count: 1)
+                    )
+                )
+            ),
+            (
+                "persistence",
+                DiagnosticPersistenceCoordinator(
+                    errorToThrow: DiagnosticPersistenceError.writeFailed(
+                        fileName: sensitiveFileName
+                    )
+                )
+            )
+        ]
+
+        for scenario in scenarios {
+            let url = try copiedAxisFixture(named: sensitiveFileName)
+            defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+            let console = DeveloperConsole()
+            let engine = diagnosticEngine(persistence: scenario.coordinator, console: console)
+
+            let result = await engine.importFileAndReturnResult(from: url)
+
+            #expect(!result.succeeded, "Expected the \(scenario.name) diagnostic path.")
+            #expect(result.fileName == sensitiveFileName)
+            expectSelectedSourceNameAbsent(sensitiveFileName, from: console)
+        }
+    }
 }
 
 private final class DiagnosticPersistenceCoordinator: ImportPersistenceCoordinating {
     private(set) var capturedFingerprint: ExactStatementFingerprint?
+    private let resultOverride: ImportPersistenceResult?
+    private let errorToThrow: Error?
+
+    init(
+        resultOverride: ImportPersistenceResult? = nil,
+        errorToThrow: Error? = nil
+    ) {
+        self.resultOverride = resultOverride
+        self.errorToThrow = errorToThrow
+    }
 
     func persistValidatedImport(
         financialDocument: FinancialDocument,
@@ -372,6 +501,12 @@ private final class DiagnosticPersistenceCoordinator: ImportPersistenceCoordinat
         accountChoice: ImportAccountChoice?
     ) throws -> ImportPersistenceResult {
         capturedFingerprint = fingerprint
+        if let errorToThrow {
+            throw errorToThrow
+        }
+        if let resultOverride {
+            return resultOverride
+        }
         return ImportPersistenceResult(
             persisted: validation.passed,
             workspaceId: validation.passed ? "workspace-diagnostics" : nil,
@@ -380,6 +515,129 @@ private final class DiagnosticPersistenceCoordinator: ImportPersistenceCoordinat
             transactionCount: validation.passed ? financialDocument.transactions.count : 0
         )
     }
+}
+
+private enum DiagnosticPersistenceError: Error, LocalizedError {
+    case writeFailed(fileName: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .writeFailed(let fileName):
+            return "Fictional repository write failed for \(fileName)."
+        }
+    }
+}
+
+@MainActor
+private func diagnosticEngine(
+    persistence: ImportPersistenceCoordinating,
+    console: DeveloperConsole
+) -> ImportEngine {
+    ImportEngine(
+        importPersistenceCoordinator: persistence,
+        developerConsole: console,
+        persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+        forcedHydration: {
+            RepositoryStoreHydrationResult(
+                didHydrate: true,
+                accountCount: 0,
+                transactionCount: 0,
+                importSessionCount: 0,
+                importAttemptCount: 0
+            )
+        },
+        rejectedAttemptHydration: {}
+    )
+}
+
+private func copiedAxisFixture(named fileName: String) throws -> URL {
+    let source = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+    return try writeDiagnosticCSV(
+        named: fileName,
+        data: Data(contentsOf: source)
+    )
+}
+
+private func writeDiagnosticCSV(named fileName: String, text: String) throws -> URL {
+    try writeDiagnosticCSV(named: fileName, data: Data(text.utf8))
+}
+
+private func writeDiagnosticCSV(named fileName: String, data: Data) throws -> URL {
+    let folder = FileManager.default.temporaryDirectory
+        .appendingPathComponent("LedgerForge-Diagnostic-Privacy-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let url = folder.appendingPathComponent(fileName)
+    try data.write(to: url)
+    return url
+}
+
+private func expectSelectedSourceNameAbsent(
+    _ fileName: String,
+    from console: DeveloperConsole
+) {
+    for entry in console.entries {
+        #expect(!entry.message.localizedCaseInsensitiveContains(fileName))
+        for (key, value) in entry.metadata ?? [:] {
+            #expect(!key.localizedCaseInsensitiveContains(fileName))
+            #expect(!value.localizedCaseInsensitiveContains(fileName))
+        }
+        if let metadataPresentation = DeveloperConsole.metadataText(for: entry) {
+            #expect(!metadataPresentation.localizedCaseInsensitiveContains(fileName))
+        }
+        #expect(!DeveloperConsole.formatForCopy(entry).localizedCaseInsensitiveContains(fileName))
+    }
+
+    var search = DeveloperConsole.Filters()
+    search.includeDebugInAll = true
+    search.searchText = fileName
+    #expect(DeveloperConsole.filteredEntries(console.entries, using: search).isEmpty)
+    #expect(!console.completeLogText.localizedCaseInsensitiveContains(fileName))
+    #expect(!DeveloperConsole.logText(from: console.entries).localizedCaseInsensitiveContains(fileName))
+}
+
+private func diagnosticPreparedImport(
+    fileName: String,
+    transactions: [Transaction]
+) -> PreparedImport {
+    let sourceURL = URL(fileURLWithPath: "/tmp").appendingPathComponent(fileName)
+    let financialDocument = FinancialDocument(
+        sourceDocument: Document(
+            filename: fileName,
+            url: sourceURL,
+            fileType: "CSV",
+            importedAt: Date(timeIntervalSince1970: 1_805_587_200)
+        ),
+        metadata: DocumentMetadata(
+            institution: .axis,
+            documentType: .bankAccount,
+            fileFormat: .csv,
+            confidence: 1
+        ),
+        parserName: "Axis Bank Account",
+        bookedCurrency: try! CurrencyCode("INR"),
+        transactions: transactions
+    )
+    let validation = ImportValidator.validate(financialDocument: financialDocument)
+    let session = ImportSession(
+        importedAt: Date(timeIntervalSince1970: 1_805_587_200),
+        fileName: fileName,
+        institution: .axis,
+        documentType: .bankAccount,
+        parserName: financialDocument.parserName,
+        transactionCount: transactions.count,
+        validation: validation
+    )
+    return PreparedImport(
+        sourceURL: sourceURL,
+        rawContents: "fictional diagnostic source",
+        fileName: fileName,
+        detectedInstitution: .axis,
+        detectedDocumentType: .bankAccount,
+        parserName: financialDocument.parserName,
+        financialDocument: financialDocument,
+        validation: validation,
+        importSession: session
+    )
 }
 
 private func resetDiagnosticRuntimeStores() {
