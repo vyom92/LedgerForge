@@ -94,7 +94,6 @@
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
 		B50000053050000000000001 /* SQLiteConfirmedImportRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000043050000000000001 /* SQLiteConfirmedImportRepository.swift */; };
-		C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */; };
 		B60000013050000000000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000003050000000000001 /* main.swift */; };
 		B60000023050000000000001 /* Repository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1362FFC4160006E7424 /* Repository.swift */; };
 		B60000033050000000000001 /* SQLiteDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1372FFC4184006E7424 /* SQLiteDatabase.swift */; };
@@ -109,18 +108,12 @@
 		B600000C3050000000000001 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400013004000000000001 /* Money.swift */; };
 		B600000D3050000000000001 /* MoneyFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400033004000000000001 /* MoneyFormatting.swift */; };
 		B600000E3050000000000001 /* DeveloperConsoleStub.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000513050000000000001 /* DeveloperConsoleStub.swift */; };
-		B600000F3050000000000001 /* LedgerForgeSubprocessProbe in CopyFiles */ = {isa = PBXBuildFile; fileRef = B60000103050000000000001 /* LedgerForgeSubprocessProbe */; };
+		B600000F3050000000000001 /* LedgerForgeSubprocessProbe in Embed Subprocess Probe */ = {isa = PBXBuildFile; fileRef = B60000103050000000000001 /* LedgerForgeSubprocessProbe */; };
 		B60000503050000000000001 /* InMemoryRepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */; };
+		C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		B60000203050000000000001 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 288EB0A52FF7955200F09BC9 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = B60000133050000000000001;
-			remoteInfo = LedgerForgeSubprocessProbe;
-		};
 		288EB0BB2FF7955300F09BC9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 288EB0A52FF7955200F09BC9 /* Project object */;
@@ -135,7 +128,28 @@
 			remoteGlobalIDString = 288EB0AC2FF7955200F09BC9;
 			remoteInfo = LedgerForge;
 		};
+		B60000203050000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 288EB0A52FF7955200F09BC9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B60000133050000000000001;
+			remoteInfo = LedgerForgeSubprocessProbe;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B60000163050000000000001 /* Embed Subprocess Probe */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 7;
+			files = (
+				B600000F3050000000000001 /* LedgerForgeSubprocessProbe in Embed Subprocess Probe */,
+			);
+			name = "Embed Subprocess Probe";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionStore.swift; sourceTree = "<group>"; };
@@ -188,10 +202,6 @@
 		288EB0B42FF7955300F09BC9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		288EB0BA2FF7955300F09BC9 /* LedgerForgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LedgerForgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LedgerForgeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		B60000103050000000000001 /* LedgerForgeSubprocessProbe */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LedgerForgeSubprocessProbe; sourceTree = BUILT_PRODUCTS_DIR; };
-		B60000003050000000000001 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		B60000113050000000000001 /* LedgerForgeSubprocessProbe.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LedgerForgeSubprocessProbe.entitlements; sourceTree = "<group>"; };
-		B60000513050000000000001 /* DeveloperConsoleStub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperConsoleStub.swift; sourceTree = "<group>"; };
 		288EB0D82FF7997000F09BC9 /* Transaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transaction.swift; sourceTree = "<group>"; };
 		288EB0E52FF7A6C000F09BC9 /* Services/ImportEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/ImportEngine.swift; sourceTree = SOURCE_ROOT; };
 		288EB0E82FF7AC9500F09BC9 /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
@@ -242,6 +252,10 @@
 		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
 		B50000043050000000000001 /* SQLiteConfirmedImportRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteConfirmedImportRepository.swift; sourceTree = "<group>"; };
+		B60000003050000000000001 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		B60000103050000000000001 /* LedgerForgeSubprocessProbe */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LedgerForgeSubprocessProbe; sourceTree = BUILT_PRODUCTS_DIR; };
+		B60000113050000000000001 /* LedgerForgeSubprocessProbe.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LedgerForgeSubprocessProbe.entitlements; sourceTree = "<group>"; };
+		B60000513050000000000001 /* DeveloperConsoleStub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperConsoleStub.swift; sourceTree = "<group>"; };
 		C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImportReconciliationGate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -274,12 +288,6 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		B60000153050000000000001 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = ();
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		288EB0AA2FF7955200F09BC9 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -301,21 +309,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-/* End PBXFrameworksBuildPhase section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		B60000163050000000000001 /* Embed Subprocess Probe */ = {
-			isa = PBXCopyFilesBuildPhase;
+		B60000153050000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 7;
 			files = (
-				B600000F3050000000000001 /* LedgerForgeSubprocessProbe in CopyFiles */,
 			);
-			name = "Embed Subprocess Probe";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-/* End PBXCopyFilesBuildPhase section */
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		281BB1642FFC4C73006E7424 /* Import */ = {
@@ -445,16 +446,6 @@
 				B60000103050000000000001 /* LedgerForgeSubprocessProbe */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		B60000123050000000000001 /* SubprocessProbe */ = {
-			isa = PBXGroup;
-			children = (
-				B60000003050000000000001 /* main.swift */,
-				B60000113050000000000001 /* LedgerForgeSubprocessProbe.entitlements */,
-				B60000513050000000000001 /* DeveloperConsoleStub.swift */,
-			);
-			path = SubprocessProbe;
 			sourceTree = "<group>";
 		};
 		288EB0D72FF7995800F09BC9 /* Models */ = {
@@ -626,23 +617,19 @@
 			path = "Project documents";
 			sourceTree = "<group>";
 		};
+		B60000123050000000000001 /* SubprocessProbe */ = {
+			isa = PBXGroup;
+			children = (
+				B60000003050000000000001 /* main.swift */,
+				B60000113050000000000001 /* LedgerForgeSubprocessProbe.entitlements */,
+				B60000513050000000000001 /* DeveloperConsoleStub.swift */,
+			);
+			path = SubprocessProbe;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		B60000133050000000000001 /* LedgerForgeSubprocessProbe */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = B60000423050000000000001 /* Build configuration list for PBXNativeTarget "LedgerForgeSubprocessProbe" */;
-			buildPhases = (
-				B60000143050000000000001 /* Sources */,
-				B60000153050000000000001 /* Frameworks */,
-			);
-			buildRules = ();
-			dependencies = ();
-			name = LedgerForgeSubprocessProbe;
-			productName = LedgerForgeSubprocessProbe;
-			productReference = B60000103050000000000001 /* LedgerForgeSubprocessProbe */;
-			productType = "com.apple.product-type.tool";
-		};
 		288EB0AC2FF7955200F09BC9 /* LedgerForge */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 288EB0CE2FF7955300F09BC9 /* Build configuration list for PBXNativeTarget "LedgerForge" */;
@@ -715,6 +702,22 @@
 			productName = LedgerForgeUITests;
 			productReference = 288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		B60000133050000000000001 /* LedgerForgeSubprocessProbe */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B60000423050000000000001 /* Build configuration list for PBXNativeTarget "LedgerForgeSubprocessProbe" */;
+			buildPhases = (
+				B60000143050000000000001 /* Sources */,
+				B60000153050000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LedgerForgeSubprocessProbe;
+			productName = LedgerForgeSubprocessProbe;
+			productReference = B60000103050000000000001 /* LedgerForgeSubprocessProbe */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -791,7 +794,8 @@
 		B60000433050000000000001 /* Re-sign Subprocess Probe */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+			);
 			inputPaths = (
 				"$(SRCROOT)/SubprocessProbe/LedgerForgeSubprocessProbe.entitlements",
 				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LedgerForgeSubprocessProbe",
@@ -806,31 +810,9 @@
 			shellPath = /bin/sh;
 			shellScript = "set -eu\nhelper=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/LedgerForgeSubprocessProbe\"\ntest_bundle=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nentitlements=\"${SRCROOT}/SubprocessProbe/LedgerForgeSubprocessProbe.entitlements\"\nentitlements_output=\"${TARGET_TEMP_DIR}/LedgerForgeSubprocessProbe-entitlements.plist\"\ncase \"${helper}\" in \"${test_bundle}\"/Contents/Resources/LedgerForgeSubprocessProbe) ;; *) echo \"Subprocess helper path is outside the expected test-bundle resources directory.\" >&2; exit 1 ;; esac\nif [ ! -f \"${helper}\" ] || [ ! -f \"${entitlements}\" ]; then echo \"Subprocess helper or approved entitlements are missing.\" >&2; exit 1; fi\nidentity=\"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\n/usr/bin/codesign --force --sign \"${identity}\" --entitlements \"${entitlements}\" --options runtime \"${helper}\"\n/usr/bin/codesign --verify --strict --verbose=4 \"${helper}\"\n/usr/bin/codesign -d --entitlements :- \"${helper}\" > \"${entitlements_output}\" 2>/dev/null\nkeys=$(/usr/libexec/PlistBuddy -c Print \"${entitlements_output}\" | /usr/bin/awk -F ' = ' '/ = / { gsub(/^[[:space:]]+/, \"\", $1); print $1 }' | /usr/bin/sort)\nexpected='com.apple.security.app-sandbox\ncom.apple.security.inherit'\nif [ \"${keys}\" != \"${expected}\" ]; then echo \"Subprocess helper has an unexpected entitlement key set.\" >&2; printf '%s\\n' \"${keys}\" >&2; exit 1; fi\n";
 		};
-/* End PBXShellScriptBuildPhase */
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		B60000143050000000000001 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				B60000013050000000000001 /* main.swift in Sources */,
-				B60000023050000000000001 /* Repository.swift in Sources */,
-				B60000033050000000000001 /* SQLiteDatabase.swift in Sources */,
-				B60000043050000000000001 /* SQLiteRepositoryProvider.swift in Sources */,
-				B60000053050000000000001 /* Migrations.swift in Sources */,
-				B60000063050000000000001 /* DTOs.swift in Sources */,
-				B60000073050000000000001 /* ConfirmedImport.swift in Sources */,
-				B60000083050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */,
-				B60000093050000000000001 /* SQLiteConfirmedImportRepository.swift in Sources */,
-				B600000A3050000000000001 /* TransactionEventIdentity.swift in Sources */,
-				B600000B3050000000000001 /* Transaction.swift in Sources */,
-				B600000C3050000000000001 /* Money.swift in Sources */,
-				B600000D3050000000000001 /* MoneyFormatting.swift in Sources */,
-				B600000E3050000000000001 /* DeveloperConsoleStub.swift in Sources */,
-				B60000503050000000000001 /* InMemoryRepositoryProvider.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		288EB0A92FF7955200F09BC9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -938,14 +920,31 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B60000143050000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B60000013050000000000001 /* main.swift in Sources */,
+				B60000023050000000000001 /* Repository.swift in Sources */,
+				B60000033050000000000001 /* SQLiteDatabase.swift in Sources */,
+				B60000043050000000000001 /* SQLiteRepositoryProvider.swift in Sources */,
+				B60000053050000000000001 /* Migrations.swift in Sources */,
+				B60000063050000000000001 /* DTOs.swift in Sources */,
+				B60000073050000000000001 /* ConfirmedImport.swift in Sources */,
+				B60000083050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */,
+				B60000093050000000000001 /* SQLiteConfirmedImportRepository.swift in Sources */,
+				B600000A3050000000000001 /* TransactionEventIdentity.swift in Sources */,
+				B600000B3050000000000001 /* Transaction.swift in Sources */,
+				B600000C3050000000000001 /* Money.swift in Sources */,
+				B600000D3050000000000001 /* MoneyFormatting.swift in Sources */,
+				B600000E3050000000000001 /* DeveloperConsoleStub.swift in Sources */,
+				B60000503050000000000001 /* InMemoryRepositoryProvider.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		B60000213050000000000001 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = B60000133050000000000001 /* LedgerForgeSubprocessProbe */;
-			targetProxy = B60000203050000000000001 /* PBXContainerItemProxy */;
-		};
 		288EB0BC2FF7955300F09BC9 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
@@ -956,45 +955,14 @@
 			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
 			targetProxy = 288EB0C52FF7955300F09BC9 /* PBXContainerItemProxy */;
 		};
+		B60000213050000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B60000133050000000000001 /* LedgerForgeSubprocessProbe */;
+			targetProxy = B60000203050000000000001 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		B60000403050000000000001 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = "SubprocessProbe/LedgerForgeSubprocessProbe.entitlements";
-				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
-				CODE_SIGN_STYLE = Automatic;
-				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeSubprocessProbe;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SDKROOT = macosx;
-				SWIFT_VERSION = 5.0;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
-			};
-			name = Debug;
-		};
-		B60000413050000000000001 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_ENTITLEMENTS = "SubprocessProbe/LedgerForgeSubprocessProbe.entitlements";
-				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
-				CODE_SIGN_STYLE = Automatic;
-				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.5;
-				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeSubprocessProbe;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SDKROOT = macosx;
-				SWIFT_VERSION = 5.0;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
-			};
-			name = Release;
-		};
 		288EB0CC2FF7955300F09BC9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1324,18 +1292,45 @@
 			};
 			name = Release;
 		};
+		B60000403050000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SubprocessProbe/LedgerForgeSubprocessProbe.entitlements;
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeSubprocessProbe;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		B60000413050000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = SubprocessProbe/LedgerForgeSubprocessProbe.entitlements;
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vyom.LedgerForgeSubprocessProbe;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		B60000423050000000000001 /* Build configuration list for PBXNativeTarget "LedgerForgeSubprocessProbe" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				B60000403050000000000001 /* Debug */,
-				B60000413050000000000001 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		288EB0A82FF7955200F09BC9 /* Build configuration list for PBXProject "LedgerForge" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1368,6 +1363,15 @@
 			buildConfigurations = (
 				288EB0D52FF7955300F09BC9 /* Debug */,
 				288EB0D62FF7955300F09BC9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B60000423050000000000001 /* Build configuration list for PBXNativeTarget "LedgerForgeSubprocessProbe" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B60000403050000000000001 /* Debug */,
+				B60000413050000000000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

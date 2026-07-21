@@ -692,9 +692,9 @@ Candidate outcomes include:
 
 - reusable Import Profiles;
 - Import Profile versioning;
-- deterministic layout recognition;
+- deterministic layout recognition that resolves mandatory semantic roles from unique, exact normalized headers rather than fixed column positions, and fails closed for missing, duplicate, ambiguous or unsupported roles;
 - explicit support for historical and changed layouts;
-- shared fixture and regression conventions;
+- shared fixture and regression conventions, including independent source-fidelity guards that do not use the production parser as their sole truth oracle;
 - bounded source-evidence contracts;
 - parser-family organization by institution and document type.
 
