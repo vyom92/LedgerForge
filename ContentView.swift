@@ -164,11 +164,11 @@ struct ImportOutcomePresentation: Equatable {
     let fileName: String
     let transactionCount: Int
     let validationStatus: String
-    let persistenceStatus: String
-    let message: String?
-    let allowsViewingTransactions: Bool
-    let iconName: String
-    let tone: ImportOutcomeTone
+    var persistenceStatus: String
+    var message: String?
+    var allowsViewingTransactions: Bool
+    var iconName: String
+    var tone: ImportOutcomeTone
     let accountId: String?
     let importSessionId: String?
     let redactedIdentifier: String?
@@ -176,12 +176,13 @@ struct ImportOutcomePresentation: Equatable {
     let previousAccountDisplayName: String?
     let isPreviouslyImported: Bool
     let transactionEventBlock: TransactionEventBlock?
+    var requiresReconciliation: Bool
 
     init(result: ImportEngineResult) {
         fileName = result.fileName
         transactionCount = result.transactionCount
         validationStatus = result.validationPassed ? "Validation Passed" : "Validation Failed"
-        allowsViewingTransactions = result.validationPassed && result.persisted
+        allowsViewingTransactions = result.validationPassed && result.persisted && !result.requiresReconciliation
         accountId = result.accountId
         importSessionId = result.importSessionId
         redactedIdentifier = result.redactedIdentifier
@@ -189,6 +190,7 @@ struct ImportOutcomePresentation: Equatable {
         previousAccountDisplayName = result.previousImport?.accountDisplayName
         isPreviouslyImported = result.previousImport != nil
         transactionEventBlock = result.transactionEventBlock
+        requiresReconciliation = result.requiresReconciliation
 
         if result.previousImport != nil || result.transactionEventBlock != nil || result.persisted {
             message = result.errorMessage?.isEmpty == false ? result.errorMessage : nil
@@ -202,11 +204,15 @@ struct ImportOutcomePresentation: Equatable {
 
         if result.previousImport != nil {
             persistenceStatus = "Previously Imported"
-            iconName = "doc.badge.checkmark.fill"
+            iconName = "checkmark.circle.fill"
             tone = .warning
         } else if result.transactionEventBlock != nil {
             persistenceStatus = "Statement Blocked"
             iconName = "exclamationmark.triangle.fill"
+            tone = .warning
+        } else if result.requiresReconciliation {
+            persistenceStatus = "Committed — Reconciliation Required"
+            iconName = "arrow.triangle.2.circlepath.circle.fill"
             tone = .warning
         } else if result.validationPassed && result.persisted {
             persistenceStatus = "Persistence Succeeded"
@@ -232,6 +238,17 @@ struct ImportOutcomePresentation: Equatable {
         }
 
         return "Processed \(transactionCount) transaction(s)"
+    }
+
+    func markingReconciled() -> ImportOutcomePresentation {
+        var copy = self
+        copy.requiresReconciliation = false
+        copy.allowsViewingTransactions = true
+        copy.persistenceStatus = "Persistence Succeeded"
+        copy.message = nil
+        copy.iconName = "checkmark.circle.fill"
+        copy.tone = .success
+        return copy
     }
 }
 
@@ -383,7 +400,7 @@ struct ImportActivityPresentation: Equatable {
                 title: "Latest durable import",
                 subtitle: "Previously imported — no new data written",
                 status: "Previously imported",
-                iconName: "doc.badge.checkmark.fill",
+                iconName: "checkmark.circle.fill",
                 tone: .warning
             )
         case ImportAttemptOutcome.existingEligibleAxisUPIEvent.rawValue,
@@ -1639,6 +1656,23 @@ struct ContentView: View {
                             .contentShape(RoundedRectangle(cornerRadius: 8))
                         }
                     }
+                    if outcome.requiresReconciliation {
+                        Button {
+                            if ImportEngine.shared.retryCanonicalHydration() {
+                                importState = .completed(outcome.markingReconciled())
+                            }
+                        } label: {
+                            Label("Retry Canonical Refresh", systemImage: "arrow.clockwise")
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .frame(maxWidth: .infinity)
+                                .background(LFTheme.surface)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(LFTheme.text)
+                    }
                 }
             case .cancelled(let fileName):
                 importedFileRow(
@@ -2262,22 +2296,6 @@ struct ContentView: View {
             accountChoice: importAccountChoice
         )
 
-        if result.requiresHydration {
-            do {
-                let hydrationResult = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
-                dashboardViewModel.markHydrationCompleted(hydrationResult)
-            } catch {
-                dashboardViewModel.markHydrationFailed(error)
-                DeveloperConsole.shared.log("Dashboard Hydration Refresh: FAILED")
-                DeveloperConsole.shared.log(error.localizedDescription)
-            }
-        } else if result.requiresImportAttemptRefresh {
-            do {
-                try RepositoryStoreHydrator().hydrateImportAttempts()
-            } catch {
-                DeveloperConsole.shared.log("Import attempt history refresh failed.")
-            }
-        }
         let outcome = ImportOutcomePresentation(result: result)
         selectedFile = result.fileName
         importState = .completed(outcome)

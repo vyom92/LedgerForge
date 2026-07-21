@@ -1,10 +1,10 @@
-// Dormant, provider-owned confirmed-import transaction.
+// Provider-owned confirmed-import transaction.
 
 import Foundation
 import SQLite3
 
-/// Installed only when the V5 ownership schema is present. The application
-/// still runs V4 and the legacy import path until the explicit Task 4 cutover.
+/// Installed with the active V5 ownership schema and used by the production
+/// confirmed-import cutover.
 final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     private let db: SQLiteDatabase
     private let generationToken: ProviderGenerationToken
@@ -40,36 +40,64 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
 
     private func commitInsideTransaction(_ plan: ConfirmedImportPlanDTO) throws -> ConfirmedImportRepositoryResult {
         guard plan.transactionTemplates.allSatisfy(\.isAccountIndependent),
+              plan.transactionTemplates.allSatisfy({ $0.transaction.workspaceId == plan.workspace.id }),
               plan.historyTemplate.document.workspaceId == plan.workspace.id,
               plan.historyTemplate.document.importSessionId == plan.historyTemplate.importSession.id,
               plan.historyTemplate.importSession.workspaceId == plan.workspace.id,
               plan.historyTemplate.fingerprint.documentId == plan.historyTemplate.document.id,
-              plan.historyTemplate.fingerprint.importSessionId == plan.historyTemplate.importSession.id else {
+              plan.historyTemplate.fingerprint.importSessionId == plan.historyTemplate.importSession.id,
+              plan.historyTemplate.successfulAttempt.workspaceId == plan.workspace.id,
+              Set(plan.transactionTemplates.map { $0.transaction.id }).count == plan.transactionTemplates.count,
+              !hasDuplicateIdentifierCandidates(plan.identifiers) else {
             return .repositoryIntegrityConflict
         }
         if try count("SELECT COUNT(*) FROM document_fingerprints WHERE algorithm = ? AND fingerprint = ?;", [plan.historyTemplate.fingerprint.algorithm, plan.historyTemplate.fingerprint.fingerprint]) > 0 {
             return .exactDuplicate
         }
 
+        let ownerSets = try plan.identifiers.map { candidate in
+            Set(try db.query(
+                sql: "SELECT account_id FROM account_identifiers WHERE workspace_id = ? AND scheme = ? AND identifier = ?;",
+                params: [plan.workspace.id, candidate.scheme, candidate.normalizedValue]
+            ) { $0.string(at: 0) ?? "" })
+        }
+        if ownerSets.contains(where: { $0.count > 1 }) { return .identityAmbiguous }
+        let resolvedOwners = Set(ownerSets.flatMap { $0 })
+        if resolvedOwners.count > 1 { return .identityConflict }
+        let currentOwner = resolvedOwners.first
+        switch plan.advisoryIdentity {
+        case .resolved(let accountID) where currentOwner != accountID: return .staleIdentityDecision
+        case .noMatch where currentOwner != nil:
+            if case .createProposedAccount = plan.accountChoice {
+                return .identifierOwnershipConflict
+            }
+            return .staleIdentityDecision
+        case .ambiguous: return .identityAmbiguous
+        case .conflict: return .identityConflict
+        default: break
+        }
+
         let account: AccountDTO
         switch plan.accountChoice {
+        case .unspecified:
+            return .explicitAccountChoiceRequired
         case .createProposedAccount:
+            guard currentOwner == nil else { return .staleIdentityDecision }
             guard plan.proposedAccount.workspaceId == plan.workspace.id else { return .repositoryIntegrityConflict }
             try db.executePrepared(sql: "INSERT INTO workspaces (id, name, created_at, updated_at) VALUES (?,?,?,?) ON CONFLICT(id) DO NOTHING;", params: [plan.workspace.id, plan.workspace.name, plan.workspace.createdAtISO, plan.workspace.updatedAtISO ?? NSNull()])
             guard try count("SELECT COUNT(*) FROM accounts WHERE id = ?;", [plan.proposedAccount.id]) == 0 else { return .repositoryIntegrityConflict }
+            try ensureInstitutionExists(id: plan.proposedAccount.institutionId, createdAtISO: plan.proposedAccount.createdAtISO)
             try db.executePrepared(sql: "INSERT INTO accounts (id, workspace_id, name, institution_id, account_type, native_currency, description, created_at) VALUES (?,?,?,?,?,?,?,?);", params: [plan.proposedAccount.id, plan.proposedAccount.workspaceId, plan.proposedAccount.name, plan.proposedAccount.institutionId ?? NSNull(), plan.proposedAccount.accountType ?? NSNull(), plan.proposedAccount.nativeCurrency, plan.proposedAccount.description ?? NSNull(), plan.proposedAccount.createdAtISO])
             account = plan.proposedAccount
         case .useExistingAccount(let accountID):
             guard let existing = try loadAccount(id: accountID) else { return .selectedAccountUnavailable }
             guard existing.workspaceId == plan.workspace.id else { return .selectedAccountWorkspaceMismatch }
+            if let currentOwner {
+                guard currentOwner == accountID else { return .identifierOwnershipConflict }
+            } else if try count("SELECT COUNT(*) FROM account_identifiers WHERE account_id = ? AND workspace_id = ?;", [accountID, plan.workspace.id]) > 0 {
+                return .selectedAccountIneligible
+            }
             account = existing
-        }
-
-        switch plan.advisoryIdentity {
-        case .resolved(let accountID) where accountID != account.id: return .staleIdentityDecision
-        case .ambiguous: return .identityAmbiguous
-        case .conflict: return .identityConflict
-        default: break
         }
 
         var observations = [(String, ConfirmedImportIdentifierCandidateDTO)]()
@@ -81,7 +109,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
                 ownershipID = try db.query(sql: "SELECT id FROM account_identifiers WHERE account_id = ? AND workspace_id = ? AND scheme = ? AND identifier = ? LIMIT 1;", params: [current, plan.workspace.id, candidate.scheme, candidate.normalizedValue]) { $0.string(at: 0) ?? "" }.first ?? ""
             } else {
                 ownershipID = UUID().uuidString
-                try db.executePrepared(sql: "INSERT INTO account_identifiers (id, account_id, workspace_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?,?);", params: [ownershipID, account.id, plan.workspace.id, candidate.scheme, candidate.normalizedValue, candidate.provenanceCode, plan.historyTemplate.completedAtISO])
+                try db.executePrepared(sql: "INSERT INTO account_identifiers (id, account_id, workspace_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?,?);", params: [ownershipID, account.id, plan.workspace.id, candidate.scheme, candidate.normalizedValue, Self.provenanceJSON(candidate), plan.historyTemplate.completedAtISO])
             }
             observations.append((ownershipID, candidate))
         }
@@ -97,7 +125,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
                 do { identity = try TransactionEventIdentity.make(transactionID: transaction.id, evidence: evidence, accountID: account.id) }
                 catch { return .repositoryIntegrityConflict }
                 if events.contains(where: { $0.algorithm == identity.algorithmIdentifier && $0.digest == identity.digest }) { return .repeatedIncomingEventEvidence }
-                if try count("SELECT COUNT(*) FROM transaction_event_identities WHERE algorithm = ? AND digest = ?;", [identity.algorithmIdentifier, identity.digest]) > 0 { return .existingEventDuplicate }
+                let owners = try db.query(sql: "SELECT account_id FROM transaction_event_identities WHERE algorithm = ? AND digest = ?;", params: [identity.algorithmIdentifier, identity.digest]) { $0.string(at: 0) ?? "" }
+                if let owner = owners.first { return owner == account.id ? .existingEventDuplicate : .eventOwnershipConflict }
                 events.append(TransactionEventIdentityDTO(id: UUID().uuidString, transactionId: transaction.id, accountId: account.id, documentId: history.document.id, importSessionId: history.importSession.id, algorithm: identity.algorithmIdentifier, digest: identity.digest, createdAtISO: history.completedAtISO))
             }
         }
@@ -129,4 +158,29 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     private func loadAccount(id: String) throws -> AccountDTO? { try db.query(sql: "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at FROM accounts WHERE id = ?;", params: [id]) { row in AccountDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", name: row.string(at: 2) ?? "", institutionId: row.string(at: 3), accountType: row.string(at: 4), nativeCurrency: row.string(at: 5) ?? "", description: row.string(at: 6), createdAtISO: row.string(at: 7) ?? "") }.first }
     private func count(_ sql: String, _ params: [Any?]) throws -> Int { Int(try db.query(sql: sql, params: params) { $0.int64(at: 0) ?? 0 }.first ?? 0) }
     private func finalTransaction(_ t: TransactionDTO, accountID: String, history: ConfirmedImportHistoryTemplateDTO) -> TransactionDTO { TransactionDTO(id: t.id, workspaceId: t.workspaceId, accountId: accountID, importSessionId: history.importSession.id, documentId: history.document.id, originalRowId: t.originalRowId, postedDateISO: t.postedDateISO, valueDateISO: t.valueDateISO, description: t.description, payee: t.payee, reference: t.reference, nativeCurrency: t.nativeCurrency, amountMinor: t.amountMinor, amountDecimal: t.amountDecimal, direction: t.direction, runningBalanceMinor: t.runningBalanceMinor, isReconciled: t.isReconciled, isTrusted: t.isTrusted, trustedAtISO: t.trustedAtISO, createdAtISO: t.createdAtISO, updatedAtISO: t.updatedAtISO, rawRows: t.rawRows) }
+
+    private func ensureInstitutionExists(id: String?, createdAtISO: String) throws {
+        guard let id, !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let code = String(id.lowercased().map { $0.isLetter || $0.isNumber ? $0 : "-" })
+        try db.executePrepared(sql: "INSERT OR IGNORE INTO institutions (id, code, name, country, created_at) VALUES (?,?,?,?,?);", params: [id, code, id, NSNull(), createdAtISO])
+    }
+
+    private static func provenanceJSON(_ candidate: ConfirmedImportIdentifierCandidateDTO) -> String {
+        let payload = ["strength": "strong", "verificationState": "verified", "provenance": candidate.provenanceCode]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let value = String(data: data, encoding: .utf8) else { return candidate.provenanceCode }
+        return value
+    }
+
+    private func hasDuplicateIdentifierCandidates(_ candidates: [ConfirmedImportIdentifierCandidateDTO]) -> Bool {
+        for index in candidates.indices {
+            for laterIndex in candidates.indices where laterIndex > index {
+                if candidates[index].scheme == candidates[laterIndex].scheme,
+                   candidates[index].normalizedValue == candidates[laterIndex].normalizedValue {
+                    return true
+                }
+            }
+        }
+        return false
+    }
 }

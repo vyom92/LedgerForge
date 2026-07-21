@@ -28,6 +28,7 @@ struct LedgerForgeTests {
 
         let folder = try sprint30TemporaryFolder(named: "Reset")
         defer {
+            LedgerForgeApp.configureInMemoryPersistenceForTesting()
             try? FileManager.default.removeItem(at: folder)
         }
 
@@ -74,6 +75,7 @@ struct LedgerForgeTests {
 
         let folder = try sprint30TemporaryFolder(named: "Reload")
         defer {
+            LedgerForgeApp.configureInMemoryPersistenceForTesting()
             try? FileManager.default.removeItem(at: folder)
         }
 

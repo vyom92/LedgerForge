@@ -8,8 +8,8 @@ struct ConfirmedImportConcurrencyTests {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let path = folder.appendingPathComponent("race.sqlite").path
-        let first = try SQLiteRepositoryProvider(path: path, migrations: allMigrations + [migrationV5])
-        let second = try SQLiteRepositoryProvider(path: path, migrations: allMigrations + [migrationV5])
+        let first = try SQLiteRepositoryProvider(path: path, migrations: allMigrations)
+        let second = try SQLiteRepositoryProvider(path: path, migrations: allMigrations)
         let firstPlan = confirmedImportPlan(generationToken: first.generationToken)
         let secondPlan = confirmedImportPlan(generationToken: second.generationToken)
         let lock = NSLock()

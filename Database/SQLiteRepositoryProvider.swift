@@ -8,25 +8,71 @@ import Combine
 #endif
 
 #if DEBUG
+enum DevelopmentDatabaseNamespaceError: Error, Equatable, LocalizedError {
+    case invalid
+
+    var errorDescription: String? {
+        "The requested development database namespace is invalid."
+    }
+}
+
+private struct DevelopmentDatabaseNamespace: Equatable {
+    let value: String
+
+    init(validating value: String) throws {
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-")
+        guard !value.isEmpty,
+              value.utf8.count <= 48,
+              value.unicodeScalars.allSatisfy(allowed.contains),
+              value.first != "-",
+              value.last != "-",
+              !value.contains("--") else {
+            throw DevelopmentDatabaseNamespaceError.invalid
+        }
+        self.value = value
+    }
+}
+
 struct DevelopmentDatabaseIdentity: Equatable {
+    static let namespaceEnvironmentKey = "LEDGERFORGE_DEVELOPMENT_DATABASE_NAMESPACE"
+    static let namespaceOverrideIsCompiled = true
+
     let canonicalDevelopmentURL: URL
     let nonDevelopmentURL: URL
     let backupURL: URL
     let temporaryDirectoryURL: URL
 
+    private let namespace: DevelopmentDatabaseNamespace?
     private let authorizedResolvedDevelopmentURL: URL
+    private let authorizedDevelopmentRootURL: URL
 
     init(applicationSupportDirectory: URL) {
+        self.init(applicationSupportDirectory: applicationSupportDirectory, namespace: nil)
+    }
+
+    private init(
+        applicationSupportDirectory: URL,
+        namespace: DevelopmentDatabaseNamespace?
+    ) {
         let applicationDirectory = applicationSupportDirectory
             .appendingPathComponent("LedgerForge", isDirectory: true)
             .standardizedFileURL
             .resolvingSymlinksInPath()
-        let developmentDirectory = applicationDirectory
+        let defaultDevelopmentDirectory = applicationDirectory
             .appendingPathComponent("Development", isDirectory: true)
+        let developmentDirectory: URL
+        if let namespace {
+            developmentDirectory = defaultDevelopmentDirectory
+                .appendingPathComponent("Namespaces", isDirectory: true)
+                .appendingPathComponent(namespace.value, isDirectory: true)
+        } else {
+            developmentDirectory = defaultDevelopmentDirectory
+        }
         let canonical = developmentDirectory
             .appendingPathComponent("ledgerforge-development.sqlite")
             .standardizedFileURL
 
+        self.namespace = namespace
         canonicalDevelopmentURL = canonical
         nonDevelopmentURL = applicationDirectory
             .appendingPathComponent("ledgerforge.sqlite")
@@ -39,21 +85,95 @@ struct DevelopmentDatabaseIdentity: Equatable {
             .appendingPathComponent("Temporary Sessions", isDirectory: true)
             .standardizedFileURL
         authorizedResolvedDevelopmentURL = canonical
+        authorizedDevelopmentRootURL = defaultDevelopmentDirectory.standardizedFileURL
     }
 
     static func applicationOwned() -> DevelopmentDatabaseIdentity {
+        lifecycleIdentity(
+            applicationSupportDirectory: applicationSupportDirectory(),
+            environment: ProcessInfo.processInfo.environment
+        )
+    }
+
+    static func applicationOwned(environment: [String: String]) throws -> DevelopmentDatabaseIdentity {
+        let applicationSupport = applicationSupportDirectory()
+        return try resolve(applicationSupportDirectory: applicationSupport, environment: environment)
+    }
+
+    static func resolve(
+        applicationSupportDirectory: URL,
+        environment: [String: String]
+    ) throws -> DevelopmentDatabaseIdentity {
+        guard let rawNamespace = environment[namespaceEnvironmentKey] else {
+            return DevelopmentDatabaseIdentity(applicationSupportDirectory: applicationSupportDirectory)
+        }
+        let namespace = try DevelopmentDatabaseNamespace(validating: rawNamespace)
+        return DevelopmentDatabaseIdentity(
+            applicationSupportDirectory: applicationSupportDirectory,
+            namespace: namespace
+        )
+    }
+
+    var isIsolatedCanonicalNamespace: Bool { namespace != nil }
+
+    func authorizesIsolatedCleanup(at candidate: URL) -> Bool {
+        namespace != nil && authorizesDestructiveWork(at: candidate)
+    }
+
+    static func lifecycleIdentity(
+        applicationSupportDirectory: URL,
+        environment: [String: String]
+    ) -> DevelopmentDatabaseIdentity {
+        if let resolved = try? resolve(
+            applicationSupportDirectory: applicationSupportDirectory,
+            environment: environment
+        ) {
+            return resolved
+        }
+        // The provider bootstrap still throws for invalid explicit activation.
+        // This non-default sentinel keeps lifecycle authority away from the
+        // existing canonical database while persistence remains unavailable.
+        let invalidNamespace = try! DevelopmentDatabaseNamespace(validating: "invalid-activation")
+        return DevelopmentDatabaseIdentity(
+            applicationSupportDirectory: applicationSupportDirectory,
+            namespace: invalidNamespace
+        )
+    }
+
+    private static func applicationSupportDirectory() -> URL {
         let fileManager = FileManager.default
-        let applicationSupport = (try? fileManager.url(
+        return (try? fileManager.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,
             appropriateFor: nil,
             create: true
         )) ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
-        return DevelopmentDatabaseIdentity(applicationSupportDirectory: applicationSupport)
     }
 
     func authorizesDestructiveWork(at candidate: URL) -> Bool {
-        candidate.standardizedFileURL.resolvingSymlinksInPath() == authorizedResolvedDevelopmentURL
+        let standardizedCandidate = candidate.standardizedFileURL
+        return standardizedCandidate == authorizedResolvedDevelopmentURL
+            && containsNoSymlink(from: standardizedCandidate, through: authorizedDevelopmentRootURL)
+    }
+
+    private func containsNoSymlink(from candidate: URL, through root: URL) -> Bool {
+        let fileManager = FileManager.default
+        var current = candidate
+        while current.pathComponents.count >= root.pathComponents.count {
+            if fileManager.fileExists(atPath: current.path) {
+                let attributes = try? fileManager.attributesOfItem(atPath: current.path)
+                if attributes?[.type] as? FileAttributeType == .typeSymbolicLink {
+                    return false
+                }
+            }
+            if current == root {
+                return true
+            }
+            let parent = current.deletingLastPathComponent()
+            guard parent != current else { return false }
+            current = parent
+        }
+        return false
     }
 
     func databaseSet(at mainURL: URL) -> [URL] {
@@ -107,7 +227,12 @@ public final class SQLiteRepositoryProvider {
         } catch let error as MigrationIntegrityError {
             throw SQLiteRepositoryProviderError.migrationIntegrityFailed(error)
         }
-        let dbPath = path ?? Self.defaultDBPath()
+        let dbPath: String
+        if let path {
+            dbPath = path
+        } else {
+            dbPath = try Self.defaultDBPath()
+        }
         self.databasePath = dbPath
         let database = SQLiteDatabase(path: dbPath)
         do {
@@ -143,23 +268,27 @@ public final class SQLiteRepositoryProvider {
         self.transactionRepo = SQLiteTransactionRepo(db: database)
         self.accountRepo = SQLiteAccountRepo(db: database)
         self.importSessionRepo = SQLiteImportSessionRepo(db: database)
-        // V5 remains dormant in normal application startup. A V5-aware
-        // confirmed provider is installed only by the Task 3 test harness.
         self.confirmedImportRepo = supportsConfirmedImport
             ? SQLiteConfirmedImportRepository(db: database, generationToken: generationToken)
             : PlaceholderConfirmedImportRepo()
     }
 
-    public static func defaultDBPath() -> String {
+    public static func defaultDBPath() throws -> String {
         let fm = FileManager.default
         let appSupport = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
 #if DEBUG
         if let appSupport {
-            let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: appSupport)
+            let identity = try DevelopmentDatabaseIdentity.resolve(
+                applicationSupportDirectory: appSupport,
+                environment: ProcessInfo.processInfo.environment
+            )
             try? fm.createDirectory(
                 at: identity.canonicalDevelopmentURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
+            guard identity.authorizesDestructiveWork(at: identity.canonicalDevelopmentURL) else {
+                throw SQLiteRepositoryProviderError.databaseInitializationFailed
+            }
             return identity.canonicalDevelopmentURL.path
         }
         return "ledgerforge-development.sqlite"
@@ -351,6 +480,19 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
         publish(provider)
     }
 
+    /// Releases the provider owned by this lifecycle coordinator before its
+    /// filesystem container is removed (for example at process teardown).
+    func closeOwnedProvider() {
+        guard let provider = sqliteProvider else { return }
+        if DatabaseProvider.shared.generationToken == provider.generationToken {
+            DatabaseProvider.shared.invalidateGeneration()
+            DatabaseProvider.shared = .unavailable(reason: .notInitialized)
+        }
+        provider.database.close()
+        sqliteProvider = nil
+        currentDatabaseURL = nil
+    }
+
     func startTemporaryEmptySession() -> DevelopmentDatabaseLifecycleResult {
         guard !isUnavailable else { return .lifecycleUnavailable }
         guard activityGate.beginExclusive() else { return .rejectedActivityInProgress }
@@ -472,7 +614,8 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             against: allMigrations,
             requiresCompleteChain: true
         )
-        let requiredTables = ["accounts", "transactions", "import_sessions", "import_attempts"]
+        try validateIdentifierOwnershipV5Schema(verification)
+        let requiredTables = ["accounts", "transactions", "import_sessions", "import_attempts", "account_identifiers", "account_identifier_observations"]
         for table in requiredTables {
             let count = try verification.queryInt(
                 "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '\(table)';"
@@ -480,6 +623,24 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             guard count == 1 else {
                 throw SQLiteDatabaseError.backupFailed("schema")
             }
+        }
+        let requiredIndexes = [
+            "idx_accounts_id_workspace",
+            "idx_account_identifiers_scheme",
+            "idx_identifier_observations_session"
+        ]
+        for index in requiredIndexes {
+            guard try verification.queryInt("SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = '\(index)';") == 1 else {
+                throw SQLiteDatabaseError.backupFailed("schema-index")
+            }
+        }
+        let relationshipChecks = [
+            "SELECT COUNT(*) FROM account_identifiers ai LEFT JOIN accounts a ON a.id = ai.account_id AND a.workspace_id = ai.workspace_id WHERE a.id IS NULL;",
+            "SELECT COUNT(*) FROM (SELECT workspace_id, scheme, identifier FROM account_identifiers GROUP BY workspace_id, scheme, identifier HAVING COUNT(*) > 1);",
+            "SELECT COUNT(*) FROM account_identifier_observations o LEFT JOIN account_identifiers ai ON ai.id = o.ownership_id LEFT JOIN import_sessions s ON s.id = o.import_session_id LEFT JOIN documents d ON d.id = o.document_id WHERE ai.id IS NULL OR s.id IS NULL OR d.id IS NULL;"
+        ]
+        for check in relationshipChecks where try verification.queryInt(check) != 0 {
+            throw SQLiteDatabaseError.backupFailed("schema-relationship")
         }
     }
 
@@ -490,14 +651,14 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
     }
 
     private func publish(_ provider: SQLiteRepositoryProvider, state: PersistenceState = .verifiedSQLite) {
-#if DEBUG
         DatabaseProvider.shared.invalidateGeneration()
-#endif
         DatabaseProvider.shared = DatabaseProvider(
             workspaceRepo: provider.workspaceRepo,
             transactionRepo: provider.transactionRepo,
             accountRepo: provider.accountRepo,
             importSessionRepo: provider.importSessionRepo,
+            confirmedImportRepo: provider.confirmedImportRepo,
+            generationToken: provider.generationToken,
             persistenceState: state,
             protectsGeneration: true
         )
@@ -658,10 +819,11 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
                 return current.id
             }
 
-            let insert = "INSERT INTO account_identifiers (id, account_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?);"
+            let insert = "INSERT INTO account_identifiers (id, account_id, workspace_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?,?);"
             try db.executePrepared(sql: insert, params: [
                 identifier.id,
                 identifier.accountId,
+                identifier.workspaceId,
                 identifier.scheme,
                 identifier.identifier,
                 Self.provenanceJSON(for: identifier),

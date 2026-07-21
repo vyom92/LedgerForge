@@ -16,7 +16,7 @@ struct LedgerForgeSubprocessProbe {
         let variant = CommandLine.arguments[3]
         let provider: SQLiteRepositoryProvider
         do {
-            provider = try SQLiteRepositoryProvider(path: databasePath, migrations: allMigrations + [migrationV5])
+            provider = try SQLiteRepositoryProvider(path: databasePath, migrations: allMigrations)
         } catch {
             exit(slot: slot, with: "unavailable")
         }

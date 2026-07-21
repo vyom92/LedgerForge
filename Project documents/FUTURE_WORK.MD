@@ -231,10 +231,10 @@ ADR-037 acceptance would reduce the shared architecture blocker. Duplicate-repai
 
 ## FW-P0-05 — Concurrent Import Guarantees
 
-**Status:** Ready for planning
+**Status:** Completed 2026-07-21
 **Architecture:** ADR-038 accepted in Sprint 49
-**Implementation:** Pending separate Chat-approved execution prompt
-**Depends on:** Separate implementation approval for ADR-038, likely Migration V5, and same-process, SQLite cross-process and provider-parity acceptance verification
+**Implementation:** Sprint 50 Tasks 3 and 4
+**Depends on:** Completed Migration V5 activation and same-process, SQLite cross-process and provider-parity acceptance verification
 
 Sprint 49 approved a bounded provider-owned atomic confirmed-import operation. The future operation begins its authoritative transaction before duplicate, identity, ownership or event lookup, revalidates the confirmed plan against current repository state and commits the complete accepted financial graph together or leaves no financial side effects.
 
@@ -251,7 +251,7 @@ Implementation must define and verify deterministic behaviour for:
 
 Acceptance requires same-process competition, multiple LedgerForge processes using the same SQLite database and equivalent In-Memory-provider serialization to produce provider-equivalent outcomes. Database constraints and transaction-time authoritative revalidation remain the correctness authority; the existing process-local lock may remain only as an optimization or user-experience guard.
 
-The bounded guarantee applies to approved writers using the expected schema. Writers that disable constraints, alter the schema or corrupt the database remain outside it. Cross-process safety must not be claimed until ADR-038 is implemented and its SQLite, In-Memory and subprocess acceptance tests pass.
+The bounded guarantee applies to approved writers using the expected schema. Writers that disable constraints, alter the schema or corrupt the database remain outside it. Sprint 50 implemented ADR-038's confirmed-import slice and verified SQLite/In-Memory parity, same-process and independent-provider competition, genuine separate-process SQLite contention, typed losing outcomes and zero losing-path residue.
 
 ---
 
@@ -354,16 +354,16 @@ Required protections include:
 
 ## FW-P0-12 — Identifier Backfill Policy
 
-**Status:** Ready for planning
+**Status:** Blocked
 **Architecture:** ADR-038 accepted in Sprint 49
-**Implementation:** Pending separate Chat-approved execution prompt
-**Depends on:** Separate implementation approval for ADR-038 and likely Migration V5; separate future decisions for identifier correction and historical repair
+**Implementation:** Confirmed-import enrichment and observation slice completed by Sprint 50; broader policy remains pending
+**Depends on:** Separate future decisions for identifier correction, reassignment and historical repair
 
 Sprint 49 approved the confirmed-import portion of identifier enrichment. When parser-produced strong verified identifiers uniquely resolve one existing account, existing same-account identifiers are idempotently accepted and additional eligible identifiers may be attached automatically only when each is unowned or already owned by that resolved account. Conflicting ownership rejects the complete import, and attachment occurs only as part of a successful provider-owned atomic confirmed import.
 
 ADR-029 remains authoritative for `noMatch`: the user must explicitly choose an eligible unseeded existing account or creation of a new account, no account may be selected automatically, and the choice must be revalidated inside the provider transaction.
 
-Sprint 49 also separates durable identifier ownership from accepted-import observation provenance. A future bounded observation record may relate one identifier ownership to an accepted import session, accepted document, parser provenance and account-association authority. Transaction-time ownership enforcement is required, and historical observations must not be invented.
+Sprint 50 implemented durable identifier ownership and accepted-import observation provenance for successful confirmed imports. Each bounded observation relates identifier ownership to its accepted import session, accepted document, parser provenance and account-association authority; transaction-time ownership enforcement is active, and historical observations are not invented.
 
 The following work remains open and separately gated:
 

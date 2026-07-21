@@ -227,7 +227,7 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(!presentation.allowsViewingTransactions)
     }
 
-    @Test func newSuccessRequiresOneCanonicalHydrationSignal() {
+    @Test func newSuccessIsAlreadyCanonicallyHydrated() {
         let result = ImportEngineResult(
             fileName: "axis.csv",
             transactionCount: 81,
@@ -236,7 +236,8 @@ struct ConfirmationGatedImportWorkflowTests {
             errorMessage: nil
         )
 
-        #expect(result.requiresHydration)
+        #expect(!result.requiresHydration)
+        #expect(result.hydrationOutcome == .committedAndHydrated)
     }
 
     @Test func competingSameProcessConfirmationsProduceOneFinancialHistory() async throws {
@@ -246,6 +247,8 @@ struct ConfirmationGatedImportWorkflowTests {
             accountRepo: provider.accountRepo,
             importSessionRepo: provider.importSessionRepo,
             transactionRepo: provider.transactionRepo,
+            confirmedImportRepo: provider.confirmedImportRepo,
+            generationToken: provider.generationToken,
             mapper: ImportPersistenceMapper(
                 workspaceId: "workspace-competing-confirmations",
                 workspaceName: "Competing Confirmations"
@@ -256,6 +259,8 @@ struct ConfirmationGatedImportWorkflowTests {
             accountRepo: provider.accountRepo,
             importSessionRepo: provider.importSessionRepo,
             transactionRepo: provider.transactionRepo,
+            confirmedImportRepo: provider.confirmedImportRepo,
+            generationToken: provider.generationToken,
             mapper: ImportPersistenceMapper(
                 workspaceId: "workspace-competing-confirmations",
                 workspaceName: "Competing Confirmations"
@@ -263,8 +268,8 @@ struct ConfirmationGatedImportWorkflowTests {
         )
         let firstEngine = availableImportEngine(firstCoordinator)
         let secondEngine = availableImportEngine(secondCoordinator)
-        let first = makePreparedImport(id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!)
-        let second = makePreparedImport(id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!)
+        let first = makePreparedImport(id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!, providerGeneration: provider.generationToken)
+        let second = makePreparedImport(id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!, providerGeneration: provider.generationToken)
 
         async let firstResult = firstEngine.commitPreparedImport(first, accountChoice: .createNewAccount)
         async let secondResult = secondEngine.commitPreparedImport(second, accountChoice: .createNewAccount)
@@ -371,7 +376,16 @@ private func resetRuntimeStoresForConfirmationWorkflow() async {
 private func availableImportEngine(_ persistence: ImportPersistenceCoordinating) -> ImportEngine {
     ImportEngine(
         importPersistenceCoordinator: persistence,
-        persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+        persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+        forcedHydration: {
+            RepositoryStoreHydrationResult(
+                didHydrate: true,
+                accountCount: 0,
+                transactionCount: 0,
+                importSessionCount: 0,
+                importAttemptCount: 0
+            )
+        }
     )
 }
 
@@ -402,7 +416,8 @@ private func makePreparedImport(
             amount: -50,
             balance: 1_050
         )
-    ]
+    ],
+    providerGeneration: ProviderGenerationToken = DatabaseProvider.shared.generationToken
 ) -> PreparedImport {
     let document = FinancialDocument(
         sourceDocument: Document(
@@ -444,7 +459,8 @@ private func makePreparedImport(
         parserName: document.parserName,
         financialDocument: document,
         validation: validation,
-        importSession: importSession
+        importSession: importSession,
+        providerGeneration: providerGeneration
     )
 }
 

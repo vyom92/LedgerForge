@@ -49,7 +49,7 @@ struct ConfirmedImportSubprocessTests {
         #expect(child.result?.result == "retryable-contention", Comment(rawValue: child.diagnostic))
         #expect(child.result?.slot == child.slot)
         #expect(child.result?.pid == child.recordedPID)
-        let provider = try SQLiteRepositoryProvider(path: database, migrations: allMigrations + [migrationV5])
+        let provider = try SQLiteRepositoryProvider(path: database, migrations: allMigrations)
         defer { provider.database.close() }
         #expect(try provider.database.queryInt("SELECT COUNT(*) FROM import_attempts;") == 0)
         #expect(try provider.database.queryInt("PRAGMA foreign_key_check;") == 0)
@@ -108,7 +108,7 @@ struct ConfirmedImportSubprocessTests {
     }
 
     private func initialize(database: String, seedExistingAccount: Bool) throws {
-        let provider = try SQLiteRepositoryProvider(path: database, migrations: allMigrations + [migrationV5])
+        let provider = try SQLiteRepositoryProvider(path: database, migrations: allMigrations)
         try validateIdentifierOwnershipV5Schema(provider.database)
         if seedExistingAccount {
             let now = "2026-07-20T00:00:00Z"
@@ -119,7 +119,7 @@ struct ConfirmedImportSubprocessTests {
     }
 
     private func assertDurableState(database: String, scenario: String, seededAccount: Bool) throws {
-        let provider = try SQLiteRepositoryProvider(path: database, migrations: allMigrations + [migrationV5])
+        let provider = try SQLiteRepositoryProvider(path: database, migrations: allMigrations)
         defer { provider.database.close() }
         let expectedAccounts = seededAccount ? 1 : 1
         let expected = [
@@ -171,17 +171,26 @@ private final class ProbeChild {
     private let terminated = DispatchSemaphore(value: 0)
     private let stdoutEOF = DispatchSemaphore(value: 0)
     private let stderrEOF = DispatchSemaphore(value: 0)
+    private let drainQueue: DispatchQueue
 
     init(slot: String = "A", executable: URL, databasePath: String, scenario: String, variant: String) throws {
         self.slot = slot
+        self.drainQueue = DispatchQueue(label: "LedgerForgeTests.ProbeDrain.\(slot)", qos: .userInitiated)
         process.executableURL = executable
         process.arguments = [databasePath, scenario, variant, slot]
+        process.qualityOfService = .userInitiated
         process.standardInput = input
         process.standardOutput = output
         process.standardError = error
         process.terminationHandler = { [weak self] _ in self?.terminated.signal() }
-        output.fileHandleForReading.readabilityHandler = { [weak self] handle in self?.consumeStdout(handle.availableData) }
-        error.fileHandleForReading.readabilityHandler = { [weak self] handle in self?.consumeStderr(handle.availableData) }
+        output.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            self?.drainQueue.async { [weak self] in self?.consumeStdout(data) }
+        }
+        error.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            self?.drainQueue.async { [weak self] in self?.consumeStderr(data) }
+        }
     }
 
     func start() throws {

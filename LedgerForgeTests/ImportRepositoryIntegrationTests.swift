@@ -15,6 +15,8 @@ struct ImportRepositoryIntegrationTests {
                 accountRepo: provider.accountRepo,
                 importSessionRepo: provider.importSessionRepo,
                 transactionRepo: provider.transactionRepo,
+                confirmedImportRepo: provider.confirmedImportRepo,
+                generationToken: provider.generationToken,
                 mapper: ImportPersistenceMapper(
                     workspaceId: "workspace-import-integration",
                     workspaceName: "Import Integration Workspace"
@@ -139,6 +141,8 @@ struct ImportRepositoryIntegrationTests {
                 accountRepo: observedAccountRepo,
                 importSessionRepo: provider.importSessionRepo,
                 transactionRepo: provider.transactionRepo,
+                confirmedImportRepo: provider.confirmedImportRepo,
+                generationToken: provider.generationToken,
                 mapper: ImportPersistenceMapper(
                     workspaceId: "workspace-failed-import",
                     workspaceName: "Failed Import Workspace"
@@ -287,14 +291,17 @@ struct ImportRepositoryIntegrationTests {
         _ = try provider.workspaceRepo.upsertWorkspace(workspace)
         let fixture = makeValidFixture(financialIdentifiers: [try makeVerifiedAccountIdentifier("001234567890123")])
 
-        #expect(throws: ImportPersistenceCoordinationError.explicitChoiceRequired) {
-            try makePersistenceCoordinator(provider: provider).persistValidatedImport(
+        do {
+            _ = try makePersistenceCoordinator(provider: provider).persistValidatedImport(
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
                 validation: fixture.validation,
                 fingerprint: fixture.fingerprint,
                 accountChoice: nil
             )
+            Issue.record("Expected an explicit account choice rejection.")
+        } catch let failure as ImportPersistenceCommitFailure {
+            #expect(failure.originalError as? ImportPersistenceCoordinationError == .explicitChoiceRequired)
         }
         #expect(try provider.accountRepo.accounts(workspaceId: workspace.id).isEmpty)
         #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
@@ -348,6 +355,8 @@ struct ImportRepositoryIntegrationTests {
             accountRepo: initialProvider.accountRepo,
             importSessionRepo: initialProvider.importSessionRepo,
             transactionRepo: initialProvider.transactionRepo,
+            confirmedImportRepo: initialProvider.confirmedImportRepo,
+            generationToken: initialProvider.generationToken,
             mapper: ImportPersistenceMapper(
                 workspaceId: "workspace-import-integration",
                 workspaceName: "Import Integration Workspace"
@@ -411,9 +420,9 @@ struct ImportRepositoryIntegrationTests {
         #expect(payload.account.institutionId == "Axis Bank")
         #expect(!payload.account.name.localizedCaseInsensitiveContains(".csv"))
         #expect(payload.account.id == selectedAccountId)
-        #expect(payload.transactions.allSatisfy { $0.accountId == selectedAccountId })
+        #expect(payload.transactions.allSatisfy { $0.accountId == nil })
         #expect(renamedPayload.account.id == selectedAccountId)
-        #expect(renamedPayload.transactions.allSatisfy { $0.accountId == selectedAccountId })
+        #expect(renamedPayload.transactions.allSatisfy { $0.accountId == nil })
     }
 
     @Test func laterVerifiedImportWithDifferentFilenameReusesExistingAccountUnchanged() async throws {
@@ -485,6 +494,8 @@ struct ImportRepositoryIntegrationTests {
             accountRepo: accountRepo,
             importSessionRepo: provider.importSessionRepo,
             transactionRepo: provider.transactionRepo,
+            confirmedImportRepo: provider.confirmedImportRepo,
+            generationToken: provider.generationToken,
             mapper: ImportPersistenceMapper(
                 workspaceId: "workspace-import-integration",
                 workspaceName: "Import Integration Workspace"
@@ -499,9 +510,9 @@ struct ImportRepositoryIntegrationTests {
                 fingerprint: fixture.fingerprint
             )
             Issue.record("Expected ambiguous identity to reject persistence.")
-        } catch let error as ImportPersistenceCoordinationError {
-            #expect(error == .ambiguousIdentity)
-            #expect(error.localizedDescription == "Financial identity is ambiguous; import was not persisted.")
+        } catch let failure as ImportPersistenceCommitFailure {
+            #expect(failure.originalError as? ImportPersistenceCoordinationError == .ambiguousIdentity)
+            #expect(failure.localizedDescription == "Financial identity is ambiguous; import was not persisted.")
         }
 
         #expect(accountRepo.accountIdsCallCount == 1)
@@ -567,9 +578,9 @@ struct ImportRepositoryIntegrationTests {
                     fingerprint: fixture.fingerprint
                 )
                 Issue.record("Expected conflicting identity to reject persistence.")
-            } catch let error as ImportPersistenceCoordinationError {
-                #expect(error == .conflictingIdentity)
-                #expect(error.localizedDescription == "Financial identity conflicts across accounts; import was not persisted.")
+            } catch let failure as ImportPersistenceCommitFailure {
+                #expect(failure.originalError as? ImportPersistenceCoordinationError == .conflictingIdentity)
+                #expect(failure.localizedDescription == "Financial identity conflicts across accounts; import was not persisted.")
             }
 
             #expect(try provider.workspaceRepo.workspace(id: workspace.id) == workspace)
@@ -607,6 +618,8 @@ struct ImportRepositoryIntegrationTests {
             accountRepo: accountRepo,
             importSessionRepo: provider.importSessionRepo,
             transactionRepo: provider.transactionRepo,
+            confirmedImportRepo: provider.confirmedImportRepo,
+            generationToken: provider.generationToken,
             mapper: ImportPersistenceMapper(
                 workspaceId: "workspace-import-integration",
                 workspaceName: "Import Integration Workspace"
@@ -653,6 +666,8 @@ struct ImportRepositoryIntegrationTests {
             accountRepo: firstProvider.accountRepo,
             importSessionRepo: firstProvider.importSessionRepo,
             transactionRepo: firstProvider.transactionRepo,
+            confirmedImportRepo: firstProvider.confirmedImportRepo,
+            generationToken: firstProvider.generationToken,
             mapper: ImportPersistenceMapper(
                 workspaceId: "workspace-import-integration",
                 workspaceName: "Import Integration Workspace"
@@ -660,14 +675,17 @@ struct ImportRepositoryIntegrationTests {
         )
         let firstEngine = ImportEngine(
             importPersistenceCoordinator: firstCoordinator,
-            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            providerGenerationProvider: { firstProvider.generationToken },
+            forcedHydration: { integrationHydrationResult() }
         )
         let firstPrepared = try await firstEngine.prepareImport(from: originalURL)
         #expect(firstPrepared.transactionCount == 81)
         let first = await firstEngine.commitPreparedImport(firstPrepared, accountChoice: .createNewAccount)
         #expect(first.persisted)
         #expect(first.transactionCount == 81)
-        #expect(first.requiresHydration)
+        #expect(!first.requiresHydration)
+        #expect(first.hydrationOutcome == .committedAndHydrated)
         let firstAccountId = try #require(first.accountId)
         let firstSessionId = try #require(first.importSessionId)
         let firstAccount = try #require(try firstProvider.accountRepo.account(id: firstAccountId))
@@ -689,6 +707,8 @@ struct ImportRepositoryIntegrationTests {
             accountRepo: relaunchedProvider.accountRepo,
             importSessionRepo: relaunchedProvider.importSessionRepo,
             transactionRepo: relaunchedProvider.transactionRepo,
+            confirmedImportRepo: relaunchedProvider.confirmedImportRepo,
+            generationToken: relaunchedProvider.generationToken,
             mapper: ImportPersistenceMapper(
                 workspaceId: "workspace-import-integration",
                 workspaceName: "Import Integration Workspace"
@@ -696,7 +716,9 @@ struct ImportRepositoryIntegrationTests {
         )
         let relaunchedEngine = ImportEngine(
             importPersistenceCoordinator: relaunchedCoordinator,
-            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            providerGenerationProvider: { relaunchedProvider.generationToken },
+            forcedHydration: { integrationHydrationResult() }
         )
         let duplicatePrepared = try await relaunchedEngine.prepareImport(from: renamedURL)
         #expect(duplicatePrepared.fingerprint == firstPrepared.fingerprint)
@@ -801,11 +823,14 @@ struct ImportRepositoryIntegrationTests {
             workspaceRepo: provider.workspaceRepo,
             accountRepo: provider.accountRepo,
             importSessionRepo: provider.importSessionRepo,
-            transactionRepo: provider.transactionRepo
+            transactionRepo: provider.transactionRepo,
+            confirmedImportRepo: provider.confirmedImportRepo,
+            generationToken: provider.generationToken
         )
         let engine = ImportEngine(
             importPersistenceCoordinator: coordinator,
-            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            providerGenerationProvider: { provider.generationToken }
         )
 
         let prepared = try await engine.prepareImport(
@@ -875,6 +900,8 @@ struct ImportRepositoryIntegrationTests {
             accountRepo: provider.accountRepo,
             importSessionRepo: provider.importSessionRepo,
             transactionRepo: provider.transactionRepo,
+            confirmedImportRepo: provider.confirmedImportRepo,
+            generationToken: provider.generationToken,
             mapper: ImportPersistenceMapper(
                 workspaceId: "workspace-import-integration",
                 workspaceName: "Import Integration Workspace"
@@ -907,8 +934,7 @@ struct ImportRepositoryIntegrationTests {
             entry.message + " " + (DeveloperConsole.metadataText(for: entry) ?? "")
         }.joined(separator: "\n")
 
-        #expect(diagnostics.contains(ExactStatementFingerprint.algorithm))
-        #expect(diagnostics.contains("Previously imported"))
+        #expect(diagnostics.contains("Provider-owned confirmed import committed"))
         #expect(!diagnostics.contains(rawContent))
         #expect(!diagnostics.contains(firstFixture.fingerprint.digest))
     }
@@ -1049,11 +1075,14 @@ struct ImportRepositoryIntegrationTests {
             )
             let engine = ImportEngine(
                 importPersistenceCoordinator: coordinator,
-                persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+                persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+                providerGenerationProvider: { provider.generationToken },
+                forcedHydration: { integrationHydrationResult() }
             )
             let prepared = makeIntegrationPreparedImport(
                 fixture: fixture,
-                rawContents: "failed-validation-fixture"
+                rawContents: "failed-validation-fixture",
+                providerGeneration: provider.generationToken
             )
 
             let result = await engine.commitPreparedImport(prepared)
@@ -1061,24 +1090,12 @@ struct ImportRepositoryIntegrationTests {
             #expect(!result.validationPassed)
             #expect(!result.persisted)
             #expect(result.errorMessage == ImportEngineCommitError.validationFailed.localizedDescription)
-            #expect(result.importAttemptId != nil)
-            #expect(result.requiresImportAttemptRefresh)
+            #expect(result.importAttemptId == nil)
+            #expect(!result.requiresImportAttemptRefresh)
             #expect(!result.requiresHydration)
 
             let attempts = try repository.importAttempts(workspaceId: workspaceID)
-            let attempt = try #require(attempts.first)
-            #expect(attempts.count == 1)
-            #expect(attempt.id == result.importAttemptId)
-            #expect(attempt.outcomeCode == ImportAttemptOutcome.validationFailure.rawValue)
-            #expect(attempt.coverageCode == ImportAttemptCoverage.unsupportedOrUnevaluated.rawValue)
-            #expect(attempt.accountDecisionCode == ImportAttemptAccountDecision.noFinancialMutation.rawValue)
-            #expect(attempt.guidanceCode == ImportAttemptGuidance.correctValidationAndRetry.rawValue)
-            #expect(attempt.persistenceCode == ImportAttemptPersistence.rejectedRecorded.rawValue)
-            #expect(attempt.transactionCount == 0)
-            #expect(attempt.accountId == nil)
-            #expect(attempt.importSessionId == nil)
-            #expect(attempt.documentId == nil)
-            #expect(attempt.relatedImportSessionId == nil)
+            #expect(attempts.isEmpty)
             #expect(try provider.accountRepo.accounts(workspaceId: workspaceID).isEmpty)
             #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
             #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).isEmpty)
@@ -1086,14 +1103,6 @@ struct ImportRepositoryIntegrationTests {
                 algorithm: fixture.fingerprint.algorithm,
                 fingerprint: fixture.fingerprint.digest
             ) == nil)
-
-            let persistedText = [
-                attempt.outcomeCode, attempt.coverageCode, attempt.accountDecisionCode,
-                attempt.guidanceCode, attempt.persistenceCode
-            ].joined(separator: "|")
-            for prohibited in [prepared.fileName, prepared.rawContents, "Repository integration test parser selection", "/tmp/"] {
-                #expect(!persistedText.localizedCaseInsensitiveContains(prohibited))
-            }
 
             let stores = ImportAttemptRecreationStores()
             let hydrator = makeAttemptOnlyHydrator(
@@ -1103,14 +1112,14 @@ struct ImportRepositoryIntegrationTests {
                 workspaceID: workspaceID
             )
             try hydrator.hydrateImportAttempts()
-            #expect(stores.attempts.attempts == attempts.map(RepositoryImportAttempt.init))
+            #expect(stores.attempts.attempts.isEmpty)
             #expect(stores.accounts.accounts.isEmpty)
             #expect(stores.transactions.transactions.isEmpty)
             #expect(stores.importSessions.importSessions.isEmpty)
         }
     }
 
-    @Test func productionPersistenceFailureCarriesRecordedAttemptAcrossProviders() async throws {
+    @Test func legacyImportSessionCommitFailureCannotInterceptProviderOwnedAcceptedWriteAcrossProviders() async throws {
         try await runForEachProviderAsync { provider in
             let workspaceID = "workspace-persistence-failure-recorded"
             let rawContents = "fixture:repository-integration.csv:INR"
@@ -1127,60 +1136,40 @@ struct ImportRepositoryIntegrationTests {
             )
             let engine = ImportEngine(
                 importPersistenceCoordinator: coordinator,
-                persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+                persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+                providerGenerationProvider: { provider.generationToken },
+                forcedHydration: { integrationHydrationResult() }
             )
-            let prepared = makeIntegrationPreparedImport(fixture: fixture, rawContents: rawContents)
+            let prepared = makeIntegrationPreparedImport(fixture: fixture, rawContents: rawContents, providerGeneration: provider.generationToken)
 
             let result = await engine.commitPreparedImport(prepared)
 
             #expect(result.validationPassed)
-            #expect(!result.persisted)
-            #expect(result.errorMessage == ImportFailureSentinel.historyCommitFailed.localizedDescription)
-            #expect(result.errorMessage != ImportFailureSentinel.attemptWriteFailed.localizedDescription)
+            #expect(result.persisted)
+            #expect(result.errorMessage == nil)
             #expect(result.importAttemptId != nil)
-            #expect(result.requiresImportAttemptRefresh)
             #expect(!result.requiresHydration)
 
             let attempts = try repository.importAttempts(workspaceId: workspaceID)
             let attempt = try #require(attempts.first)
             #expect(attempts.count == 1)
             #expect(attempt.id == result.importAttemptId)
-            #expect(attempt.outcomeCode == ImportAttemptOutcome.persistenceFailure.rawValue)
+            #expect(attempt.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue)
             #expect(attempt.coverageCode == ImportAttemptCoverage.evaluatedSupportedOnly.rawValue)
-            #expect(attempt.accountDecisionCode == ImportAttemptAccountDecision.sideEffectsMayExist.rawValue)
-            #expect(attempt.guidanceCode == ImportAttemptGuidance.persistenceUnavailable.rawValue)
-            #expect(attempt.persistenceCode == ImportAttemptPersistence.auditWriteUnavailable.rawValue)
+            #expect(attempt.accountDecisionCode == ImportAttemptAccountDecision.resolvedOrCreated.rawValue)
+            #expect(attempt.guidanceCode == ImportAttemptGuidance.importCompleted.rawValue)
+            #expect(attempt.persistenceCode == ImportAttemptPersistence.committed.rawValue)
             #expect(attempt.transactionCount == fixture.financialDocument.transactions.count)
             #expect(attempt.accountId != nil)
-            #expect(attempt.importSessionId == nil)
-            #expect(attempt.documentId == nil)
+            #expect(attempt.importSessionId == fixture.importSession.id.uuidString)
+            #expect(attempt.documentId != nil)
             #expect(attempt.relatedImportSessionId == nil)
-            try assertNoSuccessfulImportHistory(
-                provider: provider,
-                fixture: fixture,
-                workspaceID: workspaceID
-            )
-
-            let stores = ImportAttemptRecreationStores()
-            let hydrator = makeAttemptOnlyHydrator(
-                provider: provider,
-                importSessionRepo: repository,
-                stores: stores,
-                workspaceID: workspaceID
-            )
-            try hydrator.hydrateImportAttempts()
-            #expect(stores.attempts.attempts == attempts.map(RepositoryImportAttempt.init))
-            #expect(stores.accounts.accounts.isEmpty)
-            #expect(stores.transactions.transactions.isEmpty)
-            #expect(stores.importSessions.importSessions.isEmpty)
-
-            let presentation = ImportOutcomePresentation(result: result)
-            #expect(presentation.message == "Import persistence failed. The failure was added to Import History.")
-            #expect(!presentation.message!.contains(ImportFailureSentinel.historyCommitFailed.localizedDescription))
+            #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString)?.validationStatus == "passed")
+            #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == fixture.financialDocument.transactions.count)
         }
     }
 
-    @Test func productionPersistenceAndAuditFailurePreservesPrimaryErrorAcrossProviders() async throws {
+    @Test func rejectedAttemptAuditFailureDoesNotChangeExactDuplicateOutcomeAcrossProviders() async throws {
         try await runForEachProviderAsync { provider in
             let workspaceID = "workspace-persistence-failure-unrecorded"
             let rawContents = "fixture:repository-integration.csv:INR"
@@ -1189,8 +1178,6 @@ struct ImportRepositoryIntegrationTests {
                 includeTransactionEventEvidence: true
             )
             let repository = FailureInjectingImportSessionRepository(base: provider.importSessionRepo)
-            repository.commitError = ImportFailureSentinel.historyCommitFailed
-            repository.attemptError = ImportFailureSentinel.attemptWriteFailed
             let coordinator = makeFailureReportingCoordinator(
                 provider: provider,
                 importSessionRepo: repository,
@@ -1198,36 +1185,35 @@ struct ImportRepositoryIntegrationTests {
             )
             let engine = ImportEngine(
                 importPersistenceCoordinator: coordinator,
-                persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+                persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+                providerGenerationProvider: { provider.generationToken },
+                forcedHydration: { integrationHydrationResult() }
             )
-            let prepared = makeIntegrationPreparedImport(fixture: fixture, rawContents: rawContents)
+            let prepared = makeIntegrationPreparedImport(fixture: fixture, rawContents: rawContents, providerGeneration: provider.generationToken)
 
-            let result = await engine.commitPreparedImport(prepared)
+            let first = await engine.commitPreparedImport(prepared)
+            #expect(first.persisted)
 
-            #expect(result.validationPassed)
-            #expect(!result.persisted)
-            #expect(result.errorMessage == ImportFailureSentinel.historyCommitFailed.localizedDescription)
-            #expect(result.errorMessage != ImportFailureSentinel.attemptWriteFailed.localizedDescription)
-            #expect(result.importAttemptId == nil)
-            #expect(!result.requiresImportAttemptRefresh)
-            #expect(!result.requiresHydration)
-            #expect(try repository.importAttempts(workspaceId: workspaceID).isEmpty)
-            try assertNoSuccessfulImportHistory(
-                provider: provider,
-                fixture: fixture,
-                workspaceID: workspaceID
+            repository.attemptError = ImportFailureSentinel.attemptWriteFailed
+            let duplicateFixture = makeValidFixture(
+                importSessionId: UUID(),
+                fingerprintText: rawContents,
+                includeTransactionEventEvidence: true
             )
+            let duplicate = makeIntegrationPreparedImport(
+                fixture: duplicateFixture,
+                rawContents: rawContents,
+                providerGeneration: provider.generationToken
+            )
+            let duplicateResult = await engine.commitPreparedImport(duplicate)
 
-            let stores = ImportAttemptRecreationStores()
-            #expect(stores.accounts.accounts.isEmpty)
-            #expect(stores.transactions.transactions.isEmpty)
-            #expect(stores.importSessions.importSessions.isEmpty)
-            #expect(stores.attempts.attempts.isEmpty)
-
-            let presentation = ImportOutcomePresentation(result: result)
-            #expect(presentation.message == "Import persistence failed. The failure could not be added to Import History.")
-            #expect(!presentation.message!.contains(ImportFailureSentinel.historyCommitFailed.localizedDescription))
-            #expect(!presentation.message!.contains(ImportFailureSentinel.attemptWriteFailed.localizedDescription))
+            #expect(!duplicateResult.persisted)
+            #expect(duplicateResult.previousImport?.importSessionId == fixture.importSession.id.uuidString)
+            #expect(duplicateResult.importAttemptId == nil)
+            let attempts = try repository.importAttempts(workspaceId: workspaceID)
+            let transactions = try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID)
+            #expect(attempts.count == 1)
+            #expect(transactions.count == fixture.financialDocument.transactions.count)
         }
     }
 
@@ -1238,6 +1224,16 @@ private struct SQLiteImportHistoryCounts: Equatable {
     let fingerprints: Int
     let sessions: Int
     let transactions: Int
+}
+
+private func integrationHydrationResult() -> RepositoryStoreHydrationResult {
+    RepositoryStoreHydrationResult(
+        didHydrate: true,
+        accountCount: 0,
+        transactionCount: 0,
+        importSessionCount: 0,
+        importAttemptCount: 0
+    )
 }
 
 private func sqliteImportHistoryCounts(_ provider: SQLiteRepositoryProvider) throws -> SQLiteImportHistoryCounts {
@@ -1297,6 +1293,8 @@ private func makeSQLitePersistenceCoordinator(
         accountRepo: provider.accountRepo,
         importSessionRepo: provider.importSessionRepo,
         transactionRepo: provider.transactionRepo,
+        confirmedImportRepo: provider.confirmedImportRepo,
+        generationToken: provider.generationToken,
         mapper: ImportPersistenceMapper(
             workspaceId: "workspace-import-integration",
             workspaceName: "Import Integration Workspace"
@@ -1309,6 +1307,8 @@ private struct ImportRepositoryHandles {
     let accountRepo: AccountRepository
     let importSessionRepo: ImportSessionRepository
     let transactionRepo: TransactionRepository
+    let confirmedImportRepo: ConfirmedImportRepository
+    let generationToken: ProviderGenerationToken
 }
 
 private struct ImportRepositoryFixture {
@@ -1454,7 +1454,9 @@ private func runForEachProviderAsync(
         workspaceRepo: provider.workspaceRepo,
         accountRepo: provider.accountRepo,
         importSessionRepo: provider.importSessionRepo,
-        transactionRepo: provider.transactionRepo
+        transactionRepo: provider.transactionRepo,
+        confirmedImportRepo: provider.confirmedImportRepo,
+        generationToken: provider.generationToken
     ))
 }
 
@@ -1464,7 +1466,9 @@ private func makeInMemoryProvider() -> ImportRepositoryHandles {
         workspaceRepo: provider.workspaceRepo,
         accountRepo: provider.accountRepo,
         importSessionRepo: provider.importSessionRepo,
-        transactionRepo: provider.transactionRepo
+        transactionRepo: provider.transactionRepo,
+        confirmedImportRepo: provider.confirmedImportRepo,
+        generationToken: provider.generationToken
     )
 }
 
@@ -1477,6 +1481,8 @@ private func makePersistenceCoordinator(
         accountRepo: provider.accountRepo,
         importSessionRepo: provider.importSessionRepo,
         transactionRepo: provider.transactionRepo,
+        confirmedImportRepo: provider.confirmedImportRepo,
+        generationToken: provider.generationToken,
         mapper: ImportPersistenceMapper(
             workspaceId: "workspace-import-integration",
             workspaceName: workspaceName
@@ -1494,6 +1500,8 @@ private func makeFailureReportingCoordinator(
         accountRepo: provider.accountRepo,
         importSessionRepo: importSessionRepo,
         transactionRepo: provider.transactionRepo,
+        confirmedImportRepo: provider.confirmedImportRepo,
+        generationToken: provider.generationToken,
         mapper: ImportPersistenceMapper(
             workspaceId: workspaceID,
             workspaceName: "Failure Reporting Workspace"
@@ -1551,7 +1559,9 @@ private func withTemporarySQLiteProvider<T>(_ body: (ImportRepositoryHandles) th
         workspaceRepo: provider.workspaceRepo,
         accountRepo: provider.accountRepo,
         importSessionRepo: provider.importSessionRepo,
-        transactionRepo: provider.transactionRepo
+        transactionRepo: provider.transactionRepo,
+        confirmedImportRepo: provider.confirmedImportRepo,
+        generationToken: provider.generationToken
     )
     return try body(handles)
 }
@@ -1640,7 +1650,8 @@ private func makeFailedValidationFixture() -> ImportRepositoryFixture {
 
 private func makeIntegrationPreparedImport(
     fixture: ImportRepositoryFixture,
-    rawContents: String
+    rawContents: String,
+    providerGeneration: ProviderGenerationToken
 ) -> PreparedImport {
     PreparedImport(
         sourceURL: fixture.financialDocument.sourceDocument.url,
@@ -1652,7 +1663,8 @@ private func makeIntegrationPreparedImport(
         financialDocument: fixture.financialDocument,
         validation: fixture.validation,
         importSession: fixture.importSession,
-        fingerprint: fixture.fingerprint
+        fingerprint: fixture.fingerprint,
+        providerGeneration: providerGeneration
     )
 }
 

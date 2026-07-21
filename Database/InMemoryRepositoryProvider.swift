@@ -446,12 +446,15 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
 
         guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
         guard plan.transactionTemplates.allSatisfy(\.isAccountIndependent),
+              plan.transactionTemplates.allSatisfy({ $0.transaction.workspaceId == plan.workspace.id }),
               plan.historyTemplate.document.workspaceId == plan.workspace.id,
               plan.historyTemplate.document.importSessionId == plan.historyTemplate.importSession.id,
               plan.historyTemplate.importSession.workspaceId == plan.workspace.id,
               plan.historyTemplate.fingerprint.documentId == plan.historyTemplate.document.id,
               plan.historyTemplate.fingerprint.importSessionId == plan.historyTemplate.importSession.id,
-              plan.historyTemplate.successfulAttempt.workspaceId == plan.workspace.id else {
+              plan.historyTemplate.successfulAttempt.workspaceId == plan.workspace.id,
+              Set(plan.transactionTemplates.map { $0.transaction.id }).count == plan.transactionTemplates.count,
+              !hasDuplicateIdentifierCandidates(plan.identifiers) else {
             return .repositoryIntegrityConflict
         }
         guard !state.documentFingerprints.values.contains(where: {
@@ -471,9 +474,33 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         var observations = state.identifierObservations
         let injectedFailure = state.confirmedImportFailureInjection
 
+        let ownerSets = plan.identifiers.map { candidate in
+            Set(identifiers.values.filter {
+                $0.workspaceId == plan.workspace.id && $0.scheme == candidate.scheme && $0.identifier == candidate.normalizedValue
+            }.map(\.accountId))
+        }
+        if ownerSets.contains(where: { $0.count > 1 }) { return .identityAmbiguous }
+        let resolvedOwners = Set(ownerSets.flatMap { $0 })
+        if resolvedOwners.count > 1 { return .identityConflict }
+        let currentOwner = resolvedOwners.first
+        switch plan.advisoryIdentity {
+        case .resolved(let accountID) where currentOwner != accountID: return .staleIdentityDecision
+        case .noMatch where currentOwner != nil:
+            if case .createProposedAccount = plan.accountChoice {
+                return .identifierOwnershipConflict
+            }
+            return .staleIdentityDecision
+        case .ambiguous: return .identityAmbiguous
+        case .conflict: return .identityConflict
+        default: break
+        }
+
         let account: AccountDTO
         switch plan.accountChoice {
+        case .unspecified:
+            return .explicitAccountChoiceRequired
         case .createProposedAccount:
+            guard currentOwner == nil else { return .staleIdentityDecision }
             guard plan.proposedAccount.workspaceId == plan.workspace.id else { return .repositoryIntegrityConflict }
             workspaces[plan.workspace.id] = plan.workspace
             if injectedFailure == .workspace { return .repositoryIntegrityConflict }
@@ -484,18 +511,12 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         case .useExistingAccount(let accountID):
             guard let existing = accounts[accountID] else { return .selectedAccountUnavailable }
             guard existing.workspaceId == plan.workspace.id else { return .selectedAccountWorkspaceMismatch }
+            if let currentOwner {
+                guard currentOwner == accountID else { return .identifierOwnershipConflict }
+            } else if identifiers.values.contains(where: { $0.accountId == accountID && $0.workspaceId == plan.workspace.id }) {
+                return .selectedAccountIneligible
+            }
             account = existing
-        }
-
-        switch plan.advisoryIdentity {
-        case .resolved(let accountID) where accountID != account.id:
-            return .staleIdentityDecision
-        case .ambiguous:
-            return .identityAmbiguous
-        case .conflict:
-            return .identityConflict
-        default:
-            break
         }
 
         for candidate in plan.identifiers {
@@ -545,8 +566,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                 } catch { return .repositoryIntegrityConflict }
                 let keyMatches = finalEvents.contains { $0.algorithm == identity.algorithmIdentifier && $0.digest == identity.digest }
                 if keyMatches { return .repeatedIncomingEventEvidence }
-                if eventIdentities.values.contains(where: { $0.algorithm == identity.algorithmIdentifier && $0.digest == identity.digest }) {
-                    return .existingEventDuplicate
+                if let existing = eventIdentities.values.first(where: { $0.algorithm == identity.algorithmIdentifier && $0.digest == identity.digest }) {
+                    return existing.accountId == account.id ? .existingEventDuplicate : .eventOwnershipConflict
                 }
                 finalEvents.append(TransactionEventIdentityDTO(
                     id: UUID().uuidString,
@@ -599,6 +620,18 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
 
     private func withFinalRelationships(_ template: TransactionDTO, accountID: String, importSessionID: String, documentID: String) -> TransactionDTO {
         TransactionDTO(id: template.id, workspaceId: template.workspaceId, accountId: accountID, importSessionId: importSessionID, documentId: documentID, originalRowId: template.originalRowId, postedDateISO: template.postedDateISO, valueDateISO: template.valueDateISO, description: template.description, payee: template.payee, reference: template.reference, nativeCurrency: template.nativeCurrency, amountMinor: template.amountMinor, amountDecimal: template.amountDecimal, direction: template.direction, runningBalanceMinor: template.runningBalanceMinor, isReconciled: template.isReconciled, isTrusted: template.isTrusted, trustedAtISO: template.trustedAtISO, createdAtISO: template.createdAtISO, updatedAtISO: template.updatedAtISO, rawRows: template.rawRows)
+    }
+
+    private func hasDuplicateIdentifierCandidates(_ candidates: [ConfirmedImportIdentifierCandidateDTO]) -> Bool {
+        for index in candidates.indices {
+            for laterIndex in candidates.indices where laterIndex > index {
+                if candidates[index].scheme == candidates[laterIndex].scheme,
+                   candidates[index].normalizedValue == candidates[laterIndex].normalizedValue {
+                    return true
+                }
+            }
+        }
+        return false
     }
 }
 

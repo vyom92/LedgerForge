@@ -337,7 +337,7 @@ FROM import_sessions s
 WHERE s.validation_status = 'passed' AND s.completed_at IS NOT NULL;
 """)
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4]
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

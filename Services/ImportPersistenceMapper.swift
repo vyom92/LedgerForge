@@ -96,27 +96,10 @@ struct ImportPersistenceMapper {
         let transactions = try financialDocument.transactions.map {
             try transactionDTO(
                 from: $0,
-                accountId: account.id,
-                importSessionId: importSessionId,
-                documentId: documentId,
                 createdAtISO: importedAtISO,
                 documentCurrency: documentCurrency
             )
         }
-        let eventIdentities = try financialDocument.transactions.compactMap { transaction -> TransactionEventIdentityDTO? in
-            guard let identity = try TransactionEventIdentity.make(transaction: transaction, accountID: accountId) else { return nil }
-            return TransactionEventIdentityDTO(
-                id: "transaction-event-\(identity.transactionID.uuidString.lowercased())",
-                transactionId: identity.transactionID.uuidString,
-                accountId: identity.accountID,
-                documentId: documentId,
-                importSessionId: importSessionId,
-                algorithm: identity.algorithmIdentifier,
-                digest: identity.digest,
-                createdAtISO: importedAtISO
-            )
-        }
-
         return ImportPersistencePayload(
             workspace: workspace(createdAt: importSession.importedAt),
             account: account,
@@ -142,7 +125,71 @@ struct ImportPersistenceMapper {
             ),
             completedAtISO: importedAtISO,
             transactions: transactions,
-            transactionEventIdentities: eventIdentities
+            transactionEventIdentities: []
+        )
+    }
+
+    func confirmedImportPlan(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        providerGeneration: ProviderGenerationToken,
+        advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO,
+        accountChoice: ConfirmedImportAccountChoiceDTO,
+        selectedAccountId: String
+    ) throws -> ConfirmedImportPlanDTO {
+        let payload = try payload(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            accountId: selectedAccountId,
+            fingerprint: fingerprint
+        )
+        let successfulAttempt = ImportAttemptDTO(
+            workspaceId: workspaceId,
+            createdAtISO: payload.completedAtISO,
+            outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
+            coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+            accountDecisionCode: {
+                if case .useExistingAccount = accountChoice { return ImportAttemptAccountDecision.selectedExisting.rawValue }
+                return ImportAttemptAccountDecision.resolvedOrCreated.rawValue
+            }(),
+            guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
+            persistenceCode: ImportAttemptPersistence.committed.rawValue,
+            transactionCount: payload.transactions.count,
+            accountId: selectedAccountId,
+            importSessionId: payload.importSession.id,
+            documentId: payload.document.id
+        )
+        let identifiers = FinancialIdentityResolver.strongVerifiedIdentifiers(from: financialDocument.financialIdentifiers).map {
+            ConfirmedImportIdentifierCandidateDTO(
+                scheme: $0.kind.rawValue,
+                normalizedValue: $0.normalizedValue,
+                provenanceCode: $0.provenance.rawValue
+            )
+        }
+        let templates = zip(payload.transactions, financialDocument.transactions).map { transaction, source in
+            ConfirmedImportTransactionTemplateDTO(
+                transaction: transaction,
+                eventEvidence: source.verifiedAxisUPIEventEvidence.map(Self.confirmedEventEvidence(from:))
+            )
+        }
+        return ConfirmedImportPlanDTO(
+            providerGeneration: providerGeneration,
+            workspace: payload.workspace,
+            proposedAccount: payload.account,
+            accountChoice: accountChoice,
+            advisoryIdentity: advisoryIdentity,
+            identifiers: identifiers,
+            historyTemplate: ConfirmedImportHistoryTemplateDTO(
+                document: payload.document,
+                fingerprint: payload.fingerprint,
+                importSession: payload.importSession,
+                completedAtISO: payload.completedAtISO,
+                successfulAttempt: successfulAttempt
+            ),
+            transactionTemplates: templates
         )
     }
 
@@ -228,9 +275,6 @@ struct ImportPersistenceMapper {
 
     private func transactionDTO(
         from transaction: Transaction,
-        accountId: String,
-        importSessionId: String,
-        documentId: String?,
         createdAtISO: String,
         documentCurrency: String
     ) throws -> TransactionDTO {
@@ -257,9 +301,9 @@ struct ImportPersistenceMapper {
         return TransactionDTO(
             id: transaction.id.uuidString,
             workspaceId: workspaceId,
-            accountId: accountId,
-            importSessionId: importSessionId,
-            documentId: documentId,
+            accountId: nil,
+            importSessionId: nil,
+            documentId: nil,
             originalRowId: nil,
             postedDateISO: Self.dayFormatter.string(from: postedDate),
             valueDateISO: nil,
@@ -277,6 +321,18 @@ struct ImportPersistenceMapper {
             createdAtISO: createdAtISO,
             updatedAtISO: nil,
             rawRows: []
+        )
+    }
+
+    nonisolated private static func confirmedEventEvidence(
+        from evidence: AxisUPITransactionEventEvidence
+    ) -> ConfirmedImportTransactionEventEvidenceDTO {
+        .axisUPI(
+            ConfirmedImportAxisUPIEventEvidenceDTO(
+                operation: ConfirmedImportAxisUPIEventEvidenceDTO.Operation(rawValue: evidence.operation.rawValue)!,
+                reference: evidence.reference,
+                subtype: ConfirmedImportAxisUPIEventEvidenceDTO.LedgerSubtype(rawValue: evidence.subtype.rawValue)!
+            )
         )
     }
 

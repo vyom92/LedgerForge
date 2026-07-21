@@ -4,6 +4,103 @@ import SQLite3
 @testable import LedgerForge
 
 struct ConfirmedImportRepositoryContractTests {
+    @Test func mismatchedTransactionWorkspaceIsRejectedWithNoAcceptedResidueAcrossProviders() throws {
+        try assertPlanRejectedAcrossProviders { token in
+            let plan = confirmedImportPlan(generationToken: token, suffix: "mismatched-transaction")
+            let template = plan.transactionTemplates[0]
+            let mismatched = TransactionDTO(
+                id: template.transaction.id,
+                workspaceId: "wrong-workspace",
+                postedDateISO: template.transaction.postedDateISO,
+                nativeCurrency: template.transaction.nativeCurrency,
+                amountMinor: template.transaction.amountMinor,
+                amountDecimal: template.transaction.amountDecimal,
+                direction: template.transaction.direction,
+                createdAtISO: template.transaction.createdAtISO
+            )
+            return ConfirmedImportPlanDTO(
+                providerGeneration: plan.providerGeneration,
+                workspace: plan.workspace,
+                proposedAccount: plan.proposedAccount,
+                accountChoice: plan.accountChoice,
+                advisoryIdentity: plan.advisoryIdentity,
+                identifiers: plan.identifiers,
+                historyTemplate: plan.historyTemplate,
+                transactionTemplates: [ConfirmedImportTransactionTemplateDTO(transaction: mismatched, eventEvidence: template.eventEvidence)]
+            )
+        }
+    }
+
+    @Test func mismatchedSuccessfulAttemptWorkspaceIsRejectedWithNoAcceptedResidueAcrossProviders() throws {
+        try assertPlanRejectedAcrossProviders { token in
+            let plan = confirmedImportPlan(generationToken: token, suffix: "mismatched-attempt")
+            let attempt = plan.historyTemplate.successfulAttempt
+            let mismatchedAttempt = ImportAttemptDTO(
+                id: attempt.id,
+                workspaceId: "wrong-workspace",
+                createdAtISO: attempt.createdAtISO,
+                outcomeCode: attempt.outcomeCode,
+                coverageCode: attempt.coverageCode,
+                accountDecisionCode: attempt.accountDecisionCode,
+                guidanceCode: attempt.guidanceCode,
+                persistenceCode: attempt.persistenceCode,
+                transactionCount: attempt.transactionCount,
+                accountId: attempt.accountId,
+                importSessionId: attempt.importSessionId,
+                documentId: attempt.documentId
+            )
+            let history = ConfirmedImportHistoryTemplateDTO(
+                document: plan.historyTemplate.document,
+                fingerprint: plan.historyTemplate.fingerprint,
+                importSession: plan.historyTemplate.importSession,
+                completedAtISO: plan.historyTemplate.completedAtISO,
+                successfulAttempt: mismatchedAttempt
+            )
+            return ConfirmedImportPlanDTO(
+                providerGeneration: plan.providerGeneration,
+                workspace: plan.workspace,
+                proposedAccount: plan.proposedAccount,
+                accountChoice: plan.accountChoice,
+                advisoryIdentity: plan.advisoryIdentity,
+                identifiers: plan.identifiers,
+                historyTemplate: history,
+                transactionTemplates: plan.transactionTemplates
+            )
+        }
+    }
+
+    @Test func duplicateIncomingTransactionIDsAreRejectedDeterministicallyAcrossProviders() throws {
+        try assertPlanRejectedAcrossProviders { token in
+            let plan = confirmedImportPlan(generationToken: token, suffix: "duplicate-transactions")
+            return ConfirmedImportPlanDTO(
+                providerGeneration: plan.providerGeneration,
+                workspace: plan.workspace,
+                proposedAccount: plan.proposedAccount,
+                accountChoice: plan.accountChoice,
+                advisoryIdentity: plan.advisoryIdentity,
+                identifiers: plan.identifiers,
+                historyTemplate: plan.historyTemplate,
+                transactionTemplates: [plan.transactionTemplates[0], plan.transactionTemplates[0]]
+            )
+        }
+    }
+
+    @Test func duplicateIncomingIdentifierCandidatesAreRejectedDeterministicallyAcrossProviders() throws {
+        try assertPlanRejectedAcrossProviders { token in
+            let plan = confirmedImportPlan(generationToken: token, suffix: "duplicate-identifiers")
+            return ConfirmedImportPlanDTO(
+                providerGeneration: plan.providerGeneration,
+                workspace: plan.workspace,
+                proposedAccount: plan.proposedAccount,
+                accountChoice: plan.accountChoice,
+                advisoryIdentity: plan.advisoryIdentity,
+                identifiers: [plan.identifiers[0], plan.identifiers[0]],
+                historyTemplate: plan.historyTemplate,
+                transactionTemplates: plan.transactionTemplates
+            )
+        }
+    }
+
     @Test func sqliteBusyAndLockedErrorsAreRecognizedWithoutDiagnosticLeakage() {
         let busy = SQLiteExecutionError(primaryCode: SQLITE_BUSY, extendedCode: SQLITE_BUSY, operation: .transaction)
         let locked = SQLiteExecutionError(primaryCode: SQLITE_LOCKED, extendedCode: SQLITE_LOCKED, operation: .statement)
@@ -93,4 +190,26 @@ struct ConfirmedImportRepositoryContractTests {
             createdAtISO: "2026-07-20T00:00:00Z"
         )
     }
+}
+
+private func assertPlanRejectedAcrossProviders(
+    _ makePlan: (ProviderGenerationToken) -> ConfirmedImportPlanDTO
+) throws {
+    let memory = InMemoryRepositoryProvider()
+    let memoryPlan = makePlan(memory.generationToken)
+    #expect(memory.confirmedImportRepo.commitConfirmedImport(memoryPlan) == .repositoryIntegrityConflict)
+    #expect(try memory.workspaceRepo.workspace(id: memoryPlan.workspace.id) == nil)
+    #expect(try memory.accountRepo.accounts(workspaceId: memoryPlan.workspace.id).isEmpty)
+    #expect(try memory.importSessionRepo.importAttempts(workspaceId: memoryPlan.workspace.id).isEmpty)
+
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let sqlite = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("contract.sqlite").path, migrations: allMigrations)
+    defer { sqlite.database.close() }
+    let sqlitePlan = makePlan(sqlite.generationToken)
+    #expect(sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan) == .repositoryIntegrityConflict)
+    #expect(try sqlite.workspaceRepo.workspace(id: sqlitePlan.workspace.id) == nil)
+    #expect(try sqlite.accountRepo.accounts(workspaceId: sqlitePlan.workspace.id).isEmpty)
+    #expect(try sqlite.importSessionRepo.importAttempts(workspaceId: sqlitePlan.workspace.id).isEmpty)
 }

@@ -4,24 +4,25 @@ import Foundation
 
 /// Opaque provider identity captured with a prepared import. It has no display
 /// representation and is compared only for equality.
-public struct ProviderGenerationToken: Equatable, Hashable, Sendable {
+public struct ProviderGenerationToken: nonisolated Equatable, Hashable, Sendable {
     fileprivate let value: UUID
     public init() { value = UUID() }
 }
 
-public enum ConfirmedImportAccountChoiceDTO: Equatable, Sendable {
+public enum ConfirmedImportAccountChoiceDTO: nonisolated Equatable, Sendable {
+    case unspecified
     case createProposedAccount
     case useExistingAccount(accountId: String)
 }
 
-public enum ConfirmedImportAdvisoryIdentityDTO: Equatable, Sendable {
+public enum ConfirmedImportAdvisoryIdentityDTO: nonisolated Equatable, Sendable {
     case resolved(accountId: String)
     case noMatch
     case ambiguous
     case conflict
 }
 
-public struct ConfirmedImportIdentifierCandidateDTO: Equatable, Sendable {
+public struct ConfirmedImportIdentifierCandidateDTO: nonisolated Equatable, Sendable {
     public let scheme: String
     public let normalizedValue: String
     public let provenanceCode: String
@@ -36,17 +37,17 @@ public struct ConfirmedImportIdentifierCandidateDTO: Equatable, Sendable {
 /// Parser-produced, transient evidence transported only until the confirmed
 /// provider has selected the final durable account. It is deliberately not a
 /// persistence DTO and must never be serialized into history or diagnostics.
-public enum ConfirmedImportTransactionEventEvidenceDTO: Equatable, Sendable {
+public enum ConfirmedImportTransactionEventEvidenceDTO: nonisolated Equatable, Sendable {
     case axisUPI(ConfirmedImportAxisUPIEventEvidenceDTO)
 }
 
-public struct ConfirmedImportAxisUPIEventEvidenceDTO: Equatable, Sendable {
-    public enum Operation: String, Equatable, Sendable {
+public struct ConfirmedImportAxisUPIEventEvidenceDTO: nonisolated Equatable, Sendable {
+    public enum Operation: String, nonisolated Equatable, Sendable {
         case p2a
         case p2m
     }
 
-    public enum LedgerSubtype: String, Equatable, Sendable {
+    public enum LedgerSubtype: String, nonisolated Equatable, Sendable {
         case posting
         case creditAdjustment = "credit-adjustment"
     }
@@ -55,7 +56,7 @@ public struct ConfirmedImportAxisUPIEventEvidenceDTO: Equatable, Sendable {
     public let reference: String
     public let subtype: LedgerSubtype
 
-    public init(operation: Operation, reference: String, subtype: LedgerSubtype) {
+    public nonisolated init(operation: Operation, reference: String, subtype: LedgerSubtype) {
         self.operation = operation
         self.reference = reference
         self.subtype = subtype
@@ -64,7 +65,7 @@ public struct ConfirmedImportAxisUPIEventEvidenceDTO: Equatable, Sendable {
 
 /// Account-independent input. The provider assigns the final account before it
 /// derives any event identity.
-public struct ConfirmedImportTransactionTemplateDTO: Equatable, Sendable {
+public struct ConfirmedImportTransactionTemplateDTO: nonisolated Equatable, Sendable {
     public let transaction: TransactionDTO
     public let eventEvidence: ConfirmedImportTransactionEventEvidenceDTO?
 
@@ -81,7 +82,7 @@ public struct ConfirmedImportTransactionTemplateDTO: Equatable, Sendable {
     public var isAccountIndependent: Bool { transaction.accountId == nil }
 }
 
-public struct IdentifierObservationDTO: Equatable, Sendable {
+public struct IdentifierObservationDTO: nonisolated Equatable, Sendable {
     public let ownershipId: String
     public let importSessionId: String
     public let documentId: String
@@ -102,7 +103,7 @@ public struct IdentifierObservationDTO: Equatable, Sendable {
 /// Account-independent history inputs. The provider composes the final
 /// `AtomicImportHistoryDTO` only after it has resolved an account and derived
 /// final transaction-event identities.
-public struct ConfirmedImportHistoryTemplateDTO: Equatable, Sendable {
+public struct ConfirmedImportHistoryTemplateDTO: nonisolated Equatable, Sendable {
     public let document: ImportedDocumentDTO
     public let fingerprint: DocumentFingerprintDTO
     public let importSession: ImportSessionDTO
@@ -124,7 +125,7 @@ public struct ConfirmedImportHistoryTemplateDTO: Equatable, Sendable {
     }
 }
 
-public struct ConfirmedImportPlanDTO: Equatable, Sendable {
+public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
     public let providerGeneration: ProviderGenerationToken
     public let workspace: WorkspaceDTO
     public let proposedAccount: AccountDTO
@@ -146,7 +147,7 @@ public struct ConfirmedImportPlanDTO: Equatable, Sendable {
     }
 }
 
-public struct ConfirmedImportReceiptDTO: Equatable, Sendable {
+public struct ConfirmedImportReceiptDTO: nonisolated Equatable, Sendable {
     public let workspaceId: String
     public let accountId: String
     public let importSessionId: String
@@ -160,7 +161,7 @@ public struct ConfirmedImportReceiptDTO: Equatable, Sendable {
     }
 }
 
-public enum ConfirmedImportRepositoryResult: Equatable, Sendable, CustomStringConvertible {
+public enum ConfirmedImportRepositoryResult: nonisolated Equatable, Sendable, CustomStringConvertible {
     case committed(ConfirmedImportReceiptDTO)
     case exactDuplicate
     case repeatedIncomingEventEvidence

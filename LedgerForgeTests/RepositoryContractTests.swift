@@ -797,7 +797,8 @@ struct RepositoryContractTests {
         v3Database.close()
 
         let provider = try SQLiteRepositoryProvider(path: databasePath)
-        #expect(try provider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 4)
+        defer { provider.database.close() }
+        #expect(try provider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == allMigrations.map(\.version).max())
         #expect(try provider.database.queryInt("SELECT COUNT(*) FROM import_attempts;") == 1)
         #expect(try provider.database.query(sql: "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_import_attempts_workspace_created';") { _ in true }.count == 1)
         let foreignKeyTables = try provider.database.query(sql: "PRAGMA foreign_key_list(import_attempts);") { $0.string(at: 2) ?? "" }
@@ -838,7 +839,8 @@ struct RepositoryContractTests {
         }
 
         let reopenedProvider = try SQLiteRepositoryProvider(path: databasePath)
-        #expect(try reopenedProvider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 4)
+        defer { reopenedProvider.database.close() }
+        #expect(try reopenedProvider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == allMigrations.map(\.version).max())
         #expect(try reopenedProvider.importSessionRepo.importAttempts(workspaceId: workspaceID) == attempts)
         #expect(try reopenedProvider.database.queryInt("SELECT COUNT(*) FROM import_attempts;") == 1)
         #expect(try reopenedProvider.database.queryInt("SELECT COUNT(*) FROM transactions;") == 2)

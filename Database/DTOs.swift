@@ -3,13 +3,13 @@
 
 import Foundation
 
-nonisolated enum ImportAttemptOutcome: String, CaseIterable { case successfulImport = "successful_import", validationFailure = "validation_failure", persistenceFailure = "persistence_failure", exactStatementDuplicate = "exact_statement_duplicate", existingEligibleAxisUPIEvent = "existing_eligible_axis_upi_event", repeatedEligibleIncomingEvidence = "repeated_eligible_incoming_evidence", transactionEventOwnershipConflict = "transaction_event_ownership_conflict", repositoryIntegrityConflict = "repository_integrity_conflict" }
+nonisolated enum ImportAttemptOutcome: String, CaseIterable { case successfulImport = "successful_import", validationFailure = "validation_failure", persistenceFailure = "persistence_failure", exactStatementDuplicate = "exact_statement_duplicate", existingEligibleAxisUPIEvent = "existing_eligible_axis_upi_event", repeatedEligibleIncomingEvidence = "repeated_eligible_incoming_evidence", transactionEventOwnershipConflict = "transaction_event_ownership_conflict", repositoryIntegrityConflict = "repository_integrity_conflict", identityAmbiguity = "identity_ambiguity", identityConflict = "identity_conflict", staleAccountChoice = "stale_account_choice", staleProviderGeneration = "stale_provider_generation", sqliteContention = "sqlite_contention" }
 nonisolated enum ImportAttemptCoverage: String { case evaluatedSupportedOnly = "evaluated_supported_only", unsupportedOrUnevaluated = "unsupported_or_unevaluated" }
 nonisolated enum ImportAttemptAccountDecision: String { case resolvedOrCreated = "resolved_or_created", selectedExisting = "selected_existing", noFinancialMutation = "no_financial_mutation", sideEffectsMayExist = "side_effects_may_exist" }
-nonisolated enum ImportAttemptGuidance: String { case importCompleted = "import_completed", reviewPriorImport = "review_prior_import", supportedEventBlocked = "supported_event_blocked", correctValidationAndRetry = "correct_validation_and_retry", persistenceUnavailable = "persistence_unavailable", integrityReviewRequired = "integrity_review_required" }
+nonisolated enum ImportAttemptGuidance: String { case importCompleted = "import_completed", reviewPriorImport = "review_prior_import", supportedEventBlocked = "supported_event_blocked", correctValidationAndRetry = "correct_validation_and_retry", persistenceUnavailable = "persistence_unavailable", integrityReviewRequired = "integrity_review_required", prepareAgain = "prepare_again", retryConfirmation = "retry_confirmation" }
 nonisolated enum ImportAttemptPersistence: String { case committed, rejectedRecorded = "rejected_recorded", rejectedNotRecorded = "rejected_not_recorded", auditWriteUnavailable = "audit_write_unavailable" }
 
-public struct WorkspaceDTO: nonisolated Equatable {
+public struct WorkspaceDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let name: String
     public let createdAtISO: String
@@ -26,7 +26,7 @@ public struct WorkspaceDTO: nonisolated Equatable {
     }
 }
 
-public struct TransactionRawRowDTO: nonisolated Equatable {
+public struct TransactionRawRowDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let normalizedRowId: String
     public let contributionType: String?
@@ -38,7 +38,7 @@ public struct TransactionRawRowDTO: nonisolated Equatable {
     }
 }
 
-public struct TransactionDTO: nonisolated Equatable {
+public struct TransactionDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let workspaceId: String
     public let accountId: String?
@@ -109,7 +109,7 @@ public struct TransactionDTO: nonisolated Equatable {
     }
 }
 
-public struct AccountDTO: nonisolated Equatable {
+public struct AccountDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let workspaceId: String
     public let name: String
@@ -170,7 +170,7 @@ public struct AccountIdentifierDTO: nonisolated Equatable {
     }
 }
 
-public struct ImportSessionDTO: nonisolated Equatable {
+public struct ImportSessionDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let workspaceId: String
     public let userVisibleName: String?
@@ -231,7 +231,7 @@ public struct ImportSessionRecordDTO: nonisolated Equatable {
     }
 }
 
-public struct ImportedDocumentDTO: nonisolated Equatable {
+public struct ImportedDocumentDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let workspaceId: String
     public let importSessionId: String
@@ -262,7 +262,7 @@ public struct ImportedDocumentDTO: nonisolated Equatable {
     }
 }
 
-public struct DocumentFingerprintDTO: nonisolated Equatable {
+public struct DocumentFingerprintDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let documentId: String
     public let importSessionId: String
@@ -345,7 +345,7 @@ public struct TransactionEventIdentityOwnerDTO: nonisolated Equatable {
 /// Privacy-safe durable record of a processing attempt. These fields are intentionally
 /// bounded codes and trusted repository relationships; source evidence never crosses
 /// this boundary.
-public struct ImportAttemptDTO: nonisolated Equatable, Identifiable {
+public struct ImportAttemptDTO: nonisolated Equatable, Identifiable, Sendable {
     public let id: String
     public let workspaceId: String
     public let createdAtISO: String

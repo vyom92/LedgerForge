@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import LedgerForge
 
+@MainActor
 struct MigrationChainIntegrityTests {
     @Test func registeredChainRejectsDuplicateVersion() {
         let migrations = [
@@ -36,10 +37,10 @@ struct MigrationChainIntegrityTests {
         }
     }
 
-    @Test func currentV1ThroughV4RegistrationIsValidAndDeterministic() throws {
+    @Test func currentV1ThroughV5RegistrationIsValidAndDeterministic() throws {
         try MigrationChainValidator.validateRegistered(allMigrations)
 
-        #expect(allMigrations.map(\.version) == [1, 2, 3, 4])
+        #expect(allMigrations.map(\.version) == [1, 2, 3, 4, 5])
         #expect(allMigrations.map(\.checksum).allSatisfy { $0.count == 64 })
         #expect(allMigrations.map(\.checksum) == allMigrations.map(\.checksum))
     }
@@ -76,22 +77,25 @@ struct MigrationChainIntegrityTests {
         }
     }
 
-    @Test(arguments: [
-        PersistedMigrationRecord(version: nil, name: migrationV1.name, checksum: migrationV1.checksum, appliedAt: "2026-07-20T00:00:00Z"),
-        PersistedMigrationRecord(version: 1, name: nil, checksum: migrationV1.checksum, appliedAt: "2026-07-20T00:00:00Z"),
-        PersistedMigrationRecord(version: 1, name: migrationV1.name, checksum: nil, appliedAt: "2026-07-20T00:00:00Z"),
-        PersistedMigrationRecord(version: 1, name: migrationV1.name, checksum: migrationV1.checksum, appliedAt: nil)
-    ])
-    func persistedHistoryRejectsNullOrIncompleteRecord(_ incomplete: PersistedMigrationRecord) {
-        #expect(throws: MigrationIntegrityError.persistedRecordIncomplete(incomplete.version)) {
-            try MigrationChainValidator.validatePersisted([incomplete], against: allMigrations, requiresCompleteChain: false)
+    @Test func persistedHistoryRejectsNullOrIncompleteRecord() {
+        let incompleteRecords = [
+            PersistedMigrationRecord(version: nil, name: migrationV1.name, checksum: migrationV1.checksum, appliedAt: "2026-07-20T00:00:00Z"),
+            PersistedMigrationRecord(version: 1, name: nil, checksum: migrationV1.checksum, appliedAt: "2026-07-20T00:00:00Z"),
+            PersistedMigrationRecord(version: 1, name: migrationV1.name, checksum: nil, appliedAt: "2026-07-20T00:00:00Z"),
+            PersistedMigrationRecord(version: 1, name: migrationV1.name, checksum: migrationV1.checksum, appliedAt: nil)
+        ]
+
+        for incomplete in incompleteRecords {
+            #expect(throws: MigrationIntegrityError.persistedRecordIncomplete(incomplete.version)) {
+                try MigrationChainValidator.validatePersisted([incomplete], against: allMigrations, requiresCompleteChain: false)
+            }
         }
     }
 
     @Test func persistedHistoryRejectsUnsupportedFutureVersion() {
-        let future = PersistedMigrationRecord(version: 5, name: "future", checksum: String(repeating: "f", count: 64), appliedAt: "2026-07-20T00:00:00Z")
+        let future = PersistedMigrationRecord(version: 6, name: "future", checksum: String(repeating: "f", count: 64), appliedAt: "2026-07-20T00:00:00Z")
 
-        #expect(throws: MigrationIntegrityError.unsupportedFutureVersion(5)) {
+        #expect(throws: MigrationIntegrityError.unsupportedFutureVersion(6)) {
             try MigrationChainValidator.validatePersisted(allMigrations.map(record(for:)) + [future], against: allMigrations, requiresCompleteChain: false)
         }
     }
@@ -117,7 +121,7 @@ struct MigrationChainIntegrityTests {
         )
     }
 
-    @Test func freshDatabaseCreatesOneExactV1ThroughV4History() throws {
+    @Test func freshDatabaseCreatesOneExactV1ThroughV5History() throws {
         try withTemporaryDatabase(named: "Fresh") { path in
             let provider = try SQLiteRepositoryProvider(path: path)
             defer { provider.database.close() }
@@ -191,10 +195,10 @@ struct MigrationChainIntegrityTests {
         try withTamperedCurrentDatabase(named: "Future") { database in
             try database.executePrepared(
                 sql: "INSERT INTO schema_migrations(version, name, applied_at, checksum) VALUES(?, ?, ?, ?);",
-                params: [5, "future", "2026-07-20T00:00:00Z", String(repeating: "f", count: 64)]
+                params: [6, "future", "2026-07-20T00:00:00Z", String(repeating: "f", count: 64)]
             )
         } assertReopen: {
-            MigrationIntegrityError.unsupportedFutureVersion(5)
+            MigrationIntegrityError.unsupportedFutureVersion(6)
         }
     }
 

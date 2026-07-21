@@ -94,6 +94,7 @@
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
 		B50000053050000000000001 /* SQLiteConfirmedImportRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000043050000000000001 /* SQLiteConfirmedImportRepository.swift */; };
+		C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */; };
 		B60000013050000000000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000003050000000000001 /* main.swift */; };
 		B60000023050000000000001 /* Repository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1362FFC4160006E7424 /* Repository.swift */; };
 		B60000033050000000000001 /* SQLiteDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1372FFC4184006E7424 /* SQLiteDatabase.swift */; };
@@ -241,6 +242,7 @@
 		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
 		B50000043050000000000001 /* SQLiteConfirmedImportRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteConfirmedImportRepository.swift; sourceTree = "<group>"; };
+		C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImportReconciliationGate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -494,6 +496,7 @@
 				288EB0E52FF7A6C000F09BC9 /* Services/ImportEngine.swift */,
 				28E945442FFD671F00FB69E4 /* ImportPersistenceMapper.swift */,
 				28E945462FFD673000FB69E4 /* ImportPersistenceCoordinator.swift */,
+				C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */,
 				A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */,
 				28D11EA92FFDA6CB00C12A68 /* RepositoryStoreHydrator.swift */,
 				37A100102FFDA6CB00C12A68 /* AccountMetadataCoordinator.swift */,
@@ -846,6 +849,7 @@
 				288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */,
 				281BB1612FFC4A84006E7424 /* InMemoryRepositoryProvider.swift in Sources */,
 				28E945472FFD673000FB69E4 /* ImportPersistenceCoordinator.swift in Sources */,
+				C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */,
 				A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */,
 				286242592FFCE80D00B8AA66 /* DefaultReaderRegistry.swift in Sources */,
 				2862425F2FFCE80D00B8AA66 /* PDFDocumentReader.swift in Sources */,

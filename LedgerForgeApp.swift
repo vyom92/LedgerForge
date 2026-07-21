@@ -23,9 +23,11 @@ struct LedgerForgeApp: App {
 
     @discardableResult
     static func configurePersistence(path: String? = nil) -> Bool {
+        sqliteProvider?.database.close()
 #if DEBUG
-        DatabaseProvider.shared.invalidateGeneration()
+        DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
 #endif
+        DatabaseProvider.shared.invalidateGeneration()
         DatabaseProvider.shared = .unavailable(reason: .notInitialized)
         sqliteProvider = nil
         do {
@@ -45,7 +47,11 @@ struct LedgerForgeApp: App {
     }
 
     static func configureInMemoryPersistenceForTesting() {
+#if DEBUG
+        DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
+#endif
         sqliteProvider?.database.close()
+        DatabaseProvider.shared.invalidateGeneration()
         DatabaseProvider.shared = .intentionalNonDurable(.testMemory)
         sqliteProvider = nil
     }

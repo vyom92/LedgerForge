@@ -88,6 +88,15 @@ protocol ImportPersistenceCoordinating {
         fingerprint: ExactStatementFingerprint,
         accountChoice: ImportAccountChoice?
     ) throws -> ImportPersistenceResult
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ImportPersistenceResult
 }
 
 enum ImportAccountChoice: Equatable {
@@ -116,6 +125,23 @@ extension ImportPersistenceCoordinating {
         accountChoice: ImportAccountChoice? = nil
     ) throws -> ImportPersistenceResult {
         throw ImportPersistenceCoordinationError.fingerprintRequired
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ImportPersistenceResult {
+        try persistValidatedImport(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            fingerprint: fingerprint,
+            accountChoice: accountChoice
+        )
     }
 
     func reviewValidatedImport(
@@ -152,6 +178,12 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
     case ineligibleIdentifierSet
     case fingerprintRequired
     case invalidFingerprint
+    case identifierOwnershipConflict
+    case staleIdentityDecision
+    case staleProviderGeneration
+    case retryableContention
+    case persistenceUnavailable
+    case repositoryIntegrityConflict
 
     var errorDescription: String? {
         switch self {
@@ -179,6 +211,18 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
             return "Confirmed import persistence requires an exact-content fingerprint."
         case .invalidFingerprint:
             return "The prepared exact-content fingerprint is invalid."
+        case .identifierOwnershipConflict:
+            return "Verified identifier ownership conflicts; no financial history was written."
+        case .staleIdentityDecision:
+            return "The prepared account decision is no longer current."
+        case .staleProviderGeneration:
+            return "Persistence changed after preparation; prepare the import again."
+        case .retryableContention:
+            return "Persistence is busy. Retry confirmation."
+        case .persistenceUnavailable:
+            return "Persistence is unavailable. No financial history was written."
+        case .repositoryIntegrityConflict:
+            return "Repository integrity prevented confirmation. No financial history was written."
         }
     }
 }
@@ -194,56 +238,46 @@ struct ImportPersistenceCommitFailure: Error, LocalizedError {
 
 final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
 
-    private static let confirmationSerializationLock = NSLock()
-
-    private enum AccountSelection {
-        case existing(AccountDTO)
-        case new(accountId: String)
-
-        var accountId: String {
-            switch self {
-            case .existing(let account):
-                return account.id
-            case .new(let accountId):
-                return accountId
-            }
-        }
-    }
-
-    private let workspaceRepo: WorkspaceRepository
-    private let accountRepo: AccountRepository
-    private let importSessionRepo: ImportSessionRepository
-    private let transactionRepo: TransactionRepository
+    private let databaseProviderProvider: () -> DatabaseProvider
     private let mapper: ImportPersistenceMapper
     private let developerConsole: DeveloperConsole?
 
     init(
-        workspaceRepo: WorkspaceRepository,
-        accountRepo: AccountRepository,
-        importSessionRepo: ImportSessionRepository,
-        transactionRepo: TransactionRepository,
+        databaseProviderProvider: @escaping () -> DatabaseProvider = { DatabaseProvider.shared },
         mapper: ImportPersistenceMapper = ImportPersistenceMapper(),
         developerConsole: DeveloperConsole? = .shared
     ) {
-        self.workspaceRepo = workspaceRepo
-        self.accountRepo = accountRepo
-        self.importSessionRepo = importSessionRepo
-        self.transactionRepo = transactionRepo
+        self.databaseProviderProvider = databaseProviderProvider
         self.mapper = mapper
         self.developerConsole = developerConsole
     }
 
     convenience init(
-        databaseProvider: DatabaseProvider = .shared,
+        databaseProvider: DatabaseProvider,
         mapper: ImportPersistenceMapper = ImportPersistenceMapper()
     ) {
-        self.init(
-            workspaceRepo: databaseProvider.workspaceRepo,
-            accountRepo: databaseProvider.accountRepo,
-            importSessionRepo: databaseProvider.importSessionRepo,
-            transactionRepo: databaseProvider.transactionRepo,
-            mapper: mapper
+        self.init(databaseProviderProvider: { databaseProvider }, mapper: mapper)
+    }
+
+    convenience init(
+        workspaceRepo: WorkspaceRepository,
+        accountRepo: AccountRepository,
+        importSessionRepo: ImportSessionRepository,
+        transactionRepo: TransactionRepository,
+        confirmedImportRepo: ConfirmedImportRepository = PlaceholderConfirmedImportRepo(),
+        generationToken: ProviderGenerationToken = ProviderGenerationToken(),
+        mapper: ImportPersistenceMapper = ImportPersistenceMapper(),
+        developerConsole: DeveloperConsole? = .shared
+    ) {
+        let provider = DatabaseProvider(
+            workspaceRepo: workspaceRepo,
+            transactionRepo: transactionRepo,
+            accountRepo: accountRepo,
+            importSessionRepo: importSessionRepo,
+            confirmedImportRepo: confirmedImportRepo,
+            generationToken: generationToken
         )
+        self.init(databaseProviderProvider: { provider }, mapper: mapper, developerConsole: developerConsole)
     }
 
     func persistValidatedImport(
@@ -265,8 +299,9 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
     ) throws -> ImportIdentityReview {
         guard validation.passed else { return .unavailable }
 
+        let provider = databaseProviderProvider()
         let workspaceId = mapper.workspaceId
-        let resolution = try resolver().resolve(
+        let resolution = try resolver(accountRepo: provider.accountRepo).resolve(
             workspaceId: workspaceId,
             identifiers: financialDocument.financialIdentifiers
         )
@@ -275,8 +310,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             return .unavailable
         }
 
-        let eligibleAccountIds = try accountRepo.accounts(workspaceId: workspaceId)
-            .filter { try accountRepo.identifiers(accountId: $0.id, workspaceId: workspaceId).isEmpty }
+        let eligibleAccountIds = try provider.accountRepo.accounts(workspaceId: workspaceId)
+            .filter { try provider.accountRepo.identifiers(accountId: $0.id, workspaceId: workspaceId).isEmpty }
             .map(\.id)
             .sorted()
         developerConsole?.info(.import, "Identity review available", metadata: ["eligibleAccounts": "\(eligibleAccountIds.count)"])
@@ -297,7 +332,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
 
     func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
         try validate(fingerprint: fingerprint)
-        return try importSessionRepo.priorImportedStatement(
+        return try databaseProviderProvider().importSessionRepo.priorImportedStatement(
             algorithm: fingerprint.algorithm,
             fingerprint: fingerprint.digest
         ).map(Self.previousImport(from:))
@@ -305,10 +340,10 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
 
     func recordValidationFailure(fileName: String, transactionCount: Int) -> String? {
         do {
-            if try workspaceRepo.workspace(id: mapper.workspaceId) == nil {
-                _ = try workspaceRepo.upsertWorkspace(mapper.workspace(createdAt: Date()))
-            }
+            let provider = databaseProviderProvider()
+            guard try provider.workspaceRepo.workspace(id: mapper.workspaceId) != nil else { return nil }
             return recordAttempt(
+                provider: provider,
                 outcome: .validationFailure, coverage: .unsupportedOrUnevaluated,
                 decision: .noFinancialMutation, guidance: .correctValidationAndRetry,
                 persistence: .rejectedRecorded, transactionCount: transactionCount
@@ -325,212 +360,91 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         fingerprint: ExactStatementFingerprint,
         accountChoice: ImportAccountChoice? = nil
     ) throws -> ImportPersistenceResult {
+        try persistValidatedImport(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            fingerprint: fingerprint,
+            accountChoice: accountChoice,
+            providerGeneration: databaseProviderProvider().generationToken
+        )
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice? = nil,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ImportPersistenceResult {
         guard validation.passed else {
             return .skipped
         }
 
         try validate(fingerprint: fingerprint)
-        Self.confirmationSerializationLock.lock()
-        defer { Self.confirmationSerializationLock.unlock() }
-
-        if let previous = try importSessionRepo.priorImportedStatement(
-            algorithm: fingerprint.algorithm,
-            fingerprint: fingerprint.digest
-        ) {
-            developerConsole?.info(.import, "Previously imported statement blocked", metadata: [
-                "algorithm": fingerprint.algorithm,
-                "transactions": "\(previous.transactionCount)"
-            ])
-            let attemptID = recordAttempt(outcome: .exactStatementDuplicate, coverage: .evaluatedSupportedOnly,
-                                          decision: .noFinancialMutation, guidance: .reviewPriorImport,
-                                          persistence: .rejectedRecorded, transactionCount: previous.transactionCount,
-                                          accountId: previous.accountId, relatedImportSessionId: previous.importSessionId)
-            return ImportPersistenceResult(
-                persisted: false,
-                workspaceId: mapper.workspaceId,
-                accountId: previous.accountId,
-                importSessionId: previous.importSessionId,
-                transactionCount: previous.transactionCount,
-                previousImport: Self.previousImport(from: previous), importAttemptId: attemptID
-            )
+        let provider = databaseProviderProvider()
+        guard provider.persistenceState.isUsable else {
+            throw ImportPersistenceCoordinationError.persistenceUnavailable
         }
-
         let workspaceId = mapper.workspaceId
-        let resolution = try resolver().resolve(
+        let resolution = try resolver(accountRepo: provider.accountRepo).resolve(
             workspaceId: workspaceId,
             identifiers: financialDocument.financialIdentifiers
         )
-
-        let selection: AccountSelection
+        let advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO
+        let confirmedChoice: ConfirmedImportAccountChoiceDTO
+        let selectedAccountId: String
         switch resolution {
         case .resolved(let accountId):
-            guard let existingAccount = try accountRepo.account(id: accountId) else {
-                throw ImportPersistenceCoordinationError.resolvedAccountUnavailable
-            }
-            guard existingAccount.workspaceId == workspaceId else {
-                throw ImportPersistenceCoordinationError.resolvedAccountWorkspaceMismatch
-            }
-            guard try workspaceRepo.workspace(id: workspaceId) != nil else {
-                throw ImportPersistenceCoordinationError.resolvedWorkspaceUnavailable
-            }
-            selection = .existing(existingAccount)
-
+            advisoryIdentity = .resolved(accountId: accountId)
+            confirmedChoice = .useExistingAccount(accountId: accountId)
+            selectedAccountId = accountId
         case .noMatch:
-            if let identifier = eligibleIdentifier(in: financialDocument) {
-                guard let accountChoice else {
-                    throw ImportPersistenceCoordinationError.explicitChoiceRequired
-                }
+            advisoryIdentity = .noMatch
+            let proposedID = "account-\(importSession.id.uuidString.lowercased())"
+            if !FinancialIdentityResolver.strongVerifiedIdentifiers(from: financialDocument.financialIdentifiers).isEmpty {
                 switch accountChoice {
                 case .useExistingAccount(let accountId):
-                    guard try workspaceRepo.workspace(id: workspaceId) != nil else {
-                        throw ImportPersistenceCoordinationError.resolvedWorkspaceUnavailable
-                    }
-                    guard let account = try accountRepo.account(id: accountId) else {
-                        throw ImportPersistenceCoordinationError.selectedAccountUnavailable
-                    }
-                    guard account.workspaceId == workspaceId else {
-                        throw ImportPersistenceCoordinationError.selectedAccountWorkspaceMismatch
-                    }
-                    guard try accountRepo.identifiers(accountId: accountId, workspaceId: workspaceId).isEmpty else {
-                        throw ImportPersistenceCoordinationError.selectedAccountAlreadyIdentified
-                    }
-                    let owners = try accountRepo.accountIds(
-                        workspaceId: workspaceId,
-                        scheme: identifier.kind.rawValue,
-                        identifier: identifier.normalizedValue
-                    )
-                    guard owners.isEmpty else {
-                        throw ImportPersistenceCoordinationError.ineligibleIdentifierSet
-                    }
-                    selection = .existing(account)
-                    developerConsole?.info(.import, "Explicit existing-account choice requested")
+                    confirmedChoice = .useExistingAccount(accountId: accountId)
+                    selectedAccountId = accountId
                 case .createNewAccount:
-                    selection = .new(accountId: "account-\(importSession.id.uuidString.lowercased())")
-                    developerConsole?.info(.import, "Explicit create-new-account choice requested")
+                    confirmedChoice = .createProposedAccount
+                    selectedAccountId = proposedID
+                case nil:
+                    confirmedChoice = .unspecified
+                    selectedAccountId = proposedID
                 }
             } else {
-                selection = .new(accountId: "account-\(importSession.id.uuidString.lowercased())")
+                confirmedChoice = .createProposedAccount
+                selectedAccountId = proposedID
             }
-
         case .ambiguous:
-            throw ImportPersistenceCoordinationError.ambiguousIdentity
-
+            advisoryIdentity = .ambiguous
+            confirmedChoice = .unspecified
+            selectedAccountId = "account-\(importSession.id.uuidString.lowercased())"
         case .conflict:
-            throw ImportPersistenceCoordinationError.conflictingIdentity
+            advisoryIdentity = .conflict
+            confirmedChoice = .unspecified
+            selectedAccountId = "account-\(importSession.id.uuidString.lowercased())"
         }
 
-        let identities = try financialDocument.transactions.compactMap {
-            try TransactionEventIdentity.make(transaction: $0, accountID: selection.accountId)
-        }
-        let incomingDuplicates = TransactionEventIdentity.incomingDuplicates(in: identities)
-        if !incomingDuplicates.isEmpty {
-            let attemptID = recordAttempt(outcome: .repeatedEligibleIncomingEvidence, coverage: .evaluatedSupportedOnly,
-                                          decision: .noFinancialMutation, guidance: .supportedEventBlocked,
-                                          persistence: .rejectedRecorded, transactionCount: identities.count, accountId: selection.accountId)
-            return ImportPersistenceResult(
-                persisted: false, workspaceId: workspaceId, accountId: selection.accountId,
-                importSessionId: nil, transactionCount: identities.count,
-                transactionEventBlock: .repeatedIncoming(count: incomingDuplicates.count), importAttemptId: attemptID
-            )
-        }
-        let keys = Set(identities.map { TransactionEventIdentityKeyDTO(algorithm: $0.algorithmIdentifier, digest: $0.digest) })
-        let owners = try importSessionRepo.transactionEventOwners(keys: keys)
-        if !owners.isEmpty {
-            if owners.values.contains(where: { $0.accountId != selection.accountId }) {
-                let attemptID = recordAttempt(outcome: .transactionEventOwnershipConflict, coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: .integrityReviewRequired, persistence: .rejectedRecorded, transactionCount: identities.count, accountId: selection.accountId)
-                return ImportPersistenceResult(persisted: false, workspaceId: workspaceId, accountId: selection.accountId, importSessionId: nil, transactionCount: identities.count, transactionEventBlock: .ownershipConflict, importAttemptId: attemptID)
-            }
-            let attemptID = recordAttempt(outcome: .existingEligibleAxisUPIEvent, coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: .supportedEventBlocked, persistence: .rejectedRecorded, transactionCount: identities.count, accountId: selection.accountId)
-            return ImportPersistenceResult(persisted: false, workspaceId: workspaceId, accountId: selection.accountId, importSessionId: nil, transactionCount: identities.count, transactionEventBlock: .existing(count: owners.count), importAttemptId: attemptID)
-        }
-
-        let payload = try mapper.payload(
+        let plan = try mapper.confirmedImportPlan(
             financialDocument: financialDocument,
             importSession: importSession,
             validation: validation,
-            accountId: selection.accountId,
-            fingerprint: fingerprint
+            fingerprint: fingerprint,
+            providerGeneration: providerGeneration,
+            advisoryIdentity: advisoryIdentity,
+            accountChoice: confirmedChoice,
+            selectedAccountId: selectedAccountId
         )
-
-        if case .new = selection {
-            if try workspaceRepo.workspace(id: workspaceId) == nil {
-                _ = try workspaceRepo.upsertWorkspace(payload.workspace)
-            }
-            _ = try accountRepo.upsertAccount(payload.account)
-
-            for identifier in financialDocument.financialIdentifiers where
-                identifier.strength == .strong && identifier.verificationState == .verified {
-                _ = try accountRepo.attachIdentifier(
-                    identifier.repositoryDTO(
-                        accountId: selection.accountId,
-                        workspaceId: workspaceId,
-                        createdAtISO: payload.account.createdAtISO
-                    )
-                )
-            }
-        } else if let identifier = eligibleIdentifier(in: financialDocument) {
-            _ = try accountRepo.attachIdentifier(
-                identifier.repositoryDTO(
-                    accountId: selection.accountId,
-                    workspaceId: workspaceId,
-                    createdAtISO: payload.account.createdAtISO
-                )
-            )
-        }
-
-        let successfulAttempt = ImportAttemptDTO(workspaceId: workspaceId, createdAtISO: payload.completedAtISO,
-            outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
-            accountDecisionCode: {
-                if case .useExistingAccount? = accountChoice { return ImportAttemptAccountDecision.selectedExisting.rawValue }
-                return ImportAttemptAccountDecision.resolvedOrCreated.rawValue
-            }(),
-            guidanceCode: ImportAttemptGuidance.importCompleted.rawValue, persistenceCode: ImportAttemptPersistence.committed.rawValue,
-            transactionCount: payload.transactions.count, accountId: selection.accountId, importSessionId: payload.importSession.id, documentId: payload.document.id)
-        let historyResult: AtomicImportHistoryResult
-        do {
-            historyResult = try importSessionRepo.commitImportHistory(
-            AtomicImportHistoryDTO(
-                document: payload.document,
-                fingerprint: payload.fingerprint,
-                importSession: payload.importSession,
-                completedAtISO: payload.completedAtISO,
-                transactions: payload.transactions,
-                transactionEventIdentities: payload.transactionEventIdentities,
-                successfulAttempt: successfulAttempt
-            )
-            )
-        } catch {
-            let attemptID = recordAttempt(outcome: .persistenceFailure, coverage: .evaluatedSupportedOnly, decision: .sideEffectsMayExist, guidance: .persistenceUnavailable, persistence: .auditWriteUnavailable, transactionCount: payload.transactions.count, accountId: selection.accountId)
-            throw ImportPersistenceCommitFailure(originalError: error, importAttemptId: attemptID)
-        }
-        if case .duplicate(let previous) = historyResult {
-            developerConsole?.info(.import, "Previously imported statement blocked", metadata: [
-                "algorithm": fingerprint.algorithm,
-                "transactions": "\(previous.transactionCount)"
-            ])
-            let attemptID = recordAttempt(outcome: .exactStatementDuplicate, coverage: .evaluatedSupportedOnly, decision: .sideEffectsMayExist, guidance: .reviewPriorImport, persistence: .rejectedRecorded, transactionCount: previous.transactionCount, accountId: previous.accountId, relatedImportSessionId: previous.importSessionId)
-            return ImportPersistenceResult(
-                persisted: false,
-                workspaceId: workspaceId,
-                accountId: previous.accountId,
-                importSessionId: previous.importSessionId,
-                transactionCount: previous.transactionCount,
-                previousImport: Self.previousImport(from: previous), importAttemptId: attemptID
-            )
-        }
-
-        developerConsole?.info(.database, "Atomic import-history commit completed", metadata: [
-            "algorithm": fingerprint.algorithm,
-            "transactions": "\(payload.transactions.count)"
-        ])
-
-        return ImportPersistenceResult(
-            persisted: true,
-            workspaceId: workspaceId,
-            accountId: selection.accountId,
-            importSessionId: payload.importSession.id,
-            transactionCount: payload.transactions.count,
-            previousImport: nil, importAttemptId: successfulAttempt.id
+        let repositoryResult = provider.confirmedImportRepo.commitConfirmedImport(plan)
+        return try map(
+            repositoryResult,
+            provider: provider,
+            plan: plan,
+            fingerprint: fingerprint
         )
     }
 
@@ -552,7 +466,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         )
     }
 
-    private func resolver() -> FinancialIdentityResolver {
+    private func resolver(accountRepo: AccountRepository) -> FinancialIdentityResolver {
         FinancialIdentityResolver(accountRepository: accountRepo, developerConsole: developerConsole)
     }
 
@@ -564,8 +478,76 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         return identifiers[0]
     }
 
+    private func map(
+        _ result: ConfirmedImportRepositoryResult,
+        provider: DatabaseProvider,
+        plan: ConfirmedImportPlanDTO,
+        fingerprint: ExactStatementFingerprint
+    ) throws -> ImportPersistenceResult {
+        let count = plan.transactionTemplates.count
+        switch result {
+        case .committed(let receipt):
+            developerConsole?.info(.database, "Provider-owned confirmed import committed", metadata: ["transactions": "\(count)"])
+            return ImportPersistenceResult(persisted: true, workspaceId: receipt.workspaceId, accountId: receipt.accountId, importSessionId: receipt.importSessionId, transactionCount: count, importAttemptId: plan.historyTemplate.successfulAttempt.id)
+        case .exactDuplicate:
+            let previous = try provider.importSessionRepo.priorImportedStatement(algorithm: fingerprint.algorithm, fingerprint: fingerprint.digest)
+            let attemptID = recordAttempt(provider: provider, outcome: .exactStatementDuplicate, coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: .reviewPriorImport, persistence: .rejectedRecorded, transactionCount: previous?.transactionCount ?? count, accountId: previous?.accountId, relatedImportSessionId: previous?.importSessionId)
+            if let previous {
+                return ImportPersistenceResult(persisted: false, workspaceId: mapper.workspaceId, accountId: previous.accountId, importSessionId: previous.importSessionId, transactionCount: previous.transactionCount, previousImport: Self.previousImport(from: previous), importAttemptId: attemptID)
+            }
+            throw ImportPersistenceCommitFailure(originalError: ImportPersistenceCoordinationError.repositoryIntegrityConflict, importAttemptId: attemptID)
+        case .repeatedIncomingEventEvidence:
+            let attemptID = rejectedAttempt(provider: provider, result: result, count: count, accountId: nil)
+            return ImportPersistenceResult(persisted: false, workspaceId: mapper.workspaceId, accountId: nil, importSessionId: nil, transactionCount: count, transactionEventBlock: .repeatedIncoming(count: 1), importAttemptId: attemptID)
+        case .existingEventDuplicate:
+            let attemptID = rejectedAttempt(provider: provider, result: result, count: count, accountId: nil)
+            let eventCount = plan.transactionTemplates.filter { $0.eventEvidence != nil }.count
+            return ImportPersistenceResult(persisted: false, workspaceId: mapper.workspaceId, accountId: nil, importSessionId: nil, transactionCount: count, transactionEventBlock: .existing(count: max(eventCount, 1)), importAttemptId: attemptID)
+        case .eventOwnershipConflict:
+            let attemptID = rejectedAttempt(provider: provider, result: result, count: count, accountId: nil)
+            return ImportPersistenceResult(persisted: false, workspaceId: mapper.workspaceId, accountId: nil, importSessionId: nil, transactionCount: count, transactionEventBlock: .ownershipConflict, importAttemptId: attemptID)
+        default:
+            let attemptID = rejectedAttempt(provider: provider, result: result, count: count, accountId: nil)
+            throw ImportPersistenceCommitFailure(originalError: coordinationError(for: result), importAttemptId: attemptID)
+        }
+    }
+
+    private func coordinationError(for result: ConfirmedImportRepositoryResult) -> ImportPersistenceCoordinationError {
+        switch result {
+        case .identityAmbiguous: return .ambiguousIdentity
+        case .identityConflict: return .conflictingIdentity
+        case .explicitAccountChoiceRequired: return .explicitChoiceRequired
+        case .selectedAccountUnavailable: return .selectedAccountUnavailable
+        case .selectedAccountIneligible: return .selectedAccountAlreadyIdentified
+        case .selectedAccountWorkspaceMismatch: return .selectedAccountWorkspaceMismatch
+        case .identifierOwnershipConflict: return .identifierOwnershipConflict
+        case .staleIdentityDecision: return .staleIdentityDecision
+        case .staleProviderGeneration: return .staleProviderGeneration
+        case .retryableContention: return .retryableContention
+        case .persistenceUnavailable: return .persistenceUnavailable
+        default: return .repositoryIntegrityConflict
+        }
+    }
+
+    private func rejectedAttempt(provider: DatabaseProvider, result: ConfirmedImportRepositoryResult, count: Int, accountId: String?) -> String? {
+        let outcome: ImportAttemptOutcome
+        let guidance: ImportAttemptGuidance
+        switch result {
+        case .repeatedIncomingEventEvidence: outcome = .repeatedEligibleIncomingEvidence; guidance = .supportedEventBlocked
+        case .existingEventDuplicate: outcome = .existingEligibleAxisUPIEvent; guidance = .supportedEventBlocked
+        case .eventOwnershipConflict: outcome = .transactionEventOwnershipConflict; guidance = .integrityReviewRequired
+        case .identityAmbiguous: outcome = .identityAmbiguity; guidance = .integrityReviewRequired
+        case .identityConflict, .identifierOwnershipConflict: outcome = .identityConflict; guidance = .integrityReviewRequired
+        case .selectedAccountUnavailable, .selectedAccountIneligible, .selectedAccountWorkspaceMismatch, .staleIdentityDecision: outcome = .staleAccountChoice; guidance = .integrityReviewRequired
+        case .staleProviderGeneration: outcome = .staleProviderGeneration; guidance = .prepareAgain
+        case .retryableContention: outcome = .sqliteContention; guidance = .retryConfirmation
+        default: outcome = .repositoryIntegrityConflict; guidance = .integrityReviewRequired
+        }
+        return recordAttempt(provider: provider, outcome: outcome, coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: guidance, persistence: .rejectedRecorded, transactionCount: count, accountId: accountId)
+    }
+
     @discardableResult
-    private func recordAttempt(outcome: ImportAttemptOutcome, coverage: ImportAttemptCoverage,
+    private func recordAttempt(provider: DatabaseProvider, outcome: ImportAttemptOutcome, coverage: ImportAttemptCoverage,
                                decision: ImportAttemptAccountDecision, guidance: ImportAttemptGuidance,
                                persistence: ImportAttemptPersistence, transactionCount: Int,
                                accountId: String? = nil, relatedImportSessionId: String? = nil) -> String? {
@@ -575,6 +557,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             guidanceCode: guidance.rawValue, persistenceCode: persistence.rawValue,
             transactionCount: transactionCount, accountId: accountId,
             relatedImportSessionId: relatedImportSessionId)
-        return try? importSessionRepo.recordImportAttempt(payload)
+        guard (try? provider.workspaceRepo.workspace(id: mapper.workspaceId)) != nil else { return nil }
+        return try? provider.importSessionRepo.recordImportAttempt(payload)
     }
 }

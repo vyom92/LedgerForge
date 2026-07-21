@@ -23,6 +23,12 @@ struct ExactStatementFingerprint: Equatable, Sendable {
 }
 
 struct ImportEngineResult: Equatable {
+    enum HydrationOutcome: Equatable {
+        case notRequired
+        case committedAndHydrated
+        case committedReconciliationRequired
+    }
+
     let fileName: String
     let transactionCount: Int
     let validationPassed: Bool
@@ -34,6 +40,7 @@ struct ImportEngineResult: Equatable {
     let previousImport: PreviouslyImportedStatement?
     let transactionEventBlock: TransactionEventBlock?
     let importAttemptId: String?
+    let hydrationOutcome: HydrationOutcome
 
     init(
         fileName: String,
@@ -46,7 +53,8 @@ struct ImportEngineResult: Equatable {
         redactedIdentifier: String? = nil,
         previousImport: PreviouslyImportedStatement? = nil,
         transactionEventBlock: TransactionEventBlock? = nil,
-        importAttemptId: String? = nil
+        importAttemptId: String? = nil,
+        hydrationOutcome: HydrationOutcome? = nil
     ) {
         self.fileName = fileName
         self.transactionCount = transactionCount
@@ -59,17 +67,20 @@ struct ImportEngineResult: Equatable {
         self.previousImport = previousImport
         self.transactionEventBlock = transactionEventBlock
         self.importAttemptId = importAttemptId
+        self.hydrationOutcome = hydrationOutcome ?? (persisted ? .committedAndHydrated : .notRequired)
     }
 
     var succeeded: Bool {
-        validationPassed && persisted && errorMessage == nil
+        validationPassed && persisted && hydrationOutcome == .committedAndHydrated && errorMessage == nil
     }
 
     var requiresHydration: Bool {
-        persisted && previousImport == nil
+        false
     }
 
     var requiresImportAttemptRefresh: Bool { importAttemptId != nil && !persisted }
+
+    var requiresReconciliation: Bool { hydrationOutcome == .committedReconciliationRequired }
 }
 
 enum ImportEngineCommitError: Error, LocalizedError, Equatable {
@@ -106,6 +117,7 @@ struct PreparedImport: Identifiable {
     let importSession: ImportSession
     let fingerprint: ExactStatementFingerprint
     let advisoryPreviousImport: PreviouslyImportedStatement?
+    let providerGeneration: ProviderGenerationToken
 
     init(
         id: UUID = UUID(),
@@ -119,7 +131,8 @@ struct PreparedImport: Identifiable {
         validation: ImportValidationResult,
         importSession: ImportSession,
         fingerprint: ExactStatementFingerprint? = nil,
-        advisoryPreviousImport: PreviouslyImportedStatement? = nil
+        advisoryPreviousImport: PreviouslyImportedStatement? = nil,
+        providerGeneration: ProviderGenerationToken = DatabaseProvider.shared.generationToken
     ) {
         self.id = id
         self.sourceURL = sourceURL
@@ -133,6 +146,7 @@ struct PreparedImport: Identifiable {
         self.importSession = importSession
         self.fingerprint = fingerprint ?? ExactStatementFingerprint(text: rawContents)
         self.advisoryPreviousImport = advisoryPreviousImport
+        self.providerGeneration = providerGeneration
     }
 
     var transactionCount: Int {
@@ -164,6 +178,10 @@ final class ImportEngine {
     private let importCoordinator: any ImportFramework.ImportCoordinator
     private let importPersistenceCoordinatorFactory: () -> ImportPersistenceCoordinating
     private let persistenceStateProvider: () -> PersistenceState
+    private let providerGenerationProvider: () -> ProviderGenerationToken
+    private let forcedHydration: () throws -> RepositoryStoreHydrationResult
+    private let rejectedAttemptHydration: () throws -> Void
+    private let reconciliationGate: ConfirmedImportReconciliationGate
     private let developerConsole: DeveloperConsole
     private let committedPreparedImportLock = NSLock()
     private var committedPreparedImportIDs: Set<UUID> = []
@@ -178,11 +196,23 @@ final class ImportEngine {
         ),
         importPersistenceCoordinator: ImportPersistenceCoordinating? = nil,
         developerConsole: DeveloperConsole = .shared,
-        persistenceStateProvider: @escaping () -> PersistenceState = { DatabaseProvider.shared.persistenceState }
+        persistenceStateProvider: @escaping () -> PersistenceState = { DatabaseProvider.shared.persistenceState },
+        providerGenerationProvider: @escaping () -> ProviderGenerationToken = { DatabaseProvider.shared.generationToken },
+        forcedHydration: @escaping () throws -> RepositoryStoreHydrationResult = {
+            try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
+        },
+        rejectedAttemptHydration: @escaping () throws -> Void = {
+            try RepositoryStoreHydrator().hydrateImportAttempts()
+        },
+        reconciliationGate: ConfirmedImportReconciliationGate = ConfirmedImportReconciliationGate()
     ) {
         self.importCoordinator = importCoordinator
         self.developerConsole = developerConsole
         self.persistenceStateProvider = persistenceStateProvider
+        self.providerGenerationProvider = providerGenerationProvider
+        self.forcedHydration = forcedHydration
+        self.rejectedAttemptHydration = rejectedAttemptHydration
+        self.reconciliationGate = reconciliationGate
         if let importPersistenceCoordinator {
             self.importPersistenceCoordinatorFactory = {
                 importPersistenceCoordinator
@@ -249,6 +279,7 @@ final class ImportEngine {
         guard persistenceStateProvider().isUsable else {
             throw PersistenceWorkflowError.unavailable
         }
+        let preparationGeneration = providerGenerationProvider()
 #if DEBUG
         let lifecycleLease = try DevelopmentDatabaseActivityGate.shared.begin(.importPreparation)
         var transfersLifecycleLease = false
@@ -357,7 +388,8 @@ final class ImportEngine {
             validation: validation,
             importSession: importSession,
             fingerprint: fingerprint,
-            advisoryPreviousImport: advisoryPreviousImport
+            advisoryPreviousImport: advisoryPreviousImport,
+            providerGeneration: preparationGeneration
         )
 #if DEBUG
         lifecycleLease.transition(to: .preparedAwaitingConfirmation)
@@ -375,6 +407,7 @@ final class ImportEngine {
         guard persistenceStateProvider().isUsable else {
             throw PersistenceWorkflowError.unavailable
         }
+        guard !reconciliationGate.isBlocked else { return .unavailable }
         return try importPersistenceCoordinatorFactory().reviewValidatedImport(
             financialDocument: preparedImport.financialDocument,
             validation: preparedImport.validation
@@ -401,6 +434,16 @@ final class ImportEngine {
                 validationPassed: preparedImport.validation.passed,
                 persisted: false,
                 errorMessage: PersistenceWorkflowError.unavailable.localizedDescription
+            )
+        }
+        guard !reconciliationGate.isBlocked else {
+            return ImportEngineResult(
+                fileName: preparedImport.fileName,
+                transactionCount: preparedImport.transactionCount,
+                validationPassed: preparedImport.validation.passed,
+                persisted: false,
+                errorMessage: "Canonical reconciliation is required before another import can be confirmed.",
+                hydrationOutcome: .committedReconciliationRequired
             )
         }
         guard preparedImport.validation.passed else {
@@ -459,7 +502,8 @@ final class ImportEngine {
                 importSession: preparedImport.importSession,
                 validation: preparedImport.validation,
                 fingerprint: preparedImport.fingerprint,
-                accountChoice: accountChoice
+                accountChoice: accountChoice,
+                providerGeneration: preparedImport.providerGeneration
             )
             if persistenceResult.persisted {
                 developerConsole.info(.database, "Repository persistence completed")
@@ -489,6 +533,23 @@ final class ImportEngine {
             }
         }
 
+        var hydrationOutcome: ImportEngineResult.HydrationOutcome = .notRequired
+        if persistenceResult.persisted {
+            do {
+                _ = try forcedHydration()
+                reconciliationGate.clearAfterCanonicalHydration()
+                hydrationOutcome = .committedAndHydrated
+            } catch {
+                reconciliationGate.requireReconciliation()
+                hydrationOutcome = .committedReconciliationRequired
+                persistenceErrorMessage = "Import committed, but canonical reconciliation is required."
+                developerConsole.error(.database, "Committed import requires canonical reconciliation")
+            }
+        } else if persistenceResult.importAttemptId != nil {
+            do { try rejectedAttemptHydration() }
+            catch { developerConsole.warning(.database, "Import attempt refresh unavailable") }
+        }
+
         return ImportEngineResult(
             fileName: preparedImport.fileName,
             transactionCount: persistenceResult.previousImport?.transactionCount ?? preparedImport.transactionCount,
@@ -502,8 +563,22 @@ final class ImportEngine {
                 : nil,
             previousImport: persistenceResult.previousImport,
             transactionEventBlock: persistenceResult.transactionEventBlock,
-            importAttemptId: persistenceResult.importAttemptId
+            importAttemptId: persistenceResult.importAttemptId,
+            hydrationOutcome: hydrationOutcome
         )
+    }
+
+    @discardableResult
+    func retryCanonicalHydration() -> Bool {
+        guard reconciliationGate.isBlocked else { return true }
+        do {
+            _ = try forcedHydration()
+            reconciliationGate.clearAfterCanonicalHydration()
+            return true
+        } catch {
+            reconciliationGate.requireReconciliation()
+            return false
+        }
     }
 
     private static func message(for block: TransactionEventBlock) -> String {

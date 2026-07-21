@@ -182,13 +182,11 @@ public final class DatabaseProvider {
     public let transactionRepo: TransactionRepository
     public let accountRepo: AccountRepository
     public let importSessionRepo: ImportSessionRepository
-    /// Captured by a prepared import and compared only by the dormant
-    /// confirmed-import provider. It is never presented or logged.
+    /// Captured by a prepared import and compared only at confirmation. It is
+    /// never presented or logged.
     public let generationToken: ProviderGenerationToken
     public let confirmedImportRepo: ConfirmedImportRepository
-#if DEBUG
     private let generationValidity: ProviderGenerationValidity?
-#endif
 
     public init(
         workspaceRepo: WorkspaceRepository,
@@ -203,7 +201,6 @@ public final class DatabaseProvider {
         self.persistenceState = persistenceState
         self.generationToken = generationToken
         self.confirmedImportRepo = confirmedImportRepo
-#if DEBUG
         if protectsGeneration {
             let validity = ProviderGenerationValidity()
             self.generationValidity = validity
@@ -214,7 +211,6 @@ public final class DatabaseProvider {
             return
         }
         self.generationValidity = nil
-#endif
         self.workspaceRepo = workspaceRepo
         self.transactionRepo = transactionRepo
         self.accountRepo = accountRepo
@@ -232,9 +228,7 @@ public final class DatabaseProvider {
         self.importSessionRepo = provider.importSessionRepo
         self.generationToken = provider.generationToken
         self.confirmedImportRepo = provider.confirmedImportRepo
-#if DEBUG
         self.generationValidity = nil
-#endif
     }
 
     static func unavailable(reason: PersistenceUnavailableReason) -> DatabaseProvider {
@@ -257,11 +251,12 @@ public final class DatabaseProvider {
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
             generationToken: provider.generationToken,
-            persistenceState: .intentionalNonDurable(purpose)
+            persistenceState: .intentionalNonDurable(purpose),
+            protectsGeneration: true
         )
     }
 
-    static func verifiedSQLite(_ provider: SQLiteRepositoryProvider, protectsGeneration: Bool = false) -> DatabaseProvider {
+    static func verifiedSQLite(_ provider: SQLiteRepositoryProvider, protectsGeneration: Bool = true) -> DatabaseProvider {
         DatabaseProvider(
             workspaceRepo: provider.workspaceRepo,
             transactionRepo: provider.transactionRepo,
@@ -274,14 +269,11 @@ public final class DatabaseProvider {
         )
     }
 
-#if DEBUG
     func invalidateGeneration() {
         generationValidity?.invalidate()
     }
-#endif
 }
 
-#if DEBUG
 private final class ProviderGenerationValidity {
     private(set) var isValid = true
     func invalidate() { isValid = false }
@@ -329,7 +321,6 @@ private struct GenerationCheckedImportSessionRepository: ImportSessionRepository
     func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] { try validity.check(); return try base.importAttempts(workspaceId: workspaceId) }
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult { try validity.check(); return try base.commitImportHistory(payload) }
 }
-#endif
 
 // MARK: - Placeholder repos
 struct PlaceholderWorkspaceRepo: WorkspaceRepository {

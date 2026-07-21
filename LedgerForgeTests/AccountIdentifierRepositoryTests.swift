@@ -125,14 +125,15 @@ struct AccountIdentifierRepositoryTests {
         }
     }
 
-    @Test func sqliteDuplicateStoredMappingsAreReturnedAsAmbiguousCandidates() async throws {
+    @Test func sqliteV5RejectsDuplicateDurableIdentifierOwnershipWithoutResidue() async throws {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("LedgerForgeIdentifierDuplicateTests")
             .appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
 
-        let sqliteProvider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("identifiers.sqlite").path)
+        let sqliteProvider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("identifiers.sqlite").path, migrations: allMigrations)
+        defer { sqliteProvider.database.close() }
         let provider = IdentifierRepositoryHandles(
             workspaceRepo: sqliteProvider.workspaceRepo,
             accountRepo: sqliteProvider.accountRepo
@@ -147,19 +148,28 @@ struct AccountIdentifierRepositoryTests {
         )
 
         #expect(try provider.accountRepo.attachIdentifier(identifier) == identifier.id)
-        try sqliteProvider.database.executePrepared(
-            sql: "INSERT INTO account_identifiers (id, account_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?);",
-            params: [
-                "identifier-duplicate-row",
-                fixture.primaryAccountId,
-                identifier.scheme,
-                identifier.identifier,
-                "{\"provenance\":\"administrative\",\"strength\":\"strong\",\"verificationState\":\"verified\"}",
-                timestamp
-            ]
-        )
+        do {
+            try sqliteProvider.database.executePrepared(
+                sql: "INSERT INTO account_identifiers (id, account_id, workspace_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?,?);",
+                params: [
+                    "identifier-duplicate-row",
+                    fixture.secondaryAccountId,
+                    fixture.workspaceId,
+                    identifier.scheme,
+                    identifier.identifier,
+                    "{\"provenance\":\"administrative\",\"strength\":\"strong\",\"verificationState\":\"verified\"}",
+                    timestamp
+                ]
+            )
+            Issue.record("Expected V5 ownership uniqueness to reject the duplicate mapping.")
+        } catch let SQLiteDatabaseError.execution(error) {
+            #expect(error.isUniqueConstraint)
+        }
 
-        #expect(try provider.accountRepo.accountIds(workspaceId: fixture.workspaceId, scheme: identifier.scheme, identifier: identifier.identifier) == [fixture.primaryAccountId, fixture.primaryAccountId])
+        #expect(try provider.accountRepo.accountIds(workspaceId: fixture.workspaceId, scheme: identifier.scheme, identifier: identifier.identifier) == [fixture.primaryAccountId])
+        #expect(try provider.accountRepo.identifiers(accountId: fixture.primaryAccountId, workspaceId: fixture.workspaceId) == [identifier])
+        #expect(try provider.accountRepo.identifiers(accountId: fixture.secondaryAccountId, workspaceId: fixture.workspaceId).isEmpty)
+        #expect(try sqliteProvider.database.queryInt("SELECT COUNT(*) FROM account_identifiers;") == 1)
     }
 }
 

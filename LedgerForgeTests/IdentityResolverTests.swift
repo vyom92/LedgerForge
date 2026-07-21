@@ -107,37 +107,13 @@ struct IdentityResolverTests {
     }
 
     @Test func duplicateRepositoryCandidatesReturnAmbiguous() async throws {
-        let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("LedgerForgeResolverAmbiguityTests")
-            .appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: folder) }
-
-        let provider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("resolver.sqlite").path)
-        let fixture = try seedResolverWorkspace(provider)
         let identifier = try financialIdentifier(kind: .iban, value: "QA12LEDGERFORGE1234567890")
-        let dto = identifier.repositoryDTO(
-            accountId: fixture.primaryAccountId,
-            workspaceId: fixture.workspaceId,
-            createdAtISO: resolverTimestamp,
-            id: "resolver-identifier-original"
+        let resolver = FinancialIdentityResolver(
+            accountRepository: DuplicateCandidateAccountRepository(candidates: ["account-primary", "account-primary"]),
+            developerConsole: nil
         )
 
-        #expect(try provider.accountRepo.attachIdentifier(dto) == dto.id)
-        try provider.database.executePrepared(
-            sql: "INSERT INTO account_identifiers (id, account_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?);",
-            params: [
-                "resolver-identifier-duplicate",
-                fixture.primaryAccountId,
-                dto.scheme,
-                dto.identifier,
-                "{\"provenance\":\"administrative\",\"strength\":\"strong\",\"verificationState\":\"verified\"}",
-                resolverTimestamp
-            ]
-        )
-
-        let resolver = FinancialIdentityResolver(accountRepository: provider.accountRepo, developerConsole: nil)
-        #expect(try resolver.resolve(workspaceId: fixture.workspaceId, identifiers: [identifier]) == .ambiguous(candidates: [fixture.primaryAccountId, fixture.primaryAccountId]))
+        #expect(try resolver.resolve(workspaceId: "workspace-resolver", identifiers: [identifier]) == .ambiguous(candidates: ["account-primary", "account-primary"]))
     }
 
     @Test func unverifiedStrongIdentifierReturnsNoMatch() async throws {
@@ -235,6 +211,20 @@ private func financialIdentifier(kind: FinancialIdentifierKind, value: String) t
         verificationState: .verified,
         provenance: .administrative
     )
+}
+
+private struct DuplicateCandidateAccountRepository: AccountRepository {
+    let candidates: [String]
+
+    func upsertAccount(_ account: AccountDTO) throws -> String { throw TestDoubleError.unused }
+    func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool { throw TestDoubleError.unused }
+    func account(id: String) throws -> AccountDTO? { throw TestDoubleError.unused }
+    func accounts(workspaceId: String) throws -> [AccountDTO] { throw TestDoubleError.unused }
+    func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String { throw TestDoubleError.unused }
+    func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO] { throw TestDoubleError.unused }
+    func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String] { candidates }
+
+    private enum TestDoubleError: Error { case unused }
 }
 
 private func resolverAccount(id: String, workspaceId: String, name: String) -> AccountDTO {
