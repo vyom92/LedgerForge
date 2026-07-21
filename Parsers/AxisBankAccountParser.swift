@@ -110,9 +110,13 @@ struct AxisBankCSVColumnMapping {
 enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
     case missingHeader
     case malformedTransactionRow(rowNumber: Int)
+    case invalidDate(rowNumber: Int)
     case invalidMonetaryValue(role: AxisBankCSVColumnRole, rowNumber: Int)
     case missingDirection(rowNumber: Int)
     case ambiguousDirection(rowNumber: Int)
+    case malformedAccountIdentifierEvidence(sourceOrdinal: Int)
+    case invalidAccountIdentifier(sourceOrdinal: Int)
+    case conflictingAccountIdentifiers
 
     var errorDescription: String? {
         switch self {
@@ -120,12 +124,20 @@ enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
             return "The supported Axis CSV header is missing."
         case .malformedTransactionRow(let rowNumber):
             return "Axis CSV transaction row \(rowNumber) does not match the resolved layout."
+        case .invalidDate(let rowNumber):
+            return "Axis CSV transaction row \(rowNumber) contains an invalid date."
         case .invalidMonetaryValue(let role, let rowNumber):
             return "Axis CSV transaction row \(rowNumber) contains an invalid \(role.rawValue) value."
         case .missingDirection(let rowNumber):
             return "Axis CSV transaction row \(rowNumber) contains neither debit nor credit evidence."
         case .ambiguousDirection(let rowNumber):
             return "Axis CSV transaction row \(rowNumber) contains both debit and credit evidence."
+        case .malformedAccountIdentifierEvidence(let sourceOrdinal):
+            return "Axis account identifier evidence on source row \(sourceOrdinal) is malformed."
+        case .invalidAccountIdentifier(let sourceOrdinal):
+            return "Axis account identifier evidence on source row \(sourceOrdinal) cannot form a verified identifier."
+        case .conflictingAccountIdentifiers:
+            return "Axis account identifier evidence contains conflicting recognized values."
         }
     }
 }
@@ -151,7 +163,7 @@ final class AxisBankAccountParser: StatementParser {
 
         let currency = try CurrencyCode("INR")
 
-        let financialIdentifiers = Self.financialIdentifiers(
+        let financialIdentifiers = try Self.financialIdentifiers(
             from: document.sourceContext.preTransactionFragments
         )
 
@@ -178,18 +190,27 @@ final class AxisBankAccountParser: StatementParser {
         let formatter = DateFormatter()
         formatter.dateFormat = "dd-MM-yyyy"
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.isLenient = false
 
         for row in document.rows {
-            guard row.values.indices.contains(mapping.date) else {
-                continue
-            }
-            let dateString = row.values[mapping.date]
-            guard let parsedDate = formatter.date(from: dateString) else {
+            let parsedDate = row.values.indices.contains(mapping.date)
+                ? formatter.date(from: row.values[mapping.date])
+                : nil
+            guard Self.containsTransactionEvidence(
+                row,
+                mapping: mapping,
+                hasValidDate: parsedDate != nil
+            ) else {
                 continue
             }
 
             guard row.values.count > mapping.maximumIndex else {
                 throw AxisBankAccountParserError.malformedTransactionRow(
+                    rowNumber: row.rowNumber
+                )
+            }
+            guard let parsedDate else {
+                throw AxisBankAccountParserError.invalidDate(
                     rowNumber: row.rowNumber
                 )
             }
@@ -282,32 +303,62 @@ final class AxisBankAccountParser: StatementParser {
         return decimal
     }
 
+    private static func containsTransactionEvidence(
+        _ row: NormalizedRow,
+        mapping: AxisBankCSVColumnMapping,
+        hasValidDate: Bool
+    ) -> Bool {
+        if hasValidDate {
+            return true
+        }
+
+        guard row.values.count == mapping.maximumIndex + 1 else {
+            return false
+        }
+
+        return [mapping.debit, mapping.credit].contains { index in
+            guard row.values.indices.contains(index) else { return false }
+            return !row.values[index]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .isEmpty
+        }
+    }
+
     private static func financialIdentifiers(
         from fragments: [NormalizedDocument.SourceFragment]
-    ) -> [FinancialIdentifier] {
-        var uniqueValues: Set<String> = []
+    ) throws -> [FinancialIdentifier] {
+        var uniqueIdentifiers: [String: FinancialIdentifier] = [:]
 
         for fragment in fragments {
             switch statementAccountEvidence(in: fragment.text) {
             case .unsupported:
                 continue
-            case .invalid:
-                return []
-            case .valid(let value):
-                uniqueValues.insert(value)
+            case .malformed:
+                throw AxisBankAccountParserError.malformedAccountIdentifierEvidence(
+                    sourceOrdinal: fragment.sourceOrdinal
+                )
+            case .candidate(let value):
+                let identifier: FinancialIdentifier
+                do {
+                    identifier = try FinancialIdentifier(
+                        kind: .institutionAccountId,
+                        rawValue: value,
+                        verificationState: .verified,
+                        provenance: .institutionStructuredField
+                    )
+                } catch {
+                    throw AxisBankAccountParserError.invalidAccountIdentifier(
+                        sourceOrdinal: fragment.sourceOrdinal
+                    )
+                }
+                uniqueIdentifiers[identifier.normalizedValue] = identifier
             }
         }
 
-        guard
-            uniqueValues.count == 1,
-            let value = uniqueValues.first,
-            let identifier = try? FinancialIdentifier(
-                kind: .institutionAccountId,
-                rawValue: value,
-                verificationState: .verified,
-                provenance: .institutionStructuredField
-            )
-        else {
+        guard uniqueIdentifiers.count <= 1 else {
+            throw AxisBankAccountParserError.conflictingAccountIdentifiers
+        }
+        guard let identifier = uniqueIdentifiers.values.first else {
             return []
         }
 
@@ -326,19 +377,17 @@ final class AxisBankAccountParser: StatementParser {
         let remainder = text.dropFirst(statementAccountPrefix.count)
 
         guard let periodRange = remainder.range(of: statementPeriodMarker) else {
-            return .invalid
+            return .malformed
         }
 
         let value = String(remainder[..<periodRange.lowerBound])
 
-        guard
-            !value.isEmpty,
-            value.allSatisfy({ $0.isASCII && $0.isNumber })
-        else {
-            return .invalid
+        if !value.isEmpty,
+           !value.allSatisfy({ $0.isASCII && $0.isNumber }) {
+            return .malformed
         }
 
-        return .valid(value)
+        return .candidate(value)
     }
 
     private static let statementAccountPrefix = "Statement of Account No - "
@@ -371,7 +420,7 @@ final class AxisBankAccountParser: StatementParser {
 
     private enum StatementAccountEvidence {
         case unsupported
-        case invalid
-        case valid(String)
+        case malformed
+        case candidate(String)
     }
 }
