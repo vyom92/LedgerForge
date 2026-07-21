@@ -72,7 +72,7 @@ struct TransactionEventEvidenceFixtureTests {
         #expect(fixture.crossFixtureRelationships.postingAdjustmentIdentityOutcome ==
             "distinct events separated by deterministic source subtype")
         #expect(fixture.crossFixtureRelationships.postingAdjustmentFixtureRepresentation ==
-            "symbolic relationship verified from original source evidence because the byte-frozen baseline does not encode the original token reuse")
+            "symbolic relationship retained from original source evidence because the privacy-safe fixtures intentionally do not recreate the original token reuse")
     }
 
     @Test func sanitizedOverlapFixtureContainsOnlyApprovedPrivacySafeEvidence() throws {
@@ -105,6 +105,7 @@ struct TransactionEventEvidenceFixtureTests {
                 document: document,
                 metadata: metadata,
                 rows: normalization.rows,
+                header: normalization.header,
                 sourceContext: normalization.sourceContext
             )
         )
