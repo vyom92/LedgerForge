@@ -29,6 +29,7 @@ struct CSVImportRegressionTests {
             document: document,
             metadata: metadata,
             rows: normalization.rows,
+            header: normalization.header,
             sourceContext: normalization.sourceContext
         )
         let financialDocument = try parser.parse(document: normalizedDocument)
@@ -52,7 +53,11 @@ struct CSVImportRegressionTests {
 
     @Test func sourceContextPreservesExactPreTransactionFragmentsAndBoundary() {
         let text = "  Account Number,001  \n\nTran Date,Particulars,Debit,Credit,Balance\n01-01-2026,First,100,,900\n02-01-2026,Second,,25,925"
-        let document = Self.makeDocument(firstTransactionRow: 4, delimiter: ",")
+        let document = Self.makeDocument(
+            headerRow: 3,
+            firstTransactionRow: 4,
+            delimiter: ","
+        )
 
         let result = CSVNormalizer().normalizeWithSourceContext(
             text: text,
@@ -70,6 +75,10 @@ struct CSVImportRegressionTests {
         ])
         #expect(!fragments.map { $0.text }.contains("01-01-2026,First,100,,900"))
         #expect(!fragments.map { $0.text }.contains("02-01-2026,Second,,25,925"))
+        #expect(result.header?.rowNumber == 3)
+        #expect(result.header?.values == [
+            "Tran Date", "Particulars", "Debit", "Credit", "Balance"
+        ])
     }
 
     @Test func invalidOrMissingNormalizationPrerequisitesReturnEmptyRowsAndContext() {
@@ -93,13 +102,18 @@ struct CSVImportRegressionTests {
 
             #expect(result.rows.isEmpty)
             #expect(result.sourceContext.preTransactionFragments.isEmpty)
+            #expect(result.header == nil)
             #expect(compatibilityRows.isEmpty)
         }
     }
 
     @Test func rowOnlyNormalizationMatchesCompositeNormalizationRows() {
         let text = "Header,Value\n01-01-2026, Description ,, 10 \n\n"
-        let document = Self.makeDocument(firstTransactionRow: 2, delimiter: ",")
+        let document = Self.makeDocument(
+            headerRow: 1,
+            firstTransactionRow: 2,
+            delimiter: ","
+        )
         let normalizer = CSVNormalizer()
 
         let result = normalizer.normalizeWithSourceContext(
@@ -115,6 +129,7 @@ struct CSVImportRegressionTests {
         #expect(compatibilityRows.map { $0.values } == result.rows.map { $0.values })
         #expect(result.rows.map { $0.rowNumber } == [2])
         #expect(result.rows.map { $0.values } == [["01-01-2026", "Description", "", "10"]])
+        #expect(result.header?.values == ["Header", "Value"])
     }
 
     @Test func normalizedDocumentDefaultsAndRetainsSourceContext() {
@@ -146,10 +161,16 @@ struct CSVImportRegressionTests {
             document: document,
             metadata: metadata,
             rows: [],
+            header: NormalizedRow(
+                rowNumber: 1,
+                values: ["Header", "Value"]
+            ),
             sourceContext: sourceContext
         )
 
+        #expect(defaultDocument.header == nil)
         #expect(defaultDocument.sourceContext.preTransactionFragments.isEmpty)
+        #expect(explicitDocument.header?.values == ["Header", "Value"])
         #expect(explicitDocument.sourceContext.preTransactionFragments.map { $0.sourceOrdinal } == [1, 2])
         #expect(explicitDocument.sourceContext.preTransactionFragments.map { $0.text } == [
             "  exact source  ",
@@ -158,6 +179,7 @@ struct CSVImportRegressionTests {
     }
 
     private static func makeDocument(
+        headerRow: Int? = nil,
         firstTransactionRow: Int?,
         delimiter: Character?
     ) -> Document {
@@ -167,6 +189,7 @@ struct CSVImportRegressionTests {
             fileType: "CSV",
             importedAt: Date(timeIntervalSince1970: 0)
         )
+        document.headerRow = headerRow
         document.firstTransactionRow = firstTransactionRow
         document.delimiter = delimiter
         return document
