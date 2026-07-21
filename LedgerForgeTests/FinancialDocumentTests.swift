@@ -40,18 +40,21 @@ struct FinancialDocumentTests {
         #expect(financialDocument.financialIdentifiers.isEmpty)
     }
 
-    @Test func axisParserRejectsMaskedAndSuffixOnlyAccountEvidence() throws {
-        let evidenceCases = [
-            "Statement of Account No - XXXXX1234 for the period (From : 01-01-2026 To : 31-01-2026)",
-            "Account suffix - 1234"
-        ]
-
-        for evidence in evidenceCases {
-            let financialDocument = try parseSyntheticAxisDocument(sourceFragments: [evidence])
-
-            #expect(financialDocument.transactions.count == 1)
-            #expect(financialDocument.financialIdentifiers.isEmpty)
+    @Test func axisParserRejectsRecognizedMaskedAccountEvidence() {
+        #expect(throws: AxisBankAccountParserError.malformedAccountIdentifierEvidence(sourceOrdinal: 1)) {
+            try parseSyntheticAxisDocument(sourceFragments: [
+                "Statement of Account No - XXXXX1234 for the period (From : 01-01-2026 To : 31-01-2026)"
+            ])
         }
+    }
+
+    @Test func axisParserIgnoresUnsupportedAccountSuffixFragment() throws {
+        let financialDocument = try parseSyntheticAxisDocument(
+            sourceFragments: ["Account suffix - 1234"]
+        )
+
+        #expect(financialDocument.transactions.count == 1)
+        #expect(financialDocument.financialIdentifiers.isEmpty)
     }
 
     @Test func axisParserIgnoresUnrelatedStructuredHeaderValues() throws {
@@ -78,29 +81,25 @@ struct FinancialDocumentTests {
         #expect(financialDocument.financialIdentifiers.count == 1)
     }
 
-    @Test func axisParserRejectsConflictingFullAccountEvidenceWithoutAffectingTransactions() throws {
-        let financialDocument = try parseSyntheticAxisDocument(
-            sourceFragments: [
+    @Test func axisParserRejectsConflictingFullAccountEvidenceBeforeDocumentCreation() {
+        #expect(throws: AxisBankAccountParserError.conflictingAccountIdentifiers) {
+            try parseSyntheticAxisDocument(sourceFragments: [
                 "Statement of Account No - 123456789012345 for the period (From : 01-01-2026 To : 31-01-2026)",
                 "Statement of Account No - 987654321098765 for the period (From : 01-01-2026 To : 31-01-2026)"
-            ]
-        )
-
-        #expect(financialDocument.transactions.count == 1)
-        #expect(financialDocument.financialIdentifiers.isEmpty)
+            ])
+        }
     }
 
-    @Test func axisParserRejectsMalformedAccountEvidenceWithoutAffectingTransactions() throws {
+    @Test func axisParserRejectsMalformedAccountEvidenceBeforeDocumentCreation() {
         let evidenceCases = [
             "Statement of Account No - ABC123 for the period (From : 01-01-2026 To : 31-01-2026)",
             "Statement of Account No - 123456789012345"
         ]
 
         for evidence in evidenceCases {
-            let financialDocument = try parseSyntheticAxisDocument(sourceFragments: [evidence])
-
-            #expect(financialDocument.transactions.count == 1)
-            #expect(financialDocument.financialIdentifiers.isEmpty)
+            #expect(throws: AxisBankAccountParserError.malformedAccountIdentifierEvidence(sourceOrdinal: 1)) {
+                try parseSyntheticAxisDocument(sourceFragments: [evidence])
+            }
         }
     }
 
