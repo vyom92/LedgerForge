@@ -53,6 +53,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               Set(plan.historyTemplate.normalizedRows.map(\.sourceOrdinal)).count == plan.historyTemplate.normalizedRows.count,
               plan.historyTemplate.normalizedRows.allSatisfy({ $0.sourceOrdinal > 0 && !$0.digest.isEmpty }),
               plan.transactionTemplates.allSatisfy({ !$0.transaction.rawRows.isEmpty }),
+              hasValidTrustedProvenance(plan),
               !hasDuplicateIdentifierCandidates(plan.identifiers) else {
             return .repositoryIntegrityConflict
         }
@@ -204,5 +205,30 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             }
         }
         return false
+    }
+
+    private func hasValidTrustedProvenance(_ plan: ConfirmedImportPlanDTO) -> Bool {
+        guard let document = plan.historyTemplate.normalizedDocument,
+              !document.profileId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !document.profileVersion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        let rows = plan.historyTemplate.normalizedRows
+        guard Set(rows.map(\.id)).count == rows.count,
+              rows.allSatisfy({
+                  !$0.id.isEmpty &&
+                  $0.normalizedDocumentId == document.id &&
+                  $0.sourceOrdinal > 0 &&
+                  !$0.digest.isEmpty
+              }) else {
+            return false
+        }
+        let knownRowIDs = Set(rows.map(\.id))
+        return plan.transactionTemplates.allSatisfy { template in
+            let rawRows = template.transaction.rawRows
+            return !rawRows.isEmpty &&
+                Set(rawRows.map(\.normalizedRowId)).count == rawRows.count &&
+                rawRows.allSatisfy { !$0.id.isEmpty && !$0.normalizedRowId.isEmpty && knownRowIDs.contains($0.normalizedRowId) }
+        }
     }
 }

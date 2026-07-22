@@ -33,14 +33,18 @@ public struct TransactionRawRowDTO: nonisolated Equatable, Sendable {
     public let sourceOrdinal: Int?
     public let normalizedRecordDigest: String?
     public let normalizedDocumentId: String?
+    public let parserProfileId: String?
+    public let parserProfileVersion: String?
 
-    public init(id: String = UUID().uuidString, normalizedRowId: String, contributionType: String? = nil, sourceOrdinal: Int? = nil, normalizedRecordDigest: String? = nil, normalizedDocumentId: String? = nil) {
+    public init(id: String = UUID().uuidString, normalizedRowId: String, contributionType: String? = nil, sourceOrdinal: Int? = nil, normalizedRecordDigest: String? = nil, normalizedDocumentId: String? = nil, parserProfileId: String? = nil, parserProfileVersion: String? = nil) {
         self.id = id
         self.normalizedRowId = normalizedRowId
         self.contributionType = contributionType
         self.sourceOrdinal = sourceOrdinal
         self.normalizedRecordDigest = normalizedRecordDigest
         self.normalizedDocumentId = normalizedDocumentId
+        self.parserProfileId = parserProfileId
+        self.parserProfileVersion = parserProfileVersion
     }
 }
 

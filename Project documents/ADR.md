@@ -4278,6 +4278,12 @@ Migration V6 adds date-role/timezone metadata, profile metadata and record diges
 
 The approved Axis NRE CSV path is reactivated only within this exact profile and its verified evidence boundary. This does not add institutions, layouts, a general Import Profile framework, historical repair, raw-row storage, cross-document chronology, or support for timestamps from date-only evidence.
 
+## Sprint 52A Corrective Closure
+
+Sprint 52A verifies the persisted-to-runtime and writer boundaries without changing this decision. Hydration rejects unsupported financial-date roles, malformed timezone codes or invalid IANA identifiers, absent or conflicting source relationships, and absent durable parser-profile metadata before any runtime store changes. It reads the profile ID/version from the durable normalized-document relationship; it does not default, reconstruct or hardcode trusted evidence.
+
+Generic transaction replacement rejects trusted DTOs. Only the provider-owned confirmed-import operation may publish trusted history, and it validates complete normalized source relationships before atomic publication. SQLite and In-Memory expose equivalent strict readback; rejected provenance has zero accepted durable residue. V6 remains unchanged because it already contains the required durable graph.
+
 ## Related ADRs
 
 - ADR-024 — Repository Hydration Boundary

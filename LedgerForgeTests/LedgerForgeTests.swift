@@ -232,8 +232,8 @@ private func seedSprint30Repository(_ provider: DatabaseProvider) throws {
     let transaction = TransactionDTO(
         id: "transaction-sprint-30",
         workspaceId: workspace.id,
-        accountId: account.id,
-        importSessionId: session.id,
+        accountId: nil,
+        importSessionId: nil,
         postedDateISO: "2026-07-12",
         description: "Sprint 30 credit",
         nativeCurrency: "INR",
@@ -243,15 +243,81 @@ private func seedSprint30Repository(_ provider: DatabaseProvider) throws {
         runningBalanceMinor: 100_00,
         isTrusted: true,
         trustedAtISO: "2026-07-12T00:04:00Z",
-        createdAtISO: "2026-07-12T00:03:00Z"
+        createdAtISO: "2026-07-12T00:03:00Z",
+        rawRows: [
+            TransactionRawRowDTO(
+                id: "transaction-raw-sprint-30",
+                normalizedRowId: "normalized-row-sprint-30",
+                contributionType: "transaction"
+            )
+        ]
     )
-
-    _ = try provider.workspaceRepo.upsertWorkspace(workspace)
-    _ = try provider.accountRepo.upsertAccount(account)
-    _ = try provider.importSessionRepo.createImportSession(session)
-    try provider.transactionRepo.replaceTransactions(
+    let document = ImportedDocumentDTO(
+        id: "document-sprint-30",
         workspaceId: workspace.id,
         importSessionId: session.id,
-        transactions: [transaction]
+        filename: "sprint-30.csv",
+        mimeType: nil,
+        sizeBytes: nil,
+        sha256: "sprint-30-fingerprint",
+        createdAtISO: "2026-07-12T00:03:00Z"
     )
+    let fingerprint = DocumentFingerprintDTO(
+        id: "fingerprint-sprint-30",
+        documentId: document.id,
+        importSessionId: session.id,
+        algorithm: "sha256",
+        fingerprint: "sprint-30-fingerprint",
+        fingerprintData: nil,
+        createdAtISO: "2026-07-12T00:03:00Z"
+    )
+    let normalizedDocument = NormalizedDocumentDTO(
+        id: "normalized-document-sprint-30",
+        importSessionId: session.id,
+        documentId: document.id,
+        profileId: "test.sprint30",
+        profileVersion: "1"
+    )
+    let normalizedRow = NormalizedRowDTO(
+        id: "normalized-row-sprint-30",
+        normalizedDocumentId: normalizedDocument.id,
+        sourceOrdinal: 1,
+        digest: String.normalizedRecordDigest(values: ["sprint-30"])
+    )
+    let attempt = ImportAttemptDTO(
+        id: "attempt-sprint-30",
+        workspaceId: workspace.id,
+        createdAtISO: "2026-07-12T00:04:00Z",
+        outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
+        coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+        accountDecisionCode: ImportAttemptAccountDecision.resolvedOrCreated.rawValue,
+        guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
+        persistenceCode: ImportAttemptPersistence.committed.rawValue,
+        transactionCount: 1,
+        accountId: account.id,
+        importSessionId: session.id,
+        documentId: document.id
+    )
+    let plan = ConfirmedImportPlanDTO(
+        providerGeneration: provider.generationToken,
+        workspace: workspace,
+        proposedAccount: account,
+        accountChoice: .createProposedAccount,
+        advisoryIdentity: .noMatch,
+        identifiers: [],
+        historyTemplate: ConfirmedImportHistoryTemplateDTO(
+            document: document,
+            fingerprint: fingerprint,
+            importSession: session,
+            completedAtISO: "2026-07-12T00:04:00Z",
+            successfulAttempt: attempt,
+            normalizedDocument: normalizedDocument,
+            normalizedRows: [normalizedRow]
+        ),
+        transactionTemplates: [ConfirmedImportTransactionTemplateDTO(transaction: transaction)]
+    )
+    guard case .committed = provider.confirmedImportRepo.commitConfirmedImport(plan) else {
+        Issue.record("Sprint 30 test fixture failed to create its confirmed trusted graph.")
+        return
+    }
 }

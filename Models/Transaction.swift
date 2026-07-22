@@ -74,6 +74,10 @@ enum FinancialDateRole: String, CaseIterable, Equatable, Sendable {
 }
 
 enum StatementTimezoneEvidence: Equatable, Sendable {
+    enum PersistenceError: Error, Equatable {
+        case malformedCode(String)
+        case invalidIANAIdentifier(String)
+    }
     case iana(String)
     case utc
     case unknown
@@ -82,11 +86,15 @@ enum StatementTimezoneEvidence: Equatable, Sendable {
         switch self { case .iana(let value): return "iana:\(value)"; case .utc: return "utc"; case .unknown: return "unknown" }
     }
 
-    init(persistenceCode: String) {
+    init(validatingPersistenceCode persistenceCode: String) throws {
         if persistenceCode == "utc" { self = .utc }
         else if persistenceCode == "unknown" { self = .unknown }
-        else if persistenceCode.hasPrefix("iana:"), persistenceCode.count > 5 { self = .iana(String(persistenceCode.dropFirst(5))) }
-        else { self = .unknown }
+        else if persistenceCode.hasPrefix("iana:") {
+            let identifier = String(persistenceCode.dropFirst(5))
+            guard !identifier.isEmpty else { throw PersistenceError.malformedCode(persistenceCode) }
+            guard TimeZone(identifier: identifier) != nil else { throw PersistenceError.invalidIANAIdentifier(identifier) }
+            self = .iana(identifier)
+        } else { throw PersistenceError.malformedCode(persistenceCode) }
     }
 }
 

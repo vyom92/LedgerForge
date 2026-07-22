@@ -108,14 +108,11 @@ struct RepositoryStoreHydratorTests {
     @Test func forcedHydrationRefreshesRuntimeStoresWithoutDuplicatingState() throws {
         let provider = try seededProvider()
         let stores = RuntimeStores()
-        let hydrator = makeHydrator(provider: provider, stores: stores)
+        let transactionRepo = HydrationFixtureTransactionRepo(transactions: [trustedTransaction()])
+        let hydrator = makeHydrator(provider: provider, stores: stores, transactionRepo: transactionRepo)
 
         _ = try hydrator.hydrateIfNeeded()
-        try provider.transactionRepo.replaceTransactions(
-            workspaceId: "workspace-dashboard",
-            importSessionId: "import-dashboard",
-            transactions: [trustedTransaction(amountMinor: 25_00, runningBalanceMinor: 1_075_00)]
-        )
+        transactionRepo.transactions = [trustedTransaction(amountMinor: 25_00, runningBalanceMinor: 1_075_00)]
 
         let refreshResult = try hydrator.hydrateIfNeeded(forceRefresh: true)
 
@@ -129,26 +126,11 @@ struct RepositoryStoreHydratorTests {
     @Test func hydratorUsesLatestDatedRunningBalanceForAccountBalance() throws {
         let provider = try seededProvider()
         let stores = RuntimeStores()
-        let hydrator = makeHydrator(provider: provider, stores: stores)
-
-        try provider.transactionRepo.replaceTransactions(
-            workspaceId: "workspace-dashboard",
-            importSessionId: "import-dashboard",
-            transactions: [
-                trustedTransaction(
-                    id: "transaction-newer",
-                    amountMinor: 25_00,
-                    runningBalanceMinor: 1_075_00,
-                    postedDateISO: "2026-07-09"
-                ),
-                trustedTransaction(
-                    id: "transaction-older",
-                    amountMinor: 100_00,
-                    runningBalanceMinor: 1_050_00,
-                    postedDateISO: "2026-07-08"
-                )
-            ]
-        )
+        let transactionRepo = HydrationFixtureTransactionRepo(transactions: [
+            trustedTransaction(id: "transaction-newer", amountMinor: 25_00, runningBalanceMinor: 1_075_00, postedDateISO: "2026-07-09"),
+            trustedTransaction(id: "transaction-older", amountMinor: 100_00, runningBalanceMinor: 1_050_00, postedDateISO: "2026-07-08")
+        ])
+        let hydrator = makeHydrator(provider: provider, stores: stores, transactionRepo: transactionRepo)
 
         let result = try hydrator.hydrateIfNeeded(forceRefresh: true)
 
@@ -161,29 +143,8 @@ struct RepositoryStoreHydratorTests {
     @Test func hydratorRejectsNoncanonicalPersistedINRTextWithoutMutatingStores() throws {
         let provider = try seededProvider()
         let stores = RuntimeStores()
-        let hydrator = makeHydrator(provider: provider, stores: stores)
-        var malformed = trustedTransaction()
-        malformed = TransactionDTO(
-            id: malformed.id,
-            workspaceId: malformed.workspaceId,
-            accountId: malformed.accountId,
-            importSessionId: malformed.importSessionId,
-            postedDateISO: malformed.postedDateISO,
-            description: malformed.description,
-            nativeCurrency: malformed.nativeCurrency,
-            amountMinor: malformed.amountMinor,
-            amountDecimal: "100",
-            direction: malformed.direction,
-            runningBalanceMinor: malformed.runningBalanceMinor,
-            isTrusted: malformed.isTrusted,
-            trustedAtISO: malformed.trustedAtISO,
-            createdAtISO: malformed.createdAtISO
-        )
-        try provider.transactionRepo.replaceTransactions(
-            workspaceId: "workspace-dashboard",
-            importSessionId: "import-dashboard",
-            transactions: [malformed]
-        )
+        let transactionRepo = HydrationFixtureTransactionRepo(transactions: [trustedTransaction(amountDecimal: "100")])
+        let hydrator = makeHydrator(provider: provider, stores: stores, transactionRepo: transactionRepo)
 
         #expect(throws: RepositoryStoreHydrationError.self) {
             try hydrator.hydrateIfNeeded()
@@ -195,35 +156,52 @@ struct RepositoryStoreHydratorTests {
     @Test func hydratorRejectsDecimalMinorDisagreementWithoutMutatingStores() throws {
         let provider = try seededProvider()
         let stores = RuntimeStores()
-        let hydrator = makeHydrator(provider: provider, stores: stores)
-        var mismatched = trustedTransaction()
-        mismatched = TransactionDTO(
-            id: mismatched.id,
-            workspaceId: mismatched.workspaceId,
-            accountId: mismatched.accountId,
-            importSessionId: mismatched.importSessionId,
-            postedDateISO: mismatched.postedDateISO,
-            description: mismatched.description,
-            nativeCurrency: mismatched.nativeCurrency,
-            amountMinor: mismatched.amountMinor,
-            amountDecimal: "99.99",
-            direction: mismatched.direction,
-            runningBalanceMinor: mismatched.runningBalanceMinor,
-            isTrusted: mismatched.isTrusted,
-            trustedAtISO: mismatched.trustedAtISO,
-            createdAtISO: mismatched.createdAtISO
-        )
-        try provider.transactionRepo.replaceTransactions(
-            workspaceId: "workspace-dashboard",
-            importSessionId: "import-dashboard",
-            transactions: [mismatched]
-        )
+        let transactionRepo = HydrationFixtureTransactionRepo(transactions: [trustedTransaction(amountDecimal: "99.99")])
+        let hydrator = makeHydrator(provider: provider, stores: stores, transactionRepo: transactionRepo)
 
         #expect(throws: RepositoryStoreHydrationError.self) {
             try hydrator.hydrateIfNeeded()
         }
         #expect(stores.accounts.accounts.isEmpty)
         #expect(stores.transactions.transactions.isEmpty)
+    }
+
+    @Test func hydratorStrictlyRejectsMalformedTrustedEvidenceWithoutMutatingStores() throws {
+        let validRaw = trustedRawRow()
+        let cases: [(String, TransactionDTO)] = [
+            ("no relationships", trustedTransaction(rawRows: [])),
+            ("missing document", trustedTransaction(rawRows: [trustedRawRow(normalizedDocumentId: nil)])),
+            ("missing row", trustedTransaction(rawRows: [trustedRawRow(normalizedRowId: "")])),
+            ("zero ordinal", trustedTransaction(rawRows: [trustedRawRow(sourceOrdinal: 0)])),
+            ("negative ordinal", trustedTransaction(rawRows: [trustedRawRow(sourceOrdinal: -1)])),
+            ("missing digest", trustedTransaction(rawRows: [trustedRawRow(normalizedRecordDigest: nil)])),
+            ("malformed date role", trustedTransaction(financialDateRole: "posted-at")),
+            ("malformed timezone", trustedTransaction(statementTimezoneEvidence: "local")),
+            ("invalid IANA timezone", trustedTransaction(statementTimezoneEvidence: "iana:Not/AZone")),
+            ("missing profile ID", trustedTransaction(rawRows: [trustedRawRow(parserProfileId: nil)])),
+            ("missing profile version", trustedTransaction(rawRows: [trustedRawRow(parserProfileVersion: nil)])),
+            ("orphaned relationship", trustedTransaction(rawRows: [trustedRawRow(normalizedRowId: "orphaned-row", normalizedDocumentId: nil)])),
+            ("duplicate relationship", trustedTransaction(rawRows: [validRaw, validRaw])),
+            ("conflicting ordinal", trustedTransaction(rawRows: [validRaw, trustedRawRow(id: "raw-second", normalizedRowId: "normalized-row-second")])),
+            ("profile disagreement", trustedTransaction(rawRows: [validRaw, trustedRawRow(id: "raw-second", normalizedRowId: "normalized-row-second", sourceOrdinal: 2, parserProfileVersion: "2")]))
+        ]
+
+        for (name, transaction) in cases {
+            let provider = try seededProvider()
+            let stores = RuntimeStores()
+            let hydrator = makeHydrator(
+                provider: provider,
+                stores: stores,
+                transactionRepo: HydrationFixtureTransactionRepo(transactions: [transaction])
+            )
+
+            #expect(throws: RepositoryStoreHydrationError.self, "\(name)") {
+                try hydrator.hydrateIfNeeded()
+            }
+            #expect(stores.accounts.accounts.isEmpty, "\(name)")
+            #expect(stores.transactions.transactions.isEmpty, "\(name)")
+            #expect(stores.importSessions.importSessions.isEmpty, "\(name)")
+        }
     }
 }
 
@@ -233,11 +211,15 @@ private struct RuntimeStores {
     let importSessions = ImportSessionStore()
 }
 
-private func makeHydrator(provider: InMemoryRepositoryProvider, stores: RuntimeStores) -> RepositoryStoreHydrator {
+private func makeHydrator(
+    provider: InMemoryRepositoryProvider,
+    stores: RuntimeStores,
+    transactionRepo: TransactionRepository = HydrationFixtureTransactionRepo(transactions: [trustedTransaction()])
+) -> RepositoryStoreHydrator {
     RepositoryStoreHydrator(
         accountRepo: provider.accountRepo,
         importSessionRepo: provider.importSessionRepo,
-        transactionRepo: provider.transactionRepo,
+        transactionRepo: transactionRepo,
         accountStore: stores.accounts,
         transactionStore: stores.transactions,
         importSessionStore: stores.importSessions,
@@ -295,7 +277,7 @@ private func seededProvider() throws -> InMemoryRepositoryProvider {
     try provider.transactionRepo.replaceTransactions(
         workspaceId: workspace.id,
         importSessionId: session.id,
-        transactions: [trustedTransaction(), untrusted]
+        transactions: [untrusted]
     )
 
     return provider
@@ -305,7 +287,11 @@ private func trustedTransaction(
     id: String = "transaction-trusted",
     amountMinor: Int64 = 100_00,
     runningBalanceMinor: Int64 = 1_050_00,
-    postedDateISO: String = "2026-07-08"
+    postedDateISO: String = "2026-07-08",
+    amountDecimal: String? = nil,
+    financialDateRole: String = FinancialDateRole.transactionDate.rawValue,
+    statementTimezoneEvidence: String = "iana:Asia/Kolkata",
+    rawRows: [TransactionRawRowDTO] = [trustedRawRow()]
 ) -> TransactionDTO {
     TransactionDTO(
         id: id,
@@ -313,14 +299,73 @@ private func trustedTransaction(
         accountId: "account-dashboard",
         importSessionId: "import-dashboard",
         postedDateISO: postedDateISO,
+        financialDateRole: financialDateRole,
+        statementTimezoneEvidence: statementTimezoneEvidence,
         description: "Trusted credit",
         nativeCurrency: "INR",
         amountMinor: amountMinor,
-        amountDecimal: try! Money.fromMinorUnits(amountMinor, currency: "INR").canonicalDecimalString(),
+        amountDecimal: amountDecimal ?? (try! Money.fromMinorUnits(amountMinor, currency: "INR").canonicalDecimalString()),
         direction: "credit",
         runningBalanceMinor: runningBalanceMinor,
         isTrusted: true,
         trustedAtISO: "2026-07-08T00:04:00Z",
-        createdAtISO: "2026-07-08T00:03:00Z"
+        createdAtISO: "2026-07-08T00:03:00Z",
+        rawRows: rawRows
     )
+}
+
+private func trustedRawRow(
+    id: String = "transaction-raw-row",
+    normalizedRowId: String = "normalized-row",
+    sourceOrdinal: Int? = 1,
+    normalizedRecordDigest: String? = String(repeating: "a", count: 64),
+    normalizedDocumentId: String? = "normalized-document",
+    parserProfileId: String? = "fixture.profile",
+    parserProfileVersion: String? = "1"
+) -> TransactionRawRowDTO {
+    TransactionRawRowDTO(
+        id: id,
+        normalizedRowId: normalizedRowId,
+        contributionType: "transaction",
+        sourceOrdinal: sourceOrdinal,
+        normalizedRecordDigest: normalizedRecordDigest,
+        normalizedDocumentId: normalizedDocumentId,
+        parserProfileId: parserProfileId,
+        parserProfileVersion: parserProfileVersion
+    )
+}
+
+/// Test-target-only read fixture. Production code cannot instantiate this type.
+private final class HydrationFixtureTransactionRepo: TransactionRepository {
+    var transactions: [TransactionDTO]
+
+    init(transactions: [TransactionDTO]) {
+        self.transactions = transactions
+    }
+
+    func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws {
+        throw RepositoryError.trustedTransactionWriteForbidden
+    }
+
+    func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO] {
+        transactions.filter { $0.workspaceId == workspaceId && (importSessionId == nil || $0.importSessionId == importSessionId) }
+    }
+
+    func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] {
+        transactions
+            .filter { $0.workspaceId == workspaceId && $0.isTrusted }
+            .sorted { lhs, rhs in
+                if lhs.postedDateISO != rhs.postedDateISO { return lhs.postedDateISO < rhs.postedDateISO }
+                let lhsSource = lhs.rawRows.first
+                let rhsSource = rhs.rawRows.first
+                if lhsSource?.normalizedDocumentId == rhsSource?.normalizedDocumentId,
+                   let lhsOrdinal = lhsSource?.sourceOrdinal,
+                   let rhsOrdinal = rhsSource?.sourceOrdinal,
+                   lhsOrdinal != rhsOrdinal { return lhsOrdinal < rhsOrdinal }
+                if lhsSource?.normalizedDocumentId != rhsSource?.normalizedDocumentId {
+                    return (lhsSource?.normalizedDocumentId ?? "~") < (rhsSource?.normalizedDocumentId ?? "~")
+                }
+                return lhs.id < rhs.id
+            }
+    }
 }

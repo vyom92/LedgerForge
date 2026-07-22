@@ -1200,6 +1200,9 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
 
     func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws {
         // Atomic replace of candidate transactions for an import_session_id.
+        guard !transactions.contains(where: \.isTrusted) else {
+            throw RepositoryError.trustedTransactionWriteForbidden
+        }
         try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
         do {
             if let importId = importSessionId {
@@ -1305,7 +1308,7 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
     }
 
     private func rawRows(for transactionId: String) throws -> [TransactionRawRowDTO] {
-        let sql = "SELECT trr.id, trr.normalized_row_id, trr.contribution_type, nr.row_index, nr.record_digest, nr.normalized_document_id FROM transaction_raw_rows trr INNER JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = ? ORDER BY nr.row_index ASC, trr.id ASC;"
+        let sql = "SELECT trr.id, trr.normalized_row_id, trr.contribution_type, nr.row_index, nr.record_digest, nr.normalized_document_id, nd.profile_id, nd.profile_version FROM transaction_raw_rows trr INNER JOIN normalized_rows nr ON nr.id = trr.normalized_row_id INNER JOIN normalized_documents nd ON nd.id = nr.normalized_document_id WHERE trr.transaction_id = ? ORDER BY nr.row_index ASC, trr.id ASC;"
         return try db.query(sql: sql, params: [transactionId]) { row in
             TransactionRawRowDTO(
                 id: row.string(at: 0) ?? "",
@@ -1313,7 +1316,9 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
                 contributionType: row.string(at: 2),
                 sourceOrdinal: row.int64(at: 3).map(Int.init),
                 normalizedRecordDigest: row.string(at: 4),
-                normalizedDocumentId: row.string(at: 5)
+                normalizedDocumentId: row.string(at: 5),
+                parserProfileId: row.string(at: 6),
+                parserProfileVersion: row.string(at: 7)
             )
         }
     }

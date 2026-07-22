@@ -9,6 +9,7 @@ public enum RepositoryError: Error, LocalizedError {
     case persistenceUnavailable
     case recordNotFound(String)
     case relationshipViolation(String)
+    case trustedTransactionWriteForbidden
     case staleProviderGeneration
     case conflictingAccountIdentifier(workspaceId: String, scheme: String, identifier: String, existingAccountId: String, attemptedAccountId: String)
 
@@ -22,6 +23,8 @@ public enum RepositoryError: Error, LocalizedError {
             return message
         case .relationshipViolation(let message):
             return message
+        case .trustedTransactionWriteForbidden:
+            return "Trusted transactions may be written only by confirmed import."
         case .staleProviderGeneration:
             return "This repository belongs to an inactive database provider generation."
         case .conflictingAccountIdentifier(let workspaceId, let scheme, _, let existingAccountId, let attemptedAccountId):

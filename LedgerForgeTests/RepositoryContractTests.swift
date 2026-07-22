@@ -505,7 +505,7 @@ struct RepositoryContractTests {
         }
     }
 
-    @Test func transactionRepositoryCanListTrustedTransactionsForDashboard() async throws {
+    @Test func transactionRepositoryRejectsGenericTrustedWritesAndRetainsNonTrustedPurpose() async throws {
         try runForEachProvider { provider in
             let fixture = try seedWorkspaceAccountAndSession(provider)
             let trusted = transaction(
@@ -531,13 +531,24 @@ struct RepositoryContractTests {
                 isTrusted: false
             )
 
+            do {
+                try provider.transactionRepo.replaceTransactions(
+                    workspaceId: fixture.workspaceId,
+                    importSessionId: fixture.importSessionId,
+                    transactions: [trusted]
+                )
+                Issue.record("Generic replacement unexpectedly accepted a trusted transaction.")
+            } catch RepositoryError.trustedTransactionWriteForbidden {
+                // Expected: confirmed import is the only production trusted writer.
+            }
+
             try provider.transactionRepo.replaceTransactions(
                 workspaceId: fixture.workspaceId,
                 importSessionId: fixture.importSessionId,
-                transactions: [trusted, untrusted]
+                transactions: [untrusted]
             )
-
-            #expect(try provider.transactionRepo.trustedTransactions(workspaceId: fixture.workspaceId) == [trusted])
+            #expect(try provider.transactionRepo.trustedTransactions(workspaceId: fixture.workspaceId).isEmpty)
+            #expect(try provider.transactionRepo.transactions(workspaceId: fixture.workspaceId, importSessionId: fixture.importSessionId) == [untrusted])
         }
     }
 
@@ -982,8 +993,8 @@ private func seedParentUpsertGraph(in provider: SQLiteRepositoryProvider) throws
         direction: "credit",
         runningBalanceMinor: 1_250,
         isReconciled: false,
-        isTrusted: true,
-        trustedAtISO: "2026-07-18T09:04:00Z",
+        isTrusted: false,
+        trustedAtISO: nil,
         createdAtISO: "2026-07-18T09:04:00Z",
         updatedAtISO: nil,
         rawRows: [

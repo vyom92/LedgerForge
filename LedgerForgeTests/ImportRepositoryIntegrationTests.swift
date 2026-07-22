@@ -73,6 +73,8 @@ struct ImportRepositoryIntegrationTests {
             #expect(transactions.map { $0.rawRows.first?.sourceOrdinal } == [1, 2])
             #expect(transactions.map { $0.rawRows.first?.normalizedDocumentId }.allSatisfy { $0 != nil })
             #expect(transactions.map { $0.rawRows.first?.normalizedRecordDigest }.allSatisfy { $0?.count == 64 })
+            #expect(transactions.allSatisfy { $0.rawRows.first?.parserProfileId == "axis.nre.csv" })
+            #expect(transactions.allSatisfy { $0.rawRows.first?.parserProfileVersion == "1" })
 
             let orderedTransactions = transactions.sorted {
                 if $0.postedDateISO == $1.postedDateISO {
@@ -376,8 +378,23 @@ struct ImportRepositoryIntegrationTests {
             fingerprint: fixture.fingerprint
         )
         #expect(persistence.persisted)
-        let persistedIDs = try initialProvider.transactionRepo.trustedTransactions(workspaceId: "workspace-import-integration").map(\.id)
+        let persistedTransactions = try initialProvider.transactionRepo.trustedTransactions(workspaceId: "workspace-import-integration")
+        let persistedIDs = persistedTransactions.map(\.id)
+        let persistedProvenance = persistedTransactions.map { transaction in
+            transaction.rawRows.map { raw in
+                TransactionSourceProvenance(
+                    normalizedDocumentID: raw.normalizedDocumentId!,
+                    normalizedRowID: raw.normalizedRowId,
+                    sourceOrdinal: raw.sourceOrdinal!,
+                    normalizedRecordDigest: raw.normalizedRecordDigest!,
+                    parserProfileID: raw.parserProfileId!,
+                    parserProfileVersion: raw.parserProfileVersion!
+                )
+            }
+        }
         #expect(persistedIDs.count == 2)
+        #expect(persistedTransactions.allSatisfy { $0.rawRows.first?.parserProfileId == "axis.nre.csv" })
+        #expect(persistedTransactions.allSatisfy { $0.rawRows.first?.parserProfileVersion == "1" })
 
         resetRuntimeStoresForImportIntegration()
         let relaunchedProvider = try SQLiteRepositoryProvider(path: dbPath)
@@ -399,10 +416,15 @@ struct ImportRepositoryIntegrationTests {
         #expect(TransactionStore.shared.transactions.map(\.repositoryTransactionId) == persistedIDs.map(Optional.some))
         #expect(TransactionStore.shared.transactions.allSatisfy { !$0.account.contains(".csv") })
         #expect(TransactionStore.shared.transactions.allSatisfy { $0.sourceBank == "Axis Bank" })
+        #expect(TransactionStore.shared.transactions.map { $0.statementDate?.canonical } == persistedTransactions.map { Optional($0.postedDateISO) })
+        #expect(TransactionStore.shared.transactions.map(\.financialDateRole) == persistedTransactions.map { FinancialDateRole(rawValue: $0.financialDateRole)! })
+        #expect(TransactionStore.shared.transactions.map(\.statementTimezoneEvidence) == persistedTransactions.map { try! StatementTimezoneEvidence(validatingPersistenceCode: $0.statementTimezoneEvidence) })
+        #expect(TransactionStore.shared.transactions.map(\.sourceProvenance) == persistedProvenance)
 
         let forced = try hydrator.hydrateIfNeeded(forceRefresh: true)
         #expect(forced.didHydrate)
         #expect(TransactionStore.shared.transactions.map(\.repositoryTransactionId) == persistedIDs.map(Optional.some))
+        #expect(TransactionStore.shared.transactions.map(\.sourceProvenance) == persistedProvenance)
     }
 
     @Test func mapperUsesSuppliedAccountIdForAccountAndEveryTransaction() async throws {

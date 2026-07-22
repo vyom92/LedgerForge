@@ -85,6 +85,43 @@ struct ConfirmedImportRepositoryContractTests {
         }
     }
 
+    @Test func missingTrustedSourceRelationshipIsRejectedWithNoAcceptedResidueAcrossProviders() throws {
+        try assertPlanRejectedAcrossProviders { token in
+            let plan = confirmedImportPlan(generationToken: token, suffix: "missing-trusted-source")
+            let template = plan.transactionTemplates[0]
+            let orphan = TransactionRawRowDTO(
+                id: template.transaction.rawRows[0].id,
+                normalizedRowId: "missing-normalized-row",
+                contributionType: "transaction"
+            )
+            return planReplacingTransactions(plan, with: [
+                ConfirmedImportTransactionTemplateDTO(
+                    transaction: transactionReplacingRawRows(template.transaction, with: [orphan]),
+                    eventEvidence: template.eventEvidence
+                )
+            ])
+        }
+    }
+
+    @Test func duplicateTrustedSourceRelationshipIsRejectedWithNoAcceptedResidueAcrossProviders() throws {
+        try assertPlanRejectedAcrossProviders { token in
+            let plan = confirmedImportPlan(generationToken: token, suffix: "duplicate-trusted-source")
+            let template = plan.transactionTemplates[0]
+            let first = template.transaction.rawRows[0]
+            let duplicate = TransactionRawRowDTO(
+                id: "duplicate-raw-row",
+                normalizedRowId: first.normalizedRowId,
+                contributionType: first.contributionType
+            )
+            return planReplacingTransactions(plan, with: [
+                ConfirmedImportTransactionTemplateDTO(
+                    transaction: transactionReplacingRawRows(template.transaction, with: [first, duplicate]),
+                    eventEvidence: template.eventEvidence
+                )
+            ])
+        }
+    }
+
     @Test func duplicateIncomingIdentifierCandidatesAreRejectedDeterministicallyAcrossProviders() throws {
         try assertPlanRejectedAcrossProviders { token in
             let plan = confirmedImportPlan(generationToken: token, suffix: "duplicate-identifiers")
@@ -212,4 +249,52 @@ private func assertPlanRejectedAcrossProviders(
     #expect(try sqlite.workspaceRepo.workspace(id: sqlitePlan.workspace.id) == nil)
     #expect(try sqlite.accountRepo.accounts(workspaceId: sqlitePlan.workspace.id).isEmpty)
     #expect(try sqlite.importSessionRepo.importAttempts(workspaceId: sqlitePlan.workspace.id).isEmpty)
+}
+
+private func planReplacingTransactions(
+    _ plan: ConfirmedImportPlanDTO,
+    with transactions: [ConfirmedImportTransactionTemplateDTO]
+) -> ConfirmedImportPlanDTO {
+    ConfirmedImportPlanDTO(
+        providerGeneration: plan.providerGeneration,
+        workspace: plan.workspace,
+        proposedAccount: plan.proposedAccount,
+        accountChoice: plan.accountChoice,
+        advisoryIdentity: plan.advisoryIdentity,
+        identifiers: plan.identifiers,
+        historyTemplate: plan.historyTemplate,
+        transactionTemplates: transactions
+    )
+}
+
+private func transactionReplacingRawRows(
+    _ transaction: TransactionDTO,
+    with rawRows: [TransactionRawRowDTO]
+) -> TransactionDTO {
+    TransactionDTO(
+        id: transaction.id,
+        workspaceId: transaction.workspaceId,
+        accountId: transaction.accountId,
+        importSessionId: transaction.importSessionId,
+        documentId: transaction.documentId,
+        originalRowId: transaction.originalRowId,
+        postedDateISO: transaction.postedDateISO,
+        financialDateRole: transaction.financialDateRole,
+        statementTimezoneEvidence: transaction.statementTimezoneEvidence,
+        valueDateISO: transaction.valueDateISO,
+        description: transaction.description,
+        payee: transaction.payee,
+        reference: transaction.reference,
+        nativeCurrency: transaction.nativeCurrency,
+        amountMinor: transaction.amountMinor,
+        amountDecimal: transaction.amountDecimal,
+        direction: transaction.direction,
+        runningBalanceMinor: transaction.runningBalanceMinor,
+        isReconciled: transaction.isReconciled,
+        isTrusted: transaction.isTrusted,
+        trustedAtISO: transaction.trustedAtISO,
+        createdAtISO: transaction.createdAtISO,
+        updatedAtISO: transaction.updatedAtISO,
+        rawRows: rawRows
+    )
 }

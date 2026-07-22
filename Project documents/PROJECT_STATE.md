@@ -1,7 +1,7 @@
 # Repository State
 
 - Primary branch: `main`.
-- Latest verified completed increment: Sprint 52 — Trusted Statement Dates and Source Provenance.
+- Latest verified completed increment: Sprint 52A — Strict Trusted Transaction Hydration and Provenance Closure.
 - Latest architecture increment: Sprint 49 — Atomic Confirmed Import and Identifier Ownership. ADR-038 is accepted and its confirmed-import production slice is implemented by Sprint 50.
 - Sprint 50 Task 3 implementation commit: `dda03cf83cdf7d5f49d91bd82e543a669c5c5965`.
 - Sprint 50 Task 4 implementation commit: the single Task 4 commit containing this state update; its exact SHA is recorded by Git and the completion report.
@@ -11,12 +11,13 @@
 - Current migration: V6, establishing trusted statement-date semantics and durable source provenance.
 - Current accepted ADR: ADR-039 — Trusted Statement Dates and Durable Source Provenance.
 - Architecture baseline: Architecture v1.0 Frozen and UI/UX v1.0 Frozen.
-- Build state: Fresh clean Debug and whole-module optimized Release builds and fresh Debug and Release static analyses pass with zero errors and zero analyzer findings. The only tool warning was Xcode's environmental AppIntents metadata-extraction notice for a target without an AppIntents dependency. Release containment verifies that Debug-only subprocess-probe behavior is absent from the production application.
-- Latest verified automated result: 384 top-level test cases across 47 suites passed with 0 failures and 0 unexpected skips using the canonical serial TestPlan execution. Generic `LedgerForgeUITests` remained intentionally disabled.
+- Build state: Fresh clean Debug and whole-module optimized Release builds and fresh Debug and Release static analyses pass with zero errors and zero analyzer findings. The only tool warning was Xcode's environmental AppIntents metadata-extraction notice for a target without an AppIntents dependency. Release containment verifies that Debug-only lifecycle and subprocess-probe behavior is absent from the production application.
+- Latest verified automated result: 387 top-level test cases across 47 suites passed with 0 failures and 0 unexpected skips using the canonical serial TestPlan execution. Generic `LedgerForgeUITests` remained intentionally disabled.
 
 ## Current Production Capability
 
 - The approved Axis Bank NRE CSV path is the only implemented production parser path. Sprint 52 reactivates trusted import only for its approved profile: strict date-only statement evidence, Axis `Asia/Kolkata` date authority, document-scoped source ordinal and bounded durable provenance are verified.
+- Sprint 52A closes trusted persistence-to-runtime handling: malformed financial-date role, timezone evidence, source relationships and profile provenance fail hydration before runtime-store mutation; trusted writes are accepted only by the provider-owned confirmed-import graph.
 - The pipeline performs reader, institution detection, statement classification, parser selection, immutable `FinancialDocument`, validation, duplicate evaluation, explicit confirmation and repository-owned persistence.
 - `DatabaseProvider` is the atomic authority for active repositories and typed persistence state. Production publishes verified SQLite repositories only after open, complete registered-chain history validation, pending migration execution and final-chain revalidation all succeed; the current chain ends at V6.
 - Open, initialization, migration-integrity or migration-execution failure installs centrally rejecting unavailable repositories rather than an in-memory substitute. Import preparation and confirmation, hydration and account metadata mutation gate early, while every repository operation remains centrally fail-closed.
@@ -63,6 +64,8 @@
 - No rollback, resumable import job, batch queue or cancellation after confirmed persistence exists. Confirmed-persistence failure retry remains unsupported pending typed authoritative safety evidence.
 
 ## Recent Verified Changes
+
+- Sprint 52A closes the remaining ADR-039 trusted-hydration and writer boundary. `RepositoryStoreHydrator` rejects unsupported date-role codes, malformed or invalid-IANA timezone evidence, missing/conflicting provenance and missing durable profile metadata without mutating runtime stores; it reads the actual profile ID/version returned by both providers and never defaults, reconstructs or hardcodes trusted evidence. Generic transaction replacement rejects trusted DTOs, while confirmed import validates complete normalized source relationships and rejects malformed provenance atomically with zero accepted residue. No migration was added or altered: V6 already persists the required graph. Focused SQLite/In-Memory parity, confirmed-import atomicity, hydration/relaunch and complete serial TestPlan verification pass; no parser, layout, format, institution or historical-repair support was added.
 
 - Sprint 52 implements ADR-039. Axis printed dates now become strict `StatementDate` values without `Foundation.Date` conversion, persist canonically, hydrate exactly and render as `d MMM yy`. Accepted transactions retain document-scoped reader ordinal, normalized-record digest and profile provenance through the provider-owned atomic graph; repository identity survives hydration. V6 fails nonempty V5 financial graphs closed rather than guessing history. SQLite/In-Memory confirmed-import behavior and the complete TestPlan pass; no additional parser, layout, format or institution support was added.
 

@@ -30,6 +30,9 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
     case persistenceUnavailable
     case unsupportedCurrency(String)
     case invalidPostedDate(String)
+    case invalidFinancialDateRole(String)
+    case invalidStatementTimezoneEvidence(String)
+    case invalidSourceProvenance(String)
     case malformedMoney
     case decimalMinorMismatch
     case accountCurrencyMismatch
@@ -43,6 +46,12 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
             return "Currency \(currency) is not supported by dashboard hydration."
         case .invalidPostedDate(let value):
             return "Transaction posted date \(value) could not be read."
+        case .invalidFinancialDateRole:
+            return "Transaction financial date role could not be read."
+        case .invalidStatementTimezoneEvidence:
+            return "Transaction timezone evidence could not be read."
+        case .invalidSourceProvenance:
+            return "Transaction source provenance could not be read."
         case .malformedMoney:
             return "A persisted monetary value is malformed."
         case .decimalMinorMismatch:
@@ -311,6 +320,32 @@ final class RepositoryStoreHydrator {
             }
         }
         let absoluteAmount = try Money(amount: abs(decimalMoney.amount), currency: decimalMoney.currency)
+        guard let financialDateRole = FinancialDateRole(rawValue: dto.financialDateRole) else {
+            throw RepositoryStoreHydrationError.invalidFinancialDateRole(dto.financialDateRole)
+        }
+        let timezoneEvidence: StatementTimezoneEvidence
+        do { timezoneEvidence = try StatementTimezoneEvidence(validatingPersistenceCode: dto.statementTimezoneEvidence) }
+        catch { throw RepositoryStoreHydrationError.invalidStatementTimezoneEvidence(dto.statementTimezoneEvidence) }
+        let provenance = try dto.rawRows.map { raw -> TransactionSourceProvenance in
+            guard !(raw.normalizedDocumentId ?? "").isEmpty,
+                  !raw.normalizedRowId.isEmpty,
+                  let ordinal = raw.sourceOrdinal, ordinal > 0,
+                  !(raw.normalizedRecordDigest ?? "").isEmpty,
+                  !(raw.parserProfileId ?? "").isEmpty,
+                  !(raw.parserProfileVersion ?? "").isEmpty else {
+                throw RepositoryStoreHydrationError.invalidSourceProvenance(dto.id)
+            }
+            return TransactionSourceProvenance(normalizedDocumentID: raw.normalizedDocumentId!, normalizedRowID: raw.normalizedRowId, sourceOrdinal: ordinal, normalizedRecordDigest: raw.normalizedRecordDigest!, parserProfileID: raw.parserProfileId!, parserProfileVersion: raw.parserProfileVersion!)
+        }
+        guard !provenance.isEmpty,
+              Set(provenance.map(\.normalizedRowID)).count == provenance.count else {
+            throw RepositoryStoreHydrationError.invalidSourceProvenance(dto.id)
+        }
+        let ordinalsByDocument = Dictionary(grouping: provenance, by: \.normalizedDocumentID)
+        guard ordinalsByDocument.values.allSatisfy({ Set($0.map(\.sourceOrdinal)).count == $0.count }),
+              ordinalsByDocument.values.allSatisfy({ Set($0.map { "\($0.parserProfileID)|\($0.parserProfileVersion)" }).count == 1 }) else {
+            throw RepositoryStoreHydrationError.invalidSourceProvenance(dto.id)
+        }
 
         return Transaction(
             statementDate: postedDate,
@@ -324,14 +359,9 @@ final class RepositoryStoreHydrator {
             sourceFile: dto.importSessionId ?? "",
             id: runtimeIdentity(for: dto.id),
             repositoryTransactionId: dto.id,
-            financialDateRole: FinancialDateRole(rawValue: dto.financialDateRole) ?? .transactionDate,
-            statementTimezoneEvidence: StatementTimezoneEvidence(persistenceCode: dto.statementTimezoneEvidence),
-            sourceProvenance: dto.rawRows.compactMap { raw in
-                guard let normalizedDocumentID = raw.normalizedDocumentId,
-                      let ordinal = raw.sourceOrdinal,
-                      let digest = raw.normalizedRecordDigest else { return nil }
-                return TransactionSourceProvenance(normalizedDocumentID: normalizedDocumentID, normalizedRowID: raw.normalizedRowId, sourceOrdinal: ordinal, normalizedRecordDigest: digest, parserProfileID: "axis.nre.csv", parserProfileVersion: "1")
-            },
+            financialDateRole: financialDateRole,
+            statementTimezoneEvidence: timezoneEvidence,
+            sourceProvenance: provenance,
             repositoryAccountId: dto.accountId,
             repositoryImportSessionId: dto.importSessionId
         )

@@ -367,7 +367,9 @@ struct ImportPersistenceMapper {
                     contributionType: "transaction",
                     sourceOrdinal: provenance.sourceOrdinal,
                     normalizedRecordDigest: provenance.normalizedRecordDigest,
-                    normalizedDocumentId: normalizedDocumentID
+                    normalizedDocumentId: normalizedDocumentID,
+                    parserProfileId: provenance.parserProfileID,
+                    parserProfileVersion: provenance.parserProfileVersion
                 )
             }
         )

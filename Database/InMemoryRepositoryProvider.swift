@@ -459,6 +459,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               !plan.historyTemplate.normalizedRows.isEmpty,
               Set(plan.historyTemplate.normalizedRows.map(\.sourceOrdinal)).count == plan.historyTemplate.normalizedRows.count,
               plan.transactionTemplates.allSatisfy({ !$0.transaction.rawRows.isEmpty }),
+              hasValidTrustedProvenance(plan),
               Set(plan.transactionTemplates.map { $0.transaction.id }).count == plan.transactionTemplates.count,
               !hasDuplicateIdentifierCandidates(plan.identifiers) else {
             return .repositoryIntegrityConflict
@@ -648,6 +649,31 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         TransactionDTO(id: template.id, workspaceId: template.workspaceId, accountId: accountID, importSessionId: importSessionID, documentId: documentID, originalRowId: template.originalRowId, postedDateISO: template.postedDateISO, financialDateRole: template.financialDateRole, statementTimezoneEvidence: template.statementTimezoneEvidence, valueDateISO: template.valueDateISO, description: template.description, payee: template.payee, reference: template.reference, nativeCurrency: template.nativeCurrency, amountMinor: template.amountMinor, amountDecimal: template.amountDecimal, direction: template.direction, runningBalanceMinor: template.runningBalanceMinor, isReconciled: template.isReconciled, isTrusted: template.isTrusted, trustedAtISO: template.trustedAtISO, createdAtISO: template.createdAtISO, updatedAtISO: template.updatedAtISO, rawRows: template.rawRows)
     }
 
+    private func hasValidTrustedProvenance(_ plan: ConfirmedImportPlanDTO) -> Bool {
+        guard let document = plan.historyTemplate.normalizedDocument,
+              !document.profileId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !document.profileVersion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        let rows = plan.historyTemplate.normalizedRows
+        guard Set(rows.map(\.id)).count == rows.count,
+              rows.allSatisfy({
+                  !$0.id.isEmpty &&
+                  $0.normalizedDocumentId == document.id &&
+                  $0.sourceOrdinal > 0 &&
+                  !$0.digest.isEmpty
+              }) else {
+            return false
+        }
+        let knownRowIDs = Set(rows.map(\.id))
+        return plan.transactionTemplates.allSatisfy { template in
+            let rawRows = template.transaction.rawRows
+            return !rawRows.isEmpty &&
+                Set(rawRows.map(\.normalizedRowId)).count == rawRows.count &&
+                rawRows.allSatisfy { !$0.id.isEmpty && !$0.normalizedRowId.isEmpty && knownRowIDs.contains($0.normalizedRowId) }
+        }
+    }
+
     private func hasDuplicateIdentifierCandidates(_ candidates: [ConfirmedImportIdentifierCandidateDTO]) -> Bool {
         for index in candidates.indices {
             for laterIndex in candidates.indices where laterIndex > index {
@@ -670,6 +696,9 @@ private final class InMemoryTransactionRepo: TransactionRepository {
 
     func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws {
         state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard !transactions.contains(where: \.isTrusted) else {
+            throw RepositoryError.trustedTransactionWriteForbidden
+        }
         try validate(workspaceId: workspaceId, importSessionId: importSessionId, transactions: transactions)
 
         if let importSessionId {
@@ -688,16 +717,43 @@ private final class InMemoryTransactionRepo: TransactionRepository {
 
     func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO] {
         state.stateLock.lock(); defer { state.stateLock.unlock() }
-        return state.transactions.values
+        return try state.transactions.values
             .filter { transaction in
                 transaction.workspaceId == workspaceId && (importSessionId == nil || transaction.importSessionId == importSessionId)
             }
+            .map(enrichProvenance)
             .sorted(by: Self.sourceSupportedOrder)
     }
 
     func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] {
-        try transactions(workspaceId: workspaceId, importSessionId: nil)
-            .filter(\.isTrusted)
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return try state.transactions.values
+            .filter { $0.workspaceId == workspaceId && $0.isTrusted }
+            .map(enrichProvenance)
+            .sorted(by: Self.sourceSupportedOrder)
+    }
+
+    private func enrichProvenance(_ transaction: TransactionDTO) throws -> TransactionDTO {
+        let rawRows = transaction.rawRows.map { raw -> TransactionRawRowDTO in
+            guard let row = state.normalizedRows[raw.normalizedRowId],
+                  let document = state.normalizedDocuments[row.normalizedDocumentId] else {
+                // Match SQLite's joined read boundary: an orphan must arrive as
+                // incomplete evidence so the hydrator fails closed with its typed
+                // hydration error before changing runtime stores.
+                return TransactionRawRowDTO(
+                    id: raw.id,
+                    normalizedRowId: raw.normalizedRowId,
+                    contributionType: raw.contributionType,
+                    sourceOrdinal: raw.sourceOrdinal,
+                    normalizedRecordDigest: raw.normalizedRecordDigest,
+                    normalizedDocumentId: nil,
+                    parserProfileId: nil,
+                    parserProfileVersion: nil
+                )
+            }
+            return TransactionRawRowDTO(id: raw.id, normalizedRowId: raw.normalizedRowId, contributionType: raw.contributionType, sourceOrdinal: row.sourceOrdinal, normalizedRecordDigest: row.digest, normalizedDocumentId: row.normalizedDocumentId, parserProfileId: document.profileId, parserProfileVersion: document.profileVersion)
+        }
+        return TransactionDTO(id: transaction.id, workspaceId: transaction.workspaceId, accountId: transaction.accountId, importSessionId: transaction.importSessionId, documentId: transaction.documentId, originalRowId: transaction.originalRowId, postedDateISO: transaction.postedDateISO, financialDateRole: transaction.financialDateRole, statementTimezoneEvidence: transaction.statementTimezoneEvidence, valueDateISO: transaction.valueDateISO, description: transaction.description, payee: transaction.payee, reference: transaction.reference, nativeCurrency: transaction.nativeCurrency, amountMinor: transaction.amountMinor, amountDecimal: transaction.amountDecimal, direction: transaction.direction, runningBalanceMinor: transaction.runningBalanceMinor, isReconciled: transaction.isReconciled, isTrusted: transaction.isTrusted, trustedAtISO: transaction.trustedAtISO, createdAtISO: transaction.createdAtISO, updatedAtISO: transaction.updatedAtISO, rawRows: rawRows)
     }
 
     nonisolated private static func sourceSupportedOrder(_ lhs: TransactionDTO, _ rhs: TransactionDTO) -> Bool {
