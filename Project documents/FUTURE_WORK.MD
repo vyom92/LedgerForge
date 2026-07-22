@@ -596,6 +596,46 @@ Investigate additional transaction-event evidence families without expanding the
 
 Each family may require a separate ADR and implementation increment. No family may reuse the Axis UPI algorithm identifier. Stable-looking tokens alone are insufficient; date, amount, narration, balance, filename and row position remain weak evidence. Missing evidence does not prove novelty, and no historical backfill is implied.
 
+---
+
+## FW-P0-21 — Date-Only Semantic Preservation
+
+**Status:** Bug
+**Planning state:** Ready for targeted discovery
+
+Define and preserve statement transaction dates as date-only financial evidence rather than allowing an implicit timezone or time-of-day interpretation to change the represented calendar day.
+
+Targeted discovery must determine:
+
+- the parser-owned date-only domain and validation boundary;
+- the persistence representation and compatibility requirements;
+- hydration behavior that cannot shift a source calendar date;
+- presentation behavior that remains faithful to the source date;
+- deterministic cross-timezone and daylight-saving verification;
+- the policy for existing durable history and whether an independently approved migration or ADR is required.
+
+This candidate does not authorize a durable date redesign, migration, historical rewrite or production-support claim.
+
+---
+
+## FW-P0-22 — Durable Source Order and Provenance
+
+**Status:** Bug
+**Planning state:** Ready for targeted discovery
+
+Define durable source-order and raw-row provenance so same-day financial interpretation can preserve source-supported ordering and explain each persisted transaction without relying on unstable collection order.
+
+Targeted discovery must determine:
+
+- the reader/parser-owned source ordinal and its deterministic meaning;
+- equivalent SQLite and In-Memory provider behavior;
+- durable raw-row provenance and transaction-to-source linkage;
+- same-day running-balance correctness and ordering rules;
+- the policy for existing history that lacks durable source order or raw-row evidence;
+- schema-migration requirements and whether a new or amended ADR is required.
+
+This candidate does not authorize source-ordinal persistence, a migration, historical backfill or a production-support claim.
+
 # P1 — Institution and Parser Expansion
 
 ## FW-P1-01 — Axis Bank Parser Family Expansion
@@ -618,6 +658,8 @@ Each supported layout requires:
 - deterministic institution and parser-selection evidence;
 - verified identifier evidence where available;
 - regression protection.
+
+Remaining fixture-provenance gap: future Axis support or expansion must establish a repository-verifiable chain from approved source evidence to each sanitized fixture and an independent financial-truth oracle that does not use production parser output as its sole authority. Existing regression fixtures do not by themselves authorize new or renewed trusted production-support claims.
 
 Do not generalize the existing parser without fixture-backed evidence.
 
@@ -697,6 +739,8 @@ Candidate outcomes include:
 - shared fixture and regression conventions, including independent source-fidelity guards that do not use the production parser as their sole truth oracle;
 - bounded source-evidence contracts;
 - parser-family organization by institution and document type.
+
+Remaining CSV-grammar gap: targeted discovery must define deterministic handling for quoted delimiters, escaped quotes, embedded line breaks, line-ending variants, empty fields and malformed records while preserving source-row evidence. The current framework and fixtures do not establish broader CSV grammar or production-layout support.
 
 Readers remain responsible for source-format extraction.
 
