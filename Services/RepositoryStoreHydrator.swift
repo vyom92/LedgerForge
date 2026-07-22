@@ -1,6 +1,7 @@
 // LedgerForge
 // RepositoryStoreHydrator.swift
 
+import CryptoKit
 import Foundation
 
 struct RepositoryStoreHydrationResult: Equatable {
@@ -275,7 +276,7 @@ final class RepositoryStoreHydrator {
     }
 
     private static func transaction(from dto: TransactionDTO, accounts: [AccountDTO]) throws -> Transaction {
-        guard let postedDate = dayFormatter.date(from: dto.postedDateISO) else {
+        guard let postedDate = try? StatementDate(canonical: dto.postedDateISO) else {
             throw RepositoryStoreHydrationError.invalidPostedDate(dto.postedDateISO)
         }
 
@@ -312,7 +313,7 @@ final class RepositoryStoreHydrator {
         let absoluteAmount = try Money(amount: abs(decimalMoney.amount), currency: decimalMoney.currency)
 
         return Transaction(
-            date: postedDate,
+            statementDate: postedDate,
             description: dto.description ?? "",
             debitMoney: dto.direction == "debit" ? absoluteAmount : nil,
             creditMoney: dto.direction == "credit" ? absoluteAmount : nil,
@@ -321,9 +322,33 @@ final class RepositoryStoreHydrator {
             account: accountDTO.name,
             sourceBank: accountDTO.institutionId ?? "",
             sourceFile: dto.importSessionId ?? "",
+            id: runtimeIdentity(for: dto.id),
+            repositoryTransactionId: dto.id,
+            financialDateRole: FinancialDateRole(rawValue: dto.financialDateRole) ?? .transactionDate,
+            statementTimezoneEvidence: StatementTimezoneEvidence(persistenceCode: dto.statementTimezoneEvidence),
+            sourceProvenance: dto.rawRows.compactMap { raw in
+                guard let normalizedDocumentID = raw.normalizedDocumentId,
+                      let ordinal = raw.sourceOrdinal,
+                      let digest = raw.normalizedRecordDigest else { return nil }
+                return TransactionSourceProvenance(normalizedDocumentID: normalizedDocumentID, normalizedRowID: raw.normalizedRowId, sourceOrdinal: ordinal, normalizedRecordDigest: digest, parserProfileID: "axis.nre.csv", parserProfileVersion: "1")
+            },
             repositoryAccountId: dto.accountId,
             repositoryImportSessionId: dto.importSessionId
         )
+    }
+
+    /// Runtime selection needs a `UUID`, while repository IDs remain opaque immutable strings.
+    /// UUID-shaped persisted IDs retain their exact identity. Legacy/test repository IDs receive
+    /// only a deterministic UI surrogate; the original durable identity is always exposed by
+    /// `repositoryTransactionId` and is never replaced by a newly generated UUID.
+    private static func runtimeIdentity(for persistedID: String) -> UUID {
+        if let persistedUUID = UUID(uuidString: persistedID) {
+            return persistedUUID
+        }
+        let digest = SHA256.hash(data: Data(persistedID.utf8)).map { String(format: "%02x", $0) }.joined()
+        let canonical = "\(digest.prefix(8))-\(digest.dropFirst(8).prefix(4))-\(digest.dropFirst(12).prefix(4))-\(digest.dropFirst(16).prefix(4))-\(digest.dropFirst(20).prefix(12))"
+        // A SHA-256 digest always produces a syntactically valid UUID-shaped string here.
+        return UUID(uuidString: canonical)!
     }
 
     private static func accountType(from value: String?) -> AccountType {
@@ -342,38 +367,25 @@ final class RepositoryStoreHydrator {
     }
 
     private static func latestRunningBalance(from transactions: [Transaction], currency: String) throws -> Money? {
-        let latest = transactions
-            .enumerated()
-            .compactMap { offset, transaction -> (offset: Int, date: Date?, balance: Money)? in
-                guard let balance = transaction.runningBalanceMoney else { return nil }
-                return (offset, transaction.date, balance)
-            }
-            .sorted { lhs, rhs in
-                switch (lhs.date, rhs.date) {
-                case let (left?, right?) where left != right:
-                    return left > right
-                case (.some, nil):
-                    return true
-                case (nil, .some):
-                    return false
-                default:
-                    return lhs.offset > rhs.offset
-                }
-            }
-            .first
+        let dated = transactions.compactMap { transaction -> (Transaction, Money)? in
+            guard transaction.statementDate != nil, let balance = transaction.runningBalanceMoney else { return nil }
+            return (transaction, balance)
+        }
+        guard let latestDate = dated.compactMap({ $0.0.statementDate }).max() else { return nil }
+        let candidates = dated.filter { $0.0.statementDate == latestDate }
+        let latest: (Transaction, Money)?
+        if let documentID = candidates.first?.0.documentScopedSourceOrder?.documentID,
+           candidates.allSatisfy({ $0.0.documentScopedSourceOrder?.documentID == documentID }) {
+            latest = candidates.max(by: { ($0.0.documentScopedSourceOrder?.ordinal ?? 0) < ($1.0.documentScopedSourceOrder?.ordinal ?? 0) })
+        } else {
+            latest = candidates.count == 1 ? candidates.first : nil
+        }
 
         guard let latest else { return nil }
-        guard latest.balance.currency.code == currency else {
+        guard latest.1.currency.code == currency else {
             throw RepositoryStoreHydrationError.runningBalanceCurrencyMismatch
         }
-        return latest.balance
+        return latest.1
     }
 
-    private static let dayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter
-    }()
 }

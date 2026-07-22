@@ -79,7 +79,7 @@ struct DashboardViewModelTests {
     @Test func transactionSummaryAndSnapshotUseRuntimeStoreTransactions() throws {
         resetDashboardStores()
         let older = makeTransaction(
-            date: makeDate(year: 2026, month: 7, day: 1),
+            statementDate: makeStatementDate(year: 2026, month: 7, day: 1),
             description: "Debit purchase",
             debit: Decimal(20),
             credit: nil,
@@ -87,7 +87,7 @@ struct DashboardViewModelTests {
             balance: Decimal(980)
         )
         let newer = makeTransaction(
-            date: makeDate(year: 2026, month: 7, day: 8),
+            statementDate: makeStatementDate(year: 2026, month: 7, day: 8),
             description: "Salary credit",
             debit: nil,
             credit: Decimal(100),
@@ -114,7 +114,7 @@ struct DashboardViewModelTests {
         resetDashboardStores()
         TransactionStore.shared.replaceTransactions([
             Transaction(
-                date: makeDate(year: 2026, month: 7, day: 8),
+                statementDate: makeStatementDate(year: 2026, month: 7, day: 8),
                 description: "Qatari salary",
                 debit: nil,
                 credit: Decimal(123.45),
@@ -131,6 +131,36 @@ struct DashboardViewModelTests {
 
         let expectedMoney = try Money(amount: Decimal(string: "123.45")!, currency: "QAR")
         #expect(viewModel.recentTransactionSummaries.first?.amount == expectedMoney)
+    }
+
+    @Test func sameDateDifferentDocumentsUseStableDisplayOnlyAndWithholdBalanceAuthority() {
+        resetDashboardStores()
+        let date = makeStatementDate(year: 2026, month: 6, day: 6)
+        let first = makeTransaction(
+            statementDate: date,
+            description: "Document A ordinal 99",
+            debit: nil,
+            credit: 10,
+            amount: 10,
+            balance: 100,
+            repositoryTransactionId: "durable-a",
+            provenance: testProvenance(document: "document-a", ordinal: 99)
+        )
+        let second = makeTransaction(
+            statementDate: date,
+            description: "Document B ordinal 1",
+            debit: nil,
+            credit: 20,
+            amount: 20,
+            balance: 200,
+            repositoryTransactionId: "durable-b",
+            provenance: testProvenance(document: "document-b", ordinal: 1)
+        )
+        TransactionStore.shared.replaceTransactions([first, second])
+        let viewModel = DashboardViewModel()
+
+        #expect(viewModel.recentTransactionSummaries.map(\.description) == ["Document B ordinal 1", "Document A ordinal 99"])
+        #expect(viewModel.snapshot.netWorth == .zero)
     }
 
     @Test func hydrationPresentationStateRecordsLoadedAndFailedResults() {
@@ -160,15 +190,17 @@ private func resetDashboardStores() {
 }
 
 private func makeTransaction(
-    date: Date,
+    statementDate: StatementDate,
     description: String,
     debit: Decimal?,
     credit: Decimal?,
     amount: Decimal,
-    balance: Decimal
+    balance: Decimal,
+    repositoryTransactionId: String? = nil,
+    provenance: [TransactionSourceProvenance] = []
 ) -> Transaction {
     Transaction(
-        date: date,
+        statementDate: statementDate,
         description: description,
         debit: debit,
         credit: credit,
@@ -177,16 +209,16 @@ private func makeTransaction(
         currency: "INR",
         account: "Axis NRE",
         sourceBank: "Axis Bank",
-        sourceFile: "repository"
+        sourceFile: "repository",
+        repositoryTransactionId: repositoryTransactionId,
+        sourceProvenance: provenance
     )
 }
 
-private func makeDate(year: Int, month: Int, day: Int) -> Date {
-    DateComponents(
-        calendar: Calendar(identifier: .gregorian),
-        timeZone: TimeZone(secondsFromGMT: 0),
-        year: year,
-        month: month,
-        day: day
-    ).date!
+private func makeStatementDate(year: Int, month: Int, day: Int) -> StatementDate {
+    try! StatementDate(year: year, month: month, day: day)
+}
+
+private func testProvenance(document: String, ordinal: Int) -> [TransactionSourceProvenance] {
+    [TransactionSourceProvenance(normalizedDocumentID: document, normalizedRowID: "row-\(document)-\(ordinal)", sourceOrdinal: ordinal, normalizedRecordDigest: String.normalizedRecordDigest(values: [document, "\(ordinal)"]), parserProfileID: "test", parserProfileVersion: "1")]
 }

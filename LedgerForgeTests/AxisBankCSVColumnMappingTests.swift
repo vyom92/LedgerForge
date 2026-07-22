@@ -164,7 +164,7 @@ struct AxisBankCSVColumnMappingTests {
     ) -> [AxisTransactionProjection] {
         document.transactions.map {
             AxisTransactionProjection(
-                date: $0.date,
+                statementDate: $0.statementDate,
                 description: $0.description,
                 debit: $0.debit,
                 credit: $0.credit,
@@ -176,7 +176,7 @@ struct AxisBankCSVColumnMappingTests {
 }
 
 private struct AxisTransactionProjection: Equatable {
-    let date: Date?
+    let statementDate: StatementDate?
     let description: String
     let debit: Decimal?
     let credit: Decimal?

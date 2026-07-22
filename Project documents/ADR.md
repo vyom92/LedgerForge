@@ -4257,3 +4257,28 @@ No production guarantee may be recorded until implementation, migration safety w
 - ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking
 - ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics
 - ADR-037 — Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal
+
+---
+
+# ADR-039 — Trusted Statement Dates and Durable Source Provenance
+
+**Status:** Accepted and implemented by Sprint 52.
+
+## Decision
+
+`StatementDate` is the immutable Gregorian calendar date printed and assigned by the source institution. It contains year, month and day only, persists strictly as `YYYY-MM-DD`, and displays directly as English `d MMM yy`; it is never an instant, `Foundation.Date`, local midnight or timezone conversion. Financial date role and separate bounded timezone evidence persist alongside it. The supported Axis NRE profile records its printed `dd-MM-yyyy` transaction-date semantics and `Asia/Kolkata` evidence without transforming the date.
+
+Source ordinal is the one-based physical record position in one reader-produced normalized document. Parser output retains it with a privacy-minimal normalized-record digest and profile identifier/version. `normalized_documents`, `normalized_rows`, `transactions.original_row_id`, and `transaction_raw_rows` are the durable provenance boundary; unrestricted row text is not retained. One transaction may link to multiple source records in the DTO/provider shape.
+
+Within one source document, `StatementDate + source ordinal` is the authoritative sequence. Across documents, equal calendar dates do not establish intraday chronology. Stable display ties are non-financial; current/running-balance selection fails closed when a latest-date cross-document choice is ambiguous. Persisted repository IDs survive hydration as explicit durable transaction IDs.
+
+Migration V6 adds date-role/timezone metadata, profile metadata and record digest, and rejects a nonempty V5 financial graph with an explicit pre-production reset requirement. It never guesses dates, ordinals or provenance. SQLite and In-Memory confirmation are atomic and equivalent: accepted graph, provenance and identity records all commit or none do; missing/conflicting provenance is rejected without accepted residue.
+
+## Consequences
+
+The approved Axis NRE CSV path is reactivated only within this exact profile and its verified evidence boundary. This does not add institutions, layouts, a general Import Profile framework, historical repair, raw-row storage, cross-document chronology, or support for timestamps from date-only evidence.
+
+## Related ADRs
+
+- ADR-024 — Repository Hydration Boundary
+- ADR-038 — Atomic Confirmed Import and Durable Identifier Ownership

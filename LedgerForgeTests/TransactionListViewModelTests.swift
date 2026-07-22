@@ -10,6 +10,20 @@ import Testing
 @Suite("TransactionListViewModel", .serialized)
 struct TransactionListViewModelTests {
 
+    @Test func closingBalanceWithholdsAuthorityForEqualDateDifferentDocuments() {
+        let transactionStore = TransactionStore()
+        let importSessionStore = ImportSessionStore()
+        let date = try! StatementDate(canonical: "2026-06-06")
+        transactionStore.replaceTransactions([
+            transactionForClosingBalance(document: "document-a", ordinal: 99, balance: 100, date: date),
+            transactionForClosingBalance(document: "document-b", ordinal: 1, balance: 200, date: date)
+        ])
+
+        let viewModel = TransactionListViewModel(transactionStore: transactionStore, importSessionStore: importSessionStore)
+
+        #expect(viewModel.closingBalance == nil)
+    }
+
     @MainActor
     @Test
     func searchTrimsWhitespaceAndMatchesDescriptionAccountAndBank() async throws {
@@ -101,7 +115,7 @@ struct TransactionListViewModelTests {
         let transactionStore = TransactionStore()
         let importSessionStore = ImportSessionStore()
         let passed = Transaction(
-            date: Date(timeIntervalSince1970: 1_700_000_000),
+            statementDate: try! StatementDate(canonical: "2023-11-14"),
             description: "Persisted passed transaction",
             debit: nil,
             credit: 10,
@@ -114,7 +128,7 @@ struct TransactionListViewModelTests {
             repositoryImportSessionId: "session-passed"
         )
         let withoutSession = Transaction(
-            date: Date(timeIntervalSince1970: 1_700_000_001),
+            statementDate: try! StatementDate(canonical: "2023-11-14"),
             description: "No provenance",
             debit: 10,
             credit: nil,
@@ -217,7 +231,7 @@ struct TransactionListViewModelTests {
 
     private static let sampleTransactions: [Transaction] = [
         Transaction(
-            date: Date(timeIntervalSince1970: 1_700_000_000),
+            statementDate: try! StatementDate(canonical: "2023-11-14"),
             description: "Salary credit",
             debit: nil,
             credit: Decimal(100_000),
@@ -229,7 +243,7 @@ struct TransactionListViewModelTests {
             sourceFile: "salary.csv"
         ),
         Transaction(
-            date: Date(timeIntervalSince1970: 1_700_100_000),
+            statementDate: try! StatementDate(canonical: "2023-11-16"),
             description: "Rent debit",
             debit: Decimal(25_000),
             credit: nil,
@@ -245,7 +259,7 @@ struct TransactionListViewModelTests {
 
 private func transactionForValidationPresentation(sessionID: String, description: String) -> Transaction {
     Transaction(
-        date: Date(timeIntervalSince1970: 1_700_000_000),
+        statementDate: try! StatementDate(canonical: "2023-11-14"),
         description: description,
         debit: nil,
         credit: 10,
@@ -256,6 +270,29 @@ private func transactionForValidationPresentation(sessionID: String, description
         sourceBank: "CBQ",
         sourceFile: "presentation.csv",
         repositoryImportSessionId: sessionID
+    )
+}
+
+private func transactionForClosingBalance(document: String, ordinal: Int, balance: Decimal, date: StatementDate) -> Transaction {
+    Transaction(
+        statementDate: date,
+        description: "Closing balance evidence",
+        debit: nil,
+        credit: 1,
+        amount: 1,
+        balance: balance,
+        currency: "INR",
+        account: "Axis NRE",
+        sourceBank: "Axis",
+        sourceFile: "fixture",
+        sourceProvenance: [TransactionSourceProvenance(
+            normalizedDocumentID: document,
+            normalizedRowID: "row-\(document)-\(ordinal)",
+            sourceOrdinal: ordinal,
+            normalizedRecordDigest: String.normalizedRecordDigest(values: [document, "\(ordinal)"]),
+            parserProfileID: "test",
+            parserProfileVersion: "1"
+        )]
     )
 }
 

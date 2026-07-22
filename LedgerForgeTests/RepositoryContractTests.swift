@@ -796,9 +796,9 @@ struct RepositoryContractTests {
         #expect(try v3Database.queryInt("SELECT COUNT(*) FROM transactions;") == 2)
         v3Database.close()
 
-        let provider = try SQLiteRepositoryProvider(path: databasePath)
+        let provider = try SQLiteRepositoryProvider(path: databasePath, migrations: Array(allMigrations.prefix(5)))
         defer { provider.database.close() }
-        #expect(try provider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == allMigrations.map(\.version).max())
+        #expect(try provider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == migrationV5.version)
         #expect(try provider.database.queryInt("SELECT COUNT(*) FROM import_attempts;") == 1)
         #expect(try provider.database.query(sql: "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_import_attempts_workspace_created';") { _ in true }.count == 1)
         let foreignKeyTables = try provider.database.query(sql: "PRAGMA foreign_key_list(import_attempts);") { $0.string(at: 2) ?? "" }
@@ -820,10 +820,15 @@ struct RepositoryContractTests {
         #expect(try provider.accountRepo.account(id: accountID)?.id == accountID)
         #expect(try provider.accountRepo.identifiers(accountId: accountID, workspaceId: workspaceID).map(\.id) == [identifierID])
         #expect(try provider.importSessionRepo.importSession(id: sessionID)?.completedAtISO == completedAt)
-        let preservedTransactions = try provider.transactionRepo.transactions(workspaceId: workspaceID, importSessionId: sessionID)
-        #expect(preservedTransactions.map(\.id) == ["transaction-v3-b", "transaction-v3-a"])
-        #expect(preservedTransactions.map(\.amountMinor) == [-700, 2_500])
-        #expect(preservedTransactions.allSatisfy { $0.workspaceId == workspaceID && $0.accountId == accountID && $0.importSessionId == sessionID && $0.documentId == documentID })
+        let preservedTransactions = try provider.database.query(
+            sql: "SELECT id, amount_minor, workspace_id, account_id, import_session_id, document_id FROM transactions WHERE import_session_id = ? ORDER BY amount_minor ASC;",
+            params: [sessionID]
+        ) { row in
+            (row.string(at: 0) ?? "", row.int64(at: 1) ?? 0, row.string(at: 2), row.string(at: 3), row.string(at: 4), row.string(at: 5))
+        }
+        #expect(preservedTransactions.map(\.0) == ["transaction-v3-b", "transaction-v3-a"])
+        #expect(preservedTransactions.map(\.1) == [-700, 2_500])
+        #expect(preservedTransactions.allSatisfy { $0.2 == workspaceID && $0.3 == accountID && $0.4 == sessionID && $0.5 == documentID })
         #expect(try provider.database.queryInt("SELECT COUNT(*) FROM documents WHERE id = 'document-v3';") == 1)
         #expect(try provider.database.queryInt("SELECT COUNT(*) FROM document_fingerprints WHERE id = 'fingerprint-v3' AND fingerprint = 'fictional-fingerprint-v3';") == 1)
         #expect(try provider.database.queryInt("SELECT COUNT(*) FROM transaction_event_identities WHERE id = 'event-v3' AND digest = 'fictional-event-digest-v3';") == 1)
@@ -838,12 +843,13 @@ struct RepositoryContractTests {
             #expect(!persistedAttemptText.contains(prohibited))
         }
 
-        let reopenedProvider = try SQLiteRepositoryProvider(path: databasePath)
+        let reopenedProvider = try SQLiteRepositoryProvider(path: databasePath, migrations: Array(allMigrations.prefix(5)))
         defer { reopenedProvider.database.close() }
-        #expect(try reopenedProvider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == allMigrations.map(\.version).max())
+        #expect(try reopenedProvider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == migrationV5.version)
         #expect(try reopenedProvider.importSessionRepo.importAttempts(workspaceId: workspaceID) == attempts)
         #expect(try reopenedProvider.database.queryInt("SELECT COUNT(*) FROM import_attempts;") == 1)
         #expect(try reopenedProvider.database.queryInt("SELECT COUNT(*) FROM transactions;") == 2)
+
     }
 
 }
@@ -984,7 +990,9 @@ private func seedParentUpsertGraph(in provider: SQLiteRepositoryProvider) throws
             TransactionRawRowDTO(
                 id: "raw-parent-upsert",
                 normalizedRowId: "normalized-row-parent-upsert",
-                contributionType: "transaction"
+                contributionType: "transaction",
+                sourceOrdinal: 0,
+                normalizedDocumentId: "normalized-document-parent-upsert"
             )
         ]
     )

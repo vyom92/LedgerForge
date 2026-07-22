@@ -1018,7 +1018,7 @@ struct ContentView: View {
                 } else {
                     ForEach(dashboardViewModel.recentTransactionSummaries) { transaction in
                         HStack(spacing: 14) {
-                            Text(formatDate(transaction.date))
+                            Text(formatDate(transaction.statementDate))
                                 .frame(width: 84, alignment: .leading)
                             Text(transaction.description)
                                 .lineLimit(1)
@@ -1840,7 +1840,7 @@ struct ContentView: View {
 
     private func previewTransactionRow(_ transaction: Transaction) -> some View {
         HStack(spacing: 14) {
-            Text(formatDate(transaction.date))
+            Text(formatDate(transaction.statementDate))
                 .frame(width: 84, alignment: .leading)
             Text(transaction.description)
                 .lineLimit(1)
@@ -2339,7 +2339,7 @@ struct ContentView: View {
         }
     }
 
-    private func statementPeriodText(_ period: ClosedRange<Date>?) -> String {
+    private func statementPeriodText(_ period: ClosedRange<StatementDate>?) -> String {
         guard let period else { return "Unknown" }
         if period.lowerBound == period.upperBound {
             return formatDate(period.lowerBound)
@@ -2374,10 +2374,7 @@ struct ContentView: View {
         }
     }
 
-    private func formatDate(_ date: Date?) -> String {
-        guard let date else { return "—" }
-        return Self.dateFormatter.string(from: date)
-    }
+    private func formatDate(_ date: StatementDate?) -> String { date?.presentation ?? "—" }
 
     private func formatCurrency(_ value: Decimal, currencyCode: String = "INR") -> String {
         guard let money = try? Money(amount: value, currency: currencyCode) else {
@@ -2385,12 +2382,6 @@ struct ContentView: View {
         }
         return MoneyFormatting.display(money)
     }
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM yyyy"
-        return formatter
-    }()
 
     private static let numberFormatter: NumberFormatter = {
         let formatter = NumberFormatter()

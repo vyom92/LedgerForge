@@ -46,8 +46,8 @@ struct AccountImportHistoryPresentation: Identifiable, Equatable {
     let validationStatus: String
     let parserVersion: String?
     let transactionCount: Int
-    let firstTransactionDate: Date?
-    let lastTransactionDate: Date?
+    let firstTransactionDate: StatementDate?
+    let lastTransactionDate: StatementDate?
     let currencyCode: String?
 }
 
@@ -301,7 +301,7 @@ final class AccountsViewModel: ObservableObject {
             guard let sessionTransactions = transactionsBySessionID[session.id]?.map(\.1), !sessionTransactions.isEmpty else {
                 return nil
             }
-            let sortedDates = sessionTransactions.compactMap(\.date).sorted()
+            let sortedDates = sessionTransactions.compactMap(\.statementDate).sorted()
             let currencies = Set(sessionTransactions.map(\.currency))
             return AccountImportHistoryPresentation(
                 id: session.id,
@@ -325,7 +325,7 @@ final class AccountsViewModel: ObservableObject {
     }
 
     private static func isNewer(_ lhs: Transaction, _ rhs: Transaction) -> Bool {
-        switch (lhs.date, rhs.date) {
+        switch (lhs.statementDate, rhs.statementDate) {
         case let (left?, right?) where left != right:
             return left > right
         case (.some, nil):
@@ -333,8 +333,18 @@ final class AccountsViewModel: ObservableObject {
         case (nil, .some):
             return false
         default:
-            return lhs.id.uuidString > rhs.id.uuidString
+            return Self.displayOrder(lhs, rhs)
         }
+    }
+
+    private static func displayOrder(_ lhs: Transaction, _ rhs: Transaction) -> Bool {
+        if lhs.documentScopedSourceOrder?.documentID == rhs.documentScopedSourceOrder?.documentID,
+           let left = lhs.documentScopedSourceOrder?.ordinal,
+           let right = rhs.documentScopedSourceOrder?.ordinal,
+           left != right {
+            return left > right
+        }
+        return (lhs.repositoryTransactionId ?? lhs.id.uuidString) > (rhs.repositoryTransactionId ?? rhs.id.uuidString)
     }
 
     private static func accountTypeLabel(_ type: AccountType) -> String {

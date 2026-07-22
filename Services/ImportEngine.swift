@@ -157,8 +157,8 @@ struct PreparedImport: Identifiable {
         financialDocument.bookedCurrency?.code ?? validation.statementCurrency?.code
     }
 
-    var statementPeriod: ClosedRange<Date>? {
-        let dates = financialDocument.transactions.compactMap(\.date).sorted()
+    var statementPeriod: ClosedRange<StatementDate>? {
+        let dates = financialDocument.transactions.compactMap(\.statementDate).sorted()
         guard let first = dates.first, let last = dates.last else {
             return nil
         }

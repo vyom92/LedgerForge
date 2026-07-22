@@ -28,9 +28,10 @@ struct AxisNREFixtureFidelityTests {
             let oracle = try IndependentAxisCSVOracle.load(csvFileName: fixture.csv)
             let parsed = try parseProductionFixture(fileName: fixture.csv)
             let parserProjection = try parsed.financialDocument.transactions.map {
-                let date = try #require($0.date)
+                let date = try #require($0.statementDate)
                 return IndependentAxisTransaction(
-                    date: Self.dateFormatter.string(from: date),
+                    date: "\(String(format: "%02d", date.day))-\(String(format: "%02d", date.month))-\(String(format: "%04d", date.year))",
+                    physicalRowNumber: $0.sourceProvenance.first?.sourceOrdinal,
                     debit: $0.debit,
                     credit: $0.credit,
                     balance: $0.balance,
@@ -45,6 +46,20 @@ struct AxisNREFixtureFidelityTests {
             #expect(parsed.validation.openingBalance == oracle.openingBalance)
             #expect(parsed.validation.closingBalance == oracle.closingBalance)
         }
+    }
+
+    @Test func sameDayAxisRowsRetainIndependentPhysicalOrder() throws {
+        let fixture = "axis_bank_nre_account_statement_baseline.csv"
+        let oracle = try IndependentAxisCSVOracle.load(csvFileName: fixture)
+        let parsed = try parseProductionFixture(fileName: fixture).financialDocument.transactions
+        let sameDay = try #require(oracle.transactions.first { candidate in
+            oracle.transactions.filter { $0.date == candidate.date }.count > 1
+        }?.date)
+        let expectedOrdinals = oracle.transactions.filter { $0.date == sameDay }.compactMap(\.physicalRowNumber)
+        let actualOrdinals = parsed.filter {
+            $0.statementDate.map { "\(String(format: "%02d", $0.day))-\(String(format: "%02d", $0.month))-\(String(format: "%04d", $0.year))" } == sameDay
+        }.compactMap { $0.sourceProvenance.first?.sourceOrdinal }
+        #expect(actualOrdinals == expectedOrdinals)
     }
 
     @Test func privacySafeRealLayoutRegressionPreservesUPISubtypes() throws {
@@ -72,13 +87,6 @@ struct AxisNREFixtureFidelityTests {
             expected: "axis_bank_nre_header_semantic_regression.expected.json"
         )
     ]
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd-MM-yyyy"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter
-    }()
 
     private func parseProductionFixture(
         fileName: String
@@ -118,6 +126,7 @@ private struct ParsedAxisNREFixture {
 
 private struct IndependentAxisTransaction: Equatable {
     let date: String
+    let physicalRowNumber: Int?
     let debit: Decimal?
     let credit: Decimal?
     let balance: Decimal?
@@ -164,7 +173,7 @@ private struct IndependentAxisCSVOracle {
         for (offset, line) in lines.dropFirst(headerOffset + 1).enumerated() {
             let rowNumber = headerOffset + offset + 2
             let values = cells(in: line)
-            guard values.indices.contains(date), Self.dateFormatter.date(from: values[date]) != nil else {
+            guard values.indices.contains(date), Self.isAxisDate(values[date]) else {
                 continue
             }
             guard values.count > mandatoryMaximum else {
@@ -180,6 +189,7 @@ private struct IndependentAxisCSVOracle {
             transactions.append(
                 IndependentAxisTransaction(
                     date: values[date],
+                    physicalRowNumber: rowNumber,
                     debit: debit,
                     credit: credit,
                     balance: runningBalance,
@@ -234,6 +244,16 @@ private struct IndependentAxisCSVOracle {
         }
     }
 
+    private static func isAxisDate(_ value: String) -> Bool {
+        let parts = value.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0].count == 2, parts[1].count == 2, parts[2].count == 4,
+              let day = Int(parts[0]), let month = Int(parts[1]), let year = Int(parts[2]),
+              year >= 1, (1...12).contains(month) else { return false }
+        let leapYear = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+        let monthLengths = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        return (1...monthLengths[month - 1]).contains(day)
+    }
+
     private static func normalizeHeader(_ value: String) -> String {
         value
             .split(whereSeparator: \Character.isWhitespace)
@@ -277,12 +297,6 @@ private struct IndependentAxisCSVOracle {
         )
     }
 
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd-MM-yyyy"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter
-    }()
 }
 
 private struct AxisNREFidelityExpectation: Decodable {

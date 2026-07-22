@@ -207,7 +207,7 @@ struct TransactionListView: View {
 
                     Divider().overlay(LFTheme.divider)
 
-                    LFInfoRow(title: "Date", value: formatDate(selected.date), titleWidth: 86, verticalPadding: 0)
+                    LFInfoRow(title: "Date", value: formatDate(selected.statementDate), titleWidth: 86, verticalPadding: 0)
                     LFInfoRow(title: "Account", value: selected.account, titleWidth: 86, verticalPadding: 0)
                     LFInfoRow(title: "Category", value: "Imported", titleWidth: 86, verticalPadding: 0)
                     LFInfoRow(title: "Type", value: selected.credit != nil ? "Credit" : "Debit", titleWidth: 86, verticalPadding: 0)
@@ -258,7 +258,7 @@ struct TransactionListView: View {
                 Image(systemName: isSelected ? "checkmark.square.fill" : "square")
                     .foregroundStyle(isSelected ? LFTheme.primaryHover : LFTheme.textSecondary)
                     .frame(width: 20)
-                Text(formatDate(transaction.date))
+                Text(formatDate(transaction.statementDate))
                     .frame(width: 84, alignment: .leading)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(transaction.description)
@@ -367,20 +367,11 @@ struct TransactionListView: View {
     }
 
 
-    private func formatDate(_ date: Date?) -> String {
-        guard let date else { return "—" }
-        return Self.dateFormatter.string(from: date)
-    }
+    private func formatDate(_ date: StatementDate?) -> String { date?.presentation ?? "—" }
 
     private func formatSigned(_ transaction: Transaction) -> String {
         MoneyFormatting.signedDisplay(transaction.money, isCredit: transaction.creditMoney != nil)
     }
-
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM yyyy"
-        return formatter
-    }()
 
 }
 

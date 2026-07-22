@@ -44,7 +44,14 @@ final class ImportValidator {
             ))
         }
 
-        for transaction in transactions {
+        for (index, transaction) in transactions.enumerated() {
+            if transaction.statementDate == nil {
+                issues.append(ValidationIssue(
+                    severity: .error,
+                    rowNumber: transaction.sourceProvenance.first?.sourceOrdinal ?? index + 1,
+                    message: "Transaction is missing a statement date."
+                ))
+            }
             if let statementCurrency, transaction.money.currency != statementCurrency {
                 issues.append(ValidationIssue(
                     severity: .error,
@@ -117,7 +124,7 @@ final class ImportValidator {
                     issues.append(
                         ValidationIssue(
                             severity: .error,
-                            rowNumber: index + 1,
+                            rowNumber: current.sourceProvenance.first?.sourceOrdinal ?? index + 1,
                             message: "Balance reconciliation failed on \(current.description). Expected \(expectedBalance.amount), found \(currentBalance.amount)."
                         )
                     )

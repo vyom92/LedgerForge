@@ -67,6 +67,12 @@ struct ImportRepositoryIntegrationTests {
             #expect(transactions.allSatisfy { $0.accountId == result.accountId })
             #expect(transactions.allSatisfy { $0.importSessionId == fixture.importSession.id.uuidString })
             #expect(transactions.allSatisfy { $0.documentId != nil })
+            #expect(transactions.allSatisfy { $0.financialDateRole == FinancialDateRole.transactionDate.rawValue })
+            #expect(transactions.allSatisfy { $0.statementTimezoneEvidence == "iana:Asia/Kolkata" })
+            #expect(transactions.allSatisfy { $0.rawRows.count == 1 })
+            #expect(transactions.map { $0.rawRows.first?.sourceOrdinal } == [1, 2])
+            #expect(transactions.map { $0.rawRows.first?.normalizedDocumentId }.allSatisfy { $0 != nil })
+            #expect(transactions.map { $0.rawRows.first?.normalizedRecordDigest }.allSatisfy { $0?.count == 64 })
 
             let orderedTransactions = transactions.sorted {
                 if $0.postedDateISO == $1.postedDateISO {
@@ -370,6 +376,8 @@ struct ImportRepositoryIntegrationTests {
             fingerprint: fixture.fingerprint
         )
         #expect(persistence.persisted)
+        let persistedIDs = try initialProvider.transactionRepo.trustedTransactions(workspaceId: "workspace-import-integration").map(\.id)
+        #expect(persistedIDs.count == 2)
 
         resetRuntimeStoresForImportIntegration()
         let relaunchedProvider = try SQLiteRepositoryProvider(path: dbPath)
@@ -388,8 +396,13 @@ struct ImportRepositoryIntegrationTests {
         #expect(AccountStore.shared.accounts.first?.name == "Axis Bank INR")
         #expect(AccountStore.shared.accounts.first?.institution == "Axis Bank")
         #expect(TransactionStore.shared.transactions.count == 2)
+        #expect(TransactionStore.shared.transactions.map(\.repositoryTransactionId) == persistedIDs.map(Optional.some))
         #expect(TransactionStore.shared.transactions.allSatisfy { !$0.account.contains(".csv") })
         #expect(TransactionStore.shared.transactions.allSatisfy { $0.sourceBank == "Axis Bank" })
+
+        let forced = try hydrator.hydrateIfNeeded(forceRefresh: true)
+        #expect(forced.didHydrate)
+        #expect(TransactionStore.shared.transactions.map(\.repositoryTransactionId) == persistedIDs.map(Optional.some))
     }
 
     @Test func mapperUsesSuppliedAccountIdForAccountAndEveryTransaction() async throws {
@@ -1589,7 +1602,8 @@ private func makeValidFixture(
 ) -> ImportRepositoryFixture {
     var transactions = [
         makeTransaction(
-            date: Date(timeIntervalSince1970: 1_804_896_000),
+            statementDate: try! StatementDate(canonical: "2027-03-13"),
+            sourceOrdinal: 1,
             description: "Opening credit",
             debit: nil,
             credit: 100,
@@ -1598,7 +1612,8 @@ private func makeValidFixture(
             currency: currency
         ),
         makeTransaction(
-            date: Date(timeIntervalSince1970: 1_804_982_400),
+            statementDate: try! StatementDate(canonical: "2027-03-14"),
+            sourceOrdinal: 2,
             description: "Card payment",
             debit: 50,
             credit: nil,
@@ -1714,7 +1729,8 @@ private func makeImportSession(
 }
 
 private func makeTransaction(
-    date: Date,
+    statementDate: StatementDate,
+    sourceOrdinal: Int,
     description: String,
     debit: Decimal?,
     credit: Decimal?,
@@ -1723,7 +1739,7 @@ private func makeTransaction(
     currency: String
 ) -> Transaction {
     Transaction(
-        date: date,
+        statementDate: statementDate,
         description: description,
         debit: debit,
         credit: credit,
@@ -1732,7 +1748,18 @@ private func makeTransaction(
         currency: currency,
         account: "Axis NRE",
         sourceBank: "Axis Bank",
-        sourceFile: "repository-integration.csv"
+        sourceFile: "repository-integration.csv",
+        statementTimezoneEvidence: .iana("Asia/Kolkata"),
+        sourceProvenance: [
+            TransactionSourceProvenance(
+                normalizedDocumentID: "fixture-normalized-document",
+                normalizedRowID: "fixture-normalized-row-\(sourceOrdinal)",
+                sourceOrdinal: sourceOrdinal,
+                normalizedRecordDigest: String.normalizedRecordDigest(values: ["fixture", "\(sourceOrdinal)"]),
+                parserProfileID: "axis.nre.csv",
+                parserProfileVersion: "1"
+            )
+        ]
     )
 }
 

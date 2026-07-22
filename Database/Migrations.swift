@@ -337,7 +337,34 @@ FROM import_sessions s
 WHERE s.validation_status = 'passed' AND s.completed_at IS NOT NULL;
 """)
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5]
+/// The first trusted statement-date and source-provenance schema. Existing
+/// financial graphs are deliberately rejected by the pre-production audit;
+/// no historical date, row order, or provenance is guessed or rewritten.
+public let migrationV6 = Migration(
+    version: 6,
+    name: "trusted_statement_dates_and_source_provenance",
+    sql: """
+ALTER TABLE transactions ADD COLUMN financial_date_role TEXT NOT NULL DEFAULT 'transaction_date';
+ALTER TABLE transactions ADD COLUMN statement_timezone_evidence TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE normalized_documents ADD COLUMN profile_id TEXT;
+ALTER TABLE normalized_documents ADD COLUMN profile_version TEXT;
+ALTER TABLE normalized_rows ADD COLUMN record_digest TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_normalized_rows_document_ordinal ON normalized_rows(normalized_document_id, row_index);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transaction_raw_rows_transaction_row ON transaction_raw_rows(transaction_id, normalized_row_id);
+""",
+    preflightChecks: [
+        MigrationPreflightCheck(issueCode: "preproduction-reset-required") { database in
+            try database.queryInt("SELECT COUNT(*) FROM transactions;") == 0
+        },
+        MigrationPreflightCheck(issueCode: "preproduction-normalized-reset-required") { database in
+            try database.queryInt("SELECT COUNT(*) FROM normalized_documents;") == 0 &&
+            database.queryInt("SELECT COUNT(*) FROM normalized_rows;") == 0 &&
+            database.queryInt("SELECT COUNT(*) FROM transaction_raw_rows;") == 0
+        }
+    ]
+)
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

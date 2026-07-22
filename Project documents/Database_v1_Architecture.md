@@ -51,6 +51,10 @@ Migration V4 adds the bounded `import_attempts` ledger. Attempt rows are workspa
 
 Successful attempts are persisted atomically with successful import history. Rejected attempts remain distinct from successful import sessions and may be recorded without financial mutation. Attempt history excludes raw source content, identifiers, references, fingerprints, event digests, unrestricted narration, paths and localized errors. SQLite and In-Memory providers enforce equivalent behavior.
 
+### Migration V6 trusted statement dates and source provenance
+
+Migration V6 establishes the first trusted statement-date/provenance graph. `transactions.posted_date` holds strict `YYYY-MM-DD` `StatementDate` text; `financial_date_role` and `statement_timezone_evidence` preserve separate date semantics and bounded timezone evidence. `normalized_documents.profile_id/profile_version`, `normalized_rows.record_digest`, and existing normalized-row/transaction link tables preserve document-scoped ordinal and bounded digest without unrestricted source-row text. A nonempty V5 financial graph fails the V6 preflight with a pre-production reset requirement; no historical value is repaired, inferred or deleted. SQLite and In-Memory confirmed-import publication are atomic and parity-tested.
+
 Production transaction persistence currently stores one authoritative native amount and currency pair. Original merchant amount and currency, statement conversion evidence, statement-provided FX rates and fee decomposition remain unpersisted card evidence under ADR-034 and require the completed ADR-033 Money boundary plus later persistence design; they are not production-supported.
 
 ### Currency and exchange-rate schema capacity

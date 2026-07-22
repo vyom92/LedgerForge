@@ -30,11 +30,38 @@ public struct TransactionRawRowDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let normalizedRowId: String
     public let contributionType: String?
+    public let sourceOrdinal: Int?
+    public let normalizedRecordDigest: String?
+    public let normalizedDocumentId: String?
 
-    public init(id: String = UUID().uuidString, normalizedRowId: String, contributionType: String? = nil) {
+    public init(id: String = UUID().uuidString, normalizedRowId: String, contributionType: String? = nil, sourceOrdinal: Int? = nil, normalizedRecordDigest: String? = nil, normalizedDocumentId: String? = nil) {
         self.id = id
         self.normalizedRowId = normalizedRowId
         self.contributionType = contributionType
+        self.sourceOrdinal = sourceOrdinal
+        self.normalizedRecordDigest = normalizedRecordDigest
+        self.normalizedDocumentId = normalizedDocumentId
+    }
+}
+
+public struct NormalizedDocumentDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let importSessionId: String
+    public let documentId: String
+    public let profileId: String
+    public let profileVersion: String
+    public init(id: String, importSessionId: String, documentId: String, profileId: String, profileVersion: String) {
+        self.id = id; self.importSessionId = importSessionId; self.documentId = documentId; self.profileId = profileId; self.profileVersion = profileVersion
+    }
+}
+
+public struct NormalizedRowDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let normalizedDocumentId: String
+    public let sourceOrdinal: Int
+    public let digest: String
+    public init(id: String, normalizedDocumentId: String, sourceOrdinal: Int, digest: String) {
+        self.id = id; self.normalizedDocumentId = normalizedDocumentId; self.sourceOrdinal = sourceOrdinal; self.digest = digest
     }
 }
 
@@ -46,6 +73,8 @@ public struct TransactionDTO: nonisolated Equatable, Sendable {
     public let documentId: String?
     public let originalRowId: String?
     public let postedDateISO: String
+    public let financialDateRole: String
+    public let statementTimezoneEvidence: String
     public let valueDateISO: String?
     public let description: String?
     public let payee: String?
@@ -69,6 +98,8 @@ public struct TransactionDTO: nonisolated Equatable, Sendable {
                 documentId: String? = nil,
                 originalRowId: String? = nil,
                 postedDateISO: String,
+                financialDateRole: String = "transaction_date",
+                statementTimezoneEvidence: String = "unknown",
                 valueDateISO: String? = nil,
                 description: String? = nil,
                 payee: String? = nil,
@@ -91,6 +122,8 @@ public struct TransactionDTO: nonisolated Equatable, Sendable {
         self.documentId = documentId
         self.originalRowId = originalRowId
         self.postedDateISO = postedDateISO
+        self.financialDateRole = financialDateRole
+        self.statementTimezoneEvidence = statementTimezoneEvidence
         self.valueDateISO = valueDateISO
         self.description = description
         self.payee = payee

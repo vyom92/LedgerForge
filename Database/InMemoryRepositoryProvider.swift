@@ -57,6 +57,8 @@ private final class InMemoryRepositoryState {
     var documents: [String: ImportedDocumentDTO] = [:]
     var documentFingerprints: [String: DocumentFingerprintDTO] = [:]
     var importSessions: [String: ImportSessionRecordDTO] = [:]
+    var normalizedDocuments: [String: NormalizedDocumentDTO] = [:]
+    var normalizedRows: [String: NormalizedRowDTO] = [:]
     var transactions: [String: TransactionDTO] = [:]
     var transactionEventIdentities: [String: TransactionEventIdentityDTO] = [:]
     var importAttempts: [String: ImportAttemptDTO] = [:]
@@ -453,6 +455,10 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               plan.historyTemplate.fingerprint.documentId == plan.historyTemplate.document.id,
               plan.historyTemplate.fingerprint.importSessionId == plan.historyTemplate.importSession.id,
               plan.historyTemplate.successfulAttempt.workspaceId == plan.workspace.id,
+              plan.historyTemplate.normalizedDocument != nil,
+              !plan.historyTemplate.normalizedRows.isEmpty,
+              Set(plan.historyTemplate.normalizedRows.map(\.sourceOrdinal)).count == plan.historyTemplate.normalizedRows.count,
+              plan.transactionTemplates.allSatisfy({ !$0.transaction.rawRows.isEmpty }),
               Set(plan.transactionTemplates.map { $0.transaction.id }).count == plan.transactionTemplates.count,
               !hasDuplicateIdentifierCandidates(plan.identifiers) else {
             return .repositoryIntegrityConflict
@@ -468,6 +474,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         var documents = state.documents
         var fingerprints = state.documentFingerprints
         var sessions = state.importSessions
+        var normalizedDocuments = state.normalizedDocuments
+        var normalizedRows = state.normalizedRows
         var transactions = state.transactions
         var eventIdentities = state.transactionEventIdentities
         var attempts = state.importAttempts
@@ -586,6 +594,21 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         guard documents[history.document.id] == nil,
               fingerprints[history.fingerprint.id] == nil,
               sessions[history.importSession.id] == nil,
+              let normalizedDocument = history.normalizedDocument,
+              normalizedDocument.importSessionId == history.importSession.id,
+              normalizedDocument.documentId == history.document.id,
+              normalizedDocuments[normalizedDocument.id] == nil,
+              history.normalizedRows.allSatisfy({
+                  $0.normalizedDocumentId == normalizedDocument.id &&
+                  $0.sourceOrdinal > 0 &&
+                  !$0.digest.isEmpty &&
+                  normalizedRows[$0.id] == nil
+              }),
+              finalTransactions.allSatisfy({ transaction in
+                  transaction.rawRows.allSatisfy { raw in
+                      history.normalizedRows.contains { $0.id == raw.normalizedRowId }
+                  }
+              }),
               attempts[history.successfulAttempt.id] == nil,
               history.successfulAttempt.accountId == account.id,
               history.successfulAttempt.importSessionId == history.importSession.id,
@@ -603,6 +626,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             layoutVersion: history.importSession.layoutVersion
         )
         if injectedFailure == .importSession { return .repositoryIntegrityConflict }
+        normalizedDocuments[normalizedDocument.id] = normalizedDocument
+        history.normalizedRows.forEach { normalizedRows[$0.id] = $0 }
         finalTransactions.forEach { transactions[$0.id] = $0 }
         if injectedFailure == .transactions { return .repositoryIntegrityConflict }
         finalEvents.forEach { eventIdentities[$0.id] = $0 }
@@ -613,13 +638,14 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
 
         state.workspaces = workspaces; state.accounts = accounts; state.accountIdentifiers = identifiers
         state.identifierObservations = observations; state.documents = documents; state.documentFingerprints = fingerprints
-        state.importSessions = sessions; state.transactions = transactions; state.transactionEventIdentities = eventIdentities
+        state.importSessions = sessions; state.normalizedDocuments = normalizedDocuments; state.normalizedRows = normalizedRows
+        state.transactions = transactions; state.transactionEventIdentities = eventIdentities
         state.importAttempts = attempts
         return .committed(ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id))
     }
 
     private func withFinalRelationships(_ template: TransactionDTO, accountID: String, importSessionID: String, documentID: String) -> TransactionDTO {
-        TransactionDTO(id: template.id, workspaceId: template.workspaceId, accountId: accountID, importSessionId: importSessionID, documentId: documentID, originalRowId: template.originalRowId, postedDateISO: template.postedDateISO, valueDateISO: template.valueDateISO, description: template.description, payee: template.payee, reference: template.reference, nativeCurrency: template.nativeCurrency, amountMinor: template.amountMinor, amountDecimal: template.amountDecimal, direction: template.direction, runningBalanceMinor: template.runningBalanceMinor, isReconciled: template.isReconciled, isTrusted: template.isTrusted, trustedAtISO: template.trustedAtISO, createdAtISO: template.createdAtISO, updatedAtISO: template.updatedAtISO, rawRows: template.rawRows)
+        TransactionDTO(id: template.id, workspaceId: template.workspaceId, accountId: accountID, importSessionId: importSessionID, documentId: documentID, originalRowId: template.originalRowId, postedDateISO: template.postedDateISO, financialDateRole: template.financialDateRole, statementTimezoneEvidence: template.statementTimezoneEvidence, valueDateISO: template.valueDateISO, description: template.description, payee: template.payee, reference: template.reference, nativeCurrency: template.nativeCurrency, amountMinor: template.amountMinor, amountDecimal: template.amountDecimal, direction: template.direction, runningBalanceMinor: template.runningBalanceMinor, isReconciled: template.isReconciled, isTrusted: template.isTrusted, trustedAtISO: template.trustedAtISO, createdAtISO: template.createdAtISO, updatedAtISO: template.updatedAtISO, rawRows: template.rawRows)
     }
 
     private func hasDuplicateIdentifierCandidates(_ candidates: [ConfirmedImportIdentifierCandidateDTO]) -> Bool {
@@ -666,17 +692,28 @@ private final class InMemoryTransactionRepo: TransactionRepository {
             .filter { transaction in
                 transaction.workspaceId == workspaceId && (importSessionId == nil || transaction.importSessionId == importSessionId)
             }
-            .sorted { lhs, rhs in
-                if lhs.postedDateISO == rhs.postedDateISO {
-                    return lhs.id < rhs.id
-                }
-                return lhs.postedDateISO < rhs.postedDateISO
-            }
+            .sorted(by: Self.sourceSupportedOrder)
     }
 
     func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] {
         try transactions(workspaceId: workspaceId, importSessionId: nil)
             .filter(\.isTrusted)
+    }
+
+    nonisolated private static func sourceSupportedOrder(_ lhs: TransactionDTO, _ rhs: TransactionDTO) -> Bool {
+        if lhs.postedDateISO != rhs.postedDateISO { return lhs.postedDateISO < rhs.postedDateISO }
+        let lhsSource = lhs.rawRows.first
+        let rhsSource = rhs.rawRows.first
+        if lhsSource?.normalizedDocumentId == rhsSource?.normalizedDocumentId,
+           let lhsOrdinal = lhsSource?.sourceOrdinal,
+           let rhsOrdinal = rhsSource?.sourceOrdinal,
+           lhsOrdinal != rhsOrdinal {
+            return lhsOrdinal < rhsOrdinal
+        }
+        if lhsSource?.normalizedDocumentId != rhsSource?.normalizedDocumentId {
+            return (lhsSource?.normalizedDocumentId ?? "~") < (rhsSource?.normalizedDocumentId ?? "~")
+        }
+        return lhs.id < rhs.id
     }
 
     private func validate(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws {

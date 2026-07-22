@@ -9,6 +9,8 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
     case currencyRelationshipInvalid
     case missingTransactionDate(UUID)
     case missingTransactionDirection(UUID)
+    case missingTransactionProvenance
+    case conflictingTransactionProvenance
 
     var errorDescription: String? {
         switch self {
@@ -22,6 +24,10 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
             return "Transaction \(id) is missing a posted date."
         case .missingTransactionDirection(let id):
             return "Transaction \(id) is missing a debit or credit direction."
+        case .missingTransactionProvenance:
+            return "Import persistence requires transaction source provenance."
+        case .conflictingTransactionProvenance:
+            return "Import persistence found conflicting transaction source provenance."
         }
     }
 }
@@ -33,6 +39,8 @@ struct ImportPersistencePayload {
     let fingerprint: DocumentFingerprintDTO
     let importSession: ImportSessionDTO
     let completedAtISO: String
+    let normalizedDocument: NormalizedDocumentDTO
+    let normalizedRows: [NormalizedRowDTO]
     let transactions: [TransactionDTO]
     let transactionEventIdentities: [TransactionEventIdentityDTO]
 }
@@ -93,11 +101,28 @@ struct ImportPersistenceMapper {
             createdAtISO: importedAtISO
         )
 
+        let normalizedDocumentID = "normalized-document-\(importSession.id.uuidString.lowercased())"
+        let normalizedRows = try financialDocument.transactions.flatMap(\.sourceProvenance).map { provenance in
+            guard provenance.sourceOrdinal > 0, !provenance.normalizedRecordDigest.isEmpty else {
+                throw ImportPersistenceError.missingTransactionProvenance
+            }
+            return NormalizedRowDTO(
+                id: "normalized-row-\(importSession.id.uuidString.lowercased())-\(provenance.sourceOrdinal)",
+                normalizedDocumentId: normalizedDocumentID,
+                sourceOrdinal: provenance.sourceOrdinal,
+                digest: provenance.normalizedRecordDigest
+            )
+        }
+        guard Set(normalizedRows.map(\.sourceOrdinal)).count == normalizedRows.count else {
+            throw ImportPersistenceError.conflictingTransactionProvenance
+        }
         let transactions = try financialDocument.transactions.map {
             try transactionDTO(
                 from: $0,
                 createdAtISO: importedAtISO,
-                documentCurrency: documentCurrency
+                documentCurrency: documentCurrency,
+                normalizedDocumentID: normalizedDocumentID,
+                importSessionID: importSession.id.uuidString
             )
         }
         return ImportPersistencePayload(
@@ -124,6 +149,14 @@ struct ImportPersistenceMapper {
                 layoutVersion: nil
             ),
             completedAtISO: importedAtISO,
+            normalizedDocument: NormalizedDocumentDTO(
+                id: normalizedDocumentID,
+                importSessionId: importSessionId,
+                documentId: documentId,
+                profileId: "axis.nre.csv",
+                profileVersion: "1"
+            ),
+            normalizedRows: normalizedRows,
             transactions: transactions,
             transactionEventIdentities: []
         )
@@ -187,7 +220,9 @@ struct ImportPersistenceMapper {
                 fingerprint: payload.fingerprint,
                 importSession: payload.importSession,
                 completedAtISO: payload.completedAtISO,
-                successfulAttempt: successfulAttempt
+                successfulAttempt: successfulAttempt,
+                normalizedDocument: payload.normalizedDocument,
+                normalizedRows: payload.normalizedRows
             ),
             transactionTemplates: templates
         )
@@ -276,11 +311,14 @@ struct ImportPersistenceMapper {
     private func transactionDTO(
         from transaction: Transaction,
         createdAtISO: String,
-        documentCurrency: String
+        documentCurrency: String,
+        normalizedDocumentID: String,
+        importSessionID: String
     ) throws -> TransactionDTO {
-        guard let postedDate = transaction.date else {
+        guard let postedDate = transaction.statementDate else {
             throw ImportPersistenceError.missingTransactionDate(transaction.id)
         }
+        guard !transaction.sourceProvenance.isEmpty else { throw ImportPersistenceError.missingTransactionProvenance }
 
         let direction: String
         if transaction.debitMoney != nil {
@@ -305,7 +343,9 @@ struct ImportPersistenceMapper {
             importSessionId: nil,
             documentId: nil,
             originalRowId: nil,
-            postedDateISO: Self.dayFormatter.string(from: postedDate),
+            postedDateISO: postedDate.canonical,
+            financialDateRole: transaction.financialDateRole.rawValue,
+            statementTimezoneEvidence: transaction.statementTimezoneEvidence.persistenceCode,
             valueDateISO: nil,
             description: transaction.description,
             payee: nil,
@@ -320,7 +360,16 @@ struct ImportPersistenceMapper {
             trustedAtISO: createdAtISO,
             createdAtISO: createdAtISO,
             updatedAtISO: nil,
-            rawRows: []
+            rawRows: transaction.sourceProvenance.map { provenance in
+                TransactionRawRowDTO(
+                    id: "transaction-source-\(transaction.id.uuidString.lowercased())-\(provenance.sourceOrdinal)",
+                    normalizedRowId: "normalized-row-\(importSessionID.lowercased())-\(provenance.sourceOrdinal)",
+                    contributionType: "transaction",
+                    sourceOrdinal: provenance.sourceOrdinal,
+                    normalizedRecordDigest: provenance.normalizedRecordDigest,
+                    normalizedDocumentId: normalizedDocumentID
+                )
+            }
         )
     }
 
@@ -343,11 +392,4 @@ struct ImportPersistenceMapper {
         return currency.code
     }
 
-    private static let dayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter
-    }()
 }

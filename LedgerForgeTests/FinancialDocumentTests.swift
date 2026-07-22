@@ -7,6 +7,14 @@ import Testing
 @MainActor
 struct FinancialDocumentTests {
 
+    @Test func statementDateUsesInvariantCalendarPresentationWithoutFoundationDate() throws {
+        let date = try StatementDate(canonical: "2026-06-06")
+
+        #expect(date.canonical == "2026-06-06")
+        #expect(date.presentation == "6 Jun 26")
+        #expect(try StatementDate.axisNRE("06-06-2026") == date)
+    }
+
     @Test func axisParserReturnsFinancialDocumentForApprovedCSVFixture() async throws {
         let parsedFixture = try await parseApprovedAxisCSVFixture()
 
@@ -140,8 +148,8 @@ struct FinancialDocumentTests {
         let transactions = parsedFixture.financialDocument.transactions
 
         #expect(transactions.count == parsedFixture.expected.transactionCount)
-        #expect(Self.dayMonthYearFormatter.string(from: try #require(transactions.first?.date)) == parsedFixture.expected.firstTransactionDate)
-        #expect(Self.dayMonthYearFormatter.string(from: try #require(transactions.last?.date)) == parsedFixture.expected.lastTransactionDate)
+        #expect(axisDateString(try #require(transactions.first?.statementDate)) == parsedFixture.expected.firstTransactionDate)
+        #expect(axisDateString(try #require(transactions.last?.statementDate)) == parsedFixture.expected.lastTransactionDate)
         #expect(transactions.allSatisfy { $0.sourceFile == parsedFixture.normalizedDocument.document.filename })
     }
 
@@ -192,12 +200,9 @@ struct FinancialDocumentTests {
         #expect(preservedIdentifier.provenance == .institutionStructuredField)
     }
 
-    private static let dayMonthYearFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd-MM-yyyy"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter
-    }()
+    private func axisDateString(_ date: StatementDate) -> String {
+        "\(String(format: "%02d", date.day))-\(String(format: "%02d", date.month))-\(String(format: "%04d", date.year))"
+    }
 
     private func expectedStatementAccountValue(
         from sourceContext: NormalizedDocument.SourceContext

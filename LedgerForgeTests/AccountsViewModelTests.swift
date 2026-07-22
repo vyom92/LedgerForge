@@ -81,9 +81,9 @@ struct AccountsViewModelTests {
         let stores = PresentationStores()
         stores.accounts.replaceAccounts([runtimeAccount(repositoryID: "account-a", name: "Alpha", balance: 100)])
         stores.transactions.replaceTransactions([
-            runtimeTransaction(accountID: "account-a", sessionID: "session-old", description: "Old", date: date("2026-07-01")),
-            runtimeTransaction(accountID: "account-a", sessionID: "session-new", description: "New", date: date("2026-07-03")),
-            runtimeTransaction(accountID: "account-b", sessionID: "session-other", description: "Other", date: date("2026-07-04"))
+            runtimeTransaction(accountID: "account-a", sessionID: "session-old", description: "Old", statementDate: testStatementDate("2026-07-01")),
+            runtimeTransaction(accountID: "account-a", sessionID: "session-new", description: "New", statementDate: testStatementDate("2026-07-03")),
+            runtimeTransaction(accountID: "account-b", sessionID: "session-other", description: "Other", statementDate: testStatementDate("2026-07-04"))
         ])
         stores.importSessions.replaceImportSessions([
             RepositoryImportSession(id: "session-old", workspaceId: "workspace", sourceDocumentName: "old.csv", startedAtISO: "2026-07-01T00:00:00Z", completedAtISO: nil, validationStatus: "passed", parserVersion: "Parser A"),
@@ -103,7 +103,7 @@ struct AccountsViewModelTests {
         stores.accounts.replaceAccounts([runtimeAccount(repositoryID: "account-qar", name: "Qatar", balance: 100)])
         stores.transactions.replaceTransactions([
             Transaction(
-                date: date("2026-07-02"),
+                statementDate: testStatementDate("2026-07-02"),
                 description: "QAR activity",
                 debit: nil,
                 credit: Decimal(string: "123.45")!,
@@ -121,6 +121,28 @@ struct AccountsViewModelTests {
         let viewModel = makeViewModel(coordinator: RecordingMetadataCoordinator(), stores: stores)
 
         #expect(viewModel.recentActivity.first?.signedAmountDisplay == "+QAR 123.45")
+    }
+
+    @Test func equalDateCrossDocumentActivityUsesDurableDisplayOrderNotSourceOrdinalOrInputOrder() {
+        let stores = PresentationStores()
+        stores.accounts.replaceAccounts([runtimeAccount(repositoryID: "account-a", name: "Alpha", balance: 100)])
+        let first = runtimeTransaction(
+            accountID: "account-a", sessionID: "session-a", description: "Document A ordinal 99",
+            statementDate: testStatementDate("2026-06-06"), repositoryTransactionID: "durable-a",
+            provenance: testProvenance(document: "document-a", ordinal: 99)
+        )
+        let second = runtimeTransaction(
+            accountID: "account-a", sessionID: "session-b", description: "Document B ordinal 1",
+            statementDate: testStatementDate("2026-06-06"), repositoryTransactionID: "durable-b",
+            provenance: testProvenance(document: "document-b", ordinal: 1)
+        )
+        stores.transactions.replaceTransactions([first, second])
+        let viewModel = makeViewModel(coordinator: RecordingMetadataCoordinator(), stores: stores)
+
+        #expect(viewModel.recentActivity.map(\.description) == ["Document B ordinal 1", "Document A ordinal 99"])
+
+        stores.transactions.replaceTransactions([second, first])
+        #expect(viewModel.recentActivity.map(\.description) == ["Document B ordinal 1", "Document A ordinal 99"])
     }
 }
 
@@ -166,9 +188,16 @@ private func runtimeAccount(repositoryID: String, name: String, balance: Decimal
     )
 }
 
-private func runtimeTransaction(accountID: String, sessionID: String, description: String, date: Date = date("2026-07-02")) -> Transaction {
+private func runtimeTransaction(
+    accountID: String,
+    sessionID: String,
+    description: String,
+    statementDate: StatementDate = testStatementDate("2026-07-02"),
+    repositoryTransactionID: String? = nil,
+    provenance: [TransactionSourceProvenance] = []
+) -> Transaction {
     Transaction(
-        date: date,
+        statementDate: statementDate,
         description: description,
         debit: nil,
         credit: 100,
@@ -178,15 +207,24 @@ private func runtimeTransaction(accountID: String, sessionID: String, descriptio
         account: "Presentation only",
         sourceBank: "Axis",
         sourceFile: "Presentation only",
+        repositoryTransactionId: repositoryTransactionID,
+        sourceProvenance: provenance,
         repositoryAccountId: accountID,
         repositoryImportSessionId: sessionID
     )
 }
 
-private func date(_ value: String) -> Date {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd"
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.timeZone = TimeZone(secondsFromGMT: 0)
-    return formatter.date(from: value)!
+private func testStatementDate(_ value: String) -> StatementDate {
+    try! StatementDate(canonical: value)
+}
+
+private func testProvenance(document: String, ordinal: Int) -> [TransactionSourceProvenance] {
+    [TransactionSourceProvenance(
+        normalizedDocumentID: document,
+        normalizedRowID: "row-\(document)-\(ordinal)",
+        sourceOrdinal: ordinal,
+        normalizedRecordDigest: String.normalizedRecordDigest(values: [document, "\(ordinal)"]),
+        parserProfileID: "test",
+        parserProfileVersion: "1"
+    )]
 }

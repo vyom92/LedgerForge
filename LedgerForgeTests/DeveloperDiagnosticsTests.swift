@@ -280,7 +280,8 @@ struct DeveloperDiagnosticsTests {
         let engine = ImportEngine(
             importPersistenceCoordinator: persistence,
             developerConsole: console,
-            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            forcedHydration: { RepositoryStoreHydrationResult(didHydrate: true, accountCount: 0, transactionCount: 0) }
         )
         let result = await engine.importFileAndReturnResult(
             from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
@@ -389,7 +390,7 @@ private func resetDiagnosticRuntimeStores() {
 
 private func diagnosticTransaction() -> Transaction {
     Transaction(
-        date: Date(timeIntervalSince1970: 1_804_896_000),
+        statementDate: try! StatementDate(canonical: "2027-03-13"),
         description: "Runtime credit",
         debit: nil,
         credit: 100,

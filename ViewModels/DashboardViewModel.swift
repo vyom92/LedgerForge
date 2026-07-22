@@ -46,7 +46,7 @@ struct DashboardAccountSummary: Identifiable, Equatable {
 
 struct DashboardTransactionSummary: Identifiable, Equatable {
     let id: UUID
-    let date: Date?
+    let statementDate: StatementDate?
     let description: String
     let amount: Money
     let currency: String
@@ -203,25 +203,18 @@ final class DashboardViewModel: ObservableObject {
     }
 
     private static func latestKnownBalance(from transactions: [Transaction]) -> Decimal {
-        transactions
-            .enumerated()
-            .compactMap { offset, transaction -> (offset: Int, date: Date?, balance: Decimal)? in
-                guard let balance = transaction.balance else { return nil }
-                return (offset, transaction.date, balance)
-            }
-            .sorted { lhs, rhs in
-                switch (lhs.date, rhs.date) {
-                case let (left?, right?) where left != right:
-                    return left > right
-                case (.some, nil):
-                    return true
-                case (nil, .some):
-                    return false
-                default:
-                    return lhs.offset > rhs.offset
-                }
-            }
-            .first?.balance ?? .zero
+        let dated = transactions.compactMap { transaction -> (Transaction, Decimal)? in
+            guard transaction.statementDate != nil, let balance = transaction.balance else { return nil }
+            return (transaction, balance)
+        }
+        guard let latestDate = dated.compactMap({ $0.0.statementDate }).max() else { return .zero }
+        let latest = dated.filter { $0.0.statementDate == latestDate }
+        guard let documentID = latest.first?.0.documentScopedSourceOrder?.documentID,
+              latest.allSatisfy({ $0.0.documentScopedSourceOrder?.documentID == documentID }),
+              let result = latest.max(by: { ($0.0.documentScopedSourceOrder?.ordinal ?? 0) < ($1.0.documentScopedSourceOrder?.ordinal ?? 0) }) else {
+            return latest.count == 1 ? latest.first?.1 ?? .zero : .zero
+        }
+        return result.1
     }
 
     private static func recentTransactionSummaries(
@@ -231,7 +224,7 @@ final class DashboardViewModel: ObservableObject {
         transactions
             .enumerated()
             .sorted { lhs, rhs in
-                switch (lhs.element.date, rhs.element.date) {
+                switch (lhs.element.statementDate, rhs.element.statementDate) {
                 case let (left?, right?) where left != right:
                     return left > right
                 case (.some, nil):
@@ -239,19 +232,29 @@ final class DashboardViewModel: ObservableObject {
                 case (nil, .some):
                     return false
                 default:
-                    return lhs.offset > rhs.offset
+                    return displayOrder(lhs.element, rhs.element)
                 }
             }
             .prefix(limit)
             .map { _, transaction in
                 DashboardTransactionSummary(
                     id: transaction.id,
-                    date: transaction.date,
+                    statementDate: transaction.statementDate,
                     description: transaction.description,
                     amount: transaction.money,
                     currency: transaction.currency,
                     isCredit: transaction.credit != nil
                 )
             }
+    }
+
+    private static func displayOrder(_ lhs: Transaction, _ rhs: Transaction) -> Bool {
+        if lhs.documentScopedSourceOrder?.documentID == rhs.documentScopedSourceOrder?.documentID,
+           let left = lhs.documentScopedSourceOrder?.ordinal,
+           let right = rhs.documentScopedSourceOrder?.ordinal,
+           left != right {
+            return left > right
+        }
+        return (lhs.repositoryTransactionId ?? lhs.id.uuidString) > (rhs.repositoryTransactionId ?? rhs.id.uuidString)
     }
 }

@@ -37,10 +37,10 @@ struct MigrationChainIntegrityTests {
         }
     }
 
-    @Test func currentV1ThroughV5RegistrationIsValidAndDeterministic() throws {
+    @Test func currentV1ThroughV6RegistrationIsValidAndDeterministic() throws {
         try MigrationChainValidator.validateRegistered(allMigrations)
 
-        #expect(allMigrations.map(\.version) == [1, 2, 3, 4, 5])
+        #expect(allMigrations.map(\.version) == [1, 2, 3, 4, 5, 6])
         #expect(allMigrations.map(\.checksum).allSatisfy { $0.count == 64 })
         #expect(allMigrations.map(\.checksum) == allMigrations.map(\.checksum))
     }
@@ -93,9 +93,9 @@ struct MigrationChainIntegrityTests {
     }
 
     @Test func persistedHistoryRejectsUnsupportedFutureVersion() {
-        let future = PersistedMigrationRecord(version: 6, name: "future", checksum: String(repeating: "f", count: 64), appliedAt: "2026-07-20T00:00:00Z")
+        let future = PersistedMigrationRecord(version: 7, name: "future", checksum: String(repeating: "f", count: 64), appliedAt: "2026-07-20T00:00:00Z")
 
-        #expect(throws: MigrationIntegrityError.unsupportedFutureVersion(6)) {
+        #expect(throws: MigrationIntegrityError.unsupportedFutureVersion(7)) {
             try MigrationChainValidator.validatePersisted(allMigrations.map(record(for:)) + [future], against: allMigrations, requiresCompleteChain: false)
         }
     }
@@ -121,7 +121,7 @@ struct MigrationChainIntegrityTests {
         )
     }
 
-    @Test func freshDatabaseCreatesOneExactV1ThroughV5History() throws {
+    @Test func freshDatabaseCreatesOneExactV1ThroughV6History() throws {
         try withTemporaryDatabase(named: "Fresh") { path in
             let provider = try SQLiteRepositoryProvider(path: path)
             defer { provider.database.close() }
@@ -130,7 +130,7 @@ struct MigrationChainIntegrityTests {
         }
     }
 
-    @Test(arguments: [1, 2, 3, 4])
+    @Test(arguments: [1, 2, 3, 4, 5])
     func everySupportedPriorVersionUpgradesOrReopensToCurrent(_ priorVersion: Int) throws {
         try withTemporaryDatabase(named: "Upgrade-V\(priorVersion)") { path in
             let seed = SQLiteDatabase(path: path)
@@ -141,6 +141,28 @@ struct MigrationChainIntegrityTests {
             defer { provider.database.close() }
 
             try expectCurrentHistory(in: provider.database)
+        }
+    }
+
+    @Test func nonemptyV5FinancialHistoryFailsClosedWithExplicitPreproductionResetRequirement() throws {
+        try withTemporaryDatabase(named: "Nonempty-V5") { path in
+            let database = SQLiteDatabase(path: path)
+            try database.runMigrations(Array(allMigrations.prefix(5)))
+            try database.executePrepared(
+                sql: "INSERT INTO workspaces(id, name, created_at) VALUES(?, ?, ?);",
+                params: ["workspace-v5-history", "V5 history", "2026-07-20T00:00:00Z"]
+            )
+            try database.executePrepared(
+                sql: "INSERT INTO transactions(id, workspace_id, posted_date, native_currency, amount_minor, amount_decimal, direction, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?);",
+                params: ["transaction-v5-history", "workspace-v5-history", "2026-06-06", "INR", 100, "1.00", "credit", "2026-07-20T00:00:00Z"]
+            )
+
+            #expect(throws: MigrationPreflightError.failed(issueCode: "preproduction-reset-required")) {
+                try database.runMigrations(allMigrations)
+            }
+            #expect(try database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 5)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM transactions;") == 1)
+            database.close()
         }
     }
 
@@ -195,10 +217,10 @@ struct MigrationChainIntegrityTests {
         try withTamperedCurrentDatabase(named: "Future") { database in
             try database.executePrepared(
                 sql: "INSERT INTO schema_migrations(version, name, applied_at, checksum) VALUES(?, ?, ?, ?);",
-                params: [6, "future", "2026-07-20T00:00:00Z", String(repeating: "f", count: 64)]
+                params: [7, "future", "2026-07-20T00:00:00Z", String(repeating: "f", count: 64)]
             )
         } assertReopen: {
-            MigrationIntegrityError.unsupportedFutureVersion(6)
+            MigrationIntegrityError.unsupportedFutureVersion(7)
         }
     }
 

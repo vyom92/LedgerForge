@@ -39,7 +39,7 @@ struct ConfirmedImportAtomicityTests {
         let provider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("institutions.sqlite").path, migrations: allMigrations)
         defer { provider.database.close() }
         let base = confirmedImportPlan(generationToken: provider.generationToken, suffix: "rollback-institution", institutionID: "Axis Bank")
-        let repeatedTransaction = TransactionDTO(id: UUID().uuidString, workspaceId: base.workspace.id, postedDateISO: base.transactionTemplates[0].transaction.postedDateISO, nativeCurrency: "INR", amountMinor: 200, amountDecimal: "2.00", direction: "debit", createdAtISO: base.transactionTemplates[0].transaction.createdAtISO)
+        let repeatedTransaction = TransactionDTO(id: UUID().uuidString, workspaceId: base.workspace.id, postedDateISO: base.transactionTemplates[0].transaction.postedDateISO, nativeCurrency: "INR", amountMinor: 200, amountDecimal: "2.00", direction: "debit", createdAtISO: base.transactionTemplates[0].transaction.createdAtISO, rawRows: base.transactionTemplates[0].transaction.rawRows)
         let rejected = ConfirmedImportPlanDTO(providerGeneration: base.providerGeneration, workspace: base.workspace, proposedAccount: base.proposedAccount, accountChoice: base.accountChoice, advisoryIdentity: base.advisoryIdentity, identifiers: base.identifiers, historyTemplate: base.historyTemplate, transactionTemplates: [base.transactionTemplates[0], ConfirmedImportTransactionTemplateDTO(transaction: repeatedTransaction, eventEvidence: base.transactionTemplates[0].eventEvidence)])
 
         #expect(provider.confirmedImportRepo.commitConfirmedImport(rejected) == .repeatedIncomingEventEvidence)

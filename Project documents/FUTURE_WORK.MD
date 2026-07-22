@@ -600,8 +600,8 @@ Each family may require a separate ADR and implementation increment. No family m
 
 ## FW-P0-21 — Date-Only Semantic Preservation
 
-**Status:** Bug
-**Planning state:** Ready for targeted discovery
+**Status:** Complete — Sprint 52
+**Planning state:** Implemented with ADR-039 and Migration V6
 
 Define and preserve statement transaction dates as date-only financial evidence rather than allowing an implicit timezone or time-of-day interpretation to change the represented calendar day.
 
@@ -614,14 +614,14 @@ Targeted discovery must determine:
 - deterministic cross-timezone and daylight-saving verification;
 - the policy for existing durable history and whether an independently approved migration or ADR is required.
 
-This candidate does not authorize a durable date redesign, migration, historical rewrite or production-support claim.
+Sprint 52 implemented the approved date-only contract; the former `FT-P0-01` identifier in `PROJECT_STATE.md` referred to this same defect.
 
 ---
 
 ## FW-P0-22 — Durable Source Order and Provenance
 
-**Status:** Bug
-**Planning state:** Ready for targeted discovery
+**Status:** Complete — Sprint 52
+**Planning state:** Implemented with ADR-039 and Migration V6
 
 Define durable source-order and raw-row provenance so same-day financial interpretation can preserve source-supported ordering and explain each persisted transaction without relying on unstable collection order.
 
@@ -634,7 +634,7 @@ Targeted discovery must determine:
 - the policy for existing history that lacks durable source order or raw-row evidence;
 - schema-migration requirements and whether a new or amended ADR is required.
 
-This candidate does not authorize source-ordinal persistence, a migration, historical backfill or a production-support claim.
+Sprint 52 implemented the approved provenance boundary; the former `FT-P0-02` identifier in `PROJECT_STATE.md` referred to this same defect. No historical order or provenance was reconstructed.
 
 # P1 — Institution and Parser Expansion
 

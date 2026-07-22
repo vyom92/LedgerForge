@@ -92,7 +92,21 @@ final class TransactionListViewModel: ObservableObject {
     var totalCredits: Decimal { currencySummaries.count == 1 ? currencySummaries[0].inflow.amount : .zero }
     var closingBalance: Decimal? {
         guard Set(transactions.map(\.money.currency)).count <= 1 else { return nil }
-        return transactions.last?.runningBalanceMoney?.amount
+        let dated = transactions.compactMap { transaction -> (transaction: Transaction, date: StatementDate, balance: Decimal)? in
+            guard let date = transaction.statementDate,
+                  let balance = transaction.runningBalanceMoney?.amount else { return nil }
+            return (transaction, date, balance)
+        }
+        guard let latestDate = dated.map(\.date).max() else { return nil }
+        let candidates = dated.filter { $0.date == latestDate }
+        guard let documentID = candidates.first?.transaction.documentScopedSourceOrder?.documentID,
+              candidates.allSatisfy({ $0.transaction.documentScopedSourceOrder?.documentID == documentID }) else {
+            return candidates.count == 1 ? candidates.first?.balance : nil
+        }
+        return candidates.max(by: {
+            ($0.transaction.documentScopedSourceOrder?.ordinal ?? 0) <
+            ($1.transaction.documentScopedSourceOrder?.ordinal ?? 0)
+        })?.balance
     }
 
     var filteredTransactions: [Transaction] {

@@ -108,7 +108,7 @@ struct LedgerForgeTests {
         ])
         TransactionStore.shared.replaceTransactions([
             Transaction(
-                date: Date(timeIntervalSince1970: 1_804_896_000),
+                statementDate: try! StatementDate(canonical: "2027-03-13"),
                 description: "Runtime credit",
                 debit: nil,
                 credit: 100,

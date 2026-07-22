@@ -234,7 +234,7 @@ struct ImportValidatorTests {
         balance: Decimal?
     ) -> Transaction {
         Transaction(
-            date: Date(timeIntervalSince1970: 1_804_896_000),
+            statementDate: try! StatementDate(canonical: "2027-03-13"),
             description: description,
             debit: debit,
             credit: credit,

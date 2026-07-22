@@ -5,7 +5,107 @@
 //  Created by Vyom on 03/07/26.
 //
 
+import CryptoKit
 import Foundation
+
+/// A calendar date printed by a financial institution. It is deliberately not
+/// an instant: it contains no time-of-day or timezone and never converts to
+/// `Foundation.Date`.
+struct StatementDate: Comparable, Equatable, Sendable, Hashable {
+    let year: Int
+    let month: Int
+    let day: Int
+
+    enum Error: Swift.Error, Equatable {
+        case invalidComponents(year: Int, month: Int, day: Int)
+        case malformedCanonical(String)
+        case malformedAxisDate(String)
+    }
+
+    init(year: Int, month: Int, day: Int) throws {
+        let leapYear = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+        let monthLengths = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        guard year >= 1, (1...12).contains(month), (1...monthLengths[month - 1]).contains(day) else {
+            throw Error.invalidComponents(year: year, month: month, day: day)
+        }
+        self.year = year
+        self.month = month
+        self.day = day
+    }
+
+    init(canonical: String) throws {
+        let parts = canonical.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0].count == 4, parts[1].count == 2, parts[2].count == 2,
+              let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2]) else {
+            throw Error.malformedCanonical(canonical)
+        }
+        try self.init(year: year, month: month, day: day)
+        guard self.canonical == canonical else { throw Error.malformedCanonical(canonical) }
+    }
+
+    static func axisNRE(_ source: String) throws -> StatementDate {
+        let parts = source.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts[0].count == 2, parts[1].count == 2, parts[2].count == 4,
+              let day = Int(parts[0]), let month = Int(parts[1]), let year = Int(parts[2]) else {
+            throw Error.malformedAxisDate(source)
+        }
+        do { return try StatementDate(year: year, month: month, day: day) }
+        catch { throw Error.malformedAxisDate(source) }
+    }
+
+    var canonical: String { String(format: "%04d-%02d-%02d", year, month, day) }
+    var presentation: String {
+        let names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        return "\(day) \(names[month - 1]) \(String(format: "%02d", year % 100))"
+    }
+
+    static func < (lhs: StatementDate, rhs: StatementDate) -> Bool {
+        (lhs.year, lhs.month, lhs.day) < (rhs.year, rhs.month, rhs.day)
+    }
+}
+
+enum FinancialDateRole: String, CaseIterable, Equatable, Sendable {
+    case transactionDate = "transaction_date"
+    case postingDate = "posting_date"
+    case valueDate = "value_date"
+    case settlementDate = "settlement_date"
+    case tradeDate = "trade_date"
+    case statementDate = "statement_date"
+}
+
+enum StatementTimezoneEvidence: Equatable, Sendable {
+    case iana(String)
+    case utc
+    case unknown
+
+    var persistenceCode: String {
+        switch self { case .iana(let value): return "iana:\(value)"; case .utc: return "utc"; case .unknown: return "unknown" }
+    }
+
+    init(persistenceCode: String) {
+        if persistenceCode == "utc" { self = .utc }
+        else if persistenceCode == "unknown" { self = .unknown }
+        else if persistenceCode.hasPrefix("iana:"), persistenceCode.count > 5 { self = .iana(String(persistenceCode.dropFirst(5))) }
+        else { self = .unknown }
+    }
+}
+
+/// Privacy-minimal link between a transaction and one normalized source record.
+struct TransactionSourceProvenance: Equatable, Sendable {
+    let normalizedDocumentID: String
+    let normalizedRowID: String
+    let sourceOrdinal: Int
+    let normalizedRecordDigest: String
+    let parserProfileID: String
+    let parserProfileVersion: String
+}
+
+extension String {
+    static func normalizedRecordDigest(values: [String]) -> String {
+        let payload = values.map { "\($0.utf8.count):\($0)" }.joined(separator: "|")
+        return SHA256.hash(data: Data(payload.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+}
 
 struct AxisUPITransactionEventEvidence: Equatable, Sendable {
     enum Operation: String, Equatable, Sendable {
@@ -25,9 +125,15 @@ struct AxisUPITransactionEventEvidence: Equatable, Sendable {
 
 struct Transaction: Identifiable {
 
-    let id = UUID()
+    /// Runtime identity is stable for persisted transactions. New parser output
+    /// receives an ephemeral UUID until the provider persists its durable ID.
+    let id: UUID
+    let repositoryTransactionId: String?
 
-    var date: Date?
+    let statementDate: StatementDate?
+    let financialDateRole: FinancialDateRole
+    let statementTimezoneEvidence: StatementTimezoneEvidence
+    let sourceProvenance: [TransactionSourceProvenance]
 
     var description: String
 
@@ -46,6 +152,16 @@ struct Transaction: Identifiable {
         MoneyFormatting.signedDisplay(money, isCredit: creditMoney != nil)
     }
 
+    /// Source sequence is meaningful only within one durable normalized document.
+    nonisolated var documentScopedSourceOrder: (documentID: String, ordinal: Int)? {
+        guard let first = sourceProvenance.first,
+              first.sourceOrdinal > 0,
+              sourceProvenance.allSatisfy({ $0.normalizedDocumentID == first.normalizedDocumentID }) else {
+            return nil
+        }
+        return (first.normalizedDocumentID, first.sourceOrdinal)
+    }
+
     var account: String
 
     var sourceBank: String
@@ -58,7 +174,7 @@ struct Transaction: Identifiable {
     var verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
 
     init(
-        date: Date?,
+        statementDate: StatementDate?,
         description: String,
         debitMoney: Money?,
         creditMoney: Money?,
@@ -67,11 +183,21 @@ struct Transaction: Identifiable {
         account: String,
         sourceBank: String,
         sourceFile: String,
+        id: UUID = UUID(),
+        repositoryTransactionId: String? = nil,
+        financialDateRole: FinancialDateRole = .transactionDate,
+        statementTimezoneEvidence: StatementTimezoneEvidence = .unknown,
+        sourceProvenance: [TransactionSourceProvenance] = [],
         repositoryAccountId: String? = nil,
         repositoryImportSessionId: String? = nil,
         verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
     ) {
-        self.date = date
+        self.id = id
+        self.repositoryTransactionId = repositoryTransactionId
+        self.statementDate = statementDate
+        self.financialDateRole = financialDateRole
+        self.statementTimezoneEvidence = statementTimezoneEvidence
+        self.sourceProvenance = sourceProvenance
         self.description = description
         self.debitMoney = debitMoney
         self.creditMoney = creditMoney
@@ -86,7 +212,7 @@ struct Transaction: Identifiable {
     }
 
     init(
-        date: Date?,
+        statementDate: StatementDate?,
         description: String,
         debit: Decimal?,
         credit: Decimal?,
@@ -96,13 +222,18 @@ struct Transaction: Identifiable {
         account: String,
         sourceBank: String,
         sourceFile: String,
+        id: UUID = UUID(),
+        repositoryTransactionId: String? = nil,
+        financialDateRole: FinancialDateRole = .transactionDate,
+        statementTimezoneEvidence: StatementTimezoneEvidence = .unknown,
+        sourceProvenance: [TransactionSourceProvenance] = [],
         repositoryAccountId: String? = nil,
         repositoryImportSessionId: String? = nil,
         verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
     ) {
         let postedMoney = try! Money(amount: amount, currency: currency)
         self.init(
-            date: date,
+            statementDate: statementDate,
             description: description,
             debitMoney: try! debit.map { try Money(amount: $0, currency: currency) },
             creditMoney: try! credit.map { try Money(amount: $0, currency: currency) },
@@ -111,6 +242,11 @@ struct Transaction: Identifiable {
             account: account,
             sourceBank: sourceBank,
             sourceFile: sourceFile,
+            id: id,
+            repositoryTransactionId: repositoryTransactionId,
+            financialDateRole: financialDateRole,
+            statementTimezoneEvidence: statementTimezoneEvidence,
+            sourceProvenance: sourceProvenance,
             repositoryAccountId: repositoryAccountId,
             repositoryImportSessionId: repositoryImportSessionId,
             verifiedAxisUPIEventEvidence: verifiedAxisUPIEventEvidence

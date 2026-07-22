@@ -89,7 +89,7 @@ final class AccountStore: ObservableObject {
     /// This will create or update a single account derived from the import metadata.
     /// Rules:
     /// - Display name: best available import metadata, with filename only as a cleaned fallback.
-    /// - Balance: prefer the last transaction.balance if present, otherwise derive from last transaction.amount.
+    /// - Balance: use the latest statement date and, within one source document only, its source ordinal.
     func integrateImport(importSession: ImportSession, transactions: [Transaction]) {
 
         let institutionName = importSession.institution?.rawValue ?? "Unknown"
@@ -114,7 +114,8 @@ final class AccountStore: ObservableObject {
         // Determine currency from first transaction if available
         let currency = transactions.first?.currency ?? "INR"
 
-        // Determine the latest known balance from transactions without assuming array order.
+        // This path receives one parsed statement. It still fails closed rather than use array
+        // insertion order if same-date balance authority is unsupported or ambiguous.
         let latestBalance = Self.latestKnownBalance(from: transactions)
 
         // Create or update account
@@ -147,43 +148,22 @@ final class AccountStore: ObservableObject {
 
     // MARK: - Balance updates
 
-    nonisolated private static func latestKnownBalance(from transactions: [Transaction]) -> Decimal? {
-        let transactionsWithBalance: [(offset: Int, date: Date?, balance: Decimal)] = transactions
-            .enumerated()
-            .compactMap { offset, transaction in
+    private static func latestKnownBalance(from transactions: [Transaction]) -> Decimal? {
+        let dated = transactions.compactMap { transaction -> (transaction: Transaction, date: StatementDate, balance: Decimal)? in
                 guard let balance = transaction.balance else { return nil }
-                return (offset: offset, date: transaction.date, balance: balance)
+                guard let date = transaction.statementDate else { return nil }
+                return (transaction: transaction, date: date, balance: balance)
             }
-
-        if let latestWithBalance = transactionsWithBalance.sorted(by: isNewer).first {
-            return latestWithBalance.balance
+        guard let latestDate = dated.map(\.date).max() else { return nil }
+        let candidates = dated.filter { $0.date == latestDate }
+        guard let documentID = candidates.first?.transaction.documentScopedSourceOrder?.documentID,
+              candidates.allSatisfy({ $0.transaction.documentScopedSourceOrder?.documentID == documentID }) else {
+            return candidates.count == 1 ? candidates.first?.balance : nil
         }
-
-        return transactions
-            .enumerated()
-            .sorted { lhs, rhs in
-                isNewer(
-                    lhs: (offset: lhs.offset, date: lhs.element.date, balance: lhs.element.amount),
-                    rhs: (offset: rhs.offset, date: rhs.element.date, balance: rhs.element.amount)
-                )
-            }
-            .first?.element.amount
-    }
-
-    nonisolated private static func isNewer(
-        lhs: (offset: Int, date: Date?, balance: Decimal),
-        rhs: (offset: Int, date: Date?, balance: Decimal)
-    ) -> Bool {
-        switch (lhs.date, rhs.date) {
-        case let (left?, right?) where left != right:
-            return left > right
-        case (.some, nil):
-            return true
-        case (nil, .some):
-            return false
-        default:
-            return lhs.offset > rhs.offset
-        }
+        return candidates.max(by: {
+            ($0.transaction.documentScopedSourceOrder?.ordinal ?? 0) <
+            ($1.transaction.documentScopedSourceOrder?.ordinal ?? 0)
+        })?.balance
     }
 
     func updateBalance(for id: UUID, newBalance: Decimal, lastImport: Date? = nil) {

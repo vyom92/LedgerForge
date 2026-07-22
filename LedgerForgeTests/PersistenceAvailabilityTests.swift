@@ -215,7 +215,7 @@ struct PersistenceAvailabilityTests {
             currentBalance: 10
         )
         let existingTransaction = Transaction(
-            date: Date(timeIntervalSince1970: 1_804_896_000),
+            statementDate: try! StatementDate(canonical: "2027-03-13"),
             description: "Existing transaction",
             debit: nil,
             credit: 10,
@@ -323,7 +323,7 @@ struct PersistenceAvailabilityTests {
 
     private func makePreparedImport() -> PreparedImport {
         let transaction = Transaction(
-            date: Date(timeIntervalSince1970: 1_804_896_000),
+            statementDate: try! StatementDate(canonical: "2027-03-13"),
             description: "Prepared credit",
             debit: nil,
             credit: 10,

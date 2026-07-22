@@ -235,7 +235,7 @@ struct ImportOutcomePresentationTests {
 private func activityPreparedImport(fileName: String, validationPassed: Bool) throws -> PreparedImport {
     let currency = try CurrencyCode("QAR")
     let transaction = Transaction(
-        date: Date(timeIntervalSince1970: 1_700_000_000),
+        statementDate: try! StatementDate(canonical: "2023-11-14"),
         description: "Activity transaction",
         debit: nil,
         credit: 1,

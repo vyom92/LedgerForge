@@ -187,14 +187,9 @@ final class AxisBankAccountParser: StatementParser {
 
         var transactions: [Transaction] = []
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd-MM-yyyy"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.isLenient = false
-
         for row in document.rows {
-            let parsedDate = row.values.indices.contains(mapping.date)
-                ? formatter.date(from: row.values[mapping.date])
+            let parsedDate: StatementDate? = row.values.indices.contains(mapping.date)
+                ? try? StatementDate.axisNRE(row.values[mapping.date])
                 : nil
             guard Self.containsTransactionEvidence(
                 row,
@@ -256,7 +251,7 @@ final class AxisBankAccountParser: StatementParser {
 
             let postedMoney = try Money(amount: amount, currency: currency)
             let transaction = Transaction(
-                date: parsedDate,
+                statementDate: parsedDate,
                 description: description,
                 debitMoney: try direction.debit.map { try Money(amount: $0, currency: currency) },
                 creditMoney: try direction.credit.map { try Money(amount: $0, currency: currency) },
@@ -265,6 +260,18 @@ final class AxisBankAccountParser: StatementParser {
                 account: document.metadata.institution.rawValue,
                 sourceBank: "Axis Bank",
                 sourceFile: document.document.filename,
+                financialDateRole: .transactionDate,
+                statementTimezoneEvidence: .iana("Asia/Kolkata"),
+                sourceProvenance: [
+                    TransactionSourceProvenance(
+                        normalizedDocumentID: document.document.id.uuidString,
+                        normalizedRowID: row.id.uuidString,
+                        sourceOrdinal: row.rowNumber,
+                        normalizedRecordDigest: String.normalizedRecordDigest(values: row.values),
+                        parserProfileID: "axis.nre.csv",
+                        parserProfileVersion: "1"
+                    )
+                ],
                 verifiedAxisUPIEventEvidence: Self.eventEvidence(
                     narration: description,
                     direction: direction.transactionType

@@ -109,19 +109,25 @@ public struct ConfirmedImportHistoryTemplateDTO: nonisolated Equatable, Sendable
     public let importSession: ImportSessionDTO
     public let completedAtISO: String
     public let successfulAttempt: ImportAttemptDTO
+    public let normalizedDocument: NormalizedDocumentDTO?
+    public let normalizedRows: [NormalizedRowDTO]
 
     public init(
         document: ImportedDocumentDTO,
         fingerprint: DocumentFingerprintDTO,
         importSession: ImportSessionDTO,
         completedAtISO: String,
-        successfulAttempt: ImportAttemptDTO
+        successfulAttempt: ImportAttemptDTO,
+        normalizedDocument: NormalizedDocumentDTO? = nil,
+        normalizedRows: [NormalizedRowDTO] = []
     ) {
         self.document = document
         self.fingerprint = fingerprint
         self.importSession = importSession
         self.completedAtISO = completedAtISO
         self.successfulAttempt = successfulAttempt
+        self.normalizedDocument = normalizedDocument
+        self.normalizedRows = normalizedRows
     }
 }
 

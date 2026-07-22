@@ -29,6 +29,7 @@ struct RepositoryStoreHydratorTests {
         #expect(stores.accounts.accounts.first?.workspaceId == "workspace-dashboard")
         #expect(stores.transactions.transactions.first?.repositoryAccountId == "account-dashboard")
         #expect(stores.transactions.transactions.first?.repositoryImportSessionId == "import-dashboard")
+        #expect(stores.transactions.transactions.first?.repositoryTransactionId == "transaction-trusted")
         #expect(stores.importSessions.importSessions.map(\.id) == ["import-dashboard"])
 
         let viewModel = TransactionListViewModel(
@@ -87,6 +88,21 @@ struct RepositoryStoreHydratorTests {
         #expect(!secondResult.didHydrate)
         #expect(stores.accounts.accounts.count == 1)
         #expect(stores.transactions.transactions.count == 1)
+    }
+
+    @Test func hydrationUsesStableRuntimeIdentityWithoutReplacingOpaqueRepositoryIdentity() throws {
+        let provider = try seededProvider()
+        let stores = RuntimeStores()
+        let hydrator = makeHydrator(provider: provider, stores: stores)
+
+        _ = try hydrator.hydrateIfNeeded()
+        let initial = try #require(stores.transactions.transactions.first)
+        _ = try hydrator.hydrateIfNeeded(forceRefresh: true)
+        let refreshed = try #require(stores.transactions.transactions.first)
+
+        #expect(initial.repositoryTransactionId == "transaction-trusted")
+        #expect(refreshed.repositoryTransactionId == "transaction-trusted")
+        #expect(initial.id == refreshed.id)
     }
 
     @Test func forcedHydrationRefreshesRuntimeStoresWithoutDuplicatingState() throws {

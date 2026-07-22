@@ -1210,12 +1210,12 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
                 try db.executePrepared(sql: delTx, params: [importId])
             }
 
-            let insertTx = "INSERT OR REPLACE INTO transactions (id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+            let insertTx = "INSERT OR REPLACE INTO transactions (id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at, financial_date_role, statement_timezone_evidence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
 
             let insertRaw = "INSERT OR REPLACE INTO transaction_raw_rows (id, transaction_id, normalized_row_id, contribution_type, created_at) VALUES (?,?,?,?,?);"
 
             for tx in transactions {
-                try db.executePrepared(sql: insertTx, params: [tx.id, tx.workspaceId, tx.accountId ?? NSNull(), tx.importSessionId ?? NSNull(), tx.documentId ?? NSNull(), tx.originalRowId ?? NSNull(), tx.postedDateISO, tx.valueDateISO ?? NSNull(), tx.description ?? NSNull(), tx.payee ?? NSNull(), tx.reference ?? NSNull(), tx.nativeCurrency, tx.amountMinor, tx.amountDecimal, tx.direction, tx.runningBalanceMinor ?? NSNull(), tx.isReconciled ? 1 : 0, tx.isTrusted ? 1 : 0, tx.trustedAtISO ?? NSNull(), tx.createdAtISO, tx.updatedAtISO ?? NSNull()])
+                try db.executePrepared(sql: insertTx, params: [tx.id, tx.workspaceId, tx.accountId ?? NSNull(), tx.importSessionId ?? NSNull(), tx.documentId ?? NSNull(), tx.originalRowId ?? NSNull(), tx.postedDateISO, tx.valueDateISO ?? NSNull(), tx.description ?? NSNull(), tx.payee ?? NSNull(), tx.reference ?? NSNull(), tx.nativeCurrency, tx.amountMinor, tx.amountDecimal, tx.direction, tx.runningBalanceMinor ?? NSNull(), tx.isReconciled ? 1 : 0, tx.isTrusted ? 1 : 0, tx.trustedAtISO ?? NSNull(), tx.createdAtISO, tx.updatedAtISO ?? NSNull(), tx.financialDateRole, tx.statementTimezoneEvidence])
 
                 for raw in tx.rawRows {
                     try db.executePrepared(sql: insertRaw, params: [raw.id, tx.id, raw.normalizedRowId, raw.contributionType ?? NSNull(), tx.createdAtISO])
@@ -1230,13 +1230,13 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
     }
 
     func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO] {
-        var sql = "SELECT id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at FROM transactions WHERE workspace_id = ?"
+        var sql = "SELECT t.id, t.workspace_id, t.account_id, t.import_session_id, t.document_id, t.original_row_id, t.posted_date, t.value_date, t.description, t.payee, t.reference, t.native_currency, t.amount_minor, t.amount_decimal, t.direction, t.running_balance_minor, t.is_reconciled, t.is_trusted, t.trusted_at, t.created_at, t.updated_at, t.financial_date_role, t.statement_timezone_evidence FROM transactions t WHERE t.workspace_id = ?"
         var params: [Any?] = [workspaceId]
         if let importSessionId {
             sql += " AND import_session_id = ?"
             params.append(importSessionId)
         }
-        sql += " ORDER BY posted_date DESC, id DESC;"
+        sql += " ORDER BY t.posted_date ASC, (SELECT nr.normalized_document_id FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, (SELECT nr.row_index FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, t.id ASC;"
 
         return try db.query(sql: sql, params: params) { row in
             let transactionId = row.string(at: 0) ?? ""
@@ -1249,6 +1249,8 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
                 documentId: row.string(at: 4),
                 originalRowId: row.string(at: 5),
                 postedDateISO: row.string(at: 6) ?? "",
+                financialDateRole: row.string(at: 21) ?? "transaction_date",
+                statementTimezoneEvidence: row.string(at: 22) ?? "unknown",
                 valueDateISO: row.string(at: 7),
                 description: row.string(at: 8),
                 payee: row.string(at: 9),
@@ -1269,7 +1271,7 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
     }
 
     func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] {
-        let sql = "SELECT id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at FROM transactions WHERE workspace_id = ? AND is_trusted = 1 ORDER BY posted_date DESC, id DESC;"
+        let sql = "SELECT t.id, t.workspace_id, t.account_id, t.import_session_id, t.document_id, t.original_row_id, t.posted_date, t.value_date, t.description, t.payee, t.reference, t.native_currency, t.amount_minor, t.amount_decimal, t.direction, t.running_balance_minor, t.is_reconciled, t.is_trusted, t.trusted_at, t.created_at, t.updated_at, t.financial_date_role, t.statement_timezone_evidence FROM transactions t WHERE t.workspace_id = ? AND t.is_trusted = 1 ORDER BY t.posted_date ASC, (SELECT nr.normalized_document_id FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, (SELECT nr.row_index FROM transaction_raw_rows trr JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = t.id ORDER BY nr.row_index ASC LIMIT 1) ASC, t.id ASC;"
         return try db.query(sql: sql, params: [workspaceId]) { row in
             let transactionId = row.string(at: 0) ?? ""
             let rawRows = try rawRows(for: transactionId)
@@ -1281,6 +1283,8 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
                 documentId: row.string(at: 4),
                 originalRowId: row.string(at: 5),
                 postedDateISO: row.string(at: 6) ?? "",
+                financialDateRole: row.string(at: 21) ?? "transaction_date",
+                statementTimezoneEvidence: row.string(at: 22) ?? "unknown",
                 valueDateISO: row.string(at: 7),
                 description: row.string(at: 8),
                 payee: row.string(at: 9),
@@ -1301,12 +1305,15 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
     }
 
     private func rawRows(for transactionId: String) throws -> [TransactionRawRowDTO] {
-        let sql = "SELECT id, normalized_row_id, contribution_type FROM transaction_raw_rows WHERE transaction_id = ? ORDER BY id;"
+        let sql = "SELECT trr.id, trr.normalized_row_id, trr.contribution_type, nr.row_index, nr.record_digest, nr.normalized_document_id FROM transaction_raw_rows trr INNER JOIN normalized_rows nr ON nr.id = trr.normalized_row_id WHERE trr.transaction_id = ? ORDER BY nr.row_index ASC, trr.id ASC;"
         return try db.query(sql: sql, params: [transactionId]) { row in
             TransactionRawRowDTO(
                 id: row.string(at: 0) ?? "",
                 normalizedRowId: row.string(at: 1) ?? "",
-                contributionType: row.string(at: 2)
+                contributionType: row.string(at: 2),
+                sourceOrdinal: row.int64(at: 3).map(Int.init),
+                normalizedRecordDigest: row.string(at: 4),
+                normalizedDocumentId: row.string(at: 5)
             )
         }
     }

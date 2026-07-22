@@ -259,6 +259,16 @@
 		C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImportReconciliationGate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		28F69A493010D6320098467B /* Exceptions for "Sprint roadmap" folder in "LedgerForge" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"LedgerForge_Roadmap_Sprints_50-59.md",
+			);
+			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		283E97932FFE3A470034CA98 /* Branding */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -283,6 +293,14 @@
 		28B87B3E2FFBD1DE009BEE8C /* .github */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = .github;
+			sourceTree = "<group>";
+		};
+		28F69A463010D6150098467B /* Sprint roadmap */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				28F69A493010D6320098467B /* Exceptions for "Sprint roadmap" folder in "LedgerForge" target */,
+			);
+			path = "Sprint roadmap";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -603,6 +621,7 @@
 				28A3A4C22FFE1E3900DD5727 /* UI Assets */,
 				283E97932FFE3A470034CA98 /* Branding */,
 				28B87B3E2FFBD1DE009BEE8C /* .github */,
+				28F69A463010D6150098467B /* Sprint roadmap */,
 				28B87B2A2FFB2CBE009BEE8C /* Product Vision.md */,
 				28B5218230040C360007B840 /* FUTURE_WORK.MD */,
 				281BB1782FFC4CDA006E7424 /* Project_Guide.md */,
@@ -646,6 +665,7 @@
 				283E97932FFE3A470034CA98 /* Branding */,
 				28A3A4C22FFE1E3900DD5727 /* UI Assets */,
 				28B87B3E2FFBD1DE009BEE8C /* .github */,
+				28F69A463010D6150098467B /* Sprint roadmap */,
 			);
 			name = LedgerForge;
 			packageProductDependencies = (

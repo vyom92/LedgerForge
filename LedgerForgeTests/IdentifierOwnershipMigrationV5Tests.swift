@@ -10,7 +10,7 @@ struct IdentifierOwnershipMigrationV5Tests {
         let database = SQLiteDatabase(path: folder.appendingPathComponent("v5.sqlite").path)
         try database.runMigrations(allMigrations)
         try validateIdentifierOwnershipV5Schema(database)
-        #expect(allMigrations.map(\.version) == [1, 2, 3, 4, 5])
+        #expect(allMigrations.map(\.version) == [1, 2, 3, 4, 5, 6])
         #expect(migrationV1.checksum == Migration(version: 1, name: migrationV1.name, sql: migrationV1.sql).checksum)
         database.close()
     }

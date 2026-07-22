@@ -83,7 +83,7 @@ struct ConfirmationGatedImportWorkflowTests {
     @Test func persistenceFailureLeavesEveryRuntimeFinancialStoreUnchanged() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let existingTransaction = makeConfirmationTransaction(
-            date: Date(timeIntervalSince1970: 1_804_809_600),
+            statementDate: try! StatementDate(canonical: "2027-03-12"),
             description: "Existing transaction",
             debit: nil,
             credit: 25,
@@ -401,7 +401,8 @@ private func makePreparedImport(
     id: UUID = UUID(),
     transactions: [Transaction] = [
         makeConfirmationTransaction(
-            date: Date(timeIntervalSince1970: 1_804_896_000),
+            statementDate: try! StatementDate(canonical: "2027-03-13"),
+            sourceOrdinal: 1,
             description: "Opening credit",
             debit: nil,
             credit: 100,
@@ -409,7 +410,8 @@ private func makePreparedImport(
             balance: 1_100
         ),
         makeConfirmationTransaction(
-            date: Date(timeIntervalSince1970: 1_804_982_400),
+            statementDate: try! StatementDate(canonical: "2027-03-14"),
+            sourceOrdinal: 2,
             description: "Card payment",
             debit: 50,
             credit: nil,
@@ -465,7 +467,8 @@ private func makePreparedImport(
 }
 
 private func makeConfirmationTransaction(
-    date: Date,
+    statementDate: StatementDate,
+    sourceOrdinal: Int = 1,
     description: String,
     debit: Decimal?,
     credit: Decimal?,
@@ -473,7 +476,7 @@ private func makeConfirmationTransaction(
     balance: Decimal?
 ) -> Transaction {
     Transaction(
-        date: date,
+        statementDate: statementDate,
         description: description,
         debit: debit,
         credit: credit,
@@ -482,6 +485,17 @@ private func makeConfirmationTransaction(
         currency: "INR",
         account: "Axis NRE",
         sourceBank: "Axis Bank",
-        sourceFile: "confirmation-workflow.csv"
+        sourceFile: "confirmation-workflow.csv",
+        statementTimezoneEvidence: .iana("Asia/Kolkata"),
+        sourceProvenance: [
+            TransactionSourceProvenance(
+                normalizedDocumentID: "confirmation-normalized-document",
+                normalizedRowID: "confirmation-normalized-row-\(sourceOrdinal)",
+                sourceOrdinal: sourceOrdinal,
+                normalizedRecordDigest: String.normalizedRecordDigest(values: ["confirmation", "\(sourceOrdinal)"]),
+                parserProfileID: "axis.nre.csv",
+                parserProfileVersion: "1"
+            )
+        ]
     )
 }

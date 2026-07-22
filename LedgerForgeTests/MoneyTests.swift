@@ -45,7 +45,7 @@ struct MoneyTests {
 
     @Test func transactionPreviewPresentationUsesTransactionNativeMoneyAndDirection() throws {
         let transaction = Transaction(
-            date: nil,
+            statementDate: nil,
             description: "Kuwaiti debit",
             debit: Decimal(string: "4.125")!,
             credit: nil,

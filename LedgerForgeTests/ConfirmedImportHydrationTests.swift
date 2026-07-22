@@ -168,7 +168,7 @@ private func hydrationPreparedImport(
     providerGeneration: ProviderGenerationToken = DatabaseProvider.shared.generationToken
 ) -> PreparedImport {
     let transaction = Transaction(
-        date: Date(timeIntervalSince1970: 1_804_896_000),
+        statementDate: try! StatementDate(canonical: "2027-03-13"),
         description: "Hydration fixture",
         debit: nil,
         credit: 10,
@@ -177,7 +177,18 @@ private func hydrationPreparedImport(
         currency: "INR",
         account: "Fixture",
         sourceBank: "Fixture",
-        sourceFile: "hydration.csv"
+        sourceFile: "hydration.csv",
+        statementTimezoneEvidence: .iana("Asia/Kolkata"),
+        sourceProvenance: [
+            TransactionSourceProvenance(
+                normalizedDocumentID: "hydration-normalized-document",
+                normalizedRowID: "hydration-normalized-row-1",
+                sourceOrdinal: 1,
+                normalizedRecordDigest: String.normalizedRecordDigest(values: ["hydration", "1"]),
+                parserProfileID: "axis.nre.csv",
+                parserProfileVersion: "1"
+            )
+        ]
     )
     let document = FinancialDocument(
         sourceDocument: Document(filename: "hydration.csv", url: URL(fileURLWithPath: "/tmp/hydration.csv"), fileType: "CSV", importedAt: Date(timeIntervalSince1970: 1_804_896_000)),
