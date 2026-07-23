@@ -4266,7 +4266,7 @@ No production guarantee may be recorded until implementation, migration safety w
 
 ## Decision
 
-`StatementDate` is the immutable Gregorian calendar date printed and assigned by the source institution. It contains year, month and day only, persists strictly as `YYYY-MM-DD`, and displays directly as English `d MMM yy`; it is never an instant, `Foundation.Date`, local midnight or timezone conversion. Financial date role and separate bounded timezone evidence persist alongside it. The supported Axis NRE profile records its printed `dd-MM-yyyy` transaction-date semantics and `Asia/Kolkata` evidence without transforming the date.
+`StatementDate` is the immutable Gregorian calendar date printed and assigned by the source institution. It contains year, month and day only, persists strictly as `YYYY-MM-DD`, and displays directly as English `d MMM yy`; it is never an instant, `Foundation.Date`, local midnight or timezone conversion. Financial date role and separate bounded timezone evidence persist alongside it. The supported shared-layout Axis bank-account CSV profile records its printed `dd-MM-yyyy` transaction-date semantics and `Asia/Kolkata` evidence without transforming the date.
 
 Source ordinal is the one-based physical record position in one reader-produced normalized document. Parser output retains it with a privacy-minimal normalized-record digest and profile identifier/version. `normalized_documents`, `normalized_rows`, `transactions.original_row_id`, and `transaction_raw_rows` are the durable provenance boundary; unrestricted row text is not retained. One transaction may link to multiple source records in the DTO/provider shape.
 
@@ -4276,7 +4276,7 @@ Migration V6 adds date-role/timezone metadata, profile metadata and record diges
 
 ## Consequences
 
-The approved Axis NRE CSV path is reactivated only within this exact profile and its verified evidence boundary. This does not add institutions, layouts, a general Import Profile framework, historical repair, raw-row storage, cross-document chronology, or support for timestamps from date-only evidence.
+The approved shared-layout Axis NRE and supplied Axis NRO CSV paths are active only within their verified evidence boundary. New supported NRE and NRO imports use `axis.bank-account.csv` version `1`. Historical `axis.nre.csv` version `1` provenance remains readable and unchanged; it is not migrated or rewritten. Profile identity describes the source layout and provenance contract, not NRE/NRO or any other durable account classification. This does not add institutions, broader layouts, a general Import Profile framework, historical repair, raw-row storage, cross-document chronology, or support for timestamps from date-only evidence.
 
 ## Sprint 52A Corrective Closure
 

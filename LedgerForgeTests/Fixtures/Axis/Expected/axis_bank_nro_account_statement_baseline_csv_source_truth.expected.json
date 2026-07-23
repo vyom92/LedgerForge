@@ -8,7 +8,7 @@
     "csv"
   ],
   "layout_versions": {
-    "csv": "AXIS-NRO-CSV-v1",
+    "csv": "axis.bank-account.csv@1",
     "pdf": "AXIS-NRO-PDF-v1",
     "xls": "AXIS-NRO-XLS-v1"
   },
@@ -200,5 +200,6 @@
     "verification_state": "verified"
   },
   "validation_expectation": "expected valid",
-  "cross_format_boundary": "This CSV preserves its original source truth and is not financially equivalent to the Range 1 PDF/XLS pair."
+  "cross_format_boundary": "This CSV preserves its original source truth and is not financially equivalent to the Range 1 PDF/XLS pair.",
+  "csv_preamble_reconstruction": "Reconstructed from the user-confirmed shared Axis bank-account CSV layout, aligned with the approved existing Axis grammar, and populated with independently recorded fixture dates and fictional identifiers; not a byte-for-byte restoration of private original text."
 }

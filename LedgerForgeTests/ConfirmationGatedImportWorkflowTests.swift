@@ -493,8 +493,8 @@ private func makeConfirmationTransaction(
                 normalizedRowID: "confirmation-normalized-row-\(sourceOrdinal)",
                 sourceOrdinal: sourceOrdinal,
                 normalizedRecordDigest: String.normalizedRecordDigest(values: ["confirmation", "\(sourceOrdinal)"]),
-                parserProfileID: "axis.nre.csv",
-                parserProfileVersion: "1"
+                parserProfileID: AxisBankAccountParser.profileID,
+                parserProfileVersion: AxisBankAccountParser.profileVersion
             )
         ]
     )

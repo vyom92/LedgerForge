@@ -73,7 +73,9 @@ struct ImportRepositoryIntegrationTests {
             #expect(transactions.map { $0.rawRows.first?.sourceOrdinal } == [1, 2])
             #expect(transactions.map { $0.rawRows.first?.normalizedDocumentId }.allSatisfy { $0 != nil })
             #expect(transactions.map { $0.rawRows.first?.normalizedRecordDigest }.allSatisfy { $0?.count == 64 })
-            #expect(transactions.allSatisfy { $0.rawRows.first?.parserProfileId == "axis.nre.csv" })
+            #expect(transactions.allSatisfy {
+                $0.rawRows.first?.parserProfileId == AxisBankAccountParser.profileID
+            })
             #expect(transactions.allSatisfy { $0.rawRows.first?.parserProfileVersion == "1" })
 
             let orderedTransactions = transactions.sorted {
@@ -393,7 +395,9 @@ struct ImportRepositoryIntegrationTests {
             }
         }
         #expect(persistedIDs.count == 2)
-        #expect(persistedTransactions.allSatisfy { $0.rawRows.first?.parserProfileId == "axis.nre.csv" })
+        #expect(persistedTransactions.allSatisfy {
+            $0.rawRows.first?.parserProfileId == AxisBankAccountParser.profileID
+        })
         #expect(persistedTransactions.allSatisfy { $0.rawRows.first?.parserProfileVersion == "1" })
 
         resetRuntimeStoresForImportIntegration()
@@ -1778,8 +1782,8 @@ private func makeTransaction(
                 normalizedRowID: "fixture-normalized-row-\(sourceOrdinal)",
                 sourceOrdinal: sourceOrdinal,
                 normalizedRecordDigest: String.normalizedRecordDigest(values: ["fixture", "\(sourceOrdinal)"]),
-                parserProfileID: "axis.nre.csv",
-                parserProfileVersion: "1"
+                parserProfileID: AxisBankAccountParser.profileID,
+                parserProfileVersion: AxisBankAccountParser.profileVersion
             )
         ]
     )

@@ -7,7 +7,7 @@
     "xls"
   ],
   "layout_versions": {
-    "csv": "AXIS-NRO-CSV-v1",
+    "csv": "axis.bank-account.csv@1",
     "pdf": "AXIS-NRO-PDF-v1",
     "xls": "AXIS-NRO-XLS-v1"
   },

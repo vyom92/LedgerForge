@@ -1,7 +1,7 @@
 # Repository State
 
 - Primary branch: `main`.
-- Latest verified completed increment: Sprint 52A — Strict Trusted Transaction Hydration and Provenance Closure.
+- Latest verified completed increment: Sprint 53 — Axis Shared Bank-Account CSV Profile and NRO Identity Closure.
 - Latest architecture increment: Sprint 49 — Atomic Confirmed Import and Identifier Ownership. ADR-038 is accepted and its confirmed-import production slice is implemented by Sprint 50.
 - Sprint 50 Task 3 implementation commit: `dda03cf83cdf7d5f49d91bd82e543a669c5c5965`.
 - Sprint 50 Task 4 implementation commit: the single Task 4 commit containing this state update; its exact SHA is recorded by Git and the completion report.
@@ -11,12 +11,12 @@
 - Current migration: V6, establishing trusted statement-date semantics and durable source provenance.
 - Current accepted ADR: ADR-039 — Trusted Statement Dates and Durable Source Provenance.
 - Architecture baseline: Architecture v1.0 Frozen and UI/UX v1.0 Frozen.
-- Build state: Fresh clean Debug and whole-module optimized Release builds and fresh Debug and Release static analyses pass with zero errors and zero analyzer findings. The only tool warning was Xcode's environmental AppIntents metadata-extraction notice for a target without an AppIntents dependency. Release containment verifies that Debug-only lifecycle and subprocess-probe behavior is absent from the production application.
-- Latest verified automated result: 387 top-level test cases across 47 suites passed with 0 failures and 0 unexpected skips using the canonical serial TestPlan execution. Generic `LedgerForgeUITests` remained intentionally disabled.
+- Build state: Fresh Debug and whole-module optimized Release builds and fresh Debug and Release static analyses pass with zero errors, warnings or analyzer findings.
+- Latest verified automated result: 394 top-level test cases across 48 suites passed with 0 failures and 0 unexpected skips using the canonical TestPlan execution. The Sprint 53 focused run passed 201 tests across 24 suites. Generic `LedgerForgeUITests` remained intentionally disabled.
 
 ## Current Production Capability
 
-- The approved Axis Bank NRE CSV path is the only implemented production parser path. Sprint 52 reactivates trusted import only for its approved profile: strict date-only statement evidence, Axis `Asia/Kolkata` date authority, document-scoped source ordinal and bounded durable provenance are verified.
+- The approved shared-layout Axis Bank NRE and supplied Axis Bank NRO CSV evidence use one production `AxisBankAccountParser`. New supported imports emit the neutral `axis.bank-account.csv` version `1` profile; historical `axis.nre.csv` version `1` provenance remains readable and is never rewritten. Strict date-only statement evidence, Axis `Asia/Kolkata` date authority, document-scoped source ordinal and bounded durable provenance remain verified.
 - Sprint 52A closes trusted persistence-to-runtime handling: malformed financial-date role, timezone evidence, source relationships and profile provenance fail hydration before runtime-store mutation; trusted writes are accepted only by the provider-owned confirmed-import graph.
 - The pipeline performs reader, institution detection, statement classification, parser selection, immutable `FinancialDocument`, validation, duplicate evaluation, explicit confirmation and repository-owned persistence.
 - `DatabaseProvider` is the atomic authority for active repositories and typed persistence state. Production publishes verified SQLite repositories only after open, complete registered-chain history validation, pending migration execution and final-chain revalidation all succeed; the current chain ends at V6.
@@ -40,11 +40,12 @@
 - Sprint 51 does not change Developer Console filename behavior; no diagnostic filename-redaction production change was integrated.
 - Migration V5 enforces durable identifier ownership and records accepted-import identifier observations without inventing historical provenance. Post-commit workflow hydration is canonical, and a typed reconciliation gate blocks further import work if durable truth cannot be reconciled into runtime state.
 - Exact-content re-import records a bounded duplicate attempt without creating another accepted session, document, account, identifier, observation or transaction. The sanitized Axis manual workflow directly verified empty initialization, accepted import, relaunch hydration, exact duplicate and second relaunch while the disposable default development database remained absent.
+- Sprint 53 verifies separate durable NRE and NRO account identity from distinct parser-produced full institution account numbers. Each first import required explicit account creation, later statements resolved through the verified identifier, and neither profile identity nor neutral presentation was used as account classification. The disposable namespaced runtime preserved two neutral `Axis Bank INR` accounts, 118 transactions, redacted identifiers and import history across singleton relaunch hydration; exact duplicate and supported overlap blocking added no financial data.
 
 ## Current Verified Limitations
 
-- Production parser support remains limited to the approved Axis NRE CSV layout.
-- The recorded manual production presentation check is limited to INR through the approved Axis NRE CSV path. QAR Dashboard and Account Recent Activity presentation is automatically verified with constructed data only; Import Preview is automatically verified with constructed `PreparedImport` and transaction data. No QAR parser or production QAR/CBQ/Axis NRO/PDF/XLS/XLSX/card import support is claimed.
+- Production parser support remains limited to the verified shared Axis bank-account CSV grammar represented by the approved NRE and supplied NRO fixture evidence. General Axis NRO coverage and other Axis bank-account layouts remain unsupported.
+- The recorded manual production presentation check is limited to INR through the verified Axis bank-account CSV evidence. QAR Dashboard and Account Recent Activity presentation is automatically verified with constructed data only; Import Preview is automatically verified with constructed `PreparedImport` and transaction data. No QAR parser or production QAR/CBQ/PDF/XLS/XLSX/card import support is claimed.
 - PDF is a text-extraction and statement-understanding foundation only; production PDF parsing is not supported.
 - No production password-entry or Keychain workflow exists.
 - XLS, XLSX, TXT and OCR are not production-supported.
@@ -64,6 +65,8 @@
 - No rollback, resumable import job, batch queue or cancellation after confirmed persistence exists. Confirmed-persistence failure retry remains unsupported pending typed authoritative safety evidence.
 
 ## Recent Verified Changes
+
+- Sprint 53 extends the existing Axis bank-account CSV grammar to the supplied NRO fixture evidence without adding a parser family, migration or ADR. One `AxisBankAccountParser` emits `axis.bank-account.csv` version `1` for new supported NRE and NRO imports; the persistence mapper requires exactly one nonempty, exact parser-produced profile pair and rejects missing, malformed or conflicting provenance before writes. Historical `axis.nre.csv` version `1` rows hydrate unchanged. The two sanitized NRO CSV preambles and periods were explicitly reconstructed to the shared grammar while transaction rows and fictional account identity remained unchanged; this is not represented as byte-for-byte private-source recovery. Independent financial and identity oracles, SQLite/In-Memory parity, exhaustive accepted-write failure injection, exact duplicate and overlap behavior, hydration/provider reconstruction and the full TestPlan pass. Fresh Debug and optimized Release builds and analyses pass. A disposable namespaced runtime verified explicit first-account creation, later identifier resolution, two unmerged accounts, neutral/redacted presentation, 118-transaction relaunch hydration and a final zero-process shutdown.
 
 - Sprint 52A closes the remaining ADR-039 trusted-hydration and writer boundary. `RepositoryStoreHydrator` rejects unsupported date-role codes, malformed or invalid-IANA timezone evidence, missing/conflicting provenance and missing durable profile metadata without mutating runtime stores; it reads the actual profile ID/version returned by both providers and never defaults, reconstructs or hardcodes trusted evidence. Generic transaction replacement rejects trusted DTOs, while confirmed import validates complete normalized source relationships and rejects malformed provenance atomically with zero accepted residue. No migration was added or altered: V6 already persists the required graph. Focused SQLite/In-Memory parity, confirmed-import atomicity, hydration/relaunch and complete serial TestPlan verification pass; no parser, layout, format, institution or historical-repair support was added.
 

@@ -144,6 +144,9 @@ enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
 
 final class AxisBankAccountParser: StatementParser {
 
+    static let profileID = "axis.bank-account.csv"
+    static let profileVersion = "1"
+
     var name: String {
         "Axis Bank Account"
     }
@@ -268,8 +271,8 @@ final class AxisBankAccountParser: StatementParser {
                         normalizedRowID: row.id.uuidString,
                         sourceOrdinal: row.rowNumber,
                         normalizedRecordDigest: String.normalizedRecordDigest(values: row.values),
-                        parserProfileID: "axis.nre.csv",
-                        parserProfileVersion: "1"
+                        parserProfileID: Self.profileID,
+                        parserProfileVersion: Self.profileVersion
                     )
                 ],
                 verifiedAxisUPIEventEvidence: Self.eventEvidence(

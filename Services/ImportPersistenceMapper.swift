@@ -11,6 +11,9 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
     case missingTransactionDirection(UUID)
     case missingTransactionProvenance
     case conflictingTransactionProvenance
+    case missingParserProfileProvenance
+    case malformedParserProfileProvenance
+    case conflictingParserProfileProvenance
 
     var errorDescription: String? {
         switch self {
@@ -28,6 +31,12 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
             return "Import persistence requires transaction source provenance."
         case .conflictingTransactionProvenance:
             return "Import persistence found conflicting transaction source provenance."
+        case .missingParserProfileProvenance:
+            return "Import persistence requires parser-produced profile provenance."
+        case .malformedParserProfileProvenance:
+            return "Import persistence requires an exact nonempty parser profile identifier and version."
+        case .conflictingParserProfileProvenance:
+            return "Import persistence found conflicting parser profile provenance."
         }
     }
 }
@@ -102,6 +111,9 @@ struct ImportPersistenceMapper {
         )
 
         let normalizedDocumentID = "normalized-document-\(importSession.id.uuidString.lowercased())"
+        let parserProfile = try requiredParserProfile(
+            from: financialDocument.transactions
+        )
         let normalizedRows = try financialDocument.transactions.flatMap(\.sourceProvenance).map { provenance in
             guard provenance.sourceOrdinal > 0, !provenance.normalizedRecordDigest.isEmpty else {
                 throw ImportPersistenceError.missingTransactionProvenance
@@ -153,8 +165,8 @@ struct ImportPersistenceMapper {
                 id: normalizedDocumentID,
                 importSessionId: importSessionId,
                 documentId: documentId,
-                profileId: "axis.nre.csv",
-                profileVersion: "1"
+                profileId: parserProfile.id,
+                profileVersion: parserProfile.version
             ),
             normalizedRows: normalizedRows,
             transactions: transactions,
@@ -375,6 +387,38 @@ struct ImportPersistenceMapper {
         )
     }
 
+    private func requiredParserProfile(
+        from transactions: [Transaction]
+    ) throws -> (id: String, version: String) {
+        guard !transactions.isEmpty else {
+            throw ImportPersistenceError.missingParserProfileProvenance
+        }
+
+        var profiles: Set<ParserProfilePair> = []
+        for transaction in transactions {
+            guard !transaction.sourceProvenance.isEmpty else {
+                throw ImportPersistenceError.missingParserProfileProvenance
+            }
+            for provenance in transaction.sourceProvenance {
+                let id = provenance.parserProfileID
+                let version = provenance.parserProfileVersion
+                guard !id.isEmpty, !version.isEmpty else {
+                    throw ImportPersistenceError.missingParserProfileProvenance
+                }
+                guard id == id.trimmingCharacters(in: .whitespacesAndNewlines),
+                      version == version.trimmingCharacters(in: .whitespacesAndNewlines) else {
+                    throw ImportPersistenceError.malformedParserProfileProvenance
+                }
+                profiles.insert(ParserProfilePair(id: id, version: version))
+            }
+        }
+
+        guard profiles.count == 1, let profile = profiles.first else {
+            throw ImportPersistenceError.conflictingParserProfileProvenance
+        }
+        return (profile.id, profile.version)
+    }
+
     nonisolated private static func confirmedEventEvidence(
         from evidence: AxisUPITransactionEventEvidence
     ) -> ConfirmedImportTransactionEventEvidenceDTO {
@@ -394,4 +438,9 @@ struct ImportPersistenceMapper {
         return currency.code
     }
 
+}
+
+private struct ParserProfilePair: Hashable {
+    let id: String
+    let version: String
 }

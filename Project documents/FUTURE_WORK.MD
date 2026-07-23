@@ -643,10 +643,12 @@ Sprint 52 implemented the approved provenance boundary; the former `FT-P0-02` id
 **Status:** Candidate  
 **Depends on:** Approved fixtures for each layout
 
+**Supplied shared-layout Axis NRO CSV slice completed 2026-07-23:** Sprint 53 verified the supplied NRO CSV evidence through the existing Axis bank-account grammar and one shared production parser. New supported NRE and NRO imports use `axis.bank-account.csv` version `1`; two distinct full institution account identifiers preserve separate durable accounts. This completion does not establish broader Axis NRO, PDF, XLS, XLSX or card support.
+
 Expand deterministic Axis coverage in dependency and fixture-readiness order:
 
 1. additional NRE layouts;
-2. NRO account layouts;
+2. additional NRO account layouts beyond the supplied shared CSV grammar;
 3. savings and current-account layouts;
 4. broader bank-account layouts; Axis cards remain separate future card-family work subject to card semantics and fixtures;
 5. historical or changed layouts.
@@ -725,6 +727,8 @@ Do not force materially different financial documents into the bank-statement mo
 
 **Status:** Ready for discovery  
 **Depends on:** Existing reader, parser-selection and `FinancialDocument` boundaries
+
+**Narrow parser-authoritative profile-provenance slice completed 2026-07-23:** Sprint 53 makes the production persistence mapper consume exactly one nonempty profile ID/version pair produced by parser transaction provenance and fail before writes when it is missing, malformed or conflicting. Historical `axis.nre.csv` version `1` remains readable unchanged. Reusable profile architecture, broader CSV grammar, other layouts, formats and institutions remain open.
 
 Expand the internal parser framework so additional institutions, statement families and layout versions can be added without creating parallel import pipelines.
 
@@ -1974,6 +1978,7 @@ Establish one reproducible macOS validation workflow for local development, Chat
 Candidate outcomes include:
 
 - one repository-owned canonical build and test entry point;
+- one repository-owned singleton kill/build/run entry point that gracefully terminates every exact-name LedgerForge process, escalates only against remaining exact-name matches, proves the zero-instance precondition, launches one resolved freshly built bundle, and verifies its PID and executable path before UI attachment;
 - deterministic Debug and Release builds;
 - focused and full test execution;
 - a configured run or verification action for supported ChatGPT development environments;
@@ -1992,6 +1997,8 @@ Candidate outcomes include:
 - commit-status protection where repository policy supports it.
 
 The exact script names, CI provider and command interface require discovery. This candidate must not create an alternate build configuration that diverges from Xcode project truth.
+
+Sprint 53 runtime verification required this singleton process-isolation sequence to prevent attachment to stale binaries from other DerivedData roots. No authorized repository launch script existed to narrow during that sprint, so the permanent project-owned entry point remains a separate follow-up under this candidate.
 
 ---
 

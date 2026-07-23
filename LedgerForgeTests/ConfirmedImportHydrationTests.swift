@@ -185,8 +185,8 @@ private func hydrationPreparedImport(
                 normalizedRowID: "hydration-normalized-row-1",
                 sourceOrdinal: 1,
                 normalizedRecordDigest: String.normalizedRecordDigest(values: ["hydration", "1"]),
-                parserProfileID: "axis.nre.csv",
-                parserProfileVersion: "1"
+                parserProfileID: AxisBankAccountParser.profileID,
+                parserProfileVersion: AxisBankAccountParser.profileVersion
             )
         ]
     )
