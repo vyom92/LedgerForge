@@ -2,1783 +2,697 @@
 
 ## Control
 
-**File purpose:** Private Chat-user planning, roadmap and decision archive  
+**Purpose:** Private Chat-user roadmap, planning record and continuity aid  
 **Repository authority:** None  
 **Execution authority:** None  
 **Visible to Work:** No  
 **Visible to Codex:** No  
-**Stored in GitHub:** Backup only; never an authoritative repository-planning source and never supplied to Work or Codex  
-**Current repository baseline:** `main@d63c54f7a8117b36ff4849c0ad9453abb3fc9a80`  
+**GitHub status:** Backup copy only, never repository authority  
+**Repository baseline reviewed:** `main@11035461ce3de0f11ae5262bbc8a38b9639607b2`  
+**Latest verified implementation:** Sprint 53 at `11035461ce3de0f11ae5262bbc8a38b9639607b2`  
 **Last reconciled:** 2026-07-23  
-**Roadmap cycle:** Sprints 50–59
+**Cycle:** Sprints 50–59
 
-This file is a private forecast and continuity record for Chat and the user. It does not authorize implementation, Git operations, branches, migrations, ADR changes, repository edits, Work investigation or Codex execution.
+This file forecasts and records Chat-user planning. It does not authorize Work, Codex, implementation, Git operations, migrations, ADR changes or repository edits.
 
-Current repository evidence always overrides this roadmap. A sprint becomes executable only after Chat revalidates the current repository and supplies one complete, current-conversation execution prompt.
+Before any sprint decision, Chat must read this file and verify it against the exact current repository ref, `PROJECT_STATE.md`, `FUTURE_WORK.MD`, accepted ADRs, and relevant code/tests. Repository evidence overrides this roadmap.
 
-The copy stored in GitHub exists only as user-controlled backup. It must not be treated as repository authority, included in repository-state reasoning, quoted to Work or Codex, or used as an execution prompt.
-
-Work and Codex receive only the bounded prompt approved for their immediate task.
+Work and Codex must never receive this file. They receive only the bounded prompt approved for their immediate task.
 
 ---
 
-## Roadmap operating model
+## Operating rules
 
-### Ten-sprint cycle
+### Fixed cycle and corrective numbering
 
-This file covers exactly Sprints 50 through 59.
+The cycle contains Sprints 50 through 59. A blocking defect discovered by Sprint `N` is handled as `NA`, then `NB` only when another separately bounded correction remains directly attributable to Sprint `N`.
 
-After Sprint 59 is accepted or the cycle is explicitly closed, Chat performs cycle reconciliation and creates a new private roadmap for Sprints 60 through 69.
-
-The roadmap is reconciled after every accepted sprint, but future sprint numbers are not renumbered merely because corrective work is inserted.
-
-### Corrective sprint rule
-
-When Sprint `N` exposes a defect that blocks acceptance or safe continuation, the correction is inserted as Sprint `NA`, then `NB` only when another independently bounded correction remains directly attributable to Sprint `N`.
-
-Example:
+Later sprint numbers do not move.
 
 ```text
 Sprint 52
 Sprint 52A — blocking correction
-Sprint 53 — original planned sequence resumes
+Sprint 53 — original numbered sequence resumes
 ```
 
-Later planned sprints retain their numbers. The roadmap records the interruption instead of silently pushing every future sprint down.
+Use a corrective suffix only when the issue:
 
-Use an `A` sprint only when the issue:
-
-- arose from implementation or verification of the parent sprint;
+- arose from implementation or acceptance of the parent sprint;
 - blocks acceptance, trusted use or safe continuation;
-- has a bounded corrective outcome;
-- takes precedence over the next planned sprint;
-- is not an unrelated feature.
+- has one bounded corrective outcome;
+- is not unrelated feature work.
 
-A newly verified unrelated P0 defect may interrupt the cycle as a standalone integrity sprint. Chat must explain why it is not attached to the preceding sprint.
+An unrelated verified P0 defect may interrupt the roadmap as a standalone integrity sprint. Chat must state why it is not attached to the preceding sprint.
 
 ### Priority override
 
-Verified financial-correctness, persistence, identity, recoverability or privacy defects take precedence over forecast feature work.
+Verified financial-correctness, persistence, identity, privacy or recoverability defects outrank forecast work.
 
-When a roadmapped sprint discovers a blocking defect:
+When such a defect appears:
 
 1. stop acceptance of the affected outcome;
-2. classify the defect against current repository evidence;
-3. insert the appropriate corrective sprint;
-4. leave later sprint numbers unchanged;
-5. resume the roadmap only after the correction is accepted.
+2. verify and classify it against repository evidence;
+3. insert corrective or standalone integrity work;
+4. retain later sprint numbers;
+5. resume only after the blocker is accepted or explicitly deferred by the user.
 
-Non-blocking findings are added to `FUTURE_WORK.MD` through the normal documentation process and do not automatically interrupt the roadmap.
-
-### Forecast status vocabulary
+### Status vocabulary
 
 | Status | Meaning |
 |---|---|
-| **Complete** | Implemented or concluded, verified and accepted |
-| **Discovery complete** | Read-only evidence returned; architecture or implementation still requires Chat decision |
-| **Forecast** | Strongest current expected outcome, not selected for execution |
+| **Complete** | Verified and accepted |
+| **Selected** | Chat has approved a complete execution prompt |
+| **In progress** | Approved Work or Codex execution is active |
+| **Forecast** | Strong current expectation, not authorized |
 | **Conditional** | Depends on named earlier evidence or implementation |
-| **Selected** | Chat completed formal sprint planning and approved an execution prompt |
-| **In progress** | Approved Work or Codex run is active |
-| **Correction inserted** | An `A/B` sprint temporarily interrupts the sequence |
-| **Replaced** | Current evidence invalidated the forecasted outcome |
-| **Deferred** | Still valid but moved beyond this cycle |
-| **Reserved** | Sprint number retained for later evidence-based selection; no candidate is authorized |
+| **Discovery** | Read-only evidence sprint; no implementation by default |
+| **Correction inserted** | `A/B` sprint interrupts the sequence |
+| **Deferred** | Still valid, moved beyond this cycle |
+| **Replaced** | Current evidence invalidated or absorbed the earlier forecast |
 
-Only **Selected** or **In progress** may correspond to an execution prompt.
+Only **Selected** and **In progress** correspond to execution authorization.
 
-### Reconciliation rule
+### Reconciliation
 
-After every sprint, Chat updates this file with:
+After every accepted sprint, update:
 
 - exact ending `main` commit;
-- verified outcome;
-- deviations from the forecast;
-- inserted corrective sprints;
-- newly discovered blockers;
+- verified outcome and acceptance evidence;
+- deviations from forecast;
+- corrective sprints;
 - candidate readiness changes;
-- any effect on later roadmap entries;
-- the verbatim planning and report-review discussion.
+- effects on later sprint cards;
+- append-only decision log.
 
-The concise roadmap sections at the top remain current. The planning log at the end is append-only.
+Keep the active roadmap concise. Preserve detailed discussion in the log only when it materially explains a decision.
 
 ---
 
 ## Active project state
 
-- **Latest completed implementation sprint:** Sprint 52A — Strict Trusted Transaction Hydration and Provenance Closure.
-- **Latest completed architecture and implementation sprint:** Sprint 52 — Trusted Statement Dates and Durable Source Provenance.
-- **Current repository baseline:** pushed `main@d63c54f7a8117b36ff4849c0ad9453abb3fc9a80`.
+- **Latest completed sprint:** Sprint 53 — Axis Shared Bank-Account CSV Profile and NRO Identity Closure.
+- **Current pushed baseline:** `main@11035461ce3de0f11ae5262bbc8a38b9639607b2`.
 - **Current migration:** V6.
-- **Latest accepted ADR:** ADR-039 — Trusted Statement Dates and Durable Source Provenance.
-- **Production parser support:** approved Axis NRE CSV profile only.
-- **Trusted production import:** restored for the approved Axis NRE CSV profile after Sprint 52A verification.
-- **Completed former RED blockers:**
-  - `FT-P0-01` / `FW-P0-21` — Date-Only Semantic Preservation.
-  - `FT-P0-02` / `FW-P0-22` — Durable Source Order and Provenance.
-- **Current next decision:** perform read-only Axis NRO and Import Profile readiness discovery for `FW-P1-01` and `FW-P1-06`.
-- **Known intentional limitation:** supported partial overlaps currently block the complete incoming statement; bounded partial import remains future work under `FW-P1-25`.
-- **Known support boundary:** Axis NRO is not production-supported merely because a structurally similar source can pass through current code.
-- **Local-state caveat:** GitHub cannot establish local branch, worktree cleanliness, stashes, uncommitted work or unpushed commits. These must be verified before any Codex execution.
+- **Current accepted ADR:** ADR-039 — Trusted Statement Dates and Durable Source Provenance, clarified for the shared Axis bank-account CSV profile.
+- **Trusted production import:** approved Axis NRE and supplied shared-layout Axis NRO CSV evidence through one `AxisBankAccountParser`.
+- **Forward parser profile:** `axis.bank-account.csv` version `1`.
+- **Historical compatibility:** durable `axis.nre.csv` version `1` provenance remains readable and unchanged.
+- **Durable account identity:** distinct verified full institution account identifiers create and retain distinct accounts; shared customer context is non-authoritative.
+- **Current verified automated result:** 394 top-level tests across 48 suites, zero failures and zero unexpected skips.
+- **Current verified runtime result:** two durable Axis accounts, 118 transactions after relaunch hydration, exact duplicate handling, supported overlap blocking, neutral presentation and zero remaining LedgerForge processes.
+- **Current next decision:** Sprint 54 partial-overlap import architecture discovery.
+- **Known import limitation:** supported partial overlap blocks the complete incoming statement; partial import remains future work under `FW-P1-25`.
+- **Known support boundary:** broader Axis layouts, PDF, XLS, XLSX, cards, HDFC, CBQ and other institutions are not production-supported.
+- **Known runtime-tooling limitation:** manual and automation launches can attach to a stale DerivedData build when multiple LedgerForge processes exist; a deterministic singleton launch entrypoint remains future work.
+- **Local-state limitation:** GitHub cannot establish worktree cleanliness, stashes, branches, linked worktrees or unpushed commits. Those checks remain mandatory before Codex execution.
 
 ---
 
-## Ten-sprint overview
+## Cycle overview
 
-| Sprint | Expected outcome | Candidate IDs | Status | Confidence |
+| Sprint | Outcome | Candidates | Status | Confidence |
 |---|---|---|---|---|
-| **50** | Provider-owned atomic confirmed import, durable identifier ownership and Migration V5 activation | `FW-P0-05`, bounded `FW-P0-12` slice, ADR-038 | **Complete** | Verified |
-| **51** | Fail closed on malformed recognized Axis transaction-date and account-identity evidence | `FT-P0-03`, `FT-P1-04` | **Complete** | Verified |
-| **52** | Accept and implement faithful statement-date semantics plus durable source order and provenance through ADR-039 and Migration V6 | `FW-P0-21`, `FW-P0-22` | **Complete** | Verified |
-| **52A** | Close trusted hydration, profile-provenance and trusted-writer boundaries exposed during Sprint 52 verification | Sprint 52 corrective scope | **Complete** | Verified |
-| **53** | Prove the Axis NRO and reusable Import Profile boundary; decide combine or split for parser-family expansion | `FW-P1-01`, `FW-P1-06` | **Selected for planning; discovery not yet executed** | High for discovery |
-| **54** | Implement the smallest approved profile-backed Axis NRO or prerequisite Import Profile slice | `FW-P1-01`, bounded `FW-P1-06` slice | **Conditional** | Medium |
-| **55** | Discover explicit partial-overlap review and unique-transaction import semantics | `FW-P1-25`, possible bounded `FW-P2-12` relationship | **Conditional** | Medium |
-| **56** | Implement bounded, explicit partial-overlap import without silent transaction omission | `FW-P1-25` | **Conditional** | Medium |
-| **57** | Implement durable categories and manual single-transaction classification | `FW-P2-20`, ADR-036 | **Conditional** | Medium |
-| **58** | Strongest evidence-valid P1 or P2 outcome remaining after Sprint 57 reconciliation | To be selected from current `FUTURE_WORK.MD` | **Reserved** | Low |
-| **59** | Final bounded outcome or explicit close of the 50–59 cycle | To be selected from current `FUTURE_WORK.MD` | **Reserved** | Low |
+| **50** | Provider-atomic confirmed import, durable identifier ownership and Migration V5 | `FW-P0-05`, bounded `FW-P0-12`, ADR-038 | **Complete** | Verified |
+| **51** | Fail closed on malformed recognized Axis transaction-date and identity evidence | `FT-P0-03`, `FT-P1-04` | **Complete** | Verified |
+| **52** | Trusted statement dates and durable source provenance through ADR-039 and Migration V6 | `FW-P0-21`, `FW-P0-22` | **Complete** | Verified |
+| **52A** | Close trusted hydration, profile-provenance and writer-authority gaps | Sprint 52 corrective scope | **Complete** | Verified |
+| **53** | Shared Axis bank-account CSV profile and NRO durable-identity closure | supplied slice of `FW-P1-01`, bounded slice of `FW-P1-06` | **Complete** | Verified |
+| **54** | Define explicit partial-overlap review and unique-transaction import semantics | `FW-P1-25`, possible `FW-P2-12` relationship | **Discovery** | Medium-high |
+| **55** | Implement bounded partial-overlap import without silent omission | `FW-P1-25` | **Conditional** | Medium |
+| **56** | Durable categories and manual single-transaction classification | `FW-P2-20`, ADR-036 | **Conditional** | Medium |
+| **57** | DEBUG-only deterministic import verification workspace | `FW-P1-40`, bounded `FW-P1-37` | **Conditional** | Medium |
+| **58** | Production PDF, binary fingerprint and cross-format evidence discovery | `FW-P1-10`, `FW-P1-18`, readiness for `FW-P1-16` | **Discovery** | Medium-low |
+| **59** | Deterministic singleton build, launch and runtime-verification entrypoint | Sprint 53 operational follow-up | **Forecast** | Medium |
 
-Forecast confidence decreases with distance. Any verified P0 defect or failed acceptance boundary overrides this sequence without renumbering later sprints.
+Forecast confidence decreases with distance. Any verified P0 defect or failed acceptance boundary overrides the sequence without renumbering later sprints.
 
 ---
 
-# Detailed sprint cards
+# Sprint cards
 
 ## Sprint 50 — Atomic Confirmed Import and Durable Identifier Ownership
 
-### Status
-
-**Complete and verified**
+**Status:** Complete  
+**Architecture:** ADR-038  
+**Migration:** V5
 
 ### Outcome
 
-LedgerForge moved accepted confirmation into one provider-owned atomic transaction that revalidates the prepared decision against current repository truth before committing the complete financial graph.
+Accepted confirmation moved into one provider-owned transaction that revalidates repository truth before atomically publishing the accepted financial graph.
 
-### Candidate and architecture basis
+### Delivered
 
-- `FW-P0-05 — Concurrent Import Guarantees`
-- bounded successful-confirmed-import slice of `FW-P0-12 — Identifier Backfill Policy`
-- ADR-038
-- Migration V5
-
-### Delivered boundary
-
-- provider-owned confirmed-import operation;
-- transaction-time provider-generation revalidation;
-- account and identity-decision revalidation;
-- identifier ownership enforcement;
-- exact document-fingerprint and transaction-event claim revalidation;
+- provider-generation, account-choice and identity-decision revalidation;
+- identifier ownership, fingerprint and transaction-event claim enforcement;
 - atomic account, document, session, transaction, identifier and observation persistence;
-- SQLite and In-Memory provider-equivalent outcomes;
-- same-process, independent-provider and genuine separate-process competition coverage;
+- SQLite/In-Memory equivalent typed outcomes;
+- same-process, independent-provider and separate-process competition coverage;
 - zero losing-path accepted residue;
-- post-commit canonical hydration and reconciliation gating;
-- Migration V5 activation.
+- canonical post-commit hydration and reconciliation gating.
 
-### Explicit exclusions retained
+### Excluded
 
-- generic financial-mutation executor;
+- generic mutation executor;
 - historical identifier repair or invented observations;
-- unlinking, reassignment or incorrect-link recovery;
-- general rollback or compensation framework;
-- unrelated parser or product expansion.
-
-### Completion evidence
-
-Sprint 50 is repository-recorded as the implementation of ADR-038's confirmed-import production slice. It is the baseline architecture on which later provenance-bearing imports build.
-
-### Roadmap effect
-
-Sprint 50 made future provider-atomic transaction provenance possible, but it did not solve date-only semantics, source order or historical provenance.
+- unlinking, reassignment and incorrect-link recovery;
+- general rollback or compensation.
 
 ---
 
 ## Sprint 51 — Fail-Closed Recognized Axis Source Evidence
 
-### Status
-
-**Complete and verified**
+**Status:** Complete
 
 ### Outcome
 
-Recognized malformed Axis financial evidence now fails before preparation, identity review, confirmation or persistence instead of being silently omitted or downgraded.
+Recognized malformed Axis transaction rows and malformed, unconstructable or conflicting structured account evidence now fail before preparation, account review, confirmation or persistence.
 
-### Selected defect families
+### Delivered
 
-- `FT-P0-03` — malformed dates in recognized transaction rows were silently omitted, allowing truncated accepted imports;
-- `FT-P1-04` — malformed, unconstructable or conflicting recognized structured account evidence was silently downgraded to no identifier.
-
-### Delivered boundary
-
-- strict malformed-date rejection for recognized Axis financial rows;
-- typed failure for malformed, unconstructable or conflicting recognized account-identifier evidence;
-- parser-owned identity authority preserved;
-- valid supported rows and supported zero-value behavior preserved;
-- failure before fingerprint lookup, identity review, confirmation and persistence;
-- zero accepted financial residue on rejection;
-- focused, regression, provider-parity and complete-suite verification;
+- strict malformed transaction-date rejection;
+- typed parser-owned identity-evidence failure;
+- preserved valid rows and supported zero-value behavior;
+- zero accepted residue;
 - no migration or ADR change.
 
-### Integration correction
+### Integration note
 
-The original Codex branch also contained a Developer Console filename-redaction change. That change was explicitly rejected as unnecessary scope for the current single-user local app and was not integrated into `main`.
+A Developer Console filename-redaction change produced during the original Codex run was rejected as unrelated scope and not integrated.
 
-Only the approved parser and identity repair was selectively integrated. Repository documentation was recreated separately to describe the actual accepted scope.
+### Verified baseline
 
-### Completion baseline
-
-- approved repair commit on `main`: `e31343d08258cd3e1c0ce3b91c32f6fad71fda4d`;
-- synchronized documentation commit: `2aa6346fa0b8dc116ba97a6983f205afd0a206d3`;
-- recorded verification: 377 top-level tests, 401 expanded executions, 47 suites, clean Debug and optimized Release builds, Debug and Release analysis with zero findings, four pre-existing `AccountStore.swift` warnings.
-
-### Roadmap effect
-
-Sprint 51 stopped two fail-open paths but deliberately left the broader date-only and source-provenance defects unresolved.
+- repair commit: `e31343d08258cd3e1c0ce3b91c32f6fad71fda4d`;
+- synchronized documentation: `2aa6346fa0b8dc116ba97a6983f205afd0a206d3`.
 
 ---
 
 ## Sprint 52 — Trusted Statement Dates and Durable Source Provenance
 
-### Status
-
-**Complete and verified**
+**Status:** Complete  
+**Architecture:** ADR-039  
+**Migration:** V6
 
 ### Outcome
 
-LedgerForge now preserves supported Axis statement transaction dates as strict date-only financial evidence and retains document-scoped source order and bounded durable provenance through parsing, validation, provider-atomic persistence, hydration, relaunch and presentation.
+Supported Axis transaction dates remain date-only financial evidence, while document-scoped order and bounded source provenance survive parsing, validation, provider-atomic persistence, hydration, relaunch and presentation.
 
-### Candidates and architecture basis
+### Delivered
 
-- `FW-P0-21 — Date-Only Semantic Preservation`
-- `FW-P0-22 — Durable Source Order and Provenance`
-- ADR-039
-- Migration V6
-
-### Delivered boundary
-
-- immutable source-faithful statement-date domain without `Foundation.Date` conversion;
+- immutable source-faithful statement-date domain;
+- no `Foundation.Date` conversion for printed transaction dates;
 - canonical date-only persistence and exact hydration;
-- Axis `Asia/Kolkata` date authority for the approved profile;
-- reader-owned document-scoped source ordinal;
+- Axis `Asia/Kolkata` profile date authority;
+- document-scoped reader ordinal;
 - normalized-record digest and parser-profile provenance;
-- provider-owned atomic transaction and provenance persistence;
-- SQLite and In-Memory provider-equivalent behavior;
-- V6 fail-closed treatment of nonempty V5 financial graphs rather than invented history;
-- source-supported same-document ordering and running-balance interpretation;
-- independent date, source-order and financial-truth verification;
-- trusted import restoration for the approved Axis NRE CSV profile, subject to Sprint 52A closure.
+- provider-atomic transaction/provenance graph;
+- SQLite/In-Memory parity;
+- V6 fail-closed handling for nonempty V5 financial graphs rather than invented history;
+- source-supported same-document order and running-balance behavior;
+- independent source-date, order and financial-truth verification.
 
-### Explicit exclusions retained
+### Excluded
 
-- reconstruction of legacy dates, order or provenance;
+- reconstructed historical dates, order or provenance;
 - inferred global order across documents;
-- new institution, layout or format support;
+- new institutions, layouts or formats;
 - partial-overlap import;
-- historical duplicate repair;
-- raw full-document retention;
-- unrelated UI redesign;
-- categories.
+- historical duplicate repair.
 
 ### Roadmap deviation
 
-The original roadmap expected a separate architecture sprint followed by a separate implementation sprint.
-
-Current repository evidence shows that the accepted architecture, ADR-039, Migration V6 and production implementation were completed together as Sprint 52.
-
-The old forecasted Sprint 53 architecture and Sprint 54 implementation entries are therefore replaced by the actual Sprint 52 outcome. Completed reality outranks forecast choreography, despite humanity’s fondness for pretending plans control events.
-
-### Roadmap effect
-
-- `FW-P0-21` is complete.
-- `FW-P0-22` is complete.
-- Migration V6 is active.
-- ADR-039 is accepted.
-- The next unresolved product boundary moves to Axis NRO and reusable Import Profiles.
+The earlier roadmap split architecture and implementation into later sprints. Repository reality completed ADR-039, V6 and production implementation within Sprint 52, freeing later slots for additional evidence-valid work.
 
 ---
 
 ## Sprint 52A — Strict Trusted Transaction Hydration and Provenance Closure
 
-### Status
+**Status:** Complete corrective sprint
 
-**Complete and verified corrective sprint**
+### Reason
+
+Sprint 52 verification exposed remaining persistence-to-runtime and writer-authority paths that could accept malformed or incomplete trusted provenance.
+
+### Delivered
+
+- fail-closed hydration for unsupported date-role codes;
+- fail-closed hydration for malformed or invalid timezone evidence;
+- rejection of missing or conflicting source relationships;
+- durable parser profile ID/version read from provider evidence, never reconstructed or hardcoded;
+- trusted transaction rejection through generic replacement paths;
+- complete normalized source-relationship validation inside confirmed import;
+- provider-equivalent atomic rejection with zero residue;
+- hydration, relaunch and complete serial TestPlan verification.
+
+### Excluded
+
+- new parser, institution, layout or format support;
+- historical repair;
+- migration changes beyond existing V6.
+
+---
+
+## Sprint 53 — Axis Shared Bank-Account CSV Profile and NRO Identity Closure
+
+**Status:** Complete  
+**Commit:** `11035461ce3de0f11ae5262bbc8a38b9639607b2`  
+**Migration:** V6 unchanged
 
 ### Outcome
 
-Sprint 52A closed the remaining trusted persistence-to-runtime and writer-authority defects exposed during Sprint 52 verification.
+One production `AxisBankAccountParser` now supports the approved Axis NRE and supplied shared-layout Axis NRO CSV evidence through one neutral forward profile. Different verified full account numbers create and retain different durable accounts.
 
-### Why the correction was required
+### Delivered
 
-Sprint 52 established the correct durable model, but verification exposed remaining paths where malformed or incomplete trusted provenance could enter hydration or where trusted transactions could be written through an insufficiently constrained mutation surface.
+- forward profile `axis.bank-account.csv` version `1`;
+- parser-authoritative profile provenance with no persistence fallback;
+- fail-closed missing, malformed and conflicting profile evidence;
+- privacy-safe reconstruction of two NRO CSV preambles while preserving transaction rows;
+- independent financial and identity oracles;
+- explicit first-account creation and subsequent identifier resolution;
+- distinct NRE and NRO durable accounts despite shared customer context;
+- SQLite/In-Memory lifecycle parity;
+- exhaustive confirmed-import failure injection with zero accepted residue;
+- exact duplicate and supported event-overlap behavior;
+- provider reconstruction, hydration and application relaunch verification;
+- neutral presentation with redacted identity summaries;
+- historical `axis.nre.csv@1` exact readback without rewriting;
+- 394-test canonical TestPlan, Debug/Release builds and analyses, and disposable runtime verification.
 
-Those defects directly affected acceptance of Sprint 52 and therefore qualified as Sprint 52A rather than unrelated new work.
+### Excluded
 
-### Delivered boundary
+- broader Axis NRO or historical layouts;
+- PDF, XLS, XLSX and cards;
+- HDFC and other institutions;
+- broad CSV grammar and reusable profile architecture;
+- NRE/NRO classification inference;
+- customer-ID matching;
+- historical profile rewriting;
+- Migration V7.
 
-- trusted hydration rejects unsupported financial-date roles;
-- malformed or invalid-IANA timezone evidence fails before runtime-store mutation;
-- missing or conflicting source relationships fail closed;
-- trusted hydration reads actual parser profile ID and version from both providers;
-- no parser-profile provenance is defaulted, reconstructed or hardcoded;
-- generic transaction replacement rejects trusted transaction writes;
-- confirmed import validates complete normalized source relationships atomically;
-- malformed trusted provenance leaves zero accepted durable residue;
-- SQLite/In-Memory parity verified;
-- hydration and relaunch behavior verified;
-- complete serial TestPlan verification passed;
-- no migration, ADR, parser-family or format expansion was added.
+### Roadmap deviation
 
-### Explicit exclusions retained
-
-- new parser support;
-- import-profile generalization;
-- historical provenance repair;
-- partial-overlap import;
-- categories;
-- unrelated UI work.
-
-### Roadmap effect
-
-Sprint 52A satisfies the corrective-sprint rule.
-
-Trusted Axis NRE import is no longer blocked by the date/provenance hydration boundary.
-
-The original numbered roadmap sequence resumes at Sprint 53.
+Sprint 53 discovery proved the minimum implementation boundary and completed it in the same numbered sprint. The former Sprint 54 Axis-NRO implementation forecast was absorbed and replaced. Later candidates move forward one slot without changing their internal order.
 
 ---
 
-## Sprint 53 — Axis NRO and Import Profile Readiness Discovery
+## Sprint 54 — Partial-Overlap Import Architecture
 
-### Status
+**Status:** Discovery  
+**Candidate:** `FW-P1-25` with a possible bounded relationship to `FW-P2-12`
 
-**Selected for planning; discovery not yet executed**
+### Outcome
 
-### Confidence
+Define a prospective workflow that distinguishes already-owned supported events from unique incoming transactions, presents the impact, obtains explicit confirmation and preserves truthful partial-import provenance.
 
-**High for bounded discovery; implementation remains conditional**
+### Work
 
-### Selected outcome
+1. Verify current exact-document duplicate, Axis UPI event, attempt-history and ADR-039 provenance boundaries at the exact pushed ref.
+2. Classify overlap families and identify the smallest independently provable partial-import family.
+3. Decide whether `FW-P2-12` contributes only review/presentation semantics or introduces an inseparable transaction-editing dependency.
+4. Select one implementation boundary or stop with named blockers.
 
-Produce an evidence-grade decision on whether one approved Axis NRO layout can enter production through a narrowly reusable, versioned Import Profile boundary, or whether parser-framework work and NRO implementation must remain separate.
+### Required decisions
 
-### Candidates
+- exact statement duplicate versus supported event overlap;
+- full overlap, partial overlap, repeated incoming event and unsupported evidence;
+- imported, recognized-existing and rejected row provenance;
+- statement, session and attempt representation of a partial outcome;
+- opening/closing balance and running-balance interpretation;
+- same-day source order;
+- immutable user-reviewed plan;
+- transaction-time revalidation and contention behavior;
+- provider atomicity and losing-path residue;
+- migration and ADR need.
 
-- `FW-P1-01 — Axis Bank Parser Family Expansion`
-- `FW-P1-06 — Parser Framework Expansion`
+### Excluded
 
-### Priority classification
-
-| Candidate | Classification | Reason |
-|---|---|---|
-| `FW-P0-10` | Ready for discovery but deferred | No verified current financial-correctness defect requires it before parser-family readiness |
-| `FW-P0-16` | Blocked | Named dependencies remain unresolved |
-| `FW-P0-20` | Research | Not implementation-ready and not stronger than the selected bounded P1 discovery |
-| `FW-P1-01` | Ready for targeted discovery | Axis NRO support remains unproven and requires source-backed readiness work |
-| `FW-P1-06` | Ready for targeted discovery | The reusable Import Profile boundary is inseparable from deciding the safe NRO implementation shape |
-| `FW-P1-10` | Deferred | PDF support is broader and less ready than one proven CSV layout |
-| `FW-P1-25` | Deferred to Sprint 55 | Important, but follows parser and provenance foundations |
-| `FW-P1-40` | Deferred | Useful development tooling, but not stronger than a user-facing parser-family expansion boundary |
-| `FW-P2-20` | Implementation-ready but deferred | Lower priority than unresolved P1 parser expansion |
-| `FW-P2-34` | Deferred | Lower-priority lifecycle feature |
-| `FW-P2-52` | Deferred | Lower-priority preference work |
-
-### Combine or split decision
-
-Combine `FW-P1-01` and `FW-P1-06` for discovery only because they share one decision boundary:
-
-- deterministic layout recognition;
-- semantic column-role resolution;
-- parser-profile identity and versioning;
-- source-to-fixture provenance;
-- CSV grammar;
-- account-identity semantics;
-- independent financial truth;
-- compatibility with the Sprint 52 date and provenance architecture.
-
-Do not combine implementation merely to increase throughput.
-
-A combined implementation is permitted only if discovery proves that:
-
-1. one approved Axis NRO layout is independently verifiable;
-2. the minimum reusable Import Profile abstraction is required for that layout;
-3. the abstraction does not silently generalize support to unproven layouts;
-4. the complete outcome can be validated by one bounded acceptance plan.
-
-### Mode
-
-**Work: bounded, read-only investigation**
-
-Work is justified because the remaining unknowns concern:
-
-- private or locally held Axis NRO source material;
-- source-to-fixture provenance;
-- filesystem-visible fixture chains;
-- broad reader/parser/persistence tracing;
-- exact CSV grammar behavior;
-- potential repository and local evidence that GitHub alone may not establish efficiently.
-
-Work does not select the sprint, edit files, implement code, create branches or make architecture decisions.
-
-### Exact unknown
-
-Whether one deterministic Axis NRO CSV layout exists that LedgerForge can safely support using a minimal reusable Import Profile without guessing layout semantics, account identity, source dates, source order, balances or financial truth.
-
-### Why the unknown affects the decision
-
-Without this evidence, Chat cannot determine whether Sprint 54 should be:
-
-1. one combined Axis NRO plus minimal Import Profile implementation;
-2. an Import Profile foundation sprint only;
-3. a fixed parser-family extension without reusable framework work;
-4. blocked pending better source or oracle evidence.
-
-### Required Work evidence
-
-Work must return:
-
-1. **Exact baseline**
-   - inspected immutable pushed commit;
-   - relevant authoritative repository documents;
-   - explicit statement that local mutable state was not treated as repository truth unless separately inspected.
-
-2. **Source evidence**
-   - available Axis NRO originals or privacy-safe equivalents;
-   - document provenance;
-   - account type and statement-period evidence;
-   - whether each source is approved for local read-only investigation;
-   - whether sanitization preserves all financial semantics.
-
-3. **Fixture chain**
-   - source-to-sanitized-fixture derivation;
-   - fields transformed;
-   - fields preserved;
-   - proof that transformations do not alter transaction count, direction, scale, currency, dates, source order, balances, identifiers or parser-selection evidence.
-
-4. **Independent financial oracle**
-   - transaction count;
-   - debit and credit direction;
-   - native currency;
-   - decimal scale;
-   - transaction dates;
-   - physical source order;
-   - opening balance;
-   - closing balance;
-   - running-balance continuity;
-   - account identifier evidence;
-   - statement-period evidence where present.
-
-   Production parser output, generated expected JSON or implementation-derived fixtures must not be the sole oracle.
-
-5. **Reader and CSV grammar**
-   - delimiter behavior;
-   - quoted commas;
-   - escaped quotes;
-   - embedded line breaks;
-   - CRLF and LF handling;
-   - empty fields;
-   - leading and trailing whitespace;
-   - byte-order mark behavior;
-   - malformed records;
-   - duplicate or ambiguous headers;
-   - repeated header sections;
-   - footer and summary-row handling.
-
-6. **Deterministic selection**
-   - institution recognition;
-   - statement-family recognition;
-   - NRO layout recognition;
-   - supported-profile identity;
-   - unsupported-layout rejection;
-   - evidence that NRE and NRO layouts cannot be confused.
-
-7. **Semantic role mapping**
-   - transaction date;
-   - value date where present;
-   - description or narration;
-   - debit;
-   - credit;
-   - amount;
-   - direction;
-   - balance;
-   - currency;
-   - account identifier;
-   - statement period;
-   - source ordinal.
-
-8. **Account identity**
-   - exact source-supported identifier evidence;
-   - whether NRE and NRO accounts are distinguishable;
-   - whether weak or partial values must remain non-authoritative;
-   - conflict and malformed-evidence behavior;
-   - whether any merge or resolver behavior would be required.
-
-9. **Architecture trace**
-   - reader;
-   - parser selector;
-   - parser;
-   - validation;
-   - import preparation;
-   - confirmation;
-   - provider-atomic persistence;
-   - durable provenance;
-   - hydration;
-   - relaunch;
-   - presentation;
-   - duplicate and event-identity compatibility.
-
-10. **Import Profile boundary**
-    - owner and domain location;
-    - profile identifier;
-    - version semantics;
-    - supported institution and account family;
-    - required and optional semantic roles;
-    - date authority;
-    - source-order authority;
-    - identifier rules;
-    - layout recognition;
-    - unsupported-layout handling;
-    - migration behavior;
-    - whether profiles are code-defined, data-defined or hybrid;
-    - explicit reasons not to build a broader framework.
-
-11. **Migration and ADR impact**
-    - whether V6 can represent the new profile without migration;
-    - whether persisted parser-profile provenance already supports the extension;
-    - whether ADR-039 needs amendment;
-    - whether a new accepted ADR is required for Import Profiles;
-    - whether no ADR change is sufficient.
-
-12. **Falsification analysis**
-    - evidence that would disprove NRO readiness;
-    - layouts that appear similar but are semantically incompatible;
-    - malformed evidence currently accepted;
-    - tests that could pass while financial truth remains wrong;
-    - risks of fixtures derived from parser behavior;
-    - risks of profile abstraction broadening unsupported claims.
-
-13. **Final classification**
-    - implementation-ready combined slice;
-    - split required;
-    - blocked by named missing evidence.
-
-### Included scope
-
-- one or more approved Axis NRO source candidates;
-- fixture provenance requirements;
-- independent expected financial truth;
-- deterministic NRO detection;
-- deterministic layout recognition;
-- exact semantic column roles;
-- account-identifier and NRE/NRO separation semantics;
-- reader and CSV grammar requirements;
-- Import Profile ownership and version boundary;
-- compatibility with Sprint 52 date and provenance semantics;
-- migration and ADR impact;
-- implementation acceptance plan;
-- combine or split recommendation.
-
-### Explicit exclusions
-
-- Swift edits;
-- test edits;
-- fixture edits;
-- repository-document edits;
-- production NRO support claims;
-- parser implementation;
-- generalizing to every Axis account layout;
-- Axis cards;
-- PDF support;
-- XLS or XLSX support;
-- learning mode;
-- AI-assisted column mapping;
-- heuristic institution matching;
-- heuristic layout matching;
-- silent fallback from unsupported layouts;
-- production parser output as the sole financial-truth oracle;
-- account merging;
-- historical data repair;
-- access to this private roadmap.
-
-### Acceptance boundary
-
-Sprint 53 completes only with one of three evidence-backed outcomes.
-
-#### Outcome A — Implementation-ready combined slice
-
-Evidence proves:
-
-- one approved NRO layout;
-- deterministic profile selection;
-- independent financial truth;
-- safe NRE/NRO identity separation;
-- complete date and provenance compatibility;
-- minimum reusable Import Profile architecture;
-- one bounded implementation and acceptance plan.
-
-#### Outcome B — Split required
-
-Evidence proves that:
-
-- a reusable Import Profile foundation is required first;
-- NRO implementation cannot safely fit the same bounded outcome;
-- the prerequisite boundary and later NRO boundary are each independently testable.
-
-#### Outcome C — Blocked
-
-One or more named dependencies remain unavailable, such as:
-
-- approved source evidence;
-- fixture provenance;
-- independent financial oracle;
-- deterministic parser selection;
-- account identity;
-- balance truth;
-- CSV grammar;
-- privacy-safe fixture preparation.
-
-Structural similarity alone is rejection evidence, not support evidence.
-
-### Stop conditions
-
-Stop if:
-
-- approved source provenance cannot be established;
-- independent expected financial truth cannot be produced;
-- NRO and NRE identity cannot be safely distinguished;
-- parser selection requires heuristic guessing;
-- source dates, source order, balances or identifiers would require invention;
-- the proposed scope silently broadens support beyond the proven layout;
-- private source material cannot be inspected within the approved read-only boundary;
-- fixture sanitization would destroy evidence needed for acceptance.
-
-### Migration and ADR impact
-
-Sprint 53 performs no migration, ADR or source change.
-
-Discovery must determine whether Sprint 54 requires:
-
-- no migration under V6;
-- an ADR-039 amendment;
-- a new Import Profile ADR;
-- or a prerequisite framework increment.
-
----
-
-## Sprint 54 — Profile-Backed Axis NRO or Import Profile Foundation
-
-### Status
-
-**Conditional on Sprint 53 producing an implementation-ready boundary**
-
-### Confidence
-
-**Medium**
-
-### Expected outcome
-
-Implement either:
-
-1. the smallest approved deterministic Axis NRO production slice with the minimum required Import Profile boundary; or
-2. if Sprint 53 requires a split, the prerequisite Import Profile foundation only.
-
-The implementation must follow the exact combine or split decision returned by Sprint 53.
-
-It must not claim NRO production support unless the approved source and independent financial-truth boundary passes end to end.
-
-### Candidates
-
-- `FW-P1-01 — Axis Bank Parser Family Expansion`
-- possible bounded implementation slice of `FW-P1-06 — Parser Framework Expansion`
-
-### Why this follows Sprint 53
-
-Sprint 53 determines whether one approved Axis NRO layout can safely reuse or establish a versioned Import Profile boundary.
-
-Sprint 54 implements only the evidence-approved result.
-
-The trusted date and source-provenance foundation is already delivered by Sprint 52 and Sprint 52A.
-
-### Expected sequence
-
-1. **Chat** verifies:
-   - exact Sprint 53 conclusion;
-   - current pushed `main`;
-   - accepted ADRs;
-   - canonical queue;
-   - migration state;
-   - local branch, worktree, stash and divergence safeguards.
-
-2. **Chat** supplies one complete Codex execution prompt with:
-   - exact included scope;
-   - exact exclusions;
-   - source and fixture boundaries;
-   - independent oracle;
-   - migration and ADR decisions;
-   - acceptance matrix;
-   - stop conditions.
-
-3. **Codex** implements directly on `main` only after repository safeguards pass.
-
-4. **Codex** adds the exact required:
-   - fixture-provenance tests;
-   - parser-selection tests;
-   - financial-oracle tests;
-   - validation tests;
-   - provider-parity tests;
-   - atomicity and zero-residue tests;
-   - hydration tests;
-   - relaunch tests;
-   - presentation tests;
-   - Debug and Release verification.
-
-5. **Chat** independently verifies:
-   - starting and ending refs;
-   - changed files;
-   - included and excluded scope;
-   - migration and ADR impact;
-   - independent-oracle use;
-   - support claims;
-   - documentation;
-   - repository cleanliness;
-   - push result;
-   - limitations and falsification analysis.
-
-### Expected included scope if combined implementation is approved
-
-- one approved Axis NRO layout or profile;
-- deterministic institution detection;
-- deterministic statement-family classification;
-- exact semantic header-role resolution;
-- strict unsupported-layout rejection;
-- versioned Import Profile identity;
-- source-supported account identity;
-- NRE/NRO separation;
-- strict date-only parsing;
-- document-scoped source order;
-- durable source provenance;
-- transaction count, direction, money, date, order and balance verification;
-- unified import validation and confirmation;
-- provider-atomic persistence;
-- hydration and relaunch;
-- duplicate and event-blocking compatibility;
-- SQLite/In-Memory parity;
-- truthful supported-source presentation;
-- synchronized repository documentation.
-
-### Expected included scope if split implementation is approved
-
-- minimum Import Profile domain contract;
-- deterministic profile identity and version;
-- semantic role definitions;
-- required and optional role handling;
-- layout recognition contract;
-- date and source-order authority;
-- account-identifier rules;
-- unsupported-layout rejection;
-- parser-selection integration;
-- provenance compatibility;
-- tests proving that no new production layout is claimed;
-- no NRO production support until a later sprint.
-
-### Explicit exclusions
-
-- NRE/NRO account merge;
-- savings or current-account expansion beyond the approved layout;
-- Axis cards;
-- historical Axis layouts;
-- PDF;
-- XLS;
-- XLSX;
-- heuristic layout matching;
-- heuristic institution matching;
-- learning mode;
-- AI column mapping;
-- partial-overlap import;
-- historical repair;
-- generic parser rewrite;
-- unrelated UI redesign;
-- categories.
-
-### Acceptance boundary if NRO support is implemented
-
-An untouched approved NRO source or privacy-safe equivalent must independently match expected financial truth through:
-
-1. reading;
-2. profile selection;
-3. parsing;
-4. validation;
-5. preparation;
-6. confirmation;
-7. atomic persistence;
-8. hydration;
-9. provider reconstruction;
-10. relaunch;
-11. presentation;
-12. exact re-import behavior.
-
-Acceptance must independently prove:
-
-- transaction count;
-- debit and credit direction;
-- native currency and scale;
-- date-only truth;
-- source order;
-- opening and closing balances;
-- running-balance continuity;
-- account identity;
-- parser-profile provenance;
-- zero accepted residue on rejection.
-
-### Acceptance boundary if foundation only is implemented
-
-Acceptance must prove:
-
-- no production NRO support is claimed;
-- profile identity and version are deterministic;
-- unsupported layouts fail closed;
-- existing Axis NRE behavior is unchanged;
-- no financial truth is inferred;
-- future NRO support can be added without replacing the profile contract;
-- both providers remain equivalent where applicable.
-
-### Stop conditions
-
-Stop if:
-
-- repository safeguards fail;
-- the Sprint 53 evidence boundary cannot be reproduced;
-- fixture provenance differs from the approved chain;
-- the independent oracle is unavailable;
-- support requires heuristic guessing;
-- NRE and NRO identity can conflict;
-- malformed or unsupported layouts could enter trusted import;
-- implementation broadens beyond one proven layout;
-- a migration or ADR is required but was not approved;
-- source truth cannot be preserved without invention.
-
-### Corrective policy
-
-A support-boundary, financial-truth, persistence or hydration failure becomes Sprint 54A.
-
-Do not proceed to Sprint 55 while newly claimed parser or profile behavior remains untrustworthy.
-
----
-
-## Sprint 55 — Partial-Overlap Import Architecture Discovery
-
-### Status
-
-**Conditional on stable trusted parser and provenance foundations**
-
-### Confidence
-
-**Medium**
-
-### Expected outcome
-
-Define a bounded, explicit workflow that can distinguish already-owned supported transactions from source-supported unique transactions, present the impact to the user and atomically persist only the approved unique subset without pretending the source statement was wholly imported.
-
-### Candidates
-
-- `FW-P1-25 — Duplicate-Import Review and Management`
-- `FW-P2-12 — Duplicate-Transaction Review` only if discovery proves the review boundary is the same
-
-### Current behavior being evolved
-
-The current supported Axis UPI transaction-event contract intentionally blocks the complete incoming statement when any verified owned event is found.
-
-It does not silently omit duplicated rows.
-
-The future goal is not silent discard. It is an explicit partial-import result with preserved source evidence, review and truthful durable outcome.
-
-### Expected sequence
-
-1. **Chat** verifies:
-   - current duplicate rules;
-   - event-identity rules;
-   - attempt-history semantics;
-   - statement provenance;
-   - source-row provenance;
-   - account-balance interpretation;
-   - provider-atomic confirmation behavior.
-
-2. **Work** performs targeted read-only discovery:
-   - classify exact statement duplicate;
-   - classify supported event overlap;
-   - classify repeated incoming event;
-   - classify speculative duplicate;
-   - classify unsupported event family;
-   - determine which overlap classes may permit partial import;
-   - define user review and confirmation evidence;
-   - define partial statement/session/attempt provenance;
-   - define account-balance continuity;
-   - define same-day source-order behavior;
-   - define transaction-time revalidation;
-   - define concurrent winner and loser behavior;
-   - assess migration and ADR needs;
-   - separate historical repair from prospective partial import.
-
-3. **Chat** decides:
-   - whether `FW-P1-25` and a bounded `FW-P2-12` slice share one outcome;
-   - which supported event family is included;
-   - durable partial-import representation;
-   - review and confirmation contract;
-   - next implementation boundary.
-
-### Included scope
-
-- prospective supported overlap review;
-- exact explanation of existing versus incoming-unique rows;
-- source document provenance;
-- source-row provenance;
-- explicit confirmation;
-- provider-atomic transaction-time revalidation;
-- truthful partial-import durable outcome;
-- exact account and statement coverage semantics;
-- source-supported same-day order;
-- zero accepted residue on conflict or stale review;
-- combine or split decision for `FW-P2-12`;
-- migration and ADR impact.
-
-### Explicit exclusions
-
+- implementation by default;
 - silent duplicate removal;
-- speculative fuzzy matching;
-- unsupported transaction-event families;
+- fuzzy or speculative matching;
 - historical duplicate repair;
-- legacy fingerprint reconstruction;
-- import-session reversal;
-- generic mutation engine;
+- unsupported event families;
+- import reversal;
 - batch import;
-- cross-format duplicate identity;
-- editable imported financial truth;
-- automatic conflict resolution.
-
-### Acceptance boundary
-
-Discovery must define:
-
-- the exact supported overlap family;
-- authoritative event evidence;
-- unique-subset calculation;
-- user-visible review;
-- immutable confirmation plan;
-- transaction-time revalidation;
-- source and attempt provenance;
-- account balance and coverage semantics;
-- provider-equivalent atomic outcomes;
-- zero-residue rejection behavior;
-- one bounded implementation acceptance matrix.
+- generic mutation machinery.
 
 ### Stop conditions
 
-Stop if:
-
-- the unique subset cannot be proven from approved event evidence;
-- partial import would require fuzzy inference;
-- the durable result cannot truthfully distinguish full and partial import;
-- account continuity cannot be preserved;
-- source order would be lost;
-- commit-time revalidation cannot atomically preserve ownership and provenance;
-- historical repair is required to make prospective partial import work.
+Stop if the unique subset cannot be independently proven, represented truthfully or committed atomically without falsifying statement coverage or balances.
 
 ---
 
-## Sprint 56 — Explicit Partial-Overlap Import
+## Sprint 55 — Explicit Partial-Overlap Import
 
-### Status
+**Status:** Conditional on Sprint 54  
+**Candidate:** `FW-P1-25`
 
-**Conditional on Sprint 55 architecture and acceptance plan**
+### Outcome
 
-### Confidence
+For one approved supported overlap family, show existing and unique transactions, require confirmation, revalidate at commit time and atomically persist only the approved unique subset with truthful provenance.
 
-**Medium**
+### Expected scope
 
-### Expected outcome
-
-For the approved supported overlap family, LedgerForge shows the existing and unique incoming transactions, requires explicit confirmation, revalidates at commit time and atomically persists only the approved unique transactions with truthful partial-import provenance.
-
-### Candidate
-
-- `FW-P1-25 — Duplicate-Import Review and Management`
-
-A bounded `FW-P2-12` slice is included only if Sprint 55 proves it is part of the same prospective review outcome.
-
-### Expected sequence
-
-1. **Chat** approves:
-   - exact overlap family;
-   - durable outcome;
-   - review contract;
-   - accepted event evidence;
-   - exclusions;
-   - migration and ADR impact;
-   - test oracle.
-
-2. **Codex** implements against the accepted duplicate and provenance architecture.
-
-3. **Codex** verifies:
-   - no-overlap;
-   - full-overlap;
-   - partial-overlap;
-   - exact statement duplicate;
-   - repeated incoming event;
-   - concurrent overlap ownership;
-   - stale reviewed plan;
-   - injected failure;
-   - provider parity;
-   - hydration;
-   - provider reconstruction;
-   - relaunch;
-   - presentation.
-
-4. **Chat** checks that:
-   - no transaction is silently omitted;
-   - the unique subset is independently proven;
-   - no historical repair entered scope;
-   - no unsupported event family was generalized;
-   - losing paths leave zero accepted residue.
-
-### Expected included scope
-
-Subject to Sprint 55:
-
-- review model for existing and unique supported events;
-- explicit user confirmation;
 - immutable reviewed partial-import plan;
-- provider-generation binding;
-- account-decision binding;
-- transaction-time event ownership revalidation;
-- atomic persistence of unique transactions only;
-- document provenance;
-- session provenance;
-- attempt provenance;
-- source-row linkage for imported rows;
-- source-row treatment for rows rejected as already existing where approved;
-- deterministic current-balance presentation;
-- truthful statement-coverage presentation;
+- explicit impact review and confirmation;
+- provider-generation and account-decision binding;
+- event-ownership revalidation;
+- atomic persistence of the approved unique subset;
+- truthful document, session and attempt outcome;
+- source linkage for imported and recognized-existing rows where approved;
+- deterministic balance and coverage presentation;
 - SQLite/In-Memory parity;
 - zero losing-path residue;
-- exact supported outcome guidance.
+- hydration and relaunch behavior.
 
-### Explicit exclusions
+### Excluded
 
-- automatic partial import without review;
+- automatic partial import;
 - fuzzy duplicates;
-- unsupported IMPS, NEFT, card, refund or reversal families unless Sprint 55 explicitly proves and approves them;
+- unsupported event families;
 - historical cleanup;
 - delete or reverse import;
 - batch queue;
-- editable corrections;
-- generic duplicate engine;
-- cross-format duplicate matching;
-- inferred event identity;
-- transaction mutation unrelated to partial import.
+- editable transaction correction;
+- broad mutation framework.
 
-### Acceptance boundary
+### Acceptance
 
-Independent source and event evidence must prove the exact unique subset.
-
-The resulting durable history, attempt record and UI must distinguish:
-
-- full import;
-- partial import;
-- full-overlap block;
-- exact statement duplicate;
-- rejected stale review;
-- concurrent losing attempt.
-
-No imported transaction may lose its source date, source order, document relationship or parser-profile provenance.
-
-### Stop conditions
-
-Stop if:
-
-- the unique subset differs between providers;
-- any transaction is silently omitted;
-- source provenance cannot represent the partial outcome;
-- account balance becomes ambiguous;
-- stale review can commit;
-- concurrency can produce duplicate ownership;
-- losing paths leave accepted residue;
-- unsupported event families are required.
-
-### Corrective policy
-
-Any silent omission, incorrect unique-set selection, source-order loss, provenance loss or account-balance regression becomes Sprint 56A.
+Independent evidence must prove the unique subset and distinguish full import, partial import, full-overlap block and exact duplicate. Silent omission, false statement coverage or balance regression becomes Sprint 55A.
 
 ---
 
-## Sprint 57 — Durable Categories and Manual Transaction Classification
+## Sprint 56 — Durable Categories and Manual Classification
 
-### Status
+**Status:** Conditional  
+**Candidate:** `FW-P2-20`  
+**Architecture:** ADR-036
 
-**Conditional on earlier integrity work remaining accepted**
+### Outcome
 
-### Confidence
+Users can manage durable workspace categories and assign, change or clear one category on one persisted transaction without changing imported financial truth.
 
-**Medium**
+### Expected scope
 
-### Expected outcome
-
-Users can create and manage durable workspace categories and manually assign, change or clear one category on one persisted transaction without altering imported financial truth.
-
-### Candidate and architecture basis
-
-- `FW-P2-20 — Category Model and Management`
-- ADR-036 accepted
-- discovery complete and ready for Chat planning
-
-### Why it follows the integrity work
-
-This is the first substantial user-facing organization feature after trusted transaction evidence is restored and the selected parser and overlap work is resolved.
-
-It is already architecture-prepared but remains below unresolved P1 financial-import work.
-
-It no longer necessarily closes the cycle because Sprints 58 and 59 are reserved for evidence-valid outcomes selected after reconciliation.
-
-### Expected sequence
-
-1. **Chat** verifies:
-   - current transaction identity;
-   - provider generation;
-   - hydration;
-   - provider reconstruction;
-   - relaunch;
-   - lifecycle backup and recovery;
-   - migration state;
-   - existing ADR-036 assumptions.
-
-2. **Chat** confirms the bounded first category implementation remains coherent after Sprints 54 and 56.
-
-3. **Chat** supplies one exact Codex execution prompt.
-
-4. **Codex** implements directly on `main` after repository safeguards pass.
-
-5. **Chat** verifies persistence, hydration, relaunch, presentation and mutation boundaries.
-
-6. After acceptance, Chat reconciles the remaining Sprint 58 and Sprint 59 slots against the then-current canonical queue.
-
-### Expected included scope
-
-- workspace-owned durable categories;
-- immutable category identity;
-- root category plus one child level;
+- workspace-owned category identity;
+- root plus one child level;
 - one current category per transaction;
-- Uncategorized represented by no assignment;
-- user-created categories only;
-- deterministic normalized-name ordering;
-- deterministic immutable-ID tie-breaking;
-- durable persisted transaction identity exposed during hydration if not already delivered;
-- category persistence;
-- transaction-assignment persistence;
-- dedicated category repository;
+- no assignment means Uncategorized;
+- deterministic normalized-name and immutable-ID ordering;
+- durable category and assignment persistence;
+- dedicated category repository and store;
 - SQLite/In-Memory parity;
-- provider-generation protection;
-- one repository-write lease through canonical reconciliation;
-- observer-consistent hydration snapshot;
-- Settings category create;
-- Settings category rename;
-- Settings category archive;
-- Settings category restore;
-- Settings category delete when unused;
-- transaction category display;
-- transaction-detail assign;
-- transaction-detail change;
-- transaction-detail clear;
-- lifecycle backup and recovery verification;
-- additive migration number selected from the then-current chain.
+- provider-generation and write-lease protection;
+- canonical observer-consistent hydration;
+- Settings create, rename, archive, restore and delete-unused;
+- transaction display and detail assignment controls;
+- additive migration selected from the then-current chain;
+- lifecycle backup and recovery verification.
 
-### Explicit exclusions
+### Excluded
 
-- automatic categorization;
-- categorization rules;
+- rules or automatic categorization;
 - AI suggestions;
-- merchant or payee normalization;
-- recurring detection;
-- analytics;
-- budgets;
-- multiple categories;
-- tags;
-- transaction splits;
-- category filtering;
-- bulk assignment;
-- delete with replacement;
-- category merge;
-- assignment history;
-- global undo;
-- source financial-value edits;
-- imported narration edits.
+- merchant normalization or recurring detection;
+- analytics and budgets;
+- tags, splits or multiple categories;
+- filters and bulk assignment;
+- category merge or delete-with-replacement;
+- assignment history and global undo.
 
-### Acceptance boundary
+### Acceptance
 
-The persisted transaction ID must survive:
+Persisted transaction identity must survive hydration, provider reconstruction and relaunch. Any identity or assignment-loss defect becomes Sprint 56A.
 
-- forced hydration;
-- provider reconstruction;
-- relaunch;
-- category assignment;
-- category clearing;
-- category archive and restore;
-- lifecycle backup and recovery.
+---
 
-Category mutations must never:
+## Sprint 57 — Deterministic Import Verification Workspace
 
-- use regenerated runtime identity;
-- rewrite source financial values;
-- rewrite source date;
-- rewrite source order;
-- alter parser-profile provenance;
-- bypass provider-generation protection;
-- produce SQLite/In-Memory divergence.
+**Status:** Conditional  
+**Candidates:** `FW-P1-40` plus bounded `FW-P1-37`
+
+### Outcome
+
+Provide one DEBUG-only workspace that launches approved sanitized fixtures through the ordinary production URL-driven import path and displays clearer typed failure summaries without creating alternate financial logic.
+
+### Why combine
+
+Both candidates share one developer outcome and one validation boundary:
+
+- choose an approved fixture;
+- use the real preparation pipeline;
+- observe deterministic stage and failure evidence;
+- proceed through ordinary review and confirmation;
+- verify persistence and hydration;
+- remain completely absent from Release.
+
+### Expected scope
+
+- deterministic approved-fixture list;
+- fixture provenance presentation;
+- ordinary reader, detection, parser, validation, duplicate, account-choice, confirmation, persistence and hydration path;
+- no automatic confirmation;
+- structured summaries for already-typed source, validation, identity, duplicate, persistence and reconciliation outcomes;
+- privacy-safe presentation;
+- proof that private originals are not bundled;
+- optimized Release symbol, resource and runtime containment checks.
+
+### Excluded
+
+- private statement launcher;
+- fixture generation or sanitization;
+- alternate parser, validator or repository;
+- expected results injected into runtime behavior;
+- source editing, raw SQL or database browsing;
+- persistent diagnostic history or export;
+- general Developer Console rewrite;
+- new production support.
+
+### Acceptance
+
+Launching a fixture must behave the same as manually selecting that file through the ordinary application flow. Alternate-path, privacy or Release-containment failure becomes Sprint 57A.
+
+---
+
+## Sprint 58 — Production PDF and Cross-Format Evidence Discovery
+
+**Status:** Discovery  
+**Confidence:** Medium-low
+
+### Outcome
+
+Determine the smallest safe path for one approved Axis PDF statement to enter the unified production pipeline, define binary-document fingerprint authority and prepare the future cross-format equivalence acceptance boundary.
+
+### Candidates
+
+- `FW-P1-10 — Production PDF Statement Support`;
+- `FW-P1-18 — Binary-Document Fingerprint Semantics`;
+- readiness implications for `FW-P1-16 — Cross-Format Financial Equivalence`.
+
+### Why combine for discovery
+
+Production PDF support cannot be planned safely without deciding:
+
+- what representation owns exact binary duplicate identity;
+- how PDF extraction preserves date, order and transaction grouping;
+- how equivalent CSV and PDF representations preserve the same financial truth.
+
+The shared evidence boundary makes one discovery pass efficient. It does not authorize broad PDF implementation.
+
+### Work
+
+1. Verify the pushed baseline and approved PDF/CSV evidence.
+2. Trace sandbox access, extraction, classification, profile selection, identity, provenance, fingerprinting, validation and persistence.
+3. Select one result:
+   - combined implementation-ready PDF slice;
+   - binary-fingerprint prerequisite first;
+   - parser/profile prerequisite first;
+   - blocked by named source or oracle evidence.
+
+### Required evidence
+
+- approved PDF and matching CSV where equivalence is claimed;
+- source-to-fixture provenance;
+- independent financial truth for each format;
+- transaction count, direction, money, date, order, identifiers and balances;
+- sandbox-authorized production URL opening;
+- deterministic extraction and page/row order;
+- malformed, encrypted, image-only and unsupported outcomes;
+- analysis of raw bytes, normalized container content, extracted text and fingerprint versioning;
+- exact duplicate, revised document and cross-format distinction;
+- privacy, migration and ADR impact;
+- falsification cases.
+
+### Excluded
+
+- production implementation by default;
+- password entry, Keychain or OCR;
+- arbitrary institutions or card PDFs;
+- XLS/XLSX;
+- heuristic repair or AI interpretation;
+- declaring `FW-P1-16` complete before two formats are production-supported.
 
 ### Stop conditions
 
-Stop if:
-
-- durable transaction identity is unavailable;
-- category mutation requires source transaction rewriting;
-- provider-generation safety is unresolved;
-- hydration cannot produce one observer-consistent category snapshot;
-- migration cannot preserve existing financial history;
-- archived-category behavior is ambiguous;
-- delete-unused cannot be proven safe.
-
-### Corrective policy
-
-Category identity, assignment, migration or hydration defects become Sprint 57A.
+Stop if financial truth, extraction order, sandbox access or fingerprint authority cannot be established without inference from production parser output.
 
 ---
 
-## Sprint 58 — Reserved Evidence-Valid Outcome
+## Sprint 59 — Deterministic Singleton Build and Runtime Launch
 
-### Status
+**Status:** Forecast  
+**Origin:** Repeated runtime-verification failure mode observed during Sprint 53
 
-**Reserved; not selected**
+### Outcome
 
-### Purpose
+Provide one project-owned developer entrypoint that cleanly exits all existing LedgerForge instances, builds the selected target, launches exactly one freshly built bundle and verifies that automation attaches to the intended executable.
 
-Preserve one roadmap slot for the strongest evidence-valid P1 or P2 outcome remaining after Sprint 57.
+### Why this belongs in the cycle
 
-Selection must be made from the then-current `FUTURE_WORK.MD` against the exact pushed repository state.
+Sprint 53 runtime verification twice encountered competing LedgerForge processes from different DerivedData roots. The failure did not affect production financial behavior, but it made manual verification nondeterministic and risks validating a stale binary. Repeated operational failures deserve a bounded fix rather than another ceremonial reminder to close the app.
 
-No current candidate is authorized merely by occupying this slot. Numbers are not a substitute for evidence, despite project management’s occasional theological commitment to them.
+### Expected scope
 
-### Candidate-selection requirements
+- one project-local shell entrypoint outside production app source;
+- exact-name graceful termination of every LedgerForge process;
+- bounded `SIGTERM` escalation and `SIGKILL` only for remaining exact-name processes;
+- zero-instance precondition before launch;
+- build of the selected Debug or Release target;
+- launch by resolved absolute `.app` path without permitting an extra instance;
+- exactly-one-process postcondition;
+- verification that the running executable path belongs to the freshly built bundle;
+- optional process, log and telemetry verification modes where already supported;
+- clean exit and zero-process postcondition after disposable runtime verification;
+- Codex run-action integration only if it can remain developer-only and repository-appropriate;
+- tests or shell checks for path quoting, stale DerivedData instances and failed termination.
 
-Chat must:
+### Excluded
 
-1. verify the exact pushed baseline;
-2. review candidates in P0, P1, P2, then P3 order;
-3. classify every stronger candidate considered as:
-   - implementation-ready;
-   - ready for targeted discovery;
-   - blocked by a named dependency;
-   - completed or no longer applicable;
-   - deferred with explicit reason;
-4. compare the strongest plausible candidates;
-5. explain why each serious non-selected candidate was rejected, split, blocked or deferred;
-6. select only one coherent outcome;
-7. require one bounded acceptance plan;
-8. determine migration and ADR impact;
-9. identify whether Work is justified;
-10. avoid reusing stale assumptions from this roadmap.
+- production singleton enforcement unless separately justified;
+- changing user-facing multi-window behavior;
+- killing non-LedgerForge processes;
+- deleting DerivedData;
+- signing, packaging or notarization redesign;
+- runtime database cleanup;
+- financial feature work;
+- private fixture handling.
 
-### Possible candidates
+### Acceptance
 
-Candidates may include, subject to then-current evidence:
+A single command must prove:
 
-- `FW-P1-40 — Deterministic Approved-Fixture Launcher`;
-- `FW-P2-34 — Archive and Restore Account`;
-- `FW-P2-52 — User and Workspace Preferences`;
-- another higher-priority candidate newly promoted by repository evidence;
-- a corrective sprint attached to Sprint 57, in which case Sprint 58 remains unchanged.
+1. no LedgerForge process remains before launch;
+2. exactly one process exists after launch;
+3. its executable path matches the just-built bundle;
+4. repeated launch requests do not leave competing instances;
+5. final shutdown leaves zero exact-name processes;
+6. no production or Release-only behavior changes unintentionally.
 
-### Exclusions
+If repository discovery shows an existing authoritative build/run script, update that entrypoint rather than creating a competing workflow.
 
-- filler work selected merely because the slot exists;
-- lower-priority work chosen only because it is easy;
-- work blocked by an unresolved higher-priority financial defect;
-- bundling unrelated candidates for throughput;
-- implementation without a current Chat execution prompt.
+### Cycle effect
 
----
-
-## Sprint 59 — Cycle Completion or Final Bounded Outcome
-
-### Status
-
-**Reserved; not selected**
-
-### Purpose
-
-Either:
-
-1. deliver one final evidence-valid bounded outcome; or
-2. close the 50–59 cycle if no additional candidate can be safely selected.
-
-Sprint 59 must not become ceremonial work performed to make the roadmap look symmetrical. Software has enough invented rituals already.
-
-### Candidate-selection requirements
-
-The same priority, evidence, combine/split and acceptance rules used for Sprint 58 apply.
-
-### Acceptance alternative A — Final bounded sprint
-
-Chat selects one current evidence-valid candidate and provides:
-
-- repository baseline;
-- documentation discrepancies;
-- candidate triage;
-- focused evidence;
-- combine or split decision;
-- selected outcome;
-- exact included scope;
-- exact exclusions;
-- acceptance boundary;
-- stop conditions;
-- migration and ADR impact;
-- reasons competing candidates were not selected;
-- remaining evidence gaps;
-- exact execution prompt where applicable.
-
-### Acceptance alternative B — Explicit cycle close
-
-Chat may close the cycle without implementation if:
-
-- no remaining candidate is sufficiently ready;
-- stronger candidates are blocked by named dependencies;
-- a discovery campaign is more appropriate than forcing implementation;
-- starting the 60–69 roadmap provides a cleaner planning boundary.
-
-Cycle close must document why each serious remaining candidate is:
-
-- completed;
-- carried forward;
-- blocked;
-- deferred;
-- replaced;
-- or no longer applicable.
-
----
-
-# Cycle close after Sprint 59
-
-After Sprint 59 and any attached corrective sprint are accepted, or after Sprint 59 is explicitly closed without implementation, Chat must:
-
-1. establish the exact pushed `main` baseline;
-2. reconcile this file against:
-   - `PROJECT_STATE.md`;
-   - `FUTURE_WORK.MD`;
-   - accepted ADRs;
-   - production code and tests where documentation is insufficient;
-3. classify every Sprint 50–59 outcome as:
-   - complete;
-   - replaced;
-   - deferred;
-   - carried forward;
-4. record all inserted corrective sprints;
-5. record all independent discovery campaign outcomes;
-6. identify uncompleted forecast work without silently rewriting history;
-7. create `LedgerForge Roadmap: Sprints 60–69`;
-8. carry forward only evidence-valid unfinished outcomes;
-9. preserve this file as the read-only private planning archive for the 50–59 cycle;
-10. update the GitHub backup copy only after the private local roadmap is reconciled.
+Sprint 59 closes the 50–59 cycle. Any implementation-ready PDF result or deferred parser expansion moves into the 60–69 roadmap rather than being forced into this cycle for cosmetic completeness.
 
 ---
 
 # Independent discovery campaigns
 
-Independent discovery campaigns reduce future planning cost.
+Independent campaigns reduce later planning cost. They are not sprints and cannot select implementation.
 
-They are not sprints, do not select implementation and do not alter the numbered roadmap.
+## DC-01 — Backlog Readiness Campaign
 
-## DC-01 — Independent Backlog Readiness Campaign
-
-### Status
-
-**Available on user request; not automatically scheduled**
-
-### Purpose
-
-Have Work investigate as many currently eligible, implementation-independent `FUTURE_WORK.MD` candidates as possible in one continuous read-only pass so later sprint planning does not repeatedly pay the same discovery cost.
+**Status:** Available on user request
 
 ### Launch conditions
 
-- Chat identifies an opportunity while Codex is working on an unrelated sprint or after a stable pushed baseline exists.
-- The campaign is pinned to one exact immutable pushed commit.
-- The active Codex sprint does not alter the architecture boundary of any included candidate.
-- Work reads repository or GitHub evidence only unless a specifically approved local read-only boundary is required.
-- Work does not inspect a half-edited active checkout.
-- The campaign performs no edit, build, commit, branch, push, pull request or sprint selection.
-- The campaign does not receive this roadmap file.
-
-### Candidate selection rule
-
-At launch, Chat recalculates the eligible set from the current canonical queue.
-
-Include candidates marked Ready for discovery, Research or stale Blocked only when their named evidence boundary is independent of:
-
-- the active Codex sprint;
-- the next planned sprint;
-- unresolved P0 architecture;
-- private runtime state unavailable at the pinned ref;
-- source material that cannot be safely inspected.
+- pinned to one exact immutable pushed commit;
+- candidates do not depend on the active Codex sprint or next planned implementation;
+- read-only repository evidence only;
+- no inspection of a half-edited active checkout;
+- no edits, builds, branches, commits, pushes, PRs or sprint selection.
 
 ### Initial likely candidates
 
-Subject to revalidation at launch:
+Recalculate at launch. Current plausible candidates include:
 
-- `FW-P1-40 — Deterministic Approved-Fixture Launcher`;
 - `FW-P2-34 — Archive and Restore Account`;
-- `FW-P2-52 — User and Workspace Preferences`, limited to ordinary regional and display preferences independent of reporting currency;
-- other candidates proven independent by Chat at the launch baseline.
+- `FW-P2-52 — User and Workspace Preferences`, limited to ordinary regional/display preferences;
+- `FW-P0-10 — Explain Account Match, No-Match and Conflict Outcomes`, only when independent of active import work;
+- `FW-P1-02 — HDFC Parser Family`, only after approved HDFC source evidence and sanitized fixtures exist;
+- other candidates proven independent at the launch baseline.
 
-### Explicitly excluded during this cycle unless ownership changes
+### Excluded during this cycle
 
-- completed `FW-P0-21` and `FW-P0-22`;
-- `FW-P1-01` and `FW-P1-06`, owned by Sprints 53–54;
-- `FW-P1-25` and overlapping `FW-P2-12` questions, owned by Sprints 55–56;
-- `FW-P2-20`, owned by Sprint 57;
-- any candidate depending on implementation not yet pushed;
-- any candidate requiring active local runtime or private-source inspection that conflicts with Codex work;
-- any candidate whose architecture is likely to be rewritten by the active sprint;
-- any candidate already implementation-ready unless revalidation is specifically required.
+- `FW-P1-25` and related `FW-P2-12` questions, owned by Sprints 54–55;
+- `FW-P2-20`, owned by Sprint 56;
+- `FW-P1-37` and `FW-P1-40`, owned by Sprint 57;
+- `FW-P1-10`, `FW-P1-18` and `FW-P1-16` readiness, owned by Sprint 58;
+- the singleton launch follow-up, owned by Sprint 59;
+- candidates depending on unpushed work;
+- candidates whose architecture is likely to change during the active sprint;
+- candidates requiring conflicting private-runtime inspection.
 
-### Required candidate-by-candidate output
+### Required output per candidate
 
-For each candidate, Work must return:
-
-- exact candidate ID;
-- current canonical queue wording;
-- inspected ref;
+- exact candidate and inspected ref;
 - verified current behavior;
-- relevant production surfaces;
-- relevant test surfaces;
-- dependencies;
-- architecture constraints;
-- migration impact;
-- ADR impact;
-- independent-oracle requirement where financial truth is involved;
-- missing decisions;
-- falsification risks;
-- one classification:
-  - implementation-ready;
-  - ready for Chat planning;
-  - discovery complete with one named decision remaining;
-  - blocked by a named dependency;
-  - completed or no longer applicable;
-  - insufficient evidence.
+- production and test surfaces;
+- dependencies and constraints;
+- migration/ADR impact;
+- independent-oracle needs;
+- missing decisions and falsification risks;
+- classification as implementation-ready, ready for Chat planning, blocked, completed/no longer applicable or insufficient evidence.
 
-Work must not:
-
-- choose future sprints;
-- renumber roadmap items;
-- edit repository documents;
-- implement code;
-- expose private source material;
-- infer unsupported financial truth.
-
-### Revalidation rule
-
-A campaign conclusion is planning input only.
-
-Before future selection, Chat revalidates every material conclusion against the then-current `main`, because a discovery report pinned months earlier is evidence, not prophecy.
-
-## Further campaigns
-
-Repeat the same pattern as `DC-02`, `DC-03`, and so on when the user identifies another safe opportunity.
-
-Do not create campaigns merely to keep Work occupied.
+Work must not number or select future sprints.
 
 ---
 
-# Reorder and invalidation rules
+# Cycle close
 
-The roadmap is invalidated or reordered when any of the following occurs:
+After Sprint 59 and any attached correction:
 
-- a verified P0 defect appears;
-- a planned sprint fails its acceptance boundary;
-- the inspected repository differs materially from the roadmap baseline;
-- an accepted ADR changes a dependent boundary;
-- a required migration cannot preserve existing history without invention;
-- a candidate loses fixture or source-evidence support;
-- a discovery campaign contradicts roadmap readiness;
-- SQLite/In-Memory parity fails where required;
-- a new dependency blocks a forecasted outcome;
-- the user changes product priority after higher-priority safety work is resolved;
-- a newly supported parser or profile is shown to accept unproven layouts;
-- trusted hydration loses source date, order, identity or provenance;
-- local Git state contains ambiguous unique work that blocks safe execution.
-
-Reordering rules:
-
-1. insert a corrective `A/B` sprint when tied to the preceding sprint;
-2. insert a standalone integrity sprint for an unrelated verified P0 defect;
-3. retain original later sprint numbers;
-4. mark displaced work **Deferred** or **Replaced** rather than rewriting completed history;
-5. update the overview, affected sprint cards and append-only log;
-6. never treat a forecast or reserved row as authorization;
-7. do not skip a blocked higher-priority candidate without naming the blocker;
-8. prefer bounded discovery over pretending a candidate is not there.
+1. establish exact pushed `main`;
+2. reconcile against repository authorities;
+3. classify every outcome as complete, replaced, deferred or carried forward;
+4. record corrective sprints and discovery campaigns;
+5. create the private Sprints 60–69 roadmap;
+6. carry forward only evidence-valid unfinished work;
+7. preserve this cycle as read-only history.
 
 ---
 
-# Financial-truth rules for this roadmap
+# File handling
 
-For any sprint involving imported financial evidence:
+- Keep the primary copy outside the Git checkout.
+- A GitHub copy may exist only as user-controlled backup and must remain excluded from repository authority and execution prompts.
+- Never supply the file to Work or Codex.
+- At the start of a new planning chat, direct Chat to perform the roadmap preflight.
+- Replace the ChatGPT project-source copy after each reconciliation so only one active revision exists.
+- Maintain a normal local backup.
 
-- source semantics outrank derived fixtures and expected JSON;
-- production parser output must not be the sole oracle;
-- preserve native currency;
-- preserve decimal scale;
-- preserve debit and credit direction;
-- preserve source date meaning;
-- preserve source order;
-- preserve opening, closing and running balances;
-- preserve source-supported identifiers;
-- preserve parser-profile identity and version;
-- preserve document and row provenance;
-- fail closed on malformed, ambiguous, conflicting or unsupported evidence;
-- verify zero accepted durable residue on rejection;
-- require SQLite/In-Memory parity where both matter;
-- verify persistence, hydration, provider reconstruction, relaunch and presentation;
-- never infer institution, format or layout support from structural similarity;
-- never invent historical provenance, ordering, identifiers or repair data;
-- keep sanitized fixtures in Git;
-- keep private originals only in isolated, read-only local verification;
-- distinguish:
-  - source truth;
-  - implementation behavior;
-  - test evidence;
-  - inference.
-
-A verified financial defect blocks feature planning until repaired or explicitly accepted by the user.
-
----
-
-# Tool and mode routing
-
-## Chat
-
-Chat owns:
-
-- sprint planning;
-- prioritization;
-- architecture decisions;
-- execution prompts;
-- review of Work and Codex reports;
-- final acceptance decisions;
-- roadmap reconciliation.
-
-Sprint planning does not authorize implementation.
-
-## Work
-
-Use Work only for bounded, read-only investigation GitHub cannot establish efficiently, including:
-
-- local or unpushed state;
-- worktrees;
-- filesystem or Xcode configuration;
-- build, test or runtime evidence;
-- broad cross-file tracing;
-- private read-only source verification;
-- a specific unresolved architecture boundary.
-
-Before escalating, Chat states:
-
-1. the exact unknown;
-2. why it affects the decision;
-3. the bounded evidence Work must return.
-
-Work returns evidence and risks.
-
-Work does not:
-
-- select sprints;
-- edit files;
-- implement;
-- create branches;
-- commit;
-- push;
-- open pull requests.
-
-## Codex
-
-Codex edits files, builds, tests and performs Git operations only from an approved Chat execution prompt.
-
-Before Codex execution, verify:
-
-- current branch and `HEAD`;
-- `main`, `origin/main` and divergence;
-- staged files;
-- unstaged files;
-- untracked files;
-- linked worktrees;
-- local branches;
-- remote branches;
-- stashes.
-
-Never delete, reset, drop, prune or overwrite unique or unexplained work.
-
-Default workflow is one `main` branch.
-
-Do not create a branch unless:
-
-- the user explicitly approves it;
-- a repository-specific reason is stated;
-- the approved prompt requires it.
-
-## GitHub
-
-Use GitHub for:
-
-- pushed files;
-- refs;
-- commits;
-- issues;
-- pull requests;
-- CI;
-- read-only code evidence.
-
-Always identify the inspected ref or commit.
-
-Do not infer local state from GitHub.
-
-## Build macOS Apps
-
-Use only when macOS-specific expertise materially matters, such as:
-
-- SwiftUI;
-- AppKit;
-- Xcode;
-- SwiftPM;
-- runtime logging;
-- macOS test triage;
-- signing;
-- packaging.
-
-Keep it subordinate to accepted ADRs and mode boundaries.
-
-## Google Drive
-
-Use only for explicitly relevant supporting material outside GitHub.
-
-Repository documents remain authoritative.
-
-## Figma
-
-Use for approved visual evidence and design-to-code comparison.
-
-Do not infer:
-
-- business logic;
-- persistence;
-- financial semantics;
-- support boundaries
-
-from visuals.
-
-## Browser
-
-Use for current official documentation and external references unavailable through connected sources.
-
-## Computer Use
-
-Use only when a local Mac application must be inspected and no direct connector can establish the evidence.
-
-Planning and discovery are read-only by default.
-
-Never make destructive changes without explicit authorization.
-
----
-
-# File handling and visibility
-
-- Maintain the working copy as a private Chat-user planning file.
-- The GitHub copy is backup only.
-- Do not treat the GitHub copy as repository authority.
-- Do not provide this file to Work or Codex.
-- Do not quote this file inside Work or Codex prompts.
-- Work and Codex receive only the bounded current task prompt.
-- At the start of a new Chat planning conversation, attach the latest copy when continuity is required.
-- Chat reads the active state and relevant sprint card, then verifies everything against current repository evidence.
-- Repository evidence overrides this roadmap.
-- Keep a normal user-controlled local backup.
-- Update the backup copy only after Chat reconciliation.
-- Never treat the presence of this file in GitHub as authorization to use its forecasts during implementation.
-
-Suggested local working location:
+Suggested local filename:
 
 ```text
-~/Documents/LedgerForge Planning/LedgerForge_Roadmap_Sprints_50-59.md
+LedgerForge_Roadmap_Sprints_50-59.md
 ```
 
 ---
 
 # Append-only planning and decision log
 
-Do not rewrite or delete prior entries.
+## 2026-07-22 — Private roadmap adopted
 
-Add corrections as new dated entries.
+### User intent
 
-The concise sections above may be updated to reflect the current plan. This log preserves how and why the plan changed.
-
-## 2026-07-22 — Roadmap visibility problem identified
-
-### User, verbatim
-
-> Brainstorm and come up with cons and pros and then based on that a final recommendation for or against making a sprint roadmap file for only Chat and me as a way to have sprints lined up and plan better as I do not have any visibility of what to expect in coming sprints.
+Create a ten-sprint private roadmap to provide visibility, preserve planning context and avoid relying on reconstructed conversational memory.
 
 ### Decision
 
-Create a private roadmap and continuity record.
-
-Repository authorities remain controlling and the file remains non-executable.
-
-The later decision to keep a GitHub copy is treated as backup storage only. It does not change the roadmap’s authority or visibility rules.
-
----
-
-## 2026-07-22 — Ten-sprint cycle, corrective numbering and independent discovery defined
-
-### User, verbatim
-
-> I'd say a 10 sprint roadmap but not to be uploaded on github.
-> the sprints would be planned like for eg 50-60. adn then updated as part of doc sync cycle for 60-70. The sprint planning would itself say if any previous sprint identified bug etc is detetced that will take precedence of new sprint so for eg sprint 52 worked but found some new issue, instead of going for sprint 53 and pushing everything down the issue will be resolved calling sprint 52A. 
-> codex or work will not see this file at anypoint. This file is basically a file saved on my mac containing all the project planning and roadmap discussion word for word instead of you saving context in memory and the retrieving it later and then distilling or drifting.
->
-> The sprints would have brief steps and action eg. 
-> Sprint 52 
-> - get work to discover or unblock these items
-> - codex to implement these items
->
->
-> Meanwhile while codex is working and when I identify an oppurtunity, have work have all the "remaining discovery" items sequentially but in 1 big pass. This is not part of planned sprint, just a way to clear backlog from future.md Those items are waiting to be discovered and do not depend on current or upcoming project implementation. Even if they are montsh away form being implemented, when i call for "have work do a discovery on as many candidates as possible" we are doing that to save time later.
-
-### Decision
-
-Adopt:
-
-- ten fixed sprint numbers per cycle;
-- corrective `A/B` suffixes without renumbering later sprints;
-- strict Chat-user planning ownership;
-- no roadmap access for Work or Codex;
-- separate non-sprint discovery campaigns.
-
----
-
-## 2026-07-22 — Initial file requested
-
-### User, verbatim
-
-> Ok, draft structure attached. 
-> Include sprint 50-60. Although first 2 are done already, it ll give us a baseline structure .
->
-> Give me the complete final file with all sprints done till 60
-
----
+- fixed ten-sprint cycles;
+- corrective `A/B` suffixes without later renumbering;
+- repository evidence remains authoritative;
+- file remains invisible to Work and Codex;
+- independent Work discovery campaigns remain outside numbered sprints.
 
 ## 2026-07-22 — Cycle corrected
 
@@ -1788,85 +702,85 @@ Adopt:
 
 ### Decision
 
-The first roadmap cycle is Sprints 50–59.
+The first cycle is Sprints 50–59. The next cycle is Sprints 60–69.
 
-The next cycle is Sprints 60–69.
+## 2026-07-23 — Sprint 52 consolidation reconciled
 
----
+### Evidence
 
-## 2026-07-23 — Repository reconciliation invalidated the original Sprint 53–54 forecast
-
-### Repository basis
-
-- Inspected ref: `main@d63c54f7a8117b36ff4849c0ad9453abb3fc9a80`
-- Authoritative documents:
-  - `Project documents/PROJECT_STATE.md`
-  - `Project documents/FUTURE_WORK.MD`
-  - `Project documents/ADR.md`
-- Repository implementation and tests were treated as controlling where documentation was stale or incomplete.
-
-### Verified outcome
-
-Repository evidence established that:
-
-- Sprint 52 completed the trusted statement-date and durable source-provenance architecture and implementation;
-- ADR-039 was accepted;
-- Migration V6 was implemented;
-- Sprint 52A completed the remaining trusted hydration, parser-profile provenance and writer-authority correction;
-- trusted production import was restored for the approved Axis NRE CSV profile;
-- the original roadmap’s forecasted Sprint 53 architecture and Sprint 54 implementation had already been overtaken by completed repository history.
-
-### Decision effect
-
-- Sprint 52 is recorded as complete.
-- Sprint 52A is recorded as complete.
-- The original Sprint 53 and Sprint 54 forecast entries are replaced.
-- Sprint 53 becomes Axis NRO and Import Profile readiness discovery.
-- Sprint 54 becomes the conditional implementation of the exact Sprint 53 result.
-- Partial-overlap discovery and implementation become Sprints 55 and 56.
-- Categories become Sprint 57.
-- Sprints 58 and 59 remain reserved for later evidence-based selection.
-- No implementation is authorized by this reconciliation.
-
----
-
-## 2026-07-23 — GitHub roadmap copy classified as backup only
-
-### User, verbatim
-
-> Ignore the repository <> roadmap sprint 50-59.md thing. It's backed up in GitHub but wont be used by codex/work.
+- Sprint 52 completed ADR-039, Migration V6 and the combined implementation originally forecast across later slots.
+- Sprint 52A closed trusted hydration, profile-provenance and writer-authority gaps.
+- Trusted import was restored for the approved Axis NRE CSV profile.
 
 ### Decision
 
-The roadmap may remain backed up in GitHub, but:
+- move Axis NRO/Profile work to Sprints 53–54;
+- move partial-overlap work to Sprints 55–56;
+- move categories to Sprint 57;
+- use Sprint 58 for the compatible approved-fixture plus failure-summary developer outcome;
+- use Sprint 59 for PDF, binary fingerprint and cross-format discovery;
+- remove those candidates from DC-01 ownership.
 
-- it has no repository authority;
-- it is not part of repository-state reasoning;
-- Work and Codex must not receive or use it;
-- only a current bounded Chat prompt authorizes Work or Codex;
-- the local or user-maintained copy remains the working planning record.
+## 2026-07-23 — Full-file rebuild requested
 
----
+### User, verbatim
 
-## Future log-entry format
+> Direct edit failed. Give me full fie output. While shaping teh document remember your previous feedback about trimming the repetitions etc
+
+### Decision
+
+Rebuild the complete file with:
+
+- one centralized operating-rules section;
+- concise sprint cards;
+- repeated authority and exclusion language removed where the control section already governs it;
+- enough acceptance and stop conditions to preserve planning safety;
+- no loss of current repository evidence or roadmap ownership.
+
+## 2026-07-23 — Sprint 53 completed and cycle advanced
+
+### Repository basis
+
+- Inspected starting ref: `3e5ab2a636be8a3372a10224de3268fb3d9c1aab`;
+- accepted ending ref: `11035461ce3de0f11ae5262bbc8a38b9639607b2`;
+- authoritative documents: updated `PROJECT_STATE.md`, `FUTURE_WORK.MD` and ADR-039 at the ending ref.
+
+### Evidence
+
+- one shared Axis bank-account CSV parser/profile supports the approved NRE and supplied NRO evidence;
+- distinct full account identifiers produce distinct durable accounts;
+- historical `axis.nre.csv@1` provenance remains unchanged;
+- canonical TestPlan passed 394 tests across 48 suites;
+- Debug/Release builds and analyses passed;
+- disposable runtime verified two accounts, 118 transactions, relaunch hydration and zero remaining processes;
+- no migration or new ADR was required.
+
+### Decision effect
+
+- Sprint 53 changed from Discovery to Complete implementation;
+- former Sprint 54 Axis NRO implementation was absorbed and marked Replaced;
+- partial-overlap discovery and implementation move to Sprints 54–55;
+- categories move to Sprint 56;
+- deterministic import verification workspace moves to Sprint 57;
+- PDF and cross-format discovery moves to Sprint 58;
+- Sprint 59 becomes the repeated singleton build/launch/runtime-verification follow-up;
+- HDFC remains outside the active cycle until approved source evidence and fixtures establish its layout relationships.
+
+## Future log format
 
 ```markdown
-## YYYY-MM-DD HH:MM — <decision or review title>
+## YYYY-MM-DD — <decision title>
 
 ### Repository basis
 - Inspected ref:
 - Authoritative documents:
 
 ### User, verbatim
-> <full user planning message>
-
-### Chat, verbatim
-> <full Chat planning response>
+> <material planning message>
 
 ### Decision effect
 - Sprint affected:
 - Status change:
 - Reorder/correction:
 - New blocker:
-- Roadmap sections updated:
 ```
