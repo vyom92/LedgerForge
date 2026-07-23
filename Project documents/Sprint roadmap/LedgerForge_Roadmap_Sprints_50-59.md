@@ -2,15 +2,15 @@
 
 ## Control
 
-**Purpose:** Private Chat-user roadmap, planning record and continuity aid  
-**Repository authority:** None  
-**Execution authority:** None  
-**Visible to Work:** No  
-**Visible to Codex:** No  
-**GitHub status:** Backup copy only, never repository authority  
-**Repository baseline reviewed:** `main@11035461ce3de0f11ae5262bbc8a38b9639607b2`  
-**Latest verified implementation:** Sprint 53 at `11035461ce3de0f11ae5262bbc8a38b9639607b2`  
-**Last reconciled:** 2026-07-23  
+**Purpose:** Private Chat-user roadmap, planning record and continuity aid
+**Repository authority:** None
+**Execution authority:** None
+**Visible to Work:** No
+**Visible to Codex:** No
+**GitHub status:** Backup copy only, never repository authority
+**Repository baseline reviewed:** `main@bdb51b0ddcdde097e456a16bab7f0bf999fd595b`
+**Latest verified implementation:** Sprint 53 at `11035461ce3de0f11ae5262bbc8a38b9639607b2`
+**Last reconciled:** 2026-07-23
 **Cycle:** Sprints 50–59
 
 This file forecasts and records Chat-user planning. It does not authorize Work, Codex, implementation, Git operations, migrations, ADR changes or repository edits.
@@ -91,20 +91,25 @@ Keep the active roadmap concise. Preserve detailed discussion in the log only wh
 ## Active project state
 
 - **Latest completed sprint:** Sprint 53 — Axis Shared Bank-Account CSV Profile and NRO Identity Closure.
-- **Current pushed baseline:** `main@11035461ce3de0f11ae5262bbc8a38b9639607b2`.
+- **Current pushed baseline:** `main@bdb51b0ddcdde097e456a16bab7f0bf999fd595b`.
+- **Latest verified implementation:** `11035461ce3de0f11ae5262bbc8a38b9639607b2`; the pushed baseline is one documentation-only commit ahead.
 - **Current migration:** V6.
-- **Current accepted ADR:** ADR-039 — Trusted Statement Dates and Durable Source Provenance, clarified for the shared Axis bank-account CSV profile.
+- **Current accepted ADR:** ADR-039 — Trusted Statement Dates and Durable Source Provenance.
 - **Trusted production import:** approved Axis NRE and supplied shared-layout Axis NRO CSV evidence through one `AxisBankAccountParser`.
 - **Forward parser profile:** `axis.bank-account.csv` version `1`.
 - **Historical compatibility:** durable `axis.nre.csv` version `1` provenance remains readable and unchanged.
 - **Durable account identity:** distinct verified full institution account identifiers create and retain distinct accounts; shared customer context is non-authoritative.
-- **Current verified automated result:** 394 top-level tests across 48 suites, zero failures and zero unexpected skips.
-- **Current verified runtime result:** two durable Axis accounts, 118 transactions after relaunch hydration, exact duplicate handling, supported overlap blocking, neutral presentation and zero remaining LedgerForge processes.
-- **Current next decision:** Sprint 54 partial-overlap import architecture discovery.
+- **Latest recorded automated result:** 394 top-level tests across 48 suites, zero failures and zero unexpected skips at the Sprint 53 implementation baseline.
+- **Latest recorded runtime result:** two durable Axis accounts, 118 transactions after relaunch hydration, exact duplicate handling, supported overlap blocking, neutral presentation and zero remaining LedgerForge processes.
+- **Fresh discovery verification:** none. The read-only campaign and documentation cleanup performed no build, test, runtime, migration, ADR or implementation work.
+- **Current blocking defect:** `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness`.
+- **Current next planning outcome:** Sprint 54, a standalone P0 presentation-integrity repair.
+- **Why this is not Sprint 53A:** the defect is verified against current code but has not been shown to arise from Sprint 53 implementation or acceptance.
+- **Feature-planning gate:** lower-priority feature execution remains paused until `FW-P0-24` is repaired and accepted or explicitly accepted as unresolved by the user.
 - **Known import limitation:** supported partial overlap blocks the complete incoming statement; partial import remains future work under `FW-P1-25`.
 - **Known support boundary:** broader Axis layouts, PDF, XLS, XLSX, cards, HDFC, CBQ and other institutions are not production-supported.
 - **Known runtime-tooling limitation:** manual and automation launches can attach to a stale DerivedData build when multiple LedgerForge processes exist; a deterministic singleton launch entrypoint remains future work.
-- **Local-state limitation:** GitHub cannot establish worktree cleanliness, stashes, branches, linked worktrees or unpushed commits. Those checks remain mandatory before Codex execution.
+- **Local-state limitation:** GitHub cannot establish worktree cleanliness, stashes, branches, linked worktrees or unpushed commits. Those checks remain mandatory before implementation execution.
 
 ---
 
@@ -117,14 +122,16 @@ Keep the active roadmap concise. Preserve detailed discussion in the log only wh
 | **52** | Trusted statement dates and durable source provenance through ADR-039 and Migration V6 | `FW-P0-21`, `FW-P0-22` | **Complete** | Verified |
 | **52A** | Close trusted hydration, profile-provenance and writer-authority gaps | Sprint 52 corrective scope | **Complete** | Verified |
 | **53** | Shared Axis bank-account CSV profile and NRO durable-identity closure | supplied slice of `FW-P1-01`, bounded slice of `FW-P1-06` | **Complete** | Verified |
-| **54** | Define explicit partial-overlap review and unique-transaction import semantics | `FW-P1-25`, possible `FW-P2-12` relationship | **Discovery** | Medium-high |
-| **55** | Implement bounded partial-overlap import without silent omission | `FW-P1-25` | **Conditional** | Medium |
-| **56** | Durable categories and manual single-transaction classification | `FW-P2-20`, ADR-036 | **Conditional** | Medium |
-| **57** | DEBUG-only deterministic import verification workspace | `FW-P1-40`, bounded `FW-P1-37` | **Conditional** | Medium |
-| **58** | Production PDF, binary fingerprint and cross-format evidence discovery | `FW-P1-10`, `FW-P1-18`, readiness for `FW-P1-16` | **Discovery** | Medium-low |
-| **59** | Deterministic singleton build, launch and runtime-verification entrypoint | Sprint 53 operational follow-up | **Forecast** | Medium |
+| **54** | Exhaustive, typed and privacy-safe durable import-outcome presentation | `FW-P0-24` | **Forecast** | High |
+| **55** | Define explicit partial-overlap review and unique-transaction import semantics | `FW-P1-25`, possible `FW-P2-12` relationship | **Discovery** | Medium-high |
+| **56** | Implement one bounded partial-overlap import family without silent omission | `FW-P1-25` | **Conditional** | Medium |
+| **57** | Durable categories and manual single-transaction classification | `FW-P2-20`, ADR-036 | **Conditional** | Medium |
+| **58** | DEBUG-only deterministic import verification workspace | `FW-P1-40`, bounded `FW-P1-37` | **Conditional** | Medium |
+| **59** | Production PDF and binary-fingerprint architecture discovery | `FW-P1-10`, `FW-P1-18`, readiness for `FW-P1-16` | **Discovery** | Medium-low |
 
-Forecast confidence decreases with distance. Any verified P0 defect or failed acceptance boundary overrides the sequence without renumbering later sprints.
+Forecast confidence decreases with distance. Any further verified P0 defect or failed acceptance boundary overrides the sequence without disguising unrelated work as a corrective suffix.
+
+The deterministic singleton build and runtime-launch entrypoint remains valid but moves to the 60–69 cycle. It was displaced by the P0 integrity repair rather than completed or cancelled.
 
 ---
 
@@ -132,8 +139,8 @@ Forecast confidence decreases with distance. Any verified P0 defect or failed ac
 
 ## Sprint 50 — Atomic Confirmed Import and Durable Identifier Ownership
 
-**Status:** Complete  
-**Architecture:** ADR-038  
+**Status:** Complete
+**Architecture:** ADR-038
 **Migration:** V5
 
 ### Outcome
@@ -188,8 +195,8 @@ A Developer Console filename-redaction change produced during the original Codex
 
 ## Sprint 52 — Trusted Statement Dates and Durable Source Provenance
 
-**Status:** Complete  
-**Architecture:** ADR-039  
+**Status:** Complete
+**Architecture:** ADR-039
 **Migration:** V6
 
 ### Outcome
@@ -253,8 +260,8 @@ Sprint 52 verification exposed remaining persistence-to-runtime and writer-autho
 
 ## Sprint 53 — Axis Shared Bank-Account CSV Profile and NRO Identity Closure
 
-**Status:** Complete  
-**Commit:** `11035461ce3de0f11ae5262bbc8a38b9639607b2`  
+**Status:** Complete
+**Commit:** `11035461ce3de0f11ae5262bbc8a38b9639607b2`
 **Migration:** V6 unchanged
 
 ### Outcome
@@ -295,9 +302,79 @@ Sprint 53 discovery proved the minimum implementation boundary and completed it 
 
 ---
 
-## Sprint 54 — Partial-Overlap Import Architecture
+## Sprint 54 — Durable Import-Outcome Presentation Exhaustiveness
 
-**Status:** Discovery  
+**Status:** Forecast
+**Candidate:** `FW-P0-24`
+**Priority:** P0 integrity override
+**Migration:** None expected
+**ADR:** None expected
+
+### Why standalone
+
+The defect is verified at the current pushed baseline but has not been attributed to Sprint 53. It therefore interrupts the roadmap as standalone integrity work rather than being labelled Sprint 53A.
+
+### Outcome
+
+Every known durable import-attempt outcome, coverage value and guidance value is presented truthfully and consistently across Dashboard Import Activity and Import History, while unknown or malformed persistence values remain neutral and privacy-safe.
+
+### Expected scope
+
+- one shared typed presentation authority;
+- exhaustive handling of all 13 currently known durable outcomes;
+- exhaustive handling of the bounded coverage and guidance enums;
+- Dashboard Import Activity;
+- Import History list;
+- Import History detail;
+- neutral unknown and malformed handling;
+- no visible or copied raw persistence code;
+- preservation of current-workflow precedence;
+- preservation of deterministic valid-date and stable-ID latest-attempt selection;
+- focused enumeration tests for all known values;
+- hostile unknown-value tests;
+- regression coverage preventing known outcomes from silently falling through generic defaults.
+
+### Excluded
+
+- richer account-match explanation under `FW-P0-10`;
+- retry or resumable confirmed persistence;
+- resolver behavior;
+- repository or schema changes;
+- partial-overlap import;
+- Import Centre redesign;
+- general visual polish;
+- categories;
+- analytics;
+- financial mutation.
+
+### Acceptance
+
+1. Every known outcome, coverage and guidance value has one explicit truthful presentation.
+2. Unknown or malformed values remain neutral and never become persistence failure.
+3. Raw hostile values never reach visible or copied presentation.
+4. Dashboard and Import History use the same typed authority.
+5. Existing latest-attempt ordering and workflow precedence remain unchanged.
+6. Fresh canonical tests, builds and static analyses pass.
+7. The accepted result changes no migration or ADR.
+8. Local and remote `main` finish synchronized with one clean primary worktree.
+
+### Stop conditions
+
+Stop if:
+
+- the meaning of any durable code is ambiguous;
+- the implementation infers retry or mutation safety;
+- a raw persisted value can reach presentation;
+- unrelated UI or workflow work enters the change;
+- local branch, worktree or stash state is ambiguous;
+- a schema or ADR change becomes necessary;
+- focused or canonical validation fails.
+
+---
+
+## Sprint 55 — Partial-Overlap Import Architecture
+
+**Status:** Discovery
 **Candidate:** `FW-P1-25` with a possible bounded relationship to `FW-P2-12`
 
 ### Outcome
@@ -341,9 +418,9 @@ Stop if the unique subset cannot be independently proven, represented truthfully
 
 ---
 
-## Sprint 55 — Explicit Partial-Overlap Import
+## Sprint 56 — Explicit Partial-Overlap Import
 
-**Status:** Conditional on Sprint 54  
+**Status:** Conditional on Sprint 55
 **Candidate:** `FW-P1-25`
 
 ### Outcome
@@ -377,15 +454,16 @@ For one approved supported overlap family, show existing and unique transactions
 
 ### Acceptance
 
-Independent evidence must prove the unique subset and distinguish full import, partial import, full-overlap block and exact duplicate. Silent omission, false statement coverage or balance regression becomes Sprint 55A.
+Independent evidence must prove the unique subset and distinguish full import, partial import, full-overlap block and exact duplicate. Silent omission, false statement coverage or balance regression becomes Sprint 56A.
 
 ---
 
-## Sprint 56 — Durable Categories and Manual Classification
+## Sprint 57 — Durable Categories and Manual Classification
 
-**Status:** Conditional  
-**Candidate:** `FW-P2-20`  
+**Status:** Conditional
+**Candidate:** `FW-P2-20`
 **Architecture:** ADR-036
+**Migration expectation:** V7
 
 ### Outcome
 
@@ -405,7 +483,8 @@ Users can manage durable workspace categories and assign, change or clear one ca
 - canonical observer-consistent hydration;
 - Settings create, rename, archive, restore and delete-unused;
 - transaction display and detail assignment controls;
-- additive migration selected from the then-current chain;
+- additive Migration V7;
+- clean-install and V6-to-V7 verification;
 - lifecycle backup and recovery verification.
 
 ### Excluded
@@ -421,13 +500,13 @@ Users can manage durable workspace categories and assign, change or clear one ca
 
 ### Acceptance
 
-Persisted transaction identity must survive hydration, provider reconstruction and relaunch. Any identity or assignment-loss defect becomes Sprint 56A.
+Persisted transaction identity must survive hydration, provider reconstruction and relaunch. Any identity or assignment-loss defect becomes Sprint 57A.
 
 ---
 
-## Sprint 57 — Deterministic Import Verification Workspace
+## Sprint 58 — Deterministic Import Verification Workspace
 
-**Status:** Conditional  
+**Status:** Conditional
 **Candidates:** `FW-P1-40` plus bounded `FW-P1-37`
 
 ### Outcome
@@ -469,18 +548,18 @@ Both candidates share one developer outcome and one validation boundary:
 
 ### Acceptance
 
-Launching a fixture must behave the same as manually selecting that file through the ordinary application flow. Alternate-path, privacy or Release-containment failure becomes Sprint 57A.
+Launching a fixture must behave the same as manually selecting that file through the ordinary application flow. Alternate-path, privacy or Release-containment failure becomes Sprint 58A.
 
 ---
 
-## Sprint 58 — Production PDF and Cross-Format Evidence Discovery
+## Sprint 59 — Production PDF and Binary-Fingerprint Discovery
 
-**Status:** Discovery  
+**Status:** Discovery
 **Confidence:** Medium-low
 
 ### Outcome
 
-Determine the smallest safe path for one approved Axis PDF statement to enter the unified production pipeline, define binary-document fingerprint authority and prepare the future cross-format equivalence acceptance boundary.
+Determine the smallest safe path for one approved Axis PDF statement to enter the unified production pipeline, decide binary-document fingerprint authority and prepare the future cross-format equivalence acceptance boundary.
 
 ### Candidates
 
@@ -502,7 +581,8 @@ The shared evidence boundary makes one discovery pass efficient. It does not aut
 
 1. Verify the pushed baseline and approved PDF/CSV evidence.
 2. Trace sandbox access, extraction, classification, profile selection, identity, provenance, fingerprinting, validation and persistence.
-3. Select one result:
+3. Decide exact source bytes versus another explicitly defined stable binary representation.
+4. Select one result:
    - combined implementation-ready PDF slice;
    - binary-fingerprint prerequisite first;
    - parser/profile prerequisite first;
@@ -517,7 +597,7 @@ The shared evidence boundary makes one discovery pass efficient. It does not aut
 - sandbox-authorized production URL opening;
 - deterministic extraction and page/row order;
 - malformed, encrypted, image-only and unsupported outcomes;
-- analysis of raw bytes, normalized container content, extracted text and fingerprint versioning;
+- raw-byte or explicitly approved alternative fingerprint semantics;
 - exact duplicate, revised document and cross-format distinction;
 - privacy, migration and ADR impact;
 - falsification cases.
@@ -535,63 +615,9 @@ The shared evidence boundary makes one discovery pass efficient. It does not aut
 
 Stop if financial truth, extraction order, sandbox access or fingerprint authority cannot be established without inference from production parser output.
 
----
-
-## Sprint 59 — Deterministic Singleton Build and Runtime Launch
-
-**Status:** Forecast  
-**Origin:** Repeated runtime-verification failure mode observed during Sprint 53
-
-### Outcome
-
-Provide one project-owned developer entrypoint that cleanly exits all existing LedgerForge instances, builds the selected target, launches exactly one freshly built bundle and verifies that automation attaches to the intended executable.
-
-### Why this belongs in the cycle
-
-Sprint 53 runtime verification twice encountered competing LedgerForge processes from different DerivedData roots. The failure did not affect production financial behavior, but it made manual verification nondeterministic and risks validating a stale binary. Repeated operational failures deserve a bounded fix rather than another ceremonial reminder to close the app.
-
-### Expected scope
-
-- one project-local shell entrypoint outside production app source;
-- exact-name graceful termination of every LedgerForge process;
-- bounded `SIGTERM` escalation and `SIGKILL` only for remaining exact-name processes;
-- zero-instance precondition before launch;
-- build of the selected Debug or Release target;
-- launch by resolved absolute `.app` path without permitting an extra instance;
-- exactly-one-process postcondition;
-- verification that the running executable path belongs to the freshly built bundle;
-- optional process, log and telemetry verification modes where already supported;
-- clean exit and zero-process postcondition after disposable runtime verification;
-- Codex run-action integration only if it can remain developer-only and repository-appropriate;
-- tests or shell checks for path quoting, stale DerivedData instances and failed termination.
-
-### Excluded
-
-- production singleton enforcement unless separately justified;
-- changing user-facing multi-window behavior;
-- killing non-LedgerForge processes;
-- deleting DerivedData;
-- signing, packaging or notarization redesign;
-- runtime database cleanup;
-- financial feature work;
-- private fixture handling.
-
-### Acceptance
-
-A single command must prove:
-
-1. no LedgerForge process remains before launch;
-2. exactly one process exists after launch;
-3. its executable path matches the just-built bundle;
-4. repeated launch requests do not leave competing instances;
-5. final shutdown leaves zero exact-name processes;
-6. no production or Release-only behavior changes unintentionally.
-
-If repository discovery shows an existing authoritative build/run script, update that entrypoint rather than creating a competing workflow.
-
 ### Cycle effect
 
-Sprint 59 closes the 50–59 cycle. Any implementation-ready PDF result or deferred parser expansion moves into the 60–69 roadmap rather than being forced into this cycle for cosmetic completeness.
+Sprint 59 closes the 50–59 cycle. The deterministic singleton build and runtime-launch entrypoint, any implementation-ready PDF result and unfinished parser expansion move into the 60–69 roadmap rather than being forced into this cycle for cosmetic completeness.
 
 ---
 
@@ -623,11 +649,12 @@ Recalculate at launch. Current plausible candidates include:
 
 ### Excluded during this cycle
 
-- `FW-P1-25` and related `FW-P2-12` questions, owned by Sprints 54–55;
-- `FW-P2-20`, owned by Sprint 56;
-- `FW-P1-37` and `FW-P1-40`, owned by Sprint 57;
-- `FW-P1-10`, `FW-P1-18` and `FW-P1-16` readiness, owned by Sprint 58;
-- the singleton launch follow-up, owned by Sprint 59;
+- `FW-P0-24`, owned by Sprint 54;
+- `FW-P1-25` and related `FW-P2-12` questions, owned by Sprints 55–56;
+- `FW-P2-20`, owned by Sprint 57;
+- `FW-P1-37` and `FW-P1-40`, owned by Sprint 58;
+- `FW-P1-10`, `FW-P1-18` and `FW-P1-16` readiness, owned by Sprint 59;
+- the singleton build and runtime-launch follow-up, deferred to the 60–69 cycle;
 - candidates depending on unpushed work;
 - candidates whose architecture is likely to change during the active sprint;
 - candidates requiring conflicting private-runtime inspection.
@@ -765,6 +792,34 @@ Rebuild the complete file with:
 - PDF and cross-format discovery moves to Sprint 58;
 - Sprint 59 becomes the repeated singleton build/launch/runtime-verification follow-up;
 - HDFC remains outside the active cycle until approved source evidence and fixtures establish its layout relationships.
+
+## 2026-07-23 — P0 presentation defect overrides Sprint 54 forecast
+
+### Repository basis
+
+- inspected pushed ref: `bdb51b0ddcdde097e456a16bab7f0bf999fd595b`;
+- latest verified implementation: `11035461ce3de0f11ae5262bbc8a38b9639607b2`;
+- authoritative documents reconciled: `PROJECT_STATE.md` and `FUTURE_WORK.MD`;
+- no fresh build, test, runtime, migration, ADR or implementation work was performed.
+
+### Evidence
+
+- the durable attempt model defines 13 known outcomes;
+- Dashboard Import Activity does not exhaustively map every known outcome;
+- Import History defaults unhandled known and unknown outcomes to persistence failure;
+- coverage and guidance presentation currently transforms raw persistence codes;
+- the defect is verified but has not been attributed to Sprint 53.
+
+### Decision effect
+
+- insert `FW-P0-24` as standalone Sprint 54 rather than Sprint 53A;
+- move partial-overlap discovery and implementation to Sprints 55–56;
+- move categories to Sprint 57 with Migration V7 expected;
+- move the deterministic import verification workspace to Sprint 58;
+- retain PDF and binary-fingerprint discovery as Sprint 59;
+- defer the singleton build and runtime-launch entrypoint to the 60–69 cycle;
+- pause lower-priority feature execution until the P0 defect is accepted or explicitly deferred;
+- authorize no implementation through this roadmap edit.
 
 ## Future log format
 

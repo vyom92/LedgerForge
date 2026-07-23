@@ -229,32 +229,6 @@ ADR-037 acceptance would reduce the shared architecture blocker. Duplicate-repai
 
 ---
 
-## FW-P0-05 — Concurrent Import Guarantees
-
-**Status:** Completed 2026-07-21
-**Architecture:** ADR-038 accepted in Sprint 49
-**Implementation:** Sprint 50 Tasks 3 and 4
-**Depends on:** Completed Migration V5 activation and same-process, SQLite cross-process and provider-parity acceptance verification
-
-Sprint 49 approved a bounded provider-owned atomic confirmed-import operation. The future operation begins its authoritative transaction before duplicate, identity, ownership or event lookup, revalidates the confirmed plan against current repository state and commits the complete accepted financial graph together or leaves no financial side effects.
-
-Implementation must define and verify deterministic behaviour for:
-
-- simultaneous confirmations in one process;
-- multiple application processes;
-- identity-resolution races;
-- identifier-attachment races;
-- duplicate-fingerprint claims;
-- transaction-event identity and ownership claims;
-- SQLite lock contention;
-- stale account choices and stale identity resolution.
-
-Acceptance requires same-process competition, multiple LedgerForge processes using the same SQLite database and equivalent In-Memory-provider serialization to produce provider-equivalent outcomes. Database constraints and transaction-time authoritative revalidation remain the correctness authority; the existing process-local lock may remain only as an optimization or user-experience guard.
-
-The bounded guarantee applies to approved writers using the expected schema. Writers that disable constraints, alter the schema or corrupt the database remain outside it. Sprint 50 implemented ADR-038's confirmed-import slice and verified SQLite/In-Memory parity, same-process and independent-provider competition, genuine separate-process SQLite contention, typed losing outcomes and zero losing-path residue.
-
----
-
 ## FW-P0-08 — Data-Integrity Verification and Repair
 
 **Status:** Blocked
@@ -278,36 +252,44 @@ After ADR-037 acceptance and lifecycle revalidation, this candidate may proceed 
 
 # P0 — Immediate Stability and Financial-Presentation Safety
 
-## FW-P0-23 — Financial Presentation Truth and Provenance
+## FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness
 
-**Status:** Completed 2026-07-20
-**Depends on:** Existing Money foundation, durable import-session history and transaction-provenance boundaries
+**Status:** Bug
+**Depends on:** None
+**Discovery:** Verified against `main@bdb51b0ddcdde097e456a16bab7f0bf999fd595b`
 
-Correct verified presentation defects where the application displays a financial value, workflow result or transaction status using the wrong authority.
+Correct the user-facing presentation of durable import-attempt outcomes, coverage and guidance.
+
+The durable model defines bounded known values, but current Dashboard Import Activity and Import History projections do not exhaustively present them. Known identity, staleness and contention outcomes may be shown as unavailable or incorrectly labelled as persistence failure. Coverage and guidance may also reach presentation through transformed raw persistence strings.
 
 Required outcomes include:
 
-- every displayed transaction amount using that transaction’s authoritative `Money` value and native currency;
-- no financial amount rendered through a default-currency helper when the authoritative currency is available;
-- import success, failure, cancellation, duplicate and persistence outcomes derived from the authoritative workflow result rather than filename or selection state;
-- transaction validation or review badges derived from durable transaction-specific or import-session-specific evidence;
-- unsupported transaction status omitted rather than inferred from one global latest-import result;
-- correct behaviour after hydration, provider reconstruction and relaunch.
+- one shared typed presentation authority for durable outcome, coverage and guidance values;
+- exhaustive truthful presentation of every currently known durable enum case;
+- neutral handling of unknown, malformed or future persistence codes;
+- no raw unknown code, identifier, path, source fragment or other unbounded persisted string reaching visible or copied presentation;
+- consistent behavior across Dashboard Import Activity, Import History list and Import History detail;
+- preservation of deterministic latest-attempt ordering;
+- focused tests that enumerate every known value and hostile unknown values.
 
-This item does not include:
+The presentation layer must not infer:
 
-- decorative or unsupported dashboard analytics;
-- general placeholder cleanup;
-- imported-file counts in Settings;
-- visual polish unrelated to financial truth.
+- persistence failure from an unknown outcome;
+- retry safety;
+- account-linking behavior;
+- financial mutation;
+- successful or failed financial writes beyond the bounded durable code being presented.
 
-Those concerns remain governed by their P2 candidates.
+This candidate excludes:
 
-Completed from `ea64c685f584ccba94e5b9e29666519837758312` through `4877b05` (native `Money` amount presentation), `b8e4444` (per-transaction import-session validation provenance) and `71f1edf` (workflow and durable-attempt import activity presentation). Bounded hardening from `334a9e209e12fac0b67f6e79ce264945fdf5def8` adds `5d0eebd` (explicit durable persistence failure, neutral unknown outcomes and deterministic valid-date/stable-ID durable-attempt selection) and `530e897` (independent multi-session validation provenance across later imports and global validation changes). Verification passed with 298 tests across 37 suites plus fresh Debug/optimized Release builds and analysis; Release retains four pre-existing `AccountStore` actor-isolation warnings. Schema remains V4; no migration or ADR changed.
+- richer account-match explanation under `FW-P0-10`;
+- retry workflow under `FW-P1-28`;
+- resolver or persistence changes;
+- schema or migration changes;
+- partial-overlap import;
+- general placeholder or visual-polish work.
 
-The recorded manual production presentation check is INR through the approved Axis NRE CSV path only. QAR Dashboard and Account Recent Activity coverage is automated with constructed data, and Import Preview coverage is automated with constructed `PreparedImport` and transaction data. QAR production import, CBQ, Axis NRO, PDF, XLS, XLSX and card-statement production support remain outside this completed item.
-
-This completion does not authorize dashboard analytics (`FW-P2-46`), general placeholder cleanup (`FW-P2-42`), category implementation (`FW-P2-20`), or Axis NRO parser-family work (`FW-P1-01`). No production support was added for PDF, XLS, XLSX, card statements or additional currencies through parser expansion.
+Implementation must stop if the intended meaning of a durable code cannot be established from its production owner or if truthful presentation would require exposing an unbounded raw value.
 
 ---
 
@@ -315,7 +297,7 @@ This completion does not authorize dashboard analytics (`FW-P2-46`), general pla
 
 ## FW-P0-10 — Explain Account Match, No-Match and Conflict Outcomes
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Existing verified financial-identity flow
 
 Explain why an import:
@@ -336,7 +318,7 @@ The approved durable-attempt-history increment promotes only account-decision pr
 
 ## FW-P0-11 — Manual Account Linking and Unlinking
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P0-10`, Accepted ADR-037, and independently approved linking, unlinking and identifier-detachment semantics
 
 Allow explicit manual linking and unlinking beyond the current bounded account-choice workflow.
@@ -379,7 +361,7 @@ The following work remains open and separately gated:
 
 ## FW-P0-13 — Incorrect-Link Recovery and Account Split
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P0-11`, Accepted ADR-037, and independently approved split and relationship-movement rules
 
 Recover when transactions, import sessions or identifiers were attached to the wrong account.
@@ -398,7 +380,7 @@ No automatic account split is permitted.
 
 ## FW-P0-14 — Duplicate-Account Review
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P0-10` and `FW-P0-11`
 
 Present accounts that may represent the same real financial account.
@@ -416,7 +398,7 @@ Weak evidence must never establish identity automatically.
 
 ## FW-P0-15 — Manual Account Merge
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P0-14`, Accepted ADR-037, and independently approved survivor-identity, conflict and merge policy
 
 Provide a previewed manual merge that preserves:
@@ -519,31 +501,11 @@ Sprint 45 delivered Debug-only activity exclusion, provider-wrapper invalidation
 
 ---
 
-## FW-P0-17 — Legacy Exact-Statement Fingerprint Backfill and Review
-
-**Status:** Blocked  
-**Depends on:** Successful completion and approval of Sprint 39, plus an approved historical-review policy
-
-Address statement history imported before Sprint 39, where no durable exact-content fingerprint exists.
-
-Candidate outcomes include:
-
-- identifying legacy import sessions that lack fingerprints;
-- explaining why an existing statement cannot be proven identical from legacy metadata alone;
-- optional user-reviewed fingerprint registration when the original source document is re-presented;
-- preserving prospective-only Sprint 39 semantics;
-- avoiding heuristic reconstruction from filenames, paths, account names, dates, balances or transactions.
-
-Legacy history must never be silently fingerprinted from reduced repository data.
-
-**May combine with:** `FW-P1-25` if discovery shows that legacy exact-statement review belongs inside one bounded duplicate-management experience.
-
----
-
 ## FW-P0-18 — Workspace-Scoped Fingerprint Uniqueness
 
-**Status:** Blocked  
-**Depends on:** `FW-P3-40` and an approved schema decision
+**Status:** Blocked
+**Discovery:** Complete
+**Depends on:** An approved `FW-P3-40` multiple-workspace architecture that explicitly decides fingerprint scope
 
 Define exact-statement fingerprint ownership when one LedgerForge database contains more than one independent workspace.
 
@@ -552,16 +514,20 @@ The design must determine:
 - whether exact-content uniqueness is workspace-scoped or database-wide;
 - schema and migration requirements;
 - treatment of identical source content imported into independent workspaces;
-- conflict and migration behaviour for existing database-wide fingerprints;
+- conflict and migration behavior for existing database-wide fingerprints;
 - privacy and diagnostic boundaries.
 
+Fingerprint scope is a subdecision of the future multiple-workspace architecture. `FW-P0-18` must not be treated as an independent prerequisite that blocks discovery of `FW-P3-40`, because doing so creates a circular dependency.
+
 The source digest must remain derived from source evidence rather than being altered merely to encode workspace identity.
+
+No schema change is authorized until workspace identity, isolation and migration semantics are approved.
 
 ---
 
 ## FW-P0-19 — Cross-Format Statement Duplicate Identity
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Successful completion and approval of Sprint 40, `FW-P1-16` and production support for at least two equivalent source formats
 
 Determine when equivalent CSV, PDF, XLS, XLSX or TXT representations describe the same statement even though their exact source bytes differ.
@@ -598,49 +564,11 @@ Each family may require a separate ADR and implementation increment. No family m
 
 ---
 
-## FW-P0-21 — Date-Only Semantic Preservation
-
-**Status:** Complete — Sprint 52
-**Planning state:** Implemented with ADR-039 and Migration V6
-
-Define and preserve statement transaction dates as date-only financial evidence rather than allowing an implicit timezone or time-of-day interpretation to change the represented calendar day.
-
-Targeted discovery must determine:
-
-- the parser-owned date-only domain and validation boundary;
-- the persistence representation and compatibility requirements;
-- hydration behavior that cannot shift a source calendar date;
-- presentation behavior that remains faithful to the source date;
-- deterministic cross-timezone and daylight-saving verification;
-- the policy for existing durable history and whether an independently approved migration or ADR is required.
-
-Sprint 52 implemented the approved date-only contract; the former `FT-P0-01` identifier in `PROJECT_STATE.md` referred to this same defect.
-
----
-
-## FW-P0-22 — Durable Source Order and Provenance
-
-**Status:** Complete — Sprint 52
-**Planning state:** Implemented with ADR-039 and Migration V6
-
-Define durable source-order and raw-row provenance so same-day financial interpretation can preserve source-supported ordering and explain each persisted transaction without relying on unstable collection order.
-
-Targeted discovery must determine:
-
-- the reader/parser-owned source ordinal and its deterministic meaning;
-- equivalent SQLite and In-Memory provider behavior;
-- durable raw-row provenance and transaction-to-source linkage;
-- same-day running-balance correctness and ordering rules;
-- the policy for existing history that lacks durable source order or raw-row evidence;
-- schema-migration requirements and whether a new or amended ADR is required.
-
-Sprint 52 implemented the approved provenance boundary; the former `FT-P0-02` identifier in `PROJECT_STATE.md` referred to this same defect. No historical order or provenance was reconstructed.
-
 # P1 — Institution and Parser Expansion
 
 ## FW-P1-01 — Axis Bank Parser Family Expansion
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Approved fixtures for each layout
 
 **Supplied shared-layout Axis NRO CSV slice completed 2026-07-23:** Sprint 53 verified the supplied NRO CSV evidence through the existing Axis bank-account grammar and one shared production parser. New supported NRE and NRO imports use `axis.bank-account.csv` version `1`; two distinct full institution account identifiers preserve separate durable accounts. This completion does not establish broader Axis NRO, PDF, XLS, XLSX or card support.
@@ -669,7 +597,7 @@ Do not generalize the existing parser without fixture-backed evidence.
 
 ## FW-P1-02 — HDFC Parser Family
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Approved HDFC fixtures and supported source formats
 
 Near-term HDFC direction is bank-account statements only through the unified import pipeline. Card support remains separate future work.
@@ -678,7 +606,7 @@ Near-term HDFC direction is bank-account statements only through the unified imp
 
 ## FW-P1-03 — CBQ Parser Family
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Approved CBQ fixtures and supported source formats
 
 Keep independent CBQ families:
@@ -704,7 +632,7 @@ American Express is the priority independent credit-card issuer. Additional issu
 
 ## FW-P1-05 — Brokerage, Mutual-Fund, Salary, Insurance, Tax and Government Document Families
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Domain-model and product-scope decisions
 
 Investigate support for:
@@ -725,7 +653,7 @@ Do not force materially different financial documents into the bank-statement mo
 
 ## FW-P1-06 — Parser Framework Expansion
 
-**Status:** Ready for discovery  
+**Status:** Ready for planning
 **Depends on:** Existing reader, parser-selection and `FinancialDocument` boundaries
 
 **Narrow parser-authoritative profile-provenance slice completed 2026-07-23:** Sprint 53 makes the production persistence mapper consume exactly one nonempty profile ID/version pair produced by parser transaction provenance and fail before writes when it is missing, malformed or conflicting. Historical `axis.nre.csv` version `1` remains readable unchanged. Reusable profile architecture, broader CSV grammar, other layouts, formats and institutions remain open.
@@ -756,7 +684,7 @@ This candidate concerns internal application architecture. External third-party 
 
 ## FW-P1-07 — Statement Learning Mode and Profile Library
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** `FW-P1-06`, approved Import Profile semantics and privacy boundaries
 
 Investigate an offline-first workflow that helps LedgerForge recognize new or changed statement layouts while preserving deterministic parsing.
@@ -777,7 +705,7 @@ Learning must never silently promote an unreviewed profile into trusted financia
 
 ## FW-P1-08 — AI-Assisted Column Detection
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** `FW-P1-06`, editable import provenance and deterministic validation boundaries
 
 Investigate AI-assisted suggestions for identifying dates, descriptions, debit, credit, amount, currency and balance columns in unsupported tabular statements.
@@ -798,7 +726,8 @@ The original source structure and every user-approved mapping must remain inspec
 ## FW-P1-09 — Credit-Card Financial Semantics Foundation
 
 **Status:** Blocked
-**Depends on:** `FW-P3-29A` and later card implementation and persistence planning
+**Discovery:** Complete
+**Depends on:** Approved concrete card validation and persistence contracts, one selected card statement family, and a production-supported source format
 
 Define the smallest document-scoped evidence contract required before production card parsing.
 
@@ -819,9 +748,9 @@ Missing FX rates, fees, markup, tax, statement aggregates or other financial evi
 
 Payment allocation, rewards accounting, reversal matching, universal card taxonomy and institution-independent balance formulas remain outside this candidate unless separately approved.
 
-Card persistence remains blocked until the Money foundation and later card implementation and persistence planning establish the required domain, validation and persistence contracts. Institution-specific production parsers remain independently gated after the shared foundation is accepted.
+The Money foundation is complete. Card persistence remains blocked until concrete card validation, durable persistence, hydration and migration contracts are approved. Institution-specific production parsers remain independently gated by their source formats, fixtures and financial oracles.
 
-The integrated evidence and completed review satisfy the discovery dependency. Final vocabulary, persistence fields and migration shape remain blocked on the Money implementation, concrete card validation requirements and later persistence planning.
+The integrated evidence and completed review satisfy the shared semantic-discovery dependency. Final vocabulary, persistence fields and migration shape remain blocked on concrete card validation and persistence planning.
 
 Do not claim production card support from fixture integration, schema capacity, statement classification or parser candidates.
 
@@ -829,10 +758,10 @@ Do not claim production card support from fixture integration, schema capacity, 
 
 ## FW-P1-10 — Production PDF Statement Support
 
-## FW-P1-10 — Production PDF Statement Support
-
-**Status:** Ready for discovery  
-**Depends on:** Approved PDF fixture and existing extraction foundation
+**Status:** Candidate
+**Discovery:** Complete
+**Planning state:** One architecture decision remains
+**Depends on:** Approved authoritative binary-document fingerprint semantics under `FW-P1-18`, the approved PDF fixture, and the existing extraction foundation
 
 Promote PDF from extraction foundation to a production-supported import source.
 
@@ -854,7 +783,7 @@ PDF support must not be presented as production-ready merely because extraction 
 
 ## FW-P1-11 — Password-Protected PDF Support
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P1-10` and an approved password workflow
 
 Support encrypted PDF statements through the existing password-provider boundary.
@@ -865,7 +794,7 @@ Readers must not access UI prompts, Keychain or institution-specific password po
 
 ## FW-P1-12 — Secure Institution Password Storage
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P1-11` and a security review
 
 Store institution-specific credentials using macOS Keychain.
@@ -883,7 +812,7 @@ Requirements include:
 
 ## FW-P1-13 — Per-File Password Override and Entry
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P1-11`
 
 Allow manual password entry when no stored credential succeeds.
@@ -894,8 +823,8 @@ The user must control whether the password is used once, stored, replaced or dis
 
 ## FW-P1-14 — XLS and XLSX Support
 
-**Status:** Blocked  
-**Depends on:** Approved spreadsheet fixtures
+**Status:** Blocked
+**Depends on:** Selection of the first production spreadsheet family, an approved XLS or XLSX reader/extraction authority, and the existing approved spreadsheet evidence
 
 Add spreadsheet readers that feed the existing universal import pipeline.
 
@@ -905,7 +834,7 @@ XLS and XLSX may become separate sprint candidates if discovery shows materially
 
 ## FW-P1-15 — TXT Statement Support
 
-**Status:** Idea  
+**Status:** Idea
 **Depends on:** Approved TXT fixtures
 
 Support deterministic text statements through the existing pipeline.
@@ -914,7 +843,7 @@ Support deterministic text statements through the existing pipeline.
 
 ## FW-P1-16 — Cross-Format Financial Equivalence
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** At least two production-supported formats for the same statement family
 
 Verify equivalent statements produce equivalent:
@@ -933,7 +862,7 @@ Extraction differences must not change financial truth.
 
 ## FW-P1-17 — OCR Fallback
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Production PDF support and approved human-review boundaries
 
 Investigate scanned or image-only statements.
@@ -944,22 +873,42 @@ OCR output remains untrusted until deterministic parsing and validation succeed.
 
 ## FW-P1-18 — Binary-Document Fingerprint Semantics
 
-**Status:** Research  
-**Depends on:** Production support for at least one binary source path
+**Status:** Research
+**Discovery:** Complete
+**Planning state:** One architecture decision remains
+**Depends on:** Chat approval of the authoritative binary fingerprint representation and its versioned algorithm-coexistence contract
 
-Define deterministic fingerprint input for binary documents when reader-produced text is absent, incomplete or unsuitable as the exact-content authority.
+Define deterministic exact-content fingerprint input for binary documents when reader-produced text is absent, incomplete or unsuitable as the exact-content authority.
 
-The design must address:
+This decision must precede or form the minimum architecture portion of `FW-P1-10`. Production PDF support must not be used as a prerequisite for deciding the exact-content authority that production PDF support itself requires.
 
-- whether bytes, normalized container content or another stable representation is authoritative;
+The design must decide whether the authority is:
+
+- exact source bytes; or
+- another explicitly defined stable binary representation.
+
+It must also address:
+
+- immutable source-content ownership through preparation and confirmation;
+- metadata that may change without changing represented statement content;
 - encrypted and password-protected documents;
-- metadata that may change without changing statement content;
 - format-specific container differences;
 - compatibility with versioned fingerprint algorithms;
-- privacy-safe diagnostics;
-- migration and coexistence with `ledgerforge.raw-text.sha256.v1`.
+- coexistence with `ledgerforge.raw-text.sha256.v1`;
+- commit-time revalidation;
+- SQLite and In-Memory parity;
+- privacy-safe diagnostics.
 
-Binary fingerprinting must not be inferred from parsed transactions or presentation metadata.
+Binary fingerprinting must not be inferred from:
+
+- parsed transactions;
+- financial totals;
+- filenames or paths;
+- presentation metadata;
+- extracted labels merely because current code exposes them.
+
+No migration or historical fingerprint reconstruction is authorized by this candidate.
+
 
 ---
 
@@ -967,7 +916,7 @@ Binary fingerprinting must not be inferred from parsed transactions or presentat
 
 ## FW-P1-19 — LedgerForge Import Centre
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Existing confirmation-gated Import Wizard foundation
 
 Complete the Import Wizard as the LedgerForge Import Centre for preparing, reviewing, confirming and understanding imports.
@@ -996,7 +945,7 @@ This candidate provides the bounded foundation for the longer-term Import Studio
 
 ## FW-P1-20 — Batch Import
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Mature duplicate handling, cancellation boundaries and failure isolation
 
 Import multiple files as independent jobs while preserving independent:
@@ -1014,7 +963,7 @@ A failure in one file must not silently affect another. Authoritative shared-sta
 
 ## FW-P1-21 — Multi-File Drag-and-Drop Import Centre
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P1-20`
 
 Provide drag-and-drop queue visibility, per-file progress and outcomes, and result navigation for multiple files.
@@ -1023,7 +972,7 @@ Provide drag-and-drop queue visibility, per-file progress and outcomes, and resu
 
 ## FW-P1-22 — Editable Import Preview
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** An approved correction and provenance model
 
 Allow bounded correction before persistence without obscuring the distinction between:
@@ -1039,7 +988,7 @@ Every correction must remain explainable and auditable.
 
 ## FW-P1-23 — Import Correction Workflow
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P1-22` and durable correction provenance
 
 Provide deterministic correction and revalidation before persistence.
@@ -1048,7 +997,7 @@ Provide deterministic correction and revalidation before persistence.
 
 ## FW-P1-24 — Account-Match Review and Manual Override
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Identity explanation and manual linking policies
 
 Extend account choice beyond the bounded no-match workflow while preserving verified identity ownership and explicit user control.
@@ -1066,7 +1015,7 @@ Retain future work for duplicate override, partial import, broader duplicate man
 
 ## FW-P1-27 — Delete or Reverse an Import Session
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Accepted ADR-037, post-Sprint-45 revalidation, and an independently approved import-session reversal family contract and impact preview
 
 Safely reverse one import without damaging unrelated account history.
@@ -1077,7 +1026,7 @@ ADR-037 acceptance may make this candidate eligible for separate discovery. It d
 
 ## FW-P1-28 — Confirmed-Persistence Recovery and Unsupported Retry
 
-**Status:** Candidate
+**Status:** Ready for planning
 **Depends on:** Typed authoritative persistence-failure outcomes and repository-safe retry semantics
 
 Preparation now has truthful named stages, one owned cancellable operation, and bounded fresh retry for typed source-reading failures. Retain only the unscheduled recovery boundary:
@@ -1090,7 +1039,7 @@ Preparation now has truthful named stages, one owned cancellable operation, and 
 
 ## FW-P1-29 — Better Validation Guidance
 
-**Status:** Candidate  
+**Status:** Ready for planning
 **Depends on:** Existing validation pipeline
 
 Present actionable, user-facing guidance while preserving detailed developer diagnostics separately.
@@ -1101,7 +1050,7 @@ The approved durable-attempt-history increment promotes only bounded enumerated 
 
 ## FW-P1-29A — Historical Backfill Import Workflow
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Mature duplicate handling, statement continuity and reversible repair foundations
 
 Support deliberate import of older financial history without corrupting current account continuity or duplicating already represented activity.
@@ -1125,7 +1074,7 @@ Historical backfill must not assume that older statements are complete or that i
 
 ## FW-P1-30 — Granular Development Database Reset
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Separate approved selective-mutation semantics built on ADR-035
 
 Candidate reset operations include:
@@ -1143,28 +1092,28 @@ ADR-035 and Sprint 45 Phase A provide the reusable canonical lifecycle, activity
 
 ## FW-P1-31 — Repository Inspector
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Privacy-safe developer presentation
 
 ---
 
 ## FW-P1-32 — Development SQLite Browser
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Development-only access and privacy controls
 
 ---
 
 ## FW-P1-33 — Import-Session Inspector
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Implemented durable import-attempt-history foundation and an approved developer-inspection privacy boundary
 
 ---
 
 ## FW-P1-34 — Parser and Source-Evidence Inspector
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Privacy-safe source-evidence redaction
 
 Source inspection must never expose passwords or unredacted financial identifiers.
@@ -1173,28 +1122,28 @@ Source inspection must never expose passwords or unredacted financial identifier
 
 ## FW-P1-35 — Duplicate and Identity-Conflict Inspector
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Approved duplicate and conflict semantics
 
 ---
 
 ## FW-P1-36 — Diagnostic Export
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Privacy filtering and explicit user action
 
 ---
 
 ## FW-P1-37 — Better Developer Diagnostics and Failure Summaries
 
-**Status:** Candidate  
+**Status:** Ready for planning
 **Depends on:** Existing structured diagnostic system
 
 ---
 
 ## FW-P1-38 — Import Inspector and Validation Timeline
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** A separate approved diagnostic-history and timeline architecture
 
 Provide development-only inspection of an import’s progression through:
@@ -1226,7 +1175,7 @@ This candidate remains separate from the user-facing durable import-attempt hist
 
 ## FW-P1-39 — Development Database Maintenance Utilities
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Separate safety, mutation and validation contracts for each maintenance operation
 
 Investigate safe development-only utilities for:
@@ -1250,7 +1199,7 @@ Production user-facing repair remains governed by `FW-P0-08`.
 
 ## FW-P1-39A — Persistent Developer Diagnostic History
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** A new ADR replacing or extending ADR-026’s in-memory-only diagnostic constraint
 
 Investigate an optional development-only diagnostic history that survives relaunch.
@@ -1271,7 +1220,7 @@ Persistent diagnostics must not become an application persistence mechanism or a
 
 ## FW-P1-40 — Deterministic Approved-Fixture Launcher
 
-**Status:** Ready for discovery
+**Status:** Ready for planning
 **Depends on:** Existing production preparation seam and approved sanitized fixtures
 
 Provide a DEBUG-only launcher for repository-approved sanitized fixtures. It must enter the ordinary production URL-driven preparation path and preserve reader, detection, classification, parser, validation, account choice, duplicate evaluation, explicit confirmation, persistence, hydration and presentation.
@@ -1284,7 +1233,7 @@ The launcher must not auto-confirm, inject expected results, use private stateme
 
 ## FW-P2-01 — Transaction Source and Provenance View
 
-**Status:** Candidate  
+**Status:** Ready for planning
 **Depends on:** Trusted document and import-session relationships
 
 Show the account, source document and import session from which a transaction originated.
@@ -1295,7 +1244,7 @@ The approved durable-attempt-history increment exposes trusted provenance only w
 
 ## FW-P2-02 — Improved Transaction Detail Layout
 
-**Status:** Candidate  
+**Status:** Ready for planning
 **Depends on:** None
 
 Use the available detail space more effectively and remove developer-oriented terminology.
@@ -1304,7 +1253,7 @@ Use the available detail space more effectively and remove developer-oriented te
 
 ## FW-P2-03 — Advanced Transaction Search
 
-**Status:** Candidate  
+**Status:** Ready for planning
 **Depends on:** Stable transaction fields
 
 Expand future global Transactions filters for institution, account, bank/card family, currency, date and financial direction. Preserve one global repository-backed Transactions store and experience; do not claim these filters are currently implemented.
@@ -1313,21 +1262,21 @@ Expand future global Transactions filters for institution, account, bank/card fa
 
 ## FW-P2-04 — Saved Transaction Filters
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P2-03`
 
 ---
 
 ## FW-P2-05 — Transaction Multi-Selection
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Approved bulk-action boundaries
 
 ---
 
 ## FW-P2-06 — Bulk Transaction Actions
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P2-05`, Accepted ADR-037, and an independently approved contract for each concrete bulk-action family
 
 Potential actions include notes, categories, rules and safe deletion or exclusion.
@@ -1336,28 +1285,28 @@ Potential actions include notes, categories, rules and safe deletion or exclusio
 
 ## FW-P2-07 — Delete Transactions by Import Session
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Approved `FW-P1-27` import-session reversal
 
 ---
 
 ## FW-P2-08 — Undo Support
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Family-specific reversible repository history; ADR-037 rejects universal application undo
 
 ---
 
 ## FW-P2-09 — Transaction Notes
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Targeted transaction metadata mutation
 
 ---
 
 ## FW-P2-10 — Transfer Matching Between Owned Accounts
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Reliable multi-account identity and successful completion and approval of Sprint 40
 
 Match both sides of owned-account transfers without counting them as income or expense.
@@ -1368,7 +1317,7 @@ Matching must be explainable and reversible.
 
 ## FW-P2-11 — Reconciliation Workflow
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P2-10` and transaction provenance
 
 ---
@@ -1386,13 +1335,14 @@ Retain future work for speculative duplicate-transaction candidates, unsupported
 
 ## FW-P2-20 — Category Model and Management
 
-**Status:** Candidate
+**Status:** Ready for planning
 **Discovery:** Complete
 **ADR-036:** Accepted
 **Post-Sprint-45 lifecycle revalidation:** Complete
 **Planning state:** Ready for Chat planning
 **Implementation state:** Gated
-**Depends on:** Stable transaction model, durable repository transaction identity and approved category UI behavior
+**Depends on:** Approval of the category UI behavior supplement and implementation planning against the current V6 and ADR-039 baseline
+**Migration expectation:** Additive Migration V7
 
 Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` with a clean worktree and no implementation. Provider, migration and hydration assumptions were revalidated after Sprint 45, and ADR-036 is Accepted. Source implementation remains gated.
 
@@ -1412,17 +1362,17 @@ Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` wi
 - a dedicated category repository with SQLite and In-Memory parity;
 - a dedicated category store;
 - repository mutation followed by canonical `RepositoryStoreHydrator` refresh;
-- an additive migration after the then-current migration version.
+- an additive Migration V7 from the current V6 schema.
 
 ### Implementation prerequisites
 
-1. Hydrated transactions must expose stable persisted repository transaction identity.
+1. Satisfied foundation: hydrated transactions expose stable persisted repository transaction identity through ADR-039.
 2. The category UI behavior supplement must be approved.
 3. `CategoryRepository` must participate in installed-provider generation protection.
 4. One repository-write activity lease must cover provider resolution, persistence and canonical reconciliation.
 5. SQLite and In-Memory provider parity must be demonstrable.
 6. Category hydration must publish one observer-consistent runtime snapshot.
-7. The migration number must be selected from the then-current migration chain.
+7. Migration V7 must be additive, preserve the V6 financial graph and be covered by clean-install and V6-to-V7 verification.
 8. Lifecycle backup verification must cover the category schema.
 9. Focused category lifecycle and recovery tests must be approved.
 
@@ -1483,14 +1433,14 @@ This work must precede automatic categorization.
 
 ## FW-P2-21 — Deterministic Categorization Rules
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P2-20`
 
 ---
 
 ## FW-P2-22 — Explainable Rule Results
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P2-21`
 
 Every automatic categorization must explain the rule that produced it.
@@ -1499,21 +1449,21 @@ Every automatic categorization must explain the rule that produced it.
 
 ## FW-P2-23 — Rule Priority and Conflict Handling
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P2-21`
 
 ---
 
 ## FW-P2-24 — User Corrections as Reusable Rules
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P2-21` through `FW-P2-23`
 
 ---
 
 ## FW-P2-25 — Merchant and Payee Normalization
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Stable correction and provenance rules
 
 The original imported transaction description must remain preserved.
@@ -1522,14 +1472,14 @@ The original imported transaction description must remain preserved.
 
 ## FW-P2-26 — Recurring Transaction and Subscription Detection
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Reliable duplicate handling and normalized payee evidence
 
 ---
 
 ## FW-P2-27 — Automatic Transaction Classification
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Category, rule, normalization and explanation foundations
 
 Deterministic rules take precedence over AI-assisted suggestions.
@@ -1538,14 +1488,14 @@ Deterministic rules take precedence over AI-assisted suggestions.
 
 ## FW-P2-28 — Smart Deterministic Alerts
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Categorization, recurring detection or another approved rule source
 
 ---
 
 ## FW-P2-29 — Explainable Rules Engine v2
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Stable category, transaction, account, provenance and reversible-action models
 
 Define a general deterministic rules engine for explainable financial automation beyond categorization alone.
@@ -1569,7 +1519,7 @@ Rules must remain deterministic before any AI-assisted suggestion layer is consi
 
 ## FW-P2-30 — Broader Account Metadata Editing
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Existing targeted display-name mutation
 
 Define the targeted repository mutation, validation and hydration foundation required for editable account metadata beyond display name while preserving immutable account identity, identifiers, sessions and transactions.
@@ -1580,28 +1530,28 @@ Field-specific product work remains separately tracked in `FW-P2-31`, `FW-P2-32`
 
 ## FW-P2-31 — Account Notes
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P2-30`
 
 ---
 
 ## FW-P2-32 — Account Colour and Icon Customization
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Stable account presentation model
 
 ---
 
 ## FW-P2-33 — Institution Logos
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Approved asset and institution-mapping strategy
 
 ---
 
 ## FW-P2-34 — Archive and Restore Account
 
-**Status:** Ready for discovery  
+**Status:** Ready for discovery
 **Depends on:** Existing targeted account-mutation and repository-identity foundations
 
 Discovery must define account lifecycle semantics, visibility effects and restoration behaviour.
@@ -1612,21 +1562,21 @@ Archiving must not delete financial history.
 
 ## FW-P2-35 — Hide Account Without Deleting History
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Account visibility semantics
 
 ---
 
 ## FW-P2-36 — Close-Account Status and Closure Date
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P2-30`
 
 ---
 
 ## FW-P2-37 — Account Grouping, Ordering and Favourites
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Stable complete-account collection
 
 Support user-defined or deterministic grouping while preserving immutable account identity and complete account visibility.
@@ -1635,7 +1585,7 @@ Support user-defined or deterministic grouping while preserving immutable accoun
 
 ## FW-P2-38 — Full Account Transaction-History Navigation
 
-**Status:** Candidate  
+**Status:** Ready for planning
 **Depends on:** Existing account-scoped activity foundation
 
 ---
@@ -1644,21 +1594,21 @@ Support user-defined or deterministic grouping while preserving immutable accoun
 
 ## FW-P2-40 — Replace Developer Terminology in User-Facing Screens
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** None
 
 ---
 
 ## FW-P2-41 — Consistent Toolbar Composition
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** None
 
 ---
 
 ## FW-P2-42 — Remove Noisy Pending and Soon Placeholders
 
-**Status:** Candidate  
+**Status:** Ready for planning
 **Depends on:** None
 
 **Settings-only portion completed 2026-07-20:** removed the inactive Settings section list, unbacked default-preference rows and future-only Danger Zone actions. Functional Developer Mode and authoritative persistence, recovery, runtime and data information remain. The broader candidate stays open for non-Settings surfaces.
@@ -1683,7 +1633,7 @@ Unsupported dashboard analytics remain governed by `FW-P2-46`.
 
 ## FW-P2-43 — Better Account Icons
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Account presentation strategy
 
 Improve default account iconography. User customization remains governed by `FW-P2-32`, while institution logos remain governed by `FW-P2-33`.
@@ -1692,21 +1642,21 @@ Improve default account iconography. User customization remains governed by `FW-
 
 ## FW-P2-44 — Dashboard Customization
 
-**Status:** Idea  
+**Status:** Idea
 **Depends on:** Stable dashboard modules
 
 ---
 
 ## FW-P2-45 — Improved Global Search
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Stable searchable domains
 
 ---
 
 ## FW-P2-46 — Interactive Dashboard Charts
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Reliable analytical data sources
 
 Provide interactive dashboard charts only after their underlying analytical values are derived from authoritative repository-backed financial data.
@@ -1727,35 +1677,35 @@ Future charts must preserve native-currency safety, provenance, deterministic ca
 
 ## FW-P2-47 — Better Empty States and Import Guidance
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** None
 
 ---
 
 ## FW-P2-48 — Hover, Spacing and Visual Polish
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Stable primary layouts
 
 ---
 
 ## FW-P2-49 — Accessibility Review
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Stable primary workflows
 
 ---
 
 ## FW-P2-50 — Keyboard Navigation and Shortcuts
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Stable primary workflows
 
 ---
 
 ## FW-P2-51 — Startup, Runtime and Import Performance Optimization
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Measured performance evidence and representative fixtures
 
 Measure and improve:
@@ -1775,7 +1725,7 @@ Do not optimize without benchmarks.
 
 ## FW-P2-52 — User and Workspace Preferences
 
-**Status:** Ready for discovery  
+**Status:** Ready for discovery
 **Depends on:** Existing settings presentation and `WorkspaceSettings` domain direction
 
 Define durable, privacy-safe preferences for:
@@ -1796,7 +1746,7 @@ Normal regional formatting may be discovered independently. Reporting-currency p
 
 ## FW-P2-53 — Contextual Date-Range and Filter Controls
 
-**Status:** Candidate  
+**Status:** Ready for planning
 **Depends on:** Stable date semantics and searchable presentation domains
 
 Implement the frozen contextual-toolbar direction for date range, filters and other page-specific controls.
@@ -1813,7 +1763,7 @@ The controls must:
 
 ## FW-P2-54 — Document Library and Source-Document Browsing
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Durable document provenance, privacy-safe metadata and import-session history
 
 Provide a user-facing place to inspect imported source-document records and their relationships to:
@@ -1830,7 +1780,7 @@ The library must not expose raw source content by default and must not treat a d
 
 ## FW-P2-55 — Light Mode Design Revision
 
-**Status:** Idea  
+**Status:** Idea
 **Depends on:** Approved design review, updated frozen UI specification and revised UI assets
 
 Investigate a complete Light Mode visual system without weakening the current Deep Indigo dark-mode baseline.
@@ -1841,7 +1791,7 @@ Implementation may begin only after design tokens, contrast requirements, approv
 
 ## FW-P2-56 — Development Performance Profiling
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Privacy-safe developer tooling and measured performance questions
 
 Provide development-only profiling for:
@@ -1862,7 +1812,7 @@ Profiling output must remain separate from financial truth and must not retain s
 
 ## FW-P2-61 — Institution, Layout and Format Regression Matrix
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Additional supported fixtures
 
 Expand currency regression coverage once a second production currency exists; do not create a separate mixed-currency regression candidate.
@@ -1871,21 +1821,21 @@ Expand currency regression coverage once a second production currency exists; do
 
 ## FW-P2-63 — Cross-Format Fixture-Parity Tests
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Multiple production-supported formats
 
 ---
 
 ## FW-P2-64 — Large-Statement and Long-Running Import Tests
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Representative large fixtures
 
 ---
 
 ## FW-P2-65 — Repository Corruption and Recovery Tests
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Successful completion and approval of Sprint 47, plus an approved broader corruption-recovery test boundary
 
 Define a broader repository corruption and recovery regression matrix beyond the focused tests required by individual implementation candidates.
@@ -1917,7 +1867,7 @@ Production repair remains governed by `FW-P0-08`. Sprint 47 completed focused fa
 
 ## FW-P2-66 — Privacy Regression Tests
 
-**Status:** Candidate  
+**Status:** Ready for planning
 **Depends on:** None
 
 Protect against raw identifiers, passwords and source fragments entering presentation or diagnostics.
@@ -1926,7 +1876,7 @@ Protect against raw identifiers, passwords and source fragments entering present
 
 ## FW-P2-67 — App Shell and Workflow Decomposition
 
-**Status:** Maintenance  
+**Status:** Maintenance
 **Depends on:** Stable current navigation, window structure and import behaviour
 
 Decompose the monolithic SwiftUI application shell while preserving approved financial behaviour and the current product design.
@@ -1946,31 +1896,9 @@ The exact file names, scene hierarchy and coordinator types require implementati
 
 ---
 
-## FW-P2-68 — Repository-Backed Settings and Import-History Counts
-
-**Status:** Completed 2026-07-20
-**Depends on:** Existing durable import-session and import-attempt history
-
-Completed without a schema migration: Settings `Completed Imports` projects the canonical hydrated import-attempt store only when persistence is durable. It counts only committed `successful_import` attempts linked to both a durable import session and document; exact duplicates, failures, rejections and cancelled preparation do not increment it. Non-durable or unavailable history presents `Unavailable`. Focused tests and a recoverable Debug reset with sanitized approved-fixture import, relaunch and exact re-import verified `0 → 1 → 1`.
-
-Replace current-session or selected-file-derived Settings counts with truthful repository-backed values.
-
-Required outcomes include:
-
-- persisted import counts derived from durable repository history;
-- correct values after hydration and relaunch;
-- failed, cancelled and rejected attempts not counted as completed persisted imports;
-- exact duplicates distinguished from newly persisted imports;
-- no binary zero-or-one count derived from the currently selected filename;
-- an explicit unavailable state when a requested count cannot be derived from the current durable model.
-
-Persistence-provider status was completed by Sprint 47; this candidate remains limited to repository-backed counts.
-
----
-
 ## FW-P2-69 — macOS Build, CI and UI Smoke Validation
 
-**Status:** Maintenance  
+**Status:** Maintenance
 **Depends on:** None
 
 Establish one reproducible macOS validation workflow for local development, ChatGPT execution environments and continuous integration.
@@ -2004,7 +1932,7 @@ Sprint 53 runtime verification required this singleton process-isolation sequenc
 
 ## FW-P2-70 — macOS Target, Bundle and Runtime-Metadata Hardening
 
-**Status:** Maintenance  
+**Status:** Maintenance
 **Depends on:** A stable application target
 
 **Version/build presentation slice completed 2026-07-20:** Settings now derives `CFBundleShortVersionString` and `CFBundleVersion` from the application bundle, presents them as `version (build)`, and falls back deterministically when metadata is unavailable. Debug and Release built bundles both expose `1.0 (1)`. All other target and bundle hardening remains open.
@@ -2029,7 +1957,7 @@ No bundle-inclusion defect may be claimed solely from Xcode navigator visibility
 
 ## FW-P2-71 — Repository and Xcode Metadata Hygiene
 
-**Status:** Maintenance  
+**Status:** Maintenance
 **Depends on:** None
 
 Remove user-specific and generated development state from repository history and prevent its reintroduction.
@@ -2057,7 +1985,7 @@ Repository hygiene checks must distinguish source-controlled shared Xcode config
 
 ## FW-P3-01 — Identifier Confidence Scoring
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Approved non-authoritative evidence policy
 
 Confidence must never silently promote weak evidence into verified identity.
@@ -2066,28 +1994,28 @@ Confidence must never silently promote weak evidence into verified identity.
 
 ## FW-P3-02 — Identifier Aliases and Alternate Institution Identifiers
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Identifier ownership and conflict semantics
 
 ---
 
 ## FW-P3-03 — User-Visible Identity History
 
-**Status:** Idea  
+**Status:** Idea
 **Depends on:** Durable identity provenance
 
 ---
 
 ## FW-P3-04 — Administrative Identifier Correction
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Reversible identity mutations and audit history
 
 ---
 
 ## FW-P3-05 — Identity Provenance Timeline
 
-**Status:** Idea  
+**Status:** Idea
 **Depends on:** Durable identity history
 
 ---
@@ -2096,7 +2024,7 @@ Confidence must never silently promote weak evidence into verified identity.
 
 ## FW-P3-06 — Financial Intelligence Engine
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Reliable financial truth, provenance, rules and explanation foundations
 
 Define the architecture for deterministic, auditable financial conclusions that operate above imported source data.
@@ -2121,7 +2049,7 @@ The engine must not become a black-box source of financial truth.
 
 ## FW-P3-07 — Financial Replay, Timeline and Money-Journey Reconstruction
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Reliable transaction identity, transfer matching, provenance and financial-intelligence foundations
 
 Reconstruct how money moved through the user’s financial entities over time.
@@ -2141,7 +2069,7 @@ Internal transfers must never be presented as new income or expense.
 
 ## FW-P3-08 — Salary and Planning Workspace
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Salary-slip support, reliable transaction identity, account relationships and planning-domain decisions
 
 Create the monthly Salary & Planning workspace described by Product Vision.
@@ -2163,7 +2091,7 @@ This module requires an approved UI revision because it is not part of the curre
 
 ## FW-P3-09 — Upcoming Obligations and Cash-Flow Planning
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Recurring-transaction detection, reliable categories, account balances and planning semantics
 
 Present upcoming financial obligations such as:
@@ -2188,7 +2116,7 @@ These candidates remain blocked until transaction integrity, account identity an
 
 ## FW-P3-10 — Spending Analytics
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Reliable duplicate handling and categorization
 
 Includes:
@@ -2201,49 +2129,49 @@ Includes:
 
 ## FW-P3-11 — Budgets
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Stable categorization and analytics
 
 ---
 
 ## FW-P3-12 — Financial Goals
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Stable reporting model
 
 ---
 
 ## FW-P3-13 — Forecasting
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Reliable historical data and approved explainability standards
 
 ---
 
 ## FW-P3-14 — Smart Alerts
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Reliable categories, rules or forecasting inputs
 
 ---
 
 ## FW-P3-15 — Custom Reports
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Stable analytics
 
 ---
 
 ## FW-P3-16 — Tax Views
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Jurisdiction and supported-data decisions
 
 ---
 
 ## FW-P3-17 — CSV and Report Export
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Export schema and privacy policy
 
 Provide user-facing exports of reports and selected financial views. Full machine-readable domain export remains governed by `FW-P3-35`.
@@ -2252,14 +2180,14 @@ Provide user-facing exports of reports and selected financial views. Full machin
 
 ## FW-P3-18 — Net-Worth History
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Multi-account, investment and multi-currency foundations
 
 ---
 
 ## FW-P3-19 — Salary-Slip Verification Against Imported Transactions
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Salary-slip document support, reliable account identity and transaction reconciliation semantics
 
 Use imported salary-slip data to help verify corresponding bank transactions.
@@ -2278,7 +2206,7 @@ A salary slip must not silently create, modify or replace a bank transaction.
 
 ## FW-P3-19A — Liabilities, Loans and Financial Health
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Liability domain models, reliable account balances, obligations and multi-currency reporting
 
 Support durable representation and understandable presentation of:
@@ -2301,56 +2229,56 @@ Financial-health conclusions must show the underlying deterministic calculation 
 
 ## FW-P3-20 — Mutual-Fund Holdings
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Investment domain model and approved fixtures
 
 ---
 
 ## FW-P3-21 — ETF and Stock Holdings
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Investment domain model and approved fixtures
 
 ---
 
 ## FW-P3-22 — Brokerage Support Including IBKR
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Brokerage parsing and account-identity decisions
 
 ---
 
 ## FW-P3-23 — Folio and Broker Identifier Support
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Investment identity architecture
 
 ---
 
 ## FW-P3-24 — Portfolio Timeline and Performance
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Reliable holdings and investment-transaction history
 
 ---
 
 ## FW-P3-25 — Asset Allocation
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Reliable holdings
 
 ---
 
 ## FW-P3-26 — Net-Worth Integration
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Investments and multi-currency reporting
 
 ---
 
 ## FW-P3-27 — Optional Market-Data Refresh
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Investment model and offline-first cache policy
 
 Support optional market-data refresh while preserving:
@@ -2368,7 +2296,7 @@ Online market data remains optional. Core portfolio history must remain usable o
 
 ## FW-P3-28 — Manual Holdings and Custom-Fund Valuation
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Investment domain model, valuation provenance and reversible editing
 
 Support holdings that cannot be fully reconstructed from imported brokerage documents or market-data providers.
@@ -2389,7 +2317,7 @@ Manual entries must never overwrite imported source records.
 
 ## FW-P3-29 — Retirement and ISP Tracking
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Investment, contribution, employer-benefit and planning-domain models
 
 Support retirement and employer-sponsored investment plans, including ISP-style arrangements.
@@ -2413,7 +2341,7 @@ Rules must be explainable and configurable rather than inferred from institution
 
 ## FW-P3-30 — Multi-Currency Account and Transaction Presentation
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Sprint 44 Money boundary and a separately approved display or conversion scope
 
 Present native and derived monetary values using locale-aware formatting, including:
@@ -2433,7 +2361,7 @@ Sprint 44 supplies the minimum safe grouped native-currency presentation. Conver
 
 ## FW-P3-31 — Exchange-Rate Storage
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Approved rate-source and offline-cache policy
 
 Rates must be versioned and immutable, carry provider provenance and validity time, support offline cache and expose stale or missing states.
@@ -2444,7 +2372,7 @@ The presence of an `exchange_rates` table in the database design does not activa
 
 ## FW-P3-32 — Historical FX Conversion
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P3-31`
 
 Provide derived historical conversion without overwriting native values.
@@ -2453,7 +2381,7 @@ Provide derived historical conversion without overwriting native values.
 
 ## FW-P3-33 — User-Selectable Reporting Currency
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** `FW-P3-31` and `FW-P3-32`
 
 Provide selectable reporting currency while preserving native imported amounts.
@@ -2462,7 +2390,7 @@ Provide selectable reporting currency while preserving native imported amounts.
 
 ## FW-P3-34 — Currency-Aware Analytics and Net Worth
 
-**Status:** Blocked  
+**Status:** Blocked
 **Depends on:** Analytics and reporting-currency foundations
 
 Provide current valuation conversion and consolidated reporting only from auditable derived values; native values remain authoritative.
@@ -2471,7 +2399,7 @@ Provide current valuation conversion and consolidated reporting only from audita
 
 ## FW-P3-35 — Structured Data Export
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Export schema and privacy policy
 
 Provide a machine-readable export of supported LedgerForge domain data. User-facing report and selected-view exports remain governed by `FW-P3-17`.
@@ -2480,7 +2408,7 @@ Provide a machine-readable export of supported LedgerForge domain data. User-fac
 
 ## FW-P3-36 — Verified Backup, Restore and Disaster Recovery
 
-**Status:** Candidate  
+**Status:** Candidate
 **Depends on:** Stable database lifecycle and integrity-verification foundations
 
 Provide:
@@ -2501,7 +2429,7 @@ A backup is not considered trustworthy merely because a file was copied.
 
 ## FW-P3-37 — Optional Encrypted Sync
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Backup, encryption, conflict resolution and explicit opt-in architecture
 
 LedgerForge must remain fully functional without synchronization.
@@ -2510,14 +2438,14 @@ LedgerForge must remain fully functional without synchronization.
 
 ## FW-P3-38 — Open API and External Integrations
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Stable public data contracts and security policy
 
 ---
 
 ## FW-P3-39 — External Import Plugin Architecture
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Stable parser, reader, fixture, security and public extension contracts
 
 Investigate an optional plugin architecture for adding financial institutions, document families or import adapters without modifying LedgerForge’s core application.
@@ -2540,7 +2468,7 @@ No external plugin system is approved until its security, signing, compatibility
 
 ## FW-P3-40 — Multiple Workspaces and Independent Ledgers
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Workspace-scoped identity, fingerprint, settings and repository-isolation decisions
 
 Investigate support for more than one independent local financial workspace.
@@ -2563,7 +2491,7 @@ No cross-workspace matching or aggregation may occur implicitly.
 
 ## FW-P3-41 — Portable Workspace Folder
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** `FW-P3-36`, workspace isolation and safe coordination of external file changes
 
 Investigate storing or exporting a complete LedgerForge workspace in a user-selected local folder that may itself be synchronized by services such as iCloud Drive, OneDrive, Dropbox or Synology tools.
@@ -2585,7 +2513,7 @@ The design must address:
 
 ## FW-P3-42 — Cross-Platform Desktop Strategy
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Stable public domain, persistence and presentation boundaries
 
 Evaluate whether LedgerForge should eventually support Windows or Linux while preserving macOS as the primary product.
@@ -2605,7 +2533,7 @@ No portability claim may be made without an approved architecture and working ev
 
 ## FW-P3-43 — Local-Data Encryption at Rest
 
-**Status:** Research  
+**Status:** Research
 **Depends on:** Database lifecycle, backup, credential and recovery architecture
 
 Investigate encryption of LedgerForge financial data at rest.
