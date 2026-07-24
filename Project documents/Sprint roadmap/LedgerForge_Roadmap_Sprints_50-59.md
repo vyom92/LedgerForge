@@ -8,9 +8,10 @@
 **Visible to Work:** No
 **Visible to Codex:** No
 **GitHub status:** Backup copy only, never repository authority
-**Repository baseline reviewed:** `main@bdb51b0ddcdde097e456a16bab7f0bf999fd595b`
+**Current pushed baseline:** `main@7ee20a909038d1088f830a6ea588311625f415e5`
+**Discovery baseline:** `main@bdb51b0ddcdde097e456a16bab7f0bf999fd595b`
 **Latest verified implementation:** Sprint 53 at `11035461ce3de0f11ae5262bbc8a38b9639607b2`
-**Last reconciled:** 2026-07-23
+**Last reconciled:** 2026-07-24
 **Cycle:** Sprints 50–59
 
 This file forecasts and records Chat-user planning. It does not authorize Work, Codex, implementation, Git operations, migrations, ADR changes or repository edits.
@@ -66,6 +67,7 @@ When such a defect appears:
 | **Forecast** | Strong current expectation, not authorized |
 | **Conditional** | Depends on named earlier evidence or implementation |
 | **Discovery** | Read-only evidence sprint; no implementation by default |
+| **Ready for planning** | Discovery and architecture are sufficient for Chat planning; sequencing and execution remain conditional |
 | **Correction inserted** | `A/B` sprint interrupts the sequence |
 | **Deferred** | Still valid, moved beyond this cycle |
 | **Replaced** | Current evidence invalidated or absorbed the earlier forecast |
@@ -91,8 +93,9 @@ Keep the active roadmap concise. Preserve detailed discussion in the log only wh
 ## Active project state
 
 - **Latest completed sprint:** Sprint 53 — Axis Shared Bank-Account CSV Profile and NRO Identity Closure.
-- **Current pushed baseline:** `main@bdb51b0ddcdde097e456a16bab7f0bf999fd595b`.
-- **Latest verified implementation:** `11035461ce3de0f11ae5262bbc8a38b9639607b2`; the pushed baseline is one documentation-only commit ahead.
+- **Current pushed baseline:** `main@7ee20a909038d1088f830a6ea588311625f415e5`.
+- **Discovery baseline:** `main@bdb51b0ddcdde097e456a16bab7f0bf999fd595b`.
+- **Latest verified implementation:** `11035461ce3de0f11ae5262bbc8a38b9639607b2`; the current pushed baseline is two documentation/maintenance commits ahead and contains no later verified implementation.
 - **Current migration:** V6.
 - **Current accepted ADR:** ADR-039 — Trusted Statement Dates and Durable Source Provenance.
 - **Trusted production import:** approved Axis NRE and supplied shared-layout Axis NRO CSV evidence through one `AxisBankAccountParser`.
@@ -101,7 +104,8 @@ Keep the active roadmap concise. Preserve detailed discussion in the log only wh
 - **Durable account identity:** distinct verified full institution account identifiers create and retain distinct accounts; shared customer context is non-authoritative.
 - **Latest recorded automated result:** 394 top-level tests across 48 suites, zero failures and zero unexpected skips at the Sprint 53 implementation baseline.
 - **Latest recorded runtime result:** two durable Axis accounts, 118 transactions after relaunch hydration, exact duplicate handling, supported overlap blocking, neutral presentation and zero remaining LedgerForge processes.
-- **Fresh discovery verification:** none. The read-only campaign and documentation cleanup performed no build, test, runtime, migration, ADR or implementation work.
+- **Latest discovery campaign:** completed against `main@bdb51b0ddcdde097e456a16bab7f0bf999fd595b`; it changed candidate readiness and found `FW-P0-24`, but performed no build, test, runtime, migration, ADR or implementation work.
+- **Latest repository maintenance:** `7ee20a909038d1088f830a6ea588311625f415e5` reconciled planning state and removed tracked Xcode user data; it did not change production implementation.
 - **Current blocking defect:** `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness`.
 - **Current next planning outcome:** Sprint 54, a standalone P0 presentation-integrity repair.
 - **Why this is not Sprint 53A:** the defect is verified against current code but has not been shown to arise from Sprint 53 implementation or acceptance.
@@ -125,9 +129,9 @@ Keep the active roadmap concise. Preserve detailed discussion in the log only wh
 | **54** | Exhaustive, typed and privacy-safe durable import-outcome presentation | `FW-P0-24` | **Forecast** | High |
 | **55** | Define explicit partial-overlap review and unique-transaction import semantics | `FW-P1-25`, possible `FW-P2-12` relationship | **Discovery** | Medium-high |
 | **56** | Implement one bounded partial-overlap import family without silent omission | `FW-P1-25` | **Conditional** | Medium |
-| **57** | Durable categories and manual single-transaction classification | `FW-P2-20`, ADR-036 | **Conditional** | Medium |
-| **58** | DEBUG-only deterministic import verification workspace | `FW-P1-40`, bounded `FW-P1-37` | **Conditional** | Medium |
-| **59** | Production PDF and binary-fingerprint architecture discovery | `FW-P1-10`, `FW-P1-18`, readiness for `FW-P1-16` | **Discovery** | Medium-low |
+| **57** | Durable categories and manual single-transaction classification | `FW-P2-20`, ADR-036 | **Ready for planning; sequencing conditional** | Medium-high |
+| **58** | DEBUG-only deterministic import verification workspace | `FW-P1-40`, bounded `FW-P1-37` | **Ready for planning; sequencing conditional** | Medium-high |
+| **59** | Select binary fingerprint authority and close the production-PDF architecture boundary | `FW-P1-18`, `FW-P1-10`, readiness for `FW-P1-16` | **Forecast: architecture decision** | Medium-high |
 
 Forecast confidence decreases with distance. Any further verified P0 defect or failed acceptance boundary overrides the sequence without disguising unrelated work as a corrective suffix.
 
@@ -460,14 +464,19 @@ Independent evidence must prove the unique subset and distinguish full import, p
 
 ## Sprint 57 — Durable Categories and Manual Classification
 
-**Status:** Conditional
+**Status:** Ready for planning; sequencing conditional
 **Candidate:** `FW-P2-20`
+**Canonical readiness:** Ready for planning
 **Architecture:** ADR-036
 **Migration expectation:** V7
 
 ### Outcome
 
 Users can manage durable workspace categories and assign, change or clear one category on one persisted transaction without changing imported financial truth.
+
+### Remaining planning gate
+
+Approve the category UI-behavior supplement and revalidate the implementation prompt against the then-current V6/ADR-039 repository baseline. No further broad architecture discovery is expected unless that revalidation exposes a named gap.
 
 ### Expected scope
 
@@ -506,12 +515,17 @@ Persisted transaction identity must survive hydration, provider reconstruction a
 
 ## Sprint 58 — Deterministic Import Verification Workspace
 
-**Status:** Conditional
+**Status:** Ready for planning; sequencing conditional
 **Candidates:** `FW-P1-40` plus bounded `FW-P1-37`
+**Canonical readiness:** Both candidates are Ready for planning
 
 ### Outcome
 
 Provide one DEBUG-only workspace that launches approved sanitized fixtures through the ordinary production URL-driven import path and displays clearer typed failure summaries without creating alternate financial logic.
+
+### Planning note
+
+The backlog-readiness campaign completed the broad candidate discovery. Chat should prepare the bounded implementation prompt directly unless current repository revalidation reveals one precisely named unresolved boundary.
 
 ### Why combine
 
@@ -552,72 +566,107 @@ Launching a fixture must behave the same as manually selecting that file through
 
 ---
 
-## Sprint 59 — Production PDF and Binary-Fingerprint Discovery
+## Sprint 59 — Binary Fingerprint Authority and Production PDF Architecture
 
-**Status:** Discovery
-**Confidence:** Medium-low
+**Status:** Forecast, architecture decision
+**Candidates:** `FW-P1-18`, `FW-P1-10`, readiness implications for `FW-P1-16`
+**Canonical readiness:** Discovery complete for `FW-P1-18` and `FW-P1-10`; one architecture decision remains
+**Confidence:** Medium-high
 
 ### Outcome
 
-Determine the smallest safe path for one approved Axis PDF statement to enter the unified production pipeline, decide binary-document fingerprint authority and prepare the future cross-format equivalence acceptance boundary.
+Select the authoritative binary fingerprint representation and close the minimum architecture boundary required for one approved Axis PDF statement to become implementation-ready through the unified production import pipeline.
 
-### Candidates
+Sprint 59 is an architecture and implementation-readiness sprint. It does not repeat the completed broad PDF and fingerprint discovery and does not implement production PDF support by default.
 
-- `FW-P1-10 — Production PDF Statement Support`;
-- `FW-P1-18 — Binary-Document Fingerprint Semantics`;
-- readiness implications for `FW-P1-16 — Cross-Format Financial Equivalence`.
+### Decisions owned by Chat
 
-### Why combine for discovery
+- exact source bytes or another explicitly defined stable binary representation as exact-content authority;
+- immutable source-content ownership from preparation through confirmation;
+- algorithm identity and coexistence with `ledgerforge.raw-text.sha256.v1`;
+- metadata and container-change semantics;
+- commit-time fingerprint and source-content revalidation;
+- SQLite/In-Memory parity expectations;
+- privacy-safe diagnostics;
+- exact-document duplicate versus cross-format financial-equivalence boundaries;
+- whether PDF implementation is one bounded increment or requires a named prerequisite.
 
-Production PDF support cannot be planned safely without deciding:
+### Sequence
 
-- what representation owns exact binary duplicate identity;
-- how PDF extraction preserves date, order and transaction grouping;
-- how equivalent CSV and PDF representations preserve the same financial truth.
-
-The shared evidence boundary makes one discovery pass efficient. It does not authorize broad PDF implementation.
-
-### Work
-
-1. Verify the pushed baseline and approved PDF/CSV evidence.
-2. Trace sandbox access, extraction, classification, profile selection, identity, provenance, fingerprinting, validation and persistence.
-3. Decide exact source bytes versus another explicitly defined stable binary representation.
-4. Select one result:
-   - combined implementation-ready PDF slice;
-   - binary-fingerprint prerequisite first;
+1. Verify the exact pushed repository ref and the approved PDF/CSV evidence.
+2. Review the completed `FW-P1-18` and `FW-P1-10` discovery conclusions rather than commissioning the same trace again.
+3. Use Work only for one precisely named unresolved evidence gap that current GitHub and approved source evidence cannot establish efficiently.
+4. Chat selects the binary fingerprint authority and records the architecture contract.
+5. Chat classifies the future PDF implementation as:
+   - one combined implementation-ready slice;
+   - binary-fingerprint foundation first;
    - parser/profile prerequisite first;
-   - blocked by named source or oracle evidence.
+   - blocked by named evidence.
+6. Carry the approved implementation boundary into the 60–69 roadmap.
 
 ### Required evidence
 
 - approved PDF and matching CSV where equivalence is claimed;
 - source-to-fixture provenance;
-- independent financial truth for each format;
-- transaction count, direction, money, date, order, identifiers and balances;
-- sandbox-authorized production URL opening;
-- deterministic extraction and page/row order;
-- malformed, encrypted, image-only and unsupported outcomes;
-- raw-byte or explicitly approved alternative fingerprint semantics;
-- exact duplicate, revised document and cross-format distinction;
-- privacy, migration and ADR impact;
-- falsification cases.
+- independent financial truth for each representation;
+- deterministic sandbox-authorized production URL opening;
+- deterministic extraction, page order, row grouping, date and source order;
+- exact duplicate, revised-document and cross-format distinctions;
+- malformed, encrypted, image-only and unsupported behavior;
+- falsification cases for similar unsupported PDF layouts.
+
+### Acceptance
+
+Sprint 59 is accepted only when:
+
+1. one authoritative binary fingerprint representation is explicitly selected;
+2. its ownership, versioning, revalidation, provider-parity and privacy contracts are defined;
+3. no fingerprint is inferred from parsed transactions, financial totals, filenames, paths or presentation metadata;
+4. the PDF implementation combine/split boundary is deterministic;
+5. `FW-P1-16` remains blocked until two equivalent formats are production-supported;
+6. no production PDF support is claimed from extraction code or discovery alone.
 
 ### Excluded
 
-- production implementation by default;
+- production PDF implementation by default;
 - password entry, Keychain or OCR;
 - arbitrary institutions or card PDFs;
 - XLS/XLSX;
 - heuristic repair or AI interpretation;
-- declaring `FW-P1-16` complete before two formats are production-supported.
+- historical fingerprint reconstruction;
+- cross-format duplicate suppression before approved equivalence evidence;
+- declaring `FW-P1-16` complete.
 
 ### Stop conditions
 
-Stop if financial truth, extraction order, sandbox access or fingerprint authority cannot be established without inference from production parser output.
+Stop if:
+
+- the fingerprint authority remains ambiguous;
+- source-content ownership cannot survive preparation and confirmation;
+- financial truth or extraction order depends on production parser output as the sole oracle;
+- sandbox access cannot be verified through the production path;
+- the selected architecture silently generalizes support to unrelated PDFs;
+- password or OCR support is required for the chosen source.
 
 ### Cycle effect
 
-Sprint 59 closes the 50–59 cycle. The deterministic singleton build and runtime-launch entrypoint, any implementation-ready PDF result and unfinished parser expansion move into the 60–69 roadmap rather than being forced into this cycle for cosmetic completeness.
+Sprint 59 closes the 50–59 cycle. The approved PDF implementation boundary, singleton build/runtime entrypoint and all unfinished candidates move into the 60–69 roadmap without being squeezed into this cycle for numerical tidiness.
+---
+
+# 60–69 seed candidates
+
+This section preserves evidence from the backlog-readiness campaign without assigning sprint numbers or authorizing implementation. Chat must compare these groups against the then-current P0, P1, P2 and P3 queue when creating the 60–69 roadmap.
+
+| Possible coherent outcome | Candidates | Current state |
+|---|---|---|
+| Confirmed-persistence recovery and better validation guidance | `FW-P1-28`, `FW-P1-29` | Ready for planning; combine decision pending |
+| Transaction provenance and clearer detail presentation | `FW-P2-01`, `FW-P2-02` | Ready for planning; combine decision pending |
+| Transaction search and contextual controls | `FW-P2-03`, `FW-P2-53` | Ready for planning; combine decision pending |
+| Full account transaction-history navigation | `FW-P2-38` | Ready for planning |
+| Remove unsupported UI claims and strengthen privacy regression coverage | `FW-P2-42`, `FW-P2-66` | Ready for planning; combine decision pending |
+| Deterministic build, singleton launch and macOS smoke validation | `FW-P2-69` | Maintenance; discovery and implementation boundary still required |
+
+These are comparison groups only. Their ordering, combination and selection remain governed by current repository evidence and higher-priority defects.
 
 ---
 
@@ -644,8 +693,26 @@ Recalculate at launch. Current plausible candidates include:
 - `FW-P2-34 — Archive and Restore Account`;
 - `FW-P2-52 — User and Workspace Preferences`, limited to ordinary regional/display preferences;
 - `FW-P0-10 — Explain Account Match, No-Match and Conflict Outcomes`, only when independent of active import work;
-- `FW-P1-02 — HDFC Parser Family`, only after approved HDFC source evidence and sanitized fixtures exist;
 - other candidates proven independent at the launch baseline.
+
+### Source-ready but format-blocked candidate
+
+- `FW-P1-02 — HDFC Parser Family` has integrated clean-room bank-account
+  fixtures, manifests and expected financial baselines.
+
+  It is eligible for targeted discovery to determine:
+
+  - which approved HDFC layout and source format should be supported first;
+  - whether PDF or XLS provides the smallest safe production boundary;
+  - institution detection and statement classification requirements;
+  - parser/profile semantics;
+  - account-identity evidence;
+  - independent financial-truth and provenance acceptance;
+  - dependencies on `FW-P1-10`, `FW-P1-14` and `FW-P1-18`.
+
+  Production implementation remains blocked until the selected source format
+  has an approved reader, fingerprint authority and unified-pipeline acceptance
+  boundary.
 
 ### Excluded during this cycle
 
@@ -820,6 +887,35 @@ Rebuild the complete file with:
 - defer the singleton build and runtime-launch entrypoint to the 60–69 cycle;
 - pause lower-priority feature execution until the P0 defect is accepted or explicitly deferred;
 - authorize no implementation through this roadmap edit.
+
+## 2026-07-24 — Backlog-readiness campaign and current baseline reconciled
+
+### Repository basis
+
+- discovery baseline: `main@bdb51b0ddcdde097e456a16bab7f0bf999fd595b`;
+- current pushed baseline: `main@7ee20a909038d1088f830a6ea588311625f415e5`;
+- latest verified implementation: `11035461ce3de0f11ae5262bbc8a38b9639607b2`;
+- authoritative documents: current `PROJECT_STATE.md`, `FUTURE_WORK.MD` and accepted ADRs;
+- no fresh build, test, runtime, migration, ADR or production implementation evidence was generated by the campaign.
+
+### Evidence
+
+- `FW-P0-24` remains the next P0 repair and continues to gate lower-priority feature execution;
+- `FW-P2-20`, `FW-P1-37` and `FW-P1-40` are Ready for planning, although their roadmap sequence remains conditional;
+- `FW-P1-18` and `FW-P1-10` have completed discovery and each retains one architecture decision;
+- `FW-P1-28`, `FW-P1-29`, `FW-P2-01`, `FW-P2-02`, `FW-P2-03`, `FW-P2-38`, `FW-P2-42`, `FW-P2-53` and `FW-P2-66` provide seed candidates for the 60–69 comparison;
+- `FW-P2-69` retains the deterministic build, singleton launch and macOS smoke-validation follow-up;
+- HDFC remains blocked by missing approved source evidence and fixtures;
+- commit `7ee20a909038d1088f830a6ea588311625f415e5` reconciled planning documents and removed tracked Xcode user data without changing production implementation.
+
+### Decision effect
+
+- retain Sprints 54–58 in their current order;
+- strengthen Sprint 57 and Sprint 58 readiness labels without authorizing execution;
+- change Sprint 59 from broad discovery to the binary-fingerprint authority and production-PDF architecture decision;
+- add a non-numbered 60–69 seed table;
+- remove HDFC from DC-01's currently eligible candidate list;
+- authorize no Work, Codex or repository change through this roadmap replacement.
 
 ## Future log format
 

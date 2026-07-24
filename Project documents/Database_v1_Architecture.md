@@ -1,747 +1,1720 @@
 <!-- Project documents/Database_v1_Architecture.md -->
 
-# LedgerForge — Database v1 Architecture (Design Baseline)
+# LedgerForge — Database v1 Architecture
 
-Status: Database v1 design baseline, status-aligned through accepted ADR-034 and verified Sprint 42 repository implementation; later ADRs authorize no schema migration
+**Status:** Frozen database-design baseline, status-aligned through ADR-039 and verified Sprint 53 implementation  
+**Status alignment reviewed:** 2026-07-24  
+**Repository ref reviewed:** `main@686e3b91bfbf9459a38e9137abee6a2588ecec7f`  
+**Latest verified implementation:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` — Sprint 53  
+**Current registered migration:** V6  
+**Production database:** SQLite behind repository and provider boundaries
 
-This is an approved design baseline, not an inventory of production-supported formats or fully populated production tables. Current verified implementation state belongs in `PROJECT_STATE.md`.
+## Document Role
 
-Production import is verified only for the approved Axis Bank NRE CSV layout. PDF reading and statement-understanding components are foundation-only; production PDF, password workflows, XLS, XLSX, TXT and OCR remain planned. Schema capacity or a reader protocol does not establish end-user format or institution support.
+This document defines the approved LedgerForge database architecture and its current production-aligned persistence contracts.
 
-## Verified Production Alignment
+It is not:
 
-This section records accepted production extensions without rewriting the frozen database baseline or claiming that every design-baseline table is currently populated.
+- the executable DDL authority;
+- an inventory of every dormant table or column;
+- a claim of production parser or source-format support;
+- a backlog;
+- a migration script;
+- an implementation authorization.
 
-### ADR-030 exact-content duplicate authority
+The exact schema authority is the registered migration chain and the repository/DTO mapping implemented at the exact ref under review.
 
-- Algorithm: `ledgerforge.raw-text.sha256.v1`.
-- Reader-produced text is the exact authority; the digest is derived from the exact UTF-8 bytes before parsing or normalization.
-- Filename and path are excluded.
-- Exact lookup is advisory during preparation and authoritative during confirmed persistence.
-- No normalized-row, fuzzy or cross-format identity is claimed by this authority.
+When this document conflicts with:
 
-### ADR-031 transaction-event authority
+1. an accepted ADR;
+2. a registered migration;
+3. verified repository/provider behavior;
 
-- Algorithm: `ledgerforge.transaction-event.axis-upi-reference.v1`.
-- Scope is account-scoped Axis UPI P2A/P2M only.
-- Eligible references are exactly 12 ASCII digits.
-- Posting and credit-adjustment subtypes remain separate.
-- Only the privacy-safe digest paired with its algorithm persists; raw references and canonical payloads do not persist.
+the accepted ADR, migration and verified behavior control in that order.
 
-### Migration V3
+Current implementation state belongs in `PROJECT_STATE.md`. Unscheduled work belongs in `FUTURE_WORK.MD`.
 
-Migration V3 adds the bounded `transaction_event_identities` ownership table with:
+---
 
-- `id`
-- `transaction_id`
-- `account_id`
-- `document_id`
-- `import_session_id`
-- `algorithm`
-- `digest`
-- `created_at`
+# 1. Current Status Boundary
 
-The table enforces unique `(algorithm, digest)` and unique `(transaction_id, algorithm)` ownership, with restrictive foreign keys to transaction, account, document and import-session records. The composite `(account_id, import_session_id)` index supports account-scoped and account-plus-import-session lookup. Migration V3 does not create an independent import-session-only index. Migration V3 performs no historical backfill and leaves existing event-identity ownership empty.
+## 1.1 Verified production import
 
-SQLite and In-Memory providers maintain parity. Accepted event ownership is persisted atomically with the accepted import history; rejected attempts do not create ownership records. No raw event reference, canonical payload or private financial evidence is stored.
+Production import support is limited to the approved shared Axis bank-account CSV grammar represented by:
 
-### Migration V4 and durable import attempts
+- the approved Axis Bank NRE CSV evidence;
+- the supplied shared-layout Axis Bank NRO CSV evidence.
 
-Migration V4 adds the bounded `import_attempts` ledger. Attempt rows are workspace-scoped and carry versionable outcome, coverage, account-decision, guidance and persistence values, plus optional trusted account, session and document relationships. Workspace-scoped history is read newest-first. Only authoritative completed successful sessions may be backfilled as successful attempts; rejected history is never invented.
+Both use one production `AxisBankAccountParser`.
 
-Successful attempts are persisted atomically with successful import history. Rejected attempts remain distinct from successful import sessions and may be recorded without financial mutation. Attempt history excludes raw source content, identifiers, references, fingerprints, event digests, unrestricted narration, paths and localized errors. SQLite and In-Memory providers enforce equivalent behavior.
+New supported imports emit:
 
-### Migration V6 trusted statement dates and source provenance
+```text
+axis.bank-account.csv
+version 1
+```
 
-Migration V6 establishes the first trusted statement-date/provenance graph. `transactions.posted_date` holds strict `YYYY-MM-DD` `StatementDate` text; `financial_date_role` and `statement_timezone_evidence` preserve separate date semantics and bounded timezone evidence. `normalized_documents.profile_id/profile_version`, `normalized_rows.record_digest`, and existing normalized-row/transaction link tables preserve document-scoped ordinal and bounded digest without unrestricted source-row text. A nonempty V5 financial graph fails the V6 preflight with a pre-production reset requirement; no historical value is repaired, inferred or deleted. SQLite and In-Memory confirmed-import publication are atomic and parity-tested.
+Historical durable provenance using:
 
-Production transaction persistence currently stores one authoritative native amount and currency pair. Original merchant amount and currency, statement conversion evidence, statement-provided FX rates and fee decomposition remain unpersisted card evidence under ADR-034 and require the completed ADR-033 Money boundary plus later persistence design; they are not production-supported.
+```text
+axis.nre.csv
+version 1
+```
 
-### Currency and exchange-rate schema capacity
+remains readable and is not rewritten merely to adopt the neutral forward profile.
 
-The `currencies` and `exchange_rates` tables are currently inactive schema capacity, not production currency or conversion authorities. Under ADR-033, one reviewed, versioned, compiled offline catalog is the sole semantic authority for supported currency membership and fraction digits. The database `currencies` table must not override or compete with that catalog. Production import mapping and hydration remain limited to the supported INR path. No production exchange-rate repository, conversion workflow or reporting-currency total is established by the presence of those tables.
+No broader Axis, PDF, XLS, XLSX, card, HDFC, CBQ, American Express or other institution support is established by this database design.
 
-Sprint 44 implements the ADR-033 boundary without a schema migration: trusted writes and hydration require canonical catalog-scale decimal text plus exact agreeing minor units and canonical currency. Disposable development and test databases may be recreated or reseeded to the contract; this is not a production-history migration or repair.
+## 1.2 Current migration and accepted architecture
 
-### ADR-034 card evidence boundary
+The active registered migration chain ends at V6.
 
-Card evidence remains unpersisted. The current database schema establishes no persistence contract for card evidence, instrument sections, summaries, original Money, printed FX, fee, markup or tax components. ADR-034 authorizes no migration, JSON persistence decision, durable card-instrument table, card summary table or transaction schema change. Persistence shape waits for the completed Money implementation and concrete card query and hydration requirements with SQLite/In-Memory parity.
+The current database architecture includes verified implementation of:
 
-## Summary
+- versioned exact-content document fingerprints;
+- bounded transaction-event identity;
+- durable import-attempt history;
+- provider-owned atomic confirmed import;
+- workspace-scoped financial-identifier ownership;
+- accepted-import identifier observations;
+- exact `Money` persistence and hydration;
+- strict statement-date semantics;
+- durable document-scoped source order and provenance;
+- parser-profile provenance;
+- fail-closed migration-chain verification;
+- canonical repository-to-runtime hydration;
+- SQLite and In-Memory parity within accepted boundaries.
 
-This document defines the LedgerForge Database v1 architecture. It is a vendor-neutral, SQLite-targeted design that fulfills the project's ADRs, Architecture_v1.0, Product Vision and Engineering Standards. The design prioritizes:
+Accepted but unimplemented database architecture includes:
 
-- Preservation of imported financial truth and native currency (ADR-008)
-- Validation-before-persistence (ADR-010)
-- Format-independence (ADR-011)
-- Traceability and auditability for every imported value (ADR-004, ADR-007)
-- Extensibility for future features (ExchangeRateStore, Money type, synchronization)
-- Repository-backed runtime hydration as the only approved persistence-to-presentation boundary
+- document-scoped card-statement evidence under ADR-034;
+- categories and current transaction-category assignment under ADR-036;
+- financial-mutation planning, authorization and family-specific audit under ADR-037.
 
-## Top-level goals
+Acceptance does not create tables, migrations or production behavior.
 
-- Provide a format-neutral schema capable of mapping current CSV and future PDF, XLS/XLSX or TXT Reader outputs into RawDocument/row-level ingestion records (`normalized_documents` + `normalized_rows`) when those persistence paths are implemented.
-- Enable deterministic statement fingerprinting and deduplication.
-- Persist validation metadata so only validated imports become trusted application data (transactions marked trusted).
-- Preserve native currency at every level and store exchange rates separately and versioned.
-- Support efficient queries for dashboards and full-text search for payee/description.
-- Clearly separate Source Truth, Derived Data and Presentation throughout the persistence layer.
-- Preserve the approved presentation path: Repository Persistence → RepositoryStoreHydrator → Runtime Stores → ViewModels → Views.
+## 1.3 Current source-format boundary
 
-## Import Coordination
+The repository contains fixture and extraction foundations for PDF and spreadsheet families.
 
-LedgerForge uses an ImportCoordinator as the orchestration layer for every financial document import.
+Those foundations do not activate:
 
-The ImportCoordinator is responsible for:
+- production PDF persistence;
+- binary-document fingerprint authority;
+- production XLS or XLSX readers;
+- production source-file archival;
+- OCR;
+- password storage;
+- production card persistence;
+- cross-format duplicate suppression.
 
-- Receiving import requests.
-- Resolving optional passwords through PasswordProvider.
-- Selecting the appropriate Document Reader.
-- Invoking the selected Document Reader.
-- Creating ImportSessions.
-- Coordinating Institution Detection.
-- Coordinating Statement Classification.
-- Coordinating Parser Selection.
-- Coordinating Validation.
-- Coordinating Fingerprinting & Duplicate Detection after successful validation.
-- Coordinating repository persistence for validated, non-duplicate domain objects.
-- Reporting progress and import outcomes to the user interface.
+Schema capacity, protocols and fixtures are not support.
 
-The ImportCoordinator never performs parsing, validation, fingerprinting, duplicate matching or business logic itself. It coordinates independent architectural components.
+---
 
-## Financial Truth
+# 2. Database Principles
 
-LedgerForge separates financial information into three layers:
+## 2.1 Durable financial truth
 
-Source Truth
+Accepted imported financial truth is durable and immutable.
 
-↓
+Trusted persisted values include, where source-supported:
 
-Derived Data
-
-↓
-
-Presentation
-
-Source Truth consists of imported financial information and is immutable.
-
-Derived Data consists of validation results, fingerprints, exchange-rate calculations and future analytical models. It may be regenerated whenever necessary.
-
-Presentation consists of dashboard calculations, currency conversion, reporting preferences and UI state.
-
-Every architectural decision must preserve this separation.
-
-Checklist — what this design baseline contains
-
-- Every required table and a description of its purpose
-- Columns, primary keys, foreign keys and recommended types
-- Indexes and full-text search recommendations
-- Entity relationships (ER summary)
-- Future-proofing and JSON metadata choices
-- Migration strategy and schema_migrations guidance
-- How imported documents map to accounts and transactions
-- Multi-currency support details
-- Canonical target mapping for CSV and future PDF, XLS/XLSX and TXT → RawDocument and row-level ingestion records
-- Validation metadata storage and workflow mapping
-- Detailed statement fingerprinting algorithm and schema
-- Security, operational and testing notes
-
-## Important design conventions
-
-- Use UUID (TEXT) primary keys for domain entities for offline-first portability and easier sync/merge later.
-- Preserve exact imported values: `amount_decimal` stores the canonical locale-independent, non-exponent numeric value at the compiled catalog's fraction scale; `amount_minor` stores its mandatory exact integer encoding for efficient queries. The representations must agree. Original lexical source text remains in raw or normalized source evidence where available.
-- Use JSON columns for flexible structured metadata where schema evolution or vendor-specific data is expected (normalized_json, profile metadata, validation_summary).
-- Immutable, append-only patterns for exchange_rates, import_sessions and fingerprints to preserve audit history.
-- Parent repository writes with an existing immutable workspace or account ID update only their DTO-owned columns in place. They must not emulate replacement through delete-and-insert behavior: dependent durable rows remain intact, and account columns outside `AccountDTO` ownership, including lifecycle and provenance fields, remain preserved. SQLite and In-Memory providers expose equivalent observable parent-write behavior.
-
-I. Schema (tables, columns, PKs, FKs, indexes)
-
-For each table below: I show the purpose, columns (with recommended types), primary key, foreign keys and suggested indexes.
-
-1) workspaces
-- Purpose: support multi-workspace or multi-profile usage on-device.
-- Columns:
-  - id TEXT PRIMARY KEY -- UUID
-  - name TEXT NOT NULL
-  - created_at DATETIME NOT NULL
-  - updated_at DATETIME
-- Indexes: PRIMARY KEY (id)
-- Notes: All domain tables include `workspace_id` foreign key where appropriate.
-
-2) institutions
-- Purpose: canonical registry of detected institutions.
-- Columns:
-  - id TEXT PRIMARY KEY -- UUID
-  - code TEXT UNIQUE -- canonical short code (e.g., "axis")
-  - name TEXT
-  - country TEXT
-  - created_at DATETIME
-- Indexes: UNIQUE(code)
-
-3) import_profiles
-- Purpose: represent parser profiles/layout versions used after Parser Selection (ADR-005)
-- Columns:
-  - id TEXT PRIMARY KEY -- UUID
-  - institution_id TEXT REFERENCES institutions(id) ON DELETE SET NULL
-  - name TEXT
-  - version TEXT
-  - canonical_signature TEXT -- optional compact layout signature
-  - metadata JSON -- column mapping, hints
-  - created_at DATETIME
-- Indexes: (institution_id), (name, version)
-- Notes: Immutable per-version; new profile versions insert new rows.
-
-Parser selection considers:
-
-Institution
-↓
-
-Document Type
-↓
-
-Layout Version
-↓
-
-Parser Version
-
-Parser versions are immutable.
-
-New statement layouts create new parser versions rather than modifying historical parser behaviour.
-
-4) documents
-- Purpose: metadata for original uploaded files (one row per physical file)
-- Columns:
-  - id TEXT PRIMARY KEY -- UUID
-  - workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE
-  - import_session_id TEXT REFERENCES import_sessions(id) ON DELETE SET NULL
-  - filename TEXT NOT NULL
-  - mime_type TEXT
-  - size_bytes INTEGER
-  - sha256 TEXT NOT NULL
-  - storage_path TEXT -- app-managed path/URI
-  - extracted_text_snippet TEXT -- optional
-  - page_count INTEGER
-  - statement_start_date DATE
-  - statement_end_date DATE
-  - document_type TEXT
-  - created_at DATETIME NOT NULL
-- Indexes:
-  - UNIQUE(sha256)
-  - (import_session_id)
-  - (workspace_id)
-- Notes: Prefer storing file blob on disk and reference path; keep sha256 to detect identical files.
-
-Recommended `document_type` values:
-
-- bank_statement
-- credit_card_statement
-- brokerage_statement
-- insurance_statement
-- salary_statement
-- tax_document
-- unknown
-
-5) document_fingerprints
-- Purpose: deterministic statement fingerprinting for duplicate detection
-- Columns:
-  - id TEXT PRIMARY KEY -- UUID
-  - document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE
-  - import_session_id TEXT REFERENCES import_sessions(id) ON DELETE SET NULL
-  - algorithm TEXT NOT NULL -- name of fingerprint algorithm
-  - fingerprint TEXT NOT NULL
-  - fingerprint_data JSON -- canonical data used to build fingerprint
-  - created_at DATETIME NOT NULL
-- Indexes:
-  - UNIQUE(algorithm, fingerprint)
-  - (document_id)
-- Notes: Used to mark duplicates and prevent duplicate trusted imports.
-
-6) import_sessions
-- Purpose: central record for each import attempt and authoritative validation metadata (ADR-010)
-- Columns:
-  - id TEXT PRIMARY KEY -- UUID
-  - workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE
-  - user_visible_name TEXT
-  - started_at DATETIME NOT NULL
-  - completed_at DATETIME
-  - importer_version TEXT
-  - reader_version TEXT
-  - parser_version TEXT
-  - layout_version TEXT
-  - source_filename TEXT
-  - num_documents INTEGER
-  - normalized_rows_count INTEGER
-  - parsed_transactions_count INTEGER
-  - validation_status TEXT NOT NULL CHECK (validation_status IN ('pending','passed','failed','warning'))
-  - validation_summary JSON -- aggregated counts, totalsByCurrency etc.
-  - validation_score REAL
-  - created_at DATETIME NOT NULL
-  - updated_at DATETIME
-- Indexes: (workspace_id), (started_at)
-- Notes: UI and services read this table to decide whether to mark transactions trusted. Only when validation_status='passed' should transactions be considered trusted for dashboards.
-
-These traceability columns (`reader_version`, `parser_version`, `layout_version`) are intended for long-term parser traceability and debugging: they allow an import session to be associated with the exact reader/parser/layout versions used to produce the normalized output and parsed candidates.
-
-7) normalized_documents
-- Purpose: persistent representation of Document Reader output (RawDocument) used for traceability and reprocessing (ADR-011, ADR-016)
-- Columns:
-  - id TEXT PRIMARY KEY -- UUID
-  - import_session_id TEXT NOT NULL REFERENCES import_sessions(id) ON DELETE CASCADE
-  - document_id TEXT REFERENCES documents(id) ON DELETE SET NULL
-  - normalized_json JSON NOT NULL -- canonical RawDocument
-  - schema_version TEXT
-  - primary_language TEXT
-  - created_at DATETIME
-- Indexes: (import_session_id)
-- Notes: Normalized_documents preserve reader output independent of parser.
-
-8) normalized_rows
-- Purpose: store per-row normalized data that parsers consume and used for traceability
-- Columns:
-  - id TEXT PRIMARY KEY -- UUID
-  - normalized_document_id TEXT NOT NULL REFERENCES normalized_documents(id) ON DELETE CASCADE
-  - row_index INTEGER NOT NULL
-  - row_original JSON NOT NULL -- keyed by normalized column names
-  - extracted_text TEXT -- OCR cell text
-  - created_at DATETIME
-- Indexes: UNIQUE(normalized_document_id, row_index)
-- Notes: Fundamental for audit, fingerprinting, and row-level validation.
-
-9) accounts
-- Purpose: canonical ledger accounts persisted through repositories and exposed through runtime stores (ADR-013)
-- Columns:
-  - id TEXT PRIMARY KEY -- UUID
-  - workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE
-  - name TEXT NOT NULL
-  - institution_id TEXT REFERENCES institutions(id) ON DELETE SET NULL
-  - account_type TEXT -- enum: bank, credit_card, brokerage, salary, cash, liability, etc.
-  - native_currency TEXT NOT NULL REFERENCES currencies(code)
-  - description TEXT
-  - created_at DATETIME NOT NULL
-  - closed_at DATETIME
-  - created_from_import_session_id TEXT REFERENCES import_sessions(id)
-- Indexes: (workspace_id), (institution_id), (native_currency)
-- Notes: Durable identity is the immutable repository account ID. Only Statement Parsers may produce verified financial identifiers. Filenames, display names, institution labels, masked values, suffixes and other weak evidence must not define identity or automatically resolve an account.
-
-10) account_identifiers
-- Purpose: store normalized financial identifiers with strength, verification and provenance so repository resolution can use parser-produced verified strong identifiers deterministically
-- Columns:
-  - id TEXT PRIMARY KEY
-  - account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE
-  - scheme TEXT NOT NULL -- e.g., 'iban','institution_account_id'; weak kinds may be stored only with explicit weak classification
-  - identifier TEXT NOT NULL -- normalized identifier
-  - provenance JSON -- parser provenance plus strength and verification metadata in the current schema representation
-  - created_at DATETIME NOT NULL
-- Indexes: (scheme, identifier)
-- Notes: Automatic resolution uses only verified strong identifiers and remains workspace-scoped through the owning account. Masked numbers, suffixes, filenames, display names and institution labels cannot be promoted or used as verified matching keys. Parsers create identifiers; coordinators and persistence only transport or store them.
-
-11) transactions
-- Purpose: canonical parsed transactions persisted through repositories and exposed through runtime stores (ADR-013). Transactions keep native currency and are flagged trusted only after validation.
-- Columns:
-  - id TEXT PRIMARY KEY -- UUID
-  - workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE
-  - account_id TEXT REFERENCES accounts(id) ON DELETE SET NULL
-  - import_session_id TEXT REFERENCES import_sessions(id) ON DELETE SET NULL
-  - document_id TEXT REFERENCES documents(id) ON DELETE SET NULL
-  - original_row_id TEXT REFERENCES normalized_rows(id) ON DELETE SET NULL
-  - posted_date DATE NOT NULL
-  - value_date DATE
-  - description TEXT
-  - payee TEXT
-  - reference TEXT
-  - native_currency TEXT NOT NULL REFERENCES currencies(code)
-  - amount_minor INTEGER NOT NULL -- mandatory exact signed encoding at compiled-catalog scale; not independent financial truth
-  - amount_decimal TEXT NOT NULL -- canonical locale-independent, non-exponent exact numeric value at compiled-catalog scale
-  - direction TEXT NOT NULL CHECK (direction IN ('credit','debit'))
-  - running_balance_minor INTEGER -- optional exact account-currency running-balance encoding; no decimal companion is required by ADR-033
-  - is_reconciled INTEGER DEFAULT 0
-  - is_trusted INTEGER DEFAULT 0 -- set only after import_session validation passes
-  - trusted_at DATETIME
-  - created_at DATETIME NOT NULL
-  - updated_at DATETIME
-- Indexes:
-  - idx_transactions_account_date (workspace_id, account_id, posted_date)
-  - idx_transactions_import (workspace_id, import_session_id)
-  - idx_transactions_account_date_amount (account_id, posted_date, amount_minor)
-- Notes: Dashboards must query only is_trusted=1 rows for authoritative metrics.
-
-12) transaction_raw_rows
-- Purpose: mapping from transaction → normalized_rows used to construct it (1-to-many).
-- Columns:
-  - id TEXT PRIMARY KEY
-  - transaction_id TEXT NOT NULL REFERENCES transactions(id) ON DELETE CASCADE
-  - normalized_row_id TEXT NOT NULL REFERENCES normalized_rows(id) ON DELETE CASCADE
-  - contribution_type TEXT -- 'amount','date','description' etc.
-  - created_at DATETIME
-- Indexes: (transaction_id), (normalized_row_id)
-- Notes: Immutable mapping for full auditability.
-
-13) validation_issues
-- Purpose: per-import / per-row / per-transaction validation problem records (ADR-010)
-- Columns:
-  - id TEXT PRIMARY KEY
-  - import_session_id TEXT NOT NULL REFERENCES import_sessions(id) ON DELETE CASCADE
-  - normalized_row_id TEXT REFERENCES normalized_rows(id) ON DELETE SET NULL
-  - transaction_candidate_id TEXT REFERENCES transactions(id) ON DELETE SET NULL
-  - severity TEXT NOT NULL CHECK (severity IN ('error','warning','info'))
-  - code TEXT NOT NULL -- machine-readable code (e.g., ROW_MISSING_DATE)
-  - message TEXT NOT NULL
-  - field TEXT -- optional
-  - created_at DATETIME NOT NULL
-- Indexes: (import_session_id, severity), (normalized_row_id)
-- Notes: import_sessions.validation_summary aggregates these issues.
-
-14) exchange_rates
-- Purpose: versioned, auditable exchange rates (ADR-008)
-- Columns:
-  - id TEXT PRIMARY KEY
-  - workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE
-  - base_currency TEXT NOT NULL REFERENCES currencies(code)
-  - quote_currency TEXT NOT NULL REFERENCES currencies(code)
-  - rate_decimal TEXT NOT NULL -- exact decimal string
-  - rate_factor_numerator INTEGER -- optional
-  - rate_factor_denominator INTEGER -- optional
-  - valid_at DATETIME NOT NULL -- timestamp the rate is valid at
-  - source TEXT -- optional (provider)
-  - import_session_id TEXT REFERENCES import_sessions(id)
-  - created_at DATETIME NOT NULL
-- Indexes: (workspace_id, base_currency, quote_currency, valid_at)
-- Notes: Immutable; insert-only for version history.
-
-15) currencies
-- Purpose: inactive schema capacity for currency reference metadata; ADR-033 keeps the compiled offline catalog as the sole semantic authority
-- Columns:
-  - code TEXT PRIMARY KEY -- e.g., 'INR'
-  - numeric_code INTEGER
-  - name TEXT
-  - minor_unit INTEGER NOT NULL -- exponent (2 for cents)
-  - decimal_places INTEGER NOT NULL
-- Notes: Inactive in the ADR-033 increment. It must not override or compete with the compiled catalog. Activation or metadata seeding requires a separately reviewed migration decision.
-
-16) account_balance_snapshots
-- Purpose: snapshot account balances for quick historical queries
-- Columns:
-  - id TEXT PRIMARY KEY
-  - account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE
-  - snapshot_date DATE NOT NULL
-  - balance_minor INTEGER NOT NULL
-  - currency_code TEXT NOT NULL REFERENCES currencies(code)
-  - source_import_session_id TEXT REFERENCES import_sessions(id)
-  - created_at DATETIME NOT NULL
-- Indexes: (account_id, snapshot_date)
-- Notes: Snapshots must be derived from trusted transactions only.
-
-17) rules
-- Purpose: store automation rules and their provenance (read-only for imported transformation provenance)
-- Columns:
-  - id TEXT PRIMARY KEY
-  - workspace_id TEXT
-  - name TEXT
-  - rule_json JSON
-  - created_at DATETIME
-- Notes: Rules must not alter imported truth; they create enrichment metadata only.
-
-18) fts_transactions (FTS virtual table)
-- Purpose: full-text search over description, payee, reference
-- Columns:
-  - transaction_id TEXT
-  - description TEXT
-  - payee TEXT
-  - reference TEXT
-- Notes: Implement as SQLite FTS5 table with content=transactions for efficient search.
-
-19) attachments
-- Purpose: optional BLOBs (OCR images, thumbnails); prefer filesystem + references for large files
-- Columns:
-  - id TEXT PRIMARY KEY
-  - document_id TEXT REFERENCES documents(id)
-  - type TEXT
-  - blob BLOB
-  - created_at DATETIME
-- Notes: Avoid in-DB large binary storage unless necessary; prefer file storage + encryption.
-
-20) schema_migrations
-- Purpose: track migrations to support safe upgrades
-- Columns:
-  - id INTEGER PRIMARY KEY AUTOINCREMENT
-  - version INTEGER NOT NULL
-  - name TEXT
-  - applied_at DATETIME NOT NULL
-  - checksum TEXT
-- Notes: Tools must record migration application to support safe upgrades.
-
-II. Relationships (ER summary)
-
-- workspace 1 — * import_sessions
-- import_session 1 — * documents
-- import_session 1 — * normalized_documents
-- normalized_document 1 — * normalized_rows
-- normalized_row 1 — * transaction_raw_rows
-- import_session 1 — * transactions
-- document 1 — * document_fingerprints
-- account 1 — * account_identifiers
-- account 1 — * transactions
-- transactions 1 — * transaction_raw_rows
-- import_session 1 — * validation_issues
-- workspace 1 — * exchange_rates
-
-III. How imported documents map into accounts & transactions (traceability)
-
-1. User triggers import → create `import_sessions` row (`validation_status='pending'`).
-2. For each uploaded file, create a `documents` row with `sha256` and `storage_path`.
-3. Document Reader extracts the file into RawDocument.
-4. Persist RawDocument and row-level extraction output in `normalized_documents` and `normalized_rows`.
-5. Institution Detection, Statement Classification and Parser Selection determine the parser/profile before Statement Parser execution produces FinancialDocument and transaction candidates.
-6. ImportValidator validates the FinancialDocument and produces deterministic validation results.
-7. Fingerprinting & Duplicate Detection runs only after validation succeeds.
-8. Repository persistence is allowed only for validated, non-duplicate imports.
-9. When persistence succeeds: create or update the import session, resolve an account only from parser-produced verified strong identifiers (or create a new opaque repository identity when no match exists), persist trusted transactions through approved repository boundaries, and update runtime stores only through RepositoryStoreHydrator. Filenames, display names, institution labels and weak identifiers never resolve accounts.
-10. Dashboard, accounts, transaction browsing and report data must be loaded through repository-backed runtime state and include only trusted transactions to guarantee ADR-010 compliance.
-
-IV. Multi-currency support
-
-- Every monetary value retains its native currency (`transactions.native_currency`, `accounts.native_currency`).
-- For trusted transactions, store `amount_decimal` as the canonical locale-independent, non-exponent exact numeric value at compiled-catalog scale and `amount_minor` as its mandatory exact integer encoding. Neither may silently override the other when they disagree.
-- Source lexical amount and running-balance text remains in raw or normalized source evidence where available; canonical transaction columns preserve numeric financial truth rather than lexical formatting.
-- Optional `running_balance_minor` remains an exact encoding governed by the transaction and account native currency. ADR-033 requires no `running_balance_decimal` column.
-- Mapping and hydration use the same compiled catalog and exact conversion contract. Excess precision, overflow, malformed or unsupported codes and inconsistent account, transaction or running-balance currency relationships fail explicitly.
-- Aggregate presentation produces one total per `native_currency`, deterministically ordered by canonical code. No currencyless combined total is permitted without a separately approved FX domain.
-- `currencies` and `exchange_rates` remain inactive schema capacity. ADR-033 neither activates them nor authorizes conversion, exchange-rate persistence or reporting-currency totals.
-
-## Password Resolution
-
-Password management is outside the responsibility of Document Readers.
-
-The protocol boundary and locked-PDF reader interface are implemented foundations. The production default provider currently supplies no password; credential storage, password entry, per-file override and Keychain integration remain planned.
-
-The target workflow unlocks encrypted financial documents before extraction using institution-specific credentials stored securely within the operating system's secure credential storage.
-
-Document Readers always receive either an already-accessible document or the resolved password required to open it.
-
-Document Readers may apply a supplied password while extracting a document, but they never retrieve credentials or own password-storage, prompting or policy decisions.
-
-In the planned workflow, LedgerForge prompts the user when no stored credential succeeds.
-
-Successful credential profile updates remain planned.
-
-## OCR Strategy
-
-OCR is a future reader capability and is not implemented or production-supported.
-
-PDF Document Readers first determine whether a document contains extractable text.
-
-Pipeline:
-
-PDF
-↓
-
-Extractable text?
-
-├── Yes → Text Extraction
-
-└── No → OCR
-
-↓
-
-RawDocument
-
-↓
-
-Normal import pipeline
-
-OCR remains an implementation detail of the Document Reader.
-
-Downstream components remain unaware of whether OCR was required.
-
-V. Format-independence target: CSV, PDF, XLS/XLSX and TXT mapping
-
-- Document Readers convert each implemented file format into RawDocument. CSV is the current production path; PDF is foundation-only and XLS, XLSX, TXT and OCR are planned.
-- Institution Detection, Statement Classification and Parser Selection operate on extracted content independent of the original file format.
-- Statement Parsers produce FinancialDocument after parser selection.
-- normalized_rows persist row-level extracted content so downstream parsers, validators and stores can trace results regardless of file format.
-- `documents` preserves original file-level metadata for audit.
-
-VI. Validation metadata storage & workflow (ADR-010)
-
-- `import_sessions.validation_status` — authoritative import outcome (pending/passed/failed/warning).
-- `validation_issues` — fine-grained issues linked to rows or transaction candidates.
-- `import_sessions.validation_summary` — aggregated counts and totals by currency for quick UI summary.
-- Transactions derived from FinancialDocument remain untrusted until validation passes. When an import passes validation, the persistence coordinator writes trusted transactions through repository protocols and records `trusted_at` where supported.
-
-VII. Statement fingerprinting and duplicate identity
-
-The former normalized-row recommendation, `v1:normalized-rows-sha256`, fuzzy LSH/MinHash matching, cross-format identity and merge/ignore duplicate workflows are obsolete production recommendations. They are not implemented and must not be described as production behavior.
-
-ADR-030 is the production exact-content authority for reader-produced text. ADR-031 is the separate bounded Axis UPI transaction-event authority. Cross-format identity, normalized-row identity, fuzzy matching, merge/ignore workflows and broader duplicate management remain future, unimplemented concepts linked to their candidates in `FUTURE_WORK.MD`.
-
-VIII. Indexing & performance
-
-- Transactions: index `(workspace_id, account_id, posted_date)` and `(account_id, posted_date, amount_minor)` for timeline and range queries.
-- Documents: UNIQUE index on `sha256` for exact-file dedupe.
-- Document fingerprints: UNIQUE on `(algorithm, fingerprint)` to prevent duplicate insertion.
-- Normalized_rows: UNIQUE(normalized_document_id, row_index).
-- Account identifiers: index on `(scheme, identifier)` for fast account resolution.
-- Exchange rates: index `(workspace_id, base_currency, quote_currency, valid_at)`.
-- Full-text search: use an FTS5 virtual table for transactions' description, payee and reference fields.
-- For heavy analytical queries, create covering indexes as needed (e.g., networth by currency pre-aggregates) or use materialized views / snapshots (`account_balance_snapshots`).
-
-IX. Future-proofing decisions
-
-- Append-only and versioned records: exchange_rates, import_profiles, import_sessions and fingerprints are append-only to preserve auditability.
-- JSON metadata fields: allow schema evolution without constant DDL changes (normalized_json, import_profiles.metadata, import_sessions.validation_summary, fingerprint_data).
-- UUID PKs: useful for offline, sync and cross-platform portability.
-- Schema_version fields where content structure may change (normalized_documents.schema_version).
-- Additive migrations: prefer adding new columns/tables and backfilling data in background jobs.
-- Keep Document Reader output persisted (normalized_documents + normalized_rows) so automated re-parsing or later parser improvements can be applied without needing original file re-ingestion.
-
-X. Migration strategy
-
-- Use a `schema_migrations` table to record applied migrations.
-- Migration rules:
-  - Minor releases: additive changes only (new tables/columns/indexes) and background backfills.
-  - Major releases: prepare migration scripts that create new tables, copy transformed data, test, then swap.
-  - Always back up DB before running destructive migrations.
-- Example migration pattern for adding `amount_minor`:
-  1. Add column `amount_minor` (nullable).
-  2. Launch background job that reads transactions.amount_decimal and currencies.minor_unit and writes computed amount_minor.
-  3. After verification, make application rely on amount_minor and optionally mark column NOT NULL in a controlled migration.
-- Testing: maintain a migration test suite that contains sample DBs for each previous release and tests the upgrade path.
-
-## SQLite Configuration
-
-LedgerForge configures SQLite using production-safe defaults.
-
-Recommended configuration:
-
-- WAL journaling
-- Foreign key enforcement enabled
-- Busy timeout configured
-- Prepared statements
-- Parameterized queries only
-- Background write queue
-
-These settings are mandatory for production builds.
-
-XI. Security & privacy
-
-- Sensitive files (PDFs) should be stored encrypted on disk. Use OS-level secure storage APIs (Keychain/KeyStore) or SQLCipher for DB encryption in later phases.
-- Mask or encrypt personally identifiable fields where possible (full account numbers). Use `account_identifiers.provenance` to record which document provided the identifier.
-- Restrict metadata and document file access to the local user; backups / exports must be explicit and clearly indicated.
-
-XII. Operational considerations
-
-- Backups & exports: provide an export format that includes normalized_documents and transactions to enable restoration and debugging.
-- Retention & archival: allow configuration to archive or purge normalized_documents/normalized_rows older than N years while preserving transactions and essential provenance.
-- Concurrency: SQLite supports serialized writes; repository adapters should perform writes on background queues and batch updates.
-- Performance: use snapshots (`account_balance_snapshots`) for heavy dashboard queries; precompute aggregates offline.
-
-XIII. Reconciliation and user edits (auditability)
-
-- User edits must not overwrite original normalized data. Instead:
-  - Record corrections in a corrections/audit table referencing transaction_id with change_json and user_id, or
-  - Insert a compensating transaction with provenance marking it as user-correction.
-- Keep original transactions and normalized_rows for forensic inspection.
-
-XIV. Example SQL snippets (illustrative)
-
--- Transactions (illustrative)
-
-CREATE TABLE transactions (
-  id TEXT PRIMARY KEY,
-  workspace_id TEXT NOT NULL,
-  account_id TEXT,
-  import_session_id TEXT,
-  document_id TEXT,
-  original_row_id TEXT,
-  posted_date DATE NOT NULL,
-  value_date DATE,
-  description TEXT,
-  payee TEXT,
-  reference TEXT,
-  native_currency TEXT NOT NULL,
-  amount_minor INTEGER NOT NULL,
-  amount_decimal TEXT NOT NULL,
-  direction TEXT NOT NULL,
-  running_balance_minor INTEGER,
-  is_reconciled INTEGER DEFAULT 0,
-  is_trusted INTEGER DEFAULT 0,
-  trusted_at DATETIME,
-  created_at DATETIME NOT NULL,
-  updated_at DATETIME
-);
-CREATE INDEX idx_transactions_account_date ON transactions (workspace_id, account_id, posted_date);
-
--- Document fingerprints (illustrative)
-CREATE TABLE document_fingerprints (
-  id TEXT PRIMARY KEY,
-  document_id TEXT NOT NULL,
-  import_session_id TEXT,
-  algorithm TEXT NOT NULL,
-  fingerprint TEXT NOT NULL,
-  fingerprint_data JSON,
-  created_at DATETIME NOT NULL,
-  UNIQUE(algorithm, fingerprint)
-);
-
-XV. Testing & verification recommendations
-
-- Maintain approved fixtures for every production-supported institution and layout. The current Axis CSV fixture validates the production path; the Axis PDF fixture validates only the reader and statement-understanding foundations explicitly covered by tests until production PDF parsing and cross-format equivalence are implemented.
-- Add unit tests for the accepted exact reader-text fingerprint and Migration V3 ownership constraints. Normalized-row, fuzzy and cross-format identity tests remain future work.
-- Add migration tests for every schema change using sample DBs representing previous versions.
-
-XVI. Rationale: explanation of key design decisions
-
-1. Preserve native values and store canonical amount_decimal (TEXT) + exact amount_minor (INTEGER)
-   - Why: The exact numeric amount plus canonical native currency is authoritative financial truth. The decimal text is its canonical audit representation and the minor integer is its mandatory checked query encoding; disagreement is an integrity failure.
-2. Normalized_documents + normalized_rows
-   - Why: Document Readers vary by format; persisting RawDocument and row-level extraction output makes downstream detection, classification, parser selection, validation and audit workflows format-independent and maintainable (ADR-011, ADR-016).
-3. Fingerprinting and event ownership are governed by ADR-030 and ADR-031
-   - Why: Exact reader-text identity and bounded parser-verified Axis UPI event ownership preserve deterministic authority without claiming normalized-row, fuzzy or cross-format matching.
-4. Transactions can exist pre-validation but are not trusted until validation passes
-   - Why: Allows UI/UX to preview parsed candidates while enforcing ADR-010: dashboards use only validated/trusted transactions.
-5. Exchange rates as an append-only versioned table
-   - Why: Enables historical, auditable conversion and avoids overwriting past rates used in historical reports.
-6. Use JSON metadata fields
-   - Why: Reduce schema churn and permit storing parsing hints, profile definitions and normalized payloads that can evolve.
-7. UUID primary keys
-   - Why: Support offline-first workflows and future synchronization; reduce risk with merges and reconciliations.
-
-XVII. Risks and mitigations
-
-- Large DB size due to normalized row persistence
-  - Mitigation: compression, archival policies, optional purge of raw normalized rows after a retention period while preserving transactions + essential provenance.
-- Duplicate handling and fingerprint collision
-  - Mitigation: use versioned exact-content and bounded Axis UPI ownership algorithms; broader identity and management workflows remain future work.
-- Canonical Money persistence and hydration
-  - Mitigation: catalog-scale decimal text, exact minor-unit agreement and canonical currency are verified at both persistence and hydration; ADR-033 requires no schema migration.
-
-XVIII. Next steps (recommended)
-
-1. Keep the schema aligned with the canonical import pipeline as ADRs evolve.
-2. Add migration tests whenever schema changes are introduced.
-3. Add approved fixtures for each newly supported institution before treating parser behaviour as stable.
-4. Preserve RawDocument and row-level traceability for every supported file format.
-5. Review database implications before implementing PDF support, Insights & Analytics, Multi-Currency, Investments or document/institution persistence features.
-6. Treat UI shell, dashboard, accounts, transactions, import wizard shell, settings and developer console presentation work as database-neutral unless a future sprint explicitly proposes schema changes.
-
-XIX. Appendix: canonical fields and conventions
-
-- ID convention: all domain IDs are UUID v4 stored as TEXT.
-- Timestamps: store in UTC in ISO-8601 strings (DATETIME). Use created_at/updated_at on all persistent rows.
-- Currency fraction scale: use only the reviewed, versioned, compiled offline catalog. The database `currencies` table is inactive schema capacity under ADR-033.
-- Amount sign convention: amount_minor positive for credit into account, negative for debit (application must choose and document a consistent convention). Store explicit `direction` for clarity.
-- Validation policy: only `is_trusted=1` transactions are included in dashboard calculations. `is_trusted` is set in one atomic step after import validation completes successfully.
-
-XX. Maintenance checklist (for maintainers / reviewers)
-
-- [ ] Schema intent and primary entities remain aligned with current ADRs.
-- [ ] New import pipeline stages preserve RawDocument and row-level traceability.
-- [ ] Parser, validation and persistence changes preserve trusted-transaction rules.
-- [ ] New institution support includes approved reference fixtures.
-- [ ] Migration scripts and tests are added for every schema change.
-
-End of design baseline
-
-
---
-Created for Sprint 10 Phase 2A (architecture-only). Status-aligned through accepted ADR-034, verified Sprint 42 repository implementation and Sprint 46 parent-write safety without redesigning the Database v1 baseline; later ADRs authorize no schema migration. This document references ADR.md, Architecture_v1.0_Frozen.md, Engineering Standards.md, PROJECT_STATE.md and Product Vision.md as the authoritative design inputs.
+- owning account;
+- exact native-currency amount;
+- direction;
+- printed statement date;
+- bounded date-role and timezone evidence;
+- source-supported running balance;
+- accepted import session;
+- source document;
+- document-scoped source ordinal;
+- normalized-record digest;
+- parser profile ID and version;
+- transaction-event evidence;
+- exact-content fingerprint relationship.
+
+User-authored metadata remains separate from imported financial truth.
+
+## 2.2 Validation before accepted persistence
+
+Preview transactions are transient domain values.
+
+They are not inserted as durable transactions and later promoted merely by changing a trust flag.
+
+Accepted transaction rows are published only after:
+
+1. source reading;
+2. institution detection;
+3. statement classification;
+4. parser selection;
+5. immutable `FinancialDocument` construction;
+6. validation;
+7. duplicate and supported event evaluation;
+8. account and identity review;
+9. explicit confirmation;
+10. provider-owned transaction-time revalidation.
+
+Malformed, ambiguous, conflicting or unsupported trusted evidence fails closed.
+
+## 2.3 One durable authority
+
+SQLite is the production durable authority.
+
+Runtime stores are projections.
+
+Views, ViewModels, coordinators and stores must not become persistence authority.
+
+## 2.4 Canonical hydration
+
+`RepositoryStoreHydrator` is the only persistence-to-runtime boundary.
+
+Successful writes are followed by canonical hydration.
+
+Runtime stores are never patched manually to simulate a durable outcome.
+
+## 2.5 Native currency
+
+Every trusted monetary value retains its native currency and canonical scale.
+
+Conversion is derived and never replaces imported values.
+
+Mixed currencies are not silently aggregated.
+
+## 2.6 Immutable identity
+
+Repository IDs are opaque and immutable.
+
+Display names, filenames, institution labels, masked identifiers, suffixes, transaction similarity and runtime presentation IDs are not durable identity.
+
+## 2.7 Privacy-minimal persistence
+
+Persist only evidence required for:
+
+- financial truth;
+- identity;
+- duplicate protection;
+- source provenance;
+- validation and attempt semantics;
+- deterministic hydration;
+- approved audit.
+
+Do not persist unrestricted source text, raw canonical fingerprint payloads or diagnostics merely because storage is available.
+
+## 2.8 Fail closed
+
+The database layer does not invent:
+
+- historical fingerprints;
+- financial dates;
+- source order;
+- identifier observations;
+- parser provenance;
+- exchange rates;
+- category assignments;
+- card semantics;
+- repair history.
+
+---
+
+# 3. Persistence Topology
+
+```text
+Views
+    ↓
+ViewModels
+    ↓
+Runtime Stores
+    ↑
+RepositoryStoreHydrator
+    ↑
+Repository Protocols
+    ↑
+DatabaseProvider
+    ↑
+SQLite / approved In-Memory provider
+```
+
+Import persistence enters through a provider-owned confirmed-import operation rather than through a View or ViewModel composing independent repository writes.
+
+## 3.1 DatabaseProvider
+
+`DatabaseProvider` owns:
+
+- the installed repository set;
+- typed persistence state;
+- provider generation;
+- SQLite or intentional In-Memory selection;
+- persistence-unavailable state;
+- provider-owned confirmed-import execution;
+- provider-equivalent domain outcomes.
+
+Repositories captured from an earlier provider generation become stale after provider replacement.
+
+## 3.2 Repository protocols
+
+Repositories define domain-specific read and write boundaries.
+
+They do not expose a general transaction closure for arbitrary cross-domain writes.
+
+A coordinator must not simulate one atomic financial operation by calling several narrow repositories.
+
+## 3.3 SQLite provider
+
+SQLite remains an implementation detail behind repositories.
+
+Production publishes the provider only after:
+
+1. open succeeds;
+2. complete applied migration history validates;
+3. pending registered migrations execute;
+4. the final chain revalidates;
+5. repository construction succeeds.
+
+## 3.4 In-Memory provider
+
+The In-Memory provider is authoritative only within approved test or explicit Debug boundaries.
+
+Where parity is required, it must expose the same observable domain outcomes as SQLite, including atomic publication and rejection residue.
+
+## 3.5 Persistence unavailable
+
+Open, initialization, migration-integrity or migration-execution failure installs centrally rejecting unavailable repositories.
+
+Persistence unavailable is not an empty database.
+
+The application must not silently substitute a temporary In-Memory provider for failed production persistence.
+
+---
+
+# 4. Authoritative Schema Ownership
+
+The registered migrations are the exact DDL authority.
+
+This document records semantic contracts, not a second copy of SQL.
+
+A copied table definition in documentation becomes stale as soon as a migration changes:
+
+- a foreign-key action;
+- a uniqueness constraint;
+- an index;
+- a required column;
+- a check constraint;
+- a compatibility gate.
+
+Maintainers must inspect the exact migration chain and DTO mappers when exact columns or constraints matter.
+
+## 4.1 Logical production graph
+
+The current durable graph contains the following logical areas.
+
+| Area | Verified purpose |
+|---|---|
+| Migration history | Proves the complete registered schema chain and applied checksums |
+| Workspace | Scopes financial entities, attempts and identifier ownership |
+| Institution metadata | Supports bounded presentation and parser-related metadata |
+| Account | Immutable durable owner of financial history |
+| Financial identifier ownership | Stores parser-produced verified identifier ownership |
+| Identifier observation | Records accepted-import evidence for identifier ownership |
+| Imported document | Owns bounded durable document provenance |
+| Document fingerprint | Owns versioned exact-content identity |
+| Import session | Represents an accepted import session |
+| Import attempt | Represents bounded successful or rejected workflow outcome |
+| Transaction | Stores accepted trusted financial activity |
+| Transaction event identity | Owns approved cross-statement event evidence |
+| Normalized document | Owns parser profile provenance for one accepted document |
+| Normalized row | Owns document-scoped ordinal and privacy-minimal record digest |
+| Transaction/source relationship | Links a transaction to one or more normalized source records |
+| Currency and exchange-rate capacity | Dormant schema capacity, not active semantic authority |
+
+The current database contract does not require all original Sprint 10 design tables to be active or populated.
+
+---
+
+# 5. Import Persistence Lifecycle
+
+## 5.1 Preparation is read-only
+
+Preparation may:
+
+- read the authorized source;
+- detect institution;
+- classify statement family;
+- select parser/profile;
+- parse;
+- validate;
+- calculate exact-content fingerprint;
+- perform advisory duplicate lookup;
+- resolve advisory account identity;
+- prepare explicit account choice;
+- prepare supported event claims.
+
+Preparation must not:
+
+- create an accepted import session;
+- create an account;
+- attach an identifier;
+- reserve a fingerprint;
+- reserve a transaction-event identity;
+- insert trusted transactions;
+- mutate runtime stores.
+
+Cancellation before confirmed persistence creates no accepted financial graph.
+
+## 5.2 Explicit confirmation
+
+The user confirms one immutable prepared import.
+
+Confirmation binds the reviewed:
+
+- source fingerprint contract;
+- parser profile;
+- account decision;
+- identifier set;
+- transaction set;
+- validation result;
+- supported event claims.
+
+A stale preparation is not authority.
+
+## 5.3 Provider-owned atomic confirmed import
+
+The provider-owned transaction begins before authoritative confirmation-time claims are accepted.
+
+It revalidates:
+
+- provider generation;
+- workspace and account relationships;
+- current financial-identity resolution;
+- explicit no-match account choice;
+- identifier ownership;
+- exact fingerprint ownership;
+- supported transaction-event ownership;
+- parser profile provenance;
+- normalized source relationships;
+- complete accepted graph integrity.
+
+The accepted graph commits together or none of it commits.
+
+The graph may contain:
+
+- workspace creation or preservation;
+- account creation or preservation;
+- identifier ownership;
+- identifier observations;
+- imported document;
+- fingerprint;
+- import session;
+- normalized document;
+- normalized rows;
+- trusted transactions;
+- transaction/source relationships;
+- event identities;
+- successful import attempt.
+
+A losing or failed accepted operation leaves zero accepted account, identifier or financial residue.
+
+## 5.4 Rejected attempts
+
+Rejected attempts remain distinct from accepted import sessions.
+
+A bounded rejected attempt may be written after rejection or financial rollback.
+
+That audit write is best effort.
+
+Failure to record a rejected attempt must not:
+
+- create accepted data;
+- convert rejection to success;
+- conceal persistence unavailability.
+
+## 5.5 Post-commit hydration
+
+After successful durable commit, the workflow performs one forced canonical hydration.
+
+A committed graph followed by hydration failure remains durably committed.
+
+It must not be reported as an uncommitted import.
+
+Further work may be blocked until canonical reconciliation succeeds.
+
+---
+
+# 6. Durable Domain Contracts
+
+## 6.1 Workspace
+
+The workspace is the durable scope for:
+
+- accounts;
+- identifier ownership;
+- import attempts;
+- future categories;
+- future preferences.
+
+The current product may operate through one configured workspace, but persistence contracts remain workspace-scoped where approved.
+
+A workspace ID is immutable.
+
+Updating an existing workspace changes only DTO-owned metadata in place.
+
+It must not delete and recreate the parent.
+
+## 6.2 Account
+
+An account is the durable owner of imported financial history.
+
+Its repository identity is immutable.
+
+Account metadata may include bounded presentation values such as:
+
+- display name;
+- institution relationship;
+- account-family metadata;
+- native-currency metadata;
+- lifecycle fields where implemented.
+
+Updating an account with an existing ID changes only fields owned by the account DTO.
+
+It must preserve:
+
+- transactions;
+- documents;
+- import sessions;
+- identifiers;
+- identifier observations;
+- event identities;
+- provenance;
+- lifecycle fields outside the update contract.
+
+SQLite and In-Memory providers must expose equivalent parent-update behavior.
+
+## 6.3 Financial identifier ownership
+
+Only approved statement parsers may produce verified financial identifiers.
+
+Durable ownership is workspace-scoped.
+
+The accepted contract distinguishes:
+
+- ownership;
+- observation provenance;
+- presentation.
+
+A stored identifier may be:
+
+- already owned by the resolved account;
+- unowned and eligible for attachment;
+- owned by another account.
+
+Ownership by another account rejects the complete accepted import.
+
+Weak values are not promoted to strong identifiers.
+
+## 6.4 Identifier observations
+
+An accepted-import observation records bounded evidence that one accepted import supplied a trusted identifier for an account.
+
+Observation does not create another owner.
+
+Observation does not replace parser verification provenance.
+
+Historical observations are not reconstructed from:
+
+- account creation dates;
+- existing import sessions;
+- filenames;
+- masked values;
+- transaction history;
+- display metadata.
+
+## 6.5 Imported document
+
+The imported-document record owns bounded durable document provenance.
+
+It is not automatically an archive of the original file.
+
+The current architecture does not require durable storage of:
+
+- original file bytes;
+- security-scoped bookmark data;
+- arbitrary source paths;
+- extracted text snippets;
+- document thumbnails.
+
+Any future source-document archive requires separate decisions for:
+
+- encryption;
+- retention;
+- access;
+- backup;
+- deletion;
+- privacy;
+- fingerprint ownership.
+
+Filename or path metadata, when retained, is never identity or duplicate authority.
+
+## 6.6 Document fingerprint
+
+ADR-030 defines the current production exact-content algorithm:
+
+```text
+ledgerforge.raw-text.sha256.v1
+```
+
+Authority is the exact UTF-8 byte sequence of reader-produced text after reading and before parsing or normalization.
+
+The fingerprint excludes:
+
+- filename;
+- path;
+- file timestamps;
+- import timestamps;
+- institution labels;
+- account identity;
+- parser selection;
+- normalized rows;
+- parsed transactions;
+- totals;
+- balances;
+- presentation metadata;
+- generated IDs.
+
+The durable fingerprint stores the versioned algorithm and digest plus required relationships.
+
+It does not persist:
+
+- raw source text;
+- the canonical payload;
+- unrestricted fingerprint input;
+- financial identifiers.
+
+Uniqueness is database-wide under the current ADR-030 contract.
+
+Binary-document authority remains unapproved.
+
+## 6.7 Import session
+
+An import session represents accepted import history.
+
+It is not the durable row for every file-selection or preparation attempt.
+
+Preparation failure and cancellation do not create an accepted session.
+
+Accepted session relationships are part of the provider-owned atomic graph.
+
+Session metadata remains bounded and privacy-safe.
+
+Parser profile authority is held by the normalized-document provenance relationship, not inferred from a session label.
+
+## 6.8 Import attempt
+
+An import attempt records bounded workflow history.
+
+It may carry closed, versionable codes for:
+
+- outcome;
+- coverage;
+- account decision;
+- guidance;
+- persistence result.
+
+It may relate to:
+
+- workspace;
+- account;
+- accepted session;
+- accepted document;
+
+only where those durable records truthfully exist.
+
+Attempt history excludes:
+
+- raw source content;
+- full identifiers;
+- payment references;
+- full fingerprints;
+- event digests;
+- unrestricted narration;
+- file paths;
+- raw localized errors.
+
+The attempt model and presentation must remain forward-compatible with unknown future codes.
+
+## 6.9 Transaction
+
+A persisted trusted transaction is accepted financial truth.
+
+Trusted production transactions are created only by the provider-owned confirmed-import graph.
+
+The architecture does not rely on inserting preview candidates and later setting `is_trusted`.
+
+A trusted transaction preserves:
+
+- immutable repository transaction ID;
+- workspace and account relationship;
+- accepted session and document relationship;
+- strict statement date;
+- date role;
+- bounded timezone evidence;
+- exact `Money`;
+- direction;
+- bounded description/payee/reference fields where supported;
+- optional source-supported running balance;
+- normalized source relationships;
+- creation metadata required by the implemented DTO contract.
+
+A persisted transaction ID survives:
+
+- hydration;
+- relaunch;
+- provider reconstruction.
+
+Runtime-generated presentation IDs are not persistence targets.
+
+## 6.10 Money
+
+Trusted transaction persistence uses two agreeing representations:
+
+- canonical locale-independent decimal text;
+- exact integer minor-unit encoding.
+
+Both use the canonical scale defined by the compiled offline currency catalog.
+
+Trusted persistence and hydration reject:
+
+- malformed decimal text;
+- exponent notation where prohibited;
+- unsupported currency;
+- excess precision;
+- integer overflow;
+- decimal/minor disagreement;
+- account/transaction currency inconsistency;
+- invalid running-balance representation.
+
+The integer representation is a checked query encoding, not independent financial truth.
+
+The database `currencies` table does not override the compiled catalog.
+
+## 6.11 Statement date
+
+ADR-039 defines `StatementDate`.
+
+It is:
+
+- the Gregorian year, month and day printed by the institution;
+- persisted canonically as `YYYY-MM-DD`;
+- not an instant;
+- not local midnight;
+- not `Foundation.Date`;
+- not converted through timezone arithmetic.
+
+Separate fields preserve:
+
+- financial date role;
+- bounded statement-timezone evidence.
+
+The supported Axis profile carries `Asia/Kolkata` evidence without transforming the printed date.
+
+## 6.12 Normalized document
+
+For accepted trusted imports, the normalized document owns:
+
+- relationship to the accepted document;
+- relationship to the accepted session;
+- parser profile ID;
+- parser profile version.
+
+The trusted V6 contract does not depend on persisting unrestricted `RawDocument` JSON.
+
+A dormant legacy JSON column, if present, is not authority and must not be populated with unrestricted source evidence without a separately approved contract.
+
+## 6.13 Normalized row
+
+A normalized row owns privacy-minimal source provenance:
+
+- immutable row ID;
+- normalized-document relationship;
+- one-based document-scoped source ordinal;
+- normalized-record digest.
+
+It does not persist unrestricted original row JSON or source text merely for future convenience.
+
+The digest proves bounded normalized-record identity within the accepted provenance graph.
+
+It is not a transaction-event identifier or document fingerprint.
+
+## 6.14 Transaction/source relationship
+
+One transaction may relate to one or more normalized source rows.
+
+The relationship preserves:
+
+- transaction identity;
+- normalized-row identity;
+- bounded contribution semantics where implemented.
+
+The relationship must be complete and consistent before the accepted graph commits.
+
+Missing, duplicate, conflicting or cross-document source relationships fail closed.
+
+## 6.15 Transaction-event identity
+
+ADR-031 defines the current supported event family:
+
+```text
+ledgerforge.transaction-event.axis-upi-reference.v1
+```
+
+The durable record owns:
+
+- versioned algorithm;
+- privacy-safe digest;
+- transaction;
+- account;
+- document;
+- import session.
+
+The database does not persist:
+
+- raw UPI reference;
+- canonical event payload;
+- raw account identifier;
+- parser source fragment.
+
+The current family is limited to approved Axis UPI semantics.
+
+It does not generalize to IMPS, NEFT, card transactions, refunds, reversals or unstructured references.
+
+## 6.16 Migration history
+
+Migration history is part of database integrity.
+
+Each registered migration has a stable:
+
+- version;
+- identity/name;
+- checksum;
+- application order.
+
+Applied migration definitions are immutable.
+
+Startup validates the complete chain, not merely the highest version number.
+
+---
+
+# 7. Registered Migration Semantics
+
+The migration registry and migration tests are the exact authority.
+
+This section records only the accepted semantic increments.
+
+## 7.1 V1 and V2
+
+V1 and V2 establish the earlier repository and identity foundations.
+
+Their exact DDL remains defined by the registered migrations.
+
+This document does not duplicate their column-level SQL.
+
+Later migrations and accepted ADRs control current semantics where the original design baseline differs.
+
+## 7.2 V3 — Transaction-event ownership
+
+V3 adds bounded `transaction_event_identities`.
+
+The accepted contract includes:
+
+- unique ownership by `(algorithm, digest)`;
+- one identity per transaction and algorithm;
+- restrictive relationships to transaction, account, document and accepted session;
+- account/session lookup support;
+- no historical backfill;
+- no raw event evidence.
+
+Accepted ownership commits atomically with accepted import history.
+
+## 7.3 V4 — Durable import attempts
+
+V4 adds `import_attempts`.
+
+It establishes:
+
+- workspace-scoped attempt history;
+- closed versionable codes;
+- optional relationships only when durable records exist;
+- newest-first deterministic reading;
+- authoritative successful-session backfill only;
+- no invented rejected history;
+- privacy-safe payload;
+- SQLite/In-Memory parity.
+
+## 7.4 V5 — Atomic confirmed import and identifier ownership
+
+V5 implements the ADR-038 persistence direction.
+
+It establishes:
+
+- workspace-scoped identifier ownership;
+- durable uniqueness for the approved ownership key;
+- same-account idempotency;
+- accepted-import identifier observations;
+- compatibility validation before schema transition;
+- one provider-owned accepted-import transaction;
+- complete accepted-graph rollback on failure;
+- equivalent SQLite and In-Memory outcomes.
+
+V5 does not invent historical observations.
+
+Identifier correction, detachment and reassignment remain future mutation families.
+
+## 7.5 V6 — Trusted statement dates and source provenance
+
+V6 establishes:
+
+- strict date-only transaction persistence;
+- financial-date role;
+- bounded timezone evidence;
+- normalized-document parser profile provenance;
+- normalized-row record digest;
+- document-scoped source ordinal;
+- trusted transaction/source relationships;
+- durable repository transaction identity through hydration;
+- provider-atomic graph publication.
+
+V6 rejects a nonempty V5 financial graph with an explicit pre-production reset requirement.
+
+It does not reconstruct:
+
+- dates;
+- ordinals;
+- record digests;
+- profile provenance;
+- transaction/source links.
+
+## 7.6 Migration safety policy
+
+Migrations must not use generic “best effort” backfill merely because a value can be approximated.
+
+Every migration defines:
+
+- accepted source state;
+- exact transformation;
+- compatibility preflight;
+- stop conditions;
+- SQLite/In-Memory impact;
+- test fixtures;
+- relaunch/reopen verification;
+- privacy impact.
+
+When required evidence is absent, migration stops.
+
+A database backup is not a substitute for a correct migration contract.
+
+---
+
+# 8. Migration-Chain Integrity
+
+The provider validates:
+
+- registered versions are unique;
+- versions form the expected chain;
+- applied history contains no gaps;
+- applied checksums match registered definitions;
+- no unsupported future migration is present;
+- pending migrations run in order;
+- final history matches the complete registered chain.
+
+A malformed chain fails before repositories are published.
+
+Migration execution failure leaves persistence unavailable.
+
+The application does not:
+
+- continue on a partially migrated provider;
+- silently edit applied migration history;
+- skip failed versions;
+- substitute an empty database;
+- guess a compatible schema.
+
+---
+
+# 9. Parent-Write Safety
+
+Existing workspace and account writes update DTO-owned columns in place.
+
+They must not emulate an update through delete and insert.
+
+Delete-and-recreate behavior can destroy or detach:
+
+- transactions;
+- import sessions;
+- documents;
+- identifiers;
+- observations;
+- event identities;
+- future category assignments;
+- lifecycle or provenance fields.
+
+SQLite and In-Memory providers must preserve equivalent observable relationships.
+
+A new parent ID represents a new durable entity, not a rename.
+
+---
+
+# 10. Currency and Exchange-Rate Capacity
+
+The compiled offline currency catalog is the current semantic authority for:
+
+- supported currency membership;
+- canonical code;
+- fraction digits;
+- scale validation.
+
+The database `currencies` and `exchange_rates` areas are inactive capacity.
+
+They do not currently establish:
+
+- an exchange-rate repository;
+- rate retrieval;
+- historical conversion;
+- base currency;
+- secondary display currencies;
+- consolidated mixed-currency totals;
+- stale-rate behavior.
+
+Activation requires a separately approved domain covering:
+
+- source/provider provenance;
+- valid time;
+- retrieval time;
+- inversion and triangulation;
+- precision;
+- cache behavior;
+- offline availability;
+- missing/stale state;
+- migration;
+- hydration;
+- presentation.
+
+Imported native values remain unchanged.
+
+---
+
+# 11. Card Evidence Capacity
+
+ADR-034 accepts a document-scoped card evidence direction.
+
+The current database has no approved production persistence contract for:
+
+- card instrument sections;
+- statement summaries;
+- original merchant `Money`;
+- printed FX rate;
+- fee;
+- markup;
+- tax;
+- amount-owed effect;
+- card-specific reconciliation.
+
+No generic JSON column is approved as a substitute for a concrete card schema.
+
+A production card family requires:
+
+1. one selected fixture-backed family;
+2. one supported source format;
+3. exact card validation semantics;
+4. durable query requirements;
+5. SQLite/In-Memory parity;
+6. migration;
+7. hydration;
+8. relaunch;
+9. presentation.
+
+Fixture integration alone does not authorize database change.
+
+---
+
+# 12. Category Architecture
+
+ADR-036 accepts a future category domain.
+
+The initial accepted direction requires:
+
+- workspace-owned category identity;
+- immutable category ID;
+- display name and normalized name;
+- optional one-level parent;
+- archived state;
+- separate current transaction/category assignment;
+- zero or one category per transaction;
+- Uncategorized represented by no assignment;
+- assignment by durable repository transaction ID.
+
+Category operations must not modify trusted transaction rows.
+
+No category table, assignment table, V7 migration or production UI is implemented by the current V6 state.
+
+The expected migration number may be V7, but implementation remains separately authorized.
+
+---
+
+# 13. Financial Mutation and Corrections
+
+ADR-037 rejects a generic corrections table or arbitrary JSON before/after ledger as the initial architecture.
+
+No financial correction may be implemented by:
+
+- overwriting trusted transaction rows;
+- manually patching runtime stores;
+- composing independent repository writes;
+- inserting an unexplained compensating transaction;
+- restoring a whole database as record-level undo;
+- using Developer Console;
+- allowing AI to choose the mutation.
+
+Each concrete family must define:
+
+- eligible records;
+- authoritative planning scope;
+- immutable plan;
+- exact native-currency impact;
+- conflicts;
+- review;
+- single-use authorization;
+- provider-owned atomic writes;
+- successful audit;
+- hydration;
+- reversal, compensation or irreversibility;
+- migration and privacy.
+
+Current database v1 contains no generic mutation schema or audit ledger.
+
+---
+
+# 14. Validation Persistence
+
+Validation occurs before accepted persistence.
+
+The current production contract persists bounded accepted/rejected workflow evidence through:
+
+- accepted sessions;
+- import attempts;
+- trusted transaction/session relationships;
+- parser/source provenance.
+
+No current production capability depends on a general durable per-row validation-issue ledger.
+
+If dormant validation tables or JSON columns exist from the early design baseline, their presence does not authorize:
+
+- unrestricted messages;
+- raw source fragments;
+- localized error persistence;
+- parser output as validation authority.
+
+A future durable validation-detail domain requires closed codes, retention rules, privacy review and hydration/query requirements.
+
+---
+
+# 15. Search, Analytics and Derived Storage
+
+## 15.1 Full-text search
+
+A transaction FTS table is not a current production contract merely because the original design recommended one.
+
+Production search requires:
+
+- approved searchable fields;
+- privacy behavior;
+- deterministic tokenization;
+- update lifecycle;
+- rebuild behavior;
+- corruption recovery;
+- query tests;
+- provider parity or an explicitly SQLite-only read projection.
+
+## 15.2 Balance snapshots
+
+Balance snapshots are not current financial authority.
+
+A future snapshot table may be introduced only when:
+
+- source balance semantics are defined;
+- snapshot time is unambiguous;
+- recomputation is deterministic;
+- stale/incomplete state is visible;
+- native currencies remain separate.
+
+Snapshots must never replace trusted transactions or source balances.
+
+## 15.3 Materialized analytics
+
+Derived tables or materialized views require:
+
+- explicit source query;
+- algorithm version;
+- rebuild path;
+- invalidation;
+- native-currency handling;
+- migration;
+- independent correctness tests.
+
+No analytical cache may become unrecoverable financial truth.
+
+---
+
+# 16. Import Profiles
+
+The current production path persists parser profile ID/version with the accepted normalized document.
+
+That provenance is not a reusable user-managed Import Profile domain.
+
+The database does not currently claim a production repository for:
+
+- learned column mappings;
+- user-authored parser profiles;
+- automatic profile promotion;
+- profile confidence;
+- profile sharing;
+- profile rollback.
+
+A reusable Import Profile domain requires separate identity, versioning, review and conflict semantics.
+
+Parser code and approved fixture truth remain authoritative for current support.
+
+---
+
+# 17. Rules and Enrichment
+
+Rules are future user-authored enrichment.
+
+Rules must not rewrite imported financial truth.
+
+A durable rule domain requires:
+
+- immutable rule identity;
+- version;
+- condition vocabulary;
+- action vocabulary;
+- scope;
+- priority;
+- conflict handling;
+- explanation;
+- dry run;
+- deterministic evaluation;
+- assignment provenance;
+- migration;
+- hydration.
+
+A generic `rule_json` column is not an approved production contract by itself.
+
+---
+
+# 18. Source Files, Attachments and Retention
+
+The current architecture does not require permanent storage of original imported file bytes.
+
+It also does not establish:
+
+- source-file archive;
+- document thumbnails;
+- OCR image storage;
+- attachment BLOB storage;
+- arbitrary filesystem paths;
+- automatic retention or purge;
+- source-document export.
+
+These capabilities require separate decisions because source deletion can affect:
+
+- reprocessing;
+- audit;
+- privacy;
+- exact fingerprint verification;
+- backup;
+- user expectations.
+
+Trusted V6 provenance must not be purged casually.
+
+A retention policy must prove which durable evidence remains sufficient after deletion.
+
+---
+
+# 19. Database Backup and Restore
+
+Sprint 45 implements a DEBUG-only development database lifecycle.
+
+Its lifecycle-owned backup:
+
+- protects permanent Debug reset;
+- is verified before replacement;
+- includes committed SQLite/WAL state;
+- is restored automatically on reset failure;
+- is not arbitrary user backup.
+
+It is not:
+
+- production backup;
+- export;
+- cloud sync;
+- record-level undo;
+- financial-mutation reversal;
+- arbitrary database file import.
+
+Production backup and restore require separate architecture for:
+
+- consistent snapshot;
+- encryption;
+- version compatibility;
+- migration;
+- identity;
+- partial failure;
+- restore preview;
+- validation;
+- user control;
+- privacy.
+
+---
+
+# 20. SQLite Operational Contract
+
+The production provider must configure and verify the SQLite behavior required by its implementation.
+
+Relevant concerns include:
+
+- foreign-key enforcement;
+- transaction boundaries;
+- write contention;
+- busy handling;
+- WAL checkpoint and close behavior;
+- prepared/parameterized statements;
+- connection ownership;
+- migration transactionality;
+- provider shutdown;
+- subprocess competition.
+
+This document does not freeze a generic “background write queue” as correctness authority.
+
+Correctness comes from:
+
+- provider ownership;
+- database transactions;
+- constraints;
+- revalidation;
+- typed results.
+
+---
+
+# 21. Indexing and Query Design
+
+Indexes are introduced to support verified query and uniqueness requirements.
+
+Current important categories include:
+
+- primary and foreign-key access;
+- workspace-scoped account and attempt queries;
+- account/date transaction browsing;
+- exact fingerprint uniqueness;
+- transaction-event uniqueness;
+- identifier ownership lookup;
+- normalized-document/source relationships;
+- migration history verification.
+
+Do not add speculative indexes merely because a future screen may exist.
+
+Every index should have:
+
+- a named query or constraint;
+- migration ownership;
+- provider tests where relevant;
+- write-cost review;
+- query-plan verification when performance is the reason.
+
+Indexes do not define financial identity unless an accepted ADR explicitly makes the constrained key authoritative.
+
+---
+
+# 22. Deletion and Foreign-Key Policy
+
+Deletion semantics are domain-specific.
+
+The database must not use broad cascade behavior to simulate correction.
+
+Restrictive relationships are required where deleting a parent would erase trusted provenance or ownership.
+
+Any future delete, archive, merge, split or reversal operation requires:
+
+- explicit eligible state;
+- impact preview;
+- immutable identity policy;
+- exact write set;
+- audit;
+- reversal or irreversibility;
+- provider parity;
+- migration tests.
+
+Parent metadata updates remain in place and must not trigger cascades.
+
+---
+
+# 23. Security and Privacy
+
+## 23.1 Local database
+
+Core financial truth is stored locally.
+
+No internet service is required for current repository operation.
+
+## 23.2 Sensitive values
+
+The database may contain trusted financial identifiers and financial history required for correct operation.
+
+Presentation and diagnostics must redact them.
+
+Do not expose:
+
+- raw identifiers;
+- UPI references;
+- full fingerprints;
+- unrestricted source rows;
+- raw SQL errors;
+- database paths;
+- arbitrary source fragments.
+
+## 23.3 Encryption
+
+Database encryption, SQLCipher and encrypted source-file storage are not current production capabilities.
+
+They require separate platform, recovery and migration design.
+
+A design recommendation must not be described as implemented security.
+
+## 23.4 Credentials
+
+Passwords do not belong in SQLite under the current architecture.
+
+Future credentials belong behind an approved Keychain boundary.
+
+Readers receive a supplied credential and never retrieve one from the database.
+
+---
+
+# 24. Determinism
+
+Database behavior must not vary because of:
+
+- dictionary iteration;
+- repository query order;
+- locale;
+- display-name ordering;
+- filename;
+- path;
+- runtime UUID;
+- memory address;
+- diagnostic timestamp.
+
+Where order matters, queries and DTO mappers use an explicit deterministic order.
+
+Financial ordering uses source-owned evidence where approved.
+
+A generated stable display tiebreaker must not be represented as financial chronology.
+
+---
+
+# 25. Concurrency
+
+Confirmed-import correctness uses:
+
+- provider-owned transaction;
+- transaction-time authoritative revalidation;
+- schema constraints;
+- provider generation;
+- same-process serialization where useful;
+- SQLite contention handling;
+- equivalent In-Memory serialization.
+
+The accepted guarantee covers approved writers using the registered schema and enabled constraints.
+
+It does not cover:
+
+- arbitrary external SQLite writers;
+- disabled constraints;
+- schema modification;
+- malicious corruption;
+- lock-bypassing code.
+
+A losing confirmed import must leave zero accepted financial residue.
+
+---
+
+# 26. Failure Semantics
+
+Database failures map to typed domain outcomes.
+
+Raw SQLite errors are not public API.
+
+The persistence layer distinguishes, where applicable:
+
+- unavailable provider;
+- migration-integrity failure;
+- migration-execution failure;
+- duplicate;
+- event conflict;
+- identity conflict;
+- stale account choice;
+- stale prepared import;
+- provider mismatch;
+- contention;
+- repository integrity conflict;
+- atomic write failure;
+- committed but hydration failed.
+
+A committed graph is not reported as uncommitted because hydration failed.
+
+An audit-write failure is not reported as financial success.
+
+---
+
+# 27. Testing and Verification
+
+## 27.1 Migration tests
+
+Every migration requires tests for:
+
+- fresh database;
+- upgrade from every supported predecessor;
+- applied history validation;
+- checksum mismatch;
+- missing migration;
+- duplicate version;
+- unsupported future version;
+- preflight stop conditions;
+- execution failure;
+- reopen after success;
+- no partial schema publication.
+
+## 27.2 Provider parity
+
+Where both providers matter, verify equivalent:
+
+- accepted graph;
+- rejection;
+- identifier ownership;
+- observations;
+- duplicate outcomes;
+- event outcomes;
+- failure residue;
+- ordering;
+- hydration evidence;
+- typed errors.
+
+## 27.3 Atomicity
+
+Inject failure at every accepted-write stage.
+
+Verify that no losing path leaves accepted:
+
+- workspace or account residue where newly created;
+- identifier ownership;
+- observation;
+- document;
+- fingerprint;
+- session;
+- normalized source evidence;
+- transaction;
+- event identity;
+- successful attempt.
+
+## 27.4 Financial truth
+
+Production parser output is not the sole oracle.
+
+Use independent expected evidence for:
+
+- count;
+- exact amount;
+- currency;
+- direction;
+- date;
+- source order;
+- balances;
+- identifiers;
+- provenance.
+
+## 27.5 Hydration and relaunch
+
+Verify:
+
+- provider reconstruction;
+- canonical hydration;
+- application relaunch;
+- stable repository IDs;
+- source relationships;
+- parser profile;
+- date semantics;
+- presentation.
+
+## 27.6 Privacy
+
+Tests and reviews must reject:
+
+- raw identifiers in UI or diagnostics;
+- raw event references;
+- full fingerprint values;
+- source rows;
+- database paths;
+- raw SQL errors.
+
+A green suite is acceptance evidence only for the boundary it exercises.
+
+---
+
+# 28. Future Database Gates
+
+## 28.1 Production PDF
+
+Before PDF persistence becomes production-supported, approve:
+
+- binary exact-content authority;
+- source-content ownership through confirmation;
+- one fixture-backed PDF family;
+- deterministic extraction and source order;
+- malformed/encrypted/image-only outcomes;
+- provider parity;
+- independent financial oracle.
+
+## 28.2 XLS and XLSX
+
+Before spreadsheet support, approve:
+
+- reader/extraction authority;
+- sheet selection;
+- cell-type and date semantics;
+- formula-result policy;
+- source row ordering;
+- binary/container fingerprint authority;
+- malformed workbook behavior;
+- licensing and Release implications.
+
+## 28.3 Categories
+
+Before V7, approve the final bounded implementation plan for:
+
+- category table;
+- assignment table;
+- constraints;
+- migration;
+- repository parity;
+- hydration;
+- UI behavior.
+
+## 28.4 Card persistence
+
+Before card migration, select one concrete family and define:
+
+- card account/instrument identity;
+- posted amount and currency;
+- original merchant evidence;
+- summaries;
+- reconciliation;
+- queries;
+- hydration;
+- privacy.
+
+## 28.5 Search
+
+Before FTS, define:
+
+- searchable source fields;
+- tokenization;
+- privacy;
+- rebuild;
+- index lifecycle;
+- provider behavior.
+
+## 28.6 Backup and restore
+
+Before production backup, define:
+
+- consistent snapshot;
+- encryption;
+- version and migration compatibility;
+- restore validation;
+- failure recovery;
+- user control.
+
+## 28.7 Financial mutation
+
+Before any correction or reversal schema, approve one concrete operation family under ADR-037.
+
+---
+
+# 29. Maintainer Checklist
+
+Before changing persistence:
+
+- [ ] Inspect the exact current ref.
+- [ ] Read `PROJECT_STATE.md`.
+- [ ] Read the relevant `FUTURE_WORK.MD` candidate.
+- [ ] Read accepted ADRs.
+- [ ] Inspect the registered migration chain.
+- [ ] Inspect repository DTOs and provider mappings.
+- [ ] Identify the exact durable authority.
+- [ ] Define SQLite and In-Memory behavior.
+- [ ] Define migration and compatibility impact.
+- [ ] Define failure and zero-residue behavior.
+- [ ] Define hydration and relaunch acceptance.
+- [ ] Define privacy boundaries.
+- [ ] Use independent financial truth where money or provenance changes.
+- [ ] Stop rather than infer missing historical evidence.
+- [ ] Do not expose a partial repository workflow as one atomic operation.
+- [ ] Do not represent dormant schema capacity as production support.
+- [ ] Do not copy speculative SQL into this baseline as though it were active DDL.
+
+---
+
+# 30. Change Policy
+
+This database baseline may be status-aligned without reopening its core architecture when:
+
+- a verified sprint implements an accepted ADR;
+- a registered migration advances;
+- current support changes;
+- a stale claim is corrected.
+
+A database architecture change requires an accepted ADR when it changes:
+
+- durable financial truth;
+- identity;
+- source provenance;
+- atomicity;
+- mutation authority;
+- migration compatibility;
+- currency semantics;
+- duplicate/event identity;
+- repository/hydration ownership;
+- security or retention.
+
+Implementation remains separately authorized by a complete Chat-approved execution prompt.
+
+---
+
+## End of Database v1 Architecture
+
+Originally created for Sprint 10 Phase 2A.
+
+Status aligned through:
+
+- ADR-030 exact-content fingerprints;
+- ADR-031 transaction-event identity;
+- ADR-032 durable attempts;
+- ADR-033 Money;
+- ADR-034 card evidence;
+- ADR-035 development database lifecycle;
+- ADR-036 category architecture;
+- ADR-037 financial mutation architecture;
+- ADR-038 atomic confirmed import and identifier ownership;
+- ADR-039 trusted statement dates and source provenance;
+- verified Sprint 53 production state;
+- registered migration V6.
+
+Detailed DDL and migration behavior remain authoritative in the repository implementation.

@@ -52,6 +52,34 @@ A work item becomes executable only when Chat supplies one complete approved pro
 
 ---
 
+## Full Candidate Verification Audit
+
+**Audit date:** 2026-07-24  
+**Current pushed ref:** `main@de238d8abf5ee7dc7d1eb9cd13fab72803f2be28`  
+**Latest verified implementation:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` — Sprint 53  
+**Latest repository maintenance:** `7ee20a909038d1088f830a6ea588311625f415e5`  
+**Candidate entries reviewed:** 155  
+**Fresh build/test/runtime evidence:** None; this was a read-only planning audit.
+
+Every numbered candidate in this document was reviewed against the current pushed repository state, `PROJECT_STATE.md`, accepted ADRs, completed-sprint evidence, current fixture inventory and recent repository history.
+
+The audit changes only material status, dependency or completed-slice drift. Unchanged candidates retain their existing status because no current evidence establishes a different readiness boundary. A fixture being present does not by itself establish production support, but it may satisfy the evidence prerequisite for targeted discovery.
+
+Material corrections in this revision include:
+
+- repair and reversal candidates whose shared ADR-037 and post-Sprint-45 prerequisites are complete;
+- HDFC, CBQ and card-family candidates whose clean-room fixture evidence exists but whose production format or domain contracts remain unresolved;
+- spreadsheet and PDF candidates whose discovery/architecture state changed;
+- transfer matching after Sprint 53 established verified multi-account identity;
+- source-document browsing after durable document/import provenance became available;
+- dashboard chart work that remains blocked by absent analytical truth;
+- repository-hygiene work narrowed after tracked Xcode user data was removed;
+- backup/restore promoted to targeted discovery after the database lifecycle and migration-integrity foundations matured.
+
+This audit does not authorize execution, assign sprint numbers or supersede the roadmap.
+
+---
+
 ## Planning Principles
 
 Future work is ordered by:
@@ -207,32 +235,35 @@ The second statement becomes valid only after Chat supplies a complete execution
 
 ## FW-P0-02 — Historical Duplicate Review and Repair
 
-**Status:** Blocked
-**Depends on:** Completed Sprint 40 evidence and Sprint 41 bounded transaction-event ownership, Accepted ADR-037, post-Sprint-45 revalidation, and an independently approved duplicate-repair family contract
+**Status:** Ready for discovery  
+**Shared prerequisites:** Sprint 40 overlap evidence, Sprint 41 bounded transaction-event ownership, ADR-037 acceptance and post-Sprint-45 lifecycle revalidation are complete.  
+**Implementation dependency:** Selection and approval of one concrete historical duplicate-repair family contract.
 
 Provide safe review and correction for duplicate transactions already present in durable history.
 
-Candidate outcomes include:
+Targeted discovery may now define one bounded repair family, including:
 
+- independently provable duplicate evidence;
 - duplicate-candidate review;
 - explanation of matching evidence;
 - import-session and source provenance;
-- financial-impact preview;
+- exact native-currency financial-impact preview;
 - explicit user confirmation;
-- rollback or undo protection.
+- one provider-owned atomic mutation;
+- privacy-safe audit evidence;
+- family-specific reversal, compensation or explicit irreversibility.
 
-Historical data must never be silently changed.
+Historical data must never be silently changed. Discovery does not authorize implementation or broad historical cleanup.
 
-ADR-037 acceptance would reduce the shared architecture blocker. Duplicate-repair discovery, family-specific policy and a separate ADR would still be required before implementation.
-
-**May combine with:** `FW-P1-25` and `FW-P2-12` if discovery shows that review and repair form one bounded outcome.
+**May combine with:** `FW-P1-25` and `FW-P2-12` only if discovery proves that prospective duplicate review and one historical repair family share a single bounded review and acceptance boundary.
 
 ---
 
 ## FW-P0-08 — Data-Integrity Verification and Repair
 
-**Status:** Blocked
-**Depends on:** Accepted ADR-037, post-Sprint-45 revalidation, and an independently approved data-integrity repair-family contract
+**Status:** Ready for discovery  
+**Shared prerequisites:** ADR-037 acceptance and post-Sprint-45 lifecycle revalidation are complete.  
+**Implementation dependency:** Selection and approval of one concrete verification or repair family.
 
 Provide privacy-safe verification for:
 
@@ -244,9 +275,9 @@ Provide privacy-safe verification for:
 - incomplete imports;
 - inconsistent completion states.
 
-Repair actions must be explicit, previewed and recoverable.
+Targeted discovery must select one independently verifiable family and define whether the first increment is read-only verification or an explicit repair. Repair actions must be previewed, authorized, atomic and recoverable or explicitly irreversible.
 
-After ADR-037 acceptance and lifecycle revalidation, this candidate may proceed to narrower repair-family discovery. It is not implementation-ready.
+This candidate is not implementation-ready as one broad “repair everything” operation.
 
 ---
 
@@ -297,8 +328,8 @@ Implementation must stop if the intended meaning of a durable code cannot be est
 
 ## FW-P0-10 — Explain Account Match, No-Match and Conflict Outcomes
 
-**Status:** Candidate
-**Depends on:** Existing verified financial-identity flow
+**Status:** Ready for discovery  
+**Depends on:** Existing verified financial-identity flow, now satisfied for the approved Axis bank-account path.
 
 Explain why an import:
 
@@ -308,11 +339,11 @@ Explain why an import:
 - became ambiguous;
 - conflicted with existing identifier ownership.
 
-Presentation must remain bounded and privacy-safe.
+Targeted discovery must identify the durable bounded evidence that may be shown for each outcome across preparation, review, attempt history and account presentation.
 
-No raw financial identifier may be exposed.
+Presentation must remain privacy-safe. No raw financial identifier may be exposed, and weak labels or display metadata must not be presented as identity authority.
 
-The approved durable-attempt-history increment promotes only account-decision provenance required inside import-attempt history. Broader identity explanation, manual linking and unlinking remain future work.
+The approved durable-attempt-history increment promotes only account-decision provenance required inside import-attempt history. Manual linking, unlinking, reassignment and incorrect-link recovery remain separately governed.
 
 ---
 
@@ -597,36 +628,71 @@ Do not generalize the existing parser without fixture-backed evidence.
 
 ## FW-P1-02 — HDFC Parser Family
 
-**Status:** Blocked
-**Depends on:** Approved HDFC fixtures and supported source formats
+**Status:** Ready for discovery  
+**Fixture state:** Clean-room HDFC bank-account PDF and XLS evidence, manifests and expected financial baselines are integrated.  
+**Implementation blockers:** Selection of the first supported HDFC layout and source format, plus the applicable production reader/fingerprint architecture.
 
 Near-term HDFC direction is bank-account statements only through the unified import pipeline. Card support remains separate future work.
+
+Targeted discovery must determine:
+
+- which approved HDFC layout and source format should be supported first;
+- whether PDF under `FW-P1-10` or spreadsheet support under `FW-P1-14` provides the smallest safe boundary;
+- institution-detection and statement-classification evidence;
+- parser/profile semantics and versioning;
+- account-identity evidence;
+- source-date, order and provenance compatibility with ADR-039;
+- independent financial-truth acceptance;
+- exact dependencies on `FW-P1-18` and the selected reader authority.
+
+Fixture availability makes discovery eligible. It does not establish production HDFC support.
 
 ---
 
 ## FW-P1-03 — CBQ Parser Family
 
-**Status:** Blocked
-**Depends on:** Approved CBQ fixtures and supported source formats
+**Status:** Ready for discovery  
+**Fixture state:** Clean-room CBQ current-account and credit-card evidence is integrated with separate expected baselines.  
+**Implementation blockers:** Selection of one family and production source format; card work also depends on the concrete card contract under `FW-P1-09`.
 
 Keep independent CBQ families:
 
 - CBQ bank-account statements;
 - CBQ credit-card statements.
 
-Each family requires independent approved fixtures and a financial baseline. QAR support depends on native multi-currency safety; card support also depends on credit-card financial semantics.
+Targeted discovery must not combine them merely because the institution is shared. It must determine:
 
+- the smallest first family;
+- the approved source format and reader dependency;
+- QAR native-currency truth and presentation acceptance;
+- deterministic institution, statement-family and parser/profile selection;
+- bank-account identity evidence;
+- card-specific validation/persistence dependencies where applicable;
+- independent financial and source-provenance oracles.
+
+Fixture availability makes both families discoverable. Neither is production-supported.
 
 ---
 
 ## FW-P1-04 — Additional Credit-Card Parser Families
 
-**Status:** Blocked
-**Depends on:** Approved institution-specific fixtures, the credit-card financial-semantics foundation and the Money foundation where multi-currency evidence requires it
+**Status:** Ready for discovery  
+**Fixture state:** Clean-room American Express, CBQ and Axis card fixture families are integrated.  
+**Implementation blockers:** One selected concrete issuer/layout, a production-supported source format, and approved validation, persistence, hydration and migration contracts under `FW-P1-09`.
 
-Add card issuers only through deterministic, fixture-backed parser families.
+American Express remains the priority independent issuer candidate, but discovery must compare the strongest fixture-backed options rather than select by label alone.
 
-American Express is the priority independent credit-card issuer. Additional issuers may be added only through deterministic, fixture-backed parser families.
+Each family requires:
+
+- one approved source format and reader path;
+- independent posted-amount, currency, order, statement-summary and identity evidence;
+- parser-owned card-statement evidence consistent with ADR-034;
+- concrete validation and persistence semantics;
+- deterministic account-versus-instrument treatment;
+- provider parity, migration and relaunch acceptance;
+- explicit exclusion of unsupported universal card assumptions.
+
+No parser family may claim production support from fixtures, classification or shared semantic discovery alone.
 
 ---
 
@@ -725,59 +791,55 @@ The original source structure and every user-approved mapping must remain inspec
 
 ## FW-P1-09 — Credit-Card Financial Semantics Foundation
 
-**Status:** Blocked
-**Discovery:** Complete
-**Depends on:** Approved concrete card validation and persistence contracts, one selected card statement family, and a production-supported source format
+**Status:** Ready for discovery  
+**Discovery:** Shared cross-family semantic discovery is complete.  
+**Architecture:** ADR-034 accepted.  
+**Depends on:** Selection of one concrete fixture-backed card family and source format for family-specific validation, persistence, hydration and migration planning.
 
 Define the smallest document-scoped evidence contract required before production card parsing.
 
-The American Express, CBQ and Axis card fixture integrations and final cross-family evidence review are complete. ADR-034 accepts a future-implementation boundary in which `FinancialDocument` may carry a parser-owned card-statement evidence envelope capable of preserving, only where source-supported:
+The American Express, CBQ and Axis card fixture integrations and final cross-family evidence review are complete. ADR-034 accepts a future boundary in which `FinancialDocument` may carry parser-owned card-statement evidence preserving only source-supported values such as:
 
-- authoritative posted statement amount and statement currency;
-- optional source-proven effect on the amount owed;
-- source classification without claiming a universal accounting taxonomy;
+- authoritative posted statement amount and currency;
+- optional source-proven effect on amount owed;
 - account-level versus instrument-level row scope;
 - document-scoped instrument-section identity;
 - optional original merchant amount and currency;
 - independently optional printed FX-rate, fee, markup and tax evidence;
-- source-specific statement-summary components and reconciliation evidence.
+- source-specific statement-summary and reconciliation components.
 
-ADR-034 requires card-liability effects to remain separate from bank-account debit/credit semantics. A card instrument must not become an independent financial account merely because the statement presents a separate instrument section. Original merchant evidence must not replace the posted statement amount or currency.
+Targeted discovery must now select one concrete family and define its exact vocabulary, validation, durable schema, migration, provider parity, hydration, relaunch and presentation contracts.
 
-Missing FX rates, fees, markup, tax, statement aggregates or other financial evidence must not be calculated merely to populate a common model.
+Card-liability effects remain separate from bank-account debit/credit semantics. Missing rates, fees, taxes, aggregates or other evidence must not be invented. Payment allocation, rewards accounting, reversal matching and universal card taxonomy remain excluded.
 
-Payment allocation, rewards accounting, reversal matching, universal card taxonomy and institution-independent balance formulas remain outside this candidate unless separately approved.
+Do not claim production card support from fixture integration, schema capacity, classification or parser candidates.
 
-The Money foundation is complete. Card persistence remains blocked until concrete card validation, durable persistence, hydration and migration contracts are approved. Institution-specific production parsers remain independently gated by their source formats, fixtures and financial oracles.
-
-The integrated evidence and completed review satisfy the shared semantic-discovery dependency. Final vocabulary, persistence fields and migration shape remain blocked on concrete card validation and persistence planning.
-
-Do not claim production card support from fixture integration, schema capacity, statement classification or parser candidates.
+---
 
 # P1 — Import Format Expansion
 
 ## FW-P1-10 — Production PDF Statement Support
 
-**Status:** Candidate
-**Discovery:** Complete
-**Planning state:** One architecture decision remains
-**Depends on:** Approved authoritative binary-document fingerprint semantics under `FW-P1-18`, the approved PDF fixture, and the existing extraction foundation
+**Status:** Blocked  
+**Discovery:** Complete  
+**Planning state:** Implementation waits on one architecture decision.  
+**Depends on:** Approval of authoritative binary-document fingerprint semantics under `FW-P1-18`, one selected approved PDF family and the existing extraction foundation.
 
 Promote PDF from extraction foundation to a production-supported import source.
 
-Required outcomes include:
+After `FW-P1-18` is decided, planning must select one fixture-backed PDF family and require:
 
 - approved PDF content entering the unified import pipeline;
-- picker, source-format registry and reader support remaining consistent;
-- security-scoped URL access beginning and ending correctly for sandbox-authorized files;
-- sandboxed PDF opening verified through the production URL-driven preparation path;
-- institution detection and classification remaining deterministic;
-- parser output matching approved financial truth;
-- equivalent statements preserving equivalent financial results;
-- Debug and Release build validation;
-- no alternate PDF-only parser, validation, repository or persistence path.
+- consistent picker, source-format registry and reader behavior;
+- correct security-scoped URL access;
+- sandboxed opening through the production URL-driven preparation path;
+- deterministic institution detection, classification and parser/profile selection;
+- parser output matching an independent financial oracle;
+- source date, order and provenance fidelity;
+- Debug and optimized Release validation;
+- no PDF-only validation, repository or persistence path.
 
-PDF support must not be presented as production-ready merely because extraction code or dormant reader infrastructure exists.
+PDF support is not production-ready merely because extraction code, approved fixtures or dormant reader infrastructure exists.
 
 ---
 
@@ -823,12 +885,22 @@ The user must control whether the password is used once, stored, replaced or dis
 
 ## FW-P1-14 — XLS and XLSX Support
 
-**Status:** Blocked
-**Depends on:** Selection of the first production spreadsheet family, an approved XLS or XLSX reader/extraction authority, and the existing approved spreadsheet evidence
+**Status:** Ready for discovery  
+**Fixture state:** Approved spreadsheet evidence exists, including HDFC XLS bank-account fixtures.  
+**Implementation blockers:** Selection of the first production spreadsheet family and approval of an XLS or XLSX reader/extraction authority.
 
-Add spreadsheet readers that feed the existing universal import pipeline.
+Targeted discovery must determine:
 
-XLS and XLSX may become separate sprint candidates if discovery shows materially different implementation or validation boundaries.
+- whether XLS and XLSX require separate readers and increments;
+- the smallest fixture-backed first family;
+- deterministic sheet, row, cell-type, date, numeric-scale and formula-result handling;
+- source-row evidence and malformed-workbook behavior;
+- sandbox access and production URL-driven preparation;
+- exact-content fingerprint authority for the selected container;
+- parser/profile selection and independent financial truth;
+- privacy, library, licensing and Release implications.
+
+Spreadsheet readers must feed the existing universal import pipeline. Fixture availability authorizes discovery, not production support.
 
 ---
 
@@ -873,42 +945,33 @@ OCR output remains untrusted until deterministic parsing and validation succeed.
 
 ## FW-P1-18 — Binary-Document Fingerprint Semantics
 
-**Status:** Research
-**Discovery:** Complete
-**Planning state:** One architecture decision remains
-**Depends on:** Chat approval of the authoritative binary fingerprint representation and its versioned algorithm-coexistence contract
+**Status:** Ready for planning  
+**Discovery:** Complete  
+**Planning state:** One Chat-owned architecture decision remains.  
+**Depends on:** Approval of the authoritative binary fingerprint representation and versioned algorithm-coexistence contract.
 
-Define deterministic exact-content fingerprint input for binary documents when reader-produced text is absent, incomplete or unsuitable as the exact-content authority.
+Define deterministic exact-content fingerprint input for binary documents when reader-produced text is absent, incomplete or unsuitable as exact-content authority.
 
-This decision must precede or form the minimum architecture portion of `FW-P1-10`. Production PDF support must not be used as a prerequisite for deciding the exact-content authority that production PDF support itself requires.
-
-The design must decide whether the authority is:
+Chat must decide whether the authority is:
 
 - exact source bytes; or
 - another explicitly defined stable binary representation.
 
-It must also address:
+The decision must also define:
 
 - immutable source-content ownership through preparation and confirmation;
 - metadata that may change without changing represented statement content;
 - encrypted and password-protected documents;
 - format-specific container differences;
-- compatibility with versioned fingerprint algorithms;
 - coexistence with `ledgerforge.raw-text.sha256.v1`;
+- versioned algorithm selection;
 - commit-time revalidation;
-- SQLite and In-Memory parity;
+- SQLite/In-Memory parity;
 - privacy-safe diagnostics.
 
-Binary fingerprinting must not be inferred from:
+Binary fingerprinting must never be inferred from parsed transactions, totals, filenames, paths or presentation metadata.
 
-- parsed transactions;
-- financial totals;
-- filenames or paths;
-- presentation metadata;
-- extracted labels merely because current code exposes them.
-
-No migration or historical fingerprint reconstruction is authorized by this candidate.
-
+No migration or historical fingerprint reconstruction is authorized. This decision may form the architecture portion of the first `FW-P1-10` implementation increment.
 
 ---
 
@@ -1015,12 +1078,25 @@ Retain future work for duplicate override, partial import, broader duplicate man
 
 ## FW-P1-27 — Delete or Reverse an Import Session
 
-**Status:** Blocked
-**Depends on:** Accepted ADR-037, post-Sprint-45 revalidation, and an independently approved import-session reversal family contract and impact preview
+**Status:** Ready for discovery  
+**Shared prerequisites:** ADR-037 acceptance and post-Sprint-45 lifecycle revalidation are complete.  
+**Implementation dependency:** Selection and approval of one import-session reversal family contract and exact impact preview.
 
-Safely reverse one import without damaging unrelated account history.
+Safely reverse one accepted import without damaging unrelated account history.
 
-ADR-037 acceptance may make this candidate eligible for separate discovery. It does not authorize reversal implementation.
+Targeted discovery must define:
+
+- the exact session-owned records and shared relationships;
+- treatment of accounts, identifiers, observations, documents, fingerprints and overlapping transactions;
+- native-currency impact;
+- effect on later imports and account presentation;
+- immutable reviewed plan and authorization;
+- one provider-owned atomic operation;
+- successful audit evidence;
+- reversal of the reversal, compensation or explicit irreversibility;
+- provider parity, hydration and relaunch behavior.
+
+Discovery does not authorize deletion, broad rollback or backup-based undo.
 
 ---
 
@@ -1306,12 +1382,25 @@ Potential actions include notes, categories, rules and safe deletion or exclusio
 
 ## FW-P2-10 — Transfer Matching Between Owned Accounts
 
-**Status:** Blocked
-**Depends on:** Reliable multi-account identity and successful completion and approval of Sprint 40
+**Status:** Ready for discovery  
+**Shared prerequisites:** Sprint 40 evidence is complete, and Sprint 53 verifies distinct durable identity for multiple supported owned accounts.  
+**Implementation dependency:** Approved fixture-backed transfer evidence and a reversible family-specific matching contract.
 
-Match both sides of owned-account transfers without counting them as income or expense.
+Match both sides of owned-account transfers without counting them as new income or expense.
 
-Matching must be explainable and reversible.
+Targeted discovery must define:
+
+- independently provable transfer evidence;
+- same-currency and future cross-currency boundaries;
+- one-to-one, split and fee-bearing cases;
+- date and amount tolerances, if any;
+- conflict and ambiguity handling;
+- explanation and user review;
+- durable relationship provenance;
+- unmatch or correction semantics;
+- interaction with duplicate-event evidence and reconciliation.
+
+Weak similarity must never create a transfer relationship automatically.
 
 ---
 
@@ -1656,22 +1745,22 @@ Improve default account iconography. User customization remains governed by `FW-
 
 ## FW-P2-46 — Interactive Dashboard Charts
 
-**Status:** Candidate
-**Depends on:** Reliable analytical data sources
+**Status:** Blocked  
+**Depends on:** Reliable analytical data sources, including the relevant categorization, transfer, recurrence or reporting foundations.
 
 Provide interactive dashboard charts only after their underlying analytical values are derived from authoritative repository-backed financial data.
 
-Until reliable analytics exist:
+Until those foundations exist:
 
 - hardcoded spending percentages must not be presented as user financial facts;
-- decorative cash-flow values must not be presented beside real balances or expenses as though they were calculated;
-- unsupported trends must be removed or shown through an explicit unavailable state;
-- chart labels must not imply categorization, transfer matching, forecasting or historical analysis that has not been implemented;
-- sample or preview data must be unmistakably separated from the user’s repository data.
+- decorative cash-flow values must not appear beside real balances or expenses as though calculated;
+- unsupported trends must be removed or shown as unavailable;
+- chart labels must not imply categorization, transfer matching, forecasting or historical analysis that is not implemented;
+- sample data must remain unmistakably separate from repository data.
+
+Removal of misleading placeholders may be planned under `FW-P2-42`; that cleanup does not make interactive analytics ready.
 
 Future charts must preserve native-currency safety, provenance, deterministic calculations and the dependency boundaries of `FW-P3-10` and related analytical candidates.
-
----
 
 ---
 
@@ -1763,8 +1852,9 @@ The controls must:
 
 ## FW-P2-54 — Document Library and Source-Document Browsing
 
-**Status:** Blocked
-**Depends on:** Durable document provenance, privacy-safe metadata and import-session history
+**Status:** Ready for discovery  
+**Shared prerequisites:** Durable document provenance, transaction-to-source relationships and import-attempt history now exist.  
+**Implementation dependency:** Approval of the privacy-safe metadata, navigation and retention boundary.
 
 Provide a user-facing place to inspect imported source-document records and their relationships to:
 
@@ -1773,6 +1863,15 @@ Provide a user-facing place to inspect imported source-document records and thei
 - statement periods;
 - transactions;
 - validation and duplicate outcomes.
+
+Targeted discovery must determine:
+
+- which durable metadata is authoritative and safe to display;
+- how document identity differs from filename and source-content identity;
+- account, session and transaction navigation;
+- treatment of exact duplicates, partial outcomes and unavailable legacy evidence;
+- whether source reopening or content retention is excluded;
+- privacy-safe search and export boundaries.
 
 The library must not expose raw source content by default and must not treat a document record as the owner of account identity.
 
@@ -1812,8 +1911,12 @@ Profiling output must remain separate from financial truth and must not retain s
 
 ## FW-P2-61 — Institution, Layout and Format Regression Matrix
 
-**Status:** Blocked
-**Depends on:** Additional supported fixtures
+**Status:** Blocked  
+**Depends on:** Additional production-supported institution, layout or format families.
+
+Create a systematic regression matrix only when more than the current supported Axis bank-account CSV grammar exists in production.
+
+The integrated HDFC, CBQ and card fixtures may inform future discovery, but fixture presence alone does not satisfy this production-support dependency.
 
 Expand currency regression coverage once a second production currency exists; do not create a separate mixed-currency regression candidate.
 
@@ -1957,27 +2060,20 @@ No bundle-inclusion defect may be claimed solely from Xcode navigator visibility
 
 ## FW-P2-71 — Repository and Xcode Metadata Hygiene
 
-**Status:** Maintenance
+**Status:** Maintenance  
 **Depends on:** None
 
-Remove user-specific and generated development state from repository history and prevent its reintroduction.
+**Completed slice 2026-07-23:** commit `7ee20a909038d1088f830a6ea588311625f415e5` removed the tracked user-specific Find Navigator scope, breakpoint list and scheme-management state from the Git index.
 
-Candidate outcomes include:
+Remaining work is prevention and broader hygiene:
 
-- tracked `xcuserdata` removed from the Git index;
-- user-specific breakpoint and workspace state excluded;
-- ignore and repository checks covering:
-  - derived build products;
-  - local databases;
-  - temporary SQLite files;
-  - user-specific IDE state;
-  - generated files;
-  - sensitive diagnostics;
-  - exported private fixtures;
-- repository checks that fail when prohibited metadata is introduced;
-- privacy-safe cleanup guidance for already tracked local-development files.
+- verify ignore coverage for user-specific Xcode state;
+- distinguish shared schemes/configuration from personal IDE metadata;
+- add repository checks where proportionate;
+- cover derived products, local databases, temporary SQLite files, generated files, sensitive diagnostics and exported private fixtures;
+- document privacy-safe cleanup for prohibited metadata already introduced in future.
 
-Repository hygiene checks must distinguish source-controlled shared Xcode configuration from personal IDE state.
+Do not remove shared Xcode configuration merely because it lives beneath the project bundle. Repository evidence must distinguish personal from shared state.
 
 ---
 
@@ -2408,14 +2504,15 @@ Provide a machine-readable export of supported LedgerForge domain data. User-fac
 
 ## FW-P3-36 — Verified Backup, Restore and Disaster Recovery
 
-**Status:** Candidate
-**Depends on:** Stable database lifecycle and integrity-verification foundations
+**Status:** Ready for discovery  
+**Shared prerequisites:** The canonical database lifecycle, checked close, coordinated SQLite/WAL/SHM handling, verified lifecycle backup, migration-chain integrity and fail-closed recovery foundations exist.  
+**Implementation dependency:** Approval of the user-facing backup contents, integrity, restore-target, compatibility and confirmation contract.
 
 Provide:
 
 - explicit local backup creation;
 - backup integrity verification;
-- documented backup contents and exclusions;
+- documented contents and exclusions;
 - restore preview and confirmation;
 - tested restoration into a safe target;
 - version and schema compatibility checks;
@@ -2423,7 +2520,9 @@ Provide:
 - disaster-recovery guidance;
 - clear separation from optional synchronization.
 
-A backup is not considered trustworthy merely because a file was copied.
+Targeted discovery must distinguish the existing DEBUG lifecycle backup from a production user-owned backup product, define sandbox/file-access behavior and ensure restore cannot overwrite unique or newer data without explicit review.
+
+A backup is not trustworthy merely because a file was copied.
 
 ---
 

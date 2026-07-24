@@ -10,9 +10,93 @@ Each ADR captures:
 
 These records explain *why* the architecture evolved the way it did.
 
+
+## Record Governance and Current Baseline
+
+Architecture decisions are historical records.
+
+The original decision text below is preserved. Current-state corrections are additive and appear in dated **Current Alignment** blocks. A later implementation, migration or ADR may supersede an earlier limitation without erasing the evidence that the earlier decision existed.
+
+When reading this file:
+
+1. read the ADR's **Current Alignment** block;
+2. read the original decision in its historical context;
+3. apply later accepted ADRs where they extend or supersede the earlier decision;
+4. use `PROJECT_STATE.md` for verified implementation reality;
+5. use `FUTURE_WORK.MD` for unscheduled work.
+
+**Status alignment date:** 2026-07-24  
+**Repository ref reviewed:** `main@686e3b91bfbf9459a38e9137abee6a2588ecec7f`  
+**Latest verified implementation:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` — Sprint 53  
+**Latest accepted ADR:** ADR-039  
+**Current migration:** V6
+
+No alignment note authorizes implementation.
+
+## Current ADR Index
+
+| ADR | Decision | Current standing | Implementation |
+|---|---|---|---|
+| ADR-001 | Offline-First Architecture | Accepted foundational decision. | Operational as a product and persistence constraint. |
+| ADR-002 | Dashboard-First Product | Accepted foundational product decision. | Reflected in the current Dashboard-first application shell. |
+| ADR-003 | Generic Import Engine | Accepted and implemented incrementally. | Unified import orchestration became operational in Sprint 11C and was extended by later ADRs. |
+| ADR-004 | Explainable Automation | Accepted, amended by ADR-037. | Explainability and inspectability remain binding. |
+| ADR-005 | Import Profiles | Accepted product and architecture direction; general framework not implemented. | Current production persistence records parser profile ID/version as provenance under ADR-039. |
+| ADR-006 | Financial Dashboard as Single Source of Truth | Accepted product principle. | Consolidated in effect with ADR-002. |
+| ADR-007 | Explain Before Automating | Accepted foundational automation principle. | Applies to future rules, suggestions and financial intelligence. |
+| ADR-008 | Multi-Currency Domain Model | Accepted and extended by ADR-033. | The Money/native-currency foundation was implemented in Sprint 44 without a migration. |
+| ADR-009 | Reactive Store Architecture | Accepted, refined by ADR-024. | Stores own observable runtime state. |
+| ADR-010 | Validation Before Persistence | Accepted, refined by ADR-032, ADR-038 and ADR-039. | Validation remains mandatory before accepted persistence. |
+| ADR-011 | Unified FinancialDocument Pipeline | Accepted architectural direction. | Current production support remains limited to the approved shared Axis bank-account CSV grammar. |
+| ADR-012 | Separation of Readers and Parsers | Accepted and implemented. | Readers own extraction; parsers own financial interpretation. |
+| ADR-013 | Store Ownership | Accepted, refined by ADR-024. | Dedicated stores own runtime domain state. |
+| ADR-014 | Document-First Architecture | Accepted product direction. | Document-oriented extraction and classification foundations exist. |
+| ADR-015 | Automatic Password Management | Accepted product and architecture direction; production workflow not implemented. | PasswordProvider and locked-reader protocol foundations exist. |
+| ADR-016 | Universal Import Pipeline | Accepted, superseded in part by ADR-030, ADR-031, ADR-032, ADR-038 and ADR-039. | The unified pipeline remains authoritative, but its current ordering and persistence boundary have changed. |
+| ADR-017 | Deterministic Before Intelligent | Accepted foundational principle. | Deterministic processing remains mandatory at trusted boundaries. |
+| ADR-018 | Unified Import Framework Operational | Accepted and implemented in Sprint 11C. | CSV entered the unified framework. |
+| ADR-019 | Reference Fixtures Define Financial Truth | Accepted, clarified by ADR-030, ADR-031, ADR-034 and ADR-039. | Approved fixtures and independent expected evidence remain architectural acceptance inputs. |
+| ADR-020 | Deterministic Institution Detection | Accepted and implemented in Sprint 12C. | Institution detection is a deterministic pipeline stage. |
+| ADR-021 | Deterministic Statement Classification | Accepted and implemented in Sprint 13. | Statement classification is a deterministic pipeline stage. |
+| ADR-022 | Preview Compatibility During Test Builds | Accepted and implemented as a toolchain-compatibility decision. | Historical Sprint 18 build compatibility evidence remains valid for that toolchain. |
+| ADR-023 | Frozen UI/UX Architecture | Accepted and implemented. | The frozen UI/UX hierarchy remains authoritative. |
+| ADR-024 | Repository Hydration Boundary | Accepted and implemented. | RepositoryStoreHydrator is the sole persistence-to-runtime boundary. |
+| ADR-025 | Stable Financial Entity Identity | Accepted and implemented, then extended by ADR-027, ADR-029, ADR-038 and ADR-039. | Stable account identity, parser-owned identifiers, deterministic resolution, durable ownership and accepted-import observations are operational for the approved Axis path. |
+| ADR-026 | Structured Developer Diagnostics | Accepted and implemented in Sprint 31. | Structured diagnostics remain in-memory, bounded and privacy-safe. |
+| ADR-027 | Parser-Owned Financial Identifier Extraction | Accepted and implemented through Sprints 33, 35 and 36. | Verified financial identifiers originate exclusively in approved StatementParser implementations. |
+| ADR-028 | Bounded Parser Source Evidence | Accepted and implemented in Sprint 34. | Bounded transient pre-transaction source context supports parser-owned interpretation. |
+| ADR-029 | User-Confirmed Financial Identifier Attachment | Accepted and implemented in Sprint 38; atomicity limitation superseded by ADR-038 implementation. | Explicit Use Existing Account versus Create New Account control remains authoritative for eligible no-match cases. |
+| ADR-030 | Versioned Exact-Content Fingerprints and Atomic Import-History Commit | Accepted and implemented in Sprint 39; persistence/concurrency limitations superseded in part by ADR-038 implementation. | ledgerforge.raw-text.sha256.v1 remains the exact reader-text authority. |
+| ADR-031 | Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking | Accepted and implemented in Sprint 41; concurrency boundary extended by ADR-038 implementation. | ledgerforge.transaction-event.axis-upi-reference.v1 remains limited to approved account-scoped Axis UPI evidence. |
+| ADR-032 | Durable Import Attempt History and Rejected-Outcome Semantics | Accepted and implemented in Sprint 42; atomicity limitation superseded by ADR-038 implementation. | Durable attempts remain distinct from accepted import sessions. |
+| ADR-033 | Deterministic Money and Native-Currency Integrity | Accepted and implemented in Sprint 44. | Money, compiled catalog authority, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation are operational. |
+| ADR-034 | Document-Scoped Card Statement Evidence | Accepted architecture; not implemented. | Fixture evidence exists for American Express, CBQ and Axis card families. |
+| ADR-035 | Development Database Lifecycle and Recoverable Reset | Accepted and implemented in Sprint 45 Phase A. | DEBUG-only canonical/temporary database lifecycle, verified backup, recovery, activity exclusion and canonical hydration are operational. |
+| ADR-036 | Category Identity, Assignment, and Mutable Transaction Metadata | Accepted architecture; not implemented. | Discovery is complete and the candidate is ready for planning, subject to the approved UI supplement and current-baseline execution planning. |
+| ADR-037 | Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal | Accepted contract-first architecture; no executable mutation family implemented. | The shared lifecycle remains architecture-only. |
+| ADR-038 | Atomic Confirmed Import and Durable Identifier Ownership | Accepted and implemented in Sprint 50. | Migration V5, provider-owned atomic confirmed import, durable identifier ownership/observations, provider parity and subprocess contention acceptance are operational. |
+| ADR-039 | Trusted Statement Dates and Durable Source Provenance | Accepted and implemented in Sprint 52, with Sprint 52A corrective closure. | Migration V6, StatementDate, date-role/timezone evidence, parser-profile provenance, source ordinal/digest relationships and strict hydration are operational. |
+
+## Alignment Policy
+
+- Original ADR decision text is retained.
+- Current Alignment blocks are authoritative for present status.
+- Historical limitations are not silently deleted.
+- A decision is not marked implemented without verified repository evidence.
+- Fixture presence, schema capacity, protocol presence or UI placeholders do not establish production support.
+- Future corrections should add a dated amendment or a new ADR rather than retroactively rewriting architectural history.
+
 ---
 
+
 # ADR-001 — Offline-First Architecture
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted foundational decision.
+- **Implementation:** Operational as a product and persistence constraint.
+- **Current qualification:** The statement that categorization and reporting remain fully functional offline is a product-direction requirement, not a claim that the current category or reporting domains are implemented.
+
 
 ## Status
 Accepted
@@ -35,6 +119,13 @@ LedgerForge is designed as an offline-first application. All core functionality 
 
 # ADR-002 — Dashboard-First Product
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted foundational product decision.
+- **Implementation:** Reflected in the current Dashboard-first application shell.
+- **Current qualification:** This ADR defines product priority, not analytical support. Dashboard cards still require repository-backed financial authority.
+
+
 ## Status
 Accepted
 
@@ -50,6 +141,13 @@ All new features should improve the dashboard, reduce manual work or increase co
 ---
 
 # ADR-003 — Generic Import Engine
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented incrementally.
+- **Implementation:** Unified import orchestration became operational in Sprint 11C and was extended by later ADRs.
+- **Current qualification:** Supporting a new institution still requires independently approved reader, detection, classification, parser, validation, identity, duplicate, persistence and fixture boundaries. A parser profile alone is not sufficient.
+
 
 ## Status
 Accepted
@@ -67,6 +165,13 @@ The codebase remains scalable as supported institutions grow.
 
 # ADR-004 — Explainable Automation
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted, amended by ADR-037.
+- **Implementation:** Explainability and inspectability remain binding.
+- **Current qualification:** The original universal reversibility language is no longer authoritative. ADR-037 requires each financial-mutation family to be explicitly classified as reversible, compensatable, irreversible or unsupported.
+
+
 ## Status
 Accepted
 
@@ -82,6 +187,13 @@ Rules, AI assistance and automation must expose the reasoning behind every decis
 ---
 
 # ADR-005 — Import Profiles
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted product and architecture direction; general framework not implemented.
+- **Implementation:** Current production persistence records parser profile ID/version as provenance under ADR-039.
+- **Current qualification:** Parser-profile provenance is not a reusable user-managed Import Profile repository, learned mapping system or automatic profile promotion mechanism.
+
 
 ## Status
 Accepted
@@ -101,6 +213,13 @@ Financial institutions evolve their exports over time. Profiles allow LedgerForg
 
 # ADR-006 — Financial Dashboard as Single Source of Truth
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted product principle.
+- **Implementation:** Consolidated in effect with ADR-002.
+- **Current qualification:** The Dashboard is the primary experience, but it is not the durable source of truth. Repositories remain authoritative under ADR-024.
+
+
 ## Status
 Accepted
 
@@ -117,6 +236,13 @@ Development priorities should favour insights, automation and confidence over im
 
 # ADR-007 — Explain Before Automating
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted foundational automation principle.
+- **Implementation:** Applies to future rules, suggestions and financial intelligence.
+- **Current qualification:** Explanation does not itself authorize persistence or mutation. Trusted writes remain governed by validation, explicit control and provider-owned boundaries.
+
+
 ## Status
 Accepted
 
@@ -132,6 +258,13 @@ Rules, AI assistance and future learning systems must provide an audit trail exp
 ---
 
 # ADR-008 — Multi-Currency Domain Model
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and extended by ADR-033.
+- **Implementation:** The Money/native-currency foundation was implemented in Sprint 44 without a migration.
+- **Current qualification:** Exchange-rate storage, FX conversion, selectable reporting currency and consolidated mixed-currency totals remain unimplemented.
+
 
 ## Status
 Accepted
@@ -151,6 +284,13 @@ LedgerForge is designed to manage financial data across multiple countries, inst
 ---
 
 # ADR-009 — Reactive Store Architecture
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted, refined by ADR-024.
+- **Implementation:** Stores own observable runtime state.
+- **Current qualification:** Repositories own durable truth, and RepositoryStoreHydrator is the sole persistence-to-runtime boundary. Store ownership must not be read as persistence authority.
+
 
 ## Status
 Accepted
@@ -172,6 +312,13 @@ Separating ownership, business logic and presentation improves maintainability a
 
 # ADR-010 — Validation Before Persistence
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted, refined by ADR-032, ADR-038 and ADR-039.
+- **Implementation:** Validation remains mandatory before accepted persistence.
+- **Current qualification:** Preview candidates are transient. Accepted trusted transactions are published only through the provider-owned confirmed-import graph. Rejected workflow history belongs to import attempts, not successful sessions.
+
+
 ## Status
 Accepted
 
@@ -189,6 +336,13 @@ Incorrect financial data is more damaging than delayed imports. Validation shoul
 ---
 
 # ADR-011 — Unified FinancialDocument Pipeline
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted architectural direction.
+- **Implementation:** Current production support remains limited to the approved shared Axis bank-account CSV grammar.
+- **Current qualification:** Format convergence does not make every listed format supported. Each source format, institution, layout and document family remains independently gated.
+
 
 ## Status
 Accepted
@@ -209,6 +363,13 @@ Keeping downstream components independent of file formats dramatically simplifie
 
 # ADR-012 — Separation of Readers and Parsers
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented.
+- **Implementation:** Readers own extraction; parsers own financial interpretation.
+- **Current qualification:** Later ADRs preserve this boundary for identifiers, transaction-event evidence, card evidence and source provenance.
+
+
 ## Status
 Accepted
 
@@ -226,6 +387,13 @@ Extraction and interpretation change for different reasons. Separating them redu
 ---
 
 # ADR-013 — Store Ownership
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted, refined by ADR-024.
+- **Implementation:** Dedicated stores own runtime domain state.
+- **Current qualification:** Repositories remain durable authority. Future stores must hydrate through RepositoryStoreHydrator and must not create parallel persistence-to-runtime paths.
+
 
 ## Status
 Accepted
@@ -246,6 +414,13 @@ Single ownership prevents duplicated state and inconsistent dashboard calculatio
 
 # ADR-014 — Document-First Architecture
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted product direction.
+- **Implementation:** Document-oriented extraction and classification foundations exist.
+- **Current qualification:** The statement that PDF becomes a first-class source is aspirational. Production PDF, XLS, XLSX, TXT and OCR support remain unimplemented.
+
+
 ## Status
 Accepted
 
@@ -263,6 +438,13 @@ Every supported institution provides financial documents in one or more formats.
 ---
 
 # ADR-015 — Automatic Password Management
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted product and architecture direction; production workflow not implemented.
+- **Implementation:** PasswordProvider and locked-reader protocol foundations exist.
+- **Current qualification:** No production password-entry, credential-profile or Keychain workflow currently exists. Readers still must not own credential storage or prompting.
+
 
 ## Status
 Accepted
@@ -282,6 +464,13 @@ Most financial institutions consistently use the same password pattern for month
 ---
 
 # ADR-016 — Universal Import Pipeline
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted, superseded in part by ADR-030, ADR-031, ADR-032, ADR-038 and ADR-039.
+- **Implementation:** The unified pipeline remains authoritative, but its current ordering and persistence boundary have changed.
+- **Current qualification:** Current flow is reading → detection → classification → parser selection → FinancialDocument → validation → duplicate/event evaluation → account/identity review → explicit confirmation → provider-owned atomic persistence → canonical hydration. Cross-format duplicate identity is not established.
+
 
 ## Status
 Accepted
@@ -354,6 +543,13 @@ ADR-011 introduced the concept of a unified downstream pipeline. ADR-016 defines
 
 # ADR-017 — Deterministic Before Intelligent
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted foundational principle.
+- **Implementation:** Deterministic processing remains mandatory at trusted boundaries.
+- **Current qualification:** AI remains advisory and cannot become the sole authority for parsing, validation, identity, persistence or financial mutation.
+
+
 ## Status
 Accepted
 
@@ -386,6 +582,13 @@ Structured documents should be processed using deterministic rules. AI should on
 ---
 
 # ADR-018 — Unified Import Framework Operational
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 11C.
+- **Implementation:** CSV entered the unified framework.
+- **Current qualification:** The pipeline diagram and downstream atomicity limitations are historical. Later ADRs govern duplicate evaluation, attempt history, provider-owned confirmation and source provenance. Current production support is one approved Axis CSV grammar, not generic CSV.
+
 
 ## Status
 
@@ -474,6 +677,13 @@ This establishes a single extensible architecture for every supported import for
 
 # ADR-019 — Reference Fixtures Define Financial Truth
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted, clarified by ADR-030, ADR-031, ADR-034 and ADR-039.
+- **Implementation:** Approved fixtures and independent expected evidence remain architectural acceptance inputs.
+- **Current qualification:** Source semantics outrank derived expected JSON. Cross-format equivalence must be proven for each approved pair and does not create exact-content duplicate identity or broad format support.
+
+
 ## Status
 
 Accepted
@@ -516,6 +726,13 @@ Using approved reference fixtures creates a deterministic financial baseline tha
 ---
 
 # ADR-020 — Deterministic Institution Detection
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 12C.
+- **Implementation:** Institution detection is a deterministic pipeline stage.
+- **Current qualification:** CSV/PDF fixture tests do not establish production PDF support. Detection evidence must remain specific to the approved family and extracted-content boundary.
+
 
 ## Status
 
@@ -577,6 +794,13 @@ Deterministic rules preserve reproducibility, simplify regression testing and en
 
 # ADR-021 — Deterministic Statement Classification
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 13.
+- **Implementation:** Statement classification is a deterministic pipeline stage.
+- **Current qualification:** Fixture-backed classification does not establish parser, persistence or end-user support for that document family.
+
+
 ## Status
 
 Accepted
@@ -634,6 +858,13 @@ Separating these responsibilities keeps parser selection deterministic while all
 ---
 
 # ADR-022 — Preview Compatibility During Test Builds
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented as a toolchain-compatibility decision.
+- **Implementation:** Historical Sprint 18 build compatibility evidence remains valid for that toolchain.
+- **Current qualification:** This is not a permanent prohibition on #Preview. Reintroduction requires fresh toolchain and command-line build verification.
+
 
 ## Status
 
@@ -693,6 +924,13 @@ Using `PreviewProvider` preserves Xcode preview functionality while avoiding the
 
 # ADR-023 — Frozen UI/UX Architecture
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented.
+- **Implementation:** The frozen UI/UX hierarchy remains authoritative.
+- **Current qualification:** Current status alignment belongs in UI_UX_v1.0_Frozen.md. Future modules must not appear as inert navigation merely because they exist in Product Vision.
+
+
 ## Status
 
 Accepted
@@ -740,6 +978,13 @@ This mirrors the successful approach used for `Architecture_v1.0_Frozen.md`.
 ---
 
 # ADR-024 — Repository Hydration Boundary
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented.
+- **Implementation:** RepositoryStoreHydrator is the sole persistence-to-runtime boundary.
+- **Current qualification:** Later ADRs extend fail-closed hydration to Money, attempts, identifier observations, trusted dates, parser profiles and source provenance.
+
 
 ## Status
 
@@ -797,6 +1042,13 @@ It also keeps SwiftUI presentation code independent of persistence implementatio
 ---
 
 # ADR-025 — Stable Financial Entity Identity
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented, then extended by ADR-027, ADR-029, ADR-038 and ADR-039.
+- **Implementation:** Stable account identity, parser-owned identifiers, deterministic resolution, durable ownership and accepted-import observations are operational for the approved Axis path.
+- **Current qualification:** Examples of future financial entities do not establish parser or institution support.
+
 
 ## Status
 
@@ -860,6 +1112,13 @@ Stable repository identity and verified identifiers provide a deterministic foun
 ---
 
 # ADR-026 — Structured Developer Diagnostics
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 31.
+- **Implementation:** Structured diagnostics remain in-memory, bounded and privacy-safe.
+- **Current qualification:** No persistent diagnostic history, unrestricted export, SQL browser or financial-truth role is authorized.
+
 
 ## Status
 
@@ -1044,6 +1303,13 @@ ADR-026 was accepted after:
 
 # ADR-027 — Parser-Owned Financial Identifier Extraction
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented through Sprints 33, 35 and 36.
+- **Implementation:** Verified financial identifiers originate exclusively in approved StatementParser implementations.
+- **Current qualification:** Later identifier ownership and observation persistence under ADR-038 does not move verification authority out of parsers.
+
+
 ## Status
 
 Accepted
@@ -1156,6 +1422,13 @@ Those changes belong to future implementation sprints.
 ---
 
 # ADR-028 — Bounded Parser Source Evidence
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 34.
+- **Implementation:** Bounded transient pre-transaction source context supports parser-owned interpretation.
+- **Current qualification:** ADR-039 durable normalized provenance is a separate privacy-minimal post-acceptance graph. It does not authorize persistence of ADR-028 source-fragment text.
+
 
 ## Status
 
@@ -1405,6 +1678,13 @@ Those changes require separate implementation decisions and sprints.
 
 # ADR-029 — User-Confirmed Financial Identifier Attachment
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 38; atomicity limitation superseded by ADR-038 implementation.
+- **Implementation:** Explicit Use Existing Account versus Create New Account control remains authoritative for eligible no-match cases.
+- **Current qualification:** The original statement that early identifier writes may survive later failure describes pre-Sprint-50 behavior. Sprint 50 places the complete accepted graph inside one provider-owned transaction.
+
+
 ## Status
 
 Accepted
@@ -1539,6 +1819,13 @@ This ADR does not:
 
 # ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 39; persistence/concurrency limitations superseded in part by ADR-038 implementation.
+- **Implementation:** ledgerforge.raw-text.sha256.v1 remains the exact reader-text authority.
+- **Current qualification:** The original account/identifier residue and same-process-only confirmed-import limitations describe pre-Sprint-50 behavior. Binary-document and cross-format identity remain future work.
+
+
 ## Status
 
 Accepted
@@ -1634,6 +1921,13 @@ Sprint 39 does not include transaction-level duplicate detection, overlapping-st
 ---
 
 # ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 41; concurrency boundary extended by ADR-038 implementation.
+- **Implementation:** ledgerforge.transaction-event.axis-upi-reference.v1 remains limited to approved account-scoped Axis UPI evidence.
+- **Current qualification:** Sprint 50 added provider-owned transaction-time revalidation and verified multi-process competition for approved writers. It did not broaden the event family.
+
 
 ## Status
 
@@ -1798,6 +2092,13 @@ This ADR does not implement parser extraction, domain models, repository lookup,
 
 # ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 42; atomicity limitation superseded by ADR-038 implementation.
+- **Implementation:** Durable attempts remain distinct from accepted import sessions.
+- **Current qualification:** The original statement that account or identifier side effects may precede atomic history describes pre-Sprint-50 behavior. Successful attempts now commit with the complete accepted graph.
+
+
 ## Status
 
 Accepted
@@ -1848,6 +2149,13 @@ Users gain durable, privacy-safe explanation of supported import outcomes withou
 ---
 
 # ADR-033 — Deterministic Money and Native-Currency Integrity
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 44.
+- **Implementation:** Money, compiled catalog authority, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation are operational.
+- **Current qualification:** Sprint 44 introduced no migration. Production non-INR import, FX storage, conversion and reporting-currency totals remain unsupported.
+
 
 ## Status
 
@@ -2061,6 +2369,13 @@ ADR-033 does not establish QAR production support, PDF or XLS/XLSX support, card
 
 # ADR-034 — Document-Scoped Card Statement Evidence
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted architecture; not implemented.
+- **Implementation:** Fixture evidence exists for American Express, CBQ and Axis card families.
+- **Current qualification:** No card evidence domain, migration, persistence, hydration, production parser or institution support is authorized by fixture presence.
+
+
 ## Status
 
 Accepted
@@ -2180,6 +2495,13 @@ ADR-034 does not implement card evidence models, parsers, persistence, migration
 
 # ADR-035 — Development Database Lifecycle and Recoverable Reset
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 45 Phase A.
+- **Implementation:** DEBUG-only canonical/temporary database lifecycle, verified backup, recovery, activity exclusion and canonical hydration are operational.
+- **Current qualification:** This added no schema migration and does not establish production backup, arbitrary restore or financial reversal.
+
+
 ## Status
 
 Accepted
@@ -2281,6 +2603,13 @@ ADR-035 does not authorize Release or production reset, arbitrary database delet
 ---
 
 # ADR-036 — Category Identity, Assignment, and Mutable Transaction Metadata
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted architecture; not implemented.
+- **Implementation:** Discovery is complete and the candidate is ready for planning, subject to the approved UI supplement and current-baseline execution planning.
+- **Current qualification:** The durable repository transaction-ID prerequisite was satisfied by ADR-039/Sprint 52. The historical possible V5 number is obsolete because V5 and V6 are now consumed; the expected additive category migration is V7 unless another approved migration takes precedence.
+
 
 ## Status
 
@@ -2996,6 +3325,13 @@ This ADR must be marked **Accepted** before category implementation begins.
 ---
 
 # ADR-037 — Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted contract-first architecture; no executable mutation family implemented.
+- **Implementation:** The shared lifecycle remains architecture-only.
+- **Current qualification:** Its historical context about partial confirmed-import side effects was superseded by ADR-038/Sprint 50 for accepted imports. That bounded import operation does not implement the generic mutation executor, audit ledger or family-specific reversal framework.
+
 
 ## Status
 
@@ -4012,6 +4348,13 @@ This ADR must be marked **Accepted** before source-level financial-mutation cont
 
 # ADR-038 — Atomic Confirmed Import and Durable Identifier Ownership
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 50.
+- **Implementation:** Migration V5, provider-owned atomic confirmed import, durable identifier ownership/observations, provider parity and subprocess contention acceptance are operational.
+- **Current qualification:** Statements below that production implementation remains pending, V5 is merely proposed or the guarantees cannot yet be claimed describe Sprint 49 architecture state and are no longer current.
+
+
 ## Status
 
 Accepted
@@ -4262,6 +4605,13 @@ No production guarantee may be recorded until implementation, migration safety w
 
 # ADR-039 — Trusted Statement Dates and Durable Source Provenance
 
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted and implemented in Sprint 52, with Sprint 52A corrective closure.
+- **Implementation:** Migration V6, StatementDate, date-role/timezone evidence, parser-profile provenance, source ordinal/digest relationships and strict hydration are operational.
+- **Current qualification:** Sprint 53 extended the same approved shared-layout Axis bank-account CSV profile to supplied NRO evidence without changing this ADR or Migration V6.
+
+
 **Status:** Accepted and implemented by Sprint 52.
 
 ## Decision
@@ -4288,3 +4638,22 @@ Generic transaction replacement rejects trusted DTOs. Only the provider-owned co
 
 - ADR-024 — Repository Hydration Boundary
 - ADR-038 — Atomic Confirmed Import and Durable Identifier Ownership
+
+---
+
+# ADR Status Alignment Log
+
+## 2026-07-24 — Full ADR Audit
+
+- Reviewed all 39 ADRs against `main@686e3b91bfbf9459a38e9137abee6a2588ecec7f`.
+- Preserved every original ADR decision and historical limitation.
+- Added a complete current-status index.
+- Added dated Current Alignment blocks to every ADR.
+- Recorded partial supersession without deleting historical evidence.
+- Corrected current implementation status for ADR-033, ADR-035, ADR-038 and ADR-039.
+- Recorded Sprint 50's effect on the historical non-atomicity limitations in ADR-029 through ADR-032 and ADR-037.
+- Recorded the current pipeline ordering governed by ADR-030, ADR-031, ADR-032, ADR-038 and ADR-039.
+- Recorded ADR-036's satisfied durable-transaction-ID prerequisite and expected V7 direction.
+- Preserved current production support as the approved shared Axis bank-account CSV grammar only.
+- Authorized no implementation, migration or new ADR.
+
