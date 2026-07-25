@@ -160,6 +160,172 @@ enum ImportOutcomeTone: Equatable {
     }
 }
 
+struct DurableImportPresentationValue: Equatable {
+    let label: String
+    let explanation: String
+    let iconName: String
+    let tone: ImportOutcomeTone
+}
+
+struct DurableImportAttemptPresentation: Equatable {
+    let outcome: DurableImportPresentationValue
+    let coverage: String
+    let guidance: String
+
+    init(attempt: RepositoryImportAttempt) {
+        outcome = Self.outcome(
+            code: attempt.outcomeCode,
+            transactionCount: attempt.transactionCount
+        )
+        coverage = Self.coverage(code: attempt.coverageCode)
+        guidance = Self.guidance(code: attempt.guidanceCode)
+    }
+
+    nonisolated static func outcome(
+        code: String,
+        transactionCount: Int
+    ) -> DurableImportPresentationValue {
+        guard let outcome = ImportAttemptOutcome(rawValue: code) else {
+            return DurableImportPresentationValue(
+                label: "Outcome unavailable",
+                explanation: "A durable import outcome is unavailable",
+                iconName: "questionmark.circle.fill",
+                tone: .warning
+            )
+        }
+
+        switch outcome {
+        case .successfulImport:
+            return DurableImportPresentationValue(
+                label: "Import completed",
+                explanation: "Persisted \(transactionCount) transaction(s)",
+                iconName: "checkmark.circle.fill",
+                tone: .success
+            )
+        case .validationFailure:
+            return DurableImportPresentationValue(
+                label: "Validation failed",
+                explanation: "Validation failed before persistence",
+                iconName: "xmark.octagon.fill",
+                tone: .danger
+            )
+        case .persistenceFailure:
+            return DurableImportPresentationValue(
+                label: "Persistence failed",
+                explanation: "Persistence failed after validation",
+                iconName: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
+        case .exactStatementDuplicate:
+            return DurableImportPresentationValue(
+                label: "Previously imported",
+                explanation: "The exact statement was already imported. No new data was written",
+                iconName: "doc.on.doc.fill",
+                tone: .warning
+            )
+        case .existingEligibleAxisUPIEvent:
+            return DurableImportPresentationValue(
+                label: "Supported transaction event blocked",
+                explanation: "A supported transaction event already exists. No new data was written",
+                iconName: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
+        case .repeatedEligibleIncomingEvidence:
+            return DurableImportPresentationValue(
+                label: "Repeated incoming evidence",
+                explanation: "Supported transaction evidence repeats within this import. No new data was written",
+                iconName: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
+        case .transactionEventOwnershipConflict:
+            return DurableImportPresentationValue(
+                label: "Transaction-event ownership conflict",
+                explanation: "Supported transaction-event ownership conflicts. No new data was written",
+                iconName: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
+        case .repositoryIntegrityConflict:
+            return DurableImportPresentationValue(
+                label: "Repository integrity conflict",
+                explanation: "Repository integrity prevented confirmation. No new data was written",
+                iconName: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
+        case .identityAmbiguity:
+            return DurableImportPresentationValue(
+                label: "Account identity ambiguous",
+                explanation: "Account identity could not be resolved unambiguously. No new data was written",
+                iconName: "person.crop.circle.badge.questionmark",
+                tone: .warning
+            )
+        case .identityConflict:
+            return DurableImportPresentationValue(
+                label: "Account identity conflict",
+                explanation: "Account identity conflicts across accounts. No new data was written",
+                iconName: "person.crop.circle.badge.exclamationmark",
+                tone: .warning
+            )
+        case .staleAccountChoice:
+            return DurableImportPresentationValue(
+                label: "Account choice out of date",
+                explanation: "The prepared account choice is no longer current. No new data was written",
+                iconName: "clock.badge.exclamationmark.fill",
+                tone: .warning
+            )
+        case .staleProviderGeneration:
+            return DurableImportPresentationValue(
+                label: "Persistence changed",
+                explanation: "Persistence changed after preparation. No new data was written",
+                iconName: "arrow.triangle.2.circlepath",
+                tone: .warning
+            )
+        case .sqliteContention:
+            return DurableImportPresentationValue(
+                label: "Persistence busy",
+                explanation: "Confirmation did not win persistence contention. No new data was written",
+                iconName: "hourglass",
+                tone: .warning
+            )
+        }
+    }
+
+    nonisolated static func coverage(code: String) -> String {
+        guard let coverage = ImportAttemptCoverage(rawValue: code) else {
+            return "Coverage unavailable"
+        }
+        switch coverage {
+        case .evaluatedSupportedOnly:
+            return "Supported transaction-event checks evaluated"
+        case .unsupportedOrUnevaluated:
+            return "Some transaction-event families unsupported or not evaluated"
+        }
+    }
+
+    nonisolated static func guidance(code: String) -> String {
+        guard let guidance = ImportAttemptGuidance(rawValue: code) else {
+            return "Guidance unavailable"
+        }
+        switch guidance {
+        case .importCompleted:
+            return "Import completed"
+        case .reviewPriorImport:
+            return "Review the prior import"
+        case .supportedEventBlocked:
+            return "Review the supported transaction-event block"
+        case .correctValidationAndRetry:
+            return "Correct validation issues before retrying"
+        case .persistenceUnavailable:
+            return "Persistence is unavailable"
+        case .integrityReviewRequired:
+            return "Review required"
+        case .prepareAgain:
+            return "Prepare the import again"
+        case .retryConfirmation:
+            return "Retry confirmation"
+        }
+    }
+}
+
 struct ImportOutcomePresentation: Equatable {
     let fileName: String
     let transactionCount: Int
@@ -370,59 +536,14 @@ struct ImportActivityPresentation: Equatable {
     }
 
     private init(durableAttempt: RepositoryImportAttempt) {
-        switch durableAttempt.outcomeCode {
-        case ImportAttemptOutcome.successfulImport.rawValue:
-            self.init(
-                title: "Latest durable import",
-                subtitle: "Persisted \(durableAttempt.transactionCount) transaction(s)",
-                status: "Import completed",
-                iconName: "checkmark.circle.fill",
-                tone: .success
-            )
-        case ImportAttemptOutcome.validationFailure.rawValue:
-            self.init(
-                title: "Latest durable import",
-                subtitle: "Validation failed before persistence",
-                status: "Validation failed",
-                iconName: "xmark.octagon.fill",
-                tone: .danger
-            )
-        case ImportAttemptOutcome.persistenceFailure.rawValue:
-            self.init(
-                title: "Latest durable import",
-                subtitle: "Persistence failed after validation",
-                status: "Persistence failed",
-                iconName: "exclamationmark.triangle.fill",
-                tone: .warning
-            )
-        case ImportAttemptOutcome.exactStatementDuplicate.rawValue:
-            self.init(
-                title: "Latest durable import",
-                subtitle: "Previously imported — no new data written",
-                status: "Previously imported",
-                iconName: "checkmark.circle.fill",
-                tone: .warning
-            )
-        case ImportAttemptOutcome.existingEligibleAxisUPIEvent.rawValue,
-             ImportAttemptOutcome.repeatedEligibleIncomingEvidence.rawValue,
-             ImportAttemptOutcome.transactionEventOwnershipConflict.rawValue,
-             ImportAttemptOutcome.repositoryIntegrityConflict.rawValue:
-            self.init(
-                title: "Latest durable import",
-                subtitle: "Import outcome recorded in Import History",
-                status: "Statement blocked",
-                iconName: "exclamationmark.triangle.fill",
-                tone: .warning
-            )
-        default:
-            self.init(
-                title: "Latest durable import",
-                subtitle: "A durable import outcome is unavailable",
-                status: "Outcome unavailable",
-                iconName: "questionmark.circle.fill",
-                tone: .warning
-            )
-        }
+        let presentation = DurableImportAttemptPresentation(attempt: durableAttempt)
+        self.init(
+            title: "Latest durable import",
+            subtitle: presentation.outcome.explanation,
+            status: presentation.outcome.label,
+            iconName: presentation.outcome.iconName,
+            tone: presentation.outcome.tone
+        )
     }
 }
 
@@ -1711,25 +1832,29 @@ struct ContentView: View {
                     .font(.caption).foregroundStyle(LFTheme.textSecondary)
             } else {
                 ForEach(importHistoryViewModel.attempts.prefix(8)) { attempt in
+                    let presentation = DurableImportAttemptPresentation(attempt: attempt)
                     Button { importHistoryViewModel.select(id: attempt.id) } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(attemptTitle(attempt.outcomeCode)).font(.subheadline.weight(.semibold))
+                                Text(presentation.outcome.label).font(.subheadline.weight(.semibold))
                                 Text(attempt.createdAtISO).font(.caption2).foregroundStyle(LFTheme.textSecondary)
                             }
                             Spacer()
                             Text("\(attempt.transactionCount) transactions").font(.caption).foregroundStyle(LFTheme.textSecondary)
                         }
                         .padding(9).background(LFTheme.surface.opacity(0.7)).clipShape(RoundedRectangle(cornerRadius: 7))
-                    }.buttonStyle(.plain)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(presentation.outcome.label). \(presentation.outcome.explanation)")
                 }
             }
             if let attempt = importHistoryViewModel.selectedAttempt {
+                let presentation = DurableImportAttemptPresentation(attempt: attempt)
                 Divider()
                 HStack { Text("Attempt Detail").font(.subheadline.weight(.semibold)); Spacer(); Button("Close") { importHistoryViewModel.clearSelection() }.font(.caption) }
-                LFInfoRow(title: "Outcome", value: attemptTitle(attempt.outcomeCode))
-                LFInfoRow(title: "Coverage", value: attempt.coverageCode.replacingOccurrences(of: "_", with: " "))
-                LFInfoRow(title: "Guidance", value: attempt.guidanceCode.replacingOccurrences(of: "_", with: " "))
+                LFInfoRow(title: "Outcome", value: presentation.outcome.label)
+                LFInfoRow(title: "Coverage", value: presentation.coverage)
+                LFInfoRow(title: "Guidance", value: presentation.guidance)
                 if let accountID = attempt.accountId, accountsViewModel.accounts.contains(where: { $0.id == accountID }) {
                     Button("View Account") { accountsViewModel.selectAccount(repositoryAccountID: accountID); selectedSection = .accounts }
                         .font(.caption.weight(.semibold)).buttonStyle(.plain).foregroundStyle(LFTheme.primaryHover)
@@ -1737,19 +1862,6 @@ struct ContentView: View {
             }
         }
         .padding(12).background(LFTheme.surface.opacity(0.45)).clipShape(RoundedRectangle(cornerRadius: 9))
-    }
-
-    private func attemptTitle(_ code: String) -> String {
-        switch code {
-        case ImportAttemptOutcome.successfulImport.rawValue: return "Import completed"
-        case ImportAttemptOutcome.validationFailure.rawValue: return "Validation failed"
-        case ImportAttemptOutcome.exactStatementDuplicate.rawValue: return "Previously imported"
-        case ImportAttemptOutcome.existingEligibleAxisUPIEvent.rawValue: return "Supported transaction event blocked"
-        case ImportAttemptOutcome.repeatedEligibleIncomingEvidence.rawValue: return "Repeated incoming evidence"
-        case ImportAttemptOutcome.transactionEventOwnershipConflict.rawValue: return "Transaction-event ownership conflict"
-        case ImportAttemptOutcome.repositoryIntegrityConflict.rawValue: return "Repository integrity conflict"
-        default: return "Persistence failed"
-        }
     }
 
     private func preparedImportPreview(_ preparedImport: PreparedImport) -> some View {

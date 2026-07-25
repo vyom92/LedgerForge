@@ -281,49 +281,6 @@ This candidate is not implementation-ready as one broad “repair everything” 
 
 ---
 
-# P0 — Immediate Stability and Financial-Presentation Safety
-
-## FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness
-
-**Status:** Bug
-**Depends on:** None
-**Discovery:** Verified against `main@bdb51b0ddcdde097e456a16bab7f0bf999fd595b`
-
-Correct the user-facing presentation of durable import-attempt outcomes, coverage and guidance.
-
-The durable model defines bounded known values, but current Dashboard Import Activity and Import History projections do not exhaustively present them. Known identity, staleness and contention outcomes may be shown as unavailable or incorrectly labelled as persistence failure. Coverage and guidance may also reach presentation through transformed raw persistence strings.
-
-Required outcomes include:
-
-- one shared typed presentation authority for durable outcome, coverage and guidance values;
-- exhaustive truthful presentation of every currently known durable enum case;
-- neutral handling of unknown, malformed or future persistence codes;
-- no raw unknown code, identifier, path, source fragment or other unbounded persisted string reaching visible or copied presentation;
-- consistent behavior across Dashboard Import Activity, Import History list and Import History detail;
-- preservation of deterministic latest-attempt ordering;
-- focused tests that enumerate every known value and hostile unknown values.
-
-The presentation layer must not infer:
-
-- persistence failure from an unknown outcome;
-- retry safety;
-- account-linking behavior;
-- financial mutation;
-- successful or failed financial writes beyond the bounded durable code being presented.
-
-This candidate excludes:
-
-- richer account-match explanation under `FW-P0-10`;
-- retry workflow under `FW-P1-28`;
-- resolver or persistence changes;
-- schema or migration changes;
-- partial-overlap import;
-- general placeholder or visual-polish work.
-
-Implementation must stop if the intended meaning of a durable code cannot be established from its production owner or if truthful presentation would require exposing an unbounded raw value.
-
----
-
 # P0 — Financial Identity Safety
 
 ## FW-P0-10 — Explain Account Match, No-Match and Conflict Outcomes

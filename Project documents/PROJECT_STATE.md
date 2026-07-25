@@ -3,23 +3,24 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current pushed ref:** `main@de238d8abf5ee7dc7d1eb9cd13fab72803f2be28`
-- **Latest verified implementation:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` — Sprint 53, Axis Shared Bank-Account CSV Profile and NRO Identity Closure
+- **Current pushed ref:** the single Sprint 54 completion commit containing this state update; its exact SHA is Git-authoritative and recorded in the completion report
+- **Latest verified implementation:** the single Sprint 54 completion commit containing this state update — Durable Import-Outcome Presentation Exhaustiveness
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
-- **Latest verified completed increment:** Sprint 53
+  - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef9330b24bc66743fd2a17232c521f80eeb` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
+- **Latest verified completed increment:** Sprint 54
 - **Latest accepted ADR:** ADR-039 — Trusted Statement Dates and Durable Source Provenance
 - **Current migration:** V6
 - **Architecture baseline:** Architecture v1.0 Frozen and UI/UX v1.0 Frozen
 - **Latest verified repository-maintenance change:** `7ee20a909038d1088f830a6ea588311625f415e5`
 - **Latest verified implementation-adjacent maintenance repair:** Axis NRE CSV source-fidelity correction and deterministic header-semantic column mapping
-- **Latest recorded automated result:** 394 top-level tests across 48 suites, 0 failures and 0 unexpected skips at the Sprint 53 implementation baseline
-- **Latest focused Sprint 53 result:** 201 tests across 24 suites
-- **Latest recorded build and analysis result:** fresh Debug and whole-module optimized Release builds plus Debug and Release static analysis passed with zero errors, warnings or analyzer findings at the Sprint 53 implementation baseline
+- **Latest recorded automated result:** 400 top-level tests across 48 suites, 0 failures and 0 unexpected skips at the Sprint 54 implementation baseline
+- **Latest focused Sprint 54 results:** 18 presentation tests across 1 suite and 86 related model, history, hydration, engine, Dashboard and privacy tests across 7 suites, all with 0 failures and 0 unexpected skips
+- **Latest recorded build and analysis result:** fresh clean Debug and explicit `-O` whole-module Release builds plus Debug and Release static analysis passed with zero errors or analyzer findings at the Sprint 54 implementation baseline; clean builds emitted Xcode's non-product AppIntents metadata-extraction warning because the target has no AppIntents dependency
 - **Generic UI-test state:** `LedgerForgeUITests` remains intentionally disabled
-- **Fresh verification after Sprint 53:** none. The discovery campaign, candidate audit, repository-document reconciliation and roadmap updates were read-only or documentation-only and produced no new build, test, runtime, migration, ADR or implementation evidence.
+- **Sprint 54 runtime verification:** representative durable successful, known non-success and hostile unknown presentation was unavailable through an existing deterministic approved runtime route; no fixture launcher or runtime-injection infrastructure was added, and the presentation boundary is established by exhaustive automated tests
 
 GitHub establishes pushed repository state only. It does not establish local worktree cleanliness, linked worktrees, local branches, stashes, staged or unstaged changes, untracked files or unpushed commits.
 
@@ -223,7 +224,7 @@ Current presentation preserves:
 
 Mixed-currency values are not combined into one total. FX conversion is not implemented.
 
-`FW-P0-23` completed the approved financial-presentation and provenance repair boundary. A later review found that the durable-attempt presentation boundary is not exhaustive. That remaining verified defect is tracked as `FW-P0-24`.
+Sprint 54 completed `FW-P0-24` with one typed presentation authority for durable import-attempt outcome, coverage and guidance. Dashboard Import Activity, Import History list/detail and affected accessibility presentation use the same exhaustive bounded mapping. Unknown, malformed or future codes produce neutral output without reflecting raw values. Current-workflow precedence and deterministic latest-attempt ordering remain unchanged.
 
 ### Settings and repository status
 
@@ -494,6 +495,31 @@ American Express production parsing and durable card semantics remain unsupporte
 
 ## Recent Verified Changes
 
+### Sprint 54 — Durable Import-Outcome Presentation Exhaustiveness
+
+Commit:
+
+```text
+The single Sprint 54 completion commit containing this state update.
+Its exact SHA is Git-authoritative and recorded in the completion report.
+```
+
+Sprint 54:
+
+- introduced one typed presentation authority for durable import-attempt outcome, coverage and guidance;
+- explicitly presents all 13 known outcomes, both coverage codes and all 8 guidance codes;
+- routes Dashboard Import Activity and Import History list/detail through the same bounded semantics;
+- removed the separate partial history switch and raw underscore-to-space formatting;
+- uses the same bounded outcome text for affected Import History accessibility presentation;
+- returns neutral outcome, coverage and guidance labels for unknown, malformed or future codes without reflecting hostile raw values;
+- preserves successful transaction-count presentation, current-workflow precedence, valid timestamp ordering, stable equal-timestamp ID tie-breaking and malformed-timestamp behavior;
+- passed 18 focused presentation tests across 1 suite and 86 related tests across 7 suites;
+- passed the canonical 400-test, 48-suite TestPlan with 0 failures and 0 unexpected skips;
+- passed fresh clean Debug and explicit `-O` whole-module Release builds plus Debug and Release static analysis with zero errors or analyzer findings;
+- could not perform representative runtime presentation verification because no deterministic approved fixture launcher or injection route exists, and added no infrastructure to bypass that boundary.
+
+Schema, Migration V6, ADR-039, durable raw codes, repository/provider behavior and hydration semantics remain unchanged.
+
 ### Sprint 53 — Axis Shared Bank-Account CSV Profile and NRO Identity Closure
 
 Commit:
@@ -613,8 +639,7 @@ Detailed implementation history remains in Git and accepted ADRs.
 - `FW-P2-20 — Category Model and Management` remains ready for planning with an expected additive V7 migration, subject to its UI supplement and current-baseline execution planning.
 - `FW-P1-37` and `FW-P1-40` remain ready for planning as one possible bounded DEBUG-only import-verification outcome.
 - Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
-- `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` remains the highest-priority unresolved bug.
-- Lower-priority feature execution remains paused until `FW-P0-24` is repaired and accepted or the user explicitly accepts it as unresolved.
+- `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.
 - No implementation is authorized.
 
 ---

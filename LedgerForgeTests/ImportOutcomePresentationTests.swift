@@ -182,7 +182,7 @@ struct ImportOutcomePresentationTests {
         let blockedPresentation = ImportActivityPresentation(importState: .idle, latestDurableAttempt: blocked)
 
         #expect(duplicatePresentation.status == "Previously imported")
-        #expect(blockedPresentation.status == "Statement blocked")
+        #expect(blockedPresentation.status == "Supported transaction event blocked")
         #expect(![duplicatePresentation.subtitle, blockedPresentation.subtitle].joined().contains("UPI"))
     }
 
@@ -229,6 +229,154 @@ struct ImportOutcomePresentationTests {
 
         #expect(presentation.title == "current.csv")
         #expect(presentation.status == "Preparing")
+    }
+
+    @Test func everyKnownDurableOutcomeHasIndependentBoundedPresentation() {
+        let expected: [(ImportAttemptOutcome, String, String)] = [
+            (.successfulImport, "Import completed", "Persisted 2 transaction(s)"),
+            (.validationFailure, "Validation failed", "Validation failed before persistence"),
+            (.persistenceFailure, "Persistence failed", "Persistence failed after validation"),
+            (.exactStatementDuplicate, "Previously imported", "The exact statement was already imported. No new data was written"),
+            (.existingEligibleAxisUPIEvent, "Supported transaction event blocked", "A supported transaction event already exists. No new data was written"),
+            (.repeatedEligibleIncomingEvidence, "Repeated incoming evidence", "Supported transaction evidence repeats within this import. No new data was written"),
+            (.transactionEventOwnershipConflict, "Transaction-event ownership conflict", "Supported transaction-event ownership conflicts. No new data was written"),
+            (.repositoryIntegrityConflict, "Repository integrity conflict", "Repository integrity prevented confirmation. No new data was written"),
+            (.identityAmbiguity, "Account identity ambiguous", "Account identity could not be resolved unambiguously. No new data was written"),
+            (.identityConflict, "Account identity conflict", "Account identity conflicts across accounts. No new data was written"),
+            (.staleAccountChoice, "Account choice out of date", "The prepared account choice is no longer current. No new data was written"),
+            (.staleProviderGeneration, "Persistence changed", "Persistence changed after preparation. No new data was written"),
+            (.sqliteContention, "Persistence busy", "Confirmation did not win persistence contention. No new data was written")
+        ]
+
+        #expect(Set(expected.map { $0.0 }) == Set(ImportAttemptOutcome.allCases))
+
+        for (outcome, expectedLabel, expectedExplanation) in expected {
+            let presentation = DurableImportAttemptPresentation.outcome(
+                code: outcome.rawValue,
+                transactionCount: 2
+            )
+            #expect(presentation.label == expectedLabel)
+            #expect(presentation.explanation == expectedExplanation)
+            #expect(!presentation.label.contains(outcome.rawValue))
+            #expect(!presentation.explanation.contains(outcome.rawValue))
+        }
+    }
+
+    @Test func everyKnownCoverageHasIndependentBoundedPresentation() {
+        let expected: [(ImportAttemptCoverage, String)] = [
+            (.evaluatedSupportedOnly, "Supported transaction-event checks evaluated"),
+            (.unsupportedOrUnevaluated, "Some transaction-event families unsupported or not evaluated")
+        ]
+
+        #expect(Set(expected.map { $0.0 }) == Set(ImportAttemptCoverage.allCases))
+
+        for (coverage, expectedValue) in expected {
+            let value = DurableImportAttemptPresentation.coverage(code: coverage.rawValue)
+            #expect(value == expectedValue)
+            #expect(!value.contains(coverage.rawValue))
+            #expect(!value.contains("_"))
+        }
+    }
+
+    @Test func everyKnownGuidanceHasIndependentBoundedPresentation() {
+        let expected: [(ImportAttemptGuidance, String)] = [
+            (.importCompleted, "Import completed"),
+            (.reviewPriorImport, "Review the prior import"),
+            (.supportedEventBlocked, "Review the supported transaction-event block"),
+            (.correctValidationAndRetry, "Correct validation issues before retrying"),
+            (.persistenceUnavailable, "Persistence is unavailable"),
+            (.integrityReviewRequired, "Review required"),
+            (.prepareAgain, "Prepare the import again"),
+            (.retryConfirmation, "Retry confirmation")
+        ]
+
+        #expect(Set(expected.map { $0.0 }) == Set(ImportAttemptGuidance.allCases))
+
+        for (guidance, expectedValue) in expected {
+            let value = DurableImportAttemptPresentation.guidance(code: guidance.rawValue)
+            #expect(value == expectedValue)
+            #expect(!value.contains(guidance.rawValue))
+            #expect(!value.contains("_"))
+        }
+    }
+
+    @Test func hostileUnknownDurableValuesAreNeutralAndNeverReflected() {
+        let hostileValues = [
+            "future_outcome_/Users/private/account.csv",
+            "sqlite_error_account-123",
+            "identifier_XXXX9876",
+            "fingerprint_private-value",
+            "../../source-document",
+            "raw_sql_DROP_TABLE"
+        ]
+
+        for hostileValue in hostileValues {
+            let outcome = DurableImportAttemptPresentation.outcome(
+                code: hostileValue,
+                transactionCount: 0
+            )
+            let coverage = DurableImportAttemptPresentation.coverage(code: hostileValue)
+            let guidance = DurableImportAttemptPresentation.guidance(code: hostileValue)
+            let visibleAndAccessiblePresentation = [
+                outcome.label,
+                outcome.explanation,
+                coverage,
+                guidance,
+                "\(outcome.label). \(outcome.explanation)"
+            ].joined(separator: "|")
+
+            #expect(outcome.label == "Outcome unavailable")
+            #expect(outcome.explanation == "A durable import outcome is unavailable")
+            #expect(coverage == "Coverage unavailable")
+            #expect(guidance == "Guidance unavailable")
+            #expect(!visibleAndAccessiblePresentation.contains(hostileValue))
+            for fragment in ["/Users", "account-123", "XXXX9876", "fingerprint", "../", "DROP_TABLE"] {
+                #expect(!visibleAndAccessiblePresentation.localizedCaseInsensitiveContains(fragment))
+            }
+        }
+    }
+
+    @Test func dashboardAndHistoryUseTheSameDurableOutcomeAuthority() {
+        for outcome in ImportAttemptOutcome.allCases {
+            let attempt = durableAttempt(outcome: outcome, transactionCount: 2)
+            let shared = DurableImportAttemptPresentation(attempt: attempt)
+            let dashboard = ImportActivityPresentation(
+                importState: .idle,
+                latestDurableAttempt: attempt
+            )
+
+            #expect(dashboard.status == shared.outcome.label)
+            #expect(dashboard.subtitle == shared.outcome.explanation)
+            #expect(dashboard.iconName == shared.outcome.iconName)
+        }
+    }
+
+    @Test func materiallyDifferentDurableOutcomesRemainDistinct() {
+        let persistenceFailure = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.persistenceFailure.rawValue, transactionCount: 0)
+        let validationFailure = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.validationFailure.rawValue, transactionCount: 0)
+        let duplicate = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.exactStatementDuplicate.rawValue, transactionCount: 0)
+        let success = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.successfulImport.rawValue, transactionCount: 2)
+        let contention = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.sqliteContention.rawValue, transactionCount: 0)
+        let identityConflict = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.identityConflict.rawValue, transactionCount: 0)
+        let eventBlock = DurableImportAttemptPresentation.outcome(code: ImportAttemptOutcome.existingEligibleAxisUPIEvent.rawValue, transactionCount: 0)
+        let unknown = DurableImportAttemptPresentation.outcome(code: "future", transactionCount: 0)
+
+        #expect(Set([
+            persistenceFailure.label,
+            validationFailure.label,
+            duplicate.label,
+            success.label,
+            contention.label,
+            identityConflict.label,
+            eventBlock.label,
+            unknown.label
+        ]).count == 8)
+        #expect(success.explanation == "Persisted 2 transaction(s)")
+        #expect(!duplicate.explanation.contains("Persisted"))
+        #expect(!contention.label.localizedCaseInsensitiveContains("failure"))
+        #expect(!identityConflict.label.localizedCaseInsensitiveContains("unavailable"))
+        #expect(!eventBlock.label.localizedCaseInsensitiveContains("identity"))
+        #expect(unknown.label != persistenceFailure.label)
     }
 }
 
