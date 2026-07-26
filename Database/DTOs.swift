@@ -26,6 +26,46 @@ public struct WorkspaceDTO: nonisolated Equatable, Sendable {
     }
 }
 
+public struct CategoryDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let workspaceId: String
+    public let name: String
+    public let normalizedName: String
+    public let isArchived: Bool
+    public let createdAtISO: String
+    public let updatedAtISO: String?
+
+    public init(
+        id: String = UUID().uuidString,
+        workspaceId: String,
+        name: String,
+        normalizedName: String,
+        isArchived: Bool = false,
+        createdAtISO: String,
+        updatedAtISO: String? = nil
+    ) {
+        self.id = id
+        self.workspaceId = workspaceId
+        self.name = name
+        self.normalizedName = normalizedName
+        self.isArchived = isArchived
+        self.createdAtISO = createdAtISO
+        self.updatedAtISO = updatedAtISO
+    }
+}
+
+public struct TransactionCategoryAssignmentDTO: nonisolated Equatable, Sendable {
+    public let workspaceId: String
+    public let transactionId: String
+    public let categoryId: String
+
+    public init(workspaceId: String, transactionId: String, categoryId: String) {
+        self.workspaceId = workspaceId
+        self.transactionId = transactionId
+        self.categoryId = categoryId
+    }
+}
+
 public struct TransactionRawRowDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let normalizedRowId: String

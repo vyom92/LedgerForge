@@ -212,6 +212,7 @@ public final class SQLiteRepositoryProvider {
     public let database: SQLiteDatabase
     public let workspaceRepo: WorkspaceRepository
     public let transactionRepo: TransactionRepository
+    public let categoryRepo: CategoryRepository
     public let accountRepo: AccountRepository
     public let importSessionRepo: ImportSessionRepository
     public let generationToken: ProviderGenerationToken
@@ -266,6 +267,7 @@ public final class SQLiteRepositoryProvider {
 
         self.workspaceRepo = SQLiteWorkspaceRepo(db: database)
         self.transactionRepo = SQLiteTransactionRepo(db: database)
+        self.categoryRepo = SQLiteCategoryRepo(db: database)
         self.accountRepo = SQLiteAccountRepo(db: database)
         self.importSessionRepo = SQLiteImportSessionRepo(db: database)
         self.confirmedImportRepo = supportsConfirmedImport
@@ -655,6 +657,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
         DatabaseProvider.shared = DatabaseProvider(
             workspaceRepo: provider.workspaceRepo,
             transactionRepo: provider.transactionRepo,
+            categoryRepo: provider.categoryRepo,
             accountRepo: provider.accountRepo,
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
@@ -703,6 +706,236 @@ fileprivate final class SQLiteWorkspaceRepo: WorkspaceRepository {
                 updatedAtISO: row.string(at: 3)
             )
         }.first
+    }
+}
+
+fileprivate final class SQLiteCategoryRepo: CategoryRepository {
+    private let db: SQLiteDatabase
+
+    init(db: SQLiteDatabase) {
+        self.db = db
+    }
+
+    func categories(workspaceId: String) throws -> [CategoryDTO] {
+        try db.query(
+            sql: "SELECT id, workspace_id, name, normalized_name, is_archived, created_at, updated_at FROM categories WHERE workspace_id = ? ORDER BY normalized_name ASC, id ASC;",
+            params: [workspaceId]
+        ) { row in
+            CategoryDTO(
+                id: row.string(at: 0) ?? "",
+                workspaceId: row.string(at: 1) ?? "",
+                name: row.string(at: 2) ?? "",
+                normalizedName: row.string(at: 3) ?? "",
+                isArchived: row.bool(at: 4),
+                createdAtISO: row.string(at: 5) ?? "",
+                updatedAtISO: row.string(at: 6)
+            )
+        }
+    }
+
+    func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO] {
+        try db.query(
+            sql: "SELECT workspace_id, transaction_id, category_id FROM transaction_category_assignments WHERE workspace_id = ? ORDER BY transaction_id ASC;",
+            params: [workspaceId]
+        ) { row in
+            TransactionCategoryAssignmentDTO(
+                workspaceId: row.string(at: 0) ?? "",
+                transactionId: row.string(at: 1) ?? "",
+                categoryId: row.string(at: 2) ?? ""
+            )
+        }
+    }
+
+    func createCategory(_ category: CategoryDTO) throws -> CategoryDTO {
+        let validated = try CategoryName.validated(category.name)
+        guard category.normalizedName == validated.normalized else {
+            throw CategoryRepositoryError.invalidName
+        }
+        return try withImmediateTransaction {
+            guard try count(
+                "SELECT COUNT(*) FROM workspaces WHERE id = ?;",
+                [category.workspaceId]
+            ) == 1 else {
+                throw CategoryRepositoryError.workspaceMismatch
+            }
+            guard try count(
+                "SELECT COUNT(*) FROM categories WHERE workspace_id = ? AND normalized_name = ?;",
+                [category.workspaceId, validated.normalized]
+            ) == 0 else {
+                throw CategoryRepositoryError.duplicateName
+            }
+            guard try count("SELECT COUNT(*) FROM categories WHERE id = ?;", [category.id]) == 0 else {
+                throw CategoryRepositoryError.duplicateName
+            }
+            try db.executePrepared(
+                sql: "INSERT INTO categories(id, workspace_id, name, normalized_name, is_archived, created_at, updated_at) VALUES(?,?,?,?,?,?,?);",
+                params: [
+                    category.id,
+                    category.workspaceId,
+                    validated.display,
+                    validated.normalized,
+                    category.isArchived ? 1 : 0,
+                    category.createdAtISO,
+                    category.updatedAtISO ?? NSNull()
+                ]
+            )
+            return CategoryDTO(
+                id: category.id,
+                workspaceId: category.workspaceId,
+                name: validated.display,
+                normalizedName: validated.normalized,
+                isArchived: category.isArchived,
+                createdAtISO: category.createdAtISO,
+                updatedAtISO: category.updatedAtISO
+            )
+        }
+    }
+
+    func renameCategory(id: String, workspaceId: String, name: String, updatedAtISO: String) throws -> Bool {
+        let validated = try CategoryName.validated(name)
+        return try withImmediateTransaction {
+            guard let existing = try category(id: id) else {
+                throw CategoryRepositoryError.categoryNotFound
+            }
+            guard existing.workspaceId == workspaceId else {
+                throw CategoryRepositoryError.workspaceMismatch
+            }
+            guard try count(
+                "SELECT COUNT(*) FROM categories WHERE workspace_id = ? AND normalized_name = ? AND id <> ?;",
+                [workspaceId, validated.normalized, id]
+            ) == 0 else {
+                throw CategoryRepositoryError.duplicateName
+            }
+            guard existing.name != validated.display || existing.normalizedName != validated.normalized else {
+                return false
+            }
+            try db.executePrepared(
+                sql: "UPDATE categories SET name = ?, normalized_name = ?, updated_at = ? WHERE id = ? AND workspace_id = ?;",
+                params: [validated.display, validated.normalized, updatedAtISO, id, workspaceId]
+            )
+            return true
+        }
+    }
+
+    func setCategoryArchived(id: String, workspaceId: String, isArchived: Bool, updatedAtISO: String) throws -> Bool {
+        try withImmediateTransaction {
+            guard let existing = try category(id: id) else {
+                throw CategoryRepositoryError.categoryNotFound
+            }
+            guard existing.workspaceId == workspaceId else {
+                throw CategoryRepositoryError.workspaceMismatch
+            }
+            guard existing.isArchived != isArchived else { return false }
+            try db.executePrepared(
+                sql: "UPDATE categories SET is_archived = ?, updated_at = ? WHERE id = ? AND workspace_id = ?;",
+                params: [isArchived ? 1 : 0, updatedAtISO, id, workspaceId]
+            )
+            return true
+        }
+    }
+
+    func deleteUnusedCategory(id: String, workspaceId: String) throws {
+        try withImmediateTransaction {
+            guard let existing = try category(id: id) else {
+                throw CategoryRepositoryError.categoryNotFound
+            }
+            guard existing.workspaceId == workspaceId else {
+                throw CategoryRepositoryError.workspaceMismatch
+            }
+            guard try count(
+                "SELECT COUNT(*) FROM transaction_category_assignments WHERE workspace_id = ? AND category_id = ?;",
+                [workspaceId, id]
+            ) == 0 else {
+                throw CategoryRepositoryError.categoryInUse
+            }
+            try db.executePrepared(
+                sql: "DELETE FROM categories WHERE id = ? AND workspace_id = ?;",
+                params: [id, workspaceId]
+            )
+        }
+    }
+
+    func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool {
+        try withImmediateTransaction {
+            guard try count(
+                "SELECT COUNT(*) FROM transactions WHERE id = ? AND workspace_id = ? AND is_trusted = 1;",
+                [transactionId, workspaceId]
+            ) == 1 else {
+                if try count("SELECT COUNT(*) FROM transactions WHERE id = ?;", [transactionId]) == 0 {
+                    throw CategoryRepositoryError.transactionNotFound
+                }
+                throw CategoryRepositoryError.workspaceMismatch
+            }
+
+            let existingCategoryID = try db.query(
+                sql: "SELECT category_id FROM transaction_category_assignments WHERE transaction_id = ?;",
+                params: [transactionId]
+            ) { $0.string(at: 0) ?? "" }.first
+
+            guard let categoryId else {
+                guard existingCategoryID != nil else { return false }
+                try db.executePrepared(
+                    sql: "DELETE FROM transaction_category_assignments WHERE transaction_id = ? AND workspace_id = ?;",
+                    params: [transactionId, workspaceId]
+                )
+                return true
+            }
+
+            guard let selectedCategory = try category(id: categoryId) else {
+                throw CategoryRepositoryError.categoryNotFound
+            }
+            guard selectedCategory.workspaceId == workspaceId else {
+                throw CategoryRepositoryError.workspaceMismatch
+            }
+            guard !selectedCategory.isArchived else {
+                throw CategoryRepositoryError.categoryArchived
+            }
+            guard existingCategoryID != categoryId else { return false }
+            try db.executePrepared(
+                sql: """
+                INSERT INTO transaction_category_assignments(workspace_id, transaction_id, category_id)
+                VALUES(?,?,?)
+                ON CONFLICT(transaction_id) DO UPDATE SET
+                  workspace_id = excluded.workspace_id,
+                  category_id = excluded.category_id;
+                """,
+                params: [workspaceId, transactionId, categoryId]
+            )
+            return true
+        }
+    }
+
+    private func category(id: String) throws -> CategoryDTO? {
+        try db.query(
+            sql: "SELECT id, workspace_id, name, normalized_name, is_archived, created_at, updated_at FROM categories WHERE id = ?;",
+            params: [id]
+        ) { row in
+            CategoryDTO(
+                id: row.string(at: 0) ?? "",
+                workspaceId: row.string(at: 1) ?? "",
+                name: row.string(at: 2) ?? "",
+                normalizedName: row.string(at: 3) ?? "",
+                isArchived: row.bool(at: 4),
+                createdAtISO: row.string(at: 5) ?? "",
+                updatedAtISO: row.string(at: 6)
+            )
+        }.first
+    }
+
+    private func count(_ sql: String, _ params: [Any?]) throws -> Int {
+        Int(try db.query(sql: sql, params: params) { $0.int64(at: 0) ?? 0 }.first ?? 0)
+    }
+
+    private func withImmediateTransaction<T>(_ body: () throws -> T) throws -> T {
+        try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+        do {
+            let value = try body()
+            try db.execute(sql: "COMMIT;")
+            return value
+        } catch {
+            try? db.execute(sql: "ROLLBACK;")
+            throw error
+        }
     }
 }
 

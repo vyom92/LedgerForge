@@ -33,6 +33,53 @@ public enum RepositoryError: Error, LocalizedError {
     }
 }
 
+public enum CategoryRepositoryError: Error, Equatable, LocalizedError {
+    case invalidName
+    case duplicateName
+    case categoryNotFound
+    case transactionNotFound
+    case categoryArchived
+    case categoryInUse
+    case workspaceMismatch
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidName:
+            return "Category names must contain 1 to 80 characters."
+        case .duplicateName:
+            return "A category with this name already exists."
+        case .categoryNotFound:
+            return "The category no longer exists."
+        case .transactionNotFound:
+            return "The imported transaction no longer exists."
+        case .categoryArchived:
+            return "Archived categories cannot receive new assignments."
+        case .categoryInUse:
+            return "This category is assigned to one or more transactions and cannot be deleted."
+        case .workspaceMismatch:
+            return "The category and transaction must belong to the active workspace."
+        }
+    }
+}
+
+enum CategoryName {
+    static let maximumLength = 80
+
+    static func validated(_ value: String) throws -> (display: String, normalized: String) {
+        let display = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !display.isEmpty, display.count <= maximumLength else {
+            throw CategoryRepositoryError.invalidName
+        }
+        let normalized = display
+            .precomposedStringWithCanonicalMapping
+            .lowercased(with: Locale(identifier: "en_US_POSIX"))
+        guard !normalized.isEmpty else {
+            throw CategoryRepositoryError.invalidName
+        }
+        return (display, normalized)
+    }
+}
+
 public enum PersistenceUnavailableReason: String, Equatable {
     case notInitialized
     case databaseOpenFailed
@@ -137,6 +184,20 @@ public protocol TransactionRepository {
     func trustedTransactions(workspaceId: String) throws -> [TransactionDTO]
 }
 
+public protocol CategoryRepository {
+    func categories(workspaceId: String) throws -> [CategoryDTO]
+    func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO]
+    @discardableResult
+    func createCategory(_ category: CategoryDTO) throws -> CategoryDTO
+    @discardableResult
+    func renameCategory(id: String, workspaceId: String, name: String, updatedAtISO: String) throws -> Bool
+    @discardableResult
+    func setCategoryArchived(id: String, workspaceId: String, isArchived: Bool, updatedAtISO: String) throws -> Bool
+    func deleteUnusedCategory(id: String, workspaceId: String) throws
+    @discardableResult
+    func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool
+}
+
 public protocol AccountRepository {
     func upsertAccount(_ account: AccountDTO) throws -> String
     @discardableResult
@@ -192,6 +253,7 @@ public final class DatabaseProvider {
     public let persistenceState: PersistenceState
     public let workspaceRepo: WorkspaceRepository
     public let transactionRepo: TransactionRepository
+    public let categoryRepo: CategoryRepository
     public let accountRepo: AccountRepository
     public let importSessionRepo: ImportSessionRepository
     /// Captured by a prepared import and compared only at confirmation. It is
@@ -203,6 +265,7 @@ public final class DatabaseProvider {
     public init(
         workspaceRepo: WorkspaceRepository,
         transactionRepo: TransactionRepository,
+        categoryRepo: CategoryRepository? = nil,
         accountRepo: AccountRepository,
         importSessionRepo: ImportSessionRepository,
         confirmedImportRepo: ConfirmedImportRepository = PlaceholderConfirmedImportRepo(),
@@ -213,11 +276,13 @@ public final class DatabaseProvider {
         self.persistenceState = persistenceState
         self.generationToken = generationToken
         self.confirmedImportRepo = confirmedImportRepo
+        let resolvedCategoryRepo = categoryRepo ?? PlaceholderCategoryRepo()
         if protectsGeneration {
             let validity = ProviderGenerationValidity()
             self.generationValidity = validity
             self.workspaceRepo = GenerationCheckedWorkspaceRepository(base: workspaceRepo, validity: validity)
             self.transactionRepo = GenerationCheckedTransactionRepository(base: transactionRepo, validity: validity)
+            self.categoryRepo = GenerationCheckedCategoryRepository(base: resolvedCategoryRepo, validity: validity)
             self.accountRepo = GenerationCheckedAccountRepository(base: accountRepo, validity: validity)
             self.importSessionRepo = GenerationCheckedImportSessionRepository(base: importSessionRepo, validity: validity)
             return
@@ -225,6 +290,7 @@ public final class DatabaseProvider {
         self.generationValidity = nil
         self.workspaceRepo = workspaceRepo
         self.transactionRepo = transactionRepo
+        self.categoryRepo = resolvedCategoryRepo
         self.accountRepo = accountRepo
         self.importSessionRepo = importSessionRepo
     }
@@ -236,6 +302,7 @@ public final class DatabaseProvider {
         self.persistenceState = .intentionalNonDurable(.testMemory)
         self.workspaceRepo = provider.workspaceRepo
         self.transactionRepo = provider.transactionRepo
+        self.categoryRepo = provider.categoryRepo
         self.accountRepo = provider.accountRepo
         self.importSessionRepo = provider.importSessionRepo
         self.generationToken = provider.generationToken
@@ -247,6 +314,7 @@ public final class DatabaseProvider {
         DatabaseProvider(
             workspaceRepo: PlaceholderWorkspaceRepo(),
             transactionRepo: PlaceholderTransactionRepo(),
+            categoryRepo: PlaceholderCategoryRepo(),
             accountRepo: PlaceholderAccountRepo(),
             importSessionRepo: PlaceholderImportSessionRepo(),
             confirmedImportRepo: PlaceholderConfirmedImportRepo(),
@@ -259,6 +327,7 @@ public final class DatabaseProvider {
         return DatabaseProvider(
             workspaceRepo: provider.workspaceRepo,
             transactionRepo: provider.transactionRepo,
+            categoryRepo: provider.categoryRepo,
             accountRepo: provider.accountRepo,
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
@@ -272,6 +341,7 @@ public final class DatabaseProvider {
         DatabaseProvider(
             workspaceRepo: provider.workspaceRepo,
             transactionRepo: provider.transactionRepo,
+            categoryRepo: provider.categoryRepo,
             accountRepo: provider.accountRepo,
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
@@ -307,6 +377,18 @@ private struct GenerationCheckedTransactionRepository: TransactionRepository {
     func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws { try validity.check(); try base.replaceTransactions(workspaceId: workspaceId, importSessionId: importSessionId, transactions: transactions) }
     func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO] { try validity.check(); return try base.transactions(workspaceId: workspaceId, importSessionId: importSessionId) }
     func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] { try validity.check(); return try base.trustedTransactions(workspaceId: workspaceId) }
+}
+
+private struct GenerationCheckedCategoryRepository: CategoryRepository {
+    let base: CategoryRepository
+    let validity: ProviderGenerationValidity
+    func categories(workspaceId: String) throws -> [CategoryDTO] { try validity.check(); return try base.categories(workspaceId: workspaceId) }
+    func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO] { try validity.check(); return try base.assignments(workspaceId: workspaceId) }
+    func createCategory(_ category: CategoryDTO) throws -> CategoryDTO { try validity.check(); return try base.createCategory(category) }
+    func renameCategory(id: String, workspaceId: String, name: String, updatedAtISO: String) throws -> Bool { try validity.check(); return try base.renameCategory(id: id, workspaceId: workspaceId, name: name, updatedAtISO: updatedAtISO) }
+    func setCategoryArchived(id: String, workspaceId: String, isArchived: Bool, updatedAtISO: String) throws -> Bool { try validity.check(); return try base.setCategoryArchived(id: id, workspaceId: workspaceId, isArchived: isArchived, updatedAtISO: updatedAtISO) }
+    func deleteUnusedCategory(id: String, workspaceId: String) throws { try validity.check(); try base.deleteUnusedCategory(id: id, workspaceId: workspaceId) }
+    func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool { try validity.check(); return try base.setCategory(categoryId: categoryId, transactionId: transactionId, workspaceId: workspaceId) }
 }
 
 private struct GenerationCheckedAccountRepository: AccountRepository {
@@ -359,6 +441,28 @@ struct PlaceholderTransactionRepo: TransactionRepository {
     func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] {
         throw RepositoryError.persistenceUnavailable
     }
+}
+
+struct PlaceholderCategoryRepo: CategoryRepository {
+    func categories(workspaceId: String) throws -> [CategoryDTO] { throw RepositoryError.persistenceUnavailable }
+    func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO] { throw RepositoryError.persistenceUnavailable }
+    func createCategory(_ category: CategoryDTO) throws -> CategoryDTO { throw RepositoryError.persistenceUnavailable }
+    func renameCategory(id: String, workspaceId: String, name: String, updatedAtISO: String) throws -> Bool { throw RepositoryError.persistenceUnavailable }
+    func setCategoryArchived(id: String, workspaceId: String, isArchived: Bool, updatedAtISO: String) throws -> Bool { throw RepositoryError.persistenceUnavailable }
+    func deleteUnusedCategory(id: String, workspaceId: String) throws { throw RepositoryError.persistenceUnavailable }
+    func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool { throw RepositoryError.persistenceUnavailable }
+}
+
+/// Compatibility read boundary for focused hydrator tests that inject only
+/// pre-category repository protocols.
+struct EmptyCategoryRepo: CategoryRepository {
+    func categories(workspaceId: String) throws -> [CategoryDTO] { [] }
+    func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO] { [] }
+    func createCategory(_ category: CategoryDTO) throws -> CategoryDTO { throw RepositoryError.persistenceUnavailable }
+    func renameCategory(id: String, workspaceId: String, name: String, updatedAtISO: String) throws -> Bool { throw RepositoryError.persistenceUnavailable }
+    func setCategoryArchived(id: String, workspaceId: String, isArchived: Bool, updatedAtISO: String) throws -> Bool { throw RepositoryError.persistenceUnavailable }
+    func deleteUnusedCategory(id: String, workspaceId: String) throws { throw RepositoryError.persistenceUnavailable }
+    func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool { throw RepositoryError.persistenceUnavailable }
 }
 
 struct PlaceholderAccountRepo: AccountRepository {

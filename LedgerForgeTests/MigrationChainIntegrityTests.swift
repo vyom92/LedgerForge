@@ -37,16 +37,16 @@ struct MigrationChainIntegrityTests {
         }
     }
 
-    @Test func currentV1ThroughV7RegistrationIsValidAndDeterministic() throws {
+    @Test func currentV1ThroughV8RegistrationIsValidAndDeterministic() throws {
         try MigrationChainValidator.validateRegistered(allMigrations)
 
-        #expect(allMigrations.map(\.version) == [1, 2, 3, 4, 5, 6, 7])
+        #expect(allMigrations.map(\.version) == [1, 2, 3, 4, 5, 6, 7, 8])
         #expect(allMigrations.map(\.checksum).allSatisfy { $0.count == 64 })
         #expect(allMigrations.map(\.checksum) == allMigrations.map(\.checksum))
     }
 
-    @Test func cleanInstallContainsCompleteV7SchemaAndReopens() throws {
-        try withTemporaryDatabase(named: "V7CleanInstall") { path in
+    @Test func cleanInstallContainsCompleteV8SchemaAndReopens() throws {
+        try withTemporaryDatabase(named: "V8CleanInstall") { path in
             let provider = try SQLiteRepositoryProvider(path: path)
             let objects = try provider.database.query(
                 sql: "SELECT type, name FROM sqlite_master WHERE name IN ('partial_import_summaries', 'incoming_row_dispositions', 'validate_incoming_row_disposition', 'validate_partial_import_summary') ORDER BY name;",
@@ -81,12 +81,13 @@ struct MigrationChainIntegrityTests {
 
             let reopened = try SQLiteRepositoryProvider(path: path)
             defer { reopened.database.close() }
-            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM schema_migrations;") == 7)
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM schema_migrations;") == 8)
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('categories', 'transaction_category_assignments');") == 2)
         }
     }
 
-    @Test func populatedV6FullImportUpgradesToV7WithoutInventingPartialTruth() throws {
-        try withTemporaryDatabase(named: "V6ToV7") { path in
+    @Test func populatedV6FullImportUpgradesToCurrentWithoutInventingPartialOrCategoryTruth() throws {
+        try withTemporaryDatabase(named: "V6ToV8") { path in
             let database = SQLiteDatabase(path: path)
             try database.runMigrations(Array(allMigrations.prefix(6)))
             try database.execute(sql: """
@@ -116,6 +117,8 @@ struct MigrationChainIntegrityTests {
             try database.runMigrations(allMigrations)
             #expect(try database.queryInt("SELECT COUNT(*) FROM partial_import_summaries;") == 0)
             #expect(try database.queryInt("SELECT COUNT(*) FROM incoming_row_dispositions;") == 0)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM categories;") == 0)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM transaction_category_assignments;") == 0)
             let nullableCounts = try database.query(
                 sql: "SELECT source_row_count, imported_transaction_count, recognized_existing_row_count, blocked_row_count FROM import_attempts WHERE id = 'attempt';",
                 params: []
@@ -204,9 +207,9 @@ struct MigrationChainIntegrityTests {
     }
 
     @Test func persistedHistoryRejectsUnsupportedFutureVersion() {
-        let future = PersistedMigrationRecord(version: 8, name: "future", checksum: String(repeating: "f", count: 64), appliedAt: "2026-07-20T00:00:00Z")
+        let future = PersistedMigrationRecord(version: 9, name: "future", checksum: String(repeating: "f", count: 64), appliedAt: "2026-07-20T00:00:00Z")
 
-        #expect(throws: MigrationIntegrityError.unsupportedFutureVersion(8)) {
+        #expect(throws: MigrationIntegrityError.unsupportedFutureVersion(9)) {
             try MigrationChainValidator.validatePersisted(allMigrations.map(record(for:)) + [future], against: allMigrations, requiresCompleteChain: false)
         }
     }
@@ -232,7 +235,7 @@ struct MigrationChainIntegrityTests {
         )
     }
 
-    @Test func freshDatabaseCreatesOneExactV1ThroughV7History() throws {
+    @Test func freshDatabaseCreatesOneExactV1ThroughV8History() throws {
         try withTemporaryDatabase(named: "Fresh") { path in
             let provider = try SQLiteRepositoryProvider(path: path)
             defer { provider.database.close() }
@@ -328,10 +331,10 @@ struct MigrationChainIntegrityTests {
         try withTamperedCurrentDatabase(named: "Future") { database in
             try database.executePrepared(
                 sql: "INSERT INTO schema_migrations(version, name, applied_at, checksum) VALUES(?, ?, ?, ?);",
-                params: [8, "future", "2026-07-20T00:00:00Z", String(repeating: "f", count: 64)]
+                params: [9, "future", "2026-07-20T00:00:00Z", String(repeating: "f", count: 64)]
             )
         } assertReopen: {
-            MigrationIntegrityError.unsupportedFutureVersion(8)
+            MigrationIntegrityError.unsupportedFutureVersion(9)
         }
     }
 

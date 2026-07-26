@@ -482,7 +482,68 @@ BEGIN
 END;
 """)
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7]
+public let migrationV8 = Migration(version: 8, name: "durable_transaction_categories", sql: """
+CREATE TABLE categories (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  normalized_name TEXT NOT NULL,
+  is_archived INTEGER NOT NULL DEFAULT 0 CHECK(is_archived IN (0, 1)),
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME,
+  UNIQUE(workspace_id, normalized_name),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_categories_workspace_archived_name
+  ON categories(workspace_id, is_archived, normalized_name, id);
+
+CREATE TABLE transaction_category_assignments (
+  workspace_id TEXT NOT NULL,
+  transaction_id TEXT PRIMARY KEY,
+  category_id TEXT NOT NULL,
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+  FOREIGN KEY(transaction_id) REFERENCES transactions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_transaction_category_assignments_category
+  ON transaction_category_assignments(workspace_id, category_id, transaction_id);
+
+CREATE TRIGGER validate_transaction_category_assignment_insert
+BEFORE INSERT ON transaction_category_assignments
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM transactions t
+    WHERE t.id = NEW.transaction_id
+      AND t.workspace_id = NEW.workspace_id
+      AND t.is_trusted = 1
+  ) THEN RAISE(ABORT, 'category assignment transaction invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM categories c
+    WHERE c.id = NEW.category_id
+      AND c.workspace_id = NEW.workspace_id
+      AND c.is_archived = 0
+  ) THEN RAISE(ABORT, 'category assignment category invalid') END;
+END;
+
+CREATE TRIGGER validate_transaction_category_assignment_update
+BEFORE UPDATE ON transaction_category_assignments
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM transactions t
+    WHERE t.id = NEW.transaction_id
+      AND t.workspace_id = NEW.workspace_id
+      AND t.is_trusted = 1
+  ) THEN RAISE(ABORT, 'category assignment transaction invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM categories c
+    WHERE c.id = NEW.category_id
+      AND c.workspace_id = NEW.workspace_id
+      AND c.is_archived = 0
+  ) THEN RAISE(ABORT, 'category assignment category invalid') END;
+END;
+""")
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

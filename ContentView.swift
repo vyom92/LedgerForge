@@ -1015,37 +1015,42 @@ struct ContentView: View {
         )
 
         return ScrollView {
-            HStack(alignment: .top, spacing: 18) {
-                VStack(spacing: 18) {
-                    LFPanel(title: "Application") {
-                        VStack(spacing: 0) {
-                            settingsToggleRow("Developer Mode", icon: "chevron.left.forwardslash.chevron.right", isOn: $developerModeEnabled)
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top, spacing: 18) {
+                    VStack(spacing: 18) {
+                        LFPanel(title: "Application") {
+                            VStack(spacing: 0) {
+                                settingsToggleRow("Developer Mode", icon: "chevron.left.forwardslash.chevron.right", isOn: $developerModeEnabled)
+                            }
                         }
                     }
-                }
-                .frame(width: 330)
+                    .frame(width: 330)
 
-                VStack(spacing: 18) {
-                    LFPanel(title: "System Information") {
-                        LFInfoRow(title: "Version", value: SettingsPresentation.applicationVersion(infoDictionary: Bundle.main.infoDictionary))
-                        LFInfoRow(title: "Persistence", value: DatabaseProvider.shared.persistenceState.displayName)
-                        LFInfoRow(title: "Persistence Status", value: DatabaseProvider.shared.persistenceState.statusMessage)
-                        if let guidance = DatabaseProvider.shared.persistenceState.recoveryGuidance {
-                            LFInfoRow(title: "Recovery", value: guidance)
+                    VStack(spacing: 18) {
+                        LFPanel(title: "System Information") {
+                            LFInfoRow(title: "Version", value: SettingsPresentation.applicationVersion(infoDictionary: Bundle.main.infoDictionary))
+                            LFInfoRow(title: "Persistence", value: DatabaseProvider.shared.persistenceState.displayName)
+                            LFInfoRow(title: "Persistence Status", value: DatabaseProvider.shared.persistenceState.statusMessage)
+                            if let guidance = DatabaseProvider.shared.persistenceState.recoveryGuidance {
+                                LFInfoRow(title: "Recovery", value: guidance)
+                            }
+                            LFInfoRow(title: "Runtime State", value: dashboardViewModel.presentationState.message)
                         }
-                        LFInfoRow(title: "Runtime State", value: dashboardViewModel.presentationState.message)
-                    }
 
-                    LFPanel(title: "Data Summary") {
-                        LFInfoRow(title: "Accounts", value: "\(dashboardViewModel.accounts.count)")
-                        LFInfoRow(title: "Transactions", value: "\(dashboardViewModel.transactionCount)")
-                        LFInfoRow(title: "Completed Imports", value: completedImports.displayValue)
-                        if let partialValue = completedImports.secondaryValue {
-                            LFInfoRow(title: "Partial Imports", value: partialValue)
+                        LFPanel(title: "Data Summary") {
+                            LFInfoRow(title: "Accounts", value: "\(dashboardViewModel.accounts.count)")
+                            LFInfoRow(title: "Transactions", value: "\(dashboardViewModel.transactionCount)")
+                            LFInfoRow(title: "Completed Imports", value: completedImports.displayValue)
+                            if let partialValue = completedImports.secondaryValue {
+                                LFInfoRow(title: "Partial Imports", value: partialValue)
+                            }
                         }
                     }
+                    .frame(width: 330)
                 }
-                .frame(width: 330)
+
+                CategoryManagementView()
+                    .frame(width: 678)
             }
             .padding(28)
         }

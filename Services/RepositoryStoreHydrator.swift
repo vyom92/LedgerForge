@@ -10,19 +10,25 @@ struct RepositoryStoreHydrationResult: Equatable {
     let transactionCount: Int
     let importSessionCount: Int
     let importAttemptCount: Int
+    let categoryCount: Int
+    let categoryAssignmentCount: Int
 
     init(
         didHydrate: Bool,
         accountCount: Int,
         transactionCount: Int,
         importSessionCount: Int = 0,
-        importAttemptCount: Int = 0
+        importAttemptCount: Int = 0,
+        categoryCount: Int = 0,
+        categoryAssignmentCount: Int = 0
     ) {
         self.didHydrate = didHydrate
         self.accountCount = accountCount
         self.transactionCount = transactionCount
         self.importSessionCount = importSessionCount
         self.importAttemptCount = importAttemptCount
+        self.categoryCount = categoryCount
+        self.categoryAssignmentCount = categoryAssignmentCount
     }
 }
 
@@ -38,6 +44,7 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
     case accountCurrencyMismatch
     case runningBalanceCurrencyMismatch
     case invalidPartialImport(String)
+    case invalidCategoryState(String)
 
     var errorDescription: String? {
         switch self {
@@ -63,6 +70,8 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
             return "A running-balance currency does not match its account."
         case .invalidPartialImport:
             return "Persisted partial-import provenance is invalid. Runtime data was not replaced."
+        case .invalidCategoryState:
+            return "Persisted category metadata is invalid. Runtime data was not replaced."
         }
     }
 }
@@ -72,10 +81,12 @@ final class RepositoryStoreHydrator {
     private let accountRepo: AccountRepository
     private let importSessionRepo: ImportSessionRepository
     private let transactionRepo: TransactionRepository
+    private let categoryRepo: CategoryRepository
     private let accountStore: AccountStore
     private let importSessionStore: ImportSessionStore
     private let importAttemptStore: ImportAttemptStore
     private let transactionStore: TransactionStore
+    private let categoryStore: CategoryStore
     private let workspaceId: String
     private let persistenceState: PersistenceState
     private var hasHydrated = false
@@ -87,6 +98,7 @@ final class RepositoryStoreHydrator {
         databaseProvider: DatabaseProvider = .shared,
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
+        categoryStore: CategoryStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace",
@@ -96,8 +108,10 @@ final class RepositoryStoreHydrator {
             accountRepo: databaseProvider.accountRepo,
             importSessionRepo: databaseProvider.importSessionRepo,
             transactionRepo: databaseProvider.transactionRepo,
+            categoryRepo: databaseProvider.categoryRepo,
             accountStore: accountStore,
             transactionStore: transactionStore,
+            categoryStore: categoryStore,
             importSessionStore: importSessionStore,
             importAttemptStore: importAttemptStore,
             workspaceId: workspaceId,
@@ -110,8 +124,10 @@ final class RepositoryStoreHydrator {
         accountRepo: AccountRepository,
         importSessionRepo: ImportSessionRepository,
         transactionRepo: TransactionRepository,
+        categoryRepo: CategoryRepository = EmptyCategoryRepo(),
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
+        categoryStore: CategoryStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace",
@@ -121,8 +137,10 @@ final class RepositoryStoreHydrator {
         self.accountRepo = accountRepo
         self.importSessionRepo = importSessionRepo
         self.transactionRepo = transactionRepo
+        self.categoryRepo = categoryRepo
         self.accountStore = accountStore
         self.transactionStore = transactionStore
+        self.categoryStore = categoryStore
         self.importSessionStore = importSessionStore
         self.importAttemptStore = importAttemptStore
         self.workspaceId = workspaceId
@@ -152,12 +170,16 @@ final class RepositoryStoreHydrator {
                 accountCount: accountStore.accounts.count,
                 transactionCount: transactionStore.transactions.count,
                 importSessionCount: importSessionStore.importSessions.count,
-                importAttemptCount: importAttemptStore.attempts.count
+                importAttemptCount: importAttemptStore.attempts.count,
+                categoryCount: categoryStore.categories.count,
+                categoryAssignmentCount: categoryStore.snapshot.assignments.count
             )
         }
 
         let transactionDTOs = try transactionRepo.trustedTransactions(workspaceId: workspaceId)
         let accountDTOs = try accountRepo.accounts(workspaceId: workspaceId)
+        let categoryDTOs = try categoryRepo.categories(workspaceId: workspaceId)
+        let categoryAssignmentDTOs = try categoryRepo.assignments(workspaceId: workspaceId)
         let identitiesByAccountID = Dictionary(
             uniqueKeysWithValues: try accountDTOs.map { accountDTO in
                 (accountDTO.id, try Self.identitySummaries(from: accountRepo.identifiers(accountId: accountDTO.id, workspaceId: workspaceId)))
@@ -177,12 +199,19 @@ final class RepositoryStoreHydrator {
             transactions: transactions,
             identitiesByAccountID: identitiesByAccountID
         )
+        let categorySnapshot = try Self.categorySnapshot(
+            categories: categoryDTOs,
+            assignments: categoryAssignmentDTOs,
+            trustedTransactions: transactionDTOs,
+            workspaceID: workspaceId
+        )
 
         // All repository reads and mappings complete before any runtime store changes.
         accountStore.replaceAccounts(accounts)
         transactionStore.replaceTransactions(transactions)
         importSessionStore.replaceImportSessions(importSessions)
         importAttemptStore.replaceAttempts(importAttempts)
+        categoryStore.replaceSnapshot(categorySnapshot)
         hasHydrated = true
 
         return RepositoryStoreHydrationResult(
@@ -190,7 +219,56 @@ final class RepositoryStoreHydrator {
             accountCount: accounts.count,
             transactionCount: transactions.count,
             importSessionCount: importSessions.count,
-            importAttemptCount: importAttempts.count
+            importAttemptCount: importAttempts.count,
+            categoryCount: categorySnapshot.categories.count,
+            categoryAssignmentCount: categorySnapshot.assignments.count
+        )
+    }
+
+    private static func categorySnapshot(
+        categories: [CategoryDTO],
+        assignments: [TransactionCategoryAssignmentDTO],
+        trustedTransactions: [TransactionDTO],
+        workspaceID: String
+    ) throws -> CategorySnapshot {
+        guard Set(categories.map(\.id)).count == categories.count,
+              categories.allSatisfy({ $0.workspaceId == workspaceID }),
+              Set(categories.map(\.normalizedName)).count == categories.count else {
+            throw RepositoryStoreHydrationError.invalidCategoryState("category identity or workspace mismatch")
+        }
+
+        let runtimeCategories = try categories.map { dto -> Category in
+            guard let validated = try? CategoryName.validated(dto.name),
+                  dto.normalizedName == validated.normalized,
+                  dto.name == validated.display else {
+                throw RepositoryStoreHydrationError.invalidCategoryState("invalid category name")
+            }
+            return Category(
+                id: dto.id,
+                workspaceID: dto.workspaceId,
+                name: dto.name,
+                normalizedName: dto.normalizedName,
+                isArchived: dto.isArchived
+            )
+        }.sorted {
+            if $0.normalizedName != $1.normalizedName { return $0.normalizedName < $1.normalizedName }
+            return $0.id < $1.id
+        }
+
+        let categoryIDs = Set(runtimeCategories.map(\.id))
+        let trustedTransactionIDs = Set(trustedTransactions.map(\.id))
+        guard Set(assignments.map(\.transactionId)).count == assignments.count,
+              assignments.allSatisfy({
+                  $0.workspaceId == workspaceID &&
+                  trustedTransactionIDs.contains($0.transactionId) &&
+                  categoryIDs.contains($0.categoryId)
+              }) else {
+            throw RepositoryStoreHydrationError.invalidCategoryState("invalid assignment relationship")
+        }
+
+        return CategorySnapshot(
+            categories: runtimeCategories,
+            assignments: Dictionary(uniqueKeysWithValues: assignments.map { ($0.transactionId, $0.categoryId) })
         )
     }
 

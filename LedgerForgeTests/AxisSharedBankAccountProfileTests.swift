@@ -314,6 +314,7 @@ struct AxisSharedBankAccountProfileTests {
             let reconstructed = DatabaseProvider(
                 workspaceRepo: provider.workspaceRepo,
                 transactionRepo: provider.transactionRepo,
+                categoryRepo: provider.categoryRepo,
                 accountRepo: provider.accountRepo,
                 importSessionRepo: provider.importSessionRepo,
                 confirmedImportRepo: provider.confirmedImportRepo,

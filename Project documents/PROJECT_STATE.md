@@ -3,16 +3,16 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current pushed ref:** the single Sprint 56 completion commit containing this state update; its exact SHA is Git-authoritative and recorded in the completion report
-- **Latest verified implementation:** the single Sprint 56 completion commit containing this state update — Explicit Reviewed Partial-Overlap Import
+- **Current pushed ref:** the single Sprint 57 completion commit containing this state update; its exact SHA is Git-authoritative and recorded in the completion report
+- **Latest verified implementation:** the single Sprint 57 completion commit containing this state update — Durable Categories and Manual Transaction Classification
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed increment:** Sprint 56
+- **Latest verified completed increment:** Sprint 57
 - **Latest accepted ADR:** ADR-040 — Explicit Reviewed Partial-Overlap Import
-- **Current migration:** V7
+- **Current migration:** V8
 - **Architecture baseline:** Architecture v1.0 Frozen and UI/UX v1.0 Frozen
 - **Latest verified repository-maintenance change:** `7ee20a909038d1088f830a6ea588311625f415e5`
 - **Latest verified implementation-adjacent maintenance repair:** Axis bank-account CSV physical source-direction correction with independent balance evidence
@@ -20,10 +20,15 @@
 - **Sprint 56 result distinctions:** ordinary no-overlap imports remain full imports; exact-content duplicates resolve through ADR-030; full supported overlap remains whole-statement blocked; only an eligible reviewed prefix-overlap may commit as an explicitly partial session
 - **Sprint 56 persistence:** Migration V7, immutable reviewed-plan digests, SQLite/In-Memory provider parity, complete source preservation, typed row dispositions, explicit attempt counts and strict hydration/relaunch reconstruction are implemented
 - **Sprint 56 exclusions:** unsupported institutions, profiles, currencies, event families, interleaved overlap, arbitrary omission, fuzzy candidates, ownership override and historical repair remain unavailable
-- **Protected local recovery evidence:** an existing canonical Debug V5 database remains unresolved local-only recovery evidence; Sprint 56 neither opened nor migrated it, and no private contents are recorded here
-- **Latest recorded automated result:** 425 tests across 50 suites, 0 failures and 0 unexpected skips in each of three consecutive exact signed canonical default-parallel TestPlan runs at Sprint 56 acceptance closure
-- **Latest focused Sprint 56 result:** 150 tests across 14 suites covering the independent overlap oracle, reviewed-plan eligibility and staleness, provider parity, atomicity, contention, rollback, migrations, hydration, persistence isolation and bounded presentation, all with 0 failures and 0 unexpected skips
-- **Latest recorded build and analysis result:** signed Debug build, explicit optimized Release build, Debug analysis and Release analysis all passed at Sprint 56 acceptance closure
+- **Sprint 57 categories:** workspace-owned user categories and one optional current category assignment per trusted imported transaction are durable, hydrated, manually editable and additive metadata only
+- **Sprint 57 persistence:** additive Migration V8, SQLite/In-Memory parity, provider-generation protection, canonical hydration, provider reconstruction and SQLite close/reopen verification are implemented
+- **Sprint 57 UI:** Settings supports create, rename, archive, restore and permitted delete; transaction detail supports assign, change and clear, and transaction rows display the current category
+- **Sprint 57 exclusions:** automatic categorization, rules, suggestions, bulk editing, merge, delete-with-replacement, budgeting, analytics, reports, filtering, tags, splits and import behavior changes remain unavailable
+- **Protected local recovery evidence:** an existing canonical Debug V5 database remains unresolved local-only recovery evidence; Sprint 57 neither opened nor migrated it, and no private contents are recorded here
+- **Latest recorded automated result:** 430 tests, 0 failures and 0 skips in the canonical TestPlan at Sprint 57 acceptance closure
+- **Latest focused Sprint 57 result:** 5 durable-category tests covering provider parity, lifecycle, assignment, first-use creation, hydration, reconstruction, relaunch and V7-to-V8 upgrade, plus migration-integrity, hydrator, identifier-ownership and development database lifecycle regressions, all passed
+- **Latest recorded build result:** fresh signed Debug and optimized Release builds passed at Sprint 57 acceptance closure
+- **Sprint 57 runtime verification:** the exact fresh Debug app passed namespaced Verified SQLite startup, empty Category Management presentation, first-category creation and full quit/relaunch persistence; the task-owned process was stopped and the isolated database set was moved to Trash
 - **Previous Sprint 55 automated result:** 409 top-level tests across 49 suites, 0 failures and 0 unexpected skips in each of three consecutive exact canonical default-parallel TestPlan runs
 - **Latest focused Sprint 55 results:** 41 Axis direction, fixture-oracle and confirmation-gate tests across 5 suites plus 64 adjacent event, validation, repository, atomicity and hydration tests across 6 suites, all with 0 failures and 0 unexpected skips
 - **Sprint 55 acceptance closure:** the first completion attempt exposed cross-suite interference between tests mutating shared runtime singleton stores; a bounded test-only asynchronous exclusivity trait now coordinates only those global-state tests across Swift Testing suites, retains ownership across suspension and restores the shared provider generation, runtime financial/history stores, diagnostics and development activity state after success or failure
@@ -138,7 +143,7 @@ Production publishes a SQLite repository only after:
 - pending migrations execute successfully;
 - the final migration chain revalidates.
 
-The active chain ends at V7. Migration V7 adds explicit partial-attempt counts, durable partial-import summaries and one typed incoming-row disposition per normalized source row for ADR-040.
+The active chain ends at V8. Migration V7 adds explicit partial-attempt counts, durable partial-import summaries and one typed incoming-row disposition per normalized source row for ADR-040. Additive Migration V8 adds workspace-owned categories and a separate restrictive current transaction-category assignment relationship without changing imported financial rows or provenance.
 
 Open, initialization, migration-integrity or migration-execution failure installs centrally rejecting unavailable repositories rather than silently substituting an in-memory repository.
 
@@ -156,6 +161,18 @@ Sprint 52A requires hydration to fail before runtime-store mutation when trusted
 - missing, malformed or conflicting parser-profile provenance.
 
 Trusted transaction graphs are accepted only through the provider-owned confirmed-import path. Generic transaction replacement cannot publish trusted imported transactions.
+
+Category definitions and transaction assignments are read with the trusted financial graph, validated before publication and published as one category snapshot. Category mutations reconcile through the same canonical hydrator; runtime category state is not durable authority.
+
+### Durable categories and manual classification
+
+Sprint 57 provides user-created workspace categories with stable identifiers, deterministic normalized-name uniqueness and archival state.
+
+Settings supports create, rename, archive, restore and deletion only when unused. Transaction detail supports one manual category assignment, change or clear for a persisted trusted transaction. Archived categories retain existing assignments but cannot receive new ones.
+
+The assignment is stored in a separate relationship. Changing it does not update transaction amounts, dates, balances, identifiers, normalized rows, import sessions, provenance or parser output. SQLite and In-Memory providers enforce equivalent behavior, and deletion remains restrictive while a category is assigned.
+
+Automatic categorization, rules, suggestions, bulk assignment, merge, delete-with-replacement, hierarchy, tags, splits, filters, budgeting, analytics and reports remain future work.
 
 ### Financial identity
 
@@ -510,6 +527,26 @@ American Express production parsing and durable card semantics remain unsupporte
 
 ## Recent Verified Changes
 
+### Sprint 57 — Durable Categories and Manual Transaction Classification
+
+**Ref**
+
+The single Sprint 57 completion commit containing this state update.
+
+**Verified scope**
+
+Sprint 57 adds additive Migration V8 with workspace-owned category definitions and one separate optional category relationship for each trusted imported transaction. Categories have stable identifiers, validated names and archival state; Uncategorized is represented by no assignment.
+
+SQLite and In-Memory repositories provide equivalent create, rename, archive, restore, delete-unused, assign, change and clear behavior. Deletion fails while a category is assigned. Archived categories preserve existing assignments but reject new ones. Provider-generation protection and the development repository-write lease cover persistence and forced canonical reconciliation.
+
+`RepositoryStoreHydrator` reads categories and assignments with the trusted graph, rejects invalid names, duplicates, cross-workspace relationships and non-trusted transaction assignments before publication, then replaces one observer-consistent category snapshot. Provider reconstruction, SQLite close/reopen and V7-to-V8 upgrade verification preserve category metadata and leave existing imported financial/history truth unchanged.
+
+Settings provides bounded category management. Transaction rows display the current category, and transaction detail provides assign, change and clear. The first category may be created before an import by establishing the default Personal workspace through the existing workspace repository.
+
+An isolated namespaced Debug launch verified the empty Settings presentation, first-category creation and category survival after a full quit/relaunch. The task-owned process was terminated and the isolated database set was moved to Trash without opening or changing the protected canonical Debug database.
+
+No parser, reader, normalized-row, import-session, transaction financial value, balance, identifier or provenance behavior changed. No new ADR was required.
+
 ### Sprint 56 — Explicit Reviewed Partial-Overlap Import
 
 **Ref**
@@ -698,7 +735,8 @@ Detailed implementation history remains in Git and accepted ADRs.
 - Fixture-backed HDFC, CBQ and card families are eligible for targeted discovery but remain blocked from implementation by their selected source-format and domain contracts.
 - `FW-P1-18 — Binary-Document Fingerprint Semantics` is ready for Chat architecture planning.
 - `FW-P1-10 — Production PDF Statement Support` remains blocked until the `FW-P1-18` authority is approved.
-- `FW-P2-20 — Category Model and Management` remains ready for planning with an expected additive V8 migration from the V7/ADR-040 provenance baseline, subject to its UI supplement and current-baseline execution planning.
+- `FW-P2-20 — Category Model and Management` is complete in Sprint 57 and removed from the unscheduled queue.
+- `FW-P2-21 — Deterministic Categorization Rules` is now eligible for bounded discovery; no rule behavior is implemented or authorized.
 - `FW-P1-37` and `FW-P1-40` remain ready for planning as one possible bounded DEBUG-only import-verification outcome.
 - Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
 - `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.

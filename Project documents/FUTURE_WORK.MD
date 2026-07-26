@@ -1383,108 +1383,14 @@ Retain future work for speculative duplicate-transaction candidates, unsupported
 
 # P2 — Categories, Rules and Automation
 
-## FW-P2-20 — Category Model and Management
-
-**Status:** Ready for planning
-**Discovery:** Complete
-**ADR-036:** Accepted
-**Post-Sprint-45 lifecycle revalidation:** Complete
-**Planning state:** Ready for Chat planning
-**Implementation state:** Gated
-**Depends on:** Approval of the category UI behavior supplement and implementation planning against the current V7, ADR-039 and ADR-040 source-provenance baseline
-**Migration expectation:** Additive Migration V8
-
-Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` with a clean worktree and no implementation. Provider, migration and hydration assumptions were revalidated after Sprint 45, and ADR-036 is Accepted. Source implementation remains gated.
-
-### Planning direction
-
-- workspace-owned durable categories;
-- a separate current transaction-category assignment relationship;
-- Uncategorized represented by no assignment;
-- one current category per transaction;
-- user-created categories only;
-- root categories plus one child level;
-- deterministic alphabetical ordering by normalized name and immutable category ID;
-- manual single-transaction assignment, change and clearing;
-- archival for assigned categories;
-- hard deletion only for unused, childless categories;
-- durable repository transaction identity exposed during hydration;
-- a dedicated category repository with SQLite and In-Memory parity;
-- a dedicated category store;
-- repository mutation followed by canonical `RepositoryStoreHydrator` refresh;
-- an additive Migration V8 from the current V7 schema, revalidated against ADR-040 partial summaries, row dispositions and shared recognized-source relationships.
-
-### Implementation prerequisites
-
-1. Satisfied foundation: hydrated transactions expose stable persisted repository transaction identity through ADR-039.
-2. The category UI behavior supplement must be approved.
-3. `CategoryRepository` must participate in installed-provider generation protection.
-4. One repository-write activity lease must cover provider resolution, persistence and canonical reconciliation.
-5. SQLite and In-Memory provider parity must be demonstrable.
-6. Category hydration must publish one observer-consistent runtime snapshot.
-7. Migration V8 must be additive, preserve the V7 financial and partial-source graph and be covered by clean-install and V7-to-V8 verification.
-8. Lifecycle backup verification must cover the category schema.
-9. Focused category lifecycle and recovery tests must be approved.
-
-### Stop condition
-
-> Never implement category assignment using regenerated runtime `Transaction.id`. Stop unless the immutable persisted transaction ID survives forced hydration, provider reconstruction, and relaunch.
-
-### Bounded first implementation scope
-
-- category domain;
-- durable transaction identity exposure;
-- category and assignment persistence;
-- category repository;
-- SQLite/In-Memory parity;
-- category store;
-- category-management coordinator;
-- canonical hydration;
-- Settings category management;
-- transaction category display;
-- transaction-detail assign, change and clear;
-- archive and restore;
-- delete-unused only;
-- two-level hierarchy;
-- deterministic ordering.
-
-### Explicit exclusions
-
-The first increment excludes:
-
-- automatic categorization;
-- deterministic categorization rules;
-- AI categorization;
-- merchant or payee normalization;
-- recurring detection;
-- analytics;
-- budgets;
-- multiple categories;
-- tags;
-- transaction splits;
-- category filtering;
-- custom ordering;
-- bulk assignment;
-- bulk reassignment;
-- delete-with-replacement;
-- category merge;
-- assignment history;
-- global undo.
-
-### Mutation boundary and downstream effects
-
-Individual category CRUD and single-transaction assignment are targeted metadata mutations. They do not depend on the complete `FW-P0-16` reversible financial-mutation foundation. Bulk reassignment, merge, delete-with-replacement and multi-operation undo remain dependent on `FW-P0-16` or an equivalent separately approved reversible metadata-mutation contract.
-
-`FW-P2-21` does not become implementation-ready from discovery alone. After `FW-P2-20` is implemented and verified, `FW-P2-21` becomes eligible for its own discovery. `FW-P2-22` through `FW-P2-29` retain their existing dependencies. Spending analytics, budgets and Transaction Notes remain independently gated future work.
-
-This work must precede automatic categorization.
-
----
-
 ## FW-P2-21 — Deterministic Categorization Rules
 
-**Status:** Blocked
-**Depends on:** `FW-P2-20`
+**Status:** Ready for discovery
+**Depends on:** Sprint 57 durable category foundation — complete
+
+Sprint 57 completed `FW-P2-20` with additive Migration V8, durable user-created categories, manual single-transaction classification, SQLite/In-Memory parity, canonical hydration and bounded Settings/transaction UI. It did not implement automatic classification or any rule behavior.
+
+Discovery for this candidate must preserve imported transaction immutability, manual assignments, explicit user control and explainability. It must not infer implementation authority from the completed category foundation.
 
 ---
 

@@ -111,6 +111,10 @@
 		B600000F3050000000000001 /* LedgerForgeSubprocessProbe in Embed Subprocess Probe */ = {isa = PBXBuildFile; fileRef = B60000103050000000000001 /* LedgerForgeSubprocessProbe */; };
 		B60000503050000000000001 /* InMemoryRepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */; };
 		C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */; };
+		D57000113057000000000001 /* Category.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000013057000000000001 /* Category.swift */; };
+		D57000123057000000000001 /* CategoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000023057000000000001 /* CategoryStore.swift */; };
+		D57000133057000000000001 /* CategoryManagementCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000033057000000000001 /* CategoryManagementCoordinator.swift */; };
+		D57000143057000000000001 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000043057000000000001 /* CategoryManagementView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -257,6 +261,10 @@
 		B60000113050000000000001 /* LedgerForgeSubprocessProbe.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LedgerForgeSubprocessProbe.entitlements; sourceTree = "<group>"; };
 		B60000513050000000000001 /* DeveloperConsoleStub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperConsoleStub.swift; sourceTree = "<group>"; };
 		C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImportReconciliationGate.swift; sourceTree = "<group>"; };
+		D57000013057000000000001 /* Category.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Category.swift; sourceTree = "<group>"; };
+		D57000023057000000000001 /* CategoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryStore.swift; sourceTree = "<group>"; };
+		D57000033057000000000001 /* CategoryManagementCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementCoordinator.swift; sourceTree = "<group>"; };
+		D57000043057000000000001 /* CategoryManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -469,6 +477,7 @@
 		288EB0D72FF7995800F09BC9 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				D57000013057000000000001 /* Category.swift */,
 				3A4400013004000000000001 /* Money.swift */,
 				28B87B3C2FFBBFC8009BEE8C /* Account.swift */,
 				28B87B362FFBB591009BEE8C /* ImportSession.swift */,
@@ -486,6 +495,7 @@
 		288EB0DD2FF7A3D000F09BC9 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				D57000023057000000000001 /* CategoryStore.swift */,
 				28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */,
 				37A100002FFDA6CB00C12A68 /* ImportSessionStore.swift */,
 				288EB1032FF7C0A600F09BC9 /* DocumentStore.swift */,
@@ -499,6 +509,7 @@
 		288EB0DE2FF7A3D100F09BC9 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				D57000033057000000000001 /* CategoryManagementCoordinator.swift */,
 				28B5217C3003E9D30007B840 /* IdentityResolver.swift */,
 				28B87B342FFB31FC009BEE8C /* Services/ImportValidator.swift */,
 				28B87B302FFB2F1B009BEE8C /* Services/DirectionResolver.swift */,
@@ -554,6 +565,7 @@
 		288EB0E32FF7A3D500F09BC9 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				D57000043057000000000001 /* CategoryManagementView.swift */,
 				28B87B252FFB24C3009BEE8C /* TransactionListView.swift */,
 				288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */,
 				288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */,
@@ -837,6 +849,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D57000113057000000000001 /* Category.swift in Sources */,
+				D57000123057000000000001 /* CategoryStore.swift in Sources */,
+				D57000133057000000000001 /* CategoryManagementCoordinator.swift in Sources */,
+				D57000143057000000000001 /* CategoryManagementView.swift in Sources */,
 				3A4400043004000000000001 /* MoneyFormatting.swift in Sources */,
 				3A4400023004000000000001 /* Money.swift in Sources */,
 				288EB1292FF7DA3900F09BC9 /* ColumnMapping.swift in Sources */,

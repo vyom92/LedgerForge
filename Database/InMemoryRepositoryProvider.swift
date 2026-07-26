@@ -6,6 +6,7 @@ import Foundation
 public final class InMemoryRepositoryProvider {
     public let workspaceRepo: WorkspaceRepository
     public let transactionRepo: TransactionRepository
+    public let categoryRepo: CategoryRepository
     public let accountRepo: AccountRepository
     public let importSessionRepo: ImportSessionRepository
     public let generationToken: ProviderGenerationToken
@@ -18,6 +19,7 @@ public final class InMemoryRepositoryProvider {
         self.generationToken = generationToken
         self.workspaceRepo = InMemoryWorkspaceRepo(state: state)
         self.transactionRepo = InMemoryTransactionRepo(state: state)
+        self.categoryRepo = InMemoryCategoryRepo(state: state)
         self.accountRepo = InMemoryAccountRepo(state: state)
         self.importSessionRepo = InMemoryImportSessionRepo(state: state)
         self.confirmedImportRepo = InMemoryConfirmedImportRepo(state: state, generationToken: generationToken)
@@ -62,12 +64,168 @@ private final class InMemoryRepositoryState {
     var normalizedDocuments: [String: NormalizedDocumentDTO] = [:]
     var normalizedRows: [String: NormalizedRowDTO] = [:]
     var transactions: [String: TransactionDTO] = [:]
+    var categories: [String: CategoryDTO] = [:]
+    var categoryAssignments: [String: TransactionCategoryAssignmentDTO] = [:]
     var transactionEventIdentities: [String: TransactionEventIdentityDTO] = [:]
     var importAttempts: [String: ImportAttemptDTO] = [:]
     var partialImportSummaries: [String: PartialImportSummaryDTO] = [:]
     var incomingRowDispositions: [String: IncomingRowDispositionDTO] = [:]
     var identifierObservations: [String: IdentifierObservationDTO] = [:]
     var confirmedImportFailureInjection: ConfirmedImportFailureInjectionPoint?
+}
+
+private final class InMemoryCategoryRepo: CategoryRepository {
+    private let state: InMemoryRepositoryState
+
+    init(state: InMemoryRepositoryState) {
+        self.state = state
+    }
+
+    func categories(workspaceId: String) throws -> [CategoryDTO] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.categories.values
+            .filter { $0.workspaceId == workspaceId }
+            .sorted(by: Self.categoryOrder)
+    }
+
+    func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.categoryAssignments.values
+            .filter { $0.workspaceId == workspaceId }
+            .sorted { $0.transactionId < $1.transactionId }
+    }
+
+    func createCategory(_ category: CategoryDTO) throws -> CategoryDTO {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard state.workspaces[category.workspaceId] != nil else {
+            throw CategoryRepositoryError.workspaceMismatch
+        }
+        let validated = try CategoryName.validated(category.name)
+        guard category.normalizedName == validated.normalized else {
+            throw CategoryRepositoryError.invalidName
+        }
+        guard state.categories[category.id] == nil else {
+            throw CategoryRepositoryError.duplicateName
+        }
+        guard !state.categories.values.contains(where: {
+            $0.workspaceId == category.workspaceId && $0.normalizedName == validated.normalized
+        }) else {
+            throw CategoryRepositoryError.duplicateName
+        }
+        let created = CategoryDTO(
+            id: category.id,
+            workspaceId: category.workspaceId,
+            name: validated.display,
+            normalizedName: validated.normalized,
+            isArchived: category.isArchived,
+            createdAtISO: category.createdAtISO,
+            updatedAtISO: category.updatedAtISO
+        )
+        state.categories[created.id] = created
+        return created
+    }
+
+    func renameCategory(id: String, workspaceId: String, name: String, updatedAtISO: String) throws -> Bool {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        let validated = try CategoryName.validated(name)
+        guard let existing = state.categories[id] else {
+            throw CategoryRepositoryError.categoryNotFound
+        }
+        guard existing.workspaceId == workspaceId else {
+            throw CategoryRepositoryError.workspaceMismatch
+        }
+        guard !state.categories.values.contains(where: {
+            $0.id != id && $0.workspaceId == workspaceId && $0.normalizedName == validated.normalized
+        }) else {
+            throw CategoryRepositoryError.duplicateName
+        }
+        guard existing.name != validated.display || existing.normalizedName != validated.normalized else {
+            return false
+        }
+        state.categories[id] = CategoryDTO(
+            id: existing.id,
+            workspaceId: existing.workspaceId,
+            name: validated.display,
+            normalizedName: validated.normalized,
+            isArchived: existing.isArchived,
+            createdAtISO: existing.createdAtISO,
+            updatedAtISO: updatedAtISO
+        )
+        return true
+    }
+
+    func setCategoryArchived(id: String, workspaceId: String, isArchived: Bool, updatedAtISO: String) throws -> Bool {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard let existing = state.categories[id] else {
+            throw CategoryRepositoryError.categoryNotFound
+        }
+        guard existing.workspaceId == workspaceId else {
+            throw CategoryRepositoryError.workspaceMismatch
+        }
+        guard existing.isArchived != isArchived else { return false }
+        state.categories[id] = CategoryDTO(
+            id: existing.id,
+            workspaceId: existing.workspaceId,
+            name: existing.name,
+            normalizedName: existing.normalizedName,
+            isArchived: isArchived,
+            createdAtISO: existing.createdAtISO,
+            updatedAtISO: updatedAtISO
+        )
+        return true
+    }
+
+    func deleteUnusedCategory(id: String, workspaceId: String) throws {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard let category = state.categories[id] else {
+            throw CategoryRepositoryError.categoryNotFound
+        }
+        guard category.workspaceId == workspaceId else {
+            throw CategoryRepositoryError.workspaceMismatch
+        }
+        guard !state.categoryAssignments.values.contains(where: {
+            $0.workspaceId == workspaceId && $0.categoryId == id
+        }) else {
+            throw CategoryRepositoryError.categoryInUse
+        }
+        state.categories.removeValue(forKey: id)
+    }
+
+    func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard let transaction = state.transactions[transactionId], transaction.isTrusted else {
+            throw CategoryRepositoryError.transactionNotFound
+        }
+        guard transaction.workspaceId == workspaceId else {
+            throw CategoryRepositoryError.workspaceMismatch
+        }
+        guard let categoryId else {
+            return state.categoryAssignments.removeValue(forKey: transactionId) != nil
+        }
+        guard let category = state.categories[categoryId] else {
+            throw CategoryRepositoryError.categoryNotFound
+        }
+        guard category.workspaceId == workspaceId else {
+            throw CategoryRepositoryError.workspaceMismatch
+        }
+        guard !category.isArchived else {
+            throw CategoryRepositoryError.categoryArchived
+        }
+        if state.categoryAssignments[transactionId]?.categoryId == categoryId {
+            return false
+        }
+        state.categoryAssignments[transactionId] = TransactionCategoryAssignmentDTO(
+            workspaceId: workspaceId,
+            transactionId: transactionId,
+            categoryId: categoryId
+        )
+        return true
+    }
+
+    nonisolated private static func categoryOrder(_ lhs: CategoryDTO, _ rhs: CategoryDTO) -> Bool {
+        if lhs.normalizedName != rhs.normalizedName { return lhs.normalizedName < rhs.normalizedName }
+        return lhs.id < rhs.id
+    }
 }
 
 private final class InMemoryWorkspaceRepo: WorkspaceRepository {

@@ -10,9 +10,22 @@ import SwiftUI
 struct TransactionListView: View {
 
     @StateObject private var viewModel = TransactionListViewModel()
+    @ObservedObject private var categoryStore: CategoryStore
+    private let categoryCoordinator: CategoryManaging
     @State private var selectedTransactionID: Transaction.ID?
+    @State private var categoryMessage: String?
 
     private var filteredTransactions: [Transaction] { viewModel.filteredTransactions }
+
+    @MainActor
+    init(
+        categoryStore: CategoryStore? = nil,
+        categoryCoordinator: CategoryManaging? = nil
+    ) {
+        let resolvedStore = categoryStore ?? .shared
+        self.categoryStore = resolvedStore
+        self.categoryCoordinator = categoryCoordinator ?? CategoryManagementCoordinator(categoryStore: resolvedStore)
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -209,11 +222,17 @@ struct TransactionListView: View {
 
                     LFInfoRow(title: "Date", value: formatDate(selected.statementDate), titleWidth: 86, verticalPadding: 0)
                     LFInfoRow(title: "Account", value: selected.account, titleWidth: 86, verticalPadding: 0)
-                    LFInfoRow(title: "Category", value: "Imported", titleWidth: 86, verticalPadding: 0)
+                    categoryPicker(for: selected)
                     LFInfoRow(title: "Type", value: selected.credit != nil ? "Credit" : "Debit", titleWidth: 86, verticalPadding: 0)
                     LFInfoRow(title: "Description", value: selected.description, titleWidth: 86, verticalPadding: 0)
                     LFInfoRow(title: "Source", value: selected.sourceBank, titleWidth: 86, verticalPadding: 0)
                     LFInfoRow(title: "Balance After", value: selected.runningBalanceMoney.map { MoneyFormatting.display($0) } ?? "—", titleWidth: 86, verticalPadding: 0)
+
+                    if let categoryMessage {
+                        Text(categoryMessage)
+                            .font(.caption)
+                            .foregroundStyle(LFTheme.warning)
+                    }
 
                     Divider().overlay(LFTheme.divider)
 
@@ -267,6 +286,10 @@ struct TransactionListView: View {
                         .font(.caption2)
                         .foregroundStyle(LFTheme.textSecondary)
                         .lineLimit(1)
+                    Text(categoryName(for: transaction))
+                        .font(.caption2)
+                        .foregroundStyle(LFTheme.primaryHover)
+                        .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Text(transaction.account)
@@ -306,6 +329,65 @@ struct TransactionListView: View {
             .clipShape(RoundedRectangle(cornerRadius: 7))
         }
         .buttonStyle(.plain)
+    }
+
+    private func categoryPicker(for transaction: Transaction) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("Category")
+                .foregroundStyle(LFTheme.textSecondary)
+                .frame(width: 86, alignment: .leading)
+            Picker(
+                "Category",
+                selection: Binding<String?>(
+                    get: {
+                        guard let transactionID = transaction.repositoryTransactionId else { return nil }
+                        return categoryStore.snapshot.assignments[transactionID]
+                    },
+                    set: { assign($0, to: transaction) }
+                )
+            ) {
+                Text("Uncategorized").tag(String?.none)
+                ForEach(assignableCategories(for: transaction)) { category in
+                    Text(category.isArchived ? "\(category.name) (Archived)" : category.name)
+                        .tag(Optional(category.id))
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .disabled(transaction.repositoryTransactionId == nil)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .font(.caption)
+    }
+
+    private func categoryName(for transaction: Transaction) -> String {
+        guard let transactionID = transaction.repositoryTransactionId else { return "Uncategorized" }
+        return categoryStore.category(forTransactionID: transactionID)?.name ?? "Uncategorized"
+    }
+
+    private func assignableCategories(for transaction: Transaction) -> [Category] {
+        guard let transactionID = transaction.repositoryTransactionId,
+              let assigned = categoryStore.category(forTransactionID: transactionID),
+              assigned.isArchived else {
+            return categoryStore.activeCategories
+        }
+        return (categoryStore.activeCategories + [assigned]).sorted {
+            if $0.normalizedName != $1.normalizedName { return $0.normalizedName < $1.normalizedName }
+            return $0.id < $1.id
+        }
+    }
+
+    private func assign(_ categoryID: String?, to transaction: Transaction) {
+        guard let transactionID = transaction.repositoryTransactionId else {
+            categoryMessage = "Only persisted imported transactions can be classified."
+            return
+        }
+        do {
+            _ = try categoryCoordinator.setCategory(categoryID: categoryID, transactionID: transactionID)
+            categoryMessage = nil
+        } catch {
+            categoryMessage = error.localizedDescription
+        }
     }
 
     private func transactionTypeButton(

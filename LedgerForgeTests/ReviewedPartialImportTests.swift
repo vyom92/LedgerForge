@@ -487,6 +487,7 @@ struct ReviewedPartialImportTests {
         let provider = DatabaseProvider(
             workspaceRepo: concrete.workspaceRepo,
             transactionRepo: concrete.transactionRepo,
+            categoryRepo: concrete.categoryRepo,
             accountRepo: concrete.accountRepo,
             importSessionRepo: concrete.importSessionRepo,
             confirmedImportRepo: concrete.confirmedImportRepo,
