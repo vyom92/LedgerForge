@@ -366,7 +366,7 @@ struct DurableImportAttemptPresentation: Equatable {
 }
 
 struct ImportOutcomePresentation: Equatable {
-    let fileName: String
+    var fileName: String
     let transactionCount: Int
     let validationStatus: String
     var persistenceStatus: String
@@ -647,8 +647,9 @@ struct ContentView: View {
                 beginPreparation(from: url)
 
             case .failure(let error):
-                selectedFile = error.localizedDescription
-                importState = .failed(fileName: "Import failed", message: error.localizedDescription, retrySourceURL: nil)
+                let summary = ImportFailureSummary.from(error)
+                selectedFile = "Import failed"
+                importState = .failed(fileName: "Import failed", message: summary.displayText, retrySourceURL: nil)
                 selectedSection = .imports
             }
         }
@@ -781,7 +782,13 @@ struct ContentView: View {
         case .settings:
             settingsContent
         case .developer:
+#if DEBUG
+            DeveloperConsoleView { fixture in
+                beginPreparation(for: fixture)
+            }
+#else
             DeveloperConsoleView()
+#endif
         }
     }
 
@@ -1741,7 +1748,7 @@ struct ContentView: View {
                 }
             case .previewReady(let preparedImport), .validationFailed(let preparedImport), .committing(let preparedImport):
                 VStack(alignment: .leading, spacing: 10) {
-                    preparedImportPreview(preparedImport)
+                    preparedImportPreview(preparedImport, displayName: selectedFile)
                     if case .committing = importState {
                         Text("Importing confirmed financial data. This write cannot be cancelled safely.")
                             .font(.caption.weight(.semibold))
@@ -1937,10 +1944,10 @@ struct ContentView: View {
         .padding(12).background(LFTheme.surface.opacity(0.45)).clipShape(RoundedRectangle(cornerRadius: 9))
     }
 
-    private func preparedImportPreview(_ preparedImport: PreparedImport) -> some View {
+    private func preparedImportPreview(_ preparedImport: PreparedImport, displayName: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             importedFileRow(
-                name: preparedImport.fileName,
+                name: displayName ?? preparedImport.fileName,
                 subtitle: preparedImport.validation.passed ? "Prepared for confirmation" : "Validation failed before persistence",
                 icon: preparedImport.validation.passed ? "doc.text.magnifyingglass" : "xmark.octagon.fill",
                 color: preparedImport.validation.passed ? LFTheme.success : LFTheme.danger
@@ -2519,21 +2526,57 @@ struct ContentView: View {
         importState = .preparing(fileName: url.lastPathComponent, phase: .openingSource)
         selectedSection = .imports
         _ = preparationOwner.start { operationID in
-            await prepareImport(from: url, operationID: operationID)
+            await prepareImport(
+                displayName: url.lastPathComponent,
+                operationID: operationID,
+                retrySourceURL: url
+            ) { progress in
+                try await ImportEngine.shared.prepareImport(
+                    from: url,
+                    requestId: operationID,
+                    progress: progress
+                )
+            }
         }
     }
 
-    @MainActor
-    private func prepareImport(from url: URL, operationID: UUID) async {
-        do {
-            let preparedImport = try await ImportEngine.shared.prepareImport(
-                from: url,
-                requestId: operationID
+#if DEBUG
+    private func beginPreparation(for fixture: DebugApprovedFixture) {
+        importAccountChoice = nil
+        importIdentityReview = .unavailable
+        partialImportReview = .ordinaryFullImport
+        selectedFile = fixture.title
+        importState = .preparing(fileName: fixture.title, phase: .openingSource)
+        selectedSection = .imports
+        _ = preparationOwner.start { operationID in
+            await prepareImport(
+                displayName: fixture.title,
+                operationID: operationID,
+                retrySourceURL: nil
             ) { progress in
+                try await DebugImportFixtureLauncher().prepare(
+                    fixture,
+                    requestID: operationID,
+                    progress: progress
+                )
+            }
+        }
+    }
+#endif
+
+    @MainActor
+    private func prepareImport(
+        displayName: String,
+        operationID: UUID,
+        retrySourceURL: URL?,
+        loader: @escaping (@escaping (ImportProgress) -> Void) async throws -> PreparedImport
+    ) async {
+        do {
+            let preparedImport = try await loader { progress in
                 guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
                     return
                 }
-                importState = .preparing(fileName: url.lastPathComponent, phase: progress.phase)
+                importState = .preparing(fileName: displayName, phase: progress.phase)
             }
             guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
                 return
@@ -2548,34 +2591,42 @@ struct ContentView: View {
             guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
                 return
             }
-            selectedFile = preparedImport.fileName
+            selectedFile = displayName
             importState = preparedImport.validation.passed ? .previewReady(preparedImport) : .validationFailed(preparedImport)
             releasePreparationOperation(operationID)
         } catch is CancellationError {
             guard preparationOwner.isCurrent(operationID) else {
                 return
             }
-            selectedFile = url.lastPathComponent
-            importState = .cancelled(fileName: url.lastPathComponent)
+            selectedFile = displayName
+            importState = .cancelled(fileName: displayName)
             releasePreparationOperation(operationID)
         } catch let error as ImportError where error == .cancelled {
             guard preparationOwner.isCurrent(operationID) else {
                 return
             }
-            selectedFile = url.lastPathComponent
-            importState = .cancelled(fileName: url.lastPathComponent)
+            selectedFile = displayName
+            importState = .cancelled(fileName: displayName)
             releasePreparationOperation(operationID)
         } catch {
             guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
                 return
             }
-            selectedFile = url.lastPathComponent
+            let summary = ImportFailureSummary.from(error)
+            selectedFile = displayName
             importState = .failed(
-                fileName: url.lastPathComponent,
-                message: error.localizedDescription,
-                retrySourceURL: isRetryablePreparationFailure(error) ? url : nil
+                fileName: displayName,
+                message: summary.displayText,
+                retrySourceURL: isRetryablePreparationFailure(error) ? retrySourceURL : nil
             )
-            DeveloperConsole.shared.log("ERROR: \(error.localizedDescription)")
+            DeveloperConsole.shared.error(
+                .import,
+                "Import preparation failed",
+                metadata: [
+                    "stage": summary.stage.rawValue,
+                    "family": summary.family.rawValue
+                ]
+            )
             releasePreparationOperation(operationID)
         }
     }
@@ -2587,6 +2638,7 @@ struct ContentView: View {
             return
         }
 
+        let displayName = selectedFile
         importState = .committing(preparedImport)
         let result = await ImportEngine.shared.commitPreparedImport(
             preparedImport,
@@ -2597,8 +2649,9 @@ struct ContentView: View {
             }()
         )
 
-        let outcome = ImportOutcomePresentation(result: result)
-        selectedFile = result.fileName
+        var outcome = ImportOutcomePresentation(result: result)
+        outcome.fileName = displayName
+        selectedFile = displayName
         importState = .completed(outcome)
     }
 

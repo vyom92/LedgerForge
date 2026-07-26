@@ -115,6 +115,8 @@
 		D57000123057000000000001 /* CategoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000023057000000000001 /* CategoryStore.swift */; };
 		D57000133057000000000001 /* CategoryManagementCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000033057000000000001 /* CategoryManagementCoordinator.swift */; };
 		D57000143057000000000001 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000043057000000000001 /* CategoryManagementView.swift */; };
+		F58000010000000000000001 /* ImportFailureSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58000020000000000000001 /* ImportFailureSummary.swift */; };
+		F58000030000000000000001 /* DebugImportVerificationWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58000040000000000000001 /* DebugImportVerificationWorkspaceView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -265,6 +267,8 @@
 		D57000023057000000000001 /* CategoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryStore.swift; sourceTree = "<group>"; };
 		D57000033057000000000001 /* CategoryManagementCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementCoordinator.swift; sourceTree = "<group>"; };
 		D57000043057000000000001 /* CategoryManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementView.swift; sourceTree = "<group>"; };
+		F58000020000000000000001 /* ImportFailureSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFailureSummary.swift; sourceTree = "<group>"; };
+		F58000040000000000000001 /* DebugImportVerificationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugImportVerificationWorkspaceView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -366,6 +370,7 @@
 				281BB17F2FFC4D3F006E7424 /* RawDocument.swift */,
 				281BB1812FFC4D40006E7424 /* ImportResult.swift */,
 				281BB1832FFC4D40006E7424 /* ImportProgress.swift */,
+				F58000020000000000000001 /* ImportFailureSummary.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -569,6 +574,7 @@
 				28B87B252FFB24C3009BEE8C /* TransactionListView.swift */,
 				288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */,
 				288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */,
+				F58000040000000000000001 /* DebugImportVerificationWorkspaceView.swift */,
 				286D68F12FFFF60E0078AAC5 /* Common */,
 			);
 			path = Views;
@@ -668,6 +674,7 @@
 				288EB0A92FF7955200F09BC9 /* Sources */,
 				288EB0AA2FF7955200F09BC9 /* Frameworks */,
 				288EB0AB2FF7955200F09BC9 /* Resources */,
+				F58000050000000000000001 /* Copy DEBUG approved fixtures */,
 			);
 			buildRules = (
 			);
@@ -842,6 +849,24 @@
 			shellPath = /bin/sh;
 			shellScript = "set -eu\nhelper=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/LedgerForgeSubprocessProbe\"\ntest_bundle=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nentitlements=\"${SRCROOT}/SubprocessProbe/LedgerForgeSubprocessProbe.entitlements\"\nentitlements_output=\"${TARGET_TEMP_DIR}/LedgerForgeSubprocessProbe-entitlements.plist\"\ncase \"${helper}\" in \"${test_bundle}\"/Contents/Resources/LedgerForgeSubprocessProbe) ;; *) echo \"Subprocess helper path is outside the expected test-bundle resources directory.\" >&2; exit 1 ;; esac\nif [ ! -f \"${helper}\" ] || [ ! -f \"${entitlements}\" ]; then echo \"Subprocess helper or approved entitlements are missing.\" >&2; exit 1; fi\nidentity=\"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\n/usr/bin/codesign --force --sign \"${identity}\" --entitlements \"${entitlements}\" --options runtime \"${helper}\"\n/usr/bin/codesign --verify --strict --verbose=4 \"${helper}\"\n/usr/bin/codesign -d --entitlements :- \"${helper}\" > \"${entitlements_output}\" 2>/dev/null\nkeys=$(/usr/libexec/PlistBuddy -c Print \"${entitlements_output}\" | /usr/bin/awk -F ' = ' '/ = / { gsub(/^[[:space:]]+/, \"\", $1); print $1 }' | /usr/bin/sort)\nexpected='com.apple.security.app-sandbox\ncom.apple.security.inherit'\nif [ \"${keys}\" != \"${expected}\" ]; then echo \"Subprocess helper has an unexpected entitlement key set.\" >&2; printf '%s\\n' \"${keys}\" >&2; exit 1; fi\n";
 		};
+		F58000050000000000000001 /* Copy DEBUG approved fixtures */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/LedgerForgeTests/Fixtures/Axis/CSV/axis_bank_nre_private_source_semantics.csv",
+				"$(SRCROOT)/LedgerForgeTests/Fixtures/Axis/CSV/axis_bank_nro_account_statement_baseline_csv_source_truth.csv",
+			);
+			name = "Copy DEBUG approved fixtures";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LedgerForgeDebugFixtures/axis_bank_nre_private_source_semantics.csv",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LedgerForgeDebugFixtures/axis_bank_nro_account_statement_baseline_csv_source_truth.csv",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\nfixture_root=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/LedgerForgeDebugFixtures\"\nrm -rf \"${fixture_root}\"\nif [ \"${CONFIGURATION}\" != \"Debug\" ]; then exit 0; fi\nmkdir -p \"${fixture_root}\"\ncp \"${SRCROOT}/LedgerForgeTests/Fixtures/Axis/CSV/axis_bank_nre_private_source_semantics.csv\" \"${fixture_root}/axis_bank_nre_private_source_semantics.csv\"\ncp \"${SRCROOT}/LedgerForgeTests/Fixtures/Axis/CSV/axis_bank_nro_account_statement_baseline_csv_source_truth.csv\" \"${fixture_root}/axis_bank_nro_account_statement_baseline_csv_source_truth.csv\"\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -891,11 +916,13 @@
 				288EB1232FF7D89B00F09BC9 /* Parsers/AxisBankAccountParser.swift in Sources */,
 				28B5217D3003E9D30007B840 /* IdentityResolver.swift in Sources */,
 				281BB1842FFC4D40006E7424 /* ImportProgress.swift in Sources */,
+				F58000010000000000000001 /* ImportFailureSummary.swift in Sources */,
 				286D68FB2FFFF6A60078AAC5 /* LFFilterChip.swift in Sources */,
 				281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */,
 				288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */,
 				288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */,
 				288EB0FD2FF7BA1600F09BC9 /* DeveloperConsoleView.swift in Sources */,
+				F58000030000000000000001 /* DebugImportVerificationWorkspaceView.swift in Sources */,
 				288EB1212FF7D88200F09BC9 /* Parsers/StatementParserRegistry.swift in Sources */,
 				281BB17C2FFC4D1C006E7424 /* ImportFramework.swift in Sources */,
 				28E945452FFD672000FB69E4 /* ImportPersistenceMapper.swift in Sources */,

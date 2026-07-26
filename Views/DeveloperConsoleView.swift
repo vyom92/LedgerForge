@@ -13,6 +13,13 @@ struct DeveloperConsoleView: View {
     @ObservedObject var console = DeveloperConsole.shared
     @ObservedObject private var accountStore = AccountStore.shared
     @ObservedObject private var transactionStore = TransactionStore.shared
+#if DEBUG
+    private let onLaunchFixture: (DebugApprovedFixture) -> Void
+
+    init(onLaunchFixture: @escaping (DebugApprovedFixture) -> Void = { _ in }) {
+        self.onLaunchFixture = onLaunchFixture
+    }
+#endif
 
     // Filters
     @State private var filters = DeveloperConsole.Filters()
@@ -54,6 +61,10 @@ struct DeveloperConsoleView: View {
                 }
                 .frame(width: 330)
             }
+
+#if DEBUG
+            DebugImportVerificationWorkspaceView(onLaunch: onLaunchFixture)
+#endif
         }
         .padding(28)
         .background(LFTheme.backgroundGradient)
