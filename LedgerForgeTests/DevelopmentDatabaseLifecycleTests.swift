@@ -321,6 +321,118 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(try relaunchedProvider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == allMigrations.map(\.version).max())
     }
 
+    @Test(.globalRuntimeStateIsolation)
+    func migrationFailedBootstrapCanResetExactCanonicalDatabaseWithoutInstalledProvider() throws {
+        let root = try temporaryDirectory(named: "UnavailableMigrationReset")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: root)
+        try seedMigrationBlockedV5Database(identity: identity)
+
+        #expect(throws: SQLiteRepositoryProviderError.migrationFailed) {
+            _ = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
+        }
+        let originalSet = try databaseSetSnapshot(identity.databaseSet(at: identity.canonicalDevelopmentURL))
+        DatabaseProvider.shared = .unavailable(reason: .migrationFailed)
+        let coordinator = DevelopmentDatabaseLifecycleCoordinator(
+            identity: identity,
+            activityGate: DevelopmentDatabaseActivityGate()
+        )
+        defer { coordinator.closeOwnedProvider() }
+
+        let result = coordinator.resetDevelopmentDatabase()
+
+        guard case .permanentResetCompleted(let hydration) = result else {
+            Issue.record("Expected unavailable migration reset completion, received \(result)")
+            return
+        }
+        #expect(hydration.accountCount == 0)
+        #expect(hydration.transactionCount == 0)
+        #expect(coordinator.currentDatabaseURL == identity.canonicalDevelopmentURL)
+        #expect(DatabaseProvider.shared.persistenceState == .verifiedSQLite)
+        let backupSet = identity.databaseSet(at: identity.backupURL)
+        for (index, contents) in originalSet {
+            #expect(try Data(contentsOf: backupSet[index]) == contents)
+        }
+
+        coordinator.closeOwnedProvider()
+        let reopened = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
+        defer { reopened.database.close() }
+        #expect(try reopened.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == allMigrations.map(\.version).max())
+        #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM transactions;") == 0)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func unavailableResetRejectsCanonicalFileWithoutMigrationFailureState() throws {
+        let root = try temporaryDirectory(named: "UnavailableWrongState")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: root)
+        try FileManager.default.createDirectory(
+            at: identity.canonicalDevelopmentURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let provider = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
+        provider.database.close()
+        let original = try Data(contentsOf: identity.canonicalDevelopmentURL)
+        DatabaseProvider.shared = .unavailable(reason: .notInitialized)
+        let coordinator = DevelopmentDatabaseLifecycleCoordinator(
+            identity: identity,
+            activityGate: DevelopmentDatabaseActivityGate()
+        )
+
+        #expect(coordinator.resetDevelopmentDatabase() == .rejectedUnsafeIdentity)
+        #expect(try Data(contentsOf: identity.canonicalDevelopmentURL) == original)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func unavailableResetRestoresExactDatabaseSetWhenRecreationFails() throws {
+        let root = try temporaryDirectory(named: "UnavailableRecovery")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: root)
+        try seedMigrationBlockedV5Database(identity: identity)
+        #expect(throws: SQLiteRepositoryProviderError.migrationFailed) {
+            _ = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
+        }
+        let originalSet = try databaseSetSnapshot(identity.databaseSet(at: identity.canonicalDevelopmentURL))
+        DatabaseProvider.shared = .unavailable(reason: .migrationFailed)
+        let coordinator = DevelopmentDatabaseLifecycleCoordinator(
+            identity: identity,
+            activityGate: DevelopmentDatabaseActivityGate(),
+            injectedFailures: [.recreation]
+        )
+
+        #expect(coordinator.resetDevelopmentDatabase() == .recreationFailed)
+        #expect(DatabaseProvider.shared.persistenceState == .unavailable(.migrationFailed))
+        #expect(coordinator.currentDatabaseURL == nil)
+        let restoredSet = identity.databaseSet(at: identity.canonicalDevelopmentURL)
+        for (index, contents) in originalSet {
+            #expect(try Data(contentsOf: restoredSet[index]) == contents)
+        }
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func permanentResetStillRejectsTemporarySessionIdentity() throws {
+        let root = try temporaryDirectory(named: "TemporaryCannotResetCanonical")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: root)
+        try FileManager.default.createDirectory(
+            at: identity.canonicalDevelopmentURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let canonicalProvider = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
+        let coordinator = DevelopmentDatabaseLifecycleCoordinator(
+            identity: identity,
+            activityGate: DevelopmentDatabaseActivityGate()
+        )
+        coordinator.installInitialProvider(canonicalProvider)
+        defer { coordinator.closeOwnedProvider() }
+        guard case .temporarySessionStarted = coordinator.startTemporaryEmptySession() else {
+            Issue.record("Expected temporary session")
+            return
+        }
+
+        #expect(coordinator.resetDevelopmentDatabase() == .rejectedUnsafeIdentity)
+    }
+
     @Test(arguments: [
         DevelopmentDatabaseActivity.importPreparation,
         .preparedAwaitingConfirmation,
@@ -495,6 +607,32 @@ struct DevelopmentDatabaseLifecycleTests {
             description: nil,
             createdAtISO: "2026-07-17T00:00:00Z"
         ))
+    }
+
+    private func seedMigrationBlockedV5Database(identity: DevelopmentDatabaseIdentity) throws {
+        try FileManager.default.createDirectory(
+            at: identity.canonicalDevelopmentURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let database = SQLiteDatabase(path: identity.canonicalDevelopmentURL.path)
+        try database.runMigrations(Array(allMigrations.prefix(5)))
+        try database.executePrepared(
+            sql: "INSERT INTO workspaces(id, name, created_at) VALUES(?, ?, ?);",
+            params: ["workspace-v5-reset", "V5 reset", "2026-07-26T00:00:00Z"]
+        )
+        try database.executePrepared(
+            sql: "INSERT INTO transactions(id, workspace_id, posted_date, native_currency, amount_minor, amount_decimal, direction, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?);",
+            params: ["transaction-v5-reset", "workspace-v5-reset", "2026-07-26", "INR", 100, "1.00", "credit", "2026-07-26T00:00:00Z"]
+        )
+        database.close()
+    }
+
+    private func databaseSetSnapshot(_ urls: [URL]) throws -> [Int: Data] {
+        var snapshot: [Int: Data] = [:]
+        for (index, url) in urls.enumerated() where FileManager.default.fileExists(atPath: url.path) {
+            snapshot[index] = try Data(contentsOf: url)
+        }
+        return snapshot
     }
 
     private func temporaryDirectory(named name: String) throws -> URL {

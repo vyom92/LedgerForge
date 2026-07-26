@@ -156,6 +156,44 @@ struct DevelopmentDatabaseIdentity: Equatable {
             && containsNoSymlink(from: standardizedCandidate, through: authorizedDevelopmentRootURL)
     }
 
+    func authorizesUnavailableCanonicalReset() -> Bool {
+        let fileManager = FileManager.default
+        guard authorizesDestructiveWork(at: canonicalDevelopmentURL),
+              authorizesLifecycleBackup(at: backupURL),
+              isRegularFile(canonicalDevelopmentURL, fileManager: fileManager),
+              hasSQLiteHeader(canonicalDevelopmentURL) else {
+            return false
+        }
+
+        return databaseSet(at: canonicalDevelopmentURL).dropFirst().allSatisfy { member in
+            !fileManager.fileExists(atPath: member.path)
+                || isRegularFile(member, fileManager: fileManager)
+        }
+    }
+
+    private func authorizesLifecycleBackup(at candidate: URL) -> Bool {
+        let standardizedCandidate = candidate.standardizedFileURL
+        return standardizedCandidate == backupURL
+            && containsNoSymlink(from: standardizedCandidate, through: authorizedDevelopmentRootURL)
+    }
+
+    private func isRegularFile(_ url: URL, fileManager: FileManager) -> Bool {
+        guard url.isFileURL,
+              !url.path.isEmpty,
+              fileManager.fileExists(atPath: url.path),
+              let attributes = try? fileManager.attributesOfItem(atPath: url.path) else {
+            return false
+        }
+        return attributes[.type] as? FileAttributeType == .typeRegular
+    }
+
+    private func hasSQLiteHeader(_ url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        guard let header = try? handle.read(upToCount: 16) else { return false }
+        return header == Data("SQLite format 3\0".utf8)
+    }
+
     private func containsNoSymlink(from candidate: URL, through root: URL) -> Bool {
         let fileManager = FileManager.default
         var current = candidate
@@ -521,9 +559,22 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
 
     func resetDevelopmentDatabase() -> DevelopmentDatabaseLifecycleResult {
         guard !isUnavailable else { return .lifecycleUnavailable }
-        guard identity.authorizesDestructiveWork(at: identity.canonicalDevelopmentURL),
-              currentDatabaseURL == identity.canonicalDevelopmentURL,
-              let originalProvider = sqliteProvider else {
+        guard identity.authorizesDestructiveWork(at: identity.canonicalDevelopmentURL) else {
+            return .rejectedUnsafeIdentity
+        }
+        let originalProvider: SQLiteRepositoryProvider?
+        let resetsUnavailableMigrationDatabase: Bool
+        if currentDatabaseURL == identity.canonicalDevelopmentURL,
+           let provider = sqliteProvider {
+            originalProvider = provider
+            resetsUnavailableMigrationDatabase = false
+        } else if currentDatabaseURL == nil,
+                  sqliteProvider == nil,
+                  persistenceUnavailableBecauseMigrationFailed,
+                  identity.authorizesUnavailableCanonicalReset() {
+            originalProvider = nil
+            resetsUnavailableMigrationDatabase = true
+        } else {
             return .rejectedUnsafeIdentity
         }
         guard activityGate.beginExclusive() else { return .rejectedActivityInProgress }
@@ -534,32 +585,52 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             activityGate.finishExclusive(providerChanged: providerChanged)
         }
 
-        do {
-            try createAndVerifyBackup(from: originalProvider)
-        } catch {
-            return .backupFailed
-        }
+        if let originalProvider {
+            do {
+                try createAndVerifyBackup(from: originalProvider)
+            } catch {
+                return .backupFailed
+            }
 
-        do {
-            try failIfInjected(.providerQuiescence)
-            try originalProvider.database.checkpointAndClose()
-        } catch {
-            return .providerQuiescenceFailed
+            do {
+                try failIfInjected(.providerQuiescence)
+                try originalProvider.database.checkpointAndClose()
+            } catch {
+                return .providerQuiescenceFailed
+            }
+        } else {
+            do {
+                try createAndVerifyUnavailableBackup()
+            } catch {
+                return .backupFailed
+            }
         }
 
         do {
             try removeDatabaseSet(at: identity.canonicalDevelopmentURL)
             if injectedFailures.contains(.recreation) {
-                return recover(afterHydrationFailure: false, originalFailure: .recreationFailed)
+                return recoverReset(
+                    unavailableMigrationDatabase: resetsUnavailableMigrationDatabase,
+                    afterHydrationFailure: false,
+                    originalFailure: .recreationFailed
+                )
             }
             let replacement = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
             if injectedFailures.contains(.migration) {
                 try? replacement.database.checkpointAndClose()
-                return recover(afterHydrationFailure: false, originalFailure: .migrationFailed)
+                return recoverReset(
+                    unavailableMigrationDatabase: resetsUnavailableMigrationDatabase,
+                    afterHydrationFailure: false,
+                    originalFailure: .migrationFailed
+                )
             }
             if injectedFailures.contains(.providerInstallation) {
                 try? replacement.database.checkpointAndClose()
-                return recover(afterHydrationFailure: false, originalFailure: .providerInstallationFailed)
+                return recoverReset(
+                    unavailableMigrationDatabase: resetsUnavailableMigrationDatabase,
+                    afterHydrationFailure: false,
+                    originalFailure: .providerInstallationFailed
+                )
             }
             publish(replacement, state: .verifiedSQLite)
             providerChanged = true
@@ -569,11 +640,40 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
                     .hydrateIfNeeded(forceRefresh: true)
                 return .permanentResetCompleted(hydration)
             } catch {
-                return recover(afterHydrationFailure: true, originalFailure: .hydrationFailedRecoverySucceeded)
+                return recoverReset(
+                    unavailableMigrationDatabase: resetsUnavailableMigrationDatabase,
+                    afterHydrationFailure: true,
+                    originalFailure: .hydrationFailedRecoverySucceeded
+                )
             }
         } catch {
-            return recover(afterHydrationFailure: false, originalFailure: .recreationFailed)
+            return recoverReset(
+                unavailableMigrationDatabase: resetsUnavailableMigrationDatabase,
+                afterHydrationFailure: false,
+                originalFailure: .recreationFailed
+            )
         }
+    }
+
+    private var persistenceUnavailableBecauseMigrationFailed: Bool {
+        DatabaseProvider.shared.persistenceState == .unavailable(.migrationFailed)
+    }
+
+    private func recoverReset(
+        unavailableMigrationDatabase: Bool,
+        afterHydrationFailure: Bool,
+        originalFailure: DevelopmentDatabaseLifecycleResult
+    ) -> DevelopmentDatabaseLifecycleResult {
+        if unavailableMigrationDatabase {
+            return restoreUnavailableBackup(
+                afterHydrationFailure: afterHydrationFailure,
+                originalFailure: originalFailure
+            )
+        }
+        return recover(
+            afterHydrationFailure: afterHydrationFailure,
+            originalFailure: originalFailure
+        )
     }
 
     private func recover(
@@ -643,6 +743,73 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
         ]
         for check in relationshipChecks where try verification.queryInt(check) != 0 {
             throw SQLiteDatabaseError.backupFailed("schema-relationship")
+        }
+    }
+
+    private func createAndVerifyUnavailableBackup() throws {
+        try failIfInjected(.backupCreation)
+        guard identity.authorizesUnavailableCanonicalReset() else {
+            throw SQLiteDatabaseError.backupFailed("unsafe-unavailable-identity")
+        }
+        try FileManager.default.createDirectory(
+            at: identity.backupURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try removeDatabaseSet(at: identity.backupURL)
+        try copyDatabaseSet(from: identity.canonicalDevelopmentURL, to: identity.backupURL)
+        try failIfInjected(.backupVerification)
+        guard databaseSetsMatch(identity.canonicalDevelopmentURL, identity.backupURL) else {
+            throw SQLiteDatabaseError.backupFailed("unavailable-database-set")
+        }
+    }
+
+    private func restoreUnavailableBackup(
+        afterHydrationFailure: Bool,
+        originalFailure: DevelopmentDatabaseLifecycleResult
+    ) -> DevelopmentDatabaseLifecycleResult {
+        do {
+            try failIfInjected(.recovery)
+            try? sqliteProvider?.database.checkpointAndClose()
+            sqliteProvider = nil
+            currentDatabaseURL = nil
+            try removeDatabaseSet(at: identity.canonicalDevelopmentURL)
+            try copyDatabaseSet(from: identity.backupURL, to: identity.canonicalDevelopmentURL)
+            guard databaseSetsMatch(identity.backupURL, identity.canonicalDevelopmentURL) else {
+                throw SQLiteDatabaseError.backupFailed("unavailable-database-restore")
+            }
+            DatabaseProvider.shared.invalidateGeneration()
+            DatabaseProvider.shared = .unavailable(reason: .migrationFailed)
+            return afterHydrationFailure ? .hydrationFailedRecoverySucceeded : originalFailure
+        } catch {
+            isUnavailable = true
+            activityGate.enterUnavailable()
+            DatabaseProvider.shared.invalidateGeneration()
+            DatabaseProvider.shared = .unavailable(reason: .lifecycleUnavailable)
+            sqliteProvider = nil
+            currentDatabaseURL = nil
+            return .recoveryFailed
+        }
+    }
+
+    private func copyDatabaseSet(from sourceURL: URL, to destinationURL: URL) throws {
+        let fileManager = FileManager.default
+        let sourceSet = identity.databaseSet(at: sourceURL)
+        let destinationSet = identity.databaseSet(at: destinationURL)
+        for (source, destination) in zip(sourceSet, destinationSet)
+            where fileManager.fileExists(atPath: source.path) {
+            try fileManager.copyItem(at: source, to: destination)
+        }
+    }
+
+    private func databaseSetsMatch(_ firstURL: URL, _ secondURL: URL) -> Bool {
+        let fileManager = FileManager.default
+        let firstSet = identity.databaseSet(at: firstURL)
+        let secondSet = identity.databaseSet(at: secondURL)
+        return zip(firstSet, secondSet).allSatisfy { first, second in
+            let firstExists = fileManager.fileExists(atPath: first.path)
+            let secondExists = fileManager.fileExists(atPath: second.path)
+            return firstExists == secondExists
+                && (!firstExists || fileManager.contentsEqual(atPath: first.path, andPath: second.path))
         }
     }
 
