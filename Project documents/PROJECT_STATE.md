@@ -3,21 +3,29 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current pushed ref under repair:** `main@a0ceb0c0cea5d09e7c2baecc93d9c8c0d984125c` — safe Debug development-database reset after migration bootstrap failure
+- **Current pushed ref:** `main@b661472a58fc24144361322f1853b8001437a3eb` — Sprint 59 accepted ADR-041 architecture-only cycle close
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration is included in the current pushed baseline; this task does not alter parser, fixture or historical financial data
-- **Latest verified implementation under repair:** Sprint 57 durable category foundation plus the post-Sprint 57 category reconciliation closure and the accepted Axis source-truth and safe development-database reset repairs
+- **Latest verified production implementation:** Sprint 58 Deterministic Import Verification Workspace; Sprint 59 added no production implementation
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed increment:** Sprint 57
-- **Latest accepted ADR:** ADR-040 — Explicit Reviewed Partial-Overlap Import
+- **Latest verified completed numbered increment:** Sprint 59
+- **Latest accepted ADR:** ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
 - **Current migration:** V8
+- **Sprint 55A:** Axis Bank Source-Truth Restoration, ending at `f3154dbd13a340714179da7f972a6accdd3aca54`; parallel shared-runtime-store isolation remains Sprint 55 acceptance/test infrastructure
+- **Sprint 57A:** Category Reconciliation Closure, complete at `251a547cb44712a789a9ad7b23a4eabca742900b`; no migration was added
+- **Sprint 58:** Deterministic Import Verification Workspace, complete at `4547083d4d81edc9b6bcd98c3a8e77ee1538e71a`; DEBUG-only ordinary-path verification with Release containment and an isolated exact-duplicate runtime check
+- **Sprint 59:** Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority; ADR-041 selects `ledgerforge.source-bytes.sha256.v1`, but the source snapshot and source-byte foundation is not implemented
+- **Historical repair boundary:** no retained affected historical Axis database is currently identified; no historical repair was performed
 - **Architecture baseline:** Architecture v1.0 Frozen and UI/UX v1.0 Frozen
 - **Latest verified repository-maintenance change:** `7ee20a909038d1088f830a6ea588311625f415e5`
 - **Latest verified implementation-adjacent maintenance repair:** P0 Axis bank-account source-truth restoration; new imports use `axis.bank-account.csv@2`, physical DR is debit/outflow and physical CR is credit/inflow, and header positions remain dynamically resolved
 - **Current overlap boundary:** ordinary no-overlap statements remain full imports, exact-content duplicates remain ADR-030 outcomes, and full supported event overlap remains whole-statement blocked; provenance-less mixed-overlap evidence is unsupported and cannot produce a new reviewed partial plan
+- **ADR-040/V7 alignment:** reviewed-plan, disposition, attempt-count and hydration structures remain readable and validated, but the former provenance-less Axis partial-import family is suspended; mixed supported overlap currently fails closed
+- **Source-byte boundary:** `ledgerforge.raw-text.sha256.v1` remains implemented history; ADR-041's `ledgerforge.source-bytes.sha256.v1` and immutable `SourceContentSnapshot` are accepted architecture only and do not establish production PDF support
+- **Sprint 58 duplicate acceptance:** an isolated exact duplicate left accepted transactions, sessions, documents, fingerprints, account state, balance and hydrated presentation unchanged, adding only one durable rejected duplicate attempt
 - **Sprint 56 persistence:** Migration V7, immutable reviewed-plan digests, typed row dispositions, explicit attempt counts and strict hydration/relaunch reconstruction remain readable and validated for historical repository state, but no new partial session is authorized without lineage-backed overlap evidence
 - **Current exclusions:** unsupported institutions, profiles, currencies, event families, mixed or interleaved overlap, arbitrary omission, fuzzy candidates, ownership override and historical repair remain unavailable
 - **Sprint 57 categories:** workspace-owned user categories and one optional current category assignment per trusted imported transaction are durable, hydrated, manually editable and additive metadata only
@@ -547,6 +555,36 @@ The closure also verified the normal isolated runtime path: Verified SQLite star
 
 No parser, reader, normalized-row, import-session, transaction financial value, balance, identifier or provenance behavior changed. The dated ADR-036 implementation amendment records the reconciliation closure; no migration was added.
 
+### Sprint 57A — Category Reconciliation Closure
+
+**Ref**
+
+`251a547cb44712a789a9ad7b23a4eabca742900b`
+
+**Verified scope**
+
+Sprint 57A completed category reconciliation closure without a migration. Failure injection, blocked-mutation zero-write behavior, retry, provider-generation replacement and target-wide category-state cleanup preserve the immutable imported financial transaction boundary. The completion state is recorded as complete; no historical financial repair was performed.
+
+### Sprint 58 — Deterministic Import Verification Workspace
+
+**Ref**
+
+`4547083d4d81edc9b6bcd98c3a8e77ee1538e71a`
+
+**Verified scope**
+
+Sprint 58 added a DEBUG-only approved-fixture verification workspace that enters the ordinary URL-driven preparation and confirmation path. Release containment removes the fixture resources and excludes the workspace from Release behavior. The isolated exact-duplicate runtime check preserved accepted transactions, sessions, documents, fingerprints, account state, balance and hydrated presentation, adding only one durable rejected duplicate attempt. No Sprint 58A was required.
+
+### Sprint 59 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
+
+**Ref**
+
+`b661472a58fc24144361322f1853b8001437a3eb`
+
+**Verified scope**
+
+Sprint 59 accepted ADR-041 as architecture only. `ledgerforge.source-bytes.sha256.v1` and one immutable app-owned `SourceContentSnapshot` are prospective requirements shared by extraction and fingerprinting through confirmation; neither is implemented. Existing `ledgerforge.raw-text.sha256.v1` history remains untouched, production PDF support remains unavailable, FW-P1-16 remains blocked and no migration was added.
+
 ### Sprint 56 — Explicit Reviewed Partial-Overlap Import
 
 **Current alignment after Axis source-truth restoration:** Sprint 56's persistence schema, provider transaction, hydration and presentation structures remain implemented and readable, but its source-semantic acceptance is invalidated. The three-shared/one-later fixture is quarantined for missing immutable lineage, `axis.bank-account.csv@1` is historical only, and production now rejects mixed supported overlap until lineage-backed evidence authorizes a replacement boundary.
@@ -726,22 +764,16 @@ Detailed implementation history remains in Git and accepted ADRs.
 
 ## Current Planning State
 
-- A read-only backlog-readiness campaign inspected `main@bdb51b0ddcdde097e456a16bab7f0bf999fd595b`.
-- The campaign performed no build, test, runtime, migration, ADR or implementation work.
-- A subsequent full audit reviewed all 155 numbered `FUTURE_WORK.MD` candidates against:
-  - the current pushed repository;
-  - `PROJECT_STATE.md`;
-  - accepted ADRs;
-  - completed sprint evidence;
-  - current fixture inventory;
-  - recent repository history.
-- The audit corrected material readiness and dependency drift without authorizing implementation.
-- Fixture-backed HDFC, CBQ and card families are eligible for targeted discovery but remain blocked from implementation by their selected source-format and domain contracts.
-- `FW-P1-18 — Binary-Document Fingerprint Semantics` is ready for Chat architecture planning.
-- `FW-P1-10 — Production PDF Statement Support` remains blocked until the `FW-P1-18` authority is approved.
+- The current planning alignment is based on `main@b661472a58fc24144361322f1853b8001437a3eb`, completed Sprints 50–59, Migration V8 and accepted ADR-041.
+- `FW-P1-18 — Binary-Document Fingerprint Semantics` has completed its representation decision through ADR-041 and now represents the unimplemented immutable source-snapshot and source-byte fingerprint foundation.
+- One targeted schema/lifecycle discovery remains before FW-P1-18 implementation. It must resolve the legacy `documents.sha256` role, migration or compatibility shape, singular-to-multiple fingerprint ownership, snapshot storage and security scope, cleanup, concurrent preparation, confirmation-time revalidation, typed rejected outcomes, provider parity and zero-residue acceptance.
+- `FW-P1-10 — Production PDF Statement Support` remains blocked by implementation and acceptance of that foundation, plus selection and revalidation of one approved PDF family through the ordinary URL-driven production path.
+- `FW-P1-16` remains blocked until two equivalent formats are independently production-supported and a separate equivalence architecture is accepted.
+- `FW-P1-40 — Deterministic Approved-Fixture Launcher` was completed by Sprint 58 and is removed from the unscheduled queue.
+- `FW-P1-37` retains only broader structured diagnostics work not completed by Sprint 58; its bounded privacy-safe preparation-failure summary and Developer Console fixture-workflow slice is complete.
+- Fixture-backed HDFC, CBQ and card families remain eligible for targeted discovery but are not production support.
 - `FW-P2-20 — Category Model and Management` is complete in Sprint 57 and removed from the unscheduled queue.
 - `FW-P2-21 — Deterministic Categorization Rules` is now eligible for bounded discovery; no rule behavior is implemented or authorized.
-- `FW-P1-37` and `FW-P1-40` remain ready for planning as one possible bounded DEBUG-only import-verification outcome.
 - Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
 - `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.
 - No implementation is authorized.

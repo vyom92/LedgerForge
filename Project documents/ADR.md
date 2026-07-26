@@ -26,8 +26,9 @@ When reading this file:
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
 **Status alignment date:** 2026-07-26
-**Repository ref reviewed:** `main@a0ceb0c0cea5d09e7c2baecc93d9c8c0d984125c` — Sprint 57 post-sprint closure baseline
-**Latest verified implementation:** Sprint 57 durable category foundation; category reconciliation closure is the current uncommitted repair
+**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb` — Sprint 59 cycle-close baseline
+**Latest verified production implementation:** Sprint 58 Deterministic Import Verification Workspace
+**Latest completed numbered outcome:** Sprint 59 architecture-only ADR-041 acceptance
 **Latest accepted ADR:** ADR-041
 **Current migration:** V8
 
@@ -76,7 +77,7 @@ No alignment note authorizes implementation.
 | ADR-037 | Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal | Accepted contract-first architecture; no executable mutation family implemented. | The shared lifecycle remains architecture-only. |
 | ADR-038 | Atomic Confirmed Import and Durable Identifier Ownership | Accepted and implemented in Sprint 50. | Migration V5, provider-owned atomic confirmed import, durable identifier ownership/observations, provider parity and subprocess contention acceptance are operational. |
 | ADR-039 | Trusted Statement Dates and Durable Source Provenance | Accepted and implemented in Sprint 52, with Sprint 52A corrective closure. | Migration V6, StatementDate, date-role/timezone evidence, parser-profile provenance, source ordinal/digest relationships and strict hydration are operational. |
-| ADR-040 | Explicit Reviewed Partial-Overlap Import | Accepted and implemented in Sprint 56. | One bounded Axis bank-account CSV/INR/verified-UPI prefix-overlap family, Migration V7, immutable reviewed plans, atomic provider commit and strict hydration are operational. |
+| ADR-040 | Explicit Reviewed Partial-Overlap Import | Accepted; architecture and V7 compatibility structures remain readable and validated, but the former Axis production partial-overlap family is suspended. | Mixed supported overlap currently fails closed pending new immutable source evidence and an independently derived direction/event oracle. |
 | ADR-041 | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority | Accepted architecture; implementation pending. | No production implementation in Sprint 59. The binary-fingerprint foundation must precede production PDF support. |
 
 ## Alignment Policy

@@ -1,9 +1,9 @@
 # LedgerForge Agent Guide
 
 **Status:** Mandatory repository bootstrap and execution-policy entry point  
-**Alignment reviewed:** 2026-07-25  
-**Repository ref reviewed:** `main@a64c2d8d67e93631d8b0c32620ded72f389f252f`  
-**Latest verified implementation baseline:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` - Sprint 53
+**Alignment reviewed:** 2026-07-26
+**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb`
+**Latest verified implementation baseline:** `main@b661472a58fc24144361322f1853b8001437a3eb` - Sprint 58 production implementation; Sprint 59 ADR-041 architecture-only
 
 ## Project Overview
 

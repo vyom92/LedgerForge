@@ -1,9 +1,9 @@
 # LedgerForge — Engineering Standards
 
 **Status:** Active engineering and verification policy  
-**Status alignment reviewed:** 2026-07-24  
-**Repository ref reviewed:** `main@686e3b91bfbf9459a38e9137abee6a2588ecec7f`  
-**Latest verified implementation baseline:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` — Sprint 53
+**Status alignment reviewed:** 2026-07-26
+**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb`
+**Latest verified production implementation:** Sprint 58 — Deterministic Import Verification Workspace; Sprint 59 ADR-041 architecture-only
 
 ## Document Role
 
@@ -695,13 +695,17 @@ Its authority is exact reader-produced UTF-8 text before parsing or normalizatio
 
 Filename, path and financial interpretation are excluded.
 
-Exact-content fingerprinting is prospective.
+`ledgerforge.raw-text.sha256.v1` is implemented for the current reader-text boundary. Binary exact-content fingerprinting remains prospective under ADR-041.
 
 Do not reconstruct legacy fingerprints from reduced repository evidence.
 
+## Binary source snapshots under ADR-041
+
+Future binary-capable imports must use exact source bytes under `ledgerforge.source-bytes.sha256.v1`. Fingerprinting and extraction must consume one immutable app-owned `SourceContentSnapshot` through confirmation, and confirmation must revalidate that snapshot. Source bytes must not enter diagnostics or durable history merely for fingerprinting. Existing raw-text fingerprints remain valid and untouched. This is a prospective standard: the snapshot and source-byte foundation do not exist in production today.
+
 ## Binary documents
 
-Binary exact-content authority is not yet approved.
+Binary exact-content authority is accepted by ADR-041 for prospective implementation; the source snapshot and source-byte foundation are not implemented.
 
 Do not represent parsed PDF text, normalized transactions or fixture equivalence as binary identity.
 

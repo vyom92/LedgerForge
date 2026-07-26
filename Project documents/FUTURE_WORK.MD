@@ -54,10 +54,11 @@ A work item becomes executable only when Chat supplies one complete approved pro
 
 ## Full Candidate Verification Audit
 
-**Audit date:** 2026-07-24  
-**Current pushed ref:** `main@de238d8abf5ee7dc7d1eb9cd13fab72803f2be28`  
-**Latest verified implementation:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` — Sprint 53  
-**Latest repository maintenance:** `7ee20a909038d1088f830a6ea588311625f415e5`  
+**Audit date:** 2026-07-26
+**Current pushed ref:** `main@b661472a58fc24144361322f1853b8001437a3eb`
+**Latest verified production implementation:** Sprint 58 — Deterministic Import Verification Workspace
+**Latest completed numbered outcome:** Sprint 59 — ADR-041 architecture-only acceptance
+**Latest repository maintenance:** `a0ceb0c0cea5d09e7c2baecc93d9c8c0d984125c` safe disposable development-database reset
 **Candidate entries reviewed:** 155  
 **Fresh build/test/runtime evidence:** None; this was a read-only planning audit.
 
@@ -76,7 +77,10 @@ Material corrections in this revision include:
 - source-document browsing after durable document/import provenance became available;
 - dashboard chart work that remains blocked by absent analytical truth;
 - repository-hygiene work narrowed after tracked Xcode user data was removed;
-- backup/restore promoted to targeted discovery after the database lifecycle and migration-integrity foundations matured.
+- backup/restore promoted to targeted discovery after the database lifecycle and migration-integrity foundations matured;
+- Sprint 57A category reconciliation closure and Sprint 58 deterministic DEBUG-only import verification completion;
+- ADR-041 selection of source-byte authority, with the implementation foundation still unscheduled and production PDF support still blocked;
+- the Axis direction-audit subfamily narrowed because no retained affected historical database is currently identified.
 
 This audit does not authorize execution, assign sprint numbers or supersede the roadmap.
 
@@ -277,7 +281,7 @@ Provide privacy-safe verification for:
 - incomplete imports;
 - inconsistent completion states.
 
-The Axis direction-correction audit is now one concrete separately gated family: bank-account imports accepted with `axis.bank-account.csv@1` from Sprint 55 commit `9598c6de6a701d14b0d4afb37d5adb27e9fc82e0` through the parent of the P0 source-truth restoration commit may contain reversed canonical direction, signed `Money` and direction-dependent UPI subtype. Earlier alternating parser revisions also require audit. The first increment must be read-only detection against durable parser provenance and independently provable source arithmetic. Any repair requires exact impact preview, explicit authorization, provider-owned atomic mutation and recoverability or explicit irreversibility. The source-truth restoration performs no historical mutation.
+The Axis direction-audit family has no retained affected historical database currently identified. No detection or repair run is presently authorized. If a concrete affected database is supplied, the subfamily must first perform read-only detection against durable parser provenance and independently provable source arithmetic; any repair then requires exact impact preview, explicit authorization, provider-owned atomic mutation and recoverability or explicit irreversibility. The Sprint 55A source-truth restoration performed no historical mutation.
 
 Targeted discovery must select one independently verifiable family and define whether the first increment is read-only verification or an explicit repair. Repair actions must be previewed, authorized, atomic and recoverable or explicitly irreversible.
 
@@ -783,12 +787,12 @@ Do not claim production card support from fixture integration, schema capacity, 
 
 **Status:** Blocked  
 **Discovery:** Complete  
-**Planning state:** Implementation waits on one architecture decision.  
-**Depends on:** Approval of authoritative binary-document fingerprint semantics under `FW-P1-18`, one selected approved PDF family and the existing extraction foundation.
+**Planning state:** Implementation remains blocked by the unimplemented source-byte foundation.
+**Depends on:** Accepted ADR-041; implementation and acceptance of the immutable source-snapshot and source-byte fingerprint foundation; selection and revalidation of one approved PDF family; and ordinary URL-driven production-path acceptance.
 
 Promote PDF from extraction foundation to a production-supported import source.
 
-After `FW-P1-18` is decided, planning must select one fixture-backed PDF family and require:
+After the ADR-041 foundation is implemented, planning must select one fixture-backed PDF family and require:
 
 - approved PDF content entering the unified import pipeline;
 - consistent picker, source-format registry and reader behavior;
@@ -906,19 +910,14 @@ OCR output remains untrusted until deterministic parsing and validation succeed.
 
 ## FW-P1-18 — Binary-Document Fingerprint Semantics
 
-**Status:** Ready for planning  
-**Discovery:** Complete  
-**Planning state:** One Chat-owned architecture decision remains.  
-**Depends on:** Approval of the authoritative binary fingerprint representation and versioned algorithm-coexistence contract.
+**Status:** Ready for discovery
+**Discovery:** Representation decision complete in ADR-041.
+**Planning state:** Remaining implementation-foundation discovery only.
+**Depends on:** Accepted ADR-041 and a targeted schema/lifecycle contract for the unimplemented foundation.
 
 Define deterministic exact-content fingerprint input for binary documents when reader-produced text is absent, incomplete or unsuitable as exact-content authority.
 
-Chat must decide whether the authority is:
-
-- exact source bytes; or
-- another explicitly defined stable binary representation.
-
-The decision must also define:
+ADR-041 selects exact source bytes under `ledgerforge.source-bytes.sha256.v1`. Remaining discovery must define:
 
 - immutable source-content ownership through preparation and confirmation;
 - metadata that may change without changing represented statement content;
@@ -930,9 +929,20 @@ The decision must also define:
 - SQLite/In-Memory parity;
 - privacy-safe diagnostics.
 
+The remaining discovery must also resolve:
+
+- the legacy role of `documents.sha256`;
+- migration or compatibility shape without inventing V9;
+- singular-to-multiple fingerprint ownership across plans and providers;
+- `SourceContentSnapshot` storage and security-scope ownership;
+- cleanup and concurrent preparation;
+- confirmation-time snapshot revalidation;
+- typed rejected outcomes;
+- SQLite/In-Memory parity and zero-residue acceptance.
+
 Binary fingerprinting must never be inferred from parsed transactions, totals, filenames, paths or presentation metadata.
 
-No migration or historical fingerprint reconstruction is authorized. This decision may form the architecture portion of the first `FW-P1-10` implementation increment.
+No historical fingerprint reconstruction is authorized. The source-byte foundation remains unimplemented and must be accepted before it can form the implementation portion of `FW-P1-10`.
 
 ---
 
@@ -1083,7 +1093,7 @@ Preparation now has truthful named stages, one owned cancellable operation, and 
 
 Present actionable, user-facing guidance while preserving detailed developer diagnostics separately.
 
-The approved durable-attempt-history increment promotes only bounded enumerated guidance for supported attempt outcomes. Broader validation education and unsupported-result guidance remain future work.
+Sprint 58 completed bounded privacy-safe preparation-failure summaries. Retain only broader validation education and unsupported-result guidance not already implemented. Confirmed-persistence retry remains scoped to FW-P1-28 and must not be duplicated here.
 
 ---
 
@@ -1178,6 +1188,8 @@ Source inspection must never expose passwords or unredacted financial identifier
 **Status:** Ready for planning
 **Depends on:** Existing structured diagnostic system
 
+Sprint 58 completed bounded privacy-safe preparation-failure summaries and the Developer Console integration related to the approved fixture workflow. Retain only broader structured diagnostics work not completed by that slice.
+
 ---
 
 ## FW-P1-38 — Import Inspector and Validation Timeline
@@ -1254,17 +1266,6 @@ The design must define:
 - deterministic ordering and schema evolution.
 
 Persistent diagnostics must not become an application persistence mechanism or a substitute for import-session audit history.
-
----
-
-## FW-P1-40 — Deterministic Approved-Fixture Launcher
-
-**Status:** Ready for planning
-**Depends on:** Existing production preparation seam and approved sanitized fixtures
-
-Provide a DEBUG-only launcher for repository-approved sanitized fixtures. It must enter the ordinary production URL-driven preparation path and preserve reader, detection, classification, parser, validation, account choice, duplicate evaluation, explicit confirmation, persistence, hydration and presentation.
-
-The launcher must not auto-confirm, inject expected results, use private statements, or create an alternate parser, import engine, repository or persistence path. It must be absent from Release builds.
 
 ---
 

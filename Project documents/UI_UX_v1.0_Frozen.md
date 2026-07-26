@@ -2,9 +2,9 @@
 
 **Version:** 1.0  
 **Status:** FROZEN  
-**Status alignment reviewed:** 2026-07-24  
-**Repository ref reviewed:** `main@686e3b91bfbf9459a38e9137abee6a2588ecec7f`  
-**Latest verified implementation baseline:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` — Sprint 53
+**Status alignment reviewed:** 2026-07-26
+**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb`
+**Latest verified production implementation:** Sprint 58 — Deterministic Import Verification Workspace; Sprint 59 ADR-041 architecture-only
 
 ## Purpose
 
@@ -58,6 +58,10 @@ The UI must not display:
 - fake search or drag-and-drop affordances;
 - raw persistence codes, file paths, SQL errors or unredacted identifiers;
 - future modules merely to make the interface appear more complete.
+
+## Current Alignment — Sprint 59
+
+Sprint 54's durable import-outcome presentation remains operational. Sprint 57 and Sprint 57A provide durable manual categories, current transaction assignments and category-reconciliation-safe Settings and transaction-detail interactions through Migration V8. Sprint 58's import-verification workspace is DEBUG-only and follows the ordinary import preparation and confirmation path. The former ordinary Axis partial-import family is suspended, no production PDF workflow exists, automatic categorization remains unavailable, and unsupported analytics or reports must not be presented as financial truth.
 
 ---
 

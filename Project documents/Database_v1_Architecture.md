@@ -2,10 +2,10 @@
 
 # LedgerForge — Database v1 Architecture
 
-**Status:** Frozen database-design baseline, status-aligned through ADR-040, Migration V8 and the Axis source-truth restoration
+**Status:** Frozen database-design baseline, status-aligned through ADR-041, Migration V8, Sprint 57A, Sprint 58 and the Axis source-truth restoration
 **Status alignment reviewed:** 2026-07-26
-**Repository ref reviewed:** the Git-authoritative Axis source-truth restoration commit containing this update
-**Latest verified implementation under repair:** Sprint 57 durable categories plus the post-Sprint 57 category reconciliation closure
+**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb`
+**Latest verified production implementation:** Sprint 58 Deterministic Import Verification Workspace; Sprint 59 accepted ADR-041 architecture only
 **Current registered migration:** V8
 **Production database:** SQLite behind repository and provider boundaries
 
@@ -101,7 +101,7 @@ The repository contains fixture and extraction foundations for PDF and spreadshe
 Those foundations do not activate:
 
 - production PDF persistence;
-- binary-document fingerprint authority;
+- binary-document fingerprint authority under accepted ADR-041, not implemented production behavior;
 - production XLS or XLSX readers;
 - production source-file archival;
 - OCR;
@@ -592,7 +592,9 @@ It does not persist:
 
 Uniqueness is database-wide under the current ADR-030 contract.
 
-Binary-document authority remains unapproved.
+`ledgerforge.source-bytes.sha256.v1` is accepted by ADR-041 for future binary-capable imports. It is not implemented. Production has no `SourceContentSnapshot`; source bytes are not retained merely for fingerprinting, and existing `ledgerforge.raw-text.sha256.v1` history remains untouched.
+
+The legacy role of `documents.sha256`, any compatibility or future migration shape, singular-to-multiple fingerprint ownership, snapshot storage and security-scope ownership, cleanup, concurrent preparation and confirmation-time revalidation remain implementation-foundation discovery questions. This document does not invent V9 or a migration design.
 
 ## 6.7 Import session
 
@@ -1580,6 +1582,8 @@ Before PDF persistence becomes production-supported, approve:
 - malformed/encrypted/image-only outcomes;
 - provider parity;
 - independent financial oracle.
+
+ADR-041 satisfies the representation decision but not the implementation gate. PDF extraction infrastructure remains a foundation only; no production PDF support is established.
 
 ## 28.2 XLS and XLSX
 

@@ -2,11 +2,11 @@
 
 **Version:** 1.0  
 **Status:** FROZEN BASELINE  
-**Status alignment reviewed:** 2026-07-24  
-**Repository ref reviewed:** `main@686e3b91bfbf9459a38e9137abee6a2588ecec7f`  
-**Latest verified implementation baseline:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` — Sprint 53  
-**Latest accepted architecture decision:** ADR-039 — Trusted Statement Dates and Durable Source Provenance  
-**Current migration:** V6
+**Status alignment reviewed:** 2026-07-26
+**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb`
+**Latest verified production implementation:** Sprint 58 — Deterministic Import Verification Workspace
+**Latest accepted architecture decision:** ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
+**Current migration:** V8
 
 ## Document Role
 
@@ -78,7 +78,7 @@ New supported imports emit:
 
 ```text
 axis.bank-account.csv
-version 1
+version 2
 ```
 
 Historical durable provenance using:
@@ -126,7 +126,7 @@ The verified implementation includes:
 
 - SQLite production persistence;
 - equivalent In-Memory provider behavior within approved boundaries;
-- registered migrations through V6;
+- registered migrations through V8;
 - fail-closed migration-chain verification;
 - repository-owned atomic confirmed import;
 - durable exact-content fingerprints;
@@ -138,6 +138,7 @@ The verified implementation includes:
 - `Money` and native-currency integrity;
 - trusted statement dates;
 - durable source order and provenance;
+- workspace-owned categories and current transaction-category assignments;
 - canonical repository hydration;
 - DEBUG-only recoverable development-database lifecycle.
 
@@ -146,12 +147,15 @@ The verified implementation includes:
 Accepted architecture also exists for:
 
 - document-scoped card-statement evidence under ADR-034;
-- category identity and current assignment under ADR-036;
 - financial-mutation planning and authorization under ADR-037.
 
 Acceptance does not mean production implementation.
 
-No category schema, category repository, production mutation executor, generic audit ledger or card persistence currently exists.
+No generic production mutation executor, audit ledger or card persistence currently exists.
+
+## Current Alignment — Sprint 59
+
+The reviewed ref is `main@b661472a58fc24144361322f1853b8001437a3eb`. Sprint 57A completed category reconciliation without a migration. Sprint 58's approved-fixture verification workspace is DEBUG-only, follows the ordinary import path and has verified Release containment. Sprint 59 accepted ADR-041, selecting `ledgerforge.source-bytes.sha256.v1` and one immutable app-owned `SourceContentSnapshot` for future binary-capable imports; implementation remains pending. Existing `ledgerforge.raw-text.sha256.v1` history remains untouched, and production support remains limited to the approved Axis bank-account CSV grammar. ADR-040/V7 compatibility structures remain readable, but the former provenance-less Axis partial-import family is suspended and mixed supported overlap fails closed. No production PDF workflow, automatic categorization or unsupported analytics/reporting authority is established.
 
 ---
 
@@ -406,7 +410,7 @@ It supplies deterministic evidence to:
 - parser selection;
 - exact-content fingerprinting where the algorithm supports that representation.
 
-Reader-produced text and binary source bytes are distinct possible fingerprint authorities. Binary authority remains a separate architecture decision.
+Reader-produced text and binary source bytes are distinct fingerprint authorities. ADR-041 selects exact source bytes for future binary-capable imports; the source snapshot and source-byte implementation remain pending.
 
 ## Institution Detection
 
@@ -898,12 +902,9 @@ Legacy fingerprints are not reconstructed from reduced history.
 
 ## Binary-document fingerprints
 
-Binary-document exact-content authority is not yet approved.
+ADR-041 accepts exact source bytes under `ledgerforge.source-bytes.sha256.v1` for future binary-capable imports. The source snapshot and source-byte foundation remain unimplemented.
 
-Production PDF support remains blocked until the architecture selects:
-
-- exact source bytes; or
-- another explicitly defined stable binary representation.
+Production PDF support remains blocked until that foundation is implemented and accepted, and one approved PDF family is selected and revalidated through the ordinary production path.
 
 Binary identity must not be inferred from parsed financial output.
 
@@ -1191,6 +1192,8 @@ Runtime-generated transaction IDs are not persistence targets.
 No category repository, store, schema, migration or UI is currently implemented.
 
 The expected first implementation requires an additive V7 migration, but V7 is not authorized by this document.
+
+**Current alignment — Sprint 57/57A:** The preceding state describes the pre-V8 architecture baseline. Migration V8 now provides the durable category repository, current assignment relationship, hydration and bounded UI; Sprint 57A completed category reconciliation without another migration. Category hierarchy, rules, bulk mutation and richer metadata remain future work.
 
 ---
 
@@ -1678,7 +1681,7 @@ One supported family never implies full institution support.
 
 The following remain future work and require separate evidence or decisions:
 
-- binary-document fingerprint authority;
+- immutable source-snapshot and source-byte fingerprint foundation under ADR-041;
 - production PDF support;
 - XLS and XLSX readers;
 - TXT reader;
@@ -1689,7 +1692,7 @@ The following remain future work and require separate evidence or decisions:
 - profile learning;
 - AI-assisted unsupported-layout mapping;
 - production card persistence;
-- category implementation;
+- category hierarchy, rules, bulk operations and richer metadata;
 - transfer matching;
 - partial-overlap import;
 - historical repair;
