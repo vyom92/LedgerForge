@@ -635,8 +635,8 @@ private struct CleanRoomAxisBankCSVOracle {
             return CleanRoomAxisTransaction(
                 date: cells[0],
                 description: cells[2],
-                debit: Decimal(string: cells[3], locale: Locale(identifier: "en_US_POSIX")),
-                credit: Decimal(string: cells[4], locale: Locale(identifier: "en_US_POSIX")),
+                debit: Decimal(string: cells[4], locale: Locale(identifier: "en_US_POSIX")),
+                credit: Decimal(string: cells[3], locale: Locale(identifier: "en_US_POSIX")),
                 balance: Decimal(string: cells[5], locale: Locale(identifier: "en_US_POSIX")),
                 sourceOrdinal: headerIndex + offset + 2
             )

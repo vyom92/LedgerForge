@@ -33,6 +33,7 @@
   "candidate_status": "validated",
   "fixture_class": "source-faithful sanitized fixture",
   "cross_format_boundary": "Matching account identity and date range do not establish financial equivalence with the Range 1 CSV.",
+  "csv_source_direction_contract": "Where the shared axis.bank-account.csv@1 layout is referenced, physical DR maps to canonical credit and physical CR maps to canonical debit; the PDF/XLS financial oracle remains independent.",
   "overlap_verification": {
     "csv": {
       "format_pair": "Range 1 CSV to Range 2 CSV",

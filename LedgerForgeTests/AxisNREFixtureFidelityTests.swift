@@ -180,23 +180,23 @@ private struct IndependentAxisCSVOracle {
                 directionFailures.append(rowNumber)
                 continue
             }
-            let debit = decimal(values[dr])
-            let credit = decimal(values[cr])
+            let sourceDR = decimal(values[dr])
+            let sourceCR = decimal(values[cr])
             let runningBalance = decimal(values[balance])
-            if (debit == nil) == (credit == nil) {
+            if (sourceDR == nil) == (sourceCR == nil) {
                 directionFailures.append(rowNumber)
             }
             transactions.append(
                 IndependentAxisTransaction(
                     date: values[date],
                     physicalRowNumber: rowNumber,
-                    debit: debit,
-                    credit: credit,
+                    debit: sourceCR,
+                    credit: sourceDR,
                     balance: runningBalance,
                     eventEvidence: eventEvidence(
                         narration: values[description],
-                        debit: debit,
-                        credit: credit
+                        debit: sourceCR,
+                        credit: sourceDR
                     )
                 )
             )
@@ -231,8 +231,8 @@ private struct IndependentAxisCSVOracle {
             reconciliationFailureRows: reconciliationFailures,
             debitTotal: debitTotal,
             creditTotal: creditTotal,
-            rawDRColumnTotal: debitTotal,
-            rawCRColumnTotal: creditTotal,
+            rawDRColumnTotal: creditTotal,
+            rawCRColumnTotal: debitTotal,
             openingBalance: openingBalance,
             closingBalance: transactions.last?.balance
         )

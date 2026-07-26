@@ -10,8 +10,8 @@ enum AxisBankCSVColumnRole: String, CaseIterable, Hashable {
     case date
     case chequeReference
     case description
-    case debit
-    case credit
+    case sourceDR = "source DR"
+    case sourceCR = "source CR"
     case balance
     case sol
 }
@@ -40,13 +40,13 @@ struct AxisBankCSVColumnMapping {
     let date: Int
     let chequeReference: Int
     let description: Int
-    let debit: Int
-    let credit: Int
+    let sourceDR: Int
+    let sourceCR: Int
     let balance: Int
     let sol: Int
 
     var maximumIndex: Int {
-        [date, chequeReference, description, debit, credit, balance, sol].max()!
+        [date, chequeReference, description, sourceDR, sourceCR, balance, sol].max()!
     }
 
     static func resolve(
@@ -76,8 +76,8 @@ struct AxisBankCSVColumnMapping {
             date: indices[.date]!,
             chequeReference: indices[.chequeReference]!,
             description: indices[.description]!,
-            debit: indices[.debit]!,
-            credit: indices[.credit]!,
+            sourceDR: indices[.sourceDR]!,
+            sourceCR: indices[.sourceCR]!,
             balance: indices[.balance]!,
             sol: indices[.sol]!
         )
@@ -95,16 +95,35 @@ struct AxisBankCSVColumnMapping {
         "transaction date": [.date],
         "chqno": [.chequeReference],
         "particulars": [.description],
-        "dr": [.debit],
-        "debit": [.debit],
-        "cr": [.credit],
-        "credit": [.credit],
+        "dr": [.sourceDR],
+        "debit": [.sourceDR],
+        "cr": [.sourceCR],
+        "credit": [.sourceCR],
         "bal": [.balance],
         "balance": [.balance],
         "sol": [.sol],
-        "dr/cr": [.debit, .credit],
-        "debit/credit": [.debit, .credit]
+        "dr/cr": [.sourceDR, .sourceCR],
+        "debit/credit": [.sourceDR, .sourceCR]
     ]
+}
+
+/// The verified physical-column contract for `axis.bank-account.csv@1`.
+///
+/// Axis's source labels are not canonical financial roles: a populated physical
+/// DR cell is an inflow and a populated physical CR cell is an outflow.
+enum AxisBankAccountCSVProfileV1 {
+    static func resolve(
+        sourceDR: Decimal?,
+        sourceCR: Decimal?
+    ) throws -> DirectionResult {
+        try DirectionResolver.resolve(
+            strategy: .debitCreditColumns,
+            debit: sourceCR,
+            credit: sourceDR,
+            amount: nil,
+            direction: nil
+        )
+    }
 }
 
 enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
@@ -214,14 +233,14 @@ final class AxisBankAccountParser: StatementParser {
             }
 
             let description = row.values[mapping.description]
-            let debit = try Self.decimal(
-                row.values[mapping.debit],
-                role: .debit,
+            let sourceDR = try Self.decimal(
+                row.values[mapping.sourceDR],
+                role: .sourceDR,
                 rowNumber: row.rowNumber
             )
-            let credit = try Self.decimal(
-                row.values[mapping.credit],
-                role: .credit,
+            let sourceCR = try Self.decimal(
+                row.values[mapping.sourceCR],
+                role: .sourceCR,
                 rowNumber: row.rowNumber
             )
             let balance = try Self.decimal(
@@ -231,12 +250,9 @@ final class AxisBankAccountParser: StatementParser {
             )
             let direction: DirectionResult
             do {
-                direction = try DirectionResolver.resolve(
-                    strategy: .debitCreditColumns,
-                    debit: debit,
-                    credit: credit,
-                    amount: nil,
-                    direction: nil
+                direction = try AxisBankAccountCSVProfileV1.resolve(
+                    sourceDR: sourceDR,
+                    sourceCR: sourceCR
                 )
             } catch DirectionResolutionError.missingDebitAndCredit {
                 throw AxisBankAccountParserError.missingDirection(
@@ -326,7 +342,7 @@ final class AxisBankAccountParser: StatementParser {
             return false
         }
 
-        return [mapping.debit, mapping.credit].contains { index in
+        return [mapping.sourceDR, mapping.sourceCR].contains { index in
             guard row.values.indices.contains(index) else { return false }
             return !row.values[index]
                 .trimmingCharacters(in: .whitespacesAndNewlines)

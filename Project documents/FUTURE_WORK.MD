@@ -275,6 +275,8 @@ Provide privacy-safe verification for:
 - incomplete imports;
 - inconsistent completion states.
 
+The Axis direction-correction audit is now one concrete separately gated family: imports accepted after the July 21, 2026 raw-header-role regression and before the Sprint 55 correction may contain reversed canonical direction and signed `Money`. The first increment must be read-only detection against durable parser provenance and independently provable source arithmetic. Any repair requires exact impact preview, explicit authorization, provider-owned atomic mutation and recoverability or explicit irreversibility. Sprint 55 performs no historical repair.
+
 Targeted discovery must select one independently verifiable family and define whether the first increment is read-only verification or an explicit repair. Repair actions must be previewed, authorized, atomic and recoverable or explicitly irreversible.
 
 This candidate is not implementation-ready as one broad “repair everything” operation.
@@ -1030,6 +1032,8 @@ Extend account choice beyond the bounded no-match workflow while preserving veri
 **Depends on:** Approved durable-attempt-history supported outcomes plus broader duplicate-management semantics
 
 Retain future work for duplicate override, partial import, broader duplicate management, ambiguous or speculative duplicate candidates and historical duplicate repair. The approved durable-attempt-history increment covers read-only review of currently supported exact-statement and Axis UPI outcomes only.
+
+Sprint 55 closes `BLOCK-PARTIAL-ORACLE-01` for one narrow Axis UPI family with privacy-safe, independent evidence of exactly three shared supported events and one later-only supported event. This evidence does not authorize partial import. Discovery must still define the reviewed-row plan, transaction-time revalidation, contention and losing-path residue behavior, provider-owned atomic persistence, durable attempt/outcome semantics and explicit review UI. No schema or ADR decision was made.
 
 ---
 

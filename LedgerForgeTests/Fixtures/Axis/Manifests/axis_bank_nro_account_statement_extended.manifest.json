@@ -35,6 +35,8 @@
   "candidate_status": "validated",
   "fixture_class": "source-faithful sanitized fixture",
   "csv_preamble_reconstruction": "Reconstructed from the user-confirmed shared Axis bank-account CSV layout, aligned with the approved existing Axis grammar, and populated with independently recorded fixture dates and fictional identifiers; not a byte-for-byte restoration of private original text.",
+  "source_direction_contract": "Under axis.bank-account.csv@1 physical DR increases balance and maps to canonical credit, while physical CR decreases balance and maps to canonical debit.",
+  "direction_correction": "Physical column occupancy was corrected from the July 21 header-role regression without changing the independent canonical financial expectation.",
   "cross_format_boundary": "Matching account identity and date range do not establish financial equivalence with every Range 1 source.",
   "overlap_verification": {
     "csv": {

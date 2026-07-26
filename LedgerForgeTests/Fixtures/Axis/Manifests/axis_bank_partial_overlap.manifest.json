@@ -1,0 +1,38 @@
+{
+  "fixture_id": "axis-bank-partial-overlap-v1",
+  "fixture_class": "reviewed privacy-safe source-faithful derivative",
+  "institution": "Axis Bank",
+  "family": "narrow bank-account CSV partial-overlap evidence",
+  "source_formats": [
+    "csv"
+  ],
+  "layout_versions": {
+    "csv": "axis.bank-account.csv@1"
+  },
+  "source_provenance": {
+    "origin": "two institution-supplied overlapping statements",
+    "acquisition": "user_downloaded",
+    "verification": "independent exact-decimal balance and event-family analysis outside production code"
+  },
+  "privacy_assertions": {
+    "uses_fictional_customer_metadata": true,
+    "uses_fictional_account_identifier": true,
+    "contains_no_original_transaction_reference": true,
+    "contains_no_original_counterparty_identity": true,
+    "contains_no_original_financial_value": true,
+    "contains_no_private_mapping": true,
+    "contains_no_private_source_path_or_filename": true
+  },
+  "source_direction_contract": "Physical DR increases balance and maps to canonical credit; physical CR decreases balance and maps to canonical debit.",
+  "sanitisation_method": "A coherent fictional opening balance and transformed row amounts preserve exact running-balance arithmetic, source occupancy, order, same-day order, event subtype relationships and the three-shared/one-later-only overlap shape. No reversible substitution map exists.",
+  "overlap_verification": {
+    "same_account": true,
+    "same_profile": true,
+    "shared_supported_events": 3,
+    "later_only_supported_events": 1,
+    "repeated_events_within_either_statement": 0,
+    "shared_financial_projection_agreement": true,
+    "later_statement_contains_only_supported_event_rows": true
+  },
+  "scope_boundary": "This fixture closes independent evidence for the narrow partial-overlap family only. It does not authorize row omission, partial persistence, new durable outcomes, schema changes or review UI."
+}

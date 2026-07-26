@@ -1,0 +1,157 @@
+{
+  "fixture_id": "axis-bank-partial-overlap-v1",
+  "fixture_class": "reviewed privacy-safe derivative of two genuine overlapping Axis CSV statements",
+  "profile_id": "axis.bank-account.csv",
+  "profile_version": "1",
+  "physical_header_order": [
+    "Tran Date",
+    "CHQNO",
+    "PARTICULARS",
+    "DR",
+    "CR",
+    "BAL",
+    "SOL"
+  ],
+  "same_account": true,
+  "shared_event_count": 3,
+  "unique_later_event_count": 1,
+  "shared_events_financially_agree": true,
+  "no_repeated_event_within_statement": true,
+  "later_statement_contains_only_supported_events": true,
+  "statements": [
+    {
+      "fixture": "axis_bank_partial_overlap_source_a.csv",
+      "statement_start_date": "10-08-2026",
+      "statement_end_date": "12-08-2026",
+      "transaction_count": 4,
+      "raw_source_dr_total": "125.00",
+      "raw_source_cr_total": "50.00",
+      "canonical_debit_total": "50.00",
+      "canonical_credit_total": "125.00",
+      "opening_balance": "1000.00",
+      "closing_balance": "1075.00",
+      "complete_reconciliation": true,
+      "rows": [
+        {
+          "source_ordinal": 7,
+          "transaction_date": "10-08-2026",
+          "source_column": "DR",
+          "raw_source_amount": "100.00",
+          "canonical_direction": "credit",
+          "signed_canonical_amount": "100.00",
+          "running_balance": "1100.00",
+          "event_operation": "p2a",
+          "event_subtype": "credit-adjustment",
+          "event_reference": "000000005501",
+          "event_disposition": "earlier-only"
+        },
+        {
+          "source_ordinal": 8,
+          "transaction_date": "11-08-2026",
+          "source_column": "CR",
+          "raw_source_amount": "40.00",
+          "canonical_direction": "debit",
+          "signed_canonical_amount": "-40.00",
+          "running_balance": "1060.00",
+          "event_operation": "p2m",
+          "event_subtype": "posting",
+          "event_reference": "000000005502",
+          "event_disposition": "shared"
+        },
+        {
+          "source_ordinal": 9,
+          "transaction_date": "12-08-2026",
+          "source_column": "DR",
+          "raw_source_amount": "25.00",
+          "canonical_direction": "credit",
+          "signed_canonical_amount": "25.00",
+          "running_balance": "1085.00",
+          "event_operation": "p2a",
+          "event_subtype": "credit-adjustment",
+          "event_reference": "000000005503",
+          "event_disposition": "shared"
+        },
+        {
+          "source_ordinal": 10,
+          "transaction_date": "12-08-2026",
+          "source_column": "CR",
+          "raw_source_amount": "10.00",
+          "canonical_direction": "debit",
+          "signed_canonical_amount": "-10.00",
+          "running_balance": "1075.00",
+          "event_operation": "p2a",
+          "event_subtype": "posting",
+          "event_reference": "000000005504",
+          "event_disposition": "shared"
+        }
+      ]
+    },
+    {
+      "fixture": "axis_bank_partial_overlap_source_b.csv",
+      "statement_start_date": "11-08-2026",
+      "statement_end_date": "13-08-2026",
+      "transaction_count": 4,
+      "raw_source_dr_total": "25.00",
+      "raw_source_cr_total": "125.00",
+      "canonical_debit_total": "125.00",
+      "canonical_credit_total": "25.00",
+      "opening_balance": "1100.00",
+      "closing_balance": "1000.00",
+      "complete_reconciliation": true,
+      "rows": [
+        {
+          "source_ordinal": 7,
+          "transaction_date": "11-08-2026",
+          "source_column": "CR",
+          "raw_source_amount": "40.00",
+          "canonical_direction": "debit",
+          "signed_canonical_amount": "-40.00",
+          "running_balance": "1060.00",
+          "event_operation": "p2m",
+          "event_subtype": "posting",
+          "event_reference": "000000005502",
+          "event_disposition": "shared"
+        },
+        {
+          "source_ordinal": 8,
+          "transaction_date": "12-08-2026",
+          "source_column": "DR",
+          "raw_source_amount": "25.00",
+          "canonical_direction": "credit",
+          "signed_canonical_amount": "25.00",
+          "running_balance": "1085.00",
+          "event_operation": "p2a",
+          "event_subtype": "credit-adjustment",
+          "event_reference": "000000005503",
+          "event_disposition": "shared"
+        },
+        {
+          "source_ordinal": 9,
+          "transaction_date": "12-08-2026",
+          "source_column": "CR",
+          "raw_source_amount": "10.00",
+          "canonical_direction": "debit",
+          "signed_canonical_amount": "-10.00",
+          "running_balance": "1075.00",
+          "event_operation": "p2a",
+          "event_subtype": "posting",
+          "event_reference": "000000005504",
+          "event_disposition": "shared"
+        },
+        {
+          "source_ordinal": 10,
+          "transaction_date": "13-08-2026",
+          "source_column": "CR",
+          "raw_source_amount": "75.00",
+          "canonical_direction": "debit",
+          "signed_canonical_amount": "-75.00",
+          "running_balance": "1000.00",
+          "event_operation": "p2m",
+          "event_subtype": "posting",
+          "event_reference": "000000005505",
+          "event_disposition": "later-only"
+        }
+      ]
+    }
+  ]
+}

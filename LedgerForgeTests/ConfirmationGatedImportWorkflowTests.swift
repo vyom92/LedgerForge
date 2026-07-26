@@ -42,6 +42,42 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(persistence.persistCallCount == 0)
     }
 
+    @Test func futureAxisDirectionSemanticsFailBeforeAcceptedPersistenceWithZeroResidue() async throws {
+        await resetRuntimeStoresForConfirmationWorkflow()
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LedgerForge-AxisDirection-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("axis-future-direction.csv")
+        let source = """
+        Name :- TEST FUTURE DIRECTION
+        Bank :- AXIS BANK
+        Currency :- INR
+        Statement of Account No - 940000000000099 for the period (From : 01-01-2026  To : 02-01-2026)
+
+        Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL
+        01-01-2026,-,UPI/P2M/000000009901/FUTURE PAYMENT,25.00,,75.00,9001
+        02-01-2026,-,UPI/P2A/000000009902/FUTURE CREDIT,,10.00,85.00,9001
+        """
+        try Data(source.utf8).write(to: url)
+        let persistence = CountingPersistenceCoordinator()
+        let engine = availableImportEngine(persistence)
+
+        let prepared = try await engine.prepareImport(from: url)
+        let result = await engine.commitPreparedImport(prepared)
+
+        #expect(prepared.financialDocument.transactions[0].credit == Decimal(25))
+        #expect(prepared.financialDocument.transactions[1].debit == Decimal(10))
+        #expect(!prepared.validation.passed)
+        #expect(!result.validationPassed)
+        #expect(!result.persisted)
+        #expect(result.errorMessage == "Import validation failed.")
+        #expect(persistence.persistCallCount == 0)
+        #expect(AccountStore.shared.accounts.isEmpty)
+        #expect(TransactionStore.shared.transactions.isEmpty)
+        #expect(DocumentStore.shared.rows.isEmpty)
+    }
+
     @Test func confirmationCommitsUsingPreparedFinancialDocumentWithoutRuntimeMutation() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()

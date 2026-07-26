@@ -3,24 +3,24 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current pushed ref:** the single Sprint 54 completion commit containing this state update; its exact SHA is Git-authoritative and recorded in the completion report
-- **Latest verified implementation:** the single Sprint 54 completion commit containing this state update — Durable Import-Outcome Presentation Exhaustiveness
+- **Current pushed ref:** the single Sprint 55 completion commit containing this state update; its exact SHA is Git-authoritative and recorded in the completion report
+- **Latest verified implementation:** the single Sprint 55 completion commit containing this state update — Axis Source-Direction Correction and Partial-Overlap Evidence Closure
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed increment:** Sprint 54
+- **Latest verified completed increment:** Sprint 55
 - **Latest accepted ADR:** ADR-039 — Trusted Statement Dates and Durable Source Provenance
 - **Current migration:** V6
 - **Architecture baseline:** Architecture v1.0 Frozen and UI/UX v1.0 Frozen
 - **Latest verified repository-maintenance change:** `7ee20a909038d1088f830a6ea588311625f415e5`
-- **Latest verified implementation-adjacent maintenance repair:** Axis NRE CSV source-fidelity correction and deterministic header-semantic column mapping
-- **Latest recorded automated result:** 400 top-level tests across 48 suites, 0 failures and 0 unexpected skips at the Sprint 54 implementation baseline
-- **Latest focused Sprint 54 results:** 18 presentation tests across 1 suite and 86 related model, history, hydration, engine, Dashboard and privacy tests across 7 suites, all with 0 failures and 0 unexpected skips
-- **Latest recorded build and analysis result:** fresh clean Debug and explicit `-O` whole-module Release builds plus Debug and Release static analysis passed with zero errors or analyzer findings at the Sprint 54 implementation baseline; clean builds emitted Xcode's non-product AppIntents metadata-extraction warning because the target has no AppIntents dependency
+- **Latest verified implementation-adjacent maintenance repair:** Axis bank-account CSV physical source-direction correction with independent balance evidence
+- **Latest recorded automated result:** 407 top-level tests across 49 suites, 0 failures and 0 unexpected skips at the Sprint 55 implementation baseline
+- **Latest focused Sprint 55 results:** 41 Axis direction, fixture-oracle and confirmation-gate tests across 5 suites plus 64 adjacent event, validation, repository, atomicity and hydration tests across 6 suites, all with 0 failures and 0 unexpected skips
+- **Latest recorded build result:** Debug and explicit `-O` whole-module Release builds passed at the Sprint 55 implementation baseline; Release emitted Xcode's non-product AppIntents metadata-extraction warning because the target has no AppIntents dependency
 - **Generic UI-test state:** `LedgerForgeUITests` remains intentionally disabled
-- **Sprint 54 runtime verification:** representative durable successful, known non-success and hostile unknown presentation was unavailable through an existing deterministic approved runtime route; no fixture launcher or runtime-injection infrastructure was added, and the presentation boundary is established by exhaustive automated tests
+- **Sprint 55 runtime verification:** no manual runtime path was required because this correction changes parser financial truth and repository test evidence only; pipeline coverage verifies contradictory future source semantics are rejected before accepted persistence with unchanged runtime financial stores
 
 GitHub establishes pushed repository state only. It does not establish local worktree cleanliness, linked worktrees, local branches, stashes, staged or unstaged changes, untracked files or unpushed commits.
 
@@ -59,6 +59,8 @@ No broader Axis NRO, historical Axis layout, PDF, XLS, XLSX, card, HDFC, CBQ, Am
 
 Supported Axis imports preserve:
 
+- dynamic physical source-column position resolution without treating a source header label as a canonical financial role;
+- the `axis.bank-account.csv@1` direction contract in which physical DR increases balance and maps to canonical credit/inflow, while physical CR decreases balance and maps to canonical debit/outflow;
 - strict date-only financial evidence;
 - Axis `Asia/Kolkata` date authority;
 - document-scoped source ordinal;
@@ -174,6 +176,8 @@ Exact-content re-import records a bounded duplicate attempt without creating ano
 Bounded parser-verified Axis UPI transaction-event ownership uses ADR-031.
 
 A supported overlap blocks the complete incoming statement. LedgerForge does not silently omit overlapping transactions. Explicit partial-overlap import remains future work.
+
+A privacy-safe source-faithful fixture pair now independently establishes the narrow Axis UPI partial-overlap family with exactly three shared supported events and one later-only supported event. This closes the source-oracle prerequisite only; no partial persistence plan, review state, durable outcome, schema or UI exists.
 
 Unsupported event families remain unevaluated, including:
 
@@ -370,6 +374,8 @@ Existing nonempty V5 financial graphs fail closed for explicit pre-production re
 
 Legacy exact-statement fingerprint backfill is not performed from reduced repository data.
 
+Axis imports accepted after the July 21, 2026 raw-header-role regression and before the Sprint 55 correction may contain reversed canonical direction and signed `Money`. Repository evidence cannot prove which historical databases contain affected rows, so detection and any repair remain a separately gated `FW-P0-08` financial-repair family. Sprint 55 performs no historical mutation or inference-based repair.
+
 ### Test and runtime limits
 
 - Generic UI tests remain intentionally disabled.
@@ -383,6 +389,18 @@ Legacy exact-statement fingerprint backfill is not performed from reduced reposi
 ## Approved Fixture Evidence
 
 Fixture integration supplies discovery and regression evidence. It does not by itself establish production support.
+
+The approved Axis evidence now includes a privacy-safe derivative of two genuine overlapping CSV statements. An independent exact-decimal oracle, separate from production parsing, direction resolution and event-identity code, verifies:
+
+- physical DR as canonical credit and physical CR as canonical debit;
+- complete running-balance reconciliation for both statements;
+- one account and one `axis.bank-account.csv@1` layout;
+- exactly three shared supported Axis UPI events;
+- exactly one later-only supported Axis UPI event;
+- shared financial-projection agreement;
+- no repeated event reference within either statement.
+
+The original private statements remain outside Git. The fixture pair contains fictional identifiers, narrations, references and monetary values with no reversible source mapping.
 
 ### Axis bank-account evidence
 
@@ -478,6 +496,31 @@ American Express production parsing and durable card semantics remain unsupporte
 ---
 
 ## Recent Verified Changes
+
+### Sprint 55 — Axis Source-Direction Correction and Partial-Overlap Evidence Closure
+
+Commit:
+
+```text
+The single Sprint 55 completion commit containing this state update.
+Its exact SHA is Git-authoritative and recorded in the completion report.
+```
+
+Sprint 55:
+
+- separated dynamically resolved physical Axis DR/CR source columns from canonical debit/credit roles;
+- restored the verified `axis.bank-account.csv@1` contract: physical DR becomes canonical credit with positive `Money`, and physical CR becomes canonical debit with negative `Money`;
+- retained the existing parser profile ID/version because this is a source-truth defect correction rather than a new accepted layout;
+- corrected sanitised Axis fixture occupancy only where independent running-balance arithmetic established the source semantics, without changing canonical expected financial truth;
+- added a privacy-safe derivative of two genuine Axis statements with an independently verified three-shared/one-later-only supported UPI overlap;
+- added an expected oracle that does not call production parsing, direction resolution or event-identity code;
+- verified posting versus credit-adjustment subtype direction after canonical resolution;
+- proved conventional or mixed future semantics fail validation without profile switching, accepted persistence or runtime financial-store residue;
+- closed the Axis direction blocker and `BLOCK-PARTIAL-ORACLE-01`;
+- passed 41 focused tests across 5 suites, 64 adjacent tests across 6 suites and the canonical 407-test, 49-suite TestPlan;
+- passed Debug and explicit `-O` whole-module Release builds.
+
+Migration V6, ADR-039, schema architecture, partial-overlap persistence, review UI and durable partial-import outcomes remain unchanged.
 
 ### Sprint 54 — Durable Import-Outcome Presentation Exhaustiveness
 
