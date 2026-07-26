@@ -12,6 +12,7 @@ struct CategoryManagementView: View {
     @State private var editedName = ""
     @State private var categoryPendingDeletion: Category?
     @State private var message: String?
+    @State private var categoryReconciliationRequired = false
 
     @MainActor
     init(
@@ -54,6 +55,16 @@ struct CategoryManagementView: View {
                     Text(message)
                         .font(.caption)
                         .foregroundStyle(LFTheme.warning)
+                }
+
+                if categoryReconciliationRequired {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Your category change was saved, but the app could not refresh. Further category changes are temporarily blocked until the repository is refreshed.")
+                            .font(.caption)
+                            .foregroundStyle(LFTheme.warning)
+                        Button("Retry refresh", action: retryCanonicalHydration)
+                            .buttonStyle(.bordered)
+                    }
                 }
             }
         }
@@ -180,7 +191,30 @@ struct CategoryManagementView: View {
         do {
             try action()
             message = nil
+            categoryReconciliationRequired = false
         } catch {
+            message = error.localizedDescription
+            if let error = error as? CategoryManagementCoordinatorError {
+                categoryReconciliationRequired = switch error {
+                case .savedButRefreshFailed, .reconciliationRequired: true
+                default: false
+                }
+            }
+        }
+    }
+
+    private func retryCanonicalHydration() {
+        do {
+            switch try coordinator.retryCanonicalHydration() {
+            case .notRequired, .succeeded:
+                categoryReconciliationRequired = false
+                message = nil
+            case .failed:
+                categoryReconciliationRequired = true
+                message = "The repository refresh is still unavailable. Category changes remain temporarily blocked."
+            }
+        } catch {
+            categoryReconciliationRequired = true
             message = error.localizedDescription
         }
     }

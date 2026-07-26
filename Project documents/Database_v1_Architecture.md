@@ -5,7 +5,7 @@
 **Status:** Frozen database-design baseline, status-aligned through ADR-040, Migration V8 and the Axis source-truth restoration
 **Status alignment reviewed:** 2026-07-26
 **Repository ref reviewed:** the Git-authoritative Axis source-truth restoration commit containing this update
-**Latest verified implementation:** P0 Axis Bank Source-Truth Restoration after Sprint 57
+**Latest verified implementation under repair:** Sprint 57 durable categories plus the post-Sprint 57 category reconciliation closure
 **Current registered migration:** V8
 **Production database:** SQLite behind repository and provider boundaries
 
@@ -1054,7 +1054,7 @@ The initial accepted direction requires:
 
 Category operations must not modify trusted transaction rows.
 
-Migration V8 implements workspace-owned category definitions and one separate optional current assignment for each trusted transaction. Settings and transaction-detail UI provide the bounded manual operations recorded in `PROJECT_STATE.md`; automatic classification, hierarchy, rules and bulk behavior remain outside the implemented boundary.
+Migration V8 implements workspace-owned category definitions and one separate optional current assignment for each trusted transaction. Settings and transaction-detail UI provide the bounded manual operations recorded in `PROJECT_STATE.md`; automatic classification, hierarchy, rules and bulk behavior remain outside the implemented boundary. Category mutations hold one repository-write lifecycle exclusion across provider resolution, durable mutation and forced hydration. A committed-but-refresh-failed result preserves the last complete category snapshot and process-local generation-bound reconciliation state blocks later category writes until canonical hydration succeeds. Provider replacement and lifecycle transitions clear stale category state only after successful replacement hydration; no generic financial-mutation gate is introduced.
 
 ---
 
@@ -1705,7 +1705,7 @@ Status aligned through:
 - ADR-037 financial mutation architecture;
 - ADR-038 atomic confirmed import and identifier ownership;
 - ADR-039 trusted statement dates and source provenance;
-- verified Sprint 53 production state;
-- registered migration V6.
+- verified Sprint 57 durable category foundation and post-Sprint 57 reconciliation closure;
+- registered migration V8.
 
 Detailed DDL and migration behavior remain authoritative in the repository implementation.

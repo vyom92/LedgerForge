@@ -18,6 +18,7 @@ struct CategoryRepositoryTests {
         #expect(try provider.workspaceRepo.workspace(id: "default-workspace")?.name == "Personal")
         #expect(try provider.categoryRepo.categories(workspaceId: "default-workspace").map(\.name) == ["Groceries"])
         #expect(categoryStore.categories.map(\.name) == ["Groceries"])
+        #expect(try coordinator.retryCanonicalHydration() == .notRequired)
     }
 
     @Test func lifecycleAndAssignmentBehaviorMatchesAcrossProvidersWithoutFinancialMutation() throws {
@@ -225,6 +226,156 @@ struct CategoryRepositoryTests {
             #expect(try v8.importSessionRepo.importAttempts(workspaceId: seeded.workspaceID) == attemptsBefore)
         }
     }
+
+    @Test func committedMutationBlocksEveryLaterCategoryWriteUntilCanonicalRetry() throws {
+        let base = InMemoryRepositoryProvider()
+        let countingRepository = CountingCategoryRepository(base.categoryRepo)
+        let provider = DatabaseProvider(
+            workspaceRepo: base.workspaceRepo,
+            transactionRepo: base.transactionRepo,
+            categoryRepo: countingRepository,
+            accountRepo: base.accountRepo,
+            importSessionRepo: base.importSessionRepo,
+            confirmedImportRepo: base.confirmedImportRepo,
+            generationToken: base.generationToken
+        )
+        let seeded = try seedTrustedTransaction(in: provider, suffix: "category-reconciliation")
+        let existing = try createCategory(
+            name: "Existing",
+            id: "category-existing-reconciliation",
+            workspaceID: seeded.workspaceID,
+            repository: provider.categoryRepo
+        )
+        let archived = try createCategory(
+            name: "Archived",
+            id: "category-archived-reconciliation",
+            workspaceID: seeded.workspaceID,
+            repository: provider.categoryRepo
+        )
+        _ = try provider.categoryRepo.setCategoryArchived(
+            id: archived.id,
+            workspaceId: seeded.workspaceID,
+            isArchived: true,
+            updatedAtISO: "2026-07-26T02:00:00Z"
+        )
+
+        let stores = CategoryRuntimeStores()
+        let gate = CategoryReconciliationGate()
+        _ = try makeHydrator(
+            provider: provider,
+            stores: stores,
+            workspaceID: seeded.workspaceID,
+            reconciliationGate: gate
+        ).hydrateIfNeeded(forceRefresh: true)
+        let previousSnapshot = stores.categories.snapshot
+        var hydrationShouldFail = true
+        let coordinator = CategoryManagementCoordinator(
+            provider: { provider },
+            workspaceID: seeded.workspaceID,
+            categoryStore: stores.categories,
+            reconciliationGate: gate,
+            forcedHydration: { provider, categoryStore, workspaceID in
+                if hydrationShouldFail { throw CategoryHydrationTestError.failed }
+                return try RepositoryStoreHydrator(
+                    databaseProvider: provider,
+                    categoryStore: categoryStore,
+                    workspaceId: workspaceID,
+                    categoryReconciliationGate: gate,
+                    participatesInLifecycleGate: false
+                ).hydrateIfNeeded(forceRefresh: true)
+            }
+        )
+
+        #expect(throws: CategoryManagementCoordinatorError.savedButRefreshFailed) {
+            _ = try coordinator.create(name: "Committed")
+        }
+        #expect(try provider.categoryRepo.categories(workspaceId: seeded.workspaceID).contains { $0.name == "Committed" })
+        #expect(stores.categories.snapshot == previousSnapshot)
+        #expect(gate.isBlocked(for: provider.generationToken))
+
+        let writesBeforeBlockedAttempts = countingRepository.writeCount
+        let blockedOperations: [() throws -> Void] = [
+            { _ = try coordinator.create(name: "Blocked create") },
+            { _ = try coordinator.rename(categoryID: existing.id, name: "Blocked rename") },
+            { _ = try coordinator.setArchived(categoryID: existing.id, isArchived: true) },
+            { _ = try coordinator.setArchived(categoryID: archived.id, isArchived: false) },
+            { try coordinator.deleteUnused(categoryID: existing.id) },
+            { _ = try coordinator.setCategory(categoryID: existing.id, transactionID: seeded.transactionID) },
+            { _ = try coordinator.setCategory(categoryID: archived.id, transactionID: seeded.transactionID) },
+            { _ = try coordinator.setCategory(categoryID: nil, transactionID: seeded.transactionID) }
+        ]
+        for operation in blockedOperations {
+            #expect(throws: CategoryManagementCoordinatorError.reconciliationRequired, performing: operation)
+        }
+        #expect(countingRepository.writeCount == writesBeforeBlockedAttempts)
+        #expect(stores.categories.snapshot == previousSnapshot)
+
+        #expect(try coordinator.retryCanonicalHydration() == .failed)
+        #expect(gate.isBlocked(for: provider.generationToken))
+        #expect(stores.categories.snapshot == previousSnapshot)
+
+        hydrationShouldFail = false
+        #expect(try coordinator.retryCanonicalHydration() == .succeeded)
+        #expect(!gate.isBlocked(for: provider.generationToken))
+        #expect(stores.categories.categories.contains { $0.name == "Committed" })
+        #expect(try coordinator.rename(categoryID: existing.id, name: "Renamed after retry"))
+    }
+
+    @Test func providerReplacementDoesNotInheritCategoryReconciliationBlock() throws {
+        let first = DatabaseProvider(inMemory: true)
+        let second = DatabaseProvider(inMemory: true)
+        var current = first
+        let categoryStore = CategoryStore()
+        let gate = CategoryReconciliationGate()
+        var hydrationShouldFail = true
+        let coordinator = CategoryManagementCoordinator(
+            provider: { current },
+            categoryStore: categoryStore,
+            reconciliationGate: gate,
+            forcedHydration: { provider, categoryStore, workspaceID in
+                if hydrationShouldFail { throw CategoryHydrationTestError.failed }
+                return try RepositoryStoreHydrator(
+                    databaseProvider: provider,
+                    categoryStore: categoryStore,
+                    workspaceId: workspaceID,
+                    categoryReconciliationGate: gate,
+                    participatesInLifecycleGate: false
+                ).hydrateIfNeeded(forceRefresh: true)
+            }
+        )
+
+        #expect(throws: CategoryManagementCoordinatorError.savedButRefreshFailed) {
+            _ = try coordinator.create(name: "Old provider category")
+        }
+        #expect(gate.isBlocked(for: first.generationToken))
+        current = second
+        #expect(!gate.isBlocked(for: second.generationToken))
+
+        let retry = try coordinator.retryCanonicalHydration()
+        #expect(retry == .failed)
+        #expect(gate.isBlocked(for: first.generationToken))
+        #expect(!gate.isBlocked(for: second.generationToken))
+
+        hydrationShouldFail = false
+        #expect(try coordinator.retryCanonicalHydration() == .succeeded)
+        #expect(!gate.hasPendingReconciliation)
+        #expect(categoryStore.categories.isEmpty)
+        #expect(try coordinator.create(name: "Replacement category"))
+        #expect(categoryStore.categories.map(\.name) == ["Replacement category"])
+    }
+
+    @Test func categoryReconciliationStateIsProcessLocalPerGateAndDoesNotLeak() throws {
+        let firstGate = CategoryReconciliationGate()
+        let secondGate = CategoryReconciliationGate()
+        let firstProvider = DatabaseProvider(inMemory: true)
+        let secondProvider = DatabaseProvider(inMemory: true)
+
+        firstGate.requireReconciliation(for: firstProvider.generationToken)
+
+        #expect(firstGate.isBlocked(for: firstProvider.generationToken))
+        #expect(!secondGate.hasPendingReconciliation)
+        #expect(!secondGate.isBlocked(for: secondProvider.generationToken))
+    }
 }
 
 private enum CategoryProviderKind: String, CaseIterable {
@@ -249,7 +400,8 @@ private struct CategoryRuntimeStores {
 private func makeHydrator(
     provider: DatabaseProvider,
     stores: CategoryRuntimeStores,
-    workspaceID: String
+    workspaceID: String,
+    reconciliationGate: CategoryReconciliationGate? = nil
 ) -> RepositoryStoreHydrator {
     RepositoryStoreHydrator(
         accountRepo: provider.accountRepo,
@@ -263,8 +415,56 @@ private func makeHydrator(
         importAttemptStore: stores.attempts,
         workspaceId: workspaceID,
         persistenceState: provider.persistenceState,
+        providerGeneration: provider.generationToken,
+        categoryReconciliationGate: reconciliationGate,
         participatesInLifecycleGate: false
     )
+}
+
+private enum CategoryHydrationTestError: Error {
+    case failed
+}
+
+private final class CountingCategoryRepository: CategoryRepository {
+    private let base: CategoryRepository
+    private(set) var writeCount = 0
+
+    init(_ base: CategoryRepository) {
+        self.base = base
+    }
+
+    func categories(workspaceId: String) throws -> [CategoryDTO] {
+        try base.categories(workspaceId: workspaceId)
+    }
+
+    func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO] {
+        try base.assignments(workspaceId: workspaceId)
+    }
+
+    func createCategory(_ category: CategoryDTO) throws -> CategoryDTO {
+        writeCount += 1
+        return try base.createCategory(category)
+    }
+
+    func renameCategory(id: String, workspaceId: String, name: String, updatedAtISO: String) throws -> Bool {
+        writeCount += 1
+        return try base.renameCategory(id: id, workspaceId: workspaceId, name: name, updatedAtISO: updatedAtISO)
+    }
+
+    func setCategoryArchived(id: String, workspaceId: String, isArchived: Bool, updatedAtISO: String) throws -> Bool {
+        writeCount += 1
+        return try base.setCategoryArchived(id: id, workspaceId: workspaceId, isArchived: isArchived, updatedAtISO: updatedAtISO)
+    }
+
+    func deleteUnusedCategory(id: String, workspaceId: String) throws {
+        writeCount += 1
+        try base.deleteUnusedCategory(id: id, workspaceId: workspaceId)
+    }
+
+    func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool {
+        writeCount += 1
+        return try base.setCategory(categoryId: categoryId, transactionId: transactionId, workspaceId: workspaceId)
+    }
 }
 
 private func createCategory(

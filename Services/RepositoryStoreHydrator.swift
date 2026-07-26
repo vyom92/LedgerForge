@@ -89,6 +89,8 @@ final class RepositoryStoreHydrator {
     private let categoryStore: CategoryStore
     private let workspaceId: String
     private let persistenceState: PersistenceState
+    private let providerGeneration: ProviderGenerationToken?
+    private let categoryReconciliationGate: CategoryReconciliationGate?
     private var hasHydrated = false
 #if DEBUG
     private let participatesInLifecycleGate: Bool
@@ -102,6 +104,7 @@ final class RepositoryStoreHydrator {
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace",
+        categoryReconciliationGate: CategoryReconciliationGate? = .shared,
         participatesInLifecycleGate: Bool = true
     ) {
         self.init(
@@ -116,6 +119,8 @@ final class RepositoryStoreHydrator {
             importAttemptStore: importAttemptStore,
             workspaceId: workspaceId,
             persistenceState: databaseProvider.persistenceState,
+            providerGeneration: databaseProvider.generationToken,
+            categoryReconciliationGate: categoryReconciliationGate,
             participatesInLifecycleGate: participatesInLifecycleGate
         )
     }
@@ -132,6 +137,8 @@ final class RepositoryStoreHydrator {
         importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace",
         persistenceState: PersistenceState = .intentionalNonDurable(.testMemory),
+        providerGeneration: ProviderGenerationToken? = nil,
+        categoryReconciliationGate: CategoryReconciliationGate? = nil,
         participatesInLifecycleGate: Bool = true
     ) {
         self.accountRepo = accountRepo
@@ -145,6 +152,8 @@ final class RepositoryStoreHydrator {
         self.importAttemptStore = importAttemptStore
         self.workspaceId = workspaceId
         self.persistenceState = persistenceState
+        self.providerGeneration = providerGeneration
+        self.categoryReconciliationGate = categoryReconciliationGate
 #if DEBUG
         self.participatesInLifecycleGate = participatesInLifecycleGate
 #endif
@@ -212,6 +221,9 @@ final class RepositoryStoreHydrator {
         importSessionStore.replaceImportSessions(importSessions)
         importAttemptStore.replaceAttempts(importAttempts)
         categoryStore.replaceSnapshot(categorySnapshot)
+        if let providerGeneration {
+            categoryReconciliationGate?.clearAfterCanonicalHydration(for: providerGeneration)
+        }
         hasHydrated = true
 
         return RepositoryStoreHydrationResult(

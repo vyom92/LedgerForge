@@ -72,6 +72,8 @@ private enum GlobalRuntimeStateCleanup {
         DocumentStore.shared.clear()
         ImportSessionStore.shared.replaceImportSessions([])
         ImportAttemptStore.shared.replaceAttempts([])
+        CategoryStore.shared.replaceSnapshot(.empty)
+        CategoryReconciliationGate.shared.resetForTesting()
         DeveloperConsole.shared._resetForTests()
         DevelopmentDatabaseActivityGate.shared.resetForTesting()
     }

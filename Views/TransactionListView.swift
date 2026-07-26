@@ -14,6 +14,7 @@ struct TransactionListView: View {
     private let categoryCoordinator: CategoryManaging
     @State private var selectedTransactionID: Transaction.ID?
     @State private var categoryMessage: String?
+    @State private var categoryReconciliationRequired = false
 
     private var filteredTransactions: [Transaction] { viewModel.filteredTransactions }
 
@@ -234,6 +235,16 @@ struct TransactionListView: View {
                             .foregroundStyle(LFTheme.warning)
                     }
 
+                    if categoryReconciliationRequired {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Your category change was saved, but the app could not refresh. Further category changes are temporarily blocked until the repository is refreshed.")
+                                .font(.caption)
+                                .foregroundStyle(LFTheme.warning)
+                            Button("Retry refresh", action: retryCanonicalHydration)
+                                .buttonStyle(.bordered)
+                        }
+                    }
+
                     Divider().overlay(LFTheme.divider)
 
                     if let validation = viewModel.validationPresentation(for: selected) {
@@ -385,7 +396,30 @@ struct TransactionListView: View {
         do {
             _ = try categoryCoordinator.setCategory(categoryID: categoryID, transactionID: transactionID)
             categoryMessage = nil
+            categoryReconciliationRequired = false
         } catch {
+            categoryMessage = error.localizedDescription
+            if let error = error as? CategoryManagementCoordinatorError {
+                categoryReconciliationRequired = switch error {
+                case .savedButRefreshFailed, .reconciliationRequired: true
+                default: false
+                }
+            }
+        }
+    }
+
+    private func retryCanonicalHydration() {
+        do {
+            switch try categoryCoordinator.retryCanonicalHydration() {
+            case .notRequired, .succeeded:
+                categoryReconciliationRequired = false
+                categoryMessage = nil
+            case .failed:
+                categoryReconciliationRequired = true
+                categoryMessage = "The repository refresh is still unavailable. Category changes remain temporarily blocked."
+            }
+        } catch {
+            categoryReconciliationRequired = true
             categoryMessage = error.localizedDescription
         }
     }

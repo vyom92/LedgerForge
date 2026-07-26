@@ -26,10 +26,10 @@ When reading this file:
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
 **Status alignment date:** 2026-07-26
-**Repository ref reviewed:** `main@20833ff260ed9ca069d7d78bb288ac25d299b454`
-**Latest verified implementation:** Sprint 56 — Explicit Reviewed Partial-Overlap Import; the exact closure SHA is Git-authoritative and recorded in the completion report
+**Repository ref reviewed:** `main@a0ceb0c0cea5d09e7c2baecc93d9c8c0d984125c` — Sprint 57 post-sprint closure baseline
+**Latest verified implementation:** Sprint 57 durable category foundation; category reconciliation closure is the current uncommitted repair
 **Latest accepted ADR:** ADR-040
-**Current migration:** V7
+**Current migration:** V8
 
 No alignment note authorizes implementation.
 
@@ -72,7 +72,7 @@ No alignment note authorizes implementation.
 | ADR-033 | Deterministic Money and Native-Currency Integrity | Accepted and implemented in Sprint 44. | Money, compiled catalog authority, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation are operational. |
 | ADR-034 | Document-Scoped Card Statement Evidence | Accepted architecture; not implemented. | Fixture evidence exists for American Express, CBQ and Axis card families. |
 | ADR-035 | Development Database Lifecycle and Recoverable Reset | Accepted and implemented in Sprint 45 Phase A. | DEBUG-only canonical/temporary database lifecycle, verified backup, recovery, activity exclusion and canonical hydration are operational. |
-| ADR-036 | Category Identity, Assignment, and Mutable Transaction Metadata | Accepted architecture; not implemented. | Discovery is complete and the candidate is ready for planning, subject to the approved UI supplement and current-baseline execution planning. |
+| ADR-036 | Category Identity, Assignment, and Mutable Transaction Metadata | Accepted and implemented in Sprint 57; reconciliation closure aligned 2026-07-26. | Flat durable categories, current assignments, canonical hydration and category-specific reconciliation blocking/retry are operational; hierarchy and parent selection remain deferred. |
 | ADR-037 | Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal | Accepted contract-first architecture; no executable mutation family implemented. | The shared lifecycle remains architecture-only. |
 | ADR-038 | Atomic Confirmed Import and Durable Identifier Ownership | Accepted and implemented in Sprint 50. | Migration V5, provider-owned atomic confirmed import, durable identifier ownership/observations, provider parity and subprocess contention acceptance are operational. |
 | ADR-039 | Trusted Statement Dates and Durable Source Provenance | Accepted and implemented in Sprint 52, with Sprint 52A corrective closure. | Migration V6, StatementDate, date-role/timezone evidence, parser-profile provenance, source ordinal/digest relationships and strict hydration are operational. |
@@ -2615,6 +2615,15 @@ ADR-035 does not authorize Release or production reset, arbitrary database delet
 - **Decision standing:** Accepted architecture; not implemented.
 - **Implementation:** Discovery is complete and the candidate is ready for planning, subject to the approved UI supplement and current-baseline execution planning.
 - **Current qualification:** The durable repository transaction-ID prerequisite was satisfied by ADR-039/Sprint 52. The historical possible V5 number is obsolete because V5 and V6 are now consumed; the expected additive category migration is V7 unless another approved migration takes precedence.
+
+## Implementation Amendment — 2026-07-26
+
+- Sprint 57 implemented the bounded flat durable category subset in additive Migration V8.
+- Stable category identity and separate current transaction-category assignments are operational for trusted persisted transactions.
+- Category hierarchy and parent selection remain deferred, along with rules, provenance, history, bulk operations and other excluded category features.
+- Category mutations now distinguish committed-but-refresh-failed from later reconciliation-required mutations, preserve the last complete runtime snapshot, block further category writes until canonical hydration succeeds, and expose an explicit canonical hydration retry path.
+- Provider-generation replacement, development reset, temporary-session transition, recovery and relaunch use canonical hydration before stale category reconciliation state is cleared.
+- No migration was added by this reconciliation increment; Migration V8 remains unchanged.
 
 
 ## Status

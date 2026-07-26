@@ -3,8 +3,9 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current pushed ref:** the single Axis source-truth restoration commit containing this state update; its exact SHA is Git-authoritative and recorded in the completion report
-- **Latest verified implementation:** the single Axis source-truth restoration commit containing this state update — P0 Axis Bank Source-Truth Restoration
+- **Current pushed ref under repair:** `main@a0ceb0c0cea5d09e7c2baecc93d9c8c0d984125c` — safe Debug development-database reset after migration bootstrap failure
+- **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration is included in the current pushed baseline; this task does not alter parser, fixture or historical financial data
+- **Latest verified implementation under repair:** Sprint 57 durable category foundation plus the post-Sprint 57 category reconciliation closure and the accepted Axis source-truth and safe development-database reset repairs
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
@@ -23,15 +24,15 @@
 - **Sprint 57 persistence:** additive Migration V8, SQLite/In-Memory parity, provider-generation protection, canonical hydration, provider reconstruction and SQLite close/reopen verification are implemented
 - **Sprint 57 UI:** Settings supports create, rename, archive, restore and permitted delete; transaction detail supports assign, change and clear, and transaction rows display the current category
 - **Sprint 57 exclusions:** automatic categorization, rules, suggestions, bulk editing, merge, delete-with-replacement, budgeting, analytics, reports, filtering, tags, splits and import behavior changes remain unavailable
-- **Protected local recovery evidence:** an existing canonical Debug V5 database remains unresolved local-only recovery evidence; Sprint 57 neither opened nor migrated it, and no private contents are recorded here
+- **Canonical development database:** a disposable canonical database was successfully recreated through the registered migration chain at V8; no private database contents are recorded here
 - **Latest Axis source-truth automated result:** 426 top-level tests (458 parameterized executions), 0 failures and 0 skips in the complete signed canonical TestPlan
 - **Latest Axis source-truth focused result:** 41 top-level tests (46 parameterized executions), 0 failures and 0 skips across direction, source-oracle, NRO evidence, overlap-quarantine, shared-profile and direct-provider fail-closed suites using SQLite and In-Memory providers
 - **Latest Axis source-truth build result:** fresh signed Debug and explicitly optimized Release builds plus Debug and Release static analysis pass
 - **Private-source verification:** two read-only NRE originals provide 94 observable conventional row-to-row balance deltas and two read-only NRO originals provide 35; no private source was copied, launched or committed
-- **Latest recorded automated result:** 430 tests, 0 failures and 0 skips in the canonical TestPlan at Sprint 57 acceptance closure
-- **Latest focused Sprint 57 result:** 5 durable-category tests covering provider parity, lifecycle, assignment, first-use creation, hydration, reconstruction, relaunch and V7-to-V8 upgrade, plus migration-integrity, hydrator, identifier-ownership and development database lifecycle regressions, all passed
-- **Latest recorded build result:** fresh signed Debug and optimized Release builds passed at Sprint 57 acceptance closure
-- **Sprint 57 runtime verification:** the exact fresh Debug app passed namespaced Verified SQLite startup, empty Category Management presentation, first-category creation and full quit/relaunch persistence; the task-owned process was stopped and the isolated database set was moved to Trash
+- **Latest recorded automated result:** 433 top-level tests (465 parameterized executions), 0 failures and 0 skips in the complete signed canonical TestPlan for category reconciliation closure
+- **Latest focused category-reconciliation result:** 71 top-level tests (86 parameterized executions), 0 failures and 0 skips across category, hydrator, import-hydration, development-lifecycle and migration-integrity suites
+- **Latest recorded build result:** fresh signed Debug and explicitly optimized whole-module Release builds plus Debug and Release static analysis passed for the category reconciliation closure
+- **Post-Sprint 57 runtime verification:** an isolated fresh Debug launch created a category, imported the approved sanitized Axis fixture, assigned that category to a trusted transaction, quit/relaunched and verified the category and assignment persisted; the task-owned process was stopped and only its isolated database set was moved to Trash
 - **Previous Sprint 55 automated result:** 409 top-level tests across 49 suites, 0 failures and 0 unexpected skips in each of three consecutive exact canonical default-parallel TestPlan runs
 - **Latest focused Sprint 55 results:** 41 Axis direction, fixture-oracle and confirmation-gate tests across 5 suites plus 64 adjacent event, validation, repository, atomicity and hydration tests across 6 suites, all with 0 failures and 0 unexpected skips
 - **Sprint 55 acceptance closure:** the first completion attempt exposed cross-suite interference between tests mutating shared runtime singleton stores; a bounded test-only asynchronous exclusivity trait now coordinates only those global-state tests across Swift Testing suites, retains ownership across suspension and restores the shared provider generation, runtime financial/history stores, diagnostics and development activity state after success or failure
@@ -165,7 +166,7 @@ Sprint 52A requires hydration to fail before runtime-store mutation when trusted
 
 Trusted transaction graphs are accepted only through the provider-owned confirmed-import path. Generic transaction replacement cannot publish trusted imported transactions.
 
-Category definitions and transaction assignments are read with the trusted financial graph, validated before publication and published as one category snapshot. Category mutations reconcile through the same canonical hydrator; runtime category state is not durable authority.
+Category definitions and transaction assignments are read with the trusted financial graph, validated before publication and published as one category snapshot. Category mutations reconcile through the same canonical hydrator; runtime category state is not durable authority. A committed mutation whose hydration fails preserves durable repository truth, leaves the last complete runtime snapshot unchanged, blocks later category mutations with a distinct reconciliation-required result, and provides an explicit canonical hydration retry. Provider replacement and lifecycle transitions clear stale prior-generation category state only after replacement hydration succeeds.
 
 ### Durable categories and manual classification
 
@@ -540,7 +541,11 @@ Settings provides bounded category management. Transaction rows display the curr
 
 An isolated namespaced Debug launch verified the empty Settings presentation, first-category creation and category survival after a full quit/relaunch. The task-owned process was terminated and the isolated database set was moved to Trash without opening or changing the protected canonical Debug database.
 
-No parser, reader, normalized-row, import-session, transaction financial value, balance, identifier or provenance behavior changed. No new ADR was required.
+The post-Sprint 57 reconciliation closure adds no migration and preserves the immutable imported financial transaction boundary. Category reconciliation failure injection, blocked mutation zero-write behavior, retry, provider-generation replacement and target-wide category-state cleanup are covered by focused tests.
+
+The closure also verified the normal isolated runtime path: Verified SQLite startup, category creation in Settings, sanitized statement import, transaction assignment, quit/relaunch hydration and persisted assignment presentation. No private source or protected canonical database was opened or changed.
+
+No parser, reader, normalized-row, import-session, transaction financial value, balance, identifier or provenance behavior changed. The dated ADR-036 implementation amendment records the reconciliation closure; no migration was added.
 
 ### Sprint 56 — Explicit Reviewed Partial-Overlap Import
 
