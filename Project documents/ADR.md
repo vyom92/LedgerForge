@@ -28,7 +28,7 @@ When reading this file:
 **Status alignment date:** 2026-07-26
 **Repository ref reviewed:** `main@a0ceb0c0cea5d09e7c2baecc93d9c8c0d984125c` — Sprint 57 post-sprint closure baseline
 **Latest verified implementation:** Sprint 57 durable category foundation; category reconciliation closure is the current uncommitted repair
-**Latest accepted ADR:** ADR-040
+**Latest accepted ADR:** ADR-041
 **Current migration:** V8
 
 No alignment note authorizes implementation.
@@ -77,6 +77,7 @@ No alignment note authorizes implementation.
 | ADR-038 | Atomic Confirmed Import and Durable Identifier Ownership | Accepted and implemented in Sprint 50. | Migration V5, provider-owned atomic confirmed import, durable identifier ownership/observations, provider parity and subprocess contention acceptance are operational. |
 | ADR-039 | Trusted Statement Dates and Durable Source Provenance | Accepted and implemented in Sprint 52, with Sprint 52A corrective closure. | Migration V6, StatementDate, date-role/timezone evidence, parser-profile provenance, source ordinal/digest relationships and strict hydration are operational. |
 | ADR-040 | Explicit Reviewed Partial-Overlap Import | Accepted and implemented in Sprint 56. | One bounded Axis bank-account CSV/INR/verified-UPI prefix-overlap family, Migration V7, immutable reviewed plans, atomic provider commit and strict hydration are operational. |
+| ADR-041 | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority | Accepted architecture; implementation pending. | No production implementation in Sprint 59. The binary-fingerprint foundation must precede production PDF support. |
 
 ## Alignment Policy
 
@@ -4721,3 +4722,225 @@ ADR-030 exact-content fingerprint authority is unchanged.
 ## Exclusions
 
 This decision does not authorize historical repair, arbitrary row selection, ownership override, fuzzy matching, unsupported event families, cross-format identity, deletion/reversal, batch import or generic mutation infrastructure. All other overlap remains whole-statement blocked.
+
+---
+
+# ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
+
+## Status
+
+Accepted
+
+## Context
+
+ADR-030 established versioned exact-content fingerprinting using
+`ledgerforge.raw-text.sha256.v1`, whose input is the reader-produced raw text.
+That authority remains valid for existing supported text imports and historical
+durable records.
+
+A production PDF path cannot use extracted text as the sole exact-document
+identity. PDF extraction may vary independently of the source container, and
+two byte-different documents may extract to the same text. Conversely, CSV and
+PDF representations may describe equivalent financial activity while remaining
+different source documents.
+
+LedgerForge therefore requires an exact source-content authority that exists
+before financial interpretation and survives unchanged through user
+confirmation.
+
+## Decision
+
+### Exact source-content algorithm
+
+The authoritative exact source-content algorithm for future binary-capable
+imports is:
+
+`ledgerforge.source-bytes.sha256.v1`
+
+Its input is the complete exact byte sequence obtained from the
+sandbox-authorized source URL.
+
+The digest must not be derived from:
+
+- extracted or normalized text;
+- parsed transactions;
+- financial totals or balances;
+- filenames or paths;
+- filesystem dates;
+- PDF metadata;
+- presentation labels;
+- institution or parser inference.
+
+### Immutable source snapshot
+
+Preparation must acquire one immutable app-owned `SourceContentSnapshot`.
+
+That snapshot owns:
+
+- the exact source bytes, either directly or through an immutable app-owned
+  temporary file;
+- exact byte count;
+- the `ledgerforge.source-bytes.sha256.v1` digest;
+- bounded media-type evidence where independently supported.
+
+Fingerprinting and document extraction must consume the same snapshot.
+
+The system must not fingerprint one read of an external URL and parse another.
+
+The external URL is a retrieval location and is not durable identity authority.
+
+### Confirmation binding
+
+The prepared import must remain bound to the immutable source snapshot through
+explicit user confirmation.
+
+Immediately before accepted persistence, the source-byte digest must be
+recomputed from that snapshot and compared with the prepared digest.
+
+A mismatch, missing snapshot or unreadable snapshot must fail closed before any
+accepted financial write.
+
+The application must commit the reviewed snapshot’s fingerprint, never a later
+unverified read of the external source URL.
+
+### Snapshot lifetime and privacy
+
+Source bytes are transient preparation evidence.
+
+They must not be:
+
+- stored durably merely to support fingerprinting;
+- emitted to diagnostics;
+- copied into import history;
+- exposed through presentation;
+- retained after completion, cancellation or failure.
+
+Temporary snapshot storage must be task-owned and removed through deterministic
+cleanup.
+
+Durable fingerprint evidence consists only of the approved algorithm identity,
+digest and its relationship to the durable source document, plus separately
+approved bounded provenance.
+
+### Coexistence with raw-text fingerprints
+
+`ledgerforge.raw-text.sha256.v1` remains authoritative for its existing
+historical and supported text-import meaning.
+
+Sprint 59 does not:
+
+- rewrite historical fingerprints;
+- invent source-byte fingerprints for previous imports;
+- backfill unavailable source content;
+- reinterpret raw-text fingerprints as binary identity;
+- alter existing CSV duplicate outcomes.
+
+A future source document may carry more than one versioned fingerprint when
+each algorithm is independently available and its meaning remains explicit.
+
+### Byte-change semantics
+
+Any source-byte change creates a different exact source document, including a
+change limited to:
+
+- PDF metadata;
+- object ordering;
+- container structure;
+- embedded resources;
+- otherwise financially irrelevant bytes.
+
+A byte-different document may later be proven financially equivalent, but it is
+not an exact-content duplicate under this ADR.
+
+### Cross-format boundary
+
+CSV and PDF files that describe the same financial activity remain different
+source documents.
+
+Cross-format financial equivalence is governed separately by FW-P1-16 and must
+not suppress import, merge provenance or claim duplicate identity until:
+
+1. both formats are independently production-supported;
+2. one approved equivalence family has independent source truth;
+3. an additional accepted architecture defines its review, identity and
+   persistence effects.
+
+FW-P1-16 remains blocked.
+
+### Provider parity
+
+Any implementation must provide equivalent SQLite and In-Memory behavior for:
+
+- algorithm and digest persistence;
+- document relationship;
+- exact-source duplicate detection;
+- atomic confirmed import;
+- durable rejected-attempt semantics;
+- contention;
+- injected failure;
+- zero accepted losing-path residue;
+- hydration and relaunch reconstruction.
+
+### PDF sequencing
+
+Production PDF support is split into two implementation increments.
+
+The first increment implements the immutable source snapshot and source-byte
+fingerprint foundation without adding production PDF parsing.
+
+The second increment may add one approved Axis PDF statement through the
+ordinary production pipeline only after the first increment is accepted and
+the selected PDF evidence independently proves:
+
+- sandbox-authorized opening;
+- deterministic extraction;
+- page and row order;
+- transaction grouping;
+- dates;
+- native-currency money;
+- direction;
+- balances;
+- identifiers and provenance;
+- malformed, encrypted, image-only and unsupported outcomes;
+- falsification against similar unsupported layouts.
+
+Extraction code, fixture presence or discovery alone does not establish
+production PDF support.
+
+## Consequences
+
+- Exact binary identity is anchored in source evidence rather than extraction.
+- Preparation and confirmation share one immutable source-content authority.
+- Existing raw-text fingerprints remain readable and unchanged.
+- Metadata-only PDF edits are different exact source documents.
+- Financial equivalence remains separate from exact-content identity.
+- Production PDF implementation cannot precede the source-byte foundation.
+- No historical fingerprint reconstruction is authorized.
+- No migration or production implementation is performed by Sprint 59.
+
+## Implementation readiness
+
+FW-P1-18 is architecture-ready as the first implementation increment:
+Immutable Source Snapshot and Binary Fingerprint Foundation.
+
+The bounded FW-P1-10 Axis PDF implementation remains dependent on acceptance
+of that foundation and revalidation of the approved PDF source, sanitized
+fixture and independent financial oracle.
+
+FW-P1-16 remains blocked until two equivalent formats are independently
+production-supported and a separate equivalence architecture is accepted.
+
+## Exclusions
+
+This ADR does not authorize:
+
+- production PDF implementation;
+- password entry or Keychain integration;
+- OCR;
+- arbitrary institution or card PDFs;
+- XLS or XLSX support;
+- heuristic or AI interpretation;
+- historical fingerprint backfill;
+- cross-format duplicate suppression;
+- durable storage of complete source files;
+- changes to existing CSV fingerprint outcomes.
