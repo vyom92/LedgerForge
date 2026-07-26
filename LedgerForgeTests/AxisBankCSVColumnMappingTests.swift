@@ -9,31 +9,31 @@ struct AxisBankCSVColumnMappingTests {
         let canonical = try parse(
             header: ["Tran Date", "CHQNO", "PARTICULARS", "DR", "CR", "BAL", "SOL"],
             rows: [
-                ["01-01-2026", "-", "UPI/P2A/000000000101/TEST CREDIT", "25.00", "", "125.00", "4437"],
-                ["02-01-2026", "-", "UPI/P2M/000000000102/TEST PAYMENT", "", "10.00", "115.00", "4437"]
+                ["01-01-2026", "-", "UPI/P2M/000000000101/TEST PAYMENT", "25.00", "", "75.00", "4437"],
+                ["02-01-2026", "-", "UPI/P2A/000000000102/TEST CREDIT", "", "10.00", "85.00", "4437"]
             ]
         )
         let swapped = try parse(
             header: ["Tran Date", "CHQNO", "PARTICULARS", "CR", "DR", "BAL", "SOL"],
             rows: [
-                ["01-01-2026", "-", "UPI/P2A/000000000101/TEST CREDIT", "", "25.00", "125.00", "4437"],
-                ["02-01-2026", "-", "UPI/P2M/000000000102/TEST PAYMENT", "10.00", "", "115.00", "4437"]
+                ["01-01-2026", "-", "UPI/P2M/000000000101/TEST PAYMENT", "", "25.00", "75.00", "4437"],
+                ["02-01-2026", "-", "UPI/P2A/000000000102/TEST CREDIT", "10.00", "", "85.00", "4437"]
             ]
         )
         let permuted = try parse(
             header: ["SOL", "Credit", "PARTICULARS", "Transaction Date", "Balance", "Debit", "CHQNO"],
             rows: [
-                ["4437", "", "UPI/P2A/000000000101/TEST CREDIT", "01-01-2026", "125.00", "25.00", "-"],
-                ["4437", "10.00", "UPI/P2M/000000000102/TEST PAYMENT", "02-01-2026", "115.00", "", "-"]
+                ["4437", "", "UPI/P2M/000000000101/TEST PAYMENT", "01-01-2026", "75.00", "25.00", "-"],
+                ["4437", "10.00", "UPI/P2A/000000000102/TEST CREDIT", "02-01-2026", "85.00", "", "-"]
             ]
         )
 
         #expect(projection(canonical) == projection(swapped))
         #expect(projection(canonical) == projection(permuted))
-        #expect(canonical.transactions[0].credit == Decimal(25))
-        #expect(canonical.transactions[0].money.amount == Decimal(25))
-        #expect(canonical.transactions[1].debit == Decimal(10))
-        #expect(canonical.transactions[1].money.amount == Decimal(-10))
+        #expect(canonical.transactions[0].debit == Decimal(25))
+        #expect(canonical.transactions[0].money.amount == Decimal(-25))
+        #expect(canonical.transactions[1].credit == Decimal(10))
+        #expect(canonical.transactions[1].money.amount == Decimal(10))
     }
 
     @Test func closedAliasesNormalizeCaseAndWhitespace() throws {
@@ -105,42 +105,42 @@ struct AxisBankCSVColumnMappingTests {
         }
     }
 
-    @Test func sourceDRProducesCanonicalCreditAndSourceCRProducesCanonicalDebit() throws {
+    @Test func sourceDRProducesCanonicalDebitAndSourceCRProducesCanonicalCredit() throws {
         let document = try parse(
             header: ["Tran Date", "CHQNO", "PARTICULARS", "DR", "CR", "BAL", "SOL"],
             rows: [
-                ["01-01-2026", "-", "UPI/P2A/000000000101/TEST CREDIT", "25.00", "", "125.00", "4437"],
-                ["02-01-2026", "-", "UPI/P2M/000000000102/TEST PAYMENT", "", "10.00", "115.00", "4437"]
+                ["01-01-2026", "-", "UPI/P2M/000000000101/TEST PAYMENT", "25.00", "", "75.00", "4437"],
+                ["02-01-2026", "-", "UPI/P2A/000000000102/TEST CREDIT", "", "10.00", "85.00", "4437"]
             ]
         )
 
-        #expect(document.transactions[0].debit == nil)
-        #expect(document.transactions[0].credit == Decimal(25))
-        #expect(document.transactions[0].money.amount == Decimal(25))
-        #expect(document.transactions[0].verifiedAxisUPIEventEvidence?.subtype == .creditAdjustment)
-        #expect(document.transactions[1].debit == Decimal(10))
-        #expect(document.transactions[1].credit == nil)
-        #expect(document.transactions[1].money.amount == Decimal(-10))
-        #expect(document.transactions[1].verifiedAxisUPIEventEvidence?.subtype == .posting)
+        #expect(document.transactions[0].debit == Decimal(25))
+        #expect(document.transactions[0].credit == nil)
+        #expect(document.transactions[0].money.amount == Decimal(-25))
+        #expect(document.transactions[0].verifiedAxisUPIEventEvidence?.subtype == .posting)
+        #expect(document.transactions[1].debit == nil)
+        #expect(document.transactions[1].credit == Decimal(10))
+        #expect(document.transactions[1].money.amount == Decimal(10))
+        #expect(document.transactions[1].verifiedAxisUPIEventEvidence?.subtype == .creditAdjustment)
         let validation = ImportValidator.validate(financialDocument: document)
         #expect(validation.passed)
-        #expect(validation.debitTotal == Decimal(10))
-        #expect(validation.creditTotal == Decimal(25))
+        #expect(validation.debitTotal == Decimal(25))
+        #expect(validation.creditTotal == Decimal(10))
         #expect(validation.openingBalance == Decimal(100))
-        #expect(validation.closingBalance == Decimal(115))
+        #expect(validation.closingBalance == Decimal(85))
     }
 
-    @Test func futureConventionalSemanticsFailValidationWithoutAutomaticSwitching() throws {
+    @Test func unsupportedSwappedSemanticsFailValidationWithoutAutomaticSwitching() throws {
         let document = try parse(
             header: ["Tran Date", "CHQNO", "PARTICULARS", "DR", "CR", "BAL", "SOL"],
             rows: [
-                ["01-01-2026", "-", "UPI/P2M/000000000101/FUTURE PAYMENT", "25.00", "", "75.00", "4437"],
-                ["02-01-2026", "-", "UPI/P2A/000000000102/FUTURE CREDIT", "", "10.00", "85.00", "4437"]
+                ["01-01-2026", "-", "UPI/P2A/000000000101/UNSUPPORTED CREDIT", "25.00", "", "125.00", "4437"],
+                ["02-01-2026", "-", "UPI/P2M/000000000102/UNSUPPORTED PAYMENT", "", "10.00", "115.00", "4437"]
             ]
         )
 
-        #expect(document.transactions[0].credit == Decimal(25))
-        #expect(document.transactions[1].debit == Decimal(10))
+        #expect(document.transactions[0].debit == Decimal(25))
+        #expect(document.transactions[1].credit == Decimal(10))
         #expect(!ImportValidator.validate(financialDocument: document).passed)
     }
 
@@ -148,9 +148,9 @@ struct AxisBankCSVColumnMappingTests {
         let document = try parse(
             header: ["Tran Date", "CHQNO", "PARTICULARS", "DR", "CR", "BAL", "SOL"],
             rows: [
-                ["01-01-2026", "-", "UPI/P2A/000000000101/V1 CREDIT", "25.00", "", "125.00", "4437"],
-                ["02-01-2026", "-", "UPI/P2M/000000000102/V1 PAYMENT", "", "10.00", "115.00", "4437"],
-                ["03-01-2026", "-", "UPI/P2M/000000000103/FUTURE PAYMENT", "5.00", "", "110.00", "4437"]
+                ["01-01-2026", "-", "UPI/P2M/000000000101/V2 PAYMENT", "25.00", "", "75.00", "4437"],
+                ["02-01-2026", "-", "UPI/P2A/000000000102/V2 CREDIT", "", "10.00", "85.00", "4437"],
+                ["03-01-2026", "-", "UPI/P2A/000000000103/CONTRADICTORY CREDIT", "5.00", "", "90.00", "4437"]
             ]
         )
 

@@ -2,7 +2,7 @@
   "fixture_id": "axis-bank-partial-overlap-v1",
   "fixture_class": "reviewed privacy-safe derivative of two genuine overlapping Axis CSV statements",
   "profile_id": "axis.bank-account.csv",
-  "profile_version": "1",
+  "profile_version": "2",
   "physical_header_order": [
     "Tran Date",
     "CHQNO",
@@ -24,8 +24,8 @@
       "statement_start_date": "10-08-2026",
       "statement_end_date": "12-08-2026",
       "transaction_count": 4,
-      "raw_source_dr_total": "125.00",
-      "raw_source_cr_total": "50.00",
+      "raw_source_dr_total": "50.00",
+      "raw_source_cr_total": "125.00",
       "canonical_debit_total": "50.00",
       "canonical_credit_total": "125.00",
       "opening_balance": "1000.00",
@@ -35,7 +35,7 @@
         {
           "source_ordinal": 7,
           "transaction_date": "10-08-2026",
-          "source_column": "DR",
+          "source_column": "CR",
           "raw_source_amount": "100.00",
           "canonical_direction": "credit",
           "signed_canonical_amount": "100.00",
@@ -48,7 +48,7 @@
         {
           "source_ordinal": 8,
           "transaction_date": "11-08-2026",
-          "source_column": "CR",
+          "source_column": "DR",
           "raw_source_amount": "40.00",
           "canonical_direction": "debit",
           "signed_canonical_amount": "-40.00",
@@ -61,7 +61,7 @@
         {
           "source_ordinal": 9,
           "transaction_date": "12-08-2026",
-          "source_column": "DR",
+          "source_column": "CR",
           "raw_source_amount": "25.00",
           "canonical_direction": "credit",
           "signed_canonical_amount": "25.00",
@@ -74,7 +74,7 @@
         {
           "source_ordinal": 10,
           "transaction_date": "12-08-2026",
-          "source_column": "CR",
+          "source_column": "DR",
           "raw_source_amount": "10.00",
           "canonical_direction": "debit",
           "signed_canonical_amount": "-10.00",
@@ -91,8 +91,8 @@
       "statement_start_date": "11-08-2026",
       "statement_end_date": "13-08-2026",
       "transaction_count": 4,
-      "raw_source_dr_total": "25.00",
-      "raw_source_cr_total": "125.00",
+      "raw_source_dr_total": "125.00",
+      "raw_source_cr_total": "25.00",
       "canonical_debit_total": "125.00",
       "canonical_credit_total": "25.00",
       "opening_balance": "1100.00",
@@ -102,7 +102,7 @@
         {
           "source_ordinal": 7,
           "transaction_date": "11-08-2026",
-          "source_column": "CR",
+          "source_column": "DR",
           "raw_source_amount": "40.00",
           "canonical_direction": "debit",
           "signed_canonical_amount": "-40.00",
@@ -115,7 +115,7 @@
         {
           "source_ordinal": 8,
           "transaction_date": "12-08-2026",
-          "source_column": "DR",
+          "source_column": "CR",
           "raw_source_amount": "25.00",
           "canonical_direction": "credit",
           "signed_canonical_amount": "25.00",
@@ -128,7 +128,7 @@
         {
           "source_ordinal": 9,
           "transaction_date": "12-08-2026",
-          "source_column": "CR",
+          "source_column": "DR",
           "raw_source_amount": "10.00",
           "canonical_direction": "debit",
           "signed_canonical_amount": "-10.00",
@@ -141,7 +141,7 @@
         {
           "source_ordinal": 10,
           "transaction_date": "13-08-2026",
-          "source_column": "CR",
+          "source_column": "DR",
           "raw_source_amount": "75.00",
           "canonical_direction": "debit",
           "signed_canonical_amount": "-75.00",

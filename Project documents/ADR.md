@@ -683,6 +683,7 @@ This establishes a single extensible architecture for every supported import for
 - **Decision standing:** Accepted, clarified by ADR-030, ADR-031, ADR-034 and ADR-039.
 - **Implementation:** Approved fixtures and independent expected evidence remain architectural acceptance inputs.
 - **Current qualification:** Source semantics outrank derived expected JSON. Cross-format equivalence must be proven for each approved pair and does not create exact-content duplicate identity or broad format support.
+- **Axis source-truth restoration:** `axis.bank-account.csv@2` derives its accepted conventional DR-debit/CR-credit semantics from immutable private-source balance deltas and independently supplied opening evidence. Legacy NRE and partial-overlap derivatives without immutable transformation lineage are quarantined from financial-truth acceptance; parser output, expected JSON and internally coherent synthetic arithmetic cannot substitute for source lineage.
 
 
 ## Status
@@ -1923,7 +1924,7 @@ Sprint 39 does not include transaction-level duplicate detection, overlapping-st
 
 # ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking
 
-> **Current alignment — ADR-040:** The whole-import supported-overlap rule remains authoritative except for ADR-040's exact reviewed Axis CSV/INR family. That exception requires a recognized contiguous prefix, a later unique suffix, complete supported account-scoped Axis UPI evidence and provider-owned atomic revalidation.
+> **Current alignment — Axis source-truth restoration:** Whole-import supported-overlap blocking is again universal in production. ADR-040's former Axis mixed-overlap exception is suspended because its synthetic source pair lacks immutable lineage; provider review returns unsupported evidence without accepted residue for mixed overlap.
 
 ## Current Alignment — 2026-07-24
 
@@ -2095,7 +2096,7 @@ This ADR does not implement parser extraction, domain models, repository lookup,
 
 # ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics
 
-> **Current alignment — ADR-040:** A committed reviewed partial import creates one successful completed session and one successful partial attempt with explicit source/imported/recognized/blocked counts. Historical attempts retain nullable counts and are not reinterpreted.
+> **Current alignment — Axis source-truth restoration:** The durable partial-attempt schema and strict historical readback remain implemented, and any previously committed reviewed partial import retains its explicit counts. Production no longer creates a new mixed partial attempt without lineage-backed source evidence. Historical attempts remain nullable and are not reinterpreted.
 
 ## Current Alignment — 2026-07-24
 
@@ -4353,7 +4354,7 @@ This ADR must be marked **Accepted** before source-level financial-mutation cont
 
 # ADR-038 — Atomic Confirmed Import and Durable Identifier Ownership
 
-> **Current alignment — ADR-040:** The accepted confirmed-import graph now has one additional bounded form. For an eligible reviewed partial plan, the provider atomically preserves the complete incoming source graph and dispositions while creating financial transactions only for the unique suffix; every stale or losing path rejects the whole plan.
+> **Current alignment — Axis source-truth restoration:** The provider-owned partial graph remains implemented and fail-closed for historical compatibility, but no current source family is eligible to create it. New Axis mixed overlap is rejected before confirmation because the former acceptance fixture lacks immutable source lineage.
 
 ## Current Alignment — 2026-07-24
 
@@ -4612,7 +4613,7 @@ No production guarantee may be recorded until implementation, migration safety w
 
 # ADR-039 — Trusted Statement Dates and Durable Source Provenance
 
-> **Current alignment — ADR-040:** Trusted source relationships now include typed incoming-row dispositions for the bounded partial family. Recognized rows relate the new normalized source row to the unchanged durable transaction and event identity; `transaction_raw_rows.contribution_type` is descriptive only.
+> **Current alignment — Axis source-truth restoration:** Typed incoming-row dispositions and recognized-row relationships remain valid durable readback contracts. New Axis bank-account imports use profile version `2`; version `1` remains historical provenance and is never rewritten. No current mixed-overlap fixture is eligible to create new dispositions.
 
 ## Current Alignment — 2026-07-24
 
@@ -4635,7 +4636,7 @@ Migration V6 adds date-role/timezone metadata, profile metadata and record diges
 
 ## Consequences
 
-The approved shared-layout Axis NRE and supplied Axis NRO CSV paths are active only within their verified evidence boundary. New supported NRE and NRO imports use `axis.bank-account.csv` version `1`. Historical `axis.nre.csv` version `1` provenance remains readable and unchanged; it is not migrated or rewritten. Profile identity describes the source layout and provenance contract, not NRE/NRO or any other durable account classification. This does not add institutions, broader layouts, a general Import Profile framework, historical repair, raw-row storage, cross-document chronology, or support for timestamps from date-only evidence.
+The approved shared-layout Axis NRE and supplied Axis NRO CSV paths are active only within their verified evidence boundary. New supported NRE and NRO imports use `axis.bank-account.csv` version `2`, which distinguishes the restored conventional DR-debit/CR-credit contract from historical version `1` rows. Historical `axis.nre.csv` version `1` and `axis.bank-account.csv` version `1` provenance remain readable and unchanged; they are not migrated or rewritten. Profile identity describes the source layout and provenance contract, not NRE/NRO or any other durable account classification. This does not add institutions, broader layouts, a general Import Profile framework, historical repair, raw-row storage, cross-document chronology, or support for timestamps from date-only evidence.
 
 ## Sprint 52A Corrective Closure
 
@@ -4670,6 +4671,10 @@ Generic transaction replacement rejects trusted DTOs. Only the provider-owned co
 **Status:** Accepted and implemented in Sprint 56
 **Scope:** Prospective imports only
 **Migration:** V7
+
+## Current Alignment — Axis Source-Truth Restoration
+
+ADR-040's schema, provider-transaction, hydration and presentation contracts remain implemented for strict historical compatibility, but its production Axis family is suspended. The synthetic three-shared/one-later fixture lacks immutable source lineage and therefore cannot authorize a financial import under ADR-019. `axis.bank-account.csv@2` mixed overlap returns unsupported evidence with zero accepted residue. Reauthorization requires new lineage-backed source evidence and an independently derived direction/event oracle; no second semantic variant is inferred.
 
 ## Context
 

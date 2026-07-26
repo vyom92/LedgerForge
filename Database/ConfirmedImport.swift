@@ -406,7 +406,7 @@ enum ReviewedPartialImportPlanner {
               plan.proposedAccount.nativeCurrency == "INR",
               let normalizedDocument = plan.historyTemplate.normalizedDocument,
               normalizedDocument.profileId == "axis.bank-account.csv",
-              normalizedDocument.profileVersion == "1",
+              normalizedDocument.profileVersion == "2",
               let startText = plan.declaredStatementStartISO,
               let endText = plan.declaredStatementEndISO,
               let start = try? StatementDate(canonical: startText),
@@ -521,30 +521,12 @@ enum ReviewedPartialImportPlanner {
         if recognized == 0 { return .ordinaryFullImport }
         if imported == 0 { return .fullSupportedOverlap(count: recognized) }
 
-        var reachedUnique = false
-        for row in reviewedRows {
-            switch row.disposition {
-            case .recognizedExisting where reachedUnique:
-                return .unsupportedEvidence
-            case .recognizedExisting:
-                break
-            case .importedUnique:
-                reachedUnique = true
-            }
-        }
+        // The former reviewed-partial fixture pair has no immutable source
+        // lineage. Full imports and full supported-overlap blocking remain
+        // available, but a mixed recognized/unique result must fail closed
+        // until source-faithful evidence re-establishes this exception.
+        return .unsupportedEvidence
 
-        return .eligible(
-            ReviewedPartialImportPlanDTO(
-                id: planID,
-                basePlan: plan,
-                existingAccountId: accountID,
-                rows: reviewedRows,
-                sourceRowCount: reviewedRows.count,
-                recognizedCount: recognized,
-                importedCount: imported,
-                blockedCount: 0
-            )
-        )
     }
 
     static func projectionsAgree(incoming: TransactionDTO, existing: TransactionDTO) -> Bool {

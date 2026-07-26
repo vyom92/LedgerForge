@@ -1,0 +1,16 @@
+{
+  "fixture_id": "axis-bank-nre-legacy-fixture-quarantine",
+  "fixture_class": "quarantined legacy fixture inventory",
+  "financial_truth_authority": false,
+  "files": {
+    "axis_bank_nre_account_statement_baseline.csv": "structural and integration regression only; immutable source and sanitisation lineage unavailable",
+    "axis_bank_nre_account_statement_overlap.csv": "structural and overlap-blocking regression only; immutable source and sanitisation lineage unavailable",
+    "axis_bank_nre_header_semantic_regression.csv": "synthetic parser regression only; not source-truth evidence",
+    "axis_bank_nre_account_statement_baseline.pdf": "detection and reader regression only; immutable source and sanitisation lineage unavailable",
+    "axis_bank_nre_account_statement_baseline.expected.json": "legacy integration expectation only",
+    "axis_bank_nre_account_statement_overlap.expected.json": "legacy integration expectation only",
+    "axis_bank_nre_header_semantic_regression.expected.json": "synthetic integration expectation only"
+  },
+  "restoration_note": "Legacy CSV financial occupancy was restored to conventional DR debit and CR credit arithmetic so non-authoritative integration tests cannot continue defending the inverted Sprint 55 premise.",
+  "acceptance_rule": "No listed file may establish Axis financial direction, production profile semantics or a new supported source family."
+}

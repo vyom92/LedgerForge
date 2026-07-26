@@ -6,8 +6,8 @@
   "transaction_count": 81,
   "debit_total": "2821794.53",
   "credit_total": "2797798.00",
-  "raw_dr_column_total": "2797798.00",
-  "raw_cr_column_total": "2821794.53",
+  "raw_dr_column_total": "2821794.53",
+  "raw_cr_column_total": "2797798.00",
   "opening_balance": "23996.69",
   "closing_balance": "0.16",
   "first_transaction_date": "09-01-2026",
@@ -15,9 +15,9 @@
   "validation_result": "expected valid",
   "notes": [
     "This fixture is a privacy-safe derivative of a genuine Axis Bank NRE CSV statement supplied by the project owner.",
-    "Physical DR values increase balance and therefore become canonical credits; physical CR values decrease balance and therefore become canonical debits under axis.bank-account.csv@1.",
-    "The July 21 header-role rewrite contradicted the source-backed running-balance evidence; this correction restores the independently reconciling physical occupancy without changing canonical financial truth.",
-    "Dates, amount magnitudes, row count, ordering, balances, column structure, SOL and privacy transformations remain unchanged.",
+    "Debit values occupy DR and credit values occupy CR, matching the source header semantics and running-balance equations.",
+    "Dates, amount magnitudes, row count, ordering, balances, column structure, SOL and privacy transformations remain unchanged by the direction repair.",
+    "The sanitized CSV checksum intentionally changed when the verified DR/CR source-fidelity defect was corrected.",
     "Names, account number, customer ID, contact details, PAN, CKYC, transaction references and counterparties are anonymized."
   ]
 }

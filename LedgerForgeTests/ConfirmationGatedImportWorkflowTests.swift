@@ -45,7 +45,7 @@ struct ConfirmationGatedImportWorkflowTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func futureAxisDirectionSemanticsFailBeforeAcceptedPersistenceWithZeroResidue() async throws {
+    func swappedAxisDirectionSemanticsFailBeforeAcceptedPersistenceWithZeroResidue() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("LedgerForge-AxisDirection-\(UUID().uuidString)")
@@ -60,7 +60,7 @@ struct ConfirmationGatedImportWorkflowTests {
 
         Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL
         01-01-2026,-,UPI/P2M/000000009901/FUTURE PAYMENT,25.00,,75.00,9001
-        02-01-2026,-,UPI/P2A/000000009902/FUTURE CREDIT,,10.00,85.00,9001
+        02-01-2026,-,UPI/P2A/000000009902/FUTURE CREDIT,,10.00,65.00,9001
         """
         try Data(source.utf8).write(to: url)
         let persistence = CountingPersistenceCoordinator()
@@ -69,8 +69,8 @@ struct ConfirmationGatedImportWorkflowTests {
         let prepared = try await engine.prepareImport(from: url)
         let result = await engine.commitPreparedImport(prepared)
 
-        #expect(prepared.financialDocument.transactions[0].credit == Decimal(25))
-        #expect(prepared.financialDocument.transactions[1].debit == Decimal(10))
+        #expect(prepared.financialDocument.transactions[0].debit == Decimal(25))
+        #expect(prepared.financialDocument.transactions[1].credit == Decimal(10))
         #expect(!prepared.validation.passed)
         #expect(!result.validationPassed)
         #expect(!result.persisted)

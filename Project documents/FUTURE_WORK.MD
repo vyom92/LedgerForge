@@ -61,6 +61,8 @@ A work item becomes executable only when Chat supplies one complete approved pro
 **Candidate entries reviewed:** 155  
 **Fresh build/test/runtime evidence:** None; this was a read-only planning audit.
 
+**Current alignment — Axis source-truth restoration:** the Git-authoritative repository state is newer than this audit baseline. `PROJECT_STATE.md` records the active `axis.bank-account.csv@2` conventional direction contract and the suspension of provenance-less mixed partial overlap.
+
 Every numbered candidate in this document was reviewed against the current pushed repository state, `PROJECT_STATE.md`, accepted ADRs, completed-sprint evidence, current fixture inventory and recent repository history.
 
 The audit changes only material status, dependency or completed-slice drift. Unchanged candidates retain their existing status because no current evidence establishes a different readiness boundary. A fixture being present does not by itself establish production support, but it may satisfy the evidence prerequisite for targeted discovery.
@@ -275,7 +277,7 @@ Provide privacy-safe verification for:
 - incomplete imports;
 - inconsistent completion states.
 
-The Axis direction-correction audit is now one concrete separately gated family: imports accepted after the July 21, 2026 raw-header-role regression and before the Sprint 55 correction may contain reversed canonical direction and signed `Money`. The first increment must be read-only detection against durable parser provenance and independently provable source arithmetic. Any repair requires exact impact preview, explicit authorization, provider-owned atomic mutation and recoverability or explicit irreversibility. Sprint 55 performs no historical repair.
+The Axis direction-correction audit is now one concrete separately gated family: bank-account imports accepted with `axis.bank-account.csv@1` from Sprint 55 commit `9598c6de6a701d14b0d4afb37d5adb27e9fc82e0` through the parent of the P0 source-truth restoration commit may contain reversed canonical direction, signed `Money` and direction-dependent UPI subtype. Earlier alternating parser revisions also require audit. The first increment must be read-only detection against durable parser provenance and independently provable source arithmetic. Any repair requires exact impact preview, explicit authorization, provider-owned atomic mutation and recoverability or explicit irreversibility. The source-truth restoration performs no historical mutation.
 
 Targeted discovery must select one independently verifiable family and define whether the first increment is read-only verification or an explicit repair. Repair actions must be previewed, authorized, atomic and recoverable or explicitly irreversible.
 
@@ -561,7 +563,7 @@ Each family may require a separate ADR and implementation increment. No family m
 **Status:** Candidate
 **Depends on:** Approved fixtures for each layout
 
-**Supplied shared-layout Axis NRO CSV slice completed 2026-07-23:** Sprint 53 verified the supplied NRO CSV evidence through the existing Axis bank-account grammar and one shared production parser. New supported NRE and NRO imports use `axis.bank-account.csv` version `1`; two distinct full institution account identifiers preserve separate durable accounts. This completion does not establish broader Axis NRO, PDF, XLS, XLSX or card support.
+**Supplied shared-layout Axis NRO CSV slice completed 2026-07-23; source truth restored 2026-07-26:** new supported NRE and NRO bank-account CSV imports use `axis.bank-account.csv` version `2` with physical DR as debit and physical CR as credit. Two distinct full institution account identifiers preserve separate durable accounts. Version `1` is historical-only provenance and may require separate integrity detection. This completion does not establish broader Axis NRO, PDF, XLS, XLSX or card support.
 
 Expand deterministic Axis coverage in dependency and fixture-readiness order:
 
@@ -1031,9 +1033,9 @@ Extend account choice beyond the bounded no-match workflow while preserving veri
 **Status:** Ready for discovery
 **Depends on:** Approved durable-attempt-history supported outcomes plus broader duplicate-management semantics
 
-Retain future work for duplicate override, broader duplicate management, unsupported partial-import families, ambiguous or speculative duplicate candidates and historical duplicate repair. Sprint 56 completes only the prospective, contiguous-prefix/later-suffix Axis bank-account CSV/INR family backed by parser-verified Axis UPI evidence.
+Retain future work for duplicate override, broader duplicate management, partial-import families, ambiguous or speculative duplicate candidates and historical duplicate repair. The former Sprint 56 contiguous-prefix/later-suffix Axis family is suspended because its synthetic overlap fixture lacks immutable source lineage; mixed overlap now fails closed as unsupported evidence.
 
-ADR-040 and Migration V7 now define and implement that bounded family with immutable reviewed plans, transaction-time revalidation, provider-owned atomic persistence, durable dispositions and explicit review. This does not complete broad duplicate management. Retain arbitrary override, fuzzy candidates, interleaved or unsupported evidence, other institutions/formats/event families, historical duplicate cleanup and repair, and deletion/reversal for separate architecture and acceptance.
+ADR-040 and Migration V7 retain the implemented reviewed-plan, transaction, durable-disposition and hydration structures, including strict readback of any historical state. Reauthorizing a production partial family requires new immutable source lineage and independent balance/event evidence; no current synthetic fixture can supply that authority. Retain arbitrary override, fuzzy candidates, interleaved or unsupported evidence, other institutions/formats/event families, historical duplicate cleanup and repair, and deletion/reversal for separate architecture and acceptance.
 
 ---
 

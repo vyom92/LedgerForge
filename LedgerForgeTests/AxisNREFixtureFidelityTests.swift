@@ -7,8 +7,11 @@ struct AxisNREFixtureFidelityTests {
 
     @Test func sanitizedFixturesMatchIndependentHeaderSemanticFinancialOracle() throws {
         for fixture in Self.fixtures {
-            let oracle = try IndependentAxisCSVOracle.load(csvFileName: fixture.csv)
             let expected = try AxisNREFidelityExpectation.load(fileName: fixture.expected)
+            let oracle = try IndependentAxisCSVOracle.load(
+                csvFileName: fixture.csv,
+                independentOpeningBalance: expected.openingBalance
+            )
 
             #expect(oracle.headerDRIndex < oracle.headerCRIndex)
             #expect(oracle.directionFailureRows.isEmpty)
@@ -25,7 +28,11 @@ struct AxisNREFixtureFidelityTests {
 
     @Test func productionParserMatchesIndependentFixtureOracle() throws {
         for fixture in Self.fixtures {
-            let oracle = try IndependentAxisCSVOracle.load(csvFileName: fixture.csv)
+            let expected = try AxisNREFidelityExpectation.load(fileName: fixture.expected)
+            let oracle = try IndependentAxisCSVOracle.load(
+                csvFileName: fixture.csv,
+                independentOpeningBalance: expected.openingBalance
+            )
             let parsed = try parseProductionFixture(fileName: fixture.csv)
             let parserProjection = try parsed.financialDocument.transactions.map {
                 let date = try #require($0.statementDate)
@@ -49,8 +56,14 @@ struct AxisNREFixtureFidelityTests {
     }
 
     @Test func sameDayAxisRowsRetainIndependentPhysicalOrder() throws {
-        let fixture = "axis_bank_nre_account_statement_baseline.csv"
-        let oracle = try IndependentAxisCSVOracle.load(csvFileName: fixture)
+        let fixture = "axis_bank_nre_private_source_semantics.csv"
+        let expected = try AxisNREFidelityExpectation.load(
+            fileName: "axis_bank_nre_private_source_semantics.expected.json"
+        )
+        let oracle = try IndependentAxisCSVOracle.load(
+            csvFileName: fixture,
+            independentOpeningBalance: expected.openingBalance
+        )
         let parsed = try parseProductionFixture(fileName: fixture).financialDocument.transactions
         let sameDay = try #require(oracle.transactions.first { candidate in
             oracle.transactions.filter { $0.date == candidate.date }.count > 1
@@ -62,29 +75,48 @@ struct AxisNREFixtureFidelityTests {
         #expect(actualOrdinals == expectedOrdinals)
     }
 
-    @Test func privacySafeRealLayoutRegressionPreservesUPISubtypes() throws {
+    @Test func privacySafeRealLayoutRegressionPreservesUPIDirectionSubtypes() throws {
         let parsed = try parseProductionFixture(
-            fileName: "axis_bank_nre_header_semantic_regression.csv"
+            fileName: "axis_bank_nre_private_source_semantics.csv"
         )
 
-        #expect(parsed.financialDocument.transactions.count == 2)
-        #expect(parsed.financialDocument.transactions[0].verifiedAxisUPIEventEvidence?.subtype == .posting)
-        #expect(parsed.financialDocument.transactions[1].verifiedAxisUPIEventEvidence?.subtype == .creditAdjustment)
+        #expect(parsed.financialDocument.transactions.count == 4)
+        #expect(parsed.financialDocument.transactions[1].verifiedAxisUPIEventEvidence?.subtype == .posting)
+        #expect(parsed.financialDocument.transactions[2].verifiedAxisUPIEventEvidence?.subtype == .creditAdjustment)
+        #expect(parsed.financialDocument.transactions[3].verifiedAxisUPIEventEvidence?.subtype == .posting)
         #expect(parsed.validation.passed)
+    }
+
+    @Test(arguments: AxisSemanticFalsificationCase.allCases)
+    func balanceDeltaOracleRejectsContradictorySourceEvidence(
+        _ testCase: AxisSemanticFalsificationCase
+    ) {
+        #expect(throws: AxisSourceSemanticOracleError.self) {
+            _ = try IndependentAxisCSVOracle.resolveDirection(
+                sourceDR: testCase.sourceDR,
+                sourceCR: testCase.sourceCR,
+                priorBalance: 100,
+                currentBalance: testCase.currentBalance
+            )
+        }
+    }
+
+    @Test func onlyLineageBackedFixtureCanAuthorizeNRESourceTruth() throws {
+        #expect(try sourceTruthEligibility(
+            manifest: "axis_bank_nre_private_source_semantics.manifest.json"
+        ))
+        #expect(!(try sourceTruthEligibility(
+            manifest: "axis_bank_nre_legacy_fixture_quarantine.manifest.json"
+        )))
+        #expect(!(try sourceTruthEligibility(
+            manifest: "axis_bank_partial_overlap.manifest.json"
+        )))
     }
 
     private static let fixtures = [
         (
-            csv: "axis_bank_nre_account_statement_baseline.csv",
-            expected: "axis_bank_nre_account_statement_baseline.expected.json"
-        ),
-        (
-            csv: "axis_bank_nre_account_statement_overlap.csv",
-            expected: "axis_bank_nre_account_statement_overlap.expected.json"
-        ),
-        (
-            csv: "axis_bank_nre_header_semantic_regression.csv",
-            expected: "axis_bank_nre_header_semantic_regression.expected.json"
+            csv: "axis_bank_nre_private_source_semantics.csv",
+            expected: "axis_bank_nre_private_source_semantics.expected.json"
         )
     ]
 
@@ -117,6 +149,12 @@ struct AxisNREFixtureFidelityTests {
             validation: ImportValidator.validate(financialDocument: financialDocument)
         )
     }
+
+    private func sourceTruthEligibility(manifest: String) throws -> Bool {
+        let data = try Data(contentsOf: FixtureLocator.axisManifest(manifest))
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        return object["source_truth_acceptance_eligible"] as? Bool ?? false
+    }
 }
 
 private struct ParsedAxisNREFixture {
@@ -146,7 +184,10 @@ private struct IndependentAxisCSVOracle {
     let openingBalance: Decimal?
     let closingBalance: Decimal?
 
-    static func load(csvFileName: String) throws -> IndependentAxisCSVOracle {
+    static func load(
+        csvFileName: String,
+        independentOpeningBalance: Decimal
+    ) throws -> IndependentAxisCSVOracle {
         let text = try CSVReader().read(from: FixtureLocator.axisCSV(csvFileName))
         let lines = text.components(separatedBy: .newlines)
         let headerOffset = try #require(
@@ -167,7 +208,15 @@ private struct IndependentAxisCSVOracle {
         let description = try #require(descriptionMatches.count == 1 ? descriptionMatches[0] : nil)
         let balance = try #require(balanceMatches.count == 1 ? balanceMatches[0] : nil)
         let mandatoryMaximum = [dr, cr, date, description, balance].max()!
-        var transactions: [IndependentAxisTransaction] = []
+        struct PhysicalRow {
+            let date: String
+            let rowNumber: Int
+            let description: String
+            let sourceDR: Decimal?
+            let sourceCR: Decimal?
+            let balance: Decimal?
+        }
+        var physicalRows: [PhysicalRow] = []
         var directionFailures: [Int] = []
 
         for (offset, line) in lines.dropFirst(headerOffset + 1).enumerated() {
@@ -183,46 +232,54 @@ private struct IndependentAxisCSVOracle {
             let sourceDR = decimal(values[dr])
             let sourceCR = decimal(values[cr])
             let runningBalance = decimal(values[balance])
-            if (sourceDR == nil) == (sourceCR == nil) {
-                directionFailures.append(rowNumber)
+            guard (sourceDR == nil) != (sourceCR == nil) else {
+                throw AxisSourceSemanticOracleError.invalidDirectionOccupancy
             }
-            transactions.append(
-                IndependentAxisTransaction(
+            physicalRows.append(
+                PhysicalRow(
                     date: values[date],
-                    physicalRowNumber: rowNumber,
-                    debit: sourceCR,
-                    credit: sourceDR,
-                    balance: runningBalance,
-                    eventEvidence: eventEvidence(
-                        narration: values[description],
-                        debit: sourceCR,
-                        credit: sourceDR
-                    )
+                    rowNumber: rowNumber,
+                    description: values[description],
+                    sourceDR: sourceDR,
+                    sourceCR: sourceCR,
+                    balance: runningBalance
                 )
             )
         }
 
+        var transactions: [IndependentAxisTransaction] = []
         var reconciliationFailures: [Int] = []
-        for index in transactions.indices.dropFirst() {
-            let previous = transactions[index - 1]
-            let current = transactions[index]
-            guard let previousBalance = previous.balance, let currentBalance = current.balance else {
-                reconciliationFailures.append(index + 1)
+        var priorBalance = independentOpeningBalance
+        for row in physicalRows {
+            guard let currentBalance = row.balance else {
+                reconciliationFailures.append(row.rowNumber)
                 continue
             }
-            let expected = previousBalance - (current.debit ?? 0) + (current.credit ?? 0)
-            if expected != currentBalance {
-                reconciliationFailures.append(index + 1)
-            }
+            let direction = try resolveDirection(
+                sourceDR: row.sourceDR,
+                sourceCR: row.sourceCR,
+                priorBalance: priorBalance,
+                currentBalance: currentBalance
+            )
+            transactions.append(
+                IndependentAxisTransaction(
+                    date: row.date,
+                    physicalRowNumber: row.rowNumber,
+                    debit: direction.debit,
+                    credit: direction.credit,
+                    balance: currentBalance,
+                    eventEvidence: eventEvidence(
+                        narration: row.description,
+                        debit: direction.debit,
+                        credit: direction.credit
+                    )
+                )
+            )
+            priorBalance = currentBalance
         }
 
         let debitTotal = transactions.compactMap(\.debit).reduce(0, +)
         let creditTotal = transactions.compactMap(\.credit).reduce(0, +)
-        let openingBalance = transactions.first.flatMap { transaction -> Decimal? in
-            guard let balance = transaction.balance else { return nil }
-            return balance + (transaction.debit ?? 0) - (transaction.credit ?? 0)
-        }
-
         return IndependentAxisCSVOracle(
             headerDRIndex: dr,
             headerCRIndex: cr,
@@ -231,11 +288,30 @@ private struct IndependentAxisCSVOracle {
             reconciliationFailureRows: reconciliationFailures,
             debitTotal: debitTotal,
             creditTotal: creditTotal,
-            rawDRColumnTotal: creditTotal,
-            rawCRColumnTotal: debitTotal,
-            openingBalance: openingBalance,
+            rawDRColumnTotal: physicalRows.compactMap(\.sourceDR).reduce(0, +),
+            rawCRColumnTotal: physicalRows.compactMap(\.sourceCR).reduce(0, +),
+            openingBalance: independentOpeningBalance,
             closingBalance: transactions.last?.balance
         )
+    }
+
+    static func resolveDirection(
+        sourceDR: Decimal?,
+        sourceCR: Decimal?,
+        priorBalance: Decimal,
+        currentBalance: Decimal
+    ) throws -> (debit: Decimal?, credit: Decimal?) {
+        guard (sourceDR == nil) != (sourceCR == nil) else {
+            throw AxisSourceSemanticOracleError.invalidDirectionOccupancy
+        }
+        let delta = currentBalance - priorBalance
+        if let sourceDR, sourceCR == nil, delta == -sourceDR {
+            return (sourceDR, nil)
+        }
+        if let sourceCR, sourceDR == nil, delta == sourceCR {
+            return (nil, sourceCR)
+        }
+        throw AxisSourceSemanticOracleError.amountOrDirectionContradictsBalanceDelta
     }
 
     private static func cells(in line: String) -> [String] {
@@ -297,6 +373,46 @@ private struct IndependentAxisCSVOracle {
         )
     }
 
+}
+
+private enum AxisSourceSemanticOracleError: Error {
+    case invalidDirectionOccupancy
+    case amountOrDirectionContradictsBalanceDelta
+}
+
+enum AxisSemanticFalsificationCase: CaseIterable {
+    case drWhileBalanceRises
+    case crWhileBalanceFalls
+    case bothPopulated
+    case neitherPopulated
+    case drAmountMismatch
+    case crAmountMismatch
+
+    var sourceDR: Decimal? {
+        switch self {
+        case .drWhileBalanceRises, .drAmountMismatch: return 10
+        case .bothPopulated: return 10
+        case .crWhileBalanceFalls, .crAmountMismatch, .neitherPopulated: return nil
+        }
+    }
+
+    var sourceCR: Decimal? {
+        switch self {
+        case .crWhileBalanceFalls, .crAmountMismatch: return 10
+        case .bothPopulated: return 10
+        case .drWhileBalanceRises, .drAmountMismatch, .neitherPopulated: return nil
+        }
+    }
+
+    var currentBalance: Decimal {
+        switch self {
+        case .drWhileBalanceRises: return 110
+        case .crWhileBalanceFalls: return 90
+        case .bothPopulated, .neitherPopulated: return 100
+        case .drAmountMismatch: return 95
+        case .crAmountMismatch: return 105
+        }
+    }
 }
 
 private struct AxisNREFidelityExpectation: Decodable {

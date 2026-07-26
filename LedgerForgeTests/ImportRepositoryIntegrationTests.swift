@@ -76,7 +76,9 @@ struct ImportRepositoryIntegrationTests {
             #expect(transactions.allSatisfy {
                 $0.rawRows.first?.parserProfileId == AxisBankAccountParser.profileID
             })
-            #expect(transactions.allSatisfy { $0.rawRows.first?.parserProfileVersion == "1" })
+            #expect(transactions.allSatisfy {
+                $0.rawRows.first?.parserProfileVersion == AxisBankAccountParser.profileVersion
+            })
 
             let orderedTransactions = transactions.sorted {
                 if $0.postedDateISO == $1.postedDateISO {
@@ -400,7 +402,9 @@ struct ImportRepositoryIntegrationTests {
         #expect(persistedTransactions.allSatisfy {
             $0.rawRows.first?.parserProfileId == AxisBankAccountParser.profileID
         })
-        #expect(persistedTransactions.allSatisfy { $0.rawRows.first?.parserProfileVersion == "1" })
+        #expect(persistedTransactions.allSatisfy {
+            $0.rawRows.first?.parserProfileVersion == AxisBankAccountParser.profileVersion
+        })
 
         resetRuntimeStoresForImportIntegration()
         let relaunchedProvider = try SQLiteRepositoryProvider(path: dbPath)

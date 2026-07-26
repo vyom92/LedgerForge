@@ -8,7 +8,7 @@
     "xls"
   ],
   "layout_versions": {
-    "csv": "axis.bank-account.csv@1",
+    "csv": "axis.bank-account.csv@2",
     "pdf": "AXIS-NRO-PDF-v1",
     "xls": "AXIS-NRO-XLS-v1"
   },
@@ -22,7 +22,11 @@
     "AXNRO-R2-PDF",
     "AXNRO-R2-XLS"
   ],
-  "source_provenance": { "origin": "institution_supplied", "acquisition": "user_downloaded", "verification": "owner_attested" },
+  "source_provenance": {
+    "origin": "institution_supplied",
+    "acquisition": "user_downloaded",
+    "verification": "owner_attested"
+  },
   "pagination_assertions": {
     "pdf_page_count": 2,
     "repeated_headers_preserved": true
@@ -31,13 +35,18 @@
     "pdf_text_operator_order_preserved": true,
     "statement_end_placement_preserved": true
   },
-  "privacy_assertions": { "uses_fictional_customer_metadata": true, "uses_fictional_account_identifier": true, "contains_no_original_transaction_reference": true, "contains_no_original_counterparty_identity": true, "contains_no_private_mapping": true, "contains_no_private_source_path_or_filename": true },
+  "privacy_assertions": {
+    "uses_fictional_customer_metadata": true,
+    "uses_fictional_account_identifier": true,
+    "contains_no_original_transaction_reference": true,
+    "contains_no_original_counterparty_identity": true,
+    "contains_no_private_mapping": true,
+    "contains_no_private_source_path_or_filename": true
+  },
   "candidate_status": "validated",
   "fixture_class": "source-faithful sanitized fixture",
-  "csv_preamble_reconstruction": "Reconstructed from the user-confirmed shared Axis bank-account CSV layout, aligned with the approved existing Axis grammar, and populated with independently recorded fixture dates and fictional identifiers; not a byte-for-byte restoration of private original text.",
-  "source_direction_contract": "Under axis.bank-account.csv@1 physical DR increases balance and maps to canonical credit, while physical CR decreases balance and maps to canonical debit.",
-  "direction_correction": "Physical column occupancy was corrected from the July 21 header-role regression without changing the independent canonical financial expectation.",
   "cross_format_boundary": "Matching account identity and date range do not establish financial equivalence with every Range 1 source.",
+  "csv_source_direction_contract": "Under axis.bank-account.csv@2 physical DR maps to canonical debit and physical CR maps to canonical credit.",
   "overlap_verification": {
     "csv": {
       "format_pair": "Range 1 CSV to Range 2 CSV",
@@ -70,5 +79,10 @@
       "strict_historical_subset": true
     }
   },
-  "overlap_basis": { "classification": "financial_projection", "compared_fields": ["transaction_date", "debit", "credit", "running_balance", "sol"], "independently_sanitized_fields": ["cheque_or_reference", "particulars"], "textual_equality_required": false }
+  "overlap_basis": {
+    "classification": "financial_projection",
+    "compared_fields": ["transaction_date", "debit", "credit", "running_balance", "sol"],
+    "independently_sanitized_fields": ["cheque_or_reference", "particulars"],
+    "textual_equality_required": false
+  }
 }

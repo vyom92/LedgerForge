@@ -5,14 +5,17 @@ import Testing
 @MainActor
 struct AxisPartialOverlapOracleTests {
 
-    @Test func sanitisedPairMatchesIndependentExpectedOracleAndOverlapShape() throws {
+    @Test func quarantinedPairRemainsInternallyCoherentButCannotAuthorizeProduction() throws {
         let expected = try PartialOverlapExpectation.load()
         let oracles = try expected.statements.map {
-            try IndependentPartialOverlapOracle.load(fileName: $0.fixture)
+            try IndependentPartialOverlapOracle.load(
+                fileName: $0.fixture,
+                independentOpeningBalance: $0.openingBalanceDecimal
+            )
         }
 
         #expect(expected.profileID == "axis.bank-account.csv")
-        #expect(expected.profileVersion == "1")
+        #expect(expected.profileVersion == "2")
         #expect(oracles.map(\.header) == [expected.physicalHeaderOrder, expected.physicalHeaderOrder])
         #expect(Set(oracles.map(\.accountIdentifier)).count == 1)
         #expect(expected.sameAccount)
@@ -67,19 +70,26 @@ struct AxisPartialOverlapOracleTests {
         #expect(expected.sharedEventsFinanciallyAgree)
         #expect(expected.noRepeatedEventWithinStatement)
         #expect(expected.laterStatementContainsOnlySupportedEvents)
+        try IndependentPartialOverlapOracle.validateOverlap(
+            earlier: oracles[0].rows,
+            later: oracles[1].rows
+        )
     }
 
     @Test func productionParserProjectionMatchesIndependentOracle() throws {
         let expected = try PartialOverlapExpectation.load()
 
         for statement in expected.statements {
-            let oracle = try IndependentPartialOverlapOracle.load(fileName: statement.fixture)
+            let oracle = try IndependentPartialOverlapOracle.load(
+                fileName: statement.fixture,
+                independentOpeningBalance: statement.openingBalanceDecimal
+            )
             let parsed = try parseProductionFixture(fileName: statement.fixture)
             let productionRows = parsed.financialDocument.transactions.map {
                 PartialOverlapOracleRow(
                     sourceOrdinal: $0.sourceProvenance[0].sourceOrdinal,
                     transactionDate: Self.dateString($0.statementDate!),
-                    sourceColumn: $0.credit != nil ? "DR" : "CR",
+                    sourceColumn: $0.debit != nil ? "DR" : "CR",
                     rawSourceAmount: $0.credit ?? $0.debit!,
                     canonicalDirection: $0.credit != nil ? "credit" : "debit",
                     signedCanonicalAmount: $0.money.amount,
@@ -99,7 +109,7 @@ struct AxisPartialOverlapOracleTests {
             #expect(parsed.validation.closingBalance == oracle.closingBalance)
             #expect(parsed.financialDocument.transactions.allSatisfy {
                 $0.sourceProvenance[0].parserProfileID == "axis.bank-account.csv" &&
-                $0.sourceProvenance[0].parserProfileVersion == "1"
+                $0.sourceProvenance[0].parserProfileVersion == "2"
             })
         }
     }
@@ -109,10 +119,13 @@ struct AxisPartialOverlapOracleTests {
         AXIS BANK
         Statement of Account No - 930000000000001 for the period (From : 01-01-2026 To : 31-01-2026)
         Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL
-        05-01-2026,,UPI/P2A/100000000001/SYNTHETIC,100.00,,1100.00,001
-        25-01-2026,,UPI/P2M/100000000002/SYNTHETIC,,50.00,1050.00,001
+        05-01-2026,,UPI/P2M/100000000001/SYNTHETIC,100.00,,900.00,001
+        25-01-2026,,UPI/P2A/100000000002/SYNTHETIC,,50.00,950.00,001
         """
-        let oracle = try IndependentPartialOverlapOracle.load(text: text)
+        let oracle = try IndependentPartialOverlapOracle.load(
+            text: text,
+            independentOpeningBalance: 1000
+        )
 
         #expect(oracle.statementStartDate == "01-01-2026")
         #expect(oracle.statementEndDate == "31-01-2026")
@@ -123,7 +136,7 @@ struct AxisPartialOverlapOracleTests {
     @Test func invalidPeriodEvidenceFailsClosed() {
         let validRows = """
         Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL
-        05-01-2026,,UPI/P2A/100000000001/SYNTHETIC,100.00,,1100.00,001
+        05-01-2026,,UPI/P2M/100000000001/SYNTHETIC,100.00,,900.00,001
         """
         let invalidPreambles = [
             "",
@@ -141,9 +154,85 @@ struct AxisPartialOverlapOracleTests {
         for preamble in invalidPreambles {
             #expect(throws: PartialOverlapOracleError.invalidStatementPeriod) {
                 try IndependentPartialOverlapOracle.load(
-                    text: ["AXIS BANK", preamble, validRows].joined(separator: "\n")
+                    text: ["AXIS BANK", preamble, validRows].joined(separator: "\n"),
+                    independentOpeningBalance: 1000
                 )
             }
+        }
+    }
+
+    @Test func quarantinedPairCannotServeAsSourceTruthAcceptance() throws {
+        let data = try Data(contentsOf: FixtureLocator.axisManifest(
+            "axis_bank_partial_overlap.manifest.json"
+        ))
+        let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(json["source_truth_acceptance_eligible"] as? Bool == false)
+        #expect(json["fixture_class"] as? String == "quarantined synthetic architecture regression")
+    }
+
+    @Test func balanceDeltaOracleRejectsEveryContradictoryDirectionShape() {
+        let contradictoryRows = [
+            "05-01-2026,,UPI/P2M/100000000001/SYNTHETIC,100.00,,1100.00,001",
+            "05-01-2026,,UPI/P2A/100000000001/SYNTHETIC,,100.00,900.00,001",
+            "05-01-2026,,UPI/P2M/100000000001/SYNTHETIC,100.00,50.00,950.00,001",
+            "05-01-2026,,UPI/P2M/100000000001/SYNTHETIC,,,1000.00,001",
+            "05-01-2026,,UPI/P2M/100000000001/SYNTHETIC,100.00,,950.00,001"
+        ]
+        for row in contradictoryRows {
+            let text = [
+                "AXIS BANK",
+                "Statement of Account No - 930000000000001 for the period (From : 01-01-2026 To : 31-01-2026)",
+                "Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL",
+                row
+            ].joined(separator: "\n")
+            #expect(throws: PartialOverlapOracleError.self) {
+                _ = try IndependentPartialOverlapOracle.load(
+                    text: text,
+                    independentOpeningBalance: 1000
+                )
+            }
+        }
+
+        let mixedDocument = [
+            "AXIS BANK",
+            "Statement of Account No - 930000000000001 for the period (From : 01-01-2026 To : 31-01-2026)",
+            "Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL",
+            "05-01-2026,,UPI/P2M/100000000001/SYNTHETIC,100.00,,900.00,001",
+            "06-01-2026,,UPI/P2M/100000000002/SYNTHETIC,50.00,,950.00,001"
+        ].joined(separator: "\n")
+        #expect(throws: PartialOverlapOracleError.invalidBalanceSemantics) {
+            _ = try IndependentPartialOverlapOracle.load(
+                text: mixedDocument,
+                independentOpeningBalance: 1000
+            )
+        }
+    }
+
+    @Test func overlapOracleRejectsReorderedAndConflictingEvidence() throws {
+        let expected = try PartialOverlapExpectation.load()
+        let oracles = try expected.statements.map {
+            try IndependentPartialOverlapOracle.load(
+                fileName: $0.fixture,
+                independentOpeningBalance: $0.openingBalanceDecimal
+            )
+        }
+        let validLater = oracles[1].rows
+        let reordered = [validLater.last!] + Array(validLater.dropLast())
+        #expect(throws: PartialOverlapOracleError.invalidOverlapShape) {
+            try IndependentPartialOverlapOracle.validateOverlap(
+                earlier: oracles[0].rows,
+                later: reordered
+            )
+        }
+        var conflicting = validLater
+        conflicting[0] = conflicting[0].replacingSignedAmount(
+            conflicting[0].signedCanonicalAmount - 1
+        )
+        #expect(throws: PartialOverlapOracleError.conflictingOverlapEvidence) {
+            try IndependentPartialOverlapOracle.validateOverlap(
+                earlier: oracles[0].rows,
+                later: conflicting
+            )
         }
     }
 
@@ -199,15 +288,57 @@ private struct IndependentPartialOverlapOracle {
     let completeReconciliation: Bool
     let repeatedEventReferences: Set<String>
 
-    static func load(fileName: String) throws -> Self {
+    static func validateOverlap(
+        earlier: [PartialOverlapOracleRow],
+        later: [PartialOverlapOracleRow]
+    ) throws {
+        let earlierByEvent = Dictionary(uniqueKeysWithValues: earlier.map {
+            ($0.eventReference, $0)
+        })
+        var reachedUniqueSuffix = false
+        var recognizedCount = 0
+        var uniqueCount = 0
+        var seen = Set<String>()
+        for row in later {
+            guard seen.insert(row.eventReference).inserted else {
+                throw PartialOverlapOracleError.invalidOverlapShape
+            }
+            if let existing = earlierByEvent[row.eventReference] {
+                guard !reachedUniqueSuffix else {
+                    throw PartialOverlapOracleError.invalidOverlapShape
+                }
+                guard existing.eventFinancialProjection == row.eventFinancialProjection else {
+                    throw PartialOverlapOracleError.conflictingOverlapEvidence
+                }
+                recognizedCount += 1
+            } else {
+                reachedUniqueSuffix = true
+                uniqueCount += 1
+            }
+        }
+        guard recognizedCount > 0, uniqueCount > 0 else {
+            throw PartialOverlapOracleError.invalidOverlapShape
+        }
+    }
+
+    static func load(
+        fileName: String,
+        independentOpeningBalance: Decimal
+    ) throws -> Self {
         let text = try String(
             contentsOf: FixtureLocator.axisCSV(fileName),
             encoding: .utf8
         )
-        return try load(text: text)
+        return try load(
+            text: text,
+            independentOpeningBalance: independentOpeningBalance
+        )
     }
 
-    static func load(text: String) throws -> Self {
+    static func load(
+        text: String,
+        independentOpeningBalance: Decimal
+    ) throws -> Self {
         let lines = text.components(separatedBy: .newlines)
         let headerOffset = try #require(lines.firstIndex {
             $0.split(separator: ",").map(String.init) == [
@@ -253,6 +384,7 @@ private struct IndependentPartialOverlapOracle {
         }
         let datePattern = try NSRegularExpression(pattern: #"^\d{2}-\d{2}-\d{4}$"#)
         var rows: [PartialOverlapOracleRow] = []
+        var priorBalance = independentOpeningBalance
 
         for (offset, line) in lines.dropFirst(headerOffset + 1).enumerated() {
             let cells = line.split(separator: ",", omittingEmptySubsequences: false)
@@ -267,8 +399,19 @@ private struct IndependentPartialOverlapOracle {
             }
             let sourceColumn = sourceDR != nil ? "DR" : "CR"
             let rawAmount = try #require(sourceDR ?? sourceCR)
-            let canonicalDirection = sourceDR != nil ? "credit" : "debit"
-            let signedAmount = sourceDR != nil ? rawAmount : -rawAmount
+            let runningBalance = try #require(Self.decimal(cells[5]))
+            let delta = runningBalance - priorBalance
+            let canonicalDirection: String
+            let signedAmount: Decimal
+            if let sourceDR, sourceCR == nil, delta == -sourceDR {
+                canonicalDirection = "debit"
+                signedAmount = -sourceDR
+            } else if let sourceCR, sourceDR == nil, delta == sourceCR {
+                canonicalDirection = "credit"
+                signedAmount = sourceCR
+            } else {
+                throw PartialOverlapOracleError.invalidBalanceSemantics
+            }
             let components = cells[2].split(
                 separator: "/",
                 omittingEmptySubsequences: false
@@ -288,23 +431,23 @@ private struct IndependentPartialOverlapOracle {
                     rawSourceAmount: rawAmount,
                     canonicalDirection: canonicalDirection,
                     signedCanonicalAmount: signedAmount,
-                    runningBalance: try #require(Self.decimal(cells[5])),
+                    runningBalance: runningBalance,
                     eventOperation: components[1].lowercased(),
-                    eventSubtype: sourceDR != nil ? "credit-adjustment" : "posting",
+                    eventSubtype: canonicalDirection == "debit" ? "posting" : "credit-adjustment",
                     eventReference: components[2],
                     eventDisposition: ""
                 )
             )
+            priorBalance = runningBalance
         }
 
-        let first = try #require(rows.first)
-        let openingBalance = first.runningBalance - first.signedCanonicalAmount
-        var priorBalance = openingBalance
+        _ = try #require(rows.first)
+        var reconciliationBalance = independentOpeningBalance
         var reconciles = true
         for row in rows {
             reconciles = reconciles &&
-                priorBalance + row.signedCanonicalAmount == row.runningBalance
-            priorBalance = row.runningBalance
+                reconciliationBalance + row.signedCanonicalAmount == row.runningBalance
+            reconciliationBalance = row.runningBalance
         }
         let references = rows.map(\.eventReference)
         let repeatedReferences = Set(references.filter {
@@ -325,7 +468,7 @@ private struct IndependentPartialOverlapOracle {
                 .reduce(0) { $0 + $1.rawSourceAmount },
             canonicalCreditTotal: rows.filter { $0.canonicalDirection == "credit" }
                 .reduce(0) { $0 + $1.rawSourceAmount },
-            openingBalance: openingBalance,
+            openingBalance: independentOpeningBalance,
             closingBalance: try #require(rows.last?.runningBalance),
             completeReconciliation: reconciles,
             repeatedEventReferences: repeatedReferences
@@ -360,8 +503,11 @@ private struct IndependentPartialOverlapOracle {
 
 private enum PartialOverlapOracleError: Error, Equatable {
     case invalidDirectionOccupancy
+    case invalidBalanceSemantics
     case invalidStatementPeriod
     case unsupportedEvent
+    case invalidOverlapShape
+    case conflictingOverlapEvidence
 }
 
 private struct PartialOverlapOracleRow: Equatable {
@@ -409,6 +555,22 @@ private struct PartialOverlapOracleRow: Equatable {
             eventOperation: eventOperation,
             eventSubtype: eventSubtype,
             eventReference: eventReference
+        )
+    }
+
+    func replacingSignedAmount(_ amount: Decimal) -> Self {
+        Self(
+            sourceOrdinal: sourceOrdinal,
+            transactionDate: transactionDate,
+            sourceColumn: sourceColumn,
+            rawSourceAmount: rawSourceAmount,
+            canonicalDirection: canonicalDirection,
+            signedCanonicalAmount: amount,
+            runningBalance: runningBalance,
+            eventOperation: eventOperation,
+            eventSubtype: eventSubtype,
+            eventReference: eventReference,
+            eventDisposition: eventDisposition
         )
     }
 }

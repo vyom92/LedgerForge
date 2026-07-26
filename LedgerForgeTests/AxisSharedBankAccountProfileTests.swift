@@ -12,6 +12,7 @@ struct AxisSharedBankAccountProfileTests {
         let coordinator = persistenceCoordinator(provider)
         let engine = importEngine(provider, coordinator: coordinator)
         let fixtures = [
+            ("axis_bank_nre_private_source_semantics.csv", 4),
             ("axis_bank_nre_account_statement_baseline.csv", 81),
             ("axis_bank_nre_account_statement_overlap.csv", 31),
             ("axis_bank_nro_account_statement_baseline_csv_source_truth.csv", 17),
@@ -376,7 +377,7 @@ struct AxisSharedBankAccountProfileTests {
             preparationProvider,
             coordinator: preparationCoordinator
         ).prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: FixtureLocator.axisCSV("axis_bank_nre_private_source_semantics.csv")
         )
         let mapper = ImportPersistenceMapper(
             workspaceId: workspaceID,
@@ -627,7 +628,10 @@ private struct CleanRoomAxisBankCSVOracle {
         let headerIndex = try #require(lines.firstIndex {
             $0 == "Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL"
         })
-        let transactions = lines.dropFirst(headerIndex + 1).enumerated().compactMap {
+        let expectedData = try Data(contentsOf: FixtureLocator.axisExpected(expected))
+        let expected = try JSONDecoder().decode(CleanRoomAxisExpected.self, from: expectedData)
+        var priorBalance = expected.openingBalance
+        let transactions = try lines.dropFirst(headerIndex + 1).enumerated().compactMap {
             offset, line -> CleanRoomAxisTransaction? in
             let cells = line.split(separator: ",", omittingEmptySubsequences: false)
                 .map { String($0).trimmingCharacters(in: .whitespaces) }
@@ -635,22 +639,37 @@ private struct CleanRoomAxisBankCSVOracle {
                   cells[0].split(separator: "-").count == 3 else {
                 return nil
             }
+            let sourceDR = Decimal(string: cells[3], locale: Locale(identifier: "en_US_POSIX"))
+            let sourceCR = Decimal(string: cells[4], locale: Locale(identifier: "en_US_POSIX"))
+            let runningBalance = try #require(
+                Decimal(string: cells[5], locale: Locale(identifier: "en_US_POSIX"))
+            )
+            let delta = runningBalance - priorBalance
+            let debit: Decimal?
+            let credit: Decimal?
+            if let sourceDR, sourceCR == nil, delta == -sourceDR {
+                debit = sourceDR
+                credit = nil
+            } else if let sourceCR, sourceDR == nil, delta == sourceCR {
+                debit = nil
+                credit = sourceCR
+            } else {
+                throw CleanRoomAxisOracleError.sourceContradictsBalanceDelta
+            }
+            priorBalance = runningBalance
             return CleanRoomAxisTransaction(
                 date: cells[0],
                 description: cells[2],
-                debit: Decimal(string: cells[4], locale: Locale(identifier: "en_US_POSIX")),
-                credit: Decimal(string: cells[3], locale: Locale(identifier: "en_US_POSIX")),
-                balance: Decimal(string: cells[5], locale: Locale(identifier: "en_US_POSIX")),
+                debit: debit,
+                credit: credit,
+                balance: runningBalance,
                 sourceOrdinal: headerIndex + offset + 2
             )
         }
-        let expectedData = try Data(contentsOf: FixtureLocator.axisExpected(expected))
-        let expected = try JSONDecoder().decode(CleanRoomAxisExpected.self, from: expectedData)
         #expect(transactions == expected.transactions)
         let debitTotal = transactions.reduce(Decimal.zero) { $0 + ($1.debit ?? 0) }
         let creditTotal = transactions.reduce(Decimal.zero) { $0 + ($1.credit ?? 0) }
-        let first = try #require(transactions.first)
-        let opening = try #require(first.balance) + (first.debit ?? 0) - (first.credit ?? 0)
+        let opening = expected.openingBalance
         var prior = opening
         var failures: [Int] = []
         for transaction in transactions {
@@ -674,14 +693,20 @@ private struct CleanRoomAxisBankCSVOracle {
 
 private struct CleanRoomAxisExpected: Decodable {
     let transactions: [CleanRoomAxisTransaction]
+    let openingBalance: Decimal
 
     private enum CodingKeys: String, CodingKey {
         case transactions = "canonical_ordered_transactions"
+        case openingBalance = "opening_balance"
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let rows = try container.decode([Row].self, forKey: .transactions)
+        let openingText = try container.decode(String.self, forKey: .openingBalance)
+        openingBalance = try #require(
+            Decimal(string: openingText, locale: Locale(identifier: "en_US_POSIX"))
+        )
         transactions = rows.map {
             CleanRoomAxisTransaction(
                 date: $0.date,
@@ -711,6 +736,10 @@ private struct CleanRoomAxisExpected: Decodable {
             case balance = "running_balance"
         }
     }
+}
+
+private enum CleanRoomAxisOracleError: Error {
+    case sourceContradictsBalanceDelta
 }
 
 private func replacingProfile(

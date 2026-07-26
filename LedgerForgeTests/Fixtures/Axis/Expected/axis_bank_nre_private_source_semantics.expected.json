@@ -1,0 +1,16 @@
+{
+  "fixture_id": "axis-bank-nre-private-source-semantics-v1",
+  "fixture_class": "privacy-safe source-derived semantic regression",
+  "institution": "Axis Bank",
+  "document_family": "NRE bank account statement",
+  "profile_id": "axis.bank-account.csv",
+  "profile_version": "2",
+  "transaction_count": 4,
+  "raw_dr_column_total": "135.00",
+  "raw_cr_column_total": "50.00",
+  "debit_total": "135.00",
+  "credit_total": "50.00",
+  "opening_balance": "1000.00",
+  "closing_balance": "915.00",
+  "validation_result": "expected valid"
+}

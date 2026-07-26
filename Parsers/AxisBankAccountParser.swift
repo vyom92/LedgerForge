@@ -107,19 +107,20 @@ struct AxisBankCSVColumnMapping {
     ]
 }
 
-/// The verified physical-column contract for `axis.bank-account.csv@1`.
+/// The source-faithful physical-column contract for `axis.bank-account.csv@2`.
 ///
-/// Axis's source labels are not canonical financial roles: a populated physical
-/// DR cell is an inflow and a populated physical CR cell is an outflow.
-enum AxisBankAccountCSVProfileV1 {
+/// Available immutable Axis bank-account evidence uses conventional semantics:
+/// a populated physical DR cell is a debit/outflow and a populated physical CR
+/// cell is a credit/inflow. Header resolution remains position-independent.
+enum AxisBankAccountCSVProfileV2 {
     static func resolve(
         sourceDR: Decimal?,
         sourceCR: Decimal?
     ) throws -> DirectionResult {
         try DirectionResolver.resolve(
             strategy: .debitCreditColumns,
-            debit: sourceCR,
-            credit: sourceDR,
+            debit: sourceDR,
+            credit: sourceCR,
             amount: nil,
             direction: nil
         )
@@ -173,7 +174,7 @@ enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
 final class AxisBankAccountParser: StatementParser {
 
     static let profileID = "axis.bank-account.csv"
-    static let profileVersion = "1"
+    static let profileVersion = "2"
 
     var name: String {
         "Axis Bank Account"
@@ -262,7 +263,7 @@ final class AxisBankAccountParser: StatementParser {
             )
             let direction: DirectionResult
             do {
-                direction = try AxisBankAccountCSVProfileV1.resolve(
+                direction = try AxisBankAccountCSVProfileV2.resolve(
                     sourceDR: sourceDR,
                     sourceCR: sourceCR
                 )

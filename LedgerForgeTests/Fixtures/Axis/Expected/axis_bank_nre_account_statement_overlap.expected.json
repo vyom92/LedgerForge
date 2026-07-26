@@ -15,8 +15,8 @@
   "closing_balance": "0.00",
   "debit_total": "2068503.39",
   "credit_total": "2024747.00",
-  "raw_dr_column_total": "2024747.00",
-  "raw_cr_column_total": "2068503.39",
+  "raw_dr_column_total": "2068503.39",
+  "raw_cr_column_total": "2024747.00",
   "computed_final_balance": "0.00",
   "validation_result": "expected valid",
   "verified_account_identifier": {
@@ -87,10 +87,10 @@
   },
   "notes": [
     "This fixture is a deterministic privacy-safe derivative of a genuine independent overlapping Axis Bank export.",
-    "Physical DR values increase balance and therefore become canonical credits; physical CR values decrease balance and therefore become canonical debits under axis.bank-account.csv@1.",
-    "The July 21 header-role rewrite contradicted the source-backed running-balance evidence; this correction restores the independently reconciling physical occupancy without changing canonical financial truth.",
-    "Shared rows retain identical privacy-safe financial projections; the one later-only row uses a new fictional instrument and narration.",
+    "The approved 81-row baseline and this overlap fixture were corrected together so debit values occupy DR and credit values occupy CR.",
+    "Shared rows retain identical corrected privacy-safe financial projections; the one later-only row uses a new fictional instrument and narration.",
     "The original source evidence proves one UPI token reused by a posting and credit-adjustment pair; the privacy-safe fixtures intentionally retain that relationship symbolically without recreating the original token.",
+    "The sanitized CSV checksum intentionally changed when the verified DR/CR source-fidelity defect was corrected.",
     "ADR-031 accepts only account-scoped Axis UPI evidence with deterministic posting versus credit-adjustment subtype separation."
   ]
 }

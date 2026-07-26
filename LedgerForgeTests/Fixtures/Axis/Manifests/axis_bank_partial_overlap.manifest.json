@@ -1,18 +1,18 @@
 {
   "fixture_id": "axis-bank-partial-overlap-v1",
-  "fixture_class": "reviewed privacy-safe source-faithful derivative",
+  "fixture_class": "quarantined synthetic architecture regression",
   "institution": "Axis Bank",
   "family": "narrow bank-account CSV partial-overlap evidence",
   "source_formats": [
     "csv"
   ],
   "layout_versions": {
-    "csv": "axis.bank-account.csv@1"
+    "csv": "axis.bank-account.csv@2"
   },
   "source_provenance": {
-    "origin": "two institution-supplied overlapping statements",
-    "acquisition": "user_downloaded",
-    "verification": "independent exact-decimal balance and event-family analysis outside production code"
+    "origin": "unverified legacy derivative",
+    "acquisition": "unknown",
+    "verification": "no immutable source lineage available"
   },
   "privacy_assertions": {
     "uses_fictional_customer_metadata": true,
@@ -23,7 +23,7 @@
     "contains_no_private_mapping": true,
     "contains_no_private_source_path_or_filename": true
   },
-  "source_direction_contract": "Physical DR increases balance and maps to canonical credit; physical CR decreases balance and maps to canonical debit.",
+  "source_direction_contract": "Physical DR decreases balance and maps to canonical debit; physical CR increases balance and maps to canonical credit.",
   "sanitisation_method": "A coherent fictional opening balance and transformed row amounts preserve exact running-balance arithmetic, source occupancy, order, same-day order, event subtype relationships and the three-shared/one-later-only overlap shape. No reversible substitution map exists.",
   "overlap_verification": {
     "same_account": true,
@@ -34,5 +34,6 @@
     "shared_financial_projection_agreement": true,
     "later_statement_contains_only_supported_event_rows": true
   },
-  "scope_boundary": "This fixture closes independent evidence for the narrow partial-overlap family only. It does not authorize row omission, partial persistence, new durable outcomes, schema changes or review UI."
+  "source_truth_acceptance_eligible": false,
+  "scope_boundary": "This pair may exercise arithmetic and legacy architecture only. It cannot authorize production reviewed-partial import because its immutable source lineage is unavailable."
 }

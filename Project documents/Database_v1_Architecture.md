@@ -2,11 +2,11 @@
 
 # LedgerForge — Database v1 Architecture
 
-**Status:** Frozen database-design baseline, status-aligned through ADR-039 and verified Sprint 53 implementation  
-**Status alignment reviewed:** 2026-07-24  
-**Repository ref reviewed:** `main@686e3b91bfbf9459a38e9137abee6a2588ecec7f`  
-**Latest verified implementation:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` — Sprint 53  
-**Current registered migration:** V6  
+**Status:** Frozen database-design baseline, status-aligned through ADR-040, Migration V8 and the Axis source-truth restoration
+**Status alignment reviewed:** 2026-07-26
+**Repository ref reviewed:** the Git-authoritative Axis source-truth restoration commit containing this update
+**Latest verified implementation:** P0 Axis Bank Source-Truth Restoration after Sprint 57
+**Current registered migration:** V8
 **Production database:** SQLite behind repository and provider boundaries
 
 ## Document Role
@@ -40,10 +40,10 @@ Current implementation state belongs in `PROJECT_STATE.md`. Unscheduled work bel
 
 ## 1.1 Verified production import
 
-Production import support is limited to the approved shared Axis bank-account CSV grammar represented by:
+Production import support is limited to the verified shared Axis bank-account CSV grammar represented by:
 
-- the approved Axis Bank NRE CSV evidence;
-- the supplied shared-layout Axis Bank NRO CSV evidence.
+- the privacy-safe source-derived Axis Bank NRE semantic evidence;
+- the verified clean-room Axis Bank NRO CSV transaction evidence.
 
 Both use one production `AxisBankAccountParser`.
 
@@ -51,7 +51,7 @@ New supported imports emit:
 
 ```text
 axis.bank-account.csv
-version 1
+version 2
 ```
 
 Historical durable provenance using:
@@ -61,13 +61,13 @@ axis.nre.csv
 version 1
 ```
 
-remains readable and is not rewritten merely to adopt the neutral forward profile.
+remains readable and is not rewritten merely to adopt the neutral forward profile. Historical `axis.bank-account.csv@1` provenance is also read unchanged and is separately subject to integrity discovery.
 
 No broader Axis, PDF, XLS, XLSX, card, HDFC, CBQ, American Express or other institution support is established by this database design.
 
 ## 1.2 Current migration and accepted architecture
 
-The active registered migration chain ends at V6.
+The active registered migration chain ends at V8. V7 adds reviewed-partial summaries, dispositions and attempt counts; V8 adds categories and current transaction-category assignments. The Axis source-truth restoration adds no migration and creates no historical backfill.
 
 The current database architecture includes verified implementation of:
 
@@ -83,12 +83,13 @@ The current database architecture includes verified implementation of:
 - parser-profile provenance;
 - fail-closed migration-chain verification;
 - canonical repository-to-runtime hydration;
+- strict historical readback of V7 partial-import provenance while new provenance-less mixed overlap is unsupported;
+- V8 workspace-owned categories and separate current transaction-category assignments;
 - SQLite and In-Memory parity within accepted boundaries.
 
 Accepted but unimplemented database architecture includes:
 
 - document-scoped card-statement evidence under ADR-034;
-- categories and current transaction-category assignment under ADR-036;
 - financial-mutation planning, authorization and family-specific audit under ADR-037.
 
 Acceptance does not create tables, migrations or production behavior.
@@ -1037,7 +1038,7 @@ Fixture integration alone does not authorize database change.
 
 # 12. Category Architecture
 
-ADR-036 accepts a future category domain.
+ADR-036 governs the implemented category domain added by Migration V8.
 
 The initial accepted direction requires:
 
@@ -1053,9 +1054,7 @@ The initial accepted direction requires:
 
 Category operations must not modify trusted transaction rows.
 
-No category table, assignment table, V7 migration or production UI is implemented by the current V6 state.
-
-The expected migration number may be V7, but implementation remains separately authorized.
+Migration V8 implements workspace-owned category definitions and one separate optional current assignment for each trusted transaction. Settings and transaction-detail UI provide the bounded manual operations recorded in `PROJECT_STATE.md`; automatic classification, hierarchy, rules and bulk behavior remain outside the implemented boundary.
 
 ---
 
@@ -1597,15 +1596,7 @@ Before spreadsheet support, approve:
 
 ## 28.3 Categories
 
-Before V7, approve the final bounded implementation plan for:
-
-- category table;
-- assignment table;
-- constraints;
-- migration;
-- repository parity;
-- hydration;
-- UI behavior.
+Migration V8 implements the bounded flat manual category slice. Future category hierarchy, automatic rules, provenance/precedence for rule-produced assignments, bulk operations and richer recovery semantics require separate approval and must not rewrite trusted transaction rows.
 
 ## 28.4 Card persistence
 

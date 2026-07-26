@@ -24,7 +24,7 @@ struct AxisRecognizedSourceEvidenceTests {
         Statement of Account No - 930000000000001 for the period (From : 01-01-2026 To : 01-01-2026)
         Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL
 
-        01-01-2026,-,Opening credit,100.00,,100.00,4437
+        01-01-2026,-,Opening credit,,100.00,100.00,4437
 
         Unless the constituent reports a discrepancy this statement will be treated as correct.
         ,,,,,100.00,
@@ -39,7 +39,7 @@ struct AxisRecognizedSourceEvidenceTests {
 
     @Test func validSingleRowStatementRemainsSupported() throws {
         let parsed = try parse(rows: [
-            ["01-01-2026", "-", "Opening credit", "100.00", "", "100.00", "4437"]
+            ["01-01-2026", "-", "Opening credit", "", "100.00", "100.00", "4437"]
         ])
 
         #expect(parsed.transactions.count == 1)
@@ -48,7 +48,7 @@ struct AxisRecognizedSourceEvidenceTests {
 
     @Test func populatedZeroDebitRemainsARecognizedTransaction() throws {
         let parsed = try parse(rows: [
-            ["01-01-2026", "-", "Zero-value debit", "", "0.00", "100.00", "4437"]
+            ["01-01-2026", "-", "Zero-value debit", "0.00", "", "100.00", "4437"]
         ])
 
         #expect(parsed.transactions.count == 1)

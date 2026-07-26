@@ -1,0 +1,30 @@
+{
+  "fixture_id": "axis-bank-nre-private-source-semantics-v1",
+  "fixture_class": "privacy-safe source-derived semantic regression",
+  "institution": "Axis Bank",
+  "family": "NRE bank account statement",
+  "source_formats": [
+    "csv"
+  ],
+  "layout_versions": {
+    "csv": "axis.bank-account.csv@2"
+  },
+  "source_provenance": {
+    "origin": "institution_supplied private NRE source family",
+    "acquisition": "user_downloaded",
+    "verification": "94 observable row-to-row balance deltas across two read-only originals"
+  },
+  "privacy_assertions": {
+    "uses_fictional_customer_metadata": true,
+    "uses_fictional_account_identifier": true,
+    "contains_no_original_transaction_reference": true,
+    "contains_no_original_counterparty_identity": true,
+    "contains_no_original_financial_value": true,
+    "contains_no_private_mapping": true,
+    "contains_no_private_source_path_or_filename": true
+  },
+  "source_direction_contract": "Physical DR decreases balance and maps to canonical debit; physical CR increases balance and maps to canonical credit.",
+  "source_truth_acceptance_eligible": true,
+  "sanitisation_method": "A non-reversible fictional balance path preserves the observed Axis CSV header grammar, physical DR/CR occupancy classes, source ordering, exact two-decimal INR scale and both UPI and non-UPI row families. No original identifier, reference, narration, date or financial value is retained.",
+  "source_truth_boundary": "This derivative establishes NRE layout and conventional DR/CR semantics only. Full private originals remain local read-only evidence and are verified separately outside the test bundle."
+}
