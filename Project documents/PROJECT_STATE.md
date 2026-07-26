@@ -21,7 +21,8 @@
 - **Sprint 56 persistence:** Migration V7, immutable reviewed-plan digests, SQLite/In-Memory provider parity, complete source preservation, typed row dispositions, explicit attempt counts and strict hydration/relaunch reconstruction are implemented
 - **Sprint 56 exclusions:** unsupported institutions, profiles, currencies, event families, interleaved overlap, arbitrary omission, fuzzy candidates, ownership override and historical repair remain unavailable
 - **Protected local recovery evidence:** an existing canonical Debug V5 database remains unresolved local-only recovery evidence; Sprint 56 neither opened nor migrated it, and no private contents are recorded here
-- **Latest recorded automated result:** 411 tests across 50 suites, 0 failures and 0 unexpected skips in each of three consecutive exact signed canonical default-parallel TestPlan runs at Sprint 56 acceptance closure
+- **Latest recorded automated result:** 425 tests across 50 suites, 0 failures and 0 unexpected skips in each of three consecutive exact signed canonical default-parallel TestPlan runs at Sprint 56 acceptance closure
+- **Latest focused Sprint 56 result:** 150 tests across 14 suites covering the independent overlap oracle, reviewed-plan eligibility and staleness, provider parity, atomicity, contention, rollback, migrations, hydration, persistence isolation and bounded presentation, all with 0 failures and 0 unexpected skips
 - **Latest recorded build and analysis result:** signed Debug build, explicit optimized Release build, Debug analysis and Release analysis all passed at Sprint 56 acceptance closure
 - **Previous Sprint 55 automated result:** 409 top-level tests across 49 suites, 0 failures and 0 unexpected skips in each of three consecutive exact canonical default-parallel TestPlan runs
 - **Latest focused Sprint 55 results:** 41 Axis direction, fixture-oracle and confirmation-gate tests across 5 suites plus 64 adjacent event, validation, repository, atomicity and hydration tests across 6 suites, all with 0 failures and 0 unexpected skips
@@ -29,6 +30,9 @@
 - **Sprint 55 overlap-period oracle:** the independent partial-overlap oracle now parses the declared start and end dates from the exact Axis CSV preamble, fails closed on malformed, missing, duplicated or conflicting period evidence and verifies that statement periods may extend beyond first/last transaction dates; the approved sanitized overlap fixture amounts, directions, event references and dispositions are unchanged
 - **Previous Sprint 55 build result:** Debug and explicit `-O` whole-module Release builds passed
 - **Generic UI-test state:** `LedgerForgeUITests` remains intentionally disabled
+- **Sprint 56 test-host isolation:** `TestPlan.xctestplan` explicitly marks the app-hosted test process with `LEDGERFORGE_TEST_HOST=1`; `LedgerForgeApp` selects intentional test memory for that exact marker before resolving any default SQLite path, while unmarked Debug and Release launches retain normal persistence bootstrap
+- **Sprint 56 acceptance correction:** strict hydration now cross-checks each partial session against exactly one committed partial attempt and its document, transaction, source, imported, recognized and blocked counts before replacing any runtime store
+- **Sprint 56 runtime verification:** no canonical application launch was used; acceptance uses signed app-hosted tests with isolated providers and source/presentation verification
 - **Sprint 55 runtime verification:** no manual runtime path was required because this correction changes parser financial truth and repository test evidence only; pipeline coverage verifies contradictory future source semantics are rejected before accepted persistence with unchanged runtime financial stores
 
 GitHub establishes pushed repository state only. It does not establish local worktree cleanliness, linked worktrees, local branches, stashes, staged or unstaged changes, untracked files or unpushed commits.
@@ -134,7 +138,7 @@ Production publishes a SQLite repository only after:
 - pending migrations execute successfully;
 - the final migration chain revalidates.
 
-The active chain ends at V6.
+The active chain ends at V7. Migration V7 adds explicit partial-attempt counts, durable partial-import summaries and one typed incoming-row disposition per normalized source row for ADR-040.
 
 Open, initialization, migration-integrity or migration-execution failure installs centrally rejecting unavailable repositories rather than silently substituting an in-memory repository.
 
@@ -184,11 +188,9 @@ Exact-content re-import records a bounded duplicate attempt without creating ano
 
 Bounded parser-verified Axis UPI transaction-event ownership uses ADR-031.
 
-A supported overlap blocks the complete incoming statement. LedgerForge does not silently omit overlapping transactions. Explicit partial-overlap import remains future work.
+Supported overlap remains whole-statement blocked except for ADR-040's prospective `axis.bank-account.csv@1`, bank-account, INR family. That exception requires one authoritatively selected existing account, parser-owned declared-period evidence, supported Axis UPI event evidence on every row, a contiguous recognized prefix, a later unique suffix, complete reconciliation, explicit review and provider-owned atomic revalidation. Ordinary no-overlap statements remain full imports; full supported overlap remains blocked; exact-content duplicates remain ADR-030 outcomes.
 
-A privacy-safe source-faithful fixture pair now independently establishes the narrow Axis UPI partial-overlap family with exactly three shared supported events and one later-only supported event. This closes the source-oracle prerequisite only; no partial persistence plan, review state, durable outcome, schema or UI exists.
-
-Sprint 55 acceptance closure changed only test isolation, test-owned oracle verification and this repository-state record. It made no production financial, persistence, schema, migration, UI or ADR change. Partial-overlap importing remains unauthorized.
+The privacy-safe source-faithful fixture pair independently establishes the bounded family with three recognized prefix events and one later-only event. Migration V7, immutable reviewed plans, SQLite/In-Memory commit paths, durable partial summaries and dispositions, strict hydration and bounded UI presentation implement only that family. Interleaved overlap, unsupported event families, arbitrary omission, fuzzy matching and historical repair remain unavailable.
 
 Unsupported event families remain unevaluated, including:
 
@@ -258,7 +260,7 @@ Settings retains:
 - durable Completed Imports truth;
 - bundle-derived version/build presentation.
 
-`Completed Imports` counts hydrated durable attempts that are committed `successful_import` outcomes with both an import session and a document. Duplicate, failed, rejected and cancelled attempts do not increment it. Non-durable or unavailable persistence displays `Unavailable`.
+`Completed Imports` counts unique hydrated durable sessions represented by committed `successful_import` or `partial_import_committed` attempts with both an import session and a document. Partial sessions are also counted separately as a subset. Duplicate, repeated, failed, rejected and cancelled attempts do not increment either count. Non-durable or unavailable persistence displays `Unavailable`.
 
 ### Development database lifecycle
 
@@ -696,7 +698,7 @@ Detailed implementation history remains in Git and accepted ADRs.
 - Fixture-backed HDFC, CBQ and card families are eligible for targeted discovery but remain blocked from implementation by their selected source-format and domain contracts.
 - `FW-P1-18 — Binary-Document Fingerprint Semantics` is ready for Chat architecture planning.
 - `FW-P1-10 — Production PDF Statement Support` remains blocked until the `FW-P1-18` authority is approved.
-- `FW-P2-20 — Category Model and Management` remains ready for planning with an expected additive V7 migration, subject to its UI supplement and current-baseline execution planning.
+- `FW-P2-20 — Category Model and Management` remains ready for planning with an expected additive V8 migration from the V7/ADR-040 provenance baseline, subject to its UI supplement and current-baseline execution planning.
 - `FW-P1-37` and `FW-P1-40` remain ready for planning as one possible bounded DEBUG-only import-verification outcome.
 - Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
 - `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.

@@ -165,6 +165,10 @@ final class RepositoryStoreHydrator {
         )
         let importSessions = try referencedImportSessions(from: transactionDTOs)
         let importAttempts = try importSessionRepo.importAttempts(workspaceId: workspaceId).map(RepositoryImportAttempt.init)
+        try Self.validatePartialAttemptConsistency(
+            sessions: importSessions,
+            attempts: importAttempts
+        )
         let transactions = try transactionDTOs.map {
             try Self.transaction(from: $0, accounts: accountDTOs)
         }
@@ -198,6 +202,34 @@ final class RepositoryStoreHydrator {
         }
         let attempts = try importSessionRepo.importAttempts(workspaceId: workspaceId).map(RepositoryImportAttempt.init)
         importAttemptStore.replaceAttempts(attempts)
+    }
+
+    private static func validatePartialAttemptConsistency(
+        sessions: [RepositoryImportSession],
+        attempts: [RepositoryImportAttempt]
+    ) throws {
+        let partialSessions = sessions.filter { $0.partialImportSummary != nil }
+        let partialAttempts = attempts.filter {
+            $0.outcomeCode == ImportAttemptOutcome.partialImportCommitted.rawValue &&
+            $0.persistenceCode == ImportAttemptPersistence.committed.rawValue
+        }
+        guard partialAttempts.count == partialSessions.count else {
+            throw RepositoryStoreHydrationError.invalidPartialImport("attempt counts disagree")
+        }
+        for session in partialSessions {
+            guard let summary = session.partialImportSummary else { continue }
+            let matching = partialAttempts.filter { $0.importSessionId == session.id }
+            guard matching.count == 1,
+                  let attempt = matching.first,
+                  attempt.documentId == summary.documentId,
+                  attempt.transactionCount == summary.importedTransactionCount,
+                  attempt.sourceRowCount == summary.sourceRowCount,
+                  attempt.importedTransactionCount == summary.importedTransactionCount,
+                  attempt.recognizedExistingRowCount == summary.recognizedExistingRowCount,
+                  attempt.blockedRowCount == summary.blockedRowCount else {
+                throw RepositoryStoreHydrationError.invalidPartialImport("attempt counts disagree")
+            }
+        }
     }
 
     private func referencedImportSessions(from transactions: [TransactionDTO]) throws -> [RepositoryImportSession] {

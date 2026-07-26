@@ -48,6 +48,29 @@ struct SettingsPresentationTests {
         #expect(relaunchEquivalent == .available(1))
     }
 
+    @Test func completedImportsCountsUniqueFullAndPartialSessionsWithSeparatePartialSubset() {
+        let attempts = [
+            attempt(id: "full", outcome: .successfulImport),
+            attempt(id: "partial", outcome: .partialImportCommitted),
+            attempt(id: "partial-repeat", outcome: .partialImportCommitted, sessionID: "session-partial"),
+            attempt(id: "duplicate", outcome: .exactStatementDuplicate),
+            attempt(id: "failed", outcome: .persistenceFailure)
+        ]
+
+        #expect(
+            SettingsPresentation.completedImports(
+                from: attempts,
+                persistenceState: .verifiedSQLite
+            ) == .available(2, partialCount: 1)
+        )
+        #expect(
+            SettingsPresentation.completedImports(
+                from: attempts,
+                persistenceState: .intentionalNonDurable(.testMemory)
+            ) == .unavailable
+        )
+    }
+
     @Test func completedImportsReportsUnavailableWhenDurableHistoryCannotBeRead() {
         #expect(
             SettingsPresentation.completedImports(
@@ -73,7 +96,11 @@ struct SettingsPresentationTests {
     }
 }
 
-private func attempt(id: String, outcome: ImportAttemptOutcome) -> RepositoryImportAttempt {
+private func attempt(
+    id: String,
+    outcome: ImportAttemptOutcome,
+    sessionID: String? = nil
+) -> RepositoryImportAttempt {
     RepositoryImportAttempt(
         ImportAttemptDTO(
             id: id,
@@ -85,7 +112,7 @@ private func attempt(id: String, outcome: ImportAttemptOutcome) -> RepositoryImp
             guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
             persistenceCode: ImportAttemptPersistence.committed.rawValue,
             transactionCount: 1,
-            importSessionId: "session-\(id)",
+            importSessionId: sessionID ?? "session-\(id)",
             documentId: "document-\(id)"
         )
     )

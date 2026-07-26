@@ -25,9 +25,9 @@ When reading this file:
 4. use `PROJECT_STATE.md` for verified implementation reality;
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
-**Status alignment date:** 2026-07-24  
-**Repository ref reviewed:** `main@686e3b91bfbf9459a38e9137abee6a2588ecec7f`  
-**Latest verified implementation:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` — Sprint 53  
+**Status alignment date:** 2026-07-26
+**Repository ref reviewed:** `main@20833ff260ed9ca069d7d78bb288ac25d299b454`
+**Latest verified implementation:** Sprint 56 — Explicit Reviewed Partial-Overlap Import; the exact closure SHA is Git-authoritative and recorded in the completion report
 **Latest accepted ADR:** ADR-040
 **Current migration:** V7
 
@@ -4707,6 +4707,3 @@ ADR-030 exact-content fingerprint authority is unchanged.
 ## Exclusions
 
 This decision does not authorize historical repair, arbitrary row selection, ownership override, fuzzy matching, unsupported event families, cross-format identity, deletion/reversal, batch import or generic mutation infrastructure. All other overlap remains whole-statement blocked.
-- Recorded ADR-036's satisfied durable-transaction-ID prerequisite and expected V7 direction.
-- Preserved current production support as the approved shared Axis bank-account CSV grammar only.
-- Authorized no implementation, migration or new ADR.

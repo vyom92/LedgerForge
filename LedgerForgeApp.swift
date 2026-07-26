@@ -63,7 +63,11 @@ struct LedgerForgeApp: App {
     static func usesIsolatedTestPersistence(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
+#if DEBUG
         environment["LEDGERFORGE_TEST_HOST"] == "1"
+#else
+        false
+#endif
     }
 
 #if DEBUG

@@ -45,6 +45,117 @@ struct MigrationChainIntegrityTests {
         #expect(allMigrations.map(\.checksum) == allMigrations.map(\.checksum))
     }
 
+    @Test func cleanInstallContainsCompleteV7SchemaAndReopens() throws {
+        try withTemporaryDatabase(named: "V7CleanInstall") { path in
+            let provider = try SQLiteRepositoryProvider(path: path)
+            let objects = try provider.database.query(
+                sql: "SELECT type, name FROM sqlite_master WHERE name IN ('partial_import_summaries', 'incoming_row_dispositions', 'validate_incoming_row_disposition', 'validate_partial_import_summary') ORDER BY name;",
+                params: []
+            ) { row in
+                "\(row.string(at: 0) ?? ""):\(row.string(at: 1) ?? "")"
+            }
+            #expect(Set(objects) == Set([
+                "table:partial_import_summaries",
+                "table:incoming_row_dispositions",
+                "trigger:validate_incoming_row_disposition",
+                "trigger:validate_partial_import_summary"
+            ]))
+            let attemptColumns = try provider.database.query(
+                sql: "PRAGMA table_info(import_attempts);",
+                params: []
+            ) { $0.string(at: 1) ?? "" }
+            for column in [
+                "source_row_count",
+                "imported_transaction_count",
+                "recognized_existing_row_count",
+                "blocked_row_count"
+            ] {
+                #expect(attemptColumns.contains(column))
+            }
+            let dispositionIndexes = try provider.database.query(
+                sql: "PRAGMA index_list(incoming_row_dispositions);",
+                params: []
+            ) { $0.string(at: 1) ?? "" }
+            #expect(dispositionIndexes.count >= 3)
+            provider.database.close()
+
+            let reopened = try SQLiteRepositoryProvider(path: path)
+            defer { reopened.database.close() }
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM schema_migrations;") == 7)
+        }
+    }
+
+    @Test func populatedV6FullImportUpgradesToV7WithoutInventingPartialTruth() throws {
+        try withTemporaryDatabase(named: "V6ToV7") { path in
+            let database = SQLiteDatabase(path: path)
+            try database.runMigrations(Array(allMigrations.prefix(6)))
+            try database.execute(sql: """
+            INSERT INTO workspaces(id,name,created_at) VALUES('w','Workspace','2026-07-20T00:00:00Z');
+            INSERT INTO accounts(id,workspace_id,name,native_currency,created_at) VALUES('a','w','Account','INR','2026-07-20T00:00:00Z');
+            INSERT INTO import_sessions(id,workspace_id,user_visible_name,started_at,completed_at,validation_status,created_at,parser_version)
+              VALUES('s','w','Sanitized statement','2026-07-20T00:00:00Z','2026-07-20T00:00:01Z','passed','2026-07-20T00:00:00Z','AxisBankAccountParser');
+            INSERT INTO documents(id,workspace_id,import_session_id,filename,mime_type,size_bytes,sha256,created_at)
+              VALUES('d','w','s','sanitized.csv','text/csv',1,'source-sha','2026-07-20T00:00:00Z');
+            INSERT INTO normalized_documents(id,import_session_id,document_id,normalized_json,created_at,profile_id,profile_version)
+              VALUES('nd','s','d','{}','2026-07-20T00:00:00Z','axis.bank-account.csv','1');
+            INSERT INTO normalized_rows(id,normalized_document_id,row_index,row_original,created_at,record_digest)
+              VALUES('nr','nd',1,'sanitized','2026-07-20T00:00:00Z','row-digest');
+            INSERT INTO transactions(id,workspace_id,account_id,import_session_id,document_id,posted_date,native_currency,amount_minor,amount_decimal,direction,running_balance_minor,is_trusted,trusted_at,created_at,financial_date_role,statement_timezone_evidence)
+              VALUES('t','w','a','s','d','2026-07-20','INR',100,'1.00','credit',100,1,'2026-07-20T00:00:01Z','2026-07-20T00:00:00Z','transaction_date','iana:Asia/Kolkata');
+            INSERT INTO transaction_raw_rows(id,transaction_id,normalized_row_id,contribution_type,created_at)
+              VALUES('trr','t','nr','financial','2026-07-20T00:00:00Z');
+            INSERT INTO import_attempts(id,workspace_id,created_at,outcome_code,coverage_code,account_decision_code,guidance_code,persistence_code,transaction_count,account_id,import_session_id,document_id)
+              VALUES('attempt','w','2026-07-20T00:00:01Z','successful_import','evaluated_supported_only','resolved_or_created','import_completed','committed',1,'a','s','d');
+            """)
+            let transactionBefore = try database.query(
+                sql: "SELECT id, amount_minor, amount_decimal, direction, running_balance_minor FROM transactions;",
+                params: []
+            ) { row in
+                "\(row.string(at: 0) ?? "")|\(row.int64(at: 1) ?? 0)|\(row.string(at: 2) ?? "")|\(row.string(at: 3) ?? "")|\(row.int64(at: 4) ?? 0)"
+            }
+            try database.runMigrations(allMigrations)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM partial_import_summaries;") == 0)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM incoming_row_dispositions;") == 0)
+            let nullableCounts = try database.query(
+                sql: "SELECT source_row_count, imported_transaction_count, recognized_existing_row_count, blocked_row_count FROM import_attempts WHERE id = 'attempt';",
+                params: []
+            ) { row in
+                [row.int64(at: 0), row.int64(at: 1), row.int64(at: 2), row.int64(at: 3)]
+            }
+            #expect(nullableCounts == [[nil, nil, nil, nil]])
+            let transactionAfter = try database.query(
+                sql: "SELECT id, amount_minor, amount_decimal, direction, running_balance_minor FROM transactions;",
+                params: []
+            ) { row in
+                "\(row.string(at: 0) ?? "")|\(row.int64(at: 1) ?? 0)|\(row.string(at: 2) ?? "")|\(row.string(at: 3) ?? "")|\(row.int64(at: 4) ?? 0)"
+            }
+            #expect(transactionAfter == transactionBefore)
+            database.close()
+
+            let reopened = try SQLiteRepositoryProvider(path: path)
+            defer { reopened.database.close() }
+            let accountStore = AccountStore()
+            let transactionStore = TransactionStore()
+            let sessionStore = ImportSessionStore()
+            let attemptStore = ImportAttemptStore()
+            let hydration = try RepositoryStoreHydrator(
+                accountRepo: reopened.accountRepo,
+                importSessionRepo: reopened.importSessionRepo,
+                transactionRepo: reopened.transactionRepo,
+                accountStore: accountStore,
+                transactionStore: transactionStore,
+                importSessionStore: sessionStore,
+                importAttemptStore: attemptStore,
+                workspaceId: "w",
+                persistenceState: .verifiedSQLite
+            ).hydrateIfNeeded(forceRefresh: true)
+            #expect(hydration.transactionCount == 1)
+            #expect(hydration.importSessionCount == 1)
+            #expect(hydration.importAttemptCount == 1)
+            #expect(sessionStore.importSessions.first?.partialImportSummary == nil)
+        }
+    }
+
     @Test func persistedHistoryRejectsDuplicateVersion() {
         let records = [record(for: migrationV1), record(for: migrationV1)]
 
