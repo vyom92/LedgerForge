@@ -219,70 +219,70 @@ struct DurableImportAttemptPresentation: Equatable {
         case .exactStatementDuplicate:
             return DurableImportPresentationValue(
                 label: "Previously imported",
-                explanation: "The exact statement was already imported. No new data was written",
+                explanation: "The exact statement was already imported. No new financial history was written",
                 iconName: "doc.on.doc.fill",
                 tone: .warning
             )
         case .existingEligibleAxisUPIEvent:
             return DurableImportPresentationValue(
                 label: "Supported transaction event blocked",
-                explanation: "A supported transaction event already exists. No new data was written",
+                explanation: "A supported transaction event already exists. No new financial history was written",
                 iconName: "exclamationmark.triangle.fill",
                 tone: .warning
             )
         case .repeatedEligibleIncomingEvidence:
             return DurableImportPresentationValue(
                 label: "Repeated incoming evidence",
-                explanation: "Supported transaction evidence repeats within this import. No new data was written",
+                explanation: "Supported transaction evidence repeats within this import. No new financial history was written",
                 iconName: "exclamationmark.triangle.fill",
                 tone: .warning
             )
         case .transactionEventOwnershipConflict:
             return DurableImportPresentationValue(
                 label: "Transaction-event ownership conflict",
-                explanation: "Supported transaction-event ownership conflicts. No new data was written",
+                explanation: "Supported transaction-event ownership conflicts. No new financial history was written",
                 iconName: "exclamationmark.triangle.fill",
                 tone: .warning
             )
         case .repositoryIntegrityConflict:
             return DurableImportPresentationValue(
                 label: "Repository integrity conflict",
-                explanation: "Repository integrity prevented confirmation. No new data was written",
+                explanation: "Repository integrity prevented confirmation. No new financial history was written",
                 iconName: "exclamationmark.triangle.fill",
                 tone: .warning
             )
         case .identityAmbiguity:
             return DurableImportPresentationValue(
                 label: "Account identity ambiguous",
-                explanation: "Account identity could not be resolved unambiguously. No new data was written",
+                explanation: "Account identity could not be resolved unambiguously. No new financial history was written",
                 iconName: "person.crop.circle.badge.questionmark",
                 tone: .warning
             )
         case .identityConflict:
             return DurableImportPresentationValue(
                 label: "Account identity conflict",
-                explanation: "Account identity conflicts across accounts. No new data was written",
+                explanation: "Account identity conflicts across accounts. No new financial history was written",
                 iconName: "person.crop.circle.badge.exclamationmark",
                 tone: .warning
             )
         case .staleAccountChoice:
             return DurableImportPresentationValue(
                 label: "Account choice out of date",
-                explanation: "The prepared account choice is no longer current. No new data was written",
+                explanation: "The prepared account choice is no longer current. No new financial history was written",
                 iconName: "clock.badge.exclamationmark.fill",
                 tone: .warning
             )
         case .staleProviderGeneration:
             return DurableImportPresentationValue(
                 label: "Persistence changed",
-                explanation: "Persistence changed after preparation. No new data was written",
+                explanation: "Persistence changed after preparation. No new financial history was written",
                 iconName: "arrow.triangle.2.circlepath",
                 tone: .warning
             )
         case .sqliteContention:
             return DurableImportPresentationValue(
                 label: "Persistence busy",
-                explanation: "Confirmation did not win persistence contention. No new data was written",
+                explanation: "Confirmation did not win persistence contention. No new financial history was written",
                 iconName: "hourglass",
                 tone: .warning
             )

@@ -9,7 +9,7 @@
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
-  - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef9330b24bc66743fd2a17232c521f80eeb` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
+  - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
 - **Latest verified completed increment:** Sprint 54
 - **Latest accepted ADR:** ADR-039 — Trusted Statement Dates and Durable Source Provenance
 - **Current migration:** V6
@@ -369,22 +369,6 @@ The following remain separately governed:
 Existing nonempty V5 financial graphs fail closed for explicit pre-production reset rather than receiving reconstructed dates, order or provenance.
 
 Legacy exact-statement fingerprint backfill is not performed from reduced repository data.
-
-### Presentation defect
-
-The durable attempt model defines 13 known outcomes, but Dashboard Import Activity and Import History do not exhaustively present every known:
-
-- outcome;
-- coverage value;
-- guidance value.
-
-Known identity, staleness and contention outcomes may appear unavailable or be mislabelled as persistence failure. Coverage or guidance may reach presentation through transformed raw persistence codes.
-
-This is the current verified P0 bug:
-
-```text
-FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness
-```
 
 ### Test and runtime limits
 

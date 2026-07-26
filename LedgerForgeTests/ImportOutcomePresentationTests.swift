@@ -236,16 +236,16 @@ struct ImportOutcomePresentationTests {
             (.successfulImport, "Import completed", "Persisted 2 transaction(s)"),
             (.validationFailure, "Validation failed", "Validation failed before persistence"),
             (.persistenceFailure, "Persistence failed", "Persistence failed after validation"),
-            (.exactStatementDuplicate, "Previously imported", "The exact statement was already imported. No new data was written"),
-            (.existingEligibleAxisUPIEvent, "Supported transaction event blocked", "A supported transaction event already exists. No new data was written"),
-            (.repeatedEligibleIncomingEvidence, "Repeated incoming evidence", "Supported transaction evidence repeats within this import. No new data was written"),
-            (.transactionEventOwnershipConflict, "Transaction-event ownership conflict", "Supported transaction-event ownership conflicts. No new data was written"),
-            (.repositoryIntegrityConflict, "Repository integrity conflict", "Repository integrity prevented confirmation. No new data was written"),
-            (.identityAmbiguity, "Account identity ambiguous", "Account identity could not be resolved unambiguously. No new data was written"),
-            (.identityConflict, "Account identity conflict", "Account identity conflicts across accounts. No new data was written"),
-            (.staleAccountChoice, "Account choice out of date", "The prepared account choice is no longer current. No new data was written"),
-            (.staleProviderGeneration, "Persistence changed", "Persistence changed after preparation. No new data was written"),
-            (.sqliteContention, "Persistence busy", "Confirmation did not win persistence contention. No new data was written")
+            (.exactStatementDuplicate, "Previously imported", "The exact statement was already imported. No new financial history was written"),
+            (.existingEligibleAxisUPIEvent, "Supported transaction event blocked", "A supported transaction event already exists. No new financial history was written"),
+            (.repeatedEligibleIncomingEvidence, "Repeated incoming evidence", "Supported transaction evidence repeats within this import. No new financial history was written"),
+            (.transactionEventOwnershipConflict, "Transaction-event ownership conflict", "Supported transaction-event ownership conflicts. No new financial history was written"),
+            (.repositoryIntegrityConflict, "Repository integrity conflict", "Repository integrity prevented confirmation. No new financial history was written"),
+            (.identityAmbiguity, "Account identity ambiguous", "Account identity could not be resolved unambiguously. No new financial history was written"),
+            (.identityConflict, "Account identity conflict", "Account identity conflicts across accounts. No new financial history was written"),
+            (.staleAccountChoice, "Account choice out of date", "The prepared account choice is no longer current. No new financial history was written"),
+            (.staleProviderGeneration, "Persistence changed", "Persistence changed after preparation. No new financial history was written"),
+            (.sqliteContention, "Persistence busy", "Confirmation did not win persistence contention. No new financial history was written")
         ]
 
         #expect(Set(expected.map { $0.0 }) == Set(ImportAttemptOutcome.allCases))
