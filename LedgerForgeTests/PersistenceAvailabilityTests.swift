@@ -161,6 +161,12 @@ struct PersistenceAvailabilityTests {
         #expect(DatabaseProvider.shared.persistenceState == .intentionalNonDurable(.testMemory))
     }
 
+    @Test func testHostConfigurationSelectsIsolatedPersistenceOnlyWhenExplicitlyEnabled() {
+        #expect(LedgerForgeApp.usesIsolatedTestPersistence(environment: [:]) == false)
+        #expect(LedgerForgeApp.usesIsolatedTestPersistence(environment: ["LEDGERFORGE_TEST_HOST": "0"]) == false)
+        #expect(LedgerForgeApp.usesIsolatedTestPersistence(environment: ["LEDGERFORGE_TEST_HOST": "1"]))
+    }
+
     @Test func persistencePresentationIsTruthfulBoundedAndPathFree() {
         let states: [PersistenceState] = [
             .verifiedSQLite,

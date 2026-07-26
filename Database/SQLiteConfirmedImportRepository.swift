@@ -8,10 +8,74 @@ import SQLite3
 final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     private let db: SQLiteDatabase
     private let generationToken: ProviderGenerationToken
+    private let consumedPlanLock = NSLock()
+    private var consumedPlanIDs = Set<String>()
 
     init(db: SQLiteDatabase, generationToken: ProviderGenerationToken) {
         self.db = db
         self.generationToken = generationToken
+    }
+
+    func reviewPartialImport(_ plan: ConfirmedImportPlanDTO) -> PartialImportReviewResult {
+        guard plan.providerGeneration == generationToken else {
+            return .repositoryIntegrityConflict
+        }
+        do {
+            return try reviewPartialImport(plan, planID: UUID().uuidString)
+        } catch {
+            return .repositoryIntegrityConflict
+        }
+    }
+
+    func commitReviewedPartialImport(_ reviewedPlan: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult {
+        guard consumePlan(reviewedPlan.id),
+              reviewedPlan.basePlan.providerGeneration == generationToken,
+              reviewedPlan.hasValidDigest() else {
+            return .reviewedPartialPlanStale
+        }
+        do {
+            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+            if try count("SELECT COUNT(*) FROM document_fingerprints WHERE algorithm = ? AND fingerprint = ?;", [reviewedPlan.basePlan.historyTemplate.fingerprint.algorithm, reviewedPlan.basePlan.historyTemplate.fingerprint.fingerprint]) > 0 {
+                try db.execute(sql: "ROLLBACK;")
+                return .reviewedPartialPlanStale
+            }
+            let currentReview = try reviewPartialImport(
+                reviewedPlan.basePlan,
+                planID: reviewedPlan.id
+            )
+            guard case .eligible(let currentPlan) = currentReview,
+                  currentPlan == reviewedPlan else {
+                try db.execute(sql: "ROLLBACK;")
+                return .reviewedPartialPlanStale
+            }
+            guard try validateExistingIdentity(
+                reviewedPlan.basePlan,
+                accountID: reviewedPlan.existingAccountId
+            ) else {
+                try db.execute(sql: "ROLLBACK;")
+                return .reviewedPartialPlanStale
+            }
+            try insert(reviewedPartialPlan: reviewedPlan)
+            try db.execute(sql: "COMMIT;")
+            let history = reviewedPlan.basePlan.historyTemplate
+            return .partialCommitted(
+                ConfirmedImportReceiptDTO(
+                    workspaceId: reviewedPlan.basePlan.workspace.id,
+                    accountId: reviewedPlan.existingAccountId,
+                    importSessionId: history.importSession.id,
+                    documentId: history.document.id
+                )
+            )
+        } catch let error as SQLiteExecutionError where error.isRetryableContention {
+            try? db.execute(sql: "ROLLBACK;")
+            return .retryableContention
+        } catch let SQLiteDatabaseError.execution(error) where error.isRetryableContention {
+            try? db.execute(sql: "ROLLBACK;")
+            return .retryableContention
+        } catch {
+            try? db.execute(sql: "ROLLBACK;")
+            return .repositoryIntegrityConflict
+        }
     }
 
     func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
@@ -174,8 +238,228 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             try db.executePrepared(sql: "INSERT INTO account_identifier_observations (id, ownership_id, import_session_id, document_id, parser_provenance_code, association_authority_code, created_at) VALUES (?,?,?,?,?,?,?);", params: [UUID().uuidString, ownershipID, history.importSession.id, history.document.id, candidate.provenanceCode, "confirmed-import", history.completedAtISO])
         }
         let attempt = history.successfulAttempt
-        try db.executePrepared(sql: "INSERT INTO import_attempts (id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [attempt.id, attempt.workspaceId, attempt.createdAtISO, attempt.outcomeCode, attempt.coverageCode, attempt.accountDecisionCode, attempt.guidanceCode, attempt.persistenceCode, attempt.transactionCount, attempt.accountId ?? NSNull(), attempt.importSessionId ?? NSNull(), attempt.documentId ?? NSNull(), attempt.relatedImportSessionId ?? NSNull()])
+        try db.executePrepared(sql: "INSERT INTO import_attempts (id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id, source_row_count, imported_transaction_count, recognized_existing_row_count, blocked_row_count) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [attempt.id, attempt.workspaceId, attempt.createdAtISO, attempt.outcomeCode, attempt.coverageCode, attempt.accountDecisionCode, attempt.guidanceCode, attempt.persistenceCode, attempt.transactionCount, attempt.accountId ?? NSNull(), attempt.importSessionId ?? NSNull(), attempt.documentId ?? NSNull(), attempt.relatedImportSessionId ?? NSNull(), attempt.sourceRowCount ?? NSNull(), attempt.importedTransactionCount ?? NSNull(), attempt.recognizedExistingRowCount ?? NSNull(), attempt.blockedRowCount ?? NSNull()])
         try db.executePrepared(sql: "UPDATE import_sessions SET validation_status = ?, completed_at = ?, updated_at = ? WHERE id = ?;", params: ["passed", history.completedAtISO, history.completedAtISO, history.importSession.id])
+    }
+
+    private func reviewPartialImport(
+        _ plan: ConfirmedImportPlanDTO,
+        planID: String
+    ) throws -> PartialImportReviewResult {
+        guard case .useExistingAccount(let accountID) = plan.accountChoice else {
+            return .unsupportedEvidence
+        }
+        let account = try loadAccount(id: accountID)
+        var owners: [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] = [:]
+        var transactions: [String: TransactionDTO] = [:]
+        for template in plan.transactionTemplates {
+            guard let evidence = template.eventEvidence,
+                  let identity = try? TransactionEventIdentity.make(
+                    transactionID: template.transaction.id,
+                    evidence: evidence,
+                    accountID: accountID
+                  ) else {
+                continue
+            }
+            let key = TransactionEventIdentityKeyDTO(
+                algorithm: identity.algorithmIdentifier,
+                digest: identity.digest
+            )
+            let owner = try db.query(
+                sql: "SELECT id, account_id, transaction_id, document_id, import_session_id FROM transaction_event_identities WHERE algorithm = ? AND digest = ?;",
+                params: [key.algorithm, key.digest]
+            ) { row in
+                TransactionEventIdentityOwnerDTO(
+                    eventIdentityId: row.string(at: 0) ?? "",
+                    accountId: row.string(at: 1) ?? "",
+                    transactionId: row.string(at: 2) ?? "",
+                    documentId: row.string(at: 3) ?? "",
+                    importSessionId: row.string(at: 4) ?? ""
+                )
+            }.first
+            if let owner {
+                owners[key] = owner
+                if let transaction = try loadTransaction(id: owner.transactionId) {
+                    transactions[transaction.id] = transaction
+                }
+            }
+        }
+        return ReviewedPartialImportPlanner.review(
+            plan,
+            account: account,
+            owners: owners,
+            transactionsByID: transactions,
+            planID: planID
+        )
+    }
+
+    private func loadTransaction(id: String) throws -> TransactionDTO? {
+        try db.query(
+            sql: "SELECT id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at, financial_date_role, statement_timezone_evidence FROM transactions WHERE id = ?;",
+            params: [id]
+        ) { row in
+            TransactionDTO(
+                id: row.string(at: 0) ?? "",
+                workspaceId: row.string(at: 1) ?? "",
+                accountId: row.string(at: 2),
+                importSessionId: row.string(at: 3),
+                documentId: row.string(at: 4),
+                originalRowId: row.string(at: 5),
+                postedDateISO: row.string(at: 6) ?? "",
+                financialDateRole: row.string(at: 21) ?? "",
+                statementTimezoneEvidence: row.string(at: 22) ?? "",
+                valueDateISO: row.string(at: 7),
+                description: row.string(at: 8),
+                payee: row.string(at: 9),
+                reference: row.string(at: 10),
+                nativeCurrency: row.string(at: 11) ?? "",
+                amountMinor: row.int64(at: 12) ?? 0,
+                amountDecimal: row.string(at: 13) ?? "",
+                direction: row.string(at: 14) ?? "",
+                runningBalanceMinor: row.int64(at: 15),
+                isReconciled: row.bool(at: 16),
+                isTrusted: row.bool(at: 17),
+                trustedAtISO: row.string(at: 18),
+                createdAtISO: row.string(at: 19) ?? "",
+                updatedAtISO: row.string(at: 20),
+                rawRows: []
+            )
+        }.first
+    }
+
+    private func validateExistingIdentity(
+        _ plan: ConfirmedImportPlanDTO,
+        accountID: String
+    ) throws -> Bool {
+        guard let account = try loadAccount(id: accountID),
+              account.workspaceId == plan.workspace.id else { return false }
+        for candidate in plan.identifiers {
+            let owners = try db.query(
+                sql: "SELECT account_id FROM account_identifiers WHERE workspace_id = ? AND scheme = ? AND identifier = ?;",
+                params: [plan.workspace.id, candidate.scheme, candidate.normalizedValue]
+            ) { $0.string(at: 0) ?? "" }
+            if owners.contains(where: { $0 != accountID }) { return false }
+        }
+        switch plan.advisoryIdentity {
+        case .resolved(let expected):
+            return expected == accountID
+        case .noMatch:
+            return true
+        case .ambiguous, .conflict:
+            return false
+        }
+    }
+
+    private func insert(reviewedPartialPlan reviewed: ReviewedPartialImportPlanDTO) throws {
+        let plan = reviewed.basePlan
+        let history = plan.historyTemplate
+        guard let normalizedDocument = history.normalizedDocument,
+              let start = plan.declaredStatementStartISO,
+              let end = plan.declaredStatementEndISO,
+              let openingMinor = plan.openingBalanceMinor,
+              let openingDecimal = plan.openingBalanceDecimal,
+              let closingMinor = plan.closingBalanceMinor,
+              let closingDecimal = plan.closingBalanceDecimal else {
+            throw RepositoryError.relationshipViolation("Reviewed partial import is missing document evidence.")
+        }
+
+        var observations = [(String, ConfirmedImportIdentifierCandidateDTO)]()
+        for candidate in plan.identifiers {
+            let existing = try db.query(
+                sql: "SELECT id FROM account_identifiers WHERE account_id = ? AND workspace_id = ? AND scheme = ? AND identifier = ? LIMIT 1;",
+                params: [reviewed.existingAccountId, plan.workspace.id, candidate.scheme, candidate.normalizedValue]
+            ) { $0.string(at: 0) ?? "" }.first
+            let ownershipID = existing ?? UUID().uuidString
+            if existing == nil {
+                try db.executePrepared(
+                    sql: "INSERT INTO account_identifiers (id, account_id, workspace_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?,?);",
+                    params: [ownershipID, reviewed.existingAccountId, plan.workspace.id, candidate.scheme, candidate.normalizedValue, Self.provenanceJSON(candidate), history.completedAtISO]
+                )
+            }
+            observations.append((ownershipID, candidate))
+        }
+
+        let document = history.document
+        try db.executePrepared(sql: "INSERT INTO import_sessions (id, workspace_id, user_visible_name, started_at, validation_status, created_at, reader_version, parser_version, layout_version) VALUES (?,?,?,?,?,?,?,?,?);", params: [history.importSession.id, history.importSession.workspaceId, history.importSession.userVisibleName ?? NSNull(), history.importSession.startedAtISO, history.importSession.validationStatus, history.importSession.startedAtISO, history.importSession.readerVersion ?? NSNull(), history.importSession.parserVersion ?? NSNull(), history.importSession.layoutVersion ?? NSNull()])
+        try db.executePrepared(sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, mime_type, size_bytes, sha256, storage_path, extracted_text_snippet, page_count, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?);", params: [document.id, document.workspaceId, document.importSessionId, document.filename, document.mimeType ?? NSNull(), document.sizeBytes ?? NSNull(), document.sha256, NSNull(), NSNull(), NSNull(), document.createdAtISO])
+        try db.executePrepared(sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, fingerprint_data, created_at) VALUES (?,?,?,?,?,?,?);", params: [history.fingerprint.id, history.fingerprint.documentId, history.fingerprint.importSessionId, history.fingerprint.algorithm, history.fingerprint.fingerprint, history.fingerprint.fingerprintData ?? NSNull(), history.fingerprint.createdAtISO])
+        try db.executePrepared(sql: "INSERT INTO normalized_documents (id, import_session_id, document_id, normalized_json, schema_version, created_at, profile_id, profile_version) VALUES (?,?,?,?,?,?,?,?);", params: [normalizedDocument.id, normalizedDocument.importSessionId, normalizedDocument.documentId, "{\"profile\":\"\(normalizedDocument.profileId)\",\"version\":\"\(normalizedDocument.profileVersion)\"}", "trusted-source-v1", history.completedAtISO, normalizedDocument.profileId, normalizedDocument.profileVersion])
+        for row in history.normalizedRows {
+            try db.executePrepared(sql: "INSERT INTO normalized_rows (id, normalized_document_id, row_index, row_original, extracted_text, created_at, record_digest) VALUES (?,?,?,?,?,?,?);", params: [row.id, row.normalizedDocumentId, row.sourceOrdinal, "{\"digest\":\"\(row.digest)\"}", NSNull(), history.completedAtISO, row.digest])
+        }
+
+        for (ownershipID, candidate) in observations {
+            try db.executePrepared(sql: "INSERT INTO account_identifier_observations (id, ownership_id, import_session_id, document_id, parser_provenance_code, association_authority_code, created_at) VALUES (?,?,?,?,?,?,?);", params: [UUID().uuidString, ownershipID, history.importSession.id, history.document.id, candidate.provenanceCode, "confirmed-partial-import", history.completedAtISO])
+        }
+
+        for row in reviewed.rows {
+            guard let template = plan.transactionTemplates.first(where: {
+                $0.transaction.rawRows.first?.normalizedRowId == row.normalizedRowId
+            }) else {
+                throw RepositoryError.relationshipViolation("Reviewed row has no incoming transaction template.")
+            }
+            let transactionID: String
+            let eventIdentityID: String
+            switch row.disposition {
+            case .recognizedExisting:
+                guard let existingTransactionID = row.expectedTransactionId,
+                      let existingEventIdentityID = row.expectedEventIdentityId else {
+                    throw RepositoryError.relationshipViolation("Recognized row is missing its durable owner.")
+                }
+                transactionID = existingTransactionID
+                eventIdentityID = existingEventIdentityID
+                try db.executePrepared(
+                    sql: "INSERT INTO transaction_raw_rows (id, transaction_id, normalized_row_id, contribution_type, created_at) VALUES (?,?,?,?,?);",
+                    params: ["partial-source-\(history.importSession.id)-\(row.sourceOrdinal)", transactionID, row.normalizedRowId, PartialImportRowDisposition.recognizedExisting.rawValue, history.completedAtISO]
+                )
+            case .importedUnique:
+                let transaction = finalTransaction(
+                    template.transaction,
+                    accountID: reviewed.existingAccountId,
+                    history: history
+                )
+                transactionID = transaction.id
+                eventIdentityID = "partial-event-\(transaction.id)"
+                try db.executePrepared(sql: "INSERT INTO transactions (id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at, financial_date_role, statement_timezone_evidence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [transaction.id, transaction.workspaceId, transaction.accountId ?? NSNull(), transaction.importSessionId ?? NSNull(), transaction.documentId ?? NSNull(), row.normalizedRowId, transaction.postedDateISO, transaction.valueDateISO ?? NSNull(), transaction.description ?? NSNull(), transaction.payee ?? NSNull(), transaction.reference ?? NSNull(), transaction.nativeCurrency, transaction.amountMinor, transaction.amountDecimal, transaction.direction, transaction.runningBalanceMinor ?? NSNull(), transaction.isReconciled ? 1 : 0, transaction.isTrusted ? 1 : 0, transaction.trustedAtISO ?? NSNull(), transaction.createdAtISO, transaction.updatedAtISO ?? NSNull(), transaction.financialDateRole, transaction.statementTimezoneEvidence])
+                try db.executePrepared(sql: "INSERT INTO transaction_raw_rows (id, transaction_id, normalized_row_id, contribution_type, created_at) VALUES (?,?,?,?,?);", params: [template.transaction.rawRows[0].id, transaction.id, row.normalizedRowId, PartialImportRowDisposition.importedUnique.rawValue, transaction.createdAtISO])
+                try db.executePrepared(sql: "INSERT INTO transaction_event_identities (id, transaction_id, account_id, document_id, import_session_id, algorithm, digest, created_at) VALUES (?,?,?,?,?,?,?,?);", params: [eventIdentityID, transaction.id, reviewed.existingAccountId, history.document.id, history.importSession.id, row.eventAlgorithm, row.eventDigest, history.completedAtISO])
+            }
+            try db.executePrepared(
+                sql: "INSERT INTO incoming_row_dispositions (id, import_session_id, document_id, normalized_row_id, source_ordinal, disposition_code, transaction_id, transaction_event_identity_id, statement_date, financial_date_role, statement_timezone_evidence, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: ["partial-disposition-\(history.importSession.id)-\(row.sourceOrdinal)", history.importSession.id, history.document.id, row.normalizedRowId, row.sourceOrdinal, row.disposition.rawValue, transactionID, eventIdentityID, row.statementDateISO, row.financialDateRole, row.timezoneEvidence, row.nativeCurrency, row.amountMinor, row.amountDecimal, row.direction, row.runningBalanceMinor, history.completedAtISO]
+            )
+        }
+
+        let attempt = ImportAttemptDTO(
+            id: history.successfulAttempt.id,
+            workspaceId: plan.workspace.id,
+            createdAtISO: history.completedAtISO,
+            outcomeCode: ImportAttemptOutcome.partialImportCommitted.rawValue,
+            coverageCode: ImportAttemptCoverage.allRowsSupportedAxisUPIReviewed.rawValue,
+            accountDecisionCode: ImportAttemptAccountDecision.selectedExisting.rawValue,
+            guidanceCode: ImportAttemptGuidance.partialImportCompleted.rawValue,
+            persistenceCode: ImportAttemptPersistence.committed.rawValue,
+            transactionCount: reviewed.importedCount,
+            accountId: reviewed.existingAccountId,
+            importSessionId: history.importSession.id,
+            documentId: history.document.id,
+            sourceRowCount: reviewed.sourceRowCount,
+            importedTransactionCount: reviewed.importedCount,
+            recognizedExistingRowCount: reviewed.recognizedCount,
+            blockedRowCount: reviewed.blockedCount
+        )
+        try db.executePrepared(sql: "INSERT INTO import_attempts (id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id, source_row_count, imported_transaction_count, recognized_existing_row_count, blocked_row_count) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [attempt.id, attempt.workspaceId, attempt.createdAtISO, attempt.outcomeCode, attempt.coverageCode, attempt.accountDecisionCode, attempt.guidanceCode, attempt.persistenceCode, attempt.transactionCount, attempt.accountId ?? NSNull(), attempt.importSessionId ?? NSNull(), attempt.documentId ?? NSNull(), NSNull(), attempt.sourceRowCount ?? NSNull(), attempt.importedTransactionCount ?? NSNull(), attempt.recognizedExistingRowCount ?? NSNull(), attempt.blockedRowCount ?? NSNull()])
+        try db.executePrepared(
+            sql: "INSERT INTO partial_import_summaries (import_session_id, document_id, plan_digest_algorithm, plan_digest, statement_start_date, statement_end_date, native_currency, source_row_count, imported_transaction_count, recognized_existing_row_count, blocked_row_count, opening_balance_minor, opening_balance_decimal, closing_balance_minor, closing_balance_decimal, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+            params: [history.importSession.id, history.document.id, reviewed.digestAlgorithm, reviewed.digest, start, end, "INR", reviewed.sourceRowCount, reviewed.importedCount, reviewed.recognizedCount, reviewed.blockedCount, openingMinor, openingDecimal, closingMinor, closingDecimal, history.completedAtISO]
+        )
+        try db.executePrepared(sql: "UPDATE import_sessions SET validation_status = ?, completed_at = ?, updated_at = ? WHERE id = ?;", params: ["passed", history.completedAtISO, history.completedAtISO, history.importSession.id])
+    }
+
+    private func consumePlan(_ id: String) -> Bool {
+        consumedPlanLock.lock()
+        defer { consumedPlanLock.unlock() }
+        return consumedPlanIDs.insert(id).inserted
     }
 
     private func loadAccount(id: String) throws -> AccountDTO? { try db.query(sql: "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at FROM accounts WHERE id = ?;", params: [id]) { row in AccountDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", name: row.string(at: 2) ?? "", institutionId: row.string(at: 3), accountType: row.string(at: 4), nativeCurrency: row.string(at: 5) ?? "", description: row.string(at: 6), createdAtISO: row.string(at: 7) ?? "") }.first }

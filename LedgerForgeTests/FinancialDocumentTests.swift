@@ -41,11 +41,11 @@ struct FinancialDocumentTests {
         #expect(identifier.normalizedValue == expectedValue)
     }
 
-    @Test func axisParserWithoutSourceContextPreservesTransactionsAndProducesNoIdentifier() throws {
+    @Test func axisParserSyntheticPeriodPreservesTransactionsAndProducesIdentifier() throws {
         let financialDocument = try parseSyntheticAxisDocument(sourceFragments: [])
 
         #expect(financialDocument.transactions.count == 1)
-        #expect(financialDocument.financialIdentifiers.isEmpty)
+        #expect(financialDocument.financialIdentifiers.count == 1)
     }
 
     @Test func axisParserRejectsRecognizedMaskedAccountEvidence() {
@@ -62,7 +62,7 @@ struct FinancialDocumentTests {
         )
 
         #expect(financialDocument.transactions.count == 1)
-        #expect(financialDocument.financialIdentifiers.isEmpty)
+        #expect(financialDocument.financialIdentifiers.count == 1)
     }
 
     @Test func axisParserIgnoresUnrelatedStructuredHeaderValues() throws {
@@ -76,17 +76,14 @@ struct FinancialDocumentTests {
         )
 
         #expect(financialDocument.transactions.count == 1)
-        #expect(financialDocument.financialIdentifiers.isEmpty)
+        #expect(financialDocument.financialIdentifiers.count == 1)
     }
 
-    @Test func axisParserDeduplicatesRepeatedFullAccountEvidence() throws {
+    @Test func axisParserRejectsDuplicateDeclaredPeriodEvidence() {
         let evidence = "Statement of Account No - 123456789012345 for the period (From : 01-01-2026 To : 31-01-2026)"
-        let financialDocument = try parseSyntheticAxisDocument(
-            sourceFragments: [evidence, evidence]
-        )
-
-        #expect(financialDocument.transactions.count == 1)
-        #expect(financialDocument.financialIdentifiers.count == 1)
+        #expect(throws: AxisBankAccountParserError.conflictingDeclaredStatementPeriods) {
+            try parseSyntheticAxisDocument(sourceFragments: [evidence, evidence])
+        }
     }
 
     @Test func axisParserRejectsConflictingFullAccountEvidenceBeforeDocumentCreation() {
@@ -251,7 +248,11 @@ struct FinancialDocumentTests {
             ]
             : []
         let sourceContext = NormalizedDocument.SourceContext(
-            preTransactionFragments: sourceFragments.enumerated().map { index, text in
+            preTransactionFragments: (sourceFragments + (
+                sourceFragments.contains { $0.contains(" for the period (") }
+                    ? []
+                    : ["Statement of Account No - 123456789012345 for the period (From : 01-01-2026 To : 31-01-2026)"]
+            )).enumerated().map { index, text in
                 NormalizedDocument.SourceFragment(
                     sourceOrdinal: index + 1,
                     text: text

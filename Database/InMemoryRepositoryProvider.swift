@@ -42,6 +42,8 @@ enum ConfirmedImportFailureInjectionPoint: CaseIterable {
     case importSession
     case transactions
     case eventIdentities
+    case partialDispositions
+    case partialSummary
     case successfulAttempt
     case sessionCompletion
 }
@@ -62,6 +64,8 @@ private final class InMemoryRepositoryState {
     var transactions: [String: TransactionDTO] = [:]
     var transactionEventIdentities: [String: TransactionEventIdentityDTO] = [:]
     var importAttempts: [String: ImportAttemptDTO] = [:]
+    var partialImportSummaries: [String: PartialImportSummaryDTO] = [:]
+    var incomingRowDispositions: [String: IncomingRowDispositionDTO] = [:]
     var identifierObservations: [String: IdentifierObservationDTO] = [:]
     var confirmedImportFailureInjection: ConfirmedImportFailureInjectionPoint?
 }
@@ -270,7 +274,7 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
         for event in state.transactionEventIdentities.values {
             let key = TransactionEventIdentityKeyDTO(algorithm: event.algorithm, digest: event.digest)
             if keys.contains(key) {
-                result[key] = TransactionEventIdentityOwnerDTO(accountId: event.accountId, transactionId: event.transactionId, documentId: event.documentId, importSessionId: event.importSessionId)
+                result[key] = TransactionEventIdentityOwnerDTO(eventIdentityId: event.id, accountId: event.accountId, transactionId: event.transactionId, documentId: event.documentId, importSessionId: event.importSessionId)
             }
         }
         return result
@@ -294,6 +298,18 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
             if $0.createdAtISO == $1.createdAtISO { return $0.id > $1.id }
             return $0.createdAtISO > $1.createdAtISO
         }
+    }
+
+    func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.partialImportSummaries[importSessionId]
+    }
+
+    func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.incomingRowDispositions.values
+            .filter { $0.importSessionId == importSessionId }
+            .sorted { $0.sourceOrdinal < $1.sourceOrdinal }
     }
 
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
@@ -436,10 +452,266 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
 private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
     private let state: InMemoryRepositoryState
     private let generationToken: ProviderGenerationToken
+    private var consumedPartialPlanIDs = Set<String>()
 
     init(state: InMemoryRepositoryState, generationToken: ProviderGenerationToken) {
         self.state = state
         self.generationToken = generationToken
+    }
+
+    func reviewPartialImport(_ plan: ConfirmedImportPlanDTO) -> PartialImportReviewResult {
+        state.stateLock.lock()
+        defer { state.stateLock.unlock() }
+        guard plan.providerGeneration == generationToken else {
+            return .repositoryIntegrityConflict
+        }
+        return reviewPartialImportWithoutLock(plan, planID: UUID().uuidString)
+    }
+
+    func commitReviewedPartialImport(_ reviewed: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult {
+        state.stateLock.lock()
+        defer { state.stateLock.unlock() }
+        guard consumedPartialPlanIDs.insert(reviewed.id).inserted,
+              reviewed.basePlan.providerGeneration == generationToken,
+              reviewed.hasValidDigest() else {
+            return .reviewedPartialPlanStale
+        }
+        let plan = reviewed.basePlan
+        guard !state.documentFingerprints.values.contains(where: {
+            $0.algorithm == plan.historyTemplate.fingerprint.algorithm &&
+            $0.fingerprint == plan.historyTemplate.fingerprint.fingerprint
+        }) else { return .reviewedPartialPlanStale }
+        guard case .eligible(let current) = reviewPartialImportWithoutLock(
+            plan,
+            planID: reviewed.id
+        ), current == reviewed,
+              validateExistingIdentityWithoutLock(plan, accountID: reviewed.existingAccountId),
+              let normalizedDocument = plan.historyTemplate.normalizedDocument,
+              let start = plan.declaredStatementStartISO,
+              let end = plan.declaredStatementEndISO,
+              let openingMinor = plan.openingBalanceMinor,
+              let openingDecimal = plan.openingBalanceDecimal,
+              let closingMinor = plan.closingBalanceMinor,
+              let closingDecimal = plan.closingBalanceDecimal else {
+            return .reviewedPartialPlanStale
+        }
+
+        var identifiers = state.accountIdentifiers
+        var documents = state.documents
+        var fingerprints = state.documentFingerprints
+        var sessions = state.importSessions
+        var normalizedDocuments = state.normalizedDocuments
+        var normalizedRows = state.normalizedRows
+        var transactions = state.transactions
+        var eventIdentities = state.transactionEventIdentities
+        var attempts = state.importAttempts
+        var observations = state.identifierObservations
+        var summaries = state.partialImportSummaries
+        var dispositions = state.incomingRowDispositions
+        let history = plan.historyTemplate
+        let injectedFailure = state.confirmedImportFailureInjection
+
+        for candidate in plan.identifiers {
+            let existing = identifiers.values.first {
+                $0.workspaceId == plan.workspace.id &&
+                $0.accountId == reviewed.existingAccountId &&
+                $0.scheme == candidate.scheme &&
+                $0.identifier == candidate.normalizedValue
+            }
+            let ownership = existing ?? AccountIdentifierDTO(
+                accountId: reviewed.existingAccountId,
+                workspaceId: plan.workspace.id,
+                scheme: candidate.scheme,
+                identifier: candidate.normalizedValue,
+                strength: "strong",
+                verificationState: "verified",
+                provenance: candidate.provenanceCode,
+                createdAtISO: history.completedAtISO
+            )
+            identifiers[ownership.id] = ownership
+            if injectedFailure == .identifierOwnership { return .repositoryIntegrityConflict }
+            let observation = IdentifierObservationDTO(
+                ownershipId: ownership.id,
+                importSessionId: history.importSession.id,
+                documentId: history.document.id,
+                parserProvenanceCode: candidate.provenanceCode,
+                associationAuthorityCode: "confirmed-partial-import",
+                createdAtISO: history.completedAtISO
+            )
+            observations["\(ownership.id)|\(history.importSession.id)|\(history.document.id)"] = observation
+            if injectedFailure == .observation { return .repositoryIntegrityConflict }
+        }
+
+        guard documents[history.document.id] == nil,
+              fingerprints[history.fingerprint.id] == nil,
+              sessions[history.importSession.id] == nil,
+              normalizedDocuments[normalizedDocument.id] == nil,
+              history.normalizedRows.allSatisfy({ normalizedRows[$0.id] == nil }) else {
+            return .repositoryIntegrityConflict
+        }
+        documents[history.document.id] = history.document
+        if injectedFailure == .document { return .repositoryIntegrityConflict }
+        fingerprints[history.fingerprint.id] = history.fingerprint
+        if injectedFailure == .fingerprint { return .repositoryIntegrityConflict }
+        sessions[history.importSession.id] = ImportSessionRecordDTO(
+            id: history.importSession.id,
+            workspaceId: history.importSession.workspaceId,
+            userVisibleName: history.importSession.userVisibleName,
+            startedAtISO: history.importSession.startedAtISO,
+            completedAtISO: history.completedAtISO,
+            validationStatus: "passed",
+            readerVersion: history.importSession.readerVersion,
+            parserVersion: history.importSession.parserVersion,
+            layoutVersion: history.importSession.layoutVersion
+        )
+        if injectedFailure == .importSession { return .repositoryIntegrityConflict }
+        normalizedDocuments[normalizedDocument.id] = normalizedDocument
+        history.normalizedRows.forEach { normalizedRows[$0.id] = $0 }
+
+        for row in reviewed.rows {
+            guard let template = plan.transactionTemplates.first(where: {
+                $0.transaction.rawRows.first?.normalizedRowId == row.normalizedRowId
+            }) else { return .repositoryIntegrityConflict }
+            let transactionID: String
+            let eventIdentityID: String
+            switch row.disposition {
+            case .recognizedExisting:
+                guard let expectedTransactionID = row.expectedTransactionId,
+                      let expectedEventID = row.expectedEventIdentityId,
+                      let existing = transactions[expectedTransactionID],
+                      !existing.rawRows.contains(where: { $0.normalizedRowId == row.normalizedRowId }) else {
+                    return .repositoryIntegrityConflict
+                }
+                let incomingRaw = TransactionRawRowDTO(
+                    id: "partial-source-\(history.importSession.id)-\(row.sourceOrdinal)",
+                    normalizedRowId: row.normalizedRowId,
+                    contributionType: PartialImportRowDisposition.recognizedExisting.rawValue,
+                    sourceOrdinal: row.sourceOrdinal,
+                    normalizedRecordDigest: row.normalizedRecordDigest,
+                    normalizedDocumentId: normalizedDocument.id,
+                    parserProfileId: normalizedDocument.profileId,
+                    parserProfileVersion: normalizedDocument.profileVersion
+                )
+                transactions[existing.id] = replacingRawRows(
+                    existing,
+                    rawRows: existing.rawRows + [incomingRaw]
+                )
+                transactionID = existing.id
+                eventIdentityID = expectedEventID
+            case .importedUnique:
+                let transaction = withFinalRelationships(
+                    template.transaction,
+                    accountID: reviewed.existingAccountId,
+                    importSessionID: history.importSession.id,
+                    documentID: history.document.id
+                )
+                guard transactions[transaction.id] == nil else {
+                    return .repositoryIntegrityConflict
+                }
+                transactionID = transaction.id
+                eventIdentityID = "partial-event-\(transaction.id)"
+                transactions[transaction.id] = transaction
+                eventIdentities[eventIdentityID] = TransactionEventIdentityDTO(
+                    id: eventIdentityID,
+                    transactionId: transaction.id,
+                    accountId: reviewed.existingAccountId,
+                    documentId: history.document.id,
+                    importSessionId: history.importSession.id,
+                    algorithm: row.eventAlgorithm,
+                    digest: row.eventDigest,
+                    createdAtISO: history.completedAtISO
+                )
+            }
+            let disposition = IncomingRowDispositionDTO(
+                id: "partial-disposition-\(history.importSession.id)-\(row.sourceOrdinal)",
+                importSessionId: history.importSession.id,
+                documentId: history.document.id,
+                normalizedRowId: row.normalizedRowId,
+                sourceOrdinal: row.sourceOrdinal,
+                dispositionCode: row.disposition.rawValue,
+                transactionId: transactionID,
+                transactionEventIdentityId: eventIdentityID,
+                statementDateISO: row.statementDateISO,
+                financialDateRole: row.financialDateRole,
+                statementTimezoneEvidence: row.timezoneEvidence,
+                nativeCurrency: row.nativeCurrency,
+                amountMinor: row.amountMinor,
+                amountDecimal: row.amountDecimal,
+                direction: row.direction,
+                runningBalanceMinor: row.runningBalanceMinor,
+                createdAtISO: history.completedAtISO,
+                eventTransactionId: transactionID
+            )
+            guard dispositions[disposition.id] == nil else {
+                return .repositoryIntegrityConflict
+            }
+            dispositions[disposition.id] = disposition
+        }
+        if injectedFailure == .transactions { return .repositoryIntegrityConflict }
+        if injectedFailure == .eventIdentities { return .repositoryIntegrityConflict }
+        if injectedFailure == .partialDispositions { return .repositoryIntegrityConflict }
+
+        let attempt = ImportAttemptDTO(
+            id: history.successfulAttempt.id,
+            workspaceId: plan.workspace.id,
+            createdAtISO: history.completedAtISO,
+            outcomeCode: ImportAttemptOutcome.partialImportCommitted.rawValue,
+            coverageCode: ImportAttemptCoverage.allRowsSupportedAxisUPIReviewed.rawValue,
+            accountDecisionCode: ImportAttemptAccountDecision.selectedExisting.rawValue,
+            guidanceCode: ImportAttemptGuidance.partialImportCompleted.rawValue,
+            persistenceCode: ImportAttemptPersistence.committed.rawValue,
+            transactionCount: reviewed.importedCount,
+            accountId: reviewed.existingAccountId,
+            importSessionId: history.importSession.id,
+            documentId: history.document.id,
+            sourceRowCount: reviewed.sourceRowCount,
+            importedTransactionCount: reviewed.importedCount,
+            recognizedExistingRowCount: reviewed.recognizedCount,
+            blockedRowCount: reviewed.blockedCount
+        )
+        attempts[attempt.id] = attempt
+        if injectedFailure == .successfulAttempt { return .repositoryIntegrityConflict }
+        summaries[history.importSession.id] = PartialImportSummaryDTO(
+            importSessionId: history.importSession.id,
+            documentId: history.document.id,
+            planDigestAlgorithm: reviewed.digestAlgorithm,
+            planDigest: reviewed.digest,
+            statementStartDateISO: start,
+            statementEndDateISO: end,
+            nativeCurrency: "INR",
+            sourceRowCount: reviewed.sourceRowCount,
+            importedTransactionCount: reviewed.importedCount,
+            recognizedExistingRowCount: reviewed.recognizedCount,
+            blockedRowCount: reviewed.blockedCount,
+            openingBalanceMinor: openingMinor,
+            openingBalanceDecimal: openingDecimal,
+            closingBalanceMinor: closingMinor,
+            closingBalanceDecimal: closingDecimal,
+            createdAtISO: history.completedAtISO
+        )
+        if injectedFailure == .partialSummary { return .repositoryIntegrityConflict }
+        if injectedFailure == .sessionCompletion { return .repositoryIntegrityConflict }
+
+        state.accountIdentifiers = identifiers
+        state.identifierObservations = observations
+        state.documents = documents
+        state.documentFingerprints = fingerprints
+        state.importSessions = sessions
+        state.normalizedDocuments = normalizedDocuments
+        state.normalizedRows = normalizedRows
+        state.transactions = transactions
+        state.transactionEventIdentities = eventIdentities
+        state.importAttempts = attempts
+        state.partialImportSummaries = summaries
+        state.incomingRowDispositions = dispositions
+        return .partialCommitted(
+            ConfirmedImportReceiptDTO(
+                workspaceId: plan.workspace.id,
+                accountId: reviewed.existingAccountId,
+                importSessionId: history.importSession.id,
+                documentId: history.document.id
+            )
+        )
     }
 
     func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
@@ -635,6 +907,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         if injectedFailure == .eventIdentities { return .repositoryIntegrityConflict }
         attempts[history.successfulAttempt.id] = history.successfulAttempt
         if injectedFailure == .successfulAttempt { return .repositoryIntegrityConflict }
+        if injectedFailure == .partialDispositions { return .repositoryIntegrityConflict }
+        if injectedFailure == .partialSummary { return .repositoryIntegrityConflict }
         if injectedFailure == .sessionCompletion { return .repositoryIntegrityConflict }
 
         state.workspaces = workspaces; state.accounts = accounts; state.accountIdentifiers = identifiers
@@ -645,8 +919,83 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         return .committed(ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id))
     }
 
+    private func reviewPartialImportWithoutLock(
+        _ plan: ConfirmedImportPlanDTO,
+        planID: String
+    ) -> PartialImportReviewResult {
+        guard case .useExistingAccount(let accountID) = plan.accountChoice else {
+            return .unsupportedEvidence
+        }
+        var owners: [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] = [:]
+        var transactions: [String: TransactionDTO] = [:]
+        for template in plan.transactionTemplates {
+            guard let evidence = template.eventEvidence,
+                  let identity = try? TransactionEventIdentity.make(
+                    transactionID: template.transaction.id,
+                    evidence: evidence,
+                    accountID: accountID
+                  ) else { continue }
+            let key = TransactionEventIdentityKeyDTO(
+                algorithm: identity.algorithmIdentifier,
+                digest: identity.digest
+            )
+            if let event = state.transactionEventIdentities.values.first(where: {
+                $0.algorithm == key.algorithm && $0.digest == key.digest
+            }) {
+                owners[key] = TransactionEventIdentityOwnerDTO(
+                    eventIdentityId: event.id,
+                    accountId: event.accountId,
+                    transactionId: event.transactionId,
+                    documentId: event.documentId,
+                    importSessionId: event.importSessionId
+                )
+                if let transaction = state.transactions[event.transactionId] {
+                    transactions[transaction.id] = transaction
+                }
+            }
+        }
+        return ReviewedPartialImportPlanner.review(
+            plan,
+            account: state.accounts[accountID],
+            owners: owners,
+            transactionsByID: transactions,
+            planID: planID
+        )
+    }
+
+    private func validateExistingIdentityWithoutLock(
+        _ plan: ConfirmedImportPlanDTO,
+        accountID: String
+    ) -> Bool {
+        guard state.accounts[accountID]?.workspaceId == plan.workspace.id else {
+            return false
+        }
+        for candidate in plan.identifiers {
+            if state.accountIdentifiers.values.contains(where: {
+                $0.workspaceId == plan.workspace.id &&
+                $0.scheme == candidate.scheme &&
+                $0.identifier == candidate.normalizedValue &&
+                $0.accountId != accountID
+            }) {
+                return false
+            }
+        }
+        switch plan.advisoryIdentity {
+        case .resolved(let expected): return expected == accountID
+        case .noMatch: return true
+        case .ambiguous, .conflict: return false
+        }
+    }
+
     private func withFinalRelationships(_ template: TransactionDTO, accountID: String, importSessionID: String, documentID: String) -> TransactionDTO {
         TransactionDTO(id: template.id, workspaceId: template.workspaceId, accountId: accountID, importSessionId: importSessionID, documentId: documentID, originalRowId: template.originalRowId, postedDateISO: template.postedDateISO, financialDateRole: template.financialDateRole, statementTimezoneEvidence: template.statementTimezoneEvidence, valueDateISO: template.valueDateISO, description: template.description, payee: template.payee, reference: template.reference, nativeCurrency: template.nativeCurrency, amountMinor: template.amountMinor, amountDecimal: template.amountDecimal, direction: template.direction, runningBalanceMinor: template.runningBalanceMinor, isReconciled: template.isReconciled, isTrusted: template.isTrusted, trustedAtISO: template.trustedAtISO, createdAtISO: template.createdAtISO, updatedAtISO: template.updatedAtISO, rawRows: template.rawRows)
+    }
+
+    private func replacingRawRows(
+        _ transaction: TransactionDTO,
+        rawRows: [TransactionRawRowDTO]
+    ) -> TransactionDTO {
+        TransactionDTO(id: transaction.id, workspaceId: transaction.workspaceId, accountId: transaction.accountId, importSessionId: transaction.importSessionId, documentId: transaction.documentId, originalRowId: transaction.originalRowId, postedDateISO: transaction.postedDateISO, financialDateRole: transaction.financialDateRole, statementTimezoneEvidence: transaction.statementTimezoneEvidence, valueDateISO: transaction.valueDateISO, description: transaction.description, payee: transaction.payee, reference: transaction.reference, nativeCurrency: transaction.nativeCurrency, amountMinor: transaction.amountMinor, amountDecimal: transaction.amountDecimal, direction: transaction.direction, runningBalanceMinor: transaction.runningBalanceMinor, isReconciled: transaction.isReconciled, isTrusted: transaction.isTrusted, trustedAtISO: transaction.trustedAtISO, createdAtISO: transaction.createdAtISO, updatedAtISO: transaction.updatedAtISO, rawRows: rawRows)
     }
 
     private func hasValidTrustedProvenance(_ plan: ConfirmedImportPlanDTO) -> Bool {

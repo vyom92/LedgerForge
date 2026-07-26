@@ -9,6 +9,12 @@
     }
   ],
   "defaultOptions" : {
+    "environmentVariableEntries" : [
+      {
+        "key" : "LEDGERFORGE_TEST_HOST",
+        "value" : "1"
+      }
+    ],
     "testTimeoutsEnabled" : true
   },
   "testTargets" : [

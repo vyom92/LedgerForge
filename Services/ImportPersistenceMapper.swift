@@ -205,7 +205,11 @@ struct ImportPersistenceMapper {
             transactionCount: payload.transactions.count,
             accountId: selectedAccountId,
             importSessionId: payload.importSession.id,
-            documentId: payload.document.id
+            documentId: payload.document.id,
+            sourceRowCount: payload.transactions.count,
+            importedTransactionCount: payload.transactions.count,
+            recognizedExistingRowCount: 0,
+            blockedRowCount: 0
         )
         let identifiers = FinancialIdentityResolver.strongVerifiedIdentifiers(from: financialDocument.financialIdentifiers).map {
             ConfirmedImportIdentifierCandidateDTO(
@@ -236,7 +240,13 @@ struct ImportPersistenceMapper {
                 normalizedDocument: payload.normalizedDocument,
                 normalizedRows: payload.normalizedRows
             ),
-            transactionTemplates: templates
+            transactionTemplates: templates,
+            declaredStatementStartISO: financialDocument.declaredStatementPeriod?.start.canonical,
+            declaredStatementEndISO: financialDocument.declaredStatementPeriod?.end.canonical,
+            openingBalanceMinor: try validation.openingBalanceMoney.map { try $0.minorUnits() },
+            openingBalanceDecimal: try validation.openingBalanceMoney.map { try $0.canonicalDecimalString() },
+            closingBalanceMinor: try validation.closingBalanceMoney.map { try $0.minorUnits() },
+            closingBalanceDecimal: try validation.closingBalanceMoney.map { try $0.canonicalDecimalString() }
         )
     }
 

@@ -1317,7 +1317,7 @@ private func assertPersistedAttemptPrivacy(
     attempts: [ImportAttemptDTO]
 ) throws {
     let columns = try provider.database.query(sql: "PRAGMA table_info(import_attempts);") { $0.string(at: 1) ?? "" }
-    #expect(columns == ["id", "workspace_id", "created_at", "outcome_code", "coverage_code", "account_decision_code", "guidance_code", "persistence_code", "transaction_count", "account_id", "import_session_id", "document_id", "related_import_session_id"])
+    #expect(columns == ["id", "workspace_id", "created_at", "outcome_code", "coverage_code", "account_decision_code", "guidance_code", "persistence_code", "transaction_count", "account_id", "import_session_id", "document_id", "related_import_session_id", "source_row_count", "imported_transaction_count", "recognized_existing_row_count", "blocked_row_count"])
     let storedRows = try provider.database.query(sql: "SELECT id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id FROM import_attempts;") { row in
         (0...12).compactMap { row.string(at: Int32($0)) }.joined(separator: "|")
     }

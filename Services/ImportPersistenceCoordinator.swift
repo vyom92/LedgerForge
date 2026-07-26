@@ -12,6 +12,9 @@ struct ImportPersistenceResult: Equatable {
     let previousImport: PreviouslyImportedStatement?
     let transactionEventBlock: TransactionEventBlock?
     let importAttemptId: String?
+    let sourceRowCount: Int?
+    let recognizedExistingRowCount: Int?
+    let isPartialImport: Bool
 
     init(
         persisted: Bool,
@@ -21,7 +24,10 @@ struct ImportPersistenceResult: Equatable {
         transactionCount: Int,
         previousImport: PreviouslyImportedStatement? = nil,
         transactionEventBlock: TransactionEventBlock? = nil,
-        importAttemptId: String? = nil
+        importAttemptId: String? = nil,
+        sourceRowCount: Int? = nil,
+        recognizedExistingRowCount: Int? = nil,
+        isPartialImport: Bool = false
     ) {
         self.persisted = persisted
         self.workspaceId = workspaceId
@@ -31,6 +37,9 @@ struct ImportPersistenceResult: Equatable {
         self.previousImport = previousImport
         self.transactionEventBlock = transactionEventBlock
         self.importAttemptId = importAttemptId
+        self.sourceRowCount = sourceRowCount
+        self.recognizedExistingRowCount = recognizedExistingRowCount
+        self.isPartialImport = isPartialImport
     }
 
     static let skipped = ImportPersistenceResult(
@@ -70,6 +79,19 @@ protocol ImportPersistenceCoordinating {
         financialDocument: FinancialDocument,
         validation: ImportValidationResult
     ) throws -> ImportIdentityReview
+
+    func reviewPartialImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> PartialImportReviewResult
+
+    func persistReviewedPartialImport(
+        _ plan: ReviewedPartialImportPlanDTO
+    ) throws -> ImportPersistenceResult
 
     func persistValidatedImport(
         financialDocument: FinancialDocument,
@@ -151,6 +173,23 @@ extension ImportPersistenceCoordinating {
         .unavailable
     }
 
+    func reviewPartialImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> PartialImportReviewResult {
+        .unsupportedEvidence
+    }
+
+    func persistReviewedPartialImport(
+        _ plan: ReviewedPartialImportPlanDTO
+    ) throws -> ImportPersistenceResult {
+        .skipped
+    }
+
     func persistValidatedImport(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
@@ -225,6 +264,7 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
             return "Repository integrity prevented confirmation. No financial history was written."
         }
     }
+
 }
 
 struct ImportPersistenceCommitFailure: Error, LocalizedError {
@@ -278,6 +318,67 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             generationToken: generationToken
         )
         self.init(databaseProviderProvider: { provider }, mapper: mapper, developerConsole: developerConsole)
+    }
+
+    private func makeConfirmedPlan(
+        provider: DatabaseProvider,
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ConfirmedImportPlanDTO {
+        let resolution = try resolver(accountRepo: provider.accountRepo).resolve(
+            workspaceId: mapper.workspaceId,
+            identifiers: financialDocument.financialIdentifiers
+        )
+        let advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO
+        let confirmedChoice: ConfirmedImportAccountChoiceDTO
+        let selectedAccountId: String
+        switch resolution {
+        case .resolved(let accountId):
+            advisoryIdentity = .resolved(accountId: accountId)
+            confirmedChoice = .useExistingAccount(accountId: accountId)
+            selectedAccountId = accountId
+        case .noMatch:
+            advisoryIdentity = .noMatch
+            let proposedID = "account-\(importSession.id.uuidString.lowercased())"
+            if !FinancialIdentityResolver.strongVerifiedIdentifiers(from: financialDocument.financialIdentifiers).isEmpty {
+                switch accountChoice {
+                case .useExistingAccount(let accountId):
+                    confirmedChoice = .useExistingAccount(accountId: accountId)
+                    selectedAccountId = accountId
+                case .createNewAccount:
+                    confirmedChoice = .createProposedAccount
+                    selectedAccountId = proposedID
+                case nil:
+                    confirmedChoice = .unspecified
+                    selectedAccountId = proposedID
+                }
+            } else {
+                confirmedChoice = .createProposedAccount
+                selectedAccountId = proposedID
+            }
+        case .ambiguous:
+            advisoryIdentity = .ambiguous
+            confirmedChoice = .unspecified
+            selectedAccountId = "account-\(importSession.id.uuidString.lowercased())"
+        case .conflict:
+            advisoryIdentity = .conflict
+            confirmedChoice = .unspecified
+            selectedAccountId = "account-\(importSession.id.uuidString.lowercased())"
+        }
+        return try mapper.confirmedImportPlan(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            fingerprint: fingerprint,
+            providerGeneration: providerGeneration,
+            advisoryIdentity: advisoryIdentity,
+            accountChoice: confirmedChoice,
+            selectedAccountId: selectedAccountId
+        )
     }
 
     func persistValidatedImport(
@@ -387,57 +488,14 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         guard provider.persistenceState.isUsable else {
             throw ImportPersistenceCoordinationError.persistenceUnavailable
         }
-        let workspaceId = mapper.workspaceId
-        let resolution = try resolver(accountRepo: provider.accountRepo).resolve(
-            workspaceId: workspaceId,
-            identifiers: financialDocument.financialIdentifiers
-        )
-        let advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO
-        let confirmedChoice: ConfirmedImportAccountChoiceDTO
-        let selectedAccountId: String
-        switch resolution {
-        case .resolved(let accountId):
-            advisoryIdentity = .resolved(accountId: accountId)
-            confirmedChoice = .useExistingAccount(accountId: accountId)
-            selectedAccountId = accountId
-        case .noMatch:
-            advisoryIdentity = .noMatch
-            let proposedID = "account-\(importSession.id.uuidString.lowercased())"
-            if !FinancialIdentityResolver.strongVerifiedIdentifiers(from: financialDocument.financialIdentifiers).isEmpty {
-                switch accountChoice {
-                case .useExistingAccount(let accountId):
-                    confirmedChoice = .useExistingAccount(accountId: accountId)
-                    selectedAccountId = accountId
-                case .createNewAccount:
-                    confirmedChoice = .createProposedAccount
-                    selectedAccountId = proposedID
-                case nil:
-                    confirmedChoice = .unspecified
-                    selectedAccountId = proposedID
-                }
-            } else {
-                confirmedChoice = .createProposedAccount
-                selectedAccountId = proposedID
-            }
-        case .ambiguous:
-            advisoryIdentity = .ambiguous
-            confirmedChoice = .unspecified
-            selectedAccountId = "account-\(importSession.id.uuidString.lowercased())"
-        case .conflict:
-            advisoryIdentity = .conflict
-            confirmedChoice = .unspecified
-            selectedAccountId = "account-\(importSession.id.uuidString.lowercased())"
-        }
-
-        let plan = try mapper.confirmedImportPlan(
+        let plan = try makeConfirmedPlan(
+            provider: provider,
             financialDocument: financialDocument,
             importSession: importSession,
             validation: validation,
             fingerprint: fingerprint,
+            accountChoice: accountChoice,
             providerGeneration: providerGeneration,
-            advisoryIdentity: advisoryIdentity,
-            accountChoice: confirmedChoice,
-            selectedAccountId: selectedAccountId
         )
         let repositoryResult = provider.confirmedImportRepo.commitConfirmedImport(plan)
         return try map(
@@ -446,6 +504,78 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             plan: plan,
             fingerprint: fingerprint
         )
+    }
+
+    func reviewPartialImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprint: ExactStatementFingerprint,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> PartialImportReviewResult {
+        guard validation.passed else { return .unsupportedEvidence }
+        try validate(fingerprint: fingerprint)
+        let provider = databaseProviderProvider()
+        guard provider.persistenceState.isUsable else {
+            throw ImportPersistenceCoordinationError.persistenceUnavailable
+        }
+        let plan = try makeConfirmedPlan(
+            provider: provider,
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            fingerprint: fingerprint,
+            accountChoice: accountChoice,
+            providerGeneration: providerGeneration
+        )
+        return provider.confirmedImportRepo.reviewPartialImport(plan)
+    }
+
+    func persistReviewedPartialImport(
+        _ plan: ReviewedPartialImportPlanDTO
+    ) throws -> ImportPersistenceResult {
+        let provider = databaseProviderProvider()
+        guard provider.persistenceState.isUsable else {
+            throw ImportPersistenceCoordinationError.persistenceUnavailable
+        }
+        let result = provider.confirmedImportRepo.commitReviewedPartialImport(plan)
+        switch result {
+        case .partialCommitted(let receipt):
+            return ImportPersistenceResult(
+                persisted: true,
+                workspaceId: receipt.workspaceId,
+                accountId: receipt.accountId,
+                importSessionId: receipt.importSessionId,
+                transactionCount: plan.importedCount,
+                importAttemptId: plan.basePlan.historyTemplate.successfulAttempt.id,
+                sourceRowCount: plan.sourceRowCount,
+                recognizedExistingRowCount: plan.recognizedCount,
+                isPartialImport: true
+            )
+        case .exactDuplicate:
+            return try map(
+                result,
+                provider: provider,
+                plan: plan.basePlan,
+                fingerprint: ExactStatementFingerprint(
+                    algorithm: plan.basePlan.historyTemplate.fingerprint.algorithm,
+                    digest: plan.basePlan.historyTemplate.fingerprint.fingerprint,
+                    byteCount: plan.basePlan.historyTemplate.document.sizeBytes ?? 0
+                )
+            )
+        default:
+            let attemptID = rejectedAttempt(
+                provider: provider,
+                result: result,
+                count: plan.sourceRowCount,
+                accountId: plan.existingAccountId
+            )
+            throw ImportPersistenceCommitFailure(
+                originalError: coordinationError(for: result),
+                importAttemptId: attemptID
+            )
+        }
     }
 
     private func validate(fingerprint: ExactStatementFingerprint) throws {
@@ -486,7 +616,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
     ) throws -> ImportPersistenceResult {
         let count = plan.transactionTemplates.count
         switch result {
-        case .committed(let receipt):
+        case .committed(let receipt), .partialCommitted(let receipt):
             developerConsole?.info(.database, "Provider-owned confirmed import committed", metadata: ["transactions": "\(count)"])
             return ImportPersistenceResult(persisted: true, workspaceId: receipt.workspaceId, accountId: receipt.accountId, importSessionId: receipt.importSessionId, transactionCount: count, importAttemptId: plan.historyTemplate.successfulAttempt.id)
         case .exactDuplicate:
@@ -523,6 +653,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         case .identifierOwnershipConflict: return .identifierOwnershipConflict
         case .staleIdentityDecision: return .staleIdentityDecision
         case .staleProviderGeneration: return .staleProviderGeneration
+        case .reviewedPartialPlanStale: return .staleProviderGeneration
         case .retryableContention: return .retryableContention
         case .persistenceUnavailable: return .persistenceUnavailable
         default: return .repositoryIntegrityConflict
@@ -540,6 +671,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         case .identityConflict, .identifierOwnershipConflict: outcome = .identityConflict; guidance = .integrityReviewRequired
         case .selectedAccountUnavailable, .selectedAccountIneligible, .selectedAccountWorkspaceMismatch, .staleIdentityDecision: outcome = .staleAccountChoice; guidance = .integrityReviewRequired
         case .staleProviderGeneration: outcome = .staleProviderGeneration; guidance = .prepareAgain
+        case .reviewedPartialPlanStale: outcome = .reviewedPartialPlanStale; guidance = .prepareAgain
         case .retryableContention: outcome = .sqliteContention; guidance = .retryConfirmation
         default: outcome = .repositoryIntegrityConflict; guidance = .integrityReviewRequired
         }

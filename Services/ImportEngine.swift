@@ -20,6 +20,12 @@ struct ExactStatementFingerprint: Equatable, Sendable {
         self.digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
         self.byteCount = Int64(bytes.count)
     }
+
+    init(algorithm: String, digest: String, byteCount: Int64) {
+        self.algorithm = algorithm
+        self.digest = digest
+        self.byteCount = byteCount
+    }
 }
 
 struct ImportEngineResult: Equatable {
@@ -41,6 +47,9 @@ struct ImportEngineResult: Equatable {
     let transactionEventBlock: TransactionEventBlock?
     let importAttemptId: String?
     let hydrationOutcome: HydrationOutcome
+    let sourceRowCount: Int?
+    let recognizedExistingRowCount: Int?
+    let isPartialImport: Bool
 
     init(
         fileName: String,
@@ -54,7 +63,10 @@ struct ImportEngineResult: Equatable {
         previousImport: PreviouslyImportedStatement? = nil,
         transactionEventBlock: TransactionEventBlock? = nil,
         importAttemptId: String? = nil,
-        hydrationOutcome: HydrationOutcome? = nil
+        hydrationOutcome: HydrationOutcome? = nil,
+        sourceRowCount: Int? = nil,
+        recognizedExistingRowCount: Int? = nil,
+        isPartialImport: Bool = false
     ) {
         self.fileName = fileName
         self.transactionCount = transactionCount
@@ -68,6 +80,9 @@ struct ImportEngineResult: Equatable {
         self.transactionEventBlock = transactionEventBlock
         self.importAttemptId = importAttemptId
         self.hydrationOutcome = hydrationOutcome ?? (persisted ? .committedAndHydrated : .notRequired)
+        self.sourceRowCount = sourceRowCount
+        self.recognizedExistingRowCount = recognizedExistingRowCount
+        self.isPartialImport = isPartialImport
     }
 
     var succeeded: Bool {
@@ -158,6 +173,9 @@ struct PreparedImport: Identifiable {
     }
 
     var statementPeriod: ClosedRange<StatementDate>? {
+        if let declared = financialDocument.declaredStatementPeriod {
+            return declared.start...declared.end
+        }
         let dates = financialDocument.transactions.compactMap(\.statementDate).sorted()
         guard let first = dates.first, let last = dates.last else {
             return nil
@@ -415,9 +433,30 @@ final class ImportEngine {
         )
     }
 
+    func reviewPreparedPartialImport(
+        _ preparedImport: PreparedImport,
+        accountChoice: ImportAccountChoice? = nil
+    ) throws -> PartialImportReviewResult {
+        guard persistenceStateProvider().isUsable,
+              preparedImport.validation.passed,
+              preparedImport.advisoryPreviousImport == nil,
+              !reconciliationGate.isBlocked else {
+            return .unsupportedEvidence
+        }
+        return try importPersistenceCoordinatorFactory().reviewPartialImport(
+            financialDocument: preparedImport.financialDocument,
+            importSession: preparedImport.importSession,
+            validation: preparedImport.validation,
+            fingerprint: preparedImport.fingerprint,
+            accountChoice: accountChoice,
+            providerGeneration: preparedImport.providerGeneration
+        )
+    }
+
     func commitPreparedImport(
         _ preparedImport: PreparedImport,
-        accountChoice: ImportAccountChoice?
+        accountChoice: ImportAccountChoice?,
+        reviewedPartialPlan: ReviewedPartialImportPlanDTO? = nil
     ) async -> ImportEngineResult {
 #if DEBUG
         let lifecycleLease = lifecycleLeases[preparedImport.id]
@@ -498,14 +537,20 @@ final class ImportEngine {
         var persistenceErrorMessage: String?
         do {
             let importPersistenceCoordinator = importPersistenceCoordinatorFactory()
-            persistenceResult = try importPersistenceCoordinator.persistValidatedImport(
-                financialDocument: preparedImport.financialDocument,
-                importSession: preparedImport.importSession,
-                validation: preparedImport.validation,
-                fingerprint: preparedImport.fingerprint,
-                accountChoice: accountChoice,
-                providerGeneration: preparedImport.providerGeneration
-            )
+            if let reviewedPartialPlan {
+                persistenceResult = try importPersistenceCoordinator.persistReviewedPartialImport(
+                    reviewedPartialPlan
+                )
+            } else {
+                persistenceResult = try importPersistenceCoordinator.persistValidatedImport(
+                    financialDocument: preparedImport.financialDocument,
+                    importSession: preparedImport.importSession,
+                    validation: preparedImport.validation,
+                    fingerprint: preparedImport.fingerprint,
+                    accountChoice: accountChoice,
+                    providerGeneration: preparedImport.providerGeneration
+                )
+            }
             if persistenceResult.persisted {
                 developerConsole.info(.database, "Repository persistence completed")
             } else if persistenceResult.previousImport != nil {
@@ -565,7 +610,10 @@ final class ImportEngine {
             previousImport: persistenceResult.previousImport,
             transactionEventBlock: persistenceResult.transactionEventBlock,
             importAttemptId: persistenceResult.importAttemptId,
-            hydrationOutcome: hydrationOutcome
+            hydrationOutcome: hydrationOutcome,
+            sourceRowCount: persistenceResult.sourceRowCount,
+            recognizedExistingRowCount: persistenceResult.recognizedExistingRowCount,
+            isPartialImport: persistenceResult.isPartialImport
         )
     }
 

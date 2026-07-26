@@ -3,24 +3,31 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current pushed ref:** the single Sprint 55 completion commit containing this state update; its exact SHA is Git-authoritative and recorded in the completion report
-- **Latest verified implementation:** the single Sprint 55 completion commit containing this state update — Axis Source-Direction Correction and Partial-Overlap Evidence Closure
+- **Current pushed ref:** the single Sprint 56 completion commit containing this state update; its exact SHA is Git-authoritative and recorded in the completion report
+- **Latest verified implementation:** the single Sprint 56 completion commit containing this state update — Explicit Reviewed Partial-Overlap Import
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed increment:** Sprint 55
-- **Latest accepted ADR:** ADR-039 — Trusted Statement Dates and Durable Source Provenance
-- **Current migration:** V6
+- **Latest verified completed increment:** Sprint 56
+- **Latest accepted ADR:** ADR-040 — Explicit Reviewed Partial-Overlap Import
+- **Current migration:** V7
 - **Architecture baseline:** Architecture v1.0 Frozen and UI/UX v1.0 Frozen
 - **Latest verified repository-maintenance change:** `7ee20a909038d1088f830a6ea588311625f415e5`
 - **Latest verified implementation-adjacent maintenance repair:** Axis bank-account CSV physical source-direction correction with independent balance evidence
-- **Latest recorded automated result:** 409 top-level tests across 49 suites, 0 failures and 0 unexpected skips in each of three consecutive exact canonical default-parallel TestPlan runs at Sprint 55 acceptance closure
+- **Sprint 56 supported family:** prospective `axis.bank-account.csv@1` bank-account statements in INR where every row has parser-verified Axis UPI event evidence, recognized rows form one contiguous prefix, unique rows one later suffix, and one existing account is authoritatively selected
+- **Sprint 56 result distinctions:** ordinary no-overlap imports remain full imports; exact-content duplicates resolve through ADR-030; full supported overlap remains whole-statement blocked; only an eligible reviewed prefix-overlap may commit as an explicitly partial session
+- **Sprint 56 persistence:** Migration V7, immutable reviewed-plan digests, SQLite/In-Memory provider parity, complete source preservation, typed row dispositions, explicit attempt counts and strict hydration/relaunch reconstruction are implemented
+- **Sprint 56 exclusions:** unsupported institutions, profiles, currencies, event families, interleaved overlap, arbitrary omission, fuzzy candidates, ownership override and historical repair remain unavailable
+- **Protected local recovery evidence:** an existing canonical Debug V5 database remains unresolved local-only recovery evidence; Sprint 56 neither opened nor migrated it, and no private contents are recorded here
+- **Latest recorded automated result:** 411 tests across 50 suites, 0 failures and 0 unexpected skips in each of three consecutive exact signed canonical default-parallel TestPlan runs at Sprint 56 acceptance closure
+- **Latest recorded build and analysis result:** signed Debug build, explicit optimized Release build, Debug analysis and Release analysis all passed at Sprint 56 acceptance closure
+- **Previous Sprint 55 automated result:** 409 top-level tests across 49 suites, 0 failures and 0 unexpected skips in each of three consecutive exact canonical default-parallel TestPlan runs
 - **Latest focused Sprint 55 results:** 41 Axis direction, fixture-oracle and confirmation-gate tests across 5 suites plus 64 adjacent event, validation, repository, atomicity and hydration tests across 6 suites, all with 0 failures and 0 unexpected skips
 - **Sprint 55 acceptance closure:** the first completion attempt exposed cross-suite interference between tests mutating shared runtime singleton stores; a bounded test-only asynchronous exclusivity trait now coordinates only those global-state tests across Swift Testing suites, retains ownership across suspension and restores the shared provider generation, runtime financial/history stores, diagnostics and development activity state after success or failure
 - **Sprint 55 overlap-period oracle:** the independent partial-overlap oracle now parses the declared start and end dates from the exact Axis CSV preamble, fails closed on malformed, missing, duplicated or conflicting period evidence and verifies that statement periods may extend beyond first/last transaction dates; the approved sanitized overlap fixture amounts, directions, event references and dispositions are unchanged
-- **Latest recorded build result:** Debug and explicit `-O` whole-module Release builds passed at Sprint 55 acceptance closure
+- **Previous Sprint 55 build result:** Debug and explicit `-O` whole-module Release builds passed
 - **Generic UI-test state:** `LedgerForgeUITests` remains intentionally disabled
 - **Sprint 55 runtime verification:** no manual runtime path was required because this correction changes parser financial truth and repository test evidence only; pipeline coverage verifies contradictory future source semantics are rejected before accepted persistence with unchanged runtime financial stores
 
@@ -500,6 +507,28 @@ American Express production parsing and durable card semantics remain unsupporte
 ---
 
 ## Recent Verified Changes
+
+### Sprint 56 — Explicit Reviewed Partial-Overlap Import
+
+**Ref**
+
+The single Sprint 56 completion commit containing this state update.
+
+**Verified scope**
+
+Sprint 56 accepts ADR-040 and adds additive Migration V7. The parser now owns a required immutable declared Axis statement period using `StatementDate`; the ordinary preview and partial review use that source period rather than transaction extrema.
+
+One bounded prospective family may proceed after provider-backed read-only review: `axis.bank-account.csv@1`, bank-account, INR, one selected existing account, complete valid reconciliation, supported account-scoped Axis UPI evidence on every row, one contiguous recognized prefix and one later unique suffix. Immutable reviewed plans bind provider generation, account, exact fingerprint, profile, period, currency, balances, complete source rows, financial projections, event owners, dispositions and counts through `ledgerforge.partial-import-plan.sha256.v1`.
+
+SQLite and In-Memory revalidate the complete plan atomically. Accepted partial sessions preserve the complete incoming document and normalized source graph, relate recognized incoming rows to unchanged durable transactions, create only unique-suffix transactions, and persist one summary, one disposition per row and one successful partial attempt with explicit counts. Stale, consumed, conflicting and losing paths write no accepted graph.
+
+RepositoryStoreHydrator reconstructs partial summaries, attempt counts, dispositions and recognized source relationships before one observer-consistent store replacement. Missing, duplicate, unknown, cross-document, missing-event, missing-transaction, malformed period/money and count inconsistencies fail closed.
+
+The Import Wizard, Dashboard activity, Import History, account history and Completed Imports presentation distinguish partial sessions. Review surfaces show only privacy-safe period, account, counts, balance evidence, unique impact and row dispositions.
+
+The approved sanitized Sprint 55 fixture pair remains the independent oracle: Source A has four unique supported events; Source B has three recognized events plus one later-only event. Acceptance verifies five total transactions, two documents/sessions, four B dispositions, unchanged recognized transactions with new source relationships and exact-B duplicate resolution.
+
+No canonical app launch or ordinary Debug/Release container access is part of Sprint 56 acceptance. The protected V5 Debug database remains unresolved local-only recovery evidence.
 
 ### Sprint 55 — Axis Source-Direction Correction and Partial-Overlap Evidence Closure
 

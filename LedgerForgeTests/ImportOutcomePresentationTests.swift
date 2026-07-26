@@ -234,6 +234,9 @@ struct ImportOutcomePresentationTests {
     @Test func everyKnownDurableOutcomeHasIndependentBoundedPresentation() {
         let expected: [(ImportAttemptOutcome, String, String)] = [
             (.successfulImport, "Import completed", "Persisted 2 transaction(s)"),
+            (.partialImportCommitted, "Partial import completed", "Persisted 2 new transaction(s) from a reviewed partial statement"),
+            (.reviewedPartialPlanStale, "Partial review out of date", "Repository truth changed after review. No new financial history was written"),
+            (.partialImportUnsupportedEvidence, "Partial import unavailable", "The complete statement does not meet the supported partial-import evidence boundary"),
             (.validationFailure, "Validation failed", "Validation failed before persistence"),
             (.persistenceFailure, "Persistence failed", "Persistence failed after validation"),
             (.exactStatementDuplicate, "Previously imported", "The exact statement was already imported. No new financial history was written"),
@@ -265,6 +268,7 @@ struct ImportOutcomePresentationTests {
     @Test func everyKnownCoverageHasIndependentBoundedPresentation() {
         let expected: [(ImportAttemptCoverage, String)] = [
             (.evaluatedSupportedOnly, "Supported transaction-event checks evaluated"),
+            (.allRowsSupportedAxisUPIReviewed, "Every row reviewed with supported account-scoped Axis UPI evidence"),
             (.unsupportedOrUnevaluated, "Some transaction-event families unsupported or not evaluated")
         ]
 
@@ -281,6 +285,7 @@ struct ImportOutcomePresentationTests {
     @Test func everyKnownGuidanceHasIndependentBoundedPresentation() {
         let expected: [(ImportAttemptGuidance, String)] = [
             (.importCompleted, "Import completed"),
+            (.partialImportCompleted, "Reviewed partial import completed"),
             (.reviewPriorImport, "Review the prior import"),
             (.supportedEventBlocked, "Review the supported transaction-event block"),
             (.correctValidationAndRetry, "Correct validation issues before retrying"),

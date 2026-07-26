@@ -59,4 +59,63 @@ struct RepositoryImportSession: Identifiable, Equatable {
     let completedAtISO: String?
     let validationStatus: String
     let parserVersion: String?
+    let partialImportSummary: RepositoryPartialImportSummary?
+    let incomingRowDispositions: [RepositoryIncomingRowDisposition]
+
+    init(
+        id: String,
+        workspaceId: String,
+        sourceDocumentName: String?,
+        startedAtISO: String,
+        completedAtISO: String?,
+        validationStatus: String,
+        parserVersion: String?,
+        partialImportSummary: RepositoryPartialImportSummary? = nil,
+        incomingRowDispositions: [RepositoryIncomingRowDisposition] = []
+    ) {
+        self.id = id
+        self.workspaceId = workspaceId
+        self.sourceDocumentName = sourceDocumentName
+        self.startedAtISO = startedAtISO
+        self.completedAtISO = completedAtISO
+        self.validationStatus = validationStatus
+        self.parserVersion = parserVersion
+        self.partialImportSummary = partialImportSummary
+        self.incomingRowDispositions = incomingRowDispositions
+    }
+}
+
+struct RepositoryPartialImportSummary: Equatable {
+    let documentId: String
+    let statementStartDate: StatementDate
+    let statementEndDate: StatementDate
+    let nativeCurrency: String
+    let sourceRowCount: Int
+    let importedTransactionCount: Int
+    let recognizedExistingRowCount: Int
+    let blockedRowCount: Int
+    let openingBalance: Money
+    let closingBalance: Money
+}
+
+enum RepositoryIncomingRowDispositionCode: String, Equatable {
+    case importedUnique = "imported_unique"
+    case recognizedExisting = "recognized_existing"
+}
+
+struct RepositoryIncomingRowDisposition: Identifiable, Equatable {
+    let id: String
+    let documentId: String
+    let normalizedRowId: String
+    let sourceOrdinal: Int
+    let code: RepositoryIncomingRowDispositionCode
+    let transactionId: String
+    let transactionEventIdentityId: String
+    let statementDate: StatementDate
+    let financialDateRole: String
+    let timezoneEvidence: String
+    let nativeCurrency: String
+    let amount: Money
+    let direction: String
+    let runningBalance: Money
 }

@@ -12,7 +12,11 @@ struct LedgerForgeApp: App {
     private static var sqliteProvider: SQLiteRepositoryProvider?
 
     init() {
-        Self.configurePersistence()
+        if Self.usesIsolatedTestPersistence() {
+            Self.configureInMemoryPersistenceForTesting()
+        } else {
+            Self.configurePersistence()
+        }
     }
 
     var body: some Scene {
@@ -54,6 +58,12 @@ struct LedgerForgeApp: App {
         DatabaseProvider.shared.invalidateGeneration()
         DatabaseProvider.shared = .intentionalNonDurable(.testMemory)
         sqliteProvider = nil
+    }
+
+    static func usesIsolatedTestPersistence(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        environment["LEDGERFORGE_TEST_HOST"] == "1"
     }
 
 #if DEBUG

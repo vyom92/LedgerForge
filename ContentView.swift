@@ -7,16 +7,21 @@
 import SwiftUI
 
 enum SettingsCompletedImportsPresentation: Equatable {
-    case available(Int)
+    case available(Int, partialCount: Int = 0)
     case unavailable
 
     var displayValue: String {
         switch self {
-        case .available(let count):
+        case .available(let count, _):
             return "\(count)"
         case .unavailable:
             return "Unavailable"
         }
+    }
+
+    var secondaryValue: String? {
+        guard case .available(_, let partialCount) = self else { return nil }
+        return "\(partialCount) partial"
     }
 }
 
@@ -29,13 +34,22 @@ enum SettingsPresentation {
             return .unavailable
         }
 
-        let completedCount = attempts.count {
-            $0.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue &&
+        let completedAttempts = attempts.filter {
+            [$0.outcomeCode].contains(where: {
+                $0 == ImportAttemptOutcome.successfulImport.rawValue ||
+                $0 == ImportAttemptOutcome.partialImportCommitted.rawValue
+            }) &&
             $0.persistenceCode == ImportAttemptPersistence.committed.rawValue &&
             $0.importSessionId != nil &&
             $0.documentId != nil
         }
-        return .available(completedCount)
+        let completedSessionIDs = Set(completedAttempts.compactMap(\.importSessionId))
+        let partialSessionIDs = Set(completedAttempts.compactMap {
+            $0.outcomeCode == ImportAttemptOutcome.partialImportCommitted.rawValue
+                ? $0.importSessionId
+                : nil
+        })
+        return .available(completedSessionIDs.count, partialCount: partialSessionIDs.count)
     }
 
     static func applicationVersion(infoDictionary: [String: Any]?) -> String {
@@ -202,6 +216,27 @@ struct DurableImportAttemptPresentation: Equatable {
                 iconName: "checkmark.circle.fill",
                 tone: .success
             )
+        case .partialImportCommitted:
+            return DurableImportPresentationValue(
+                label: "Partial import completed",
+                explanation: "Persisted \(transactionCount) new transaction(s) from a reviewed partial statement",
+                iconName: "checkmark.circle.fill",
+                tone: .success
+            )
+        case .reviewedPartialPlanStale:
+            return DurableImportPresentationValue(
+                label: "Partial review out of date",
+                explanation: "Repository truth changed after review. No new financial history was written",
+                iconName: "arrow.triangle.2.circlepath",
+                tone: .warning
+            )
+        case .partialImportUnsupportedEvidence:
+            return DurableImportPresentationValue(
+                label: "Partial import unavailable",
+                explanation: "The complete statement does not meet the supported partial-import evidence boundary",
+                iconName: "exclamationmark.triangle.fill",
+                tone: .warning
+            )
         case .validationFailure:
             return DurableImportPresentationValue(
                 label: "Validation failed",
@@ -296,6 +331,8 @@ struct DurableImportAttemptPresentation: Equatable {
         switch coverage {
         case .evaluatedSupportedOnly:
             return "Supported transaction-event checks evaluated"
+        case .allRowsSupportedAxisUPIReviewed:
+            return "Every row reviewed with supported account-scoped Axis UPI evidence"
         case .unsupportedOrUnevaluated:
             return "Some transaction-event families unsupported or not evaluated"
         }
@@ -308,6 +345,8 @@ struct DurableImportAttemptPresentation: Equatable {
         switch guidance {
         case .importCompleted:
             return "Import completed"
+        case .partialImportCompleted:
+            return "Reviewed partial import completed"
         case .reviewPriorImport:
             return "Review the prior import"
         case .supportedEventBlocked:
@@ -343,6 +382,9 @@ struct ImportOutcomePresentation: Equatable {
     let isPreviouslyImported: Bool
     let transactionEventBlock: TransactionEventBlock?
     var requiresReconciliation: Bool
+    let isPartialImport: Bool
+    let sourceRowCount: Int?
+    let recognizedExistingRowCount: Int?
 
     init(result: ImportEngineResult) {
         fileName = result.fileName
@@ -357,6 +399,9 @@ struct ImportOutcomePresentation: Equatable {
         isPreviouslyImported = result.previousImport != nil
         transactionEventBlock = result.transactionEventBlock
         requiresReconciliation = result.requiresReconciliation
+        isPartialImport = result.isPartialImport
+        sourceRowCount = result.sourceRowCount
+        recognizedExistingRowCount = result.recognizedExistingRowCount
 
         if result.previousImport != nil || result.transactionEventBlock != nil || result.persisted {
             message = result.errorMessage?.isEmpty == false ? result.errorMessage : nil
@@ -381,7 +426,7 @@ struct ImportOutcomePresentation: Equatable {
             iconName = "arrow.triangle.2.circlepath.circle.fill"
             tone = .warning
         } else if result.validationPassed && result.persisted {
-            persistenceStatus = "Persistence Succeeded"
+            persistenceStatus = result.isPartialImport ? "Partial Import Succeeded" : "Persistence Succeeded"
             iconName = "checkmark.circle.fill"
             tone = .success
         } else if result.validationPassed {
@@ -398,6 +443,9 @@ struct ImportOutcomePresentation: Equatable {
     var fileSubtitle: String {
         if isPreviouslyImported {
             return "Previously imported — no new data written"
+        }
+        if isPartialImport {
+            return "Partial import — \(transactionCount) new, \(recognizedExistingRowCount ?? 0) already represented, \(sourceRowCount ?? transactionCount) source rows"
         }
         if allowsViewingTransactions {
             return "Imported \(transactionCount) transaction(s)"
@@ -555,6 +603,7 @@ struct ContentView: View {
     @State private var preparationOwner = ImportPreparationTaskOwner()
     @State private var importIdentityReview: ImportIdentityReview = .unavailable
     @State private var importAccountChoice: ImportAccountChoice?
+    @State private var partialImportReview: PartialImportReviewResult = .ordinaryFullImport
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @StateObject private var accountsViewModel = AccountsViewModel()
     @StateObject private var importHistoryViewModel = ImportHistoryViewModel()
@@ -991,6 +1040,9 @@ struct ContentView: View {
                         LFInfoRow(title: "Accounts", value: "\(dashboardViewModel.accounts.count)")
                         LFInfoRow(title: "Transactions", value: "\(dashboardViewModel.transactionCount)")
                         LFInfoRow(title: "Completed Imports", value: completedImports.displayValue)
+                        if let partialValue = completedImports.secondaryValue {
+                            LFInfoRow(title: "Partial Imports", value: partialValue)
+                        }
                     }
                 }
                 .frame(width: 330)
@@ -1315,7 +1367,9 @@ struct ContentView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(session.sourceDocumentName ?? "Imported statement")
                                         .font(.caption.weight(.semibold))
-                                    Text("\(session.validationStatus) · \(session.transactionCount) transaction(s)")
+                                    Text(session.isPartialImport
+                                         ? "\(session.validationStatus) · Partial: \(session.transactionCount) new, \(session.recognizedExistingRowCount ?? 0) represented"
+                                         : "\(session.validationStatus) · \(session.transactionCount) transaction(s)")
                                         .font(.caption2)
                                         .foregroundStyle(LFTheme.textSecondary)
                                 }
@@ -1339,6 +1393,11 @@ struct ContentView: View {
                         LFInfoRow(title: "Source", value: session.sourceDocumentName ?? "Imported statement")
                         LFInfoRow(title: "Status", value: session.validationStatus)
                         LFInfoRow(title: "Transactions", value: "\(session.transactionCount)")
+                        if session.isPartialImport {
+                            LFInfoRow(title: "Import Type", value: "Reviewed partial import")
+                            LFInfoRow(title: "Source Rows", value: "\(session.sourceRowCount ?? 0)")
+                            LFInfoRow(title: "Already Represented", value: "\(session.recognizedExistingRowCount ?? 0)")
+                        }
                         if let parserVersion = session.parserVersion {
                             LFInfoRow(title: "Parser", value: parserVersion)
                         }
@@ -1840,7 +1899,10 @@ struct ContentView: View {
                                 Text(attempt.createdAtISO).font(.caption2).foregroundStyle(LFTheme.textSecondary)
                             }
                             Spacer()
-                            Text("\(attempt.transactionCount) transactions").font(.caption).foregroundStyle(LFTheme.textSecondary)
+                            Text(attempt.outcomeCode == ImportAttemptOutcome.partialImportCommitted.rawValue
+                                 ? "\(attempt.importedTransactionCount ?? attempt.transactionCount) new · partial"
+                                 : "\(attempt.transactionCount) transactions")
+                                .font(.caption).foregroundStyle(LFTheme.textSecondary)
                         }
                         .padding(9).background(LFTheme.surface.opacity(0.7)).clipShape(RoundedRectangle(cornerRadius: 7))
                     }
@@ -1855,6 +1917,12 @@ struct ContentView: View {
                 LFInfoRow(title: "Outcome", value: presentation.outcome.label)
                 LFInfoRow(title: "Coverage", value: presentation.coverage)
                 LFInfoRow(title: "Guidance", value: presentation.guidance)
+                if let sourceCount = attempt.sourceRowCount {
+                    LFInfoRow(title: "Source Rows", value: "\(sourceCount)")
+                    LFInfoRow(title: "Imported", value: "\(attempt.importedTransactionCount ?? 0)")
+                    LFInfoRow(title: "Already Represented", value: "\(attempt.recognizedExistingRowCount ?? 0)")
+                    LFInfoRow(title: "Blocked", value: "\(attempt.blockedRowCount ?? 0)")
+                }
                 if let accountID = attempt.accountId, accountsViewModel.accounts.contains(where: { $0.id == accountID }) {
                     Button("View Account") { accountsViewModel.selectAccount(repositoryAccountID: accountID); selectedSection = .accounts }
                         .font(.caption.weight(.semibold)).buttonStyle(.plain).foregroundStyle(LFTheme.primaryHover)
@@ -1898,6 +1966,7 @@ struct ContentView: View {
                     ForEach(accountsViewModel.accounts.filter { importIdentityReview.eligibleAccountIds.contains($0.id) }) { account in
                         Button {
                             importAccountChoice = .useExistingAccount(accountId: account.id)
+                            refreshPartialImportReview(preparedImport)
                         } label: {
                             HStack {
                                 VStack(alignment: .leading) {
@@ -1918,6 +1987,7 @@ struct ContentView: View {
                     }
                     Button {
                         importAccountChoice = .createNewAccount
+                        refreshPartialImportReview(preparedImport)
                     } label: {
                         HStack {
                             Text("Create New Account")
@@ -1936,6 +2006,10 @@ struct ContentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
+            if case .eligible(let plan) = partialImportReview {
+                partialImportReviewPanel(plan, preparedImport: preparedImport)
+            }
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("Transaction Preview")
                     .font(.subheadline.weight(.semibold))
@@ -1948,6 +2022,105 @@ struct ContentView: View {
             .background(LFTheme.surface.opacity(0.55))
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
+    }
+
+    private var importConfirmationLabel: String {
+        if case .eligible(let plan) = partialImportReview {
+            return "Import \(plan.importedCount) new transaction\(plan.importedCount == 1 ? "" : "s")"
+        }
+        return "Confirm Import"
+    }
+
+    private var partialReviewBlocksConfirmation: Bool {
+        switch partialImportReview {
+        case .fullSupportedOverlap, .repeatedIncomingEvidence, .ownershipConflict,
+                .repositoryIntegrityConflict:
+            return true
+        case .ordinaryFullImport, .eligible, .unsupportedEvidence:
+            return false
+        }
+    }
+
+    @MainActor
+    private func refreshPartialImportReview(_ preparedImport: PreparedImport) {
+        do {
+            partialImportReview = try ImportEngine.shared.reviewPreparedPartialImport(
+                preparedImport,
+                accountChoice: importAccountChoice
+            )
+        } catch {
+            partialImportReview = .unsupportedEvidence
+        }
+    }
+
+    private func partialImportReviewPanel(
+        _ plan: ReviewedPartialImportPlanDTO,
+        preparedImport: PreparedImport
+    ) -> some View {
+        let selectedAccount = accountsViewModel.accounts.first { $0.id == plan.existingAccountId }
+        let uniqueMinor = plan.rows
+            .filter { $0.disposition == .importedUnique }
+            .reduce(Int64.zero) { partial, row in
+                let result = partial.addingReportingOverflow(row.amountMinor)
+                return result.overflow ? partial : result.partialValue
+            }
+        let uniqueImpact = (try? Money(
+            amount: Decimal(uniqueMinor) / Decimal(100),
+            currency: plan.basePlan.proposedAccount.nativeCurrency
+        )).map { MoneyFormatting.display($0) } ?? "Unavailable"
+        let transactionsByOrdinal = Dictionary(
+            uniqueKeysWithValues: preparedImport.financialDocument.transactions.compactMap {
+                transaction in transaction.documentScopedSourceOrder.map { ($0.ordinal, transaction) }
+            }
+        )
+
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("Reviewed Partial Import")
+                .font(.headline)
+            Text("Parser-verified, account-scoped Axis UPI evidence recognizes the earlier rows. LedgerForge will preserve the complete statement and import only the reviewed later rows.")
+                .font(.caption)
+                .foregroundStyle(LFTheme.textSecondary)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                LFInfoRow(title: "Declared Period", value: "\(plan.basePlan.declaredStatementStartISO ?? "Unknown") – \(plan.basePlan.declaredStatementEndISO ?? "Unknown")")
+                LFInfoRow(title: "Selected Account", value: selectedAccount?.displayName ?? "Existing account")
+                LFInfoRow(title: "Source Rows", value: "\(plan.sourceRowCount)")
+                LFInfoRow(title: "Already Represented", value: "\(plan.recognizedCount)")
+                LFInfoRow(title: "New Transactions", value: "\(plan.importedCount)")
+                LFInfoRow(title: "Blocked", value: "\(plan.blockedCount)")
+                LFInfoRow(title: "Opening Balance Evidence", value: "\(plan.basePlan.proposedAccount.nativeCurrency) \(plan.basePlan.openingBalanceDecimal ?? "Unavailable")")
+                LFInfoRow(title: "Closing Balance Evidence", value: "\(plan.basePlan.proposedAccount.nativeCurrency) \(plan.basePlan.closingBalanceDecimal ?? "Unavailable")")
+                LFInfoRow(title: "New Native-Currency Impact", value: uniqueImpact)
+            }
+            VStack(spacing: 0) {
+                ForEach(plan.rows, id: \.sourceOrdinal) { row in
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(transactionsByOrdinal[row.sourceOrdinal]?.description ?? "Statement transaction")
+                                .lineLimit(1)
+                            Text("\(row.statementDateISO) · \(row.nativeCurrency) \(row.amountDecimal)")
+                                .font(.caption2)
+                                .foregroundStyle(LFTheme.textSecondary)
+                        }
+                        Spacer()
+                        Text(row.disposition == .recognizedExisting ? "Already represented" : "Will import")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(row.disposition == .recognizedExisting ? LFTheme.textSecondary : LFTheme.success)
+                    }
+                    .padding(.vertical, 7)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Statement row \(row.sourceOrdinal). \(row.disposition == .recognizedExisting ? "Already represented" : "Will import").")
+                    if row.sourceOrdinal != plan.rows.last?.sourceOrdinal { Divider() }
+                }
+            }
+            Text("Repository truth is rechecked atomically at confirmation. If it changes, no part of this reviewed plan will be imported.")
+                .font(.caption)
+                .foregroundStyle(LFTheme.warning)
+        }
+        .padding(12)
+        .background(LFTheme.primary.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Reviewed partial import. \(plan.recognizedCount) already represented. \(plan.importedCount) will import. Zero blocked.")
     }
 
     private func previewTransactionRow(_ transaction: Transaction) -> some View {
@@ -1985,7 +2158,7 @@ struct ContentView: View {
                         await confirmPreparedImport(preparedImport)
                     }
                 } label: {
-                    Label("Confirm Import", systemImage: "checkmark.circle")
+                    Label(importConfirmationLabel, systemImage: "checkmark.circle")
                         .labelStyle(.titleAndIcon)
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 32)
@@ -1997,7 +2170,10 @@ struct ContentView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
-                .disabled(importIdentityReview.isAvailable && importAccountChoice == nil)
+                .disabled(
+                    (importIdentityReview.isAvailable && importAccountChoice == nil) ||
+                    partialReviewBlocksConfirmation
+                )
             case .committing:
                 Label("Importing", systemImage: "hourglass")
                     .labelStyle(.titleAndIcon)
@@ -2333,6 +2509,7 @@ struct ContentView: View {
     private func beginPreparation(from url: URL) {
         importAccountChoice = nil
         importIdentityReview = .unavailable
+        partialImportReview = .ordinaryFullImport
         selectedFile = url.lastPathComponent
         importState = .preparing(fileName: url.lastPathComponent, phase: .openingSource)
         selectedSection = .imports
@@ -2360,6 +2537,9 @@ struct ContentView: View {
             importIdentityReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
                 ? (try ImportEngine.shared.reviewPreparedImport(preparedImport))
                 : .unavailable
+            partialImportReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
+                ? (try ImportEngine.shared.reviewPreparedPartialImport(preparedImport))
+                : .ordinaryFullImport
             guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
                 return
             }
@@ -2405,7 +2585,11 @@ struct ContentView: View {
         importState = .committing(preparedImport)
         let result = await ImportEngine.shared.commitPreparedImport(
             preparedImport,
-            accountChoice: importAccountChoice
+            accountChoice: importAccountChoice,
+            reviewedPartialPlan: {
+                if case .eligible(let plan) = partialImportReview { return plan }
+                return nil
+            }()
         )
 
         let outcome = ImportOutcomePresentation(result: result)
@@ -2429,6 +2613,7 @@ struct ContentView: View {
         }
         importAccountChoice = nil
         importIdentityReview = .unavailable
+        partialImportReview = .ordinaryFullImport
         selectedFile = fileName
         importState = .cancelled(fileName: fileName)
     }

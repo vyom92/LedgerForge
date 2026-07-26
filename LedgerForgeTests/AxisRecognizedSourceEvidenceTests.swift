@@ -90,7 +90,6 @@ struct AxisRecognizedSourceEvidenceTests {
         let parsed = try parse(
             rows: Self.validRows,
             sourceFragments: [
-                "Statement of Account No - 123456789012345 for the period (From : 01-01-2026 To : 31-01-2026)",
                 "Statement of Account No - 123456789012345 for the period (From : 01-01-2026 To : 31-01-2026)"
             ]
         )
@@ -115,7 +114,7 @@ struct AxisRecognizedSourceEvidenceTests {
         )
 
         #expect(parsed.transactions.count == Self.validRows.count)
-        #expect(parsed.financialIdentifiers.isEmpty)
+        #expect(parsed.financialIdentifiers.count == 1)
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -257,7 +256,11 @@ struct AxisRecognizedSourceEvidenceTests {
             },
             header: NormalizedRow(rowNumber: 1, values: Self.header),
             sourceContext: NormalizedDocument.SourceContext(
-                preTransactionFragments: sourceFragments.enumerated().map { index, text in
+                preTransactionFragments: (sourceFragments + (
+                    sourceFragments.contains { $0.contains(" for the period (") }
+                        ? []
+                        : ["Statement of Account No - 123456789012345 for the period (From : 01-01-2026 To : 31-01-2026)"]
+                )).enumerated().map { index, text in
                     NormalizedDocument.SourceFragment(sourceOrdinal: index + 1, text: text)
                 }
             )

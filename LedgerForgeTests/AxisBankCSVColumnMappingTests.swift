@@ -219,7 +219,15 @@ struct AxisBankCSVColumnMappingTests {
             rows: rows.enumerated().map { index, values in
                 NormalizedRow(rowNumber: index + 2, values: values)
             },
-            header: NormalizedRow(rowNumber: 1, values: header)
+            header: NormalizedRow(rowNumber: 1, values: header),
+            sourceContext: NormalizedDocument.SourceContext(
+                preTransactionFragments: [
+                    NormalizedDocument.SourceFragment(
+                        sourceOrdinal: 1,
+                        text: "Statement of Account No - 123456789012345 for the period (From : 01-01-2026 To : 31-01-2026)"
+                    )
+                ]
+            )
         )
 
         return try AxisBankAccountParser().parse(document: normalizedDocument)

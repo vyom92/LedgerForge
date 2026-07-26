@@ -1031,9 +1031,9 @@ Extend account choice beyond the bounded no-match workflow while preserving veri
 **Status:** Ready for discovery
 **Depends on:** Approved durable-attempt-history supported outcomes plus broader duplicate-management semantics
 
-Retain future work for duplicate override, partial import, broader duplicate management, ambiguous or speculative duplicate candidates and historical duplicate repair. The approved durable-attempt-history increment covers read-only review of currently supported exact-statement and Axis UPI outcomes only.
+Retain future work for duplicate override, broader duplicate management, unsupported partial-import families, ambiguous or speculative duplicate candidates and historical duplicate repair. Sprint 56 completes only the prospective, contiguous-prefix/later-suffix Axis bank-account CSV/INR family backed by parser-verified Axis UPI evidence.
 
-Sprint 55 closes `BLOCK-PARTIAL-ORACLE-01` for one narrow Axis UPI family with privacy-safe, independent evidence of exactly three shared supported events and one later-only supported event. This evidence does not authorize partial import. Discovery must still define the reviewed-row plan, transaction-time revalidation, contention and losing-path residue behavior, provider-owned atomic persistence, durable attempt/outcome semantics and explicit review UI. No schema or ADR decision was made.
+ADR-040 and Migration V7 now define and implement that bounded family with immutable reviewed plans, transaction-time revalidation, provider-owned atomic persistence, durable dispositions and explicit review. This does not complete broad duplicate management. Retain arbitrary override, fuzzy candidates, interleaved or unsupported evidence, other institutions/formats/event families, historical duplicate cleanup and repair, and deletion/reversal for separate architecture and acceptance.
 
 ---
 
@@ -1391,8 +1391,8 @@ Retain future work for speculative duplicate-transaction candidates, unsupported
 **Post-Sprint-45 lifecycle revalidation:** Complete
 **Planning state:** Ready for Chat planning
 **Implementation state:** Gated
-**Depends on:** Approval of the category UI behavior supplement and implementation planning against the current V6 and ADR-039 baseline
-**Migration expectation:** Additive Migration V7
+**Depends on:** Approval of the category UI behavior supplement and implementation planning against the current V7, ADR-039 and ADR-040 source-provenance baseline
+**Migration expectation:** Additive Migration V8
 
 Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` with a clean worktree and no implementation. Provider, migration and hydration assumptions were revalidated after Sprint 45, and ADR-036 is Accepted. Source implementation remains gated.
 
@@ -1412,7 +1412,7 @@ Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` wi
 - a dedicated category repository with SQLite and In-Memory parity;
 - a dedicated category store;
 - repository mutation followed by canonical `RepositoryStoreHydrator` refresh;
-- an additive Migration V7 from the current V6 schema.
+- an additive Migration V8 from the current V7 schema, revalidated against ADR-040 partial summaries, row dispositions and shared recognized-source relationships.
 
 ### Implementation prerequisites
 
@@ -1422,7 +1422,7 @@ Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` wi
 4. One repository-write activity lease must cover provider resolution, persistence and canonical reconciliation.
 5. SQLite and In-Memory provider parity must be demonstrable.
 6. Category hydration must publish one observer-consistent runtime snapshot.
-7. Migration V7 must be additive, preserve the V6 financial graph and be covered by clean-install and V6-to-V7 verification.
+7. Migration V8 must be additive, preserve the V7 financial and partial-source graph and be covered by clean-install and V7-to-V8 verification.
 8. Lifecycle backup verification must cover the category schema.
 9. Focused category lifecycle and recovery tests must be approved.
 

@@ -364,7 +364,125 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_transaction_raw_rows_transaction_row ON tr
     ]
 )
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6]
+public let migrationV7 = Migration(version: 7, name: "reviewed_partial_overlap_import", sql: """
+ALTER TABLE import_attempts ADD COLUMN source_row_count INTEGER;
+ALTER TABLE import_attempts ADD COLUMN imported_transaction_count INTEGER;
+ALTER TABLE import_attempts ADD COLUMN recognized_existing_row_count INTEGER;
+ALTER TABLE import_attempts ADD COLUMN blocked_row_count INTEGER;
+
+CREATE TABLE partial_import_summaries (
+  import_session_id TEXT PRIMARY KEY,
+  document_id TEXT NOT NULL UNIQUE,
+  plan_digest_algorithm TEXT NOT NULL,
+  plan_digest TEXT NOT NULL,
+  statement_start_date DATE NOT NULL,
+  statement_end_date DATE NOT NULL,
+  native_currency TEXT NOT NULL,
+  source_row_count INTEGER NOT NULL CHECK(source_row_count > 0),
+  imported_transaction_count INTEGER NOT NULL CHECK(imported_transaction_count > 0),
+  recognized_existing_row_count INTEGER NOT NULL CHECK(recognized_existing_row_count > 0),
+  blocked_row_count INTEGER NOT NULL CHECK(blocked_row_count = 0),
+  opening_balance_minor INTEGER NOT NULL,
+  opening_balance_decimal TEXT NOT NULL,
+  closing_balance_minor INTEGER NOT NULL,
+  closing_balance_decimal TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  CHECK(imported_transaction_count + recognized_existing_row_count = source_row_count),
+  CHECK(statement_start_date <= statement_end_date),
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE incoming_row_dispositions (
+  id TEXT PRIMARY KEY,
+  import_session_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  normalized_row_id TEXT NOT NULL UNIQUE,
+  source_ordinal INTEGER NOT NULL CHECK(source_ordinal > 0),
+  disposition_code TEXT NOT NULL CHECK(disposition_code IN ('imported_unique', 'recognized_existing')),
+  transaction_id TEXT NOT NULL,
+  transaction_event_identity_id TEXT NOT NULL,
+  statement_date DATE NOT NULL,
+  financial_date_role TEXT NOT NULL,
+  statement_timezone_evidence TEXT NOT NULL,
+  native_currency TEXT NOT NULL,
+  amount_minor INTEGER NOT NULL,
+  amount_decimal TEXT NOT NULL,
+  direction TEXT NOT NULL CHECK(direction IN ('debit', 'credit')),
+  running_balance_minor INTEGER NOT NULL,
+  created_at DATETIME NOT NULL,
+  UNIQUE(document_id, source_ordinal),
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_row_id) REFERENCES normalized_rows(id) ON DELETE RESTRICT,
+  FOREIGN KEY(transaction_id) REFERENCES transactions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(transaction_event_identity_id) REFERENCES transaction_event_identities(id) ON DELETE RESTRICT
+);
+
+CREATE TRIGGER validate_incoming_row_disposition
+BEFORE INSERT ON incoming_row_dispositions
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1
+    FROM normalized_rows nr
+    JOIN normalized_documents nd ON nd.id = nr.normalized_document_id
+    WHERE nr.id = NEW.normalized_row_id
+      AND nr.row_index = NEW.source_ordinal
+      AND nd.import_session_id = NEW.import_session_id
+      AND nd.document_id = NEW.document_id
+  ) THEN RAISE(ABORT, 'partial disposition source relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM transaction_raw_rows trr
+    WHERE trr.transaction_id = NEW.transaction_id
+      AND trr.normalized_row_id = NEW.normalized_row_id
+  ) THEN RAISE(ABORT, 'partial disposition transaction source relationship missing') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM transaction_event_identities tei
+    WHERE tei.id = NEW.transaction_event_identity_id
+      AND tei.transaction_id = NEW.transaction_id
+  ) THEN RAISE(ABORT, 'partial disposition event relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_partial_import_summary
+BEFORE INSERT ON partial_import_summaries
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d
+    WHERE d.id = NEW.document_id
+      AND d.import_session_id = NEW.import_session_id
+  ) THEN RAISE(ABORT, 'partial summary document relationship invalid') END;
+  SELECT CASE WHEN (
+    SELECT COUNT(*)
+    FROM normalized_documents nd
+    JOIN normalized_rows nr ON nr.normalized_document_id = nd.id
+    WHERE nd.import_session_id = NEW.import_session_id
+      AND nd.document_id = NEW.document_id
+  ) != NEW.source_row_count
+  THEN RAISE(ABORT, 'partial summary source count invalid') END;
+  SELECT CASE WHEN (
+    SELECT COUNT(*) FROM incoming_row_dispositions d
+    WHERE d.import_session_id = NEW.import_session_id
+      AND d.document_id = NEW.document_id
+  ) != NEW.source_row_count
+  THEN RAISE(ABORT, 'partial summary disposition count invalid') END;
+  SELECT CASE WHEN (
+    SELECT COUNT(*) FROM incoming_row_dispositions d
+    WHERE d.import_session_id = NEW.import_session_id
+      AND d.document_id = NEW.document_id
+      AND d.disposition_code = 'imported_unique'
+  ) != NEW.imported_transaction_count
+  THEN RAISE(ABORT, 'partial summary imported count invalid') END;
+  SELECT CASE WHEN (
+    SELECT COUNT(*) FROM incoming_row_dispositions d
+    WHERE d.import_session_id = NEW.import_session_id
+      AND d.document_id = NEW.document_id
+      AND d.disposition_code = 'recognized_existing'
+  ) != NEW.recognized_existing_row_count
+  THEN RAISE(ABORT, 'partial summary recognized count invalid') END;
+END;
+""")
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

@@ -3,10 +3,10 @@
 
 import Foundation
 
-nonisolated enum ImportAttemptOutcome: String, CaseIterable { case successfulImport = "successful_import", validationFailure = "validation_failure", persistenceFailure = "persistence_failure", exactStatementDuplicate = "exact_statement_duplicate", existingEligibleAxisUPIEvent = "existing_eligible_axis_upi_event", repeatedEligibleIncomingEvidence = "repeated_eligible_incoming_evidence", transactionEventOwnershipConflict = "transaction_event_ownership_conflict", repositoryIntegrityConflict = "repository_integrity_conflict", identityAmbiguity = "identity_ambiguity", identityConflict = "identity_conflict", staleAccountChoice = "stale_account_choice", staleProviderGeneration = "stale_provider_generation", sqliteContention = "sqlite_contention" }
-nonisolated enum ImportAttemptCoverage: String, CaseIterable { case evaluatedSupportedOnly = "evaluated_supported_only", unsupportedOrUnevaluated = "unsupported_or_unevaluated" }
+nonisolated enum ImportAttemptOutcome: String, CaseIterable { case successfulImport = "successful_import", partialImportCommitted = "partial_import_committed", reviewedPartialPlanStale = "reviewed_partial_plan_stale", partialImportUnsupportedEvidence = "partial_import_unsupported_evidence", validationFailure = "validation_failure", persistenceFailure = "persistence_failure", exactStatementDuplicate = "exact_statement_duplicate", existingEligibleAxisUPIEvent = "existing_eligible_axis_upi_event", repeatedEligibleIncomingEvidence = "repeated_eligible_incoming_evidence", transactionEventOwnershipConflict = "transaction_event_ownership_conflict", repositoryIntegrityConflict = "repository_integrity_conflict", identityAmbiguity = "identity_ambiguity", identityConflict = "identity_conflict", staleAccountChoice = "stale_account_choice", staleProviderGeneration = "stale_provider_generation", sqliteContention = "sqlite_contention" }
+nonisolated enum ImportAttemptCoverage: String, CaseIterable { case evaluatedSupportedOnly = "evaluated_supported_only", allRowsSupportedAxisUPIReviewed = "all_rows_supported_axis_upi_reviewed", unsupportedOrUnevaluated = "unsupported_or_unevaluated" }
 nonisolated enum ImportAttemptAccountDecision: String { case resolvedOrCreated = "resolved_or_created", selectedExisting = "selected_existing", noFinancialMutation = "no_financial_mutation", sideEffectsMayExist = "side_effects_may_exist" }
-nonisolated enum ImportAttemptGuidance: String, CaseIterable { case importCompleted = "import_completed", reviewPriorImport = "review_prior_import", supportedEventBlocked = "supported_event_blocked", correctValidationAndRetry = "correct_validation_and_retry", persistenceUnavailable = "persistence_unavailable", integrityReviewRequired = "integrity_review_required", prepareAgain = "prepare_again", retryConfirmation = "retry_confirmation" }
+nonisolated enum ImportAttemptGuidance: String, CaseIterable { case importCompleted = "import_completed", partialImportCompleted = "partial_import_completed", reviewPriorImport = "review_prior_import", supportedEventBlocked = "supported_event_blocked", correctValidationAndRetry = "correct_validation_and_retry", persistenceUnavailable = "persistence_unavailable", integrityReviewRequired = "integrity_review_required", prepareAgain = "prepare_again", retryConfirmation = "retry_confirmation" }
 nonisolated enum ImportAttemptPersistence: String { case committed, rejectedRecorded = "rejected_recorded", rejectedNotRecorded = "rejected_not_recorded", auditWriteUnavailable = "audit_write_unavailable" }
 
 public struct WorkspaceDTO: nonisolated Equatable, Sendable {
@@ -370,12 +370,13 @@ public struct TransactionEventIdentityDTO: nonisolated Equatable {
 }
 
 public struct TransactionEventIdentityOwnerDTO: nonisolated Equatable {
+    public let eventIdentityId: String
     public let accountId: String
     public let transactionId: String
     public let documentId: String
     public let importSessionId: String
-    public init(accountId: String, transactionId: String, documentId: String, importSessionId: String) {
-        self.accountId = accountId; self.transactionId = transactionId; self.documentId = documentId; self.importSessionId = importSessionId
+    public init(eventIdentityId: String = "", accountId: String, transactionId: String, documentId: String, importSessionId: String) {
+        self.eventIdentityId = eventIdentityId; self.accountId = accountId; self.transactionId = transactionId; self.documentId = documentId; self.importSessionId = importSessionId
     }
 }
 
@@ -396,18 +397,28 @@ public struct ImportAttemptDTO: nonisolated Equatable, Identifiable, Sendable {
     public let importSessionId: String?
     public let documentId: String?
     public let relatedImportSessionId: String?
+    public let sourceRowCount: Int?
+    public let importedTransactionCount: Int?
+    public let recognizedExistingRowCount: Int?
+    public let blockedRowCount: Int?
 
     public init(id: String = UUID().uuidString, workspaceId: String, createdAtISO: String,
                 outcomeCode: String, coverageCode: String, accountDecisionCode: String,
                 guidanceCode: String, persistenceCode: String, transactionCount: Int,
                 accountId: String? = nil, importSessionId: String? = nil,
-                documentId: String? = nil, relatedImportSessionId: String? = nil) {
+                documentId: String? = nil, relatedImportSessionId: String? = nil,
+                sourceRowCount: Int? = nil, importedTransactionCount: Int? = nil,
+                recognizedExistingRowCount: Int? = nil, blockedRowCount: Int? = nil) {
         self.id = id; self.workspaceId = workspaceId; self.createdAtISO = createdAtISO
         self.outcomeCode = outcomeCode; self.coverageCode = coverageCode
         self.accountDecisionCode = accountDecisionCode; self.guidanceCode = guidanceCode
         self.persistenceCode = persistenceCode; self.transactionCount = transactionCount
         self.accountId = accountId; self.importSessionId = importSessionId
         self.documentId = documentId; self.relatedImportSessionId = relatedImportSessionId
+        self.sourceRowCount = sourceRowCount
+        self.importedTransactionCount = importedTransactionCount
+        self.recognizedExistingRowCount = recognizedExistingRowCount
+        self.blockedRowCount = blockedRowCount
     }
 }
 
@@ -416,10 +427,77 @@ struct RepositoryImportAttempt: nonisolated Identifiable, Equatable {
     let accountDecisionCode: String; let guidanceCode: String; let persistenceCode: String
     let transactionCount: Int; let accountId: String?; let importSessionId: String?
     let documentId: String?; let relatedImportSessionId: String?
+    let sourceRowCount: Int?; let importedTransactionCount: Int?
+    let recognizedExistingRowCount: Int?; let blockedRowCount: Int?
     nonisolated init(_ dto: ImportAttemptDTO) {
         id = dto.id; createdAtISO = dto.createdAtISO; outcomeCode = dto.outcomeCode; coverageCode = dto.coverageCode
         accountDecisionCode = dto.accountDecisionCode; guidanceCode = dto.guidanceCode; persistenceCode = dto.persistenceCode
         transactionCount = dto.transactionCount; accountId = dto.accountId; importSessionId = dto.importSessionId; documentId = dto.documentId; relatedImportSessionId = dto.relatedImportSessionId
+        sourceRowCount = dto.sourceRowCount; importedTransactionCount = dto.importedTransactionCount
+        recognizedExistingRowCount = dto.recognizedExistingRowCount; blockedRowCount = dto.blockedRowCount
+    }
+}
+
+public struct PartialImportSummaryDTO: nonisolated Equatable, Sendable {
+    public let importSessionId: String
+    public let documentId: String
+    public let planDigestAlgorithm: String
+    public let planDigest: String
+    public let statementStartDateISO: String
+    public let statementEndDateISO: String
+    public let nativeCurrency: String
+    public let sourceRowCount: Int
+    public let importedTransactionCount: Int
+    public let recognizedExistingRowCount: Int
+    public let blockedRowCount: Int
+    public let openingBalanceMinor: Int64
+    public let openingBalanceDecimal: String
+    public let closingBalanceMinor: Int64
+    public let closingBalanceDecimal: String
+    public let createdAtISO: String
+
+    public init(importSessionId: String, documentId: String, planDigestAlgorithm: String, planDigest: String, statementStartDateISO: String, statementEndDateISO: String, nativeCurrency: String, sourceRowCount: Int, importedTransactionCount: Int, recognizedExistingRowCount: Int, blockedRowCount: Int, openingBalanceMinor: Int64, openingBalanceDecimal: String, closingBalanceMinor: Int64, closingBalanceDecimal: String, createdAtISO: String) {
+        self.importSessionId = importSessionId; self.documentId = documentId
+        self.planDigestAlgorithm = planDigestAlgorithm; self.planDigest = planDigest
+        self.statementStartDateISO = statementStartDateISO; self.statementEndDateISO = statementEndDateISO
+        self.nativeCurrency = nativeCurrency; self.sourceRowCount = sourceRowCount
+        self.importedTransactionCount = importedTransactionCount
+        self.recognizedExistingRowCount = recognizedExistingRowCount; self.blockedRowCount = blockedRowCount
+        self.openingBalanceMinor = openingBalanceMinor; self.openingBalanceDecimal = openingBalanceDecimal
+        self.closingBalanceMinor = closingBalanceMinor; self.closingBalanceDecimal = closingBalanceDecimal
+        self.createdAtISO = createdAtISO
+    }
+}
+
+public struct IncomingRowDispositionDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let importSessionId: String
+    public let documentId: String
+    public let normalizedRowId: String
+    public let sourceOrdinal: Int
+    public let dispositionCode: String
+    public let transactionId: String
+    public let transactionEventIdentityId: String
+    public let statementDateISO: String
+    public let financialDateRole: String
+    public let statementTimezoneEvidence: String
+    public let nativeCurrency: String
+    public let amountMinor: Int64
+    public let amountDecimal: String
+    public let direction: String
+    public let runningBalanceMinor: Int64
+    public let createdAtISO: String
+    public let eventTransactionId: String?
+
+    public init(id: String, importSessionId: String, documentId: String, normalizedRowId: String, sourceOrdinal: Int, dispositionCode: String, transactionId: String, transactionEventIdentityId: String, statementDateISO: String, financialDateRole: String, statementTimezoneEvidence: String, nativeCurrency: String, amountMinor: Int64, amountDecimal: String, direction: String, runningBalanceMinor: Int64, createdAtISO: String, eventTransactionId: String? = nil) {
+        self.id = id; self.importSessionId = importSessionId; self.documentId = documentId
+        self.normalizedRowId = normalizedRowId; self.sourceOrdinal = sourceOrdinal
+        self.dispositionCode = dispositionCode; self.transactionId = transactionId
+        self.transactionEventIdentityId = transactionEventIdentityId; self.statementDateISO = statementDateISO
+        self.financialDateRole = financialDateRole; self.statementTimezoneEvidence = statementTimezoneEvidence
+        self.nativeCurrency = nativeCurrency; self.amountMinor = amountMinor; self.amountDecimal = amountDecimal
+        self.direction = direction; self.runningBalanceMinor = runningBalanceMinor; self.createdAtISO = createdAtISO
+        self.eventTransactionId = eventTransactionId
     }
 }
 

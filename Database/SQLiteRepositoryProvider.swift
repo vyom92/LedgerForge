@@ -984,10 +984,10 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
         var result: [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] = [:]
         for key in keys {
             let rows = try db.query(
-                sql: "SELECT account_id, transaction_id, document_id, import_session_id FROM transaction_event_identities WHERE algorithm = ? AND digest = ?;",
+                sql: "SELECT id, account_id, transaction_id, document_id, import_session_id FROM transaction_event_identities WHERE algorithm = ? AND digest = ?;",
                 params: [key.algorithm, key.digest]
             ) { row in
-                TransactionEventIdentityOwnerDTO(accountId: row.string(at: 0) ?? "", transactionId: row.string(at: 1) ?? "", documentId: row.string(at: 2) ?? "", importSessionId: row.string(at: 3) ?? "")
+                TransactionEventIdentityOwnerDTO(eventIdentityId: row.string(at: 0) ?? "", accountId: row.string(at: 1) ?? "", transactionId: row.string(at: 2) ?? "", documentId: row.string(at: 3) ?? "", importSessionId: row.string(at: 4) ?? "")
             }
             if let owner = rows.first { result[key] = owner }
         }
@@ -1000,8 +1000,25 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
     }
 
     func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] {
-        try db.query(sql: "SELECT id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id FROM import_attempts WHERE workspace_id = ? ORDER BY created_at DESC, id DESC;", params: [workspaceId]) { row in
-            ImportAttemptDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", createdAtISO: row.string(at: 2) ?? "", outcomeCode: row.string(at: 3) ?? "", coverageCode: row.string(at: 4) ?? "", accountDecisionCode: row.string(at: 5) ?? "", guidanceCode: row.string(at: 6) ?? "", persistenceCode: row.string(at: 7) ?? "", transactionCount: Int(row.int64(at: 8) ?? 0), accountId: row.string(at: 9), importSessionId: row.string(at: 10), documentId: row.string(at: 11), relatedImportSessionId: row.string(at: 12))
+        let columns = try db.query(sql: "PRAGMA table_info(import_attempts);") { $0.string(at: 1) ?? "" }
+        let hasV7Counts = columns.contains("source_row_count")
+        let countSelection = hasV7Counts
+            ? ", source_row_count, imported_transaction_count, recognized_existing_row_count, blocked_row_count"
+            : ""
+        return try db.query(sql: "SELECT id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id\(countSelection) FROM import_attempts WHERE workspace_id = ? ORDER BY created_at DESC, id DESC;", params: [workspaceId]) { row in
+            ImportAttemptDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", createdAtISO: row.string(at: 2) ?? "", outcomeCode: row.string(at: 3) ?? "", coverageCode: row.string(at: 4) ?? "", accountDecisionCode: row.string(at: 5) ?? "", guidanceCode: row.string(at: 6) ?? "", persistenceCode: row.string(at: 7) ?? "", transactionCount: Int(row.int64(at: 8) ?? 0), accountId: row.string(at: 9), importSessionId: row.string(at: 10), documentId: row.string(at: 11), relatedImportSessionId: row.string(at: 12), sourceRowCount: hasV7Counts ? row.int64(at: 13).map(Int.init) : nil, importedTransactionCount: hasV7Counts ? row.int64(at: 14).map(Int.init) : nil, recognizedExistingRowCount: hasV7Counts ? row.int64(at: 15).map(Int.init) : nil, blockedRowCount: hasV7Counts ? row.int64(at: 16).map(Int.init) : nil)
+        }
+    }
+
+    func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? {
+        try db.query(sql: "SELECT import_session_id, document_id, plan_digest_algorithm, plan_digest, statement_start_date, statement_end_date, native_currency, source_row_count, imported_transaction_count, recognized_existing_row_count, blocked_row_count, opening_balance_minor, opening_balance_decimal, closing_balance_minor, closing_balance_decimal, created_at FROM partial_import_summaries WHERE import_session_id = ?;", params: [importSessionId]) { row in
+            PartialImportSummaryDTO(importSessionId: row.string(at: 0) ?? "", documentId: row.string(at: 1) ?? "", planDigestAlgorithm: row.string(at: 2) ?? "", planDigest: row.string(at: 3) ?? "", statementStartDateISO: row.string(at: 4) ?? "", statementEndDateISO: row.string(at: 5) ?? "", nativeCurrency: row.string(at: 6) ?? "", sourceRowCount: Int(row.int64(at: 7) ?? 0), importedTransactionCount: Int(row.int64(at: 8) ?? 0), recognizedExistingRowCount: Int(row.int64(at: 9) ?? 0), blockedRowCount: Int(row.int64(at: 10) ?? 0), openingBalanceMinor: row.int64(at: 11) ?? 0, openingBalanceDecimal: row.string(at: 12) ?? "", closingBalanceMinor: row.int64(at: 13) ?? 0, closingBalanceDecimal: row.string(at: 14) ?? "", createdAtISO: row.string(at: 15) ?? "")
+        }.first
+    }
+
+    func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] {
+        try db.query(sql: "SELECT d.id, d.import_session_id, d.document_id, d.normalized_row_id, d.source_ordinal, d.disposition_code, d.transaction_id, d.transaction_event_identity_id, d.statement_date, d.financial_date_role, d.statement_timezone_evidence, d.native_currency, d.amount_minor, d.amount_decimal, d.direction, d.running_balance_minor, d.created_at, e.transaction_id FROM incoming_row_dispositions d LEFT JOIN transaction_event_identities e ON e.id = d.transaction_event_identity_id WHERE d.import_session_id = ? ORDER BY d.source_ordinal, d.id;", params: [importSessionId]) { row in
+            IncomingRowDispositionDTO(id: row.string(at: 0) ?? "", importSessionId: row.string(at: 1) ?? "", documentId: row.string(at: 2) ?? "", normalizedRowId: row.string(at: 3) ?? "", sourceOrdinal: Int(row.int64(at: 4) ?? 0), dispositionCode: row.string(at: 5) ?? "", transactionId: row.string(at: 6) ?? "", transactionEventIdentityId: row.string(at: 7) ?? "", statementDateISO: row.string(at: 8) ?? "", financialDateRole: row.string(at: 9) ?? "", statementTimezoneEvidence: row.string(at: 10) ?? "", nativeCurrency: row.string(at: 11) ?? "", amountMinor: row.int64(at: 12) ?? 0, amountDecimal: row.string(at: 13) ?? "", direction: row.string(at: 14) ?? "", runningBalanceMinor: row.int64(at: 15) ?? 0, createdAtISO: row.string(at: 16) ?? "", eventTransactionId: row.string(at: 17))
         }
     }
 
@@ -1190,7 +1207,7 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
     }
 
     private func insertImportAttempt(_ payload: ImportAttemptDTO) throws {
-        try db.executePrepared(sql: "INSERT INTO import_attempts (id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [payload.id, payload.workspaceId, payload.createdAtISO, payload.outcomeCode, payload.coverageCode, payload.accountDecisionCode, payload.guidanceCode, payload.persistenceCode, payload.transactionCount, payload.accountId ?? NSNull(), payload.importSessionId ?? NSNull(), payload.documentId ?? NSNull(), payload.relatedImportSessionId ?? NSNull()])
+        try db.executePrepared(sql: "INSERT INTO import_attempts (id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id, source_row_count, imported_transaction_count, recognized_existing_row_count, blocked_row_count) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [payload.id, payload.workspaceId, payload.createdAtISO, payload.outcomeCode, payload.coverageCode, payload.accountDecisionCode, payload.guidanceCode, payload.persistenceCode, payload.transactionCount, payload.accountId ?? NSNull(), payload.importSessionId ?? NSNull(), payload.documentId ?? NSNull(), payload.relatedImportSessionId ?? NSNull(), payload.sourceRowCount ?? NSNull(), payload.importedTransactionCount ?? NSNull(), payload.recognizedExistingRowCount ?? NSNull(), payload.blockedRowCount ?? NSNull()])
     }
 }
 

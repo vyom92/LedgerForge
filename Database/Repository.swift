@@ -156,13 +156,22 @@ public protocol ImportSessionRepository {
     func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO]
     func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String
     func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO]
+    func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO?
+    func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO]
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult
+}
+
+public extension ImportSessionRepository {
+    func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? { nil }
+    func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] { [] }
 }
 
 /// This deliberately does not expose a generic transaction closure. Providers
 /// own the full accepted-import graph and may only return bounded outcomes.
 public protocol ConfirmedImportRepository {
+    func reviewPartialImport(_ plan: ConfirmedImportPlanDTO) -> PartialImportReviewResult
     func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult
+    func commitReviewedPartialImport(_ plan: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult
 }
 
 public struct PartialImportSessionUpdate {
@@ -322,6 +331,8 @@ private struct GenerationCheckedImportSessionRepository: ImportSessionRepository
     func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] { try validity.check(); return try base.transactionEventOwners(keys: keys) }
     func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String { try validity.check(); return try base.recordImportAttempt(payload) }
     func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] { try validity.check(); return try base.importAttempts(workspaceId: workspaceId) }
+    func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? { try validity.check(); return try base.partialImportSummary(importSessionId: importSessionId) }
+    func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] { try validity.check(); return try base.incomingRowDispositions(importSessionId: importSessionId) }
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult { try validity.check(); return try base.commitImportHistory(payload) }
 }
 
@@ -409,7 +420,15 @@ struct PlaceholderImportSessionRepo: ImportSessionRepository {
 public struct PlaceholderConfirmedImportRepo: ConfirmedImportRepository {
     public init() {}
 
+    public func reviewPartialImport(_ plan: ConfirmedImportPlanDTO) -> PartialImportReviewResult {
+        .repositoryIntegrityConflict
+    }
+
     public func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
+        .persistenceUnavailable
+    }
+
+    public func commitReviewedPartialImport(_ plan: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult {
         .persistenceUnavailable
     }
 }

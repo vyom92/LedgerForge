@@ -49,6 +49,9 @@ struct AccountImportHistoryPresentation: Identifiable, Equatable {
     let firstTransactionDate: StatementDate?
     let lastTransactionDate: StatementDate?
     let currencyCode: String?
+    let isPartialImport: Bool
+    let sourceRowCount: Int?
+    let recognizedExistingRowCount: Int?
 }
 
 enum AccountDisplayNameEditState: Equatable {
@@ -310,10 +313,13 @@ final class AccountsViewModel: ObservableObject {
                 completedAtISO: session.completedAtISO,
                 validationStatus: session.validationStatus,
                 parserVersion: session.parserVersion,
-                transactionCount: sessionTransactions.count,
-                firstTransactionDate: sortedDates.first,
-                lastTransactionDate: sortedDates.last,
-                currencyCode: currencies.count == 1 ? currencies.first : nil
+                transactionCount: session.partialImportSummary?.importedTransactionCount ?? sessionTransactions.count,
+                firstTransactionDate: session.partialImportSummary?.statementStartDate ?? sortedDates.first,
+                lastTransactionDate: session.partialImportSummary?.statementEndDate ?? sortedDates.last,
+                currencyCode: session.partialImportSummary?.nativeCurrency ?? (currencies.count == 1 ? currencies.first : nil),
+                isPartialImport: session.partialImportSummary != nil,
+                sourceRowCount: session.partialImportSummary?.sourceRowCount,
+                recognizedExistingRowCount: session.partialImportSummary?.recognizedExistingRowCount
             )
         }
         .sorted { lhs, rhs in

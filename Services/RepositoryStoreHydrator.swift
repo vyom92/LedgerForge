@@ -37,6 +37,7 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
     case decimalMinorMismatch
     case accountCurrencyMismatch
     case runningBalanceCurrencyMismatch
+    case invalidPartialImport(String)
 
     var errorDescription: String? {
         switch self {
@@ -60,6 +61,8 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
             return "A transaction currency does not match its account."
         case .runningBalanceCurrencyMismatch:
             return "A running-balance currency does not match its account."
+        case .invalidPartialImport:
+            return "Persisted partial-import provenance is invalid. Runtime data was not replaced."
         }
     }
 }
@@ -207,11 +210,20 @@ final class RepositoryStoreHydrator {
             }
         ).sorted()
 
+        let transactionsByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
         return try referencedSessionIDs.compactMap { sessionID in
             guard let session = try importSessionRepo.importSession(id: sessionID),
                   session.workspaceId == workspaceId else {
                 return nil
             }
+            let summaryDTO = try importSessionRepo.partialImportSummary(importSessionId: sessionID)
+            let dispositionDTOs = try importSessionRepo.incomingRowDispositions(importSessionId: sessionID)
+            let partial = try Self.partialImportRuntime(
+                sessionID: sessionID,
+                summary: summaryDTO,
+                dispositions: dispositionDTOs,
+                transactionsByID: transactionsByID
+            )
             return RepositoryImportSession(
                 id: session.id,
                 workspaceId: session.workspaceId,
@@ -219,9 +231,115 @@ final class RepositoryStoreHydrator {
                 startedAtISO: session.startedAtISO,
                 completedAtISO: session.completedAtISO,
                 validationStatus: session.validationStatus,
-                parserVersion: session.parserVersion
+                parserVersion: session.parserVersion,
+                partialImportSummary: partial.summary,
+                incomingRowDispositions: partial.dispositions
             )
         }
+    }
+
+    private static func partialImportRuntime(
+        sessionID: String,
+        summary: PartialImportSummaryDTO?,
+        dispositions: [IncomingRowDispositionDTO],
+        transactionsByID: [String: TransactionDTO]
+    ) throws -> (summary: RepositoryPartialImportSummary?, dispositions: [RepositoryIncomingRowDisposition]) {
+        guard let summary else {
+            guard dispositions.isEmpty else {
+                throw RepositoryStoreHydrationError.invalidPartialImport("dispositions without summary")
+            }
+            return (nil, [])
+        }
+        guard summary.importSessionId == sessionID,
+              summary.planDigestAlgorithm == ReviewedPartialImportPlanDTO.digestAlgorithm,
+              !summary.planDigest.isEmpty,
+              summary.sourceRowCount > 0,
+              summary.importedTransactionCount > 0,
+              summary.recognizedExistingRowCount > 0,
+              summary.blockedRowCount == 0,
+              summary.importedTransactionCount + summary.recognizedExistingRowCount == summary.sourceRowCount,
+              dispositions.count == summary.sourceRowCount,
+              Set(dispositions.map(\.id)).count == dispositions.count,
+              Set(dispositions.map(\.normalizedRowId)).count == dispositions.count,
+              Set(dispositions.map(\.sourceOrdinal)).count == dispositions.count,
+              let start = try? StatementDate(canonical: summary.statementStartDateISO),
+              let end = try? StatementDate(canonical: summary.statementEndDateISO),
+              start <= end,
+              let opening = try? Money(canonicalDecimal: summary.openingBalanceDecimal, currency: summary.nativeCurrency),
+              let closing = try? Money(canonicalDecimal: summary.closingBalanceDecimal, currency: summary.nativeCurrency),
+              (try? opening.minorUnits()) == summary.openingBalanceMinor,
+              (try? closing.minorUnits()) == summary.closingBalanceMinor else {
+            throw RepositoryStoreHydrationError.invalidPartialImport("invalid summary")
+        }
+
+        let runtimeRows: [RepositoryIncomingRowDisposition] = try dispositions.sorted { $0.sourceOrdinal < $1.sourceOrdinal }.map { row in
+            guard row.importSessionId == sessionID,
+                  row.documentId == summary.documentId,
+                  row.sourceOrdinal > 0,
+                  let code = RepositoryIncomingRowDispositionCode(rawValue: row.dispositionCode),
+                  !row.transactionEventIdentityId.isEmpty,
+                  row.eventTransactionId == row.transactionId,
+                  let transaction = transactionsByID[row.transactionId],
+                  transaction.rawRows.contains(where: {
+                      $0.normalizedRowId == row.normalizedRowId &&
+                      $0.sourceOrdinal == row.sourceOrdinal
+                  }),
+                  let date = try? StatementDate(canonical: row.statementDateISO),
+                  start <= date, date <= end,
+                  row.nativeCurrency == summary.nativeCurrency,
+                  let amount = try? Money(canonicalDecimal: row.amountDecimal, currency: row.nativeCurrency),
+                  let runningBalance = try? Money(
+                      amount: Decimal(row.runningBalanceMinor) / Decimal(100),
+                      currency: row.nativeCurrency
+                  ),
+                  (try? amount.minorUnits()) == row.amountMinor,
+                  ["debit", "credit"].contains(row.direction),
+                  transaction.postedDateISO == row.statementDateISO,
+                  transaction.financialDateRole == row.financialDateRole,
+                  transaction.statementTimezoneEvidence == row.statementTimezoneEvidence,
+                  transaction.nativeCurrency == row.nativeCurrency,
+                  transaction.amountMinor == row.amountMinor,
+                  transaction.amountDecimal == row.amountDecimal,
+                  transaction.direction == row.direction,
+                  transaction.runningBalanceMinor == row.runningBalanceMinor else {
+                throw RepositoryStoreHydrationError.invalidPartialImport("invalid row disposition")
+            }
+            return RepositoryIncomingRowDisposition(
+                id: row.id,
+                documentId: row.documentId,
+                normalizedRowId: row.normalizedRowId,
+                sourceOrdinal: row.sourceOrdinal,
+                code: code,
+                transactionId: row.transactionId,
+                transactionEventIdentityId: row.transactionEventIdentityId,
+                statementDate: date,
+                financialDateRole: row.financialDateRole,
+                timezoneEvidence: row.statementTimezoneEvidence,
+                nativeCurrency: row.nativeCurrency,
+                amount: amount,
+                direction: row.direction,
+                runningBalance: runningBalance
+            )
+        }
+        guard runtimeRows.filter({ $0.code == .importedUnique }).count == summary.importedTransactionCount,
+              runtimeRows.filter({ $0.code == .recognizedExisting }).count == summary.recognizedExistingRowCount else {
+            throw RepositoryStoreHydrationError.invalidPartialImport("disposition counts disagree")
+        }
+        return (
+            RepositoryPartialImportSummary(
+                documentId: summary.documentId,
+                statementStartDate: start,
+                statementEndDate: end,
+                nativeCurrency: summary.nativeCurrency,
+                sourceRowCount: summary.sourceRowCount,
+                importedTransactionCount: summary.importedTransactionCount,
+                recognizedExistingRowCount: summary.recognizedExistingRowCount,
+                blockedRowCount: summary.blockedRowCount,
+                openingBalance: opening,
+                closingBalance: closing
+            ),
+            runtimeRows
+        )
     }
 
     private static func accounts(

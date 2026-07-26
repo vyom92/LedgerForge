@@ -28,8 +28,8 @@ When reading this file:
 **Status alignment date:** 2026-07-24  
 **Repository ref reviewed:** `main@686e3b91bfbf9459a38e9137abee6a2588ecec7f`  
 **Latest verified implementation:** `11035461ce3de0f11ae5262bbc8a38b9639607b2` — Sprint 53  
-**Latest accepted ADR:** ADR-039  
-**Current migration:** V6
+**Latest accepted ADR:** ADR-040
+**Current migration:** V7
 
 No alignment note authorizes implementation.
 
@@ -76,6 +76,7 @@ No alignment note authorizes implementation.
 | ADR-037 | Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal | Accepted contract-first architecture; no executable mutation family implemented. | The shared lifecycle remains architecture-only. |
 | ADR-038 | Atomic Confirmed Import and Durable Identifier Ownership | Accepted and implemented in Sprint 50. | Migration V5, provider-owned atomic confirmed import, durable identifier ownership/observations, provider parity and subprocess contention acceptance are operational. |
 | ADR-039 | Trusted Statement Dates and Durable Source Provenance | Accepted and implemented in Sprint 52, with Sprint 52A corrective closure. | Migration V6, StatementDate, date-role/timezone evidence, parser-profile provenance, source ordinal/digest relationships and strict hydration are operational. |
+| ADR-040 | Explicit Reviewed Partial-Overlap Import | Accepted and implemented in Sprint 56. | One bounded Axis bank-account CSV/INR/verified-UPI prefix-overlap family, Migration V7, immutable reviewed plans, atomic provider commit and strict hydration are operational. |
 
 ## Alignment Policy
 
@@ -1922,6 +1923,8 @@ Sprint 39 does not include transaction-level duplicate detection, overlapping-st
 
 # ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking
 
+> **Current alignment — ADR-040:** The whole-import supported-overlap rule remains authoritative except for ADR-040's exact reviewed Axis CSV/INR family. That exception requires a recognized contiguous prefix, a later unique suffix, complete supported account-scoped Axis UPI evidence and provider-owned atomic revalidation.
+
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented in Sprint 41; concurrency boundary extended by ADR-038 implementation.
@@ -2091,6 +2094,8 @@ This ADR does not implement parser extraction, domain models, repository lookup,
 ---
 
 # ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics
+
+> **Current alignment — ADR-040:** A committed reviewed partial import creates one successful completed session and one successful partial attempt with explicit source/imported/recognized/blocked counts. Historical attempts retain nullable counts and are not reinterpreted.
 
 ## Current Alignment — 2026-07-24
 
@@ -4348,6 +4353,8 @@ This ADR must be marked **Accepted** before source-level financial-mutation cont
 
 # ADR-038 — Atomic Confirmed Import and Durable Identifier Ownership
 
+> **Current alignment — ADR-040:** The accepted confirmed-import graph now has one additional bounded form. For an eligible reviewed partial plan, the provider atomically preserves the complete incoming source graph and dispositions while creating financial transactions only for the unique suffix; every stale or losing path rejects the whole plan.
+
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented in Sprint 50.
@@ -4605,6 +4612,8 @@ No production guarantee may be recorded until implementation, migration safety w
 
 # ADR-039 — Trusted Statement Dates and Durable Source Provenance
 
+> **Current alignment — ADR-040:** Trusted source relationships now include typed incoming-row dispositions for the bounded partial family. Recognized rows relate the new normalized source row to the unchanged durable transaction and event identity; `transaction_raw_rows.contribution_type` is descriptive only.
+
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented in Sprint 52, with Sprint 52A corrective closure.
@@ -4653,7 +4662,51 @@ Generic transaction replacement rejects trusted DTOs. Only the provider-owned co
 - Corrected current implementation status for ADR-033, ADR-035, ADR-038 and ADR-039.
 - Recorded Sprint 50's effect on the historical non-atomicity limitations in ADR-029 through ADR-032 and ADR-037.
 - Recorded the current pipeline ordering governed by ADR-030, ADR-031, ADR-032, ADR-038 and ADR-039.
+
+---
+
+# ADR-040 — Explicit Reviewed Partial-Overlap Import
+
+**Status:** Accepted and implemented in Sprint 56
+**Scope:** Prospective imports only
+**Migration:** V7
+
+## Context
+
+Whole-statement blocking remains the safe default for transaction-event overlap. Independent sanitized Axis evidence proves one narrower case in which a complete later statement contains a contiguous prefix already represented by immutable durable transactions and a contiguous later suffix of unique events. Silently dropping the prefix would be false source history; duplicating it would be false financial history.
+
+## Decision
+
+LedgerForge permits partial import only for `axis.bank-account.csv@1`, bank-account statements in INR, one authoritatively selected existing immutable account, a valid parser-owned declared statement period, complete validation and running-balance reconciliation, and parser-verified `ledgerforge.transaction-event.axis-upi-reference.v1` evidence on every row. At least one row must be recognized and at least one unique; recognized rows must be one contiguous source-order prefix and unique rows one later suffix. Every recognized financial projection must exactly agree with its durable transaction.
+
+The read-only provider review produces an immutable, process-local, single-use plan bound to provider generation, account decision, exact fingerprint, profile, declared period, currency, balances, complete document, ordered source rows, normalized row IDs and digests, financial projections, supported event digests, expected recognized transaction/event owners, dispositions and counts. `ledgerforge.partial-import-plan.sha256.v1` hashes deterministic explicit length-prefixed UTF-8 components. It excludes filenames, paths, narration, raw account identifiers and raw UPI references.
+
+Confirmation is explicit. SQLite revalidates inside `BEGIN IMMEDIATE`; In-Memory performs the equivalent serialized copy-on-write operation. Both independently validate the plan digest and every reviewed assumption. They never recompute a smaller subset. A stale, consumed, conflicting or malformed plan rejects completely.
+
+A committed partial result creates one completed successful session; the complete source document and exact fingerprint; one normalized document and every normalized row; only unique-suffix transactions and their event identities; incoming relationships from recognized rows to unchanged existing transactions and event identities; exactly one typed disposition per incoming row; one partial summary; and one successful partial attempt with explicit source/imported/recognized/blocked counts. Historical attempts remain nullable and receive no invented backfill.
+
+`recognized_existing` and `imported_unique` are the only accepted disposition values. The disposition record is authoritative; `transaction_raw_rows.contribution_type` is not. Recognized transactions retain their original session, document and financial values. Opening, closing and running balances remain document evidence and do not overwrite account balance authority.
+
+Exact-content authority remains ADR-030: reimport of the committed partial source resolves to its prior partial session. RepositoryStoreHydrator remains the sole persistence-to-runtime boundary and fails closed before store mutation on missing, duplicate, unknown, cross-document or financially inconsistent partial provenance.
+
+## Privacy and presentation
+
+Review and history presentation may expose declared period, selected account display name, bounded counts, balance evidence, unique-suffix native-currency impact and privacy-safe row dispositions. They must not expose raw UPI references, identifiers, event or plan digests, database IDs, source paths or persistence codes. Completed Imports counts full and partial completed sessions while presenting the partial subset separately.
+
+## Amendments
+
+ADR-040 narrowly amends:
+
+- ADR-031 whole-import supported-overlap blocking for this family only;
+- ADR-032 attempt and successful-session semantics;
+- ADR-038 accepted confirmed-import graph ownership;
+- ADR-039 trusted incoming source relationships.
+
+ADR-030 exact-content fingerprint authority is unchanged.
+
+## Exclusions
+
+This decision does not authorize historical repair, arbitrary row selection, ownership override, fuzzy matching, unsupported event families, cross-format identity, deletion/reversal, batch import or generic mutation infrastructure. All other overlap remains whole-statement blocked.
 - Recorded ADR-036's satisfied durable-transaction-ID prerequisite and expected V7 direction.
 - Preserved current production support as the approved shared Axis bank-account CSV grammar only.
 - Authorized no implementation, migration or new ADR.
-

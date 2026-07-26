@@ -136,6 +136,9 @@ enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
     case malformedAccountIdentifierEvidence(sourceOrdinal: Int)
     case invalidAccountIdentifier(sourceOrdinal: Int)
     case conflictingAccountIdentifiers
+    case missingDeclaredStatementPeriod
+    case malformedDeclaredStatementPeriod(sourceOrdinal: Int)
+    case conflictingDeclaredStatementPeriods
 
     var errorDescription: String? {
         switch self {
@@ -157,6 +160,12 @@ enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
             return "Axis account identifier evidence on source row \(sourceOrdinal) cannot form a verified identifier."
         case .conflictingAccountIdentifiers:
             return "Axis account identifier evidence contains conflicting recognized values."
+        case .missingDeclaredStatementPeriod:
+            return "The supported Axis statement is missing its declared statement period."
+        case .malformedDeclaredStatementPeriod(let sourceOrdinal):
+            return "Axis declared statement-period evidence on source row \(sourceOrdinal) is malformed."
+        case .conflictingDeclaredStatementPeriods:
+            return "Axis declared statement-period evidence is duplicated or conflicting."
         }
     }
 }
@@ -188,7 +197,6 @@ final class AxisBankAccountParser: StatementParser {
         let financialIdentifiers = try Self.financialIdentifiers(
             from: document.sourceContext.preTransactionFragments
         )
-
         guard let header = document.header else {
             throw AxisBankAccountParserError.missingHeader
         }
@@ -197,11 +205,15 @@ final class AxisBankAccountParser: StatementParser {
         )
 
         guard !document.rows.isEmpty else {
+            let declaredStatementPeriod = try Self.declaredStatementPeriod(
+                from: document.sourceContext.preTransactionFragments
+            )
             return FinancialDocument(
                 sourceDocument: document.document,
                 metadata: document.metadata,
                 parserName: name,
                 bookedCurrency: currency,
+                declaredStatementPeriod: declaredStatementPeriod,
                 transactions: [],
                 financialIdentifiers: financialIdentifiers
             )
@@ -300,11 +312,16 @@ final class AxisBankAccountParser: StatementParser {
             transactions.append(transaction)
         }
 
+        let declaredStatementPeriod = try Self.declaredStatementPeriod(
+            from: document.sourceContext.preTransactionFragments
+        )
+
         return FinancialDocument(
             sourceDocument: document.document,
             metadata: document.metadata,
             parserName: name,
             bookedCurrency: currency,
+            declaredStatementPeriod: declaredStatementPeriod,
             transactions: transactions,
             financialIdentifiers: financialIdentifiers
         )
@@ -418,6 +435,47 @@ final class AxisBankAccountParser: StatementParser {
 
     private static let statementAccountPrefix = "Statement of Account No - "
     private static let statementPeriodMarker = " for the period ("
+
+    private static func declaredStatementPeriod(
+        from fragments: [NormalizedDocument.SourceFragment]
+    ) throws -> DeclaredStatementPeriod {
+        let matching = fragments.filter {
+            let text = $0.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.hasPrefix(statementAccountPrefix) &&
+                text.contains(statementPeriodMarker)
+        }
+        guard !matching.isEmpty else {
+            throw AxisBankAccountParserError.missingDeclaredStatementPeriod
+        }
+        guard matching.count == 1, let fragment = matching.first else {
+            throw AxisBankAccountParserError.conflictingDeclaredStatementPeriods
+        }
+
+        let text = fragment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let markerRange = text.range(of: statementPeriodMarker) else {
+            throw AxisBankAccountParserError.malformedDeclaredStatementPeriod(
+                sourceOrdinal: fragment.sourceOrdinal
+            )
+        }
+        let periodText = String(text[markerRange.upperBound...])
+        let pattern = #"^From\s*:\s*(\d{2}-\d{2}-\d{4})\s+To\s*:\s*(\d{2}-\d{2}-\d{4})\)\s*$"#
+        guard let expression = try? NSRegularExpression(pattern: pattern),
+              let match = expression.firstMatch(
+                in: periodText,
+                range: NSRange(periodText.startIndex..., in: periodText)
+              ),
+              match.numberOfRanges == 3,
+              let startRange = Range(match.range(at: 1), in: periodText),
+              let endRange = Range(match.range(at: 2), in: periodText),
+              let start = try? StatementDate.axisNRE(String(periodText[startRange])),
+              let end = try? StatementDate.axisNRE(String(periodText[endRange])),
+              let period = try? DeclaredStatementPeriod(start: start, end: end) else {
+            throw AxisBankAccountParserError.malformedDeclaredStatementPeriod(
+                sourceOrdinal: fragment.sourceOrdinal
+            )
+        }
+        return period
+    }
 
     private static func eventEvidence(
         narration: String,
