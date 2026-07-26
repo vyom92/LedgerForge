@@ -118,7 +118,8 @@ struct AxisRecognizedSourceEvidenceTests {
         #expect(parsed.financialIdentifiers.isEmpty)
     }
 
-    @Test func malformedDatesNeverProducePreparedImportOrReachPersistence() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func malformedDatesNeverProducePreparedImportOrReachPersistence() async throws {
         for malformedIndex in Self.validRows.indices {
             var rows = Self.validRows
             rows[malformedIndex][0] = "invalid-date"
@@ -136,7 +137,8 @@ struct AxisRecognizedSourceEvidenceTests {
         }
     }
 
-    @Test func malformedAndConflictingIdentityNeverProducePreparedImportOrReachPersistence() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func malformedAndConflictingIdentityNeverProducePreparedImportOrReachPersistence() async throws {
         let cases: [(name: String, fragments: [String], expectedDescription: String)] = [
             (
                 "malformed",

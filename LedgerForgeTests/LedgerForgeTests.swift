@@ -18,7 +18,8 @@ struct LedgerForgeTests {
         // https://developer.apple.com/documentation/testing
     }
 
-    @Test func developmentDatabaseResetSwapsToFreshProviderAndHydratesEmptyRuntimeState() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func developmentDatabaseResetSwapsToFreshProviderAndHydratesEmptyRuntimeState() throws {
         resetSprint30RuntimeState()
         defer {
             resetSprint30RuntimeState()
@@ -66,7 +67,8 @@ struct LedgerForgeTests {
         #expect(TransactionStore.shared.transactions.isEmpty)
     }
 
-    @Test func canonicalReloadDataRefreshesRuntimeCountsFromRepositoryState() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func canonicalReloadDataRefreshesRuntimeCountsFromRepositoryState() throws {
         resetSprint30RuntimeState()
         defer {
             resetSprint30RuntimeState()
@@ -90,7 +92,8 @@ struct LedgerForgeTests {
         #expect(TransactionStore.shared.transactions.count == 1)
     }
 
-    @Test func runtimeInspectorAndRepositorySummaryUseRuntimeStoreCounts() {
+    @Test(.globalRuntimeStateIsolation)
+    func runtimeInspectorAndRepositorySummaryUseRuntimeStoreCounts() {
         resetSprint30RuntimeState()
         defer {
             resetSprint30RuntimeState()

@@ -8,7 +8,8 @@ import Testing
 @MainActor
 struct ConfirmationGatedImportWorkflowTests {
 
-    @Test func prepareImportParsesAndValidatesWithoutPersistenceOrRuntimeStoreMutation() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func prepareImportParsesAndValidatesWithoutPersistenceOrRuntimeStoreMutation() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = availableImportEngine(persistence)
@@ -27,7 +28,8 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(TransactionStore.shared.transactions.isEmpty)
     }
 
-    @Test func validationFailureBlocksCommitAndDoesNotPersist() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func validationFailureBlocksCommitAndDoesNotPersist() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = availableImportEngine(persistence)
@@ -42,7 +44,8 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(persistence.persistCallCount == 0)
     }
 
-    @Test func futureAxisDirectionSemanticsFailBeforeAcceptedPersistenceWithZeroResidue() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func futureAxisDirectionSemanticsFailBeforeAcceptedPersistenceWithZeroResidue() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("LedgerForge-AxisDirection-\(UUID().uuidString)")
@@ -78,7 +81,8 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(DocumentStore.shared.rows.isEmpty)
     }
 
-    @Test func confirmationCommitsUsingPreparedFinancialDocumentWithoutRuntimeMutation() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func confirmationCommitsUsingPreparedFinancialDocumentWithoutRuntimeMutation() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = availableImportEngine(persistence)
@@ -100,7 +104,8 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(AccountStore.shared.accounts.isEmpty)
     }
 
-    @Test func duplicateConfirmationIsRejectedWithoutSecondPersistence() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func duplicateConfirmationIsRejectedWithoutSecondPersistence() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = availableImportEngine(persistence)
@@ -116,7 +121,8 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(persistence.persistCallCount == 1)
     }
 
-    @Test func persistenceFailureLeavesEveryRuntimeFinancialStoreUnchanged() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func persistenceFailureLeavesEveryRuntimeFinancialStoreUnchanged() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let existingTransaction = makeConfirmationTransaction(
             statementDate: try! StatementDate(canonical: "2027-03-12"),
@@ -156,7 +162,8 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(AccountStore.shared.accounts.map(\.id) == originalAccountIds)
     }
 
-    @Test func skippedPersistenceLeavesRuntimeStoresEmptyAndReportsFailure() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func skippedPersistenceLeavesRuntimeStoresEmptyAndReportsFailure() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         persistence.resultOverride = .skipped
@@ -172,7 +179,8 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(AccountStore.shared.accounts.isEmpty)
     }
 
-    @Test func ambiguousAndConflictingIdentityFailuresLeaveRuntimeStoresUnchanged() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func ambiguousAndConflictingIdentityFailuresLeaveRuntimeStoresUnchanged() async throws {
         let errors: [ImportPersistenceCoordinationError] = [
             .ambiguousIdentity,
             .conflictingIdentity

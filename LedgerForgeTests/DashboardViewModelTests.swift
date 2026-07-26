@@ -7,7 +7,8 @@ import Testing
 @MainActor
 struct DashboardViewModelTests {
 
-    @Test func emptyHydrationProducesEmptyDashboardState() {
+    @Test(.globalRuntimeStateIsolation)
+    func emptyHydrationProducesEmptyDashboardState() {
         resetDashboardStores()
         let viewModel = DashboardViewModel()
 
@@ -29,7 +30,8 @@ struct DashboardViewModelTests {
         #expect(viewModel.snapshot.cashFlow == .zero)
     }
 
-    @Test func accountSummaryUsesRuntimeStoreAccounts() {
+    @Test(.globalRuntimeStateIsolation)
+    func accountSummaryUsesRuntimeStoreAccounts() {
         resetDashboardStores()
         let firstAccountId = UUID()
         AccountStore.shared.replaceAccounts([
@@ -76,7 +78,8 @@ struct DashboardViewModelTests {
         #expect(viewModel.accountSummaries.first?.currentBalance == Decimal(1_050))
     }
 
-    @Test func transactionSummaryAndSnapshotUseRuntimeStoreTransactions() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func transactionSummaryAndSnapshotUseRuntimeStoreTransactions() throws {
         resetDashboardStores()
         let older = makeTransaction(
             statementDate: makeStatementDate(year: 2026, month: 7, day: 1),
@@ -110,7 +113,8 @@ struct DashboardViewModelTests {
         #expect(viewModel.recentTransactionSummaries.first?.isCredit == true)
     }
 
-    @Test func recentTransactionSummaryPreservesNativeMoneyForDisplay() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func recentTransactionSummaryPreservesNativeMoneyForDisplay() throws {
         resetDashboardStores()
         TransactionStore.shared.replaceTransactions([
             Transaction(
@@ -133,7 +137,8 @@ struct DashboardViewModelTests {
         #expect(viewModel.recentTransactionSummaries.first?.amount == expectedMoney)
     }
 
-    @Test func sameDateDifferentDocumentsUseStableDisplayOnlyAndWithholdBalanceAuthority() {
+    @Test(.globalRuntimeStateIsolation)
+    func sameDateDifferentDocumentsUseStableDisplayOnlyAndWithholdBalanceAuthority() {
         resetDashboardStores()
         let date = makeStatementDate(year: 2026, month: 6, day: 6)
         let first = makeTransaction(
@@ -163,7 +168,8 @@ struct DashboardViewModelTests {
         #expect(viewModel.snapshot.netWorth == .zero)
     }
 
-    @Test func hydrationPresentationStateRecordsLoadedAndFailedResults() {
+    @Test(.globalRuntimeStateIsolation)
+    func hydrationPresentationStateRecordsLoadedAndFailedResults() {
         resetDashboardStores()
         let viewModel = DashboardViewModel()
 

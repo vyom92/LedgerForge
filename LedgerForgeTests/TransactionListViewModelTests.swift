@@ -25,7 +25,7 @@ struct TransactionListViewModelTests {
     }
 
     @MainActor
-    @Test
+    @Test(.globalRuntimeStateIsolation)
     func searchTrimsWhitespaceAndMatchesDescriptionAccountAndBank() async throws {
         TransactionStore.shared.replaceTransactions([])
         TransactionStore.shared.replaceTransactions(Self.sampleTransactions)
@@ -55,7 +55,7 @@ struct TransactionListViewModelTests {
     }
 
     @MainActor
-    @Test
+    @Test(.globalRuntimeStateIsolation)
     func creditAndDebitFiltersAreMutuallySafe() async throws {
         TransactionStore.shared.replaceTransactions([])
         TransactionStore.shared.replaceTransactions(Self.sampleTransactions)
@@ -91,7 +91,7 @@ struct TransactionListViewModelTests {
     }
 
     @MainActor
-    @Test
+    @Test(.globalRuntimeStateIsolation)
     func totalsUseAllRuntimeTransactions() async throws {
         TransactionStore.shared.replaceTransactions([])
         TransactionStore.shared.replaceTransactions(Self.sampleTransactions)

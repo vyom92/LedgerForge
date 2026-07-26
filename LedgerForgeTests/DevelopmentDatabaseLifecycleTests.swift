@@ -257,7 +257,8 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(!identity.authorizesDestructiveWork(at: outside))
     }
 
-    @Test func temporarySessionIsEmptyAndCanonicalDataReturnsAfterRelaunch() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func temporarySessionIsEmptyAndCanonicalDataReturnsAfterRelaunch() throws {
         let root = try temporaryDirectory(named: "Temporary")
         defer { try? FileManager.default.removeItem(at: root) }
         let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: root)
@@ -284,7 +285,8 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(try relaunchedProvider.accountRepo.accounts(workspaceId: "workspace-lifecycle").count == 1)
     }
 
-    @Test func permanentResetRecreatesCanonicalIdentityAndSurvivesRelaunch() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func permanentResetRecreatesCanonicalIdentityAndSurvivesRelaunch() throws {
         let root = try temporaryDirectory(named: "Reset")
         defer { try? FileManager.default.removeItem(at: root) }
         let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: root)
@@ -356,7 +358,8 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(coordinator.startTemporaryEmptySession() == .rejectedActivityInProgress)
     }
 
-    @Test func successfulProviderReplacementInvalidatesCapturedRepositories() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func successfulProviderReplacementInvalidatesCapturedRepositories() throws {
         let root = try temporaryDirectory(named: "Generation")
         defer { try? FileManager.default.removeItem(at: root) }
         let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: root)
@@ -379,7 +382,7 @@ struct DevelopmentDatabaseLifecycleTests {
         }
     }
 
-    @Test(arguments: [
+    @Test(.globalRuntimeStateIsolation, arguments: [
         (DevelopmentDatabaseLifecycleFailurePoint.backupCreation, DevelopmentDatabaseLifecycleResult.backupFailed),
         (.backupVerification, .backupFailed),
         (.providerQuiescence, .providerQuiescenceFailed)
@@ -399,7 +402,7 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(try relaunched.accountRepo.accounts(workspaceId: "workspace-lifecycle").count == 1)
     }
 
-    @Test(arguments: [
+    @Test(.globalRuntimeStateIsolation, arguments: [
         (DevelopmentDatabaseLifecycleFailurePoint.recreation, DevelopmentDatabaseLifecycleResult.recreationFailed),
         (.migration, .migrationFailed),
         (.providerInstallation, .providerInstallationFailed),
@@ -420,7 +423,8 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(try relaunched.accountRepo.accounts(workspaceId: "workspace-lifecycle").count == 1)
     }
 
-    @Test func recoveryFailureEntersUnavailableStateAndRejectsFurtherLifecycleWork() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func recoveryFailureEntersUnavailableStateAndRejectsFurtherLifecycleWork() throws {
         let setup = try makeSeededCoordinator(
             named: "RecoveryFailure",
             failures: [.recreation, .recovery]
@@ -433,7 +437,8 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(setup.coordinator.startTemporaryEmptySession() == .lifecycleUnavailable)
     }
 
-    @Test func backupVerificationRejectsTamperedLowerMigrationMetadataEvenWhenHighestVersionIsCurrent() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func backupVerificationRejectsTamperedLowerMigrationMetadataEvenWhenHighestVersionIsCurrent() throws {
         let setup = try makeSeededCoordinator(named: "TamperedBackup", failures: [])
         defer { try? FileManager.default.removeItem(at: setup.root) }
         defer { setup.coordinator.closeOwnedProvider() }

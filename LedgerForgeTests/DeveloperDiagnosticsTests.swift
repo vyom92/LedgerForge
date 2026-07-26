@@ -224,7 +224,7 @@ struct DeveloperDiagnosticsTests {
         #expect(console.entries.first?.sequence == 1)
     }
 
-    @Test("Clear removes diagnostics without mutating runtime stores")
+    @Test("Clear removes diagnostics without mutating runtime stores", .globalRuntimeStateIsolation)
     func clearLeavesRuntimeStoresUnchanged() async throws {
         let console = DeveloperConsole()
         resetDiagnosticRuntimeStores()
@@ -267,7 +267,7 @@ struct DeveloperDiagnosticsTests {
         #expect(console.entries.map { $0.sequence } == [1, 2]) // stored order unchanged
     }
 
-    @Test("Successful import emits concise lifecycle entries and debug parser internals")
+    @Test("Successful import emits concise lifecycle entries and debug parser internals", .globalRuntimeStateIsolation)
     func successfulImportLifecycleDiagnostics() async throws {
         let console = DeveloperConsole()
         resetDiagnosticRuntimeStores()

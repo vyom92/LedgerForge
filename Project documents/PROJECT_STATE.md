@@ -16,9 +16,11 @@
 - **Architecture baseline:** Architecture v1.0 Frozen and UI/UX v1.0 Frozen
 - **Latest verified repository-maintenance change:** `7ee20a909038d1088f830a6ea588311625f415e5`
 - **Latest verified implementation-adjacent maintenance repair:** Axis bank-account CSV physical source-direction correction with independent balance evidence
-- **Latest recorded automated result:** 407 top-level tests across 49 suites, 0 failures and 0 unexpected skips at the Sprint 55 implementation baseline
+- **Latest recorded automated result:** 409 top-level tests across 49 suites, 0 failures and 0 unexpected skips in each of three consecutive exact canonical default-parallel TestPlan runs at Sprint 55 acceptance closure
 - **Latest focused Sprint 55 results:** 41 Axis direction, fixture-oracle and confirmation-gate tests across 5 suites plus 64 adjacent event, validation, repository, atomicity and hydration tests across 6 suites, all with 0 failures and 0 unexpected skips
-- **Latest recorded build result:** Debug and explicit `-O` whole-module Release builds passed at the Sprint 55 implementation baseline; Release emitted Xcode's non-product AppIntents metadata-extraction warning because the target has no AppIntents dependency
+- **Sprint 55 acceptance closure:** the first completion attempt exposed cross-suite interference between tests mutating shared runtime singleton stores; a bounded test-only asynchronous exclusivity trait now coordinates only those global-state tests across Swift Testing suites, retains ownership across suspension and restores the shared provider generation, runtime financial/history stores, diagnostics and development activity state after success or failure
+- **Sprint 55 overlap-period oracle:** the independent partial-overlap oracle now parses the declared start and end dates from the exact Axis CSV preamble, fails closed on malformed, missing, duplicated or conflicting period evidence and verifies that statement periods may extend beyond first/last transaction dates; the approved sanitized overlap fixture amounts, directions, event references and dispositions are unchanged
+- **Latest recorded build result:** Debug and explicit `-O` whole-module Release builds passed at Sprint 55 acceptance closure
 - **Generic UI-test state:** `LedgerForgeUITests` remains intentionally disabled
 - **Sprint 55 runtime verification:** no manual runtime path was required because this correction changes parser financial truth and repository test evidence only; pipeline coverage verifies contradictory future source semantics are rejected before accepted persistence with unchanged runtime financial stores
 
@@ -178,6 +180,8 @@ Bounded parser-verified Axis UPI transaction-event ownership uses ADR-031.
 A supported overlap blocks the complete incoming statement. LedgerForge does not silently omit overlapping transactions. Explicit partial-overlap import remains future work.
 
 A privacy-safe source-faithful fixture pair now independently establishes the narrow Axis UPI partial-overlap family with exactly three shared supported events and one later-only supported event. This closes the source-oracle prerequisite only; no partial persistence plan, review state, durable outcome, schema or UI exists.
+
+Sprint 55 acceptance closure changed only test isolation, test-owned oracle verification and this repository-state record. It made no production financial, persistence, schema, migration, UI or ADR change. Partial-overlap importing remains unauthorized.
 
 Unsupported event families remain unevaluated, including:
 

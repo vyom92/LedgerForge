@@ -74,14 +74,16 @@ struct PersistenceAvailabilityTests {
         }
     }
 
-    @Test func defaultProviderStartsUnavailableRatherThanMutableMemory() {
+    @Test(.globalRuntimeStateIsolation)
+    func defaultProviderStartsUnavailableRatherThanMutableMemory() {
         DatabaseProvider.shared = .unavailable(reason: .notInitialized)
 
         #expect(DatabaseProvider.shared.persistenceState == .unavailable(.notInitialized))
         expectUnavailable { try DatabaseProvider.shared.accountRepo.accounts(workspaceId: "default-workspace") }
     }
 
-    @Test func SQLiteOpenFailurePublishesUnavailableWithoutMemoryFallbackOrRawDetails() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func SQLiteOpenFailurePublishesUnavailableWithoutMemoryFallbackOrRawDetails() throws {
         let folder = try temporaryFolder(named: "OpenFailure")
         defer {
             LedgerForgeApp.configureInMemoryPersistenceForTesting()
@@ -95,7 +97,8 @@ struct PersistenceAvailabilityTests {
         assertDiagnosticsArePrivacySafe(forbiddenPath: folder.path)
     }
 
-    @Test func migrationIntegrityFailurePublishesUnavailableAndNeverPublishesDurableProvider() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func migrationIntegrityFailurePublishesUnavailableAndNeverPublishesDurableProvider() throws {
         let folder = try temporaryFolder(named: "IntegrityFailure")
         defer {
             LedgerForgeApp.configureInMemoryPersistenceForTesting()
@@ -116,7 +119,8 @@ struct PersistenceAvailabilityTests {
         assertDiagnosticsArePrivacySafe(forbiddenPath: path)
     }
 
-    @Test func migrationExecutionFailurePublishesBoundedUnavailableState() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func migrationExecutionFailurePublishesBoundedUnavailableState() throws {
         let folder = try temporaryFolder(named: "ExecutionFailure")
         defer {
             LedgerForgeApp.configureInMemoryPersistenceForTesting()
@@ -135,7 +139,8 @@ struct PersistenceAvailabilityTests {
         assertDiagnosticsArePrivacySafe(forbiddenPath: path)
     }
 
-    @Test func successfulBootstrapPublishesVerifiedSQLiteOnlyAfterValidation() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func successfulBootstrapPublishesVerifiedSQLiteOnlyAfterValidation() throws {
         let folder = try temporaryFolder(named: "Verified")
         defer {
             LedgerForgeApp.configureInMemoryPersistenceForTesting()
@@ -149,7 +154,8 @@ struct PersistenceAvailabilityTests {
         #expect(try DatabaseProvider.shared.accountRepo.accounts(workspaceId: "default-workspace").isEmpty)
     }
 
-    @Test func explicitTestingConfigurationPublishesIntentionalMemory() {
+    @Test(.globalRuntimeStateIsolation)
+    func explicitTestingConfigurationPublishesIntentionalMemory() {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
 
         #expect(DatabaseProvider.shared.persistenceState == .intentionalNonDurable(.testMemory))

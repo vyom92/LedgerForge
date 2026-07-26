@@ -6,7 +6,8 @@ import Testing
 @MainActor
 struct ImportLifecycleTests {
 
-    @Test func approvedAxisPreparationEmitsOrderedNamedStagesWithoutSourceEvidence() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func approvedAxisPreparationEmitsOrderedNamedStagesWithoutSourceEvidence() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
         let engine = ImportEngine(
             importPersistenceCoordinator: PreparationOnlyPersistenceCoordinator(),

@@ -104,6 +104,49 @@ struct AxisPartialOverlapOracleTests {
         }
     }
 
+    @Test func declaredPeriodCanExtendBeyondTransactionBoundaries() throws {
+        let text = """
+        AXIS BANK
+        Statement of Account No - 930000000000001 for the period (From : 01-01-2026 To : 31-01-2026)
+        Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL
+        05-01-2026,,UPI/P2A/100000000001/SYNTHETIC,100.00,,1100.00,001
+        25-01-2026,,UPI/P2M/100000000002/SYNTHETIC,,50.00,1050.00,001
+        """
+        let oracle = try IndependentPartialOverlapOracle.load(text: text)
+
+        #expect(oracle.statementStartDate == "01-01-2026")
+        #expect(oracle.statementEndDate == "31-01-2026")
+        #expect(oracle.rows.first?.transactionDate == "05-01-2026")
+        #expect(oracle.rows.last?.transactionDate == "25-01-2026")
+    }
+
+    @Test func invalidPeriodEvidenceFailsClosed() {
+        let validRows = """
+        Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL
+        05-01-2026,,UPI/P2A/100000000001/SYNTHETIC,100.00,,1100.00,001
+        """
+        let invalidPreambles = [
+            "",
+            "Statement of Account No - 930000000000001 for the period (From : 99-01-2026 To : 31-01-2026)",
+            """
+            Statement of Account No - 930000000000001 for the period (From : 01-01-2026 To : 31-01-2026)
+            Statement of Account No - 930000000000001 for the period (From : 01-01-2026 To : 31-01-2026)
+            """,
+            """
+            Statement of Account No - 930000000000001 for the period (From : 01-01-2026 To : 31-01-2026)
+            Statement of Account No - 930000000000001 for the period (From : 02-01-2026 To : 31-01-2026)
+            """
+        ]
+
+        for preamble in invalidPreambles {
+            #expect(throws: PartialOverlapOracleError.invalidStatementPeriod) {
+                try IndependentPartialOverlapOracle.load(
+                    text: ["AXIS BANK", preamble, validRows].joined(separator: "\n")
+                )
+            }
+        }
+    }
+
     private func parseProductionFixture(fileName: String) throws -> ParsedPartialOverlapFixture {
         let url = FixtureLocator.axisCSV(fileName)
         let text = try CSVReader().read(from: url)
@@ -161,6 +204,10 @@ private struct IndependentPartialOverlapOracle {
             contentsOf: FixtureLocator.axisCSV(fileName),
             encoding: .utf8
         )
+        return try load(text: text)
+    }
+
+    static func load(text: String) throws -> Self {
         let lines = text.components(separatedBy: .newlines)
         let headerOffset = try #require(lines.firstIndex {
             $0.split(separator: ",").map(String.init) == [
@@ -173,10 +220,37 @@ private struct IndependentPartialOverlapOracle {
         ).map(String.init)
         let accountPrefix = "Statement of Account No - "
         let periodMarker = " for the period ("
-        let accountLine = try #require(lines.first { $0.hasPrefix(accountPrefix) })
+        let accountLines = lines.filter { $0.hasPrefix(accountPrefix) }
+        guard accountLines.count == 1 else {
+            throw PartialOverlapOracleError.invalidStatementPeriod
+        }
+        let accountLine = accountLines[0]
         let accountRemainder = accountLine.dropFirst(accountPrefix.count)
-        let periodRange = try #require(accountRemainder.range(of: periodMarker))
+        guard let periodRange = accountRemainder.range(of: periodMarker) else {
+            throw PartialOverlapOracleError.invalidStatementPeriod
+        }
         let accountIdentifier = String(accountRemainder[..<periodRange.lowerBound])
+        let periodText = accountRemainder[periodRange.upperBound...]
+        let periodPattern = try NSRegularExpression(
+            pattern: #"^From\s*:\s*(\d{2}-\d{2}-\d{4})\s+To\s*:\s*(\d{2}-\d{2}-\d{4})\)\s*$"#
+        )
+        let periodString = String(periodText)
+        let periodNSRange = NSRange(periodString.startIndex..., in: periodString)
+        guard let periodMatch = periodPattern.firstMatch(
+            in: periodString,
+            range: periodNSRange
+        ), periodMatch.numberOfRanges == 3,
+              let startRange = Range(periodMatch.range(at: 1), in: periodString),
+              let endRange = Range(periodMatch.range(at: 2), in: periodString) else {
+            throw PartialOverlapOracleError.invalidStatementPeriod
+        }
+        let statementStartDate = String(periodString[startRange])
+        let statementEndDate = String(periodString[endRange])
+        guard let startDate = Self.gregorianDate(statementStartDate),
+              let endDate = Self.gregorianDate(statementEndDate),
+              startDate <= endDate else {
+            throw PartialOverlapOracleError.invalidStatementPeriod
+        }
         let datePattern = try NSRegularExpression(pattern: #"^\d{2}-\d{2}-\d{4}$"#)
         var rows: [PartialOverlapOracleRow] = []
 
@@ -240,8 +314,8 @@ private struct IndependentPartialOverlapOracle {
         return Self(
             header: header,
             accountIdentifier: accountIdentifier,
-            statementStartDate: try #require(rows.first?.transactionDate),
-            statementEndDate: try #require(rows.last?.transactionDate),
+            statementStartDate: statementStartDate,
+            statementEndDate: statementEndDate,
             rows: rows,
             rawSourceDRTotal: rows.filter { $0.sourceColumn == "DR" }
                 .reduce(0) { $0 + $1.rawSourceAmount },
@@ -262,10 +336,31 @@ private struct IndependentPartialOverlapOracle {
         guard !value.isEmpty else { return nil }
         return Decimal(string: value, locale: Locale(identifier: "en_US_POSIX"))
     }
+
+    private static func gregorianDate(_ value: String) -> Date? {
+        let components = value.split(separator: "-").compactMap { Int($0) }
+        guard components.count == 3 else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let dateComponents = DateComponents(
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            year: components[2],
+            month: components[1],
+            day: components[0]
+        )
+        guard let date = calendar.date(from: dateComponents),
+              calendar.dateComponents([.year, .month, .day], from: date) ==
+              DateComponents(year: components[2], month: components[1], day: components[0]) else {
+            return nil
+        }
+        return date
+    }
 }
 
-private enum PartialOverlapOracleError: Error {
+private enum PartialOverlapOracleError: Error, Equatable {
     case invalidDirectionOccupancy
+    case invalidStatementPeriod
     case unsupportedEvent
 }
 

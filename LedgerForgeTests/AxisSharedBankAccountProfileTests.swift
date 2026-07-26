@@ -70,7 +70,8 @@ struct AxisSharedBankAccountProfileTests {
         }
     }
 
-    @Test func sharedRuntimeEnginePreservesAxisDebitCreditSemantics() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func sharedRuntimeEnginePreservesAxisDebitCreditSemantics() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
         defer {
             DatabaseProvider.shared.invalidateGeneration()
@@ -185,7 +186,8 @@ struct AxisSharedBankAccountProfileTests {
         #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).isEmpty)
     }
 
-    @Test func distinctAccountLifecycleAndHydrationMatchSQLiteAndInMemory() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func distinctAccountLifecycleAndHydrationMatchSQLiteAndInMemory() async throws {
         try await withProviders { provider in
             let coordinator = persistenceCoordinator(provider)
             let engine = importEngine(provider, coordinator: coordinator)

@@ -326,7 +326,8 @@ struct ImportRepositoryIntegrationTests {
         }
     }
 
-    @Test func appPersistenceBootstrapConfiguresDurableSQLiteProvider() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func appPersistenceBootstrapConfiguresDurableSQLiteProvider() async throws {
         let folder = try temporaryFolder(named: "LedgerForgePersistenceBootstrapTests")
         defer {
             LedgerForgeApp.configureInMemoryPersistenceForTesting()
@@ -350,7 +351,8 @@ struct ImportRepositoryIntegrationTests {
         #expect(restoredWorkspace == workspace)
     }
 
-    @Test func persistedImportHydratesRuntimeStoresAfterSQLiteProviderRecreation() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func persistedImportHydratesRuntimeStoresAfterSQLiteProviderRecreation() async throws {
         let folder = try temporaryFolder(named: "LedgerForgePersistenceRelaunchRegressionTests")
         defer {
             resetRuntimeStoresForImportIntegration()
@@ -978,7 +980,8 @@ struct ImportRepositoryIntegrationTests {
         #expect(!diagnostics.contains(firstFixture.fingerprint.digest))
     }
 
-    @Test func successfulAttemptSurvivesSQLiteProviderRecreationAndHydratesRuntimeState() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func successfulAttemptSurvivesSQLiteProviderRecreationAndHydratesRuntimeState() throws {
         let folder = try temporaryFolder(named: "LedgerForgeSuccessfulAttemptRecreationTests")
         defer { try? FileManager.default.removeItem(at: folder) }
         let databasePath = folder.appendingPathComponent("successful-attempt.sqlite").path
@@ -1032,7 +1035,8 @@ struct ImportRepositoryIntegrationTests {
         #expect(try provider.importSessionRepo.importAttempts(workspaceId: workspaceID) == attempts)
     }
 
-    @Test func rejectedExactDuplicateAttemptSurvivesRecreationAndAttemptOnlyHydrationIsIdempotent() throws {
+    @Test(.globalRuntimeStateIsolation)
+    func rejectedExactDuplicateAttemptSurvivesRecreationAndAttemptOnlyHydrationIsIdempotent() throws {
         let folder = try temporaryFolder(named: "LedgerForgeRejectedAttemptRecreationTests")
         defer { try? FileManager.default.removeItem(at: folder) }
         let databasePath = folder.appendingPathComponent("rejected-attempt.sqlite").path
