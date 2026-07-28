@@ -3,21 +3,25 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current pushed ref:** `main@b661472a58fc24144361322f1853b8001437a3eb` — Sprint 59 accepted ADR-041 architecture-only cycle close
+- **Current pushed ref:** `main@b49724f9d78701a9f0e7bc870f69c963dd3d8b62` — Sprint 61 account-outcome implementation baseline
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration is included in the current pushed baseline; this task does not alter parser, fixture or historical financial data
-- **Latest verified production implementation:** Sprint 58 Deterministic Import Verification Workspace; Sprint 59 added no production implementation
+- **Latest verified production implementation:** Sprint 61 durable account-outcome presentation and explicit account-choice workflow
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed numbered increment:** Sprint 59
+- **Latest verified completed numbered increment:** Sprint 61
+- **Accepted Sprint 61 implementation ref:** `b49724f9d78701a9f0e7bc870f69c963dd3d8b62`
 - **Latest accepted ADR:** ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
 - **Current migration:** V8
 - **Sprint 55A:** Axis Bank Source-Truth Restoration, ending at `f3154dbd13a340714179da7f972a6accdd3aca54`; parallel shared-runtime-store isolation remains Sprint 55 acceptance/test infrastructure
 - **Sprint 57A:** Category Reconciliation Closure, complete at `251a547cb44712a789a9ad7b23a4eabca742900b`; no migration was added
 - **Sprint 58:** Deterministic Import Verification Workspace, complete at `4547083d4d81edc9b6bcd98c3a8e77ee1538e71a`; DEBUG-only ordinary-path verification with Release containment and an isolated exact-duplicate runtime check
 - **Sprint 59:** Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority; ADR-041 selects `ledgerforge.source-bytes.sha256.v1`, but the source snapshot and source-byte foundation is not implemented
+- **Sprint 60:** Completed the read-only account-outcome explanation contract across the bounded import workflow; no schema or historical rewrite occurred.
+- **Sprint 61:** Implemented privacy-safe durable account-outcome presentation and explicit eligible no-match account choice. FinancialIdentityResolver behavior is unchanged: parser-produced strong verified identifiers remain the sole identity authority, and eligible no-match cases require explicit Use Existing Account or Create New Account choice. No automatic account selection was introduced. Prospective successful durable account decisions are `matched_existing`, `user_selected_existing` and `created_new`; rejected outcomes include `account_choice_required`, `identifier_ownership_conflict`, `identity_ambiguity`, `identity_conflict`, `stale_account_choice` and `stale_provider_generation`. Historical `selected_existing` and `resolved_or_created` remain neutral and are not reinterpreted. One shared bounded presentation authority serves preparation, immediate result and Import History; hostile and unknown values fail closed to neutral unavailable presentation. Account IDs, candidate IDs, normalized identifiers, suffixes, filenames, paths, fingerprints, raw codes and unrestricted errors are excluded from account-outcome copy and accessibility text. SQLite/In-Memory parity and rejected-path zero accepted residue were verified. No schema or historical rewrite occurred.
+- **Sprint 61 integrated verification:** 466 top-level tests, 498 executions, 39 dynamic-parameter runs, 0 failures and 0 skips; Debug build, explicitly optimized whole-module Release build and Debug analysis passed. Isolated runtime acceptance used the approved sanitized Axis fixture against one fresh namespaced canonical V8 SQLite database. Preview, explicit choice, confirmation, immediate result, live Import History, quit/relaunch and hydration were verified. Runtime persisted and rehydrated 1 account, 4 transactions and 1 durable attempt. The task-owned namespace was removed recoverably after acceptance. No private source or user financial database was used. Manual linking, unlinking, reassignment, repair, account merge/split and raw identifier display remain excluded.
 - **Historical repair boundary:** no retained affected historical Axis database is currently identified; no historical repair was performed
 - **Architecture baseline:** Architecture v1.0 Frozen and UI/UX v1.0 Frozen
 - **Latest verified repository-maintenance change:** `7ee20a909038d1088f830a6ea588311625f415e5`
@@ -764,7 +768,7 @@ Detailed implementation history remains in Git and accepted ADRs.
 
 ## Current Planning State
 
-- The current planning alignment is based on `main@b661472a58fc24144361322f1853b8001437a3eb`, completed Sprints 50–59, Migration V8 and accepted ADR-041.
+- The current planning alignment is based on `main@b49724f9d78701a9f0e7bc870f69c963dd3d8b62`, completed Sprints 50–61, Migration V8 and accepted ADR-041.
 - `FW-P1-18 — Binary-Document Fingerprint Semantics` has completed its representation decision through ADR-041 and now represents the unimplemented immutable source-snapshot and source-byte fingerprint foundation.
 - One targeted schema/lifecycle discovery remains before FW-P1-18 implementation. It must resolve the legacy `documents.sha256` role, migration or compatibility shape, singular-to-multiple fingerprint ownership, snapshot storage and security scope, cleanup, concurrent preparation, confirmation-time revalidation, typed rejected outcomes, provider parity and zero-residue acceptance.
 - `FW-P1-10 — Production PDF Statement Support` remains blocked by implementation and acceptance of that foundation, plus selection and revalidation of one approved PDF family through the ordinary URL-driven production path.

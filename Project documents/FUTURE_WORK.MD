@@ -291,31 +291,12 @@ This candidate is not implementation-ready as one broad “repair everything” 
 
 # P0 — Financial Identity Safety
 
-## FW-P0-10 — Explain Account Match, No-Match and Conflict Outcomes
-
-**Status:** Ready for discovery  
-**Depends on:** Existing verified financial-identity flow, now satisfied for the approved Axis bank-account path.
-
-Explain why an import:
-
-- matched an existing account;
-- produced no match;
-- required explicit account choice;
-- became ambiguous;
-- conflicted with existing identifier ownership.
-
-Targeted discovery must identify the durable bounded evidence that may be shown for each outcome across preparation, review, attempt history and account presentation.
-
-Presentation must remain privacy-safe. No raw financial identifier may be exposed, and weak labels or display metadata must not be presented as identity authority.
-
-The approved durable-attempt-history increment promotes only account-decision provenance required inside import-attempt history. Manual linking, unlinking, reassignment and incorrect-link recovery remain separately governed.
-
----
-
 ## FW-P0-11 — Manual Account Linking and Unlinking
 
 **Status:** Blocked
-**Depends on:** `FW-P0-10`, Accepted ADR-037, and independently approved linking, unlinking and identifier-detachment semantics
+**Depends on:** Accepted ADR-037 and independently approved linking, unlinking and identifier-detachment semantics
+
+The account-outcome explanation prerequisite was completed by Sprint 61. The remaining blocker is independently approved linking, unlinking and identifier-detachment semantics under ADR-037; this candidate is not implementation-ready.
 
 Allow explicit manual linking and unlinking beyond the current bounded account-choice workflow.
 
@@ -377,7 +358,7 @@ No automatic account split is permitted.
 ## FW-P0-14 — Duplicate-Account Review
 
 **Status:** Blocked
-**Depends on:** `FW-P0-10` and `FW-P0-11`
+**Depends on:** `FW-P0-11`
 
 Present accounts that may represent the same real financial account.
 
