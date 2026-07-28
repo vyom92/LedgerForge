@@ -126,8 +126,16 @@ struct ImportRepositoryIntegrationTests {
                 id: fixture.importSession.id.uuidString
             )
             let storedImportSession = try #require(storedImportSessionValue)
+            let storedAttempts = try provider.importSessionRepo.importAttempts(
+                workspaceId: "workspace-import-integration"
+            )
+            let storedAttempt = try #require(
+                storedAttempts.first { $0.id == result.importAttemptId }
+            )
 
             #expect(result.persisted)
+            #expect(result.accountOutcome == .createdNew)
+            #expect(storedAttempt.accountDecisionCode == ImportAttemptAccountDecision.createdNew.rawValue)
             #expect(try provider.accountRepo.accounts(workspaceId: "workspace-import-integration").count == 1)
             #expect(accountId == "account-\(fixture.importSession.id.uuidString.lowercased())")
             #expect(!accountId.localizedCaseInsensitiveContains(fixture.importSession.fileName))
@@ -196,7 +204,15 @@ struct ImportRepositoryIntegrationTests {
             )
 
             let accountId = try #require(result.accountId)
+            let storedAttempts = try provider.importSessionRepo.importAttempts(
+                workspaceId: "workspace-import-integration"
+            )
+            let storedAttempt = try #require(
+                storedAttempts.first { $0.id == result.importAttemptId }
+            )
             #expect(result.persisted)
+            #expect(result.accountOutcome == .unavailable)
+            #expect(storedAttempt.accountDecisionCode == ImportAttemptAccountDecision.resolvedOrCreated.rawValue)
             #expect(accountId == "account-\(fixture.importSession.id.uuidString.lowercased())")
             #expect(!accountId.localizedCaseInsensitiveContains("axis"))
             #expect(!accountId.localizedCaseInsensitiveContains("missing"))
@@ -242,81 +258,230 @@ struct ImportRepositoryIntegrationTests {
         }
     }
 
-    @Test func explicitExistingAccountChoiceAttachesIdentifierWithoutReplacingAccount() async throws {
+    @Test func typedIdentityReviewMapsEveryResolverOutcomeAndKeepsAccountIdsInternal() async throws {
         let provider = makeInMemoryProvider()
         let workspace = WorkspaceDTO(
             id: "workspace-import-integration",
-            name: "Existing Workspace",
+            name: "Review Workspace",
             createdAtISO: "2026-07-13T00:00:00Z"
         )
-        let existingAccount = AccountDTO(
-            id: "account-unseeded",
-            workspaceId: workspace.id,
-            name: "Verification Account",
-            institutionId: "Independent Credit Union",
-            accountType: "cash",
-            nativeCurrency: "INR",
-            description: "Unseeded account with unrelated presentation metadata",
-            createdAtISO: "2026-07-13T00:00:00Z"
-        )
+        let accountA = makeAccountDTO(id: "account-review-private-a")
+        let accountZ = makeAccountDTO(id: "account-review-private-z")
         _ = try provider.workspaceRepo.upsertWorkspace(workspace)
-        _ = try provider.accountRepo.upsertAccount(existingAccount)
-        let identifier = try makeVerifiedAccountIdentifier("001234567890123")
-        let fixture = makeValidFixture(financialIdentifiers: [identifier])
-        let coordinator = makePersistenceCoordinator(provider: provider)
-
-        let review = try coordinator.reviewValidatedImport(
-            financialDocument: fixture.financialDocument,
-            validation: fixture.validation
-        )
-        #expect(review.isAvailable)
-        #expect(review.eligibleAccountIds == [existingAccount.id])
-
-        let result = try coordinator.persistValidatedImport(
-            financialDocument: fixture.financialDocument,
-            importSession: fixture.importSession,
-            validation: fixture.validation,
-            fingerprint: fixture.fingerprint,
-            accountChoice: .useExistingAccount(accountId: existingAccount.id)
+        _ = try provider.accountRepo.upsertAccount(accountZ)
+        _ = try provider.accountRepo.upsertAccount(accountA)
+        let console = DeveloperConsole()
+        let coordinator = DefaultImportPersistenceCoordinator(
+            workspaceRepo: provider.workspaceRepo,
+            accountRepo: provider.accountRepo,
+            importSessionRepo: provider.importSessionRepo,
+            transactionRepo: provider.transactionRepo,
+            confirmedImportRepo: provider.confirmedImportRepo,
+            generationToken: provider.generationToken,
+            mapper: ImportPersistenceMapper(
+                workspaceId: workspace.id,
+                workspaceName: workspace.name
+            ),
+            developerConsole: console
         )
 
-        #expect(result.persisted)
-        #expect(result.accountId == existingAccount.id)
-        #expect(try provider.accountRepo.account(id: existingAccount.id) == existingAccount)
-        #expect(try provider.accountRepo.identifiers(
-            accountId: existingAccount.id,
-            workspaceId: workspace.id
-        ).count == 1)
-        #expect(try provider.transactionRepo.transactions(
+        let failed = makeFailedValidationFixture()
+        #expect(try coordinator.reviewValidatedImport(
+            financialDocument: failed.financialDocument,
+            validation: failed.validation
+        ) == .unavailable)
+
+        let identifierFree = makeValidFixture()
+        #expect(try coordinator.reviewValidatedImport(
+            financialDocument: identifierFree.financialDocument,
+            validation: identifierFree.validation
+        ) == .unavailable)
+
+        let weak = try FinancialIdentifier(
+            kind: .accountSuffix,
+            rawValue: "9876",
+            verificationState: .verified,
+            provenance: .parserDerivedText
+        )
+        let weakOnly = makeValidFixture(financialIdentifiers: [weak])
+        #expect(try coordinator.reviewValidatedImport(
+            financialDocument: weakOnly.financialDocument,
+            validation: weakOnly.validation
+        ) == .unavailable)
+
+        let firstIdentifier = try makeVerifiedAccountIdentifier("001234567890123")
+        let noMatch = makeValidFixture(financialIdentifiers: [firstIdentifier])
+        let choiceReview = try coordinator.reviewValidatedImport(
+            financialDocument: noMatch.financialDocument,
+            validation: noMatch.validation
+        )
+        #expect(choiceReview == .choiceRequired(
+            eligibleAccountIds: [accountA.id, accountZ.id]
+        ))
+        #expect(choiceReview.requiresExplicitChoice)
+        #expect(choiceReview.blocksConfirmation)
+
+        _ = try provider.accountRepo.attachIdentifier(firstIdentifier.repositoryDTO(
+            accountId: accountA.id,
             workspaceId: workspace.id,
-            importSessionId: fixture.importSession.id.uuidString
-        ).allSatisfy { $0.accountId == existingAccount.id })
+            createdAtISO: accountA.createdAtISO,
+            id: "identifier-review-private-a"
+        ))
+        let matchedReview = try coordinator.reviewValidatedImport(
+            financialDocument: noMatch.financialDocument,
+            validation: noMatch.validation
+        )
+        #expect(matchedReview == .matchedExisting(accountId: accountA.id))
+        #expect(!matchedReview.requiresExplicitChoice)
+        #expect(!matchedReview.blocksConfirmation)
+
+        let secondIdentifier = try makeVerifiedAccountIdentifier("009876543210987")
+        _ = try provider.accountRepo.attachIdentifier(secondIdentifier.repositoryDTO(
+            accountId: accountZ.id,
+            workspaceId: workspace.id,
+            createdAtISO: accountZ.createdAtISO,
+            id: "identifier-review-private-z"
+        ))
+        let conflictFixture = makeValidFixture(
+            financialIdentifiers: [firstIdentifier, secondIdentifier]
+        )
+        let conflictReview = try coordinator.reviewValidatedImport(
+            financialDocument: conflictFixture.financialDocument,
+            validation: conflictFixture.validation
+        )
+        #expect(conflictReview == .conflict)
+        #expect(conflictReview.blocksConfirmation)
+
+        let ambiguousProvider = makeInMemoryProvider()
+        let ambiguousConsole = DeveloperConsole()
+        let candidateA = "candidate-review-private-a"
+        let candidateB = "candidate-review-private-b"
+        let ambiguousAccountRepo = ObservingAccountRepository(
+            base: ambiguousProvider.accountRepo,
+            forcedCandidates: [candidateB, candidateA]
+        )
+        let ambiguousCoordinator = DefaultImportPersistenceCoordinator(
+            workspaceRepo: ambiguousProvider.workspaceRepo,
+            accountRepo: ambiguousAccountRepo,
+            importSessionRepo: ambiguousProvider.importSessionRepo,
+            transactionRepo: ambiguousProvider.transactionRepo,
+            confirmedImportRepo: ambiguousProvider.confirmedImportRepo,
+            generationToken: ambiguousProvider.generationToken,
+            mapper: ImportPersistenceMapper(
+                workspaceId: workspace.id,
+                workspaceName: workspace.name
+            ),
+            developerConsole: ambiguousConsole
+        )
+        let ambiguousReview = try ambiguousCoordinator.reviewValidatedImport(
+            financialDocument: noMatch.financialDocument,
+            validation: noMatch.validation
+        )
+        #expect(ambiguousReview == .ambiguous)
+        #expect(ambiguousReview.blocksConfirmation)
+
+        let diagnosticText = DeveloperConsole.logText(
+            from: console.entries + ambiguousConsole.entries
+        )
+        for internalID in [accountA.id, accountZ.id, candidateA, candidateB] {
+            #expect(!diagnosticText.contains(internalID))
+        }
     }
 
-    @Test func qualifyingNoMatchRejectsMissingChoiceBeforeEveryWrite() async throws {
-        let provider = makeInMemoryProvider()
-        let workspace = WorkspaceDTO(
-            id: "workspace-import-integration",
-            name: "Choice Workspace",
-            createdAtISO: "2026-07-13T00:00:00Z"
-        )
-        _ = try provider.workspaceRepo.upsertWorkspace(workspace)
-        let fixture = makeValidFixture(financialIdentifiers: [try makeVerifiedAccountIdentifier("001234567890123")])
+    @Test func explicitExistingAccountChoiceAttachesIdentifierWithoutReplacingAccount() async throws {
+        try runForEachProvider { provider in
+            let workspace = WorkspaceDTO(
+                id: "workspace-import-integration",
+                name: "Existing Workspace",
+                createdAtISO: "2026-07-13T00:00:00Z"
+            )
+            let existingAccount = AccountDTO(
+                id: "account-unseeded",
+                workspaceId: workspace.id,
+                name: "Verification Account",
+                institutionId: "Independent Credit Union",
+                accountType: "cash",
+                nativeCurrency: "INR",
+                description: "Unseeded account with unrelated presentation metadata",
+                createdAtISO: "2026-07-13T00:00:00Z"
+            )
+            _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+            _ = try provider.accountRepo.upsertAccount(existingAccount)
+            let identifier = try makeVerifiedAccountIdentifier("001234567890123")
+            let fixture = makeValidFixture(financialIdentifiers: [identifier])
+            let coordinator = makePersistenceCoordinator(provider: provider)
 
-        do {
-            _ = try makePersistenceCoordinator(provider: provider).persistValidatedImport(
+            let review = try coordinator.reviewValidatedImport(
+                financialDocument: fixture.financialDocument,
+                validation: fixture.validation
+            )
+            #expect(review == .choiceRequired(eligibleAccountIds: [existingAccount.id]))
+            #expect(review.isAvailable)
+            #expect(review.requiresExplicitChoice)
+            #expect(review.blocksConfirmation)
+
+            let result = try coordinator.persistValidatedImport(
                 financialDocument: fixture.financialDocument,
                 importSession: fixture.importSession,
                 validation: fixture.validation,
                 fingerprint: fixture.fingerprint,
-                accountChoice: nil
+                accountChoice: .useExistingAccount(accountId: existingAccount.id)
             )
-            Issue.record("Expected an explicit account choice rejection.")
-        } catch let failure as ImportPersistenceCommitFailure {
-            #expect(failure.originalError as? ImportPersistenceCoordinationError == .explicitChoiceRequired)
+            let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspace.id)
+            let attempt = try #require(attempts.first { $0.id == result.importAttemptId })
+
+            #expect(result.persisted)
+            #expect(result.accountId == existingAccount.id)
+            #expect(result.accountOutcome == .userSelectedExisting)
+            #expect(attempt.accountDecisionCode == ImportAttemptAccountDecision.userSelectedExisting.rawValue)
+            #expect(try provider.accountRepo.account(id: existingAccount.id) == existingAccount)
+            #expect(try provider.accountRepo.identifiers(
+                accountId: existingAccount.id,
+                workspaceId: workspace.id
+            ).count == 1)
+            #expect(try provider.transactionRepo.transactions(
+                workspaceId: workspace.id,
+                importSessionId: fixture.importSession.id.uuidString
+            ).allSatisfy { $0.accountId == existingAccount.id })
         }
-        #expect(try provider.accountRepo.accounts(workspaceId: workspace.id).isEmpty)
-        #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
+    }
+
+    @Test func qualifyingNoMatchRecordsChoiceRequiredWithoutFinancialResidue() async throws {
+        try runForEachProvider { provider in
+            let workspace = WorkspaceDTO(
+                id: "workspace-import-integration",
+                name: "Choice Workspace",
+                createdAtISO: "2026-07-13T00:00:00Z"
+            )
+            _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+            let fixture = makeValidFixture(
+                financialIdentifiers: [try makeVerifiedAccountIdentifier("001234567890123")]
+            )
+
+            do {
+                _ = try makePersistenceCoordinator(provider: provider).persistValidatedImport(
+                    financialDocument: fixture.financialDocument,
+                    importSession: fixture.importSession,
+                    validation: fixture.validation,
+                    fingerprint: fixture.fingerprint,
+                    accountChoice: nil
+                )
+                Issue.record("Expected an explicit account choice rejection.")
+            } catch let failure as ImportPersistenceCommitFailure {
+                #expect(failure.originalError as? ImportPersistenceCoordinationError == .explicitChoiceRequired)
+                #expect(failure.accountOutcome == .choiceRequired)
+                let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspace.id)
+                let attempt = try #require(attempts.first { $0.id == failure.importAttemptId })
+                #expect(attempt.outcomeCode == ImportAttemptOutcome.accountChoiceRequired.rawValue)
+                #expect(attempt.accountDecisionCode == ImportAttemptAccountDecision.noFinancialMutation.rawValue)
+            }
+            #expect(try provider.accountRepo.accounts(workspaceId: workspace.id).isEmpty)
+            #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
+            #expect(try provider.transactionRepo.transactions(
+                workspaceId: workspace.id,
+                importSessionId: fixture.importSession.id.uuidString
+            ).isEmpty)
+        }
     }
 
     @Test func unsupportedCurrencyCannotReachPersistenceConstruction() async throws {
@@ -509,8 +674,21 @@ struct ImportRepositoryIntegrationTests {
                 validation: secondFixture.validation,
                 fingerprint: secondFixture.fingerprint
             )
+            let attempts = try provider.importSessionRepo.importAttempts(
+                workspaceId: "workspace-import-integration"
+            )
+            let firstAttempt = try #require(
+                attempts.first { $0.id == firstResult.importAttemptId }
+            )
+            let secondAttempt = try #require(
+                attempts.first { $0.id == secondResult.importAttemptId }
+            )
 
             #expect(firstResult.accountId == secondResult.accountId)
+            #expect(firstResult.accountOutcome == .createdNew)
+            #expect(secondResult.accountOutcome == .matchedExisting)
+            #expect(firstAttempt.accountDecisionCode == ImportAttemptAccountDecision.createdNew.rawValue)
+            #expect(secondAttempt.accountDecisionCode == ImportAttemptAccountDecision.matchedExisting.rawValue)
             #expect(try provider.accountRepo.accounts(workspaceId: "workspace-import-integration").count == 1)
             #expect(try provider.accountRepo.account(id: originalAccountId) == originalAccount)
             #expect(try provider.workspaceRepo.workspace(id: "workspace-import-integration") == originalWorkspace)
@@ -526,50 +704,68 @@ struct ImportRepositoryIntegrationTests {
         }
     }
 
-    @Test func ambiguousIdentityThrowsBeforeEveryRepositoryWrite() async throws {
-        let provider = makeInMemoryProvider()
-        let accountRepo = ObservingAccountRepository(
-            base: provider.accountRepo,
-            forcedCandidates: ["account-a", "account-b"]
-        )
-        let identifier = try makeVerifiedAccountIdentifier("001234567890123")
-        let fixture = makeValidFixture(financialIdentifiers: [identifier])
-        let coordinator = DefaultImportPersistenceCoordinator(
-            workspaceRepo: provider.workspaceRepo,
-            accountRepo: accountRepo,
-            importSessionRepo: provider.importSessionRepo,
-            transactionRepo: provider.transactionRepo,
-            confirmedImportRepo: provider.confirmedImportRepo,
-            generationToken: provider.generationToken,
-            mapper: ImportPersistenceMapper(
-                workspaceId: "workspace-import-integration",
-                workspaceName: "Import Integration Workspace"
+    @Test func ambiguousIdentityRecordsDistinctOutcomeWithoutFinancialResidue() async throws {
+        try runForEachProvider { provider in
+            let workspace = WorkspaceDTO(
+                id: "workspace-import-integration",
+                name: "Ambiguous Identity Workspace",
+                createdAtISO: "2026-07-13T00:00:00Z"
             )
-        )
+            _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+            let accountRepo = ObservingAccountRepository(
+                base: provider.accountRepo,
+                forcedCandidates: ["account-private-a", "account-private-b"]
+            )
+            let identifier = try makeVerifiedAccountIdentifier("001234567890123")
+            let fixture = makeValidFixture(financialIdentifiers: [identifier])
+            let coordinator = DefaultImportPersistenceCoordinator(
+                workspaceRepo: provider.workspaceRepo,
+                accountRepo: accountRepo,
+                importSessionRepo: provider.importSessionRepo,
+                transactionRepo: provider.transactionRepo,
+                confirmedImportRepo: provider.confirmedImportRepo,
+                generationToken: provider.generationToken,
+                mapper: ImportPersistenceMapper(
+                    workspaceId: workspace.id,
+                    workspaceName: workspace.name
+                )
+            )
 
-        do {
-            _ = try coordinator.persistValidatedImport(
+            let review = try coordinator.reviewValidatedImport(
                 financialDocument: fixture.financialDocument,
-                importSession: fixture.importSession,
-                validation: fixture.validation,
-                fingerprint: fixture.fingerprint
+                validation: fixture.validation
             )
-            Issue.record("Expected ambiguous identity to reject persistence.")
-        } catch let failure as ImportPersistenceCommitFailure {
-            #expect(failure.originalError as? ImportPersistenceCoordinationError == .ambiguousIdentity)
-            #expect(failure.localizedDescription == "Financial identity is ambiguous; import was not persisted.")
-        }
+            #expect(review == .ambiguous)
+            #expect(review.blocksConfirmation)
 
-        #expect(accountRepo.accountIdsCallCount == 1)
-        #expect(accountRepo.upsertCallCount == 0)
-        #expect(accountRepo.attachCallCount == 0)
-        #expect(try provider.workspaceRepo.workspace(id: "workspace-import-integration") == nil)
-        #expect(try provider.accountRepo.accounts(workspaceId: "workspace-import-integration").isEmpty)
-        #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
-        #expect(try provider.transactionRepo.transactions(
-            workspaceId: "workspace-import-integration",
-            importSessionId: fixture.importSession.id.uuidString
-        ).isEmpty)
+            do {
+                _ = try coordinator.persistValidatedImport(
+                    financialDocument: fixture.financialDocument,
+                    importSession: fixture.importSession,
+                    validation: fixture.validation,
+                    fingerprint: fixture.fingerprint
+                )
+                Issue.record("Expected ambiguous identity to reject persistence.")
+            } catch let failure as ImportPersistenceCommitFailure {
+                #expect(failure.originalError as? ImportPersistenceCoordinationError == .ambiguousIdentity)
+                #expect(failure.localizedDescription == "Financial identity is ambiguous; import was not persisted.")
+                #expect(failure.accountOutcome == .identityAmbiguous)
+                let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspace.id)
+                let attempt = try #require(attempts.first { $0.id == failure.importAttemptId })
+                #expect(attempt.outcomeCode == ImportAttemptOutcome.identityAmbiguity.rawValue)
+            }
+
+            #expect(accountRepo.accountIdsCallCount == 2)
+            #expect(accountRepo.upsertCallCount == 0)
+            #expect(accountRepo.attachCallCount == 0)
+            #expect(try provider.workspaceRepo.workspace(id: workspace.id) == workspace)
+            #expect(try provider.accountRepo.accounts(workspaceId: workspace.id).isEmpty)
+            #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
+            #expect(try provider.transactionRepo.transactions(
+                workspaceId: workspace.id,
+                importSessionId: fixture.importSession.id.uuidString
+            ).isEmpty)
+        }
     }
 
     @Test func conflictingIdentityPreservesEveryExistingRelationshipAndWritesNothing() async throws {
@@ -614,9 +810,16 @@ struct ImportRepositoryIntegrationTests {
             let fixture = makeValidFixture(
                 financialIdentifiers: [firstIdentifier, secondIdentifier]
             )
+            let coordinator = makePersistenceCoordinator(provider: provider)
+            let review = try coordinator.reviewValidatedImport(
+                financialDocument: fixture.financialDocument,
+                validation: fixture.validation
+            )
+            #expect(review == .conflict)
+            #expect(review.blocksConfirmation)
 
             do {
-                _ = try makePersistenceCoordinator(provider: provider).persistValidatedImport(
+                _ = try coordinator.persistValidatedImport(
                     financialDocument: fixture.financialDocument,
                     importSession: fixture.importSession,
                     validation: fixture.validation,
@@ -626,6 +829,10 @@ struct ImportRepositoryIntegrationTests {
             } catch let failure as ImportPersistenceCommitFailure {
                 #expect(failure.originalError as? ImportPersistenceCoordinationError == .conflictingIdentity)
                 #expect(failure.localizedDescription == "Financial identity conflicts across accounts; import was not persisted.")
+                #expect(failure.accountOutcome == .identityConflict)
+                let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspace.id)
+                let attempt = try #require(attempts.first { $0.id == failure.importAttemptId })
+                #expect(attempt.outcomeCode == ImportAttemptOutcome.identityConflict.rawValue)
             }
 
             #expect(try provider.workspaceRepo.workspace(id: workspace.id) == workspace)
@@ -642,6 +849,153 @@ struct ImportRepositoryIntegrationTests {
             #expect(try provider.transactionRepo.transactions(
                 workspaceId: workspace.id,
                 importSessionId: fixture.importSession.id.uuidString
+            ).isEmpty)
+        }
+    }
+
+    @Test func identifierOwnershipConflictRecordsDistinctOutcomeWithoutAcceptedResidue() async throws {
+        try runForEachProvider { provider in
+            let workspace = WorkspaceDTO(
+                id: "workspace-import-integration",
+                name: "Ownership Workspace",
+                createdAtISO: "2026-07-13T00:00:00Z"
+            )
+            let owningAccount = makeAccountDTO(id: "account-existing-owner")
+            let identifier = try makeVerifiedAccountIdentifier("001234567890123")
+            _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+            _ = try provider.accountRepo.upsertAccount(owningAccount)
+            _ = try provider.accountRepo.attachIdentifier(identifier.repositoryDTO(
+                accountId: owningAccount.id,
+                workspaceId: workspace.id,
+                createdAtISO: owningAccount.createdAtISO,
+                id: "identifier-existing-owner"
+            ))
+            let originalAccounts = try provider.accountRepo.accounts(workspaceId: workspace.id)
+            let originalIdentifiers = try provider.accountRepo.identifiers(
+                accountId: owningAccount.id,
+                workspaceId: workspace.id
+            )
+            let advisoryAccountRepo = ObservingAccountRepository(
+                base: provider.accountRepo,
+                forcedCandidates: []
+            )
+            let fixture = makeValidFixture(financialIdentifiers: [identifier])
+            let coordinator = DefaultImportPersistenceCoordinator(
+                workspaceRepo: provider.workspaceRepo,
+                accountRepo: advisoryAccountRepo,
+                importSessionRepo: provider.importSessionRepo,
+                transactionRepo: provider.transactionRepo,
+                confirmedImportRepo: provider.confirmedImportRepo,
+                generationToken: provider.generationToken,
+                mapper: ImportPersistenceMapper(
+                    workspaceId: workspace.id,
+                    workspaceName: workspace.name
+                )
+            )
+
+            do {
+                _ = try coordinator.persistValidatedImport(
+                    financialDocument: fixture.financialDocument,
+                    importSession: fixture.importSession,
+                    validation: fixture.validation,
+                    fingerprint: fixture.fingerprint,
+                    accountChoice: .createNewAccount
+                )
+                Issue.record("Expected identifier ownership conflict.")
+            } catch let failure as ImportPersistenceCommitFailure {
+                #expect(failure.originalError as? ImportPersistenceCoordinationError == .identifierOwnershipConflict)
+                #expect(failure.accountOutcome == .identifierOwnershipConflict)
+                let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspace.id)
+                let attempt = try #require(attempts.first { $0.id == failure.importAttemptId })
+                #expect(attempt.outcomeCode == ImportAttemptOutcome.identifierOwnershipConflict.rawValue)
+                #expect(attempt.accountDecisionCode == ImportAttemptAccountDecision.noFinancialMutation.rawValue)
+            }
+
+            #expect(advisoryAccountRepo.accountIdsCallCount == 1)
+            #expect(try provider.accountRepo.accounts(workspaceId: workspace.id) == originalAccounts)
+            #expect(try provider.accountRepo.identifiers(
+                accountId: owningAccount.id,
+                workspaceId: workspace.id
+            ) == originalIdentifiers)
+            #expect(try provider.importSessionRepo.importSession(id: fixture.importSession.id.uuidString) == nil)
+            #expect(try provider.transactionRepo.transactions(
+                workspaceId: workspace.id,
+                importSessionId: fixture.importSession.id.uuidString
+            ).isEmpty)
+        }
+    }
+
+    @Test func staleAccountChoiceAndProviderGenerationRemainDistinctAcrossProviders() async throws {
+        try runForEachProvider { provider in
+            let workspace = WorkspaceDTO(
+                id: "workspace-import-integration",
+                name: "Stale Decision Workspace",
+                createdAtISO: "2026-07-13T00:00:00Z"
+            )
+            _ = try provider.workspaceRepo.upsertWorkspace(workspace)
+            let coordinator = makePersistenceCoordinator(provider: provider)
+            let staleChoiceFixture = makeValidFixture(
+                importSessionId: UUID(uuidString: "10101010-2020-3030-4040-505050505050")!,
+                fileName: "stale-account-choice.csv",
+                financialIdentifiers: [try makeVerifiedAccountIdentifier("001234567890123")]
+            )
+
+            do {
+                _ = try coordinator.persistValidatedImport(
+                    financialDocument: staleChoiceFixture.financialDocument,
+                    importSession: staleChoiceFixture.importSession,
+                    validation: staleChoiceFixture.validation,
+                    fingerprint: staleChoiceFixture.fingerprint,
+                    accountChoice: .useExistingAccount(accountId: "account-no-longer-available")
+                )
+                Issue.record("Expected stale account choice rejection.")
+            } catch let failure as ImportPersistenceCommitFailure {
+                #expect(failure.originalError as? ImportPersistenceCoordinationError == .selectedAccountUnavailable)
+                #expect(failure.accountOutcome == .staleAccountChoice)
+                let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspace.id)
+                let attempt = try #require(attempts.first { $0.id == failure.importAttemptId })
+                #expect(attempt.outcomeCode == ImportAttemptOutcome.staleAccountChoice.rawValue)
+            }
+
+            let staleProviderFixture = makeValidFixture(
+                importSessionId: UUID(uuidString: "60606060-7070-8080-9090-101010101010")!,
+                fileName: "stale-provider-generation.csv",
+                financialIdentifiers: [try makeVerifiedAccountIdentifier("009876543210987")]
+            )
+            do {
+                _ = try coordinator.persistValidatedImport(
+                    financialDocument: staleProviderFixture.financialDocument,
+                    importSession: staleProviderFixture.importSession,
+                    validation: staleProviderFixture.validation,
+                    fingerprint: staleProviderFixture.fingerprint,
+                    accountChoice: .createNewAccount,
+                    providerGeneration: ProviderGenerationToken()
+                )
+                Issue.record("Expected stale provider generation rejection.")
+            } catch let failure as ImportPersistenceCommitFailure {
+                #expect(failure.originalError as? ImportPersistenceCoordinationError == .staleProviderGeneration)
+                #expect(failure.accountOutcome == .staleProviderGeneration)
+                let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspace.id)
+                let attempt = try #require(attempts.first { $0.id == failure.importAttemptId })
+                #expect(attempt.outcomeCode == ImportAttemptOutcome.staleProviderGeneration.rawValue)
+            }
+
+            let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspace.id)
+            #expect(attempts.count == 2)
+            #expect(Set(attempts.map(\.outcomeCode)) == Set([
+                ImportAttemptOutcome.staleAccountChoice.rawValue,
+                ImportAttemptOutcome.staleProviderGeneration.rawValue
+            ]))
+            #expect(try provider.accountRepo.accounts(workspaceId: workspace.id).isEmpty)
+            #expect(try provider.importSessionRepo.importSession(
+                id: staleChoiceFixture.importSession.id.uuidString
+            ) == nil)
+            #expect(try provider.importSessionRepo.importSession(
+                id: staleProviderFixture.importSession.id.uuidString
+            ) == nil)
+            #expect(try provider.transactionRepo.transactions(
+                workspaceId: workspace.id,
+                importSessionId: nil
             ).isEmpty)
         }
     }

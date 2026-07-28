@@ -174,6 +174,152 @@ enum ImportOutcomeTone: Equatable {
     }
 }
 
+extension ImportAccountOutcomePresentation {
+    var accessibilityText: String {
+        "\(label). \(explanation)"
+    }
+}
+
+struct ImportAccountOutcomeView: View {
+    let presentation: ImportAccountOutcomePresentation
+    let iconName: String
+    let tone: ImportOutcomeTone
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: iconName)
+                .foregroundStyle(tone.color)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(presentation.label)
+                    .font(.subheadline.weight(.semibold))
+                Text(presentation.explanation)
+                    .font(.caption)
+                    .foregroundStyle(LFTheme.textSecondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(tone.color.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(presentation.accessibilityText)
+    }
+}
+
+struct ImportIdentityReviewUIProjection: Equatable {
+    let presentation: ImportAccountOutcomePresentation?
+    let iconName: String?
+    let tone: ImportOutcomeTone
+    let matchedAccountID: String?
+    let eligibleAccountIDs: [String]
+
+    init(review: ImportIdentityReview) {
+        switch review {
+        case .unavailable:
+            presentation = nil
+            iconName = nil
+            tone = .warning
+            matchedAccountID = nil
+            eligibleAccountIDs = []
+        case .matchedExisting(let accountID):
+            presentation = ImportAccountOutcomePresentationMapper.presentation(for: .matchedExisting)
+            iconName = "person.crop.circle.badge.checkmark"
+            tone = .success
+            matchedAccountID = accountID
+            eligibleAccountIDs = []
+        case .choiceRequired(let eligibleAccountIDs):
+            presentation = ImportAccountOutcomePresentationMapper.presentation(for: .choiceRequired)
+            iconName = "person.crop.circle.badge.questionmark"
+            tone = .warning
+            matchedAccountID = nil
+            self.eligibleAccountIDs = eligibleAccountIDs
+        case .ambiguous:
+            presentation = ImportAccountOutcomePresentationMapper.presentation(for: .identityAmbiguous)
+            iconName = "person.crop.circle.badge.questionmark"
+            tone = .warning
+            matchedAccountID = nil
+            eligibleAccountIDs = []
+        case .conflict:
+            presentation = ImportAccountOutcomePresentationMapper.presentation(for: .identityConflict)
+            iconName = "person.crop.circle.badge.exclamationmark"
+            tone = .warning
+            matchedAccountID = nil
+            eligibleAccountIDs = []
+        }
+    }
+}
+
+enum ImportAccountConfirmationPolicy {
+    static func initialChoice(for _: ImportIdentityReview) -> ImportAccountChoice? {
+        nil
+    }
+
+    static func allowsConfirmation(
+        review: ImportIdentityReview,
+        choice: ImportAccountChoice?
+    ) -> Bool {
+        switch (review, choice) {
+        case (.matchedExisting, _), (.unavailable, _):
+            return true
+        case let (.choiceRequired(eligibleAccountIDs), .some(.useExistingAccount(accountID))):
+            return eligibleAccountIDs.contains(accountID)
+        case (.choiceRequired, .some(.createNewAccount)):
+            return true
+        case (.choiceRequired, nil), (.ambiguous, _), (.conflict, _):
+            return false
+        }
+    }
+}
+
+enum DurableImportAccountOutcomeSection {
+    static func presentation(
+        for attempt: RepositoryImportAttempt
+    ) -> ImportAccountOutcomePresentation? {
+        presentation(
+            outcomeCode: attempt.outcomeCode,
+            accountDecisionCode: attempt.accountDecisionCode
+        )
+    }
+
+    static func presentation(
+        outcomeCode: String,
+        accountDecisionCode: String
+    ) -> ImportAccountOutcomePresentation? {
+        if let outcome = ImportAttemptOutcome(rawValue: outcomeCode) {
+            switch outcome {
+            case .successfulImport, .partialImportCommitted, .accountChoiceRequired,
+                    .identifierOwnershipConflict, .identityAmbiguity, .identityConflict,
+                    .staleAccountChoice, .staleProviderGeneration:
+                return ImportAccountOutcomePresentationMapper.presentation(
+                    outcomeCode: outcomeCode,
+                    accountDecisionCode: accountDecisionCode
+                )
+            case .reviewedPartialPlanStale, .partialImportUnsupportedEvidence,
+                    .validationFailure, .persistenceFailure, .exactStatementDuplicate,
+                    .existingEligibleAxisUPIEvent, .repeatedEligibleIncomingEvidence,
+                    .transactionEventOwnershipConflict, .repositoryIntegrityConflict,
+                    .sqliteContention:
+                return nil
+            }
+        }
+
+        guard let decision = ImportAttemptAccountDecision(rawValue: accountDecisionCode) else {
+            return nil
+        }
+        switch decision {
+        case .matchedExisting, .userSelectedExisting, .createdNew,
+                .resolvedOrCreated, .selectedExisting:
+            return ImportAccountOutcomePresentationMapper.presentation(
+                outcomeCode: outcomeCode,
+                accountDecisionCode: accountDecisionCode
+            )
+        case .noFinancialMutation, .sideEffectsMayExist:
+            return nil
+        }
+    }
+}
+
 struct DurableImportPresentationValue: Equatable {
     let label: String
     let explanation: String
@@ -286,6 +432,26 @@ struct DurableImportAttemptPresentation: Equatable {
                 iconName: "exclamationmark.triangle.fill",
                 tone: .warning
             )
+        case .accountChoiceRequired:
+            let accountPresentation = ImportAccountOutcomePresentationMapper.presentation(
+                outcomeCode: outcome.rawValue
+            )
+            return DurableImportPresentationValue(
+                label: accountPresentation.label,
+                explanation: accountPresentation.explanation,
+                iconName: "person.crop.circle.badge.questionmark",
+                tone: .warning
+            )
+        case .identifierOwnershipConflict:
+            let accountPresentation = ImportAccountOutcomePresentationMapper.presentation(
+                outcomeCode: outcome.rawValue
+            )
+            return DurableImportPresentationValue(
+                label: accountPresentation.label,
+                explanation: accountPresentation.explanation,
+                iconName: "person.crop.circle.badge.exclamationmark",
+                tone: .warning
+            )
         case .identityAmbiguity:
             return DurableImportPresentationValue(
                 label: "Account identity ambiguous",
@@ -385,6 +551,7 @@ struct ImportOutcomePresentation: Equatable {
     let isPartialImport: Bool
     let sourceRowCount: Int?
     let recognizedExistingRowCount: Int?
+    let accountOutcomePresentation: ImportAccountOutcomePresentation?
 
     init(result: ImportEngineResult) {
         fileName = result.fileName
@@ -402,6 +569,9 @@ struct ImportOutcomePresentation: Equatable {
         isPartialImport = result.isPartialImport
         sourceRowCount = result.sourceRowCount
         recognizedExistingRowCount = result.recognizedExistingRowCount
+        accountOutcomePresentation = result.accountOutcome == .unavailable
+            ? nil
+            : ImportAccountOutcomePresentationMapper.presentation(for: result.accountOutcome)
 
         if result.previousImport != nil || result.transactionEventBlock != nil || result.persisted {
             message = result.errorMessage?.isEmpty == false ? result.errorMessage : nil
@@ -1772,6 +1942,16 @@ struct ContentView: View {
                         LFStatusBadge(title: outcome.persistenceStatus, color: outcome.tone.color)
                     }
 
+                    if let accountPresentation = outcome.accountOutcomePresentation {
+                        ImportAccountOutcomeView(
+                            presentation: accountPresentation,
+                            iconName: outcome.tone == .success
+                                ? "person.crop.circle.badge.checkmark"
+                                : "person.crop.circle.badge.exclamationmark",
+                            tone: outcome.tone
+                        )
+                    }
+
                     LFInfoRow(title: "Transactions", value: "\(outcome.transactionCount)")
 
                     if outcome.isPreviouslyImported {
@@ -1929,6 +2109,18 @@ struct ContentView: View {
                 LFInfoRow(title: "Outcome", value: presentation.outcome.label)
                 LFInfoRow(title: "Coverage", value: presentation.coverage)
                 LFInfoRow(title: "Guidance", value: presentation.guidance)
+                if let accountPresentation = DurableImportAccountOutcomeSection.presentation(for: attempt) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Account Outcome")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(LFTheme.textSecondary)
+                        ImportAccountOutcomeView(
+                            presentation: accountPresentation,
+                            iconName: durableAccountOutcomeIcon(outcomeCode: attempt.outcomeCode),
+                            tone: durableAccountOutcomeTone(outcomeCode: attempt.outcomeCode)
+                        )
+                    }
+                }
                 if let sourceCount = attempt.sourceRowCount {
                     LFInfoRow(title: "Source Rows", value: "\(sourceCount)")
                     LFInfoRow(title: "Imported", value: "\(attempt.importedTransactionCount ?? 0)")
@@ -1942,6 +2134,21 @@ struct ContentView: View {
             }
         }
         .padding(12).background(LFTheme.surface.opacity(0.45)).clipShape(RoundedRectangle(cornerRadius: 9))
+    }
+
+    private func durableAccountOutcomeTone(outcomeCode: String) -> ImportOutcomeTone {
+        switch ImportAttemptOutcome(rawValue: outcomeCode) {
+        case .successfulImport, .partialImportCommitted:
+            return .success
+        default:
+            return .warning
+        }
+    }
+
+    private func durableAccountOutcomeIcon(outcomeCode: String) -> String {
+        durableAccountOutcomeTone(outcomeCode: outcomeCode) == .success
+            ? "person.crop.circle.badge.checkmark"
+            : "person.crop.circle.badge.exclamationmark"
     }
 
     private func preparedImportPreview(_ preparedImport: PreparedImport, displayName: String? = nil) -> some View {
@@ -1968,14 +2175,48 @@ struct ContentView: View {
                 LFInfoRow(title: "Closing Balance", value: balanceText(preparedImport.validation.closingBalance, currency: preparedImport.detectedCurrency))
             }
 
-            if importIdentityReview.isAvailable {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Choose Account")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Choose where this verified identity will be attached. No account is selected automatically.")
-                        .font(.caption)
-                        .foregroundStyle(LFTheme.textSecondary)
-                    ForEach(accountsViewModel.accounts.filter { importIdentityReview.eligibleAccountIds.contains($0.id) }) { account in
+            importIdentityReviewPanel(preparedImport)
+
+            if case .eligible(let plan) = partialImportReview {
+                partialImportReviewPanel(plan, preparedImport: preparedImport)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Transaction Preview")
+                    .font(.subheadline.weight(.semibold))
+                tableHeader(["Date", "Description", "Currency", "Type", "Amount", "Balance"])
+                ForEach(preparedImport.financialDocument.transactions.prefix(12)) { transaction in
+                    previewTransactionRow(transaction)
+                }
+            }
+            .padding(12)
+            .background(LFTheme.surface.opacity(0.55))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    @ViewBuilder
+    private func importIdentityReviewPanel(_ preparedImport: PreparedImport) -> some View {
+        let projection = ImportIdentityReviewUIProjection(review: importIdentityReview)
+        if let presentation = projection.presentation,
+           let iconName = projection.iconName {
+            VStack(alignment: .leading, spacing: 10) {
+                ImportAccountOutcomeView(
+                    presentation: presentation,
+                    iconName: iconName,
+                    tone: projection.tone
+                )
+
+                if let matchedAccountID = projection.matchedAccountID,
+                   let account = accountsViewModel.accounts.first(where: { $0.id == matchedAccountID }) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        LFInfoRow(title: "Destination Account", value: account.displayName)
+                        LFInfoRow(title: "Institution", value: account.institution)
+                    }
+                }
+
+                if case .choiceRequired = importIdentityReview {
+                    ForEach(accountsViewModel.accounts.filter { projection.eligibleAccountIDs.contains($0.id) }) { account in
                         Button {
                             importAccountChoice = .useExistingAccount(accountId: account.id)
                             refreshPartialImportReview(preparedImport)
@@ -2013,25 +2254,9 @@ struct ContentView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(LFTheme.text)
                 }
-                .padding(12)
-                .background(LFTheme.primary.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-
-            if case .eligible(let plan) = partialImportReview {
-                partialImportReviewPanel(plan, preparedImport: preparedImport)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Transaction Preview")
-                    .font(.subheadline.weight(.semibold))
-                tableHeader(["Date", "Description", "Currency", "Type", "Amount", "Balance"])
-                ForEach(preparedImport.financialDocument.transactions.prefix(12)) { transaction in
-                    previewTransactionRow(transaction)
-                }
             }
             .padding(12)
-            .background(LFTheme.surface.opacity(0.55))
+            .background(LFTheme.primary.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
@@ -2183,7 +2408,10 @@ struct ContentView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
                 .disabled(
-                    (importIdentityReview.isAvailable && importAccountChoice == nil) ||
+                    !ImportAccountConfirmationPolicy.allowsConfirmation(
+                        review: importIdentityReview,
+                        choice: importAccountChoice
+                    ) ||
                     partialReviewBlocksConfirmation
                 )
             case .committing:
@@ -2581,10 +2809,11 @@ struct ContentView: View {
             guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
                 return
             }
-            importAccountChoice = nil
-            importIdentityReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
+            let identityReview: ImportIdentityReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
                 ? (try ImportEngine.shared.reviewPreparedImport(preparedImport))
                 : .unavailable
+            importIdentityReview = identityReview
+            importAccountChoice = ImportAccountConfirmationPolicy.initialChoice(for: identityReview)
             partialImportReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
                 ? (try ImportEngine.shared.reviewPreparedPartialImport(preparedImport))
                 : .ordinaryFullImport

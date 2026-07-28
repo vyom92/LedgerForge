@@ -815,7 +815,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             createdAtISO: history.completedAtISO,
             outcomeCode: ImportAttemptOutcome.partialImportCommitted.rawValue,
             coverageCode: ImportAttemptCoverage.allRowsSupportedAxisUPIReviewed.rawValue,
-            accountDecisionCode: ImportAttemptAccountDecision.selectedExisting.rawValue,
+            accountDecisionCode: history.successfulAttempt.accountDecisionCode,
             guidanceCode: ImportAttemptGuidance.partialImportCompleted.rawValue,
             persistenceCode: ImportAttemptPersistence.committed.rawValue,
             transactionCount: reviewed.importedCount,

@@ -50,6 +50,7 @@ struct ImportEngineResult: Equatable {
     let sourceRowCount: Int?
     let recognizedExistingRowCount: Int?
     let isPartialImport: Bool
+    let accountOutcome: ImportAccountOutcome
 
     init(
         fileName: String,
@@ -66,7 +67,8 @@ struct ImportEngineResult: Equatable {
         hydrationOutcome: HydrationOutcome? = nil,
         sourceRowCount: Int? = nil,
         recognizedExistingRowCount: Int? = nil,
-        isPartialImport: Bool = false
+        isPartialImport: Bool = false,
+        accountOutcome: ImportAccountOutcome = .unavailable
     ) {
         self.fileName = fileName
         self.transactionCount = transactionCount
@@ -83,6 +85,7 @@ struct ImportEngineResult: Equatable {
         self.sourceRowCount = sourceRowCount
         self.recognizedExistingRowCount = recognizedExistingRowCount
         self.isPartialImport = isPartialImport
+        self.accountOutcome = accountOutcome
     }
 
     var succeeded: Bool {
@@ -572,7 +575,8 @@ final class ImportEngine {
                     accountId: nil,
                     importSessionId: nil,
                     transactionCount: preparedImport.transactionCount,
-                    importAttemptId: failure.importAttemptId
+                    importAttemptId: failure.importAttemptId,
+                    accountOutcome: failure.accountOutcome
                 )
             } else {
                 persistenceErrorMessage = error.localizedDescription
@@ -613,7 +617,8 @@ final class ImportEngine {
             hydrationOutcome: hydrationOutcome,
             sourceRowCount: persistenceResult.sourceRowCount,
             recognizedExistingRowCount: persistenceResult.recognizedExistingRowCount,
-            isPartialImport: persistenceResult.isPartialImport
+            isPartialImport: persistenceResult.isPartialImport,
+            accountOutcome: persistenceResult.accountOutcome
         )
     }
 

@@ -15,6 +15,7 @@ struct ImportPersistenceResult: Equatable {
     let sourceRowCount: Int?
     let recognizedExistingRowCount: Int?
     let isPartialImport: Bool
+    let accountOutcome: ImportAccountOutcome
 
     init(
         persisted: Bool,
@@ -27,7 +28,8 @@ struct ImportPersistenceResult: Equatable {
         importAttemptId: String? = nil,
         sourceRowCount: Int? = nil,
         recognizedExistingRowCount: Int? = nil,
-        isPartialImport: Bool = false
+        isPartialImport: Bool = false,
+        accountOutcome: ImportAccountOutcome = .unavailable
     ) {
         self.persisted = persisted
         self.workspaceId = workspaceId
@@ -40,6 +42,7 @@ struct ImportPersistenceResult: Equatable {
         self.sourceRowCount = sourceRowCount
         self.recognizedExistingRowCount = recognizedExistingRowCount
         self.isPartialImport = isPartialImport
+        self.accountOutcome = accountOutcome
     }
 
     static let skipped = ImportPersistenceResult(
@@ -126,11 +129,240 @@ enum ImportAccountChoice: Equatable {
     case createNewAccount
 }
 
-struct ImportIdentityReview: Equatable {
-    let isAvailable: Bool
-    let eligibleAccountIds: [String]
+enum ImportIdentityReview: Equatable, Sendable {
+    case unavailable
+    case matchedExisting(accountId: String)
+    case choiceRequired(eligibleAccountIds: [String])
+    case ambiguous
+    case conflict
 
-    static let unavailable = ImportIdentityReview(isAvailable: false, eligibleAccountIds: [])
+    var eligibleAccountIds: [String] {
+        guard case .choiceRequired(let eligibleAccountIds) = self else { return [] }
+        return eligibleAccountIds
+    }
+
+    var requiresExplicitChoice: Bool {
+        if case .choiceRequired = self { return true }
+        return false
+    }
+
+    var blocksConfirmation: Bool {
+        switch self {
+        case .choiceRequired, .ambiguous, .conflict:
+            return true
+        case .unavailable, .matchedExisting:
+            return false
+        }
+    }
+
+    /// Temporary Packet 1 compatibility for the existing SwiftUI account
+    /// choice controls. Packet 2 owns typed presentation integration.
+    var isAvailable: Bool { requiresExplicitChoice }
+}
+
+enum ImportAccountOutcome: CaseIterable, Equatable, Sendable {
+    case matchedExisting
+    case choiceRequired
+    case userSelectedExisting
+    case createdNew
+    case identityAmbiguous
+    case identityConflict
+    case identifierOwnershipConflict
+    case staleAccountChoice
+    case staleProviderGeneration
+    case unavailable
+
+    static func confirmed(
+        advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO,
+        accountChoice: ConfirmedImportAccountChoiceDTO,
+        eligibleIdentifierCount: Int
+    ) -> ImportAccountOutcome {
+        guard eligibleIdentifierCount > 0 else { return .unavailable }
+
+        switch (advisoryIdentity, accountChoice) {
+        case let (.resolved(resolvedAccountID), .useExistingAccount(selectedAccountID))
+            where resolvedAccountID == selectedAccountID:
+            return .matchedExisting
+        case (.noMatch, .useExistingAccount):
+            return .userSelectedExisting
+        case (.noMatch, .createProposedAccount):
+            return .createdNew
+        default:
+            return .unavailable
+        }
+    }
+
+    static func rejected(_ result: ConfirmedImportRepositoryResult) -> ImportAccountOutcome {
+        switch result {
+        case .explicitAccountChoiceRequired:
+            return .choiceRequired
+        case .identityAmbiguous:
+            return .identityAmbiguous
+        case .identityConflict:
+            return .identityConflict
+        case .identifierOwnershipConflict:
+            return .identifierOwnershipConflict
+        case .selectedAccountUnavailable, .selectedAccountIneligible,
+                .selectedAccountWorkspaceMismatch, .staleIdentityDecision:
+            return .staleAccountChoice
+        case .staleProviderGeneration:
+            return .staleProviderGeneration
+        default:
+            return .unavailable
+        }
+    }
+
+    var successfulAttemptDecision: ImportAttemptAccountDecision {
+        switch self {
+        case .matchedExisting:
+            return .matchedExisting
+        case .userSelectedExisting:
+            return .userSelectedExisting
+        case .createdNew:
+            return .createdNew
+        case .unavailable:
+            // Identifier-free historical behavior remains readable and new
+            // identifier-free imports must not claim that identity created an account.
+            return .resolvedOrCreated
+        case .choiceRequired, .identityAmbiguous, .identityConflict,
+                .identifierOwnershipConflict, .staleAccountChoice,
+                .staleProviderGeneration:
+            return .noFinancialMutation
+        }
+    }
+}
+
+struct ImportAccountOutcomePresentation: Equatable, Sendable {
+    let label: String
+    let explanation: String
+}
+
+enum ImportAccountOutcomePresentationMapper {
+    static func presentation(
+        for outcome: ImportAccountOutcome
+    ) -> ImportAccountOutcomePresentation {
+        switch outcome {
+        case .matchedExisting:
+            return ImportAccountOutcomePresentation(
+                label: "Matched an existing account",
+                explanation: "A verified account identifier is already owned by this account."
+            )
+        case .choiceRequired:
+            return ImportAccountOutcomePresentation(
+                label: "Choose an account",
+                explanation: "No existing account owns this verified identifier. Choose an eligible account or create a new one."
+            )
+        case .userSelectedExisting:
+            return ImportAccountOutcomePresentation(
+                label: "Used your selected account",
+                explanation: "You selected an eligible existing account for this verified identifier."
+            )
+        case .createdNew:
+            return ImportAccountOutcomePresentation(
+                label: "Created a new account",
+                explanation: "The import created a new account for this verified identifier."
+            )
+        case .identityAmbiguous:
+            return ImportAccountOutcomePresentation(
+                label: "Account match ambiguous",
+                explanation: "One verified identifier is associated with more than one account. No account was selected."
+            )
+        case .identityConflict:
+            return ImportAccountOutcomePresentation(
+                label: "Account identity conflict",
+                explanation: "Verified identifiers point to different accounts. No account was selected."
+            )
+        case .identifierOwnershipConflict:
+            return ImportAccountOutcomePresentation(
+                label: "Identifier ownership conflict",
+                explanation: "Verified identifier ownership changed or conflicted before confirmation. No financial history was written."
+            )
+        case .staleAccountChoice:
+            return ImportAccountOutcomePresentation(
+                label: "Account choice out of date",
+                explanation: "The selected account is no longer available or eligible. Prepare or review the import again."
+            )
+        case .staleProviderGeneration:
+            return ImportAccountOutcomePresentation(
+                label: "Preparation out of date",
+                explanation: "Persistence changed after preparation. Prepare the import again."
+            )
+        case .unavailable:
+            return unavailable
+        }
+    }
+
+    static func presentation(
+        accountDecisionCode: String
+    ) -> ImportAccountOutcomePresentation {
+        guard let decision = ImportAttemptAccountDecision(rawValue: accountDecisionCode) else {
+            return unavailable
+        }
+        switch decision {
+        case .matchedExisting:
+            return presentation(for: .matchedExisting)
+        case .userSelectedExisting:
+            return presentation(for: .userSelectedExisting)
+        case .createdNew:
+            return presentation(for: .createdNew)
+        case .selectedExisting:
+            return ImportAccountOutcomePresentation(
+                label: "Existing account used",
+                explanation: "This older record does not distinguish an automatic match from an explicit choice."
+            )
+        case .resolvedOrCreated:
+            return ImportAccountOutcomePresentation(
+                label: "Account association completed",
+                explanation: "This older record does not distinguish account matching from account creation."
+            )
+        case .noFinancialMutation, .sideEffectsMayExist:
+            return unavailable
+        }
+    }
+
+    static func presentation(
+        outcomeCode: String
+    ) -> ImportAccountOutcomePresentation {
+        guard let outcome = ImportAttemptOutcome(rawValue: outcomeCode) else {
+            return unavailable
+        }
+        switch outcome {
+        case .accountChoiceRequired:
+            return presentation(for: .choiceRequired)
+        case .identifierOwnershipConflict:
+            return presentation(for: .identifierOwnershipConflict)
+        case .identityAmbiguity:
+            return presentation(for: .identityAmbiguous)
+        case .identityConflict:
+            return presentation(for: .identityConflict)
+        case .staleAccountChoice:
+            return presentation(for: .staleAccountChoice)
+        case .staleProviderGeneration:
+            return presentation(for: .staleProviderGeneration)
+        default:
+            return unavailable
+        }
+    }
+
+    static func presentation(
+        outcomeCode: String,
+        accountDecisionCode: String
+    ) -> ImportAccountOutcomePresentation {
+        guard let outcome = ImportAttemptOutcome(rawValue: outcomeCode) else {
+            return unavailable
+        }
+        switch outcome {
+        case .successfulImport, .partialImportCommitted:
+            return presentation(accountDecisionCode: accountDecisionCode)
+        default:
+            return presentation(outcomeCode: outcomeCode)
+        }
+    }
+
+    private static let unavailable = ImportAccountOutcomePresentation(
+        label: "Account outcome unavailable",
+        explanation: "Detailed account-association information is unavailable."
+    )
 }
 
 extension ImportPersistenceCoordinating {
@@ -270,6 +502,17 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
 struct ImportPersistenceCommitFailure: Error, LocalizedError {
     let originalError: Error
     let importAttemptId: String?
+    let accountOutcome: ImportAccountOutcome
+
+    init(
+        originalError: Error,
+        importAttemptId: String?,
+        accountOutcome: ImportAccountOutcome = .unavailable
+    ) {
+        self.originalError = originalError
+        self.importAttemptId = importAttemptId
+        self.accountOutcome = accountOutcome
+    }
 
     var errorDescription: String? {
         originalError.localizedDescription
@@ -406,8 +649,18 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             workspaceId: workspaceId,
             identifiers: financialDocument.financialIdentifiers
         )
-        guard case .noMatch = resolution,
-              eligibleIdentifier(in: financialDocument) != nil else {
+        switch resolution {
+        case .resolved(let accountId):
+            return .matchedExisting(accountId: accountId)
+        case .ambiguous:
+            return .ambiguous
+        case .conflict:
+            return .conflict
+        case .noMatch:
+            break
+        }
+
+        guard eligibleIdentifier(in: financialDocument) != nil else {
             return .unavailable
         }
 
@@ -416,7 +669,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             .map(\.id)
             .sorted()
         developerConsole?.info(.import, "Identity review available", metadata: ["eligibleAccounts": "\(eligibleAccountIds.count)"])
-        return ImportIdentityReview(isAvailable: true, eligibleAccountIds: eligibleAccountIds)
+        return .choiceRequired(eligibleAccountIds: eligibleAccountIds)
     }
 
     func persistValidatedImport(
@@ -542,6 +795,11 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         let result = provider.confirmedImportRepo.commitReviewedPartialImport(plan)
         switch result {
         case .partialCommitted(let receipt):
+            let accountOutcome = ImportAccountOutcome.confirmed(
+                advisoryIdentity: plan.basePlan.advisoryIdentity,
+                accountChoice: plan.basePlan.accountChoice,
+                eligibleIdentifierCount: plan.basePlan.identifiers.count
+            )
             return ImportPersistenceResult(
                 persisted: true,
                 workspaceId: receipt.workspaceId,
@@ -551,7 +809,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 importAttemptId: plan.basePlan.historyTemplate.successfulAttempt.id,
                 sourceRowCount: plan.sourceRowCount,
                 recognizedExistingRowCount: plan.recognizedCount,
-                isPartialImport: true
+                isPartialImport: true,
+                accountOutcome: accountOutcome
             )
         case .exactDuplicate:
             return try map(
@@ -573,7 +832,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             )
             throw ImportPersistenceCommitFailure(
                 originalError: coordinationError(for: result),
-                importAttemptId: attemptID
+                importAttemptId: attemptID,
+                accountOutcome: ImportAccountOutcome.rejected(result)
             )
         }
     }
@@ -617,8 +877,13 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         let count = plan.transactionTemplates.count
         switch result {
         case .committed(let receipt), .partialCommitted(let receipt):
+            let accountOutcome = ImportAccountOutcome.confirmed(
+                advisoryIdentity: plan.advisoryIdentity,
+                accountChoice: plan.accountChoice,
+                eligibleIdentifierCount: plan.identifiers.count
+            )
             developerConsole?.info(.database, "Provider-owned confirmed import committed", metadata: ["transactions": "\(count)"])
-            return ImportPersistenceResult(persisted: true, workspaceId: receipt.workspaceId, accountId: receipt.accountId, importSessionId: receipt.importSessionId, transactionCount: count, importAttemptId: plan.historyTemplate.successfulAttempt.id)
+            return ImportPersistenceResult(persisted: true, workspaceId: receipt.workspaceId, accountId: receipt.accountId, importSessionId: receipt.importSessionId, transactionCount: count, importAttemptId: plan.historyTemplate.successfulAttempt.id, accountOutcome: accountOutcome)
         case .exactDuplicate:
             let previous = try provider.importSessionRepo.priorImportedStatement(algorithm: fingerprint.algorithm, fingerprint: fingerprint.digest)
             let attemptID = recordAttempt(provider: provider, outcome: .exactStatementDuplicate, coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: .reviewPriorImport, persistence: .rejectedRecorded, transactionCount: previous?.transactionCount ?? count, accountId: previous?.accountId, relatedImportSessionId: previous?.importSessionId)
@@ -638,7 +903,11 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             return ImportPersistenceResult(persisted: false, workspaceId: mapper.workspaceId, accountId: nil, importSessionId: nil, transactionCount: count, transactionEventBlock: .ownershipConflict, importAttemptId: attemptID)
         default:
             let attemptID = rejectedAttempt(provider: provider, result: result, count: count, accountId: nil)
-            throw ImportPersistenceCommitFailure(originalError: coordinationError(for: result), importAttemptId: attemptID)
+            throw ImportPersistenceCommitFailure(
+                originalError: coordinationError(for: result),
+                importAttemptId: attemptID,
+                accountOutcome: ImportAccountOutcome.rejected(result)
+            )
         }
     }
 
@@ -667,8 +936,10 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         case .repeatedIncomingEventEvidence: outcome = .repeatedEligibleIncomingEvidence; guidance = .supportedEventBlocked
         case .existingEventDuplicate: outcome = .existingEligibleAxisUPIEvent; guidance = .supportedEventBlocked
         case .eventOwnershipConflict: outcome = .transactionEventOwnershipConflict; guidance = .integrityReviewRequired
+        case .explicitAccountChoiceRequired: outcome = .accountChoiceRequired; guidance = .integrityReviewRequired
         case .identityAmbiguous: outcome = .identityAmbiguity; guidance = .integrityReviewRequired
-        case .identityConflict, .identifierOwnershipConflict: outcome = .identityConflict; guidance = .integrityReviewRequired
+        case .identityConflict: outcome = .identityConflict; guidance = .integrityReviewRequired
+        case .identifierOwnershipConflict: outcome = .identifierOwnershipConflict; guidance = .integrityReviewRequired
         case .selectedAccountUnavailable, .selectedAccountIneligible, .selectedAccountWorkspaceMismatch, .staleIdentityDecision: outcome = .staleAccountChoice; guidance = .integrityReviewRequired
         case .staleProviderGeneration: outcome = .staleProviderGeneration; guidance = .prepareAgain
         case .reviewedPartialPlanStale: outcome = .reviewedPartialPlanStale; guidance = .prepareAgain

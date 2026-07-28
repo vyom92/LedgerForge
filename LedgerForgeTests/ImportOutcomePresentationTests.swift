@@ -244,6 +244,8 @@ struct ImportOutcomePresentationTests {
             (.repeatedEligibleIncomingEvidence, "Repeated incoming evidence", "Supported transaction evidence repeats within this import. No new financial history was written"),
             (.transactionEventOwnershipConflict, "Transaction-event ownership conflict", "Supported transaction-event ownership conflicts. No new financial history was written"),
             (.repositoryIntegrityConflict, "Repository integrity conflict", "Repository integrity prevented confirmation. No new financial history was written"),
+            (.accountChoiceRequired, "Choose an account", "No existing account owns this verified identifier. Choose an eligible account or create a new one."),
+            (.identifierOwnershipConflict, "Identifier ownership conflict", "Verified identifier ownership changed or conflicted before confirmation. No financial history was written."),
             (.identityAmbiguity, "Account identity ambiguous", "Account identity could not be resolved unambiguously. No new financial history was written"),
             (.identityConflict, "Account identity conflict", "Account identity conflicts across accounts. No new financial history was written"),
             (.staleAccountChoice, "Account choice out of date", "The prepared account choice is no longer current. No new financial history was written"),
@@ -262,6 +264,206 @@ struct ImportOutcomePresentationTests {
             #expect(presentation.explanation == expectedExplanation)
             #expect(!presentation.label.contains(outcome.rawValue))
             #expect(!presentation.explanation.contains(outcome.rawValue))
+        }
+    }
+
+    @Test func accountRejectionPresentationCannotDivergeFromSharedCopyAuthority() {
+        let expected: [(ImportAttemptOutcome, String, String)] = [
+            (
+                .accountChoiceRequired,
+                "Choose an account",
+                "No existing account owns this verified identifier. Choose an eligible account or create a new one."
+            ),
+            (
+                .identifierOwnershipConflict,
+                "Identifier ownership conflict",
+                "Verified identifier ownership changed or conflicted before confirmation. No financial history was written."
+            )
+        ]
+
+        for (outcome, expectedLabel, expectedExplanation) in expected {
+            let shared = ImportAccountOutcomePresentationMapper.presentation(
+                outcomeCode: outcome.rawValue
+            )
+            let durable = DurableImportAttemptPresentation.outcome(
+                code: outcome.rawValue,
+                transactionCount: 0
+            )
+
+            #expect(shared.label == expectedLabel)
+            #expect(shared.explanation == expectedExplanation)
+            #expect(durable.label == expectedLabel)
+            #expect(durable.explanation == expectedExplanation)
+            #expect(durable.label == shared.label)
+            #expect(durable.explanation == shared.explanation)
+        }
+    }
+
+    @Test @MainActor func durableAccountSectionRendersProspectiveAndLegacyDecisions() throws {
+        let prospective: [(ImportAttemptAccountDecision, String, String)] = [
+            (
+                .matchedExisting,
+                "Matched an existing account",
+                "A verified account identifier is already owned by this account."
+            ),
+            (
+                .userSelectedExisting,
+                "Used your selected account",
+                "You selected an eligible existing account for this verified identifier."
+            ),
+            (
+                .createdNew,
+                "Created a new account",
+                "The import created a new account for this verified identifier."
+            )
+        ]
+
+        for outcome in [
+            ImportAttemptOutcome.successfulImport,
+            ImportAttemptOutcome.partialImportCommitted
+        ] {
+            for (decision, label, explanation) in prospective {
+                let presentation = try #require(DurableImportAccountOutcomeSection.presentation(
+                    outcomeCode: outcome.rawValue,
+                    accountDecisionCode: decision.rawValue
+                ))
+                #expect(presentation == ImportAccountOutcomePresentation(
+                    label: label,
+                    explanation: explanation
+                ))
+            }
+        }
+
+        let legacy: [(ImportAttemptAccountDecision, String, String)] = [
+            (
+                .selectedExisting,
+                "Existing account used",
+                "This older record does not distinguish an automatic match from an explicit choice."
+            ),
+            (
+                .resolvedOrCreated,
+                "Account association completed",
+                "This older record does not distinguish account matching from account creation."
+            )
+        ]
+        for (decision, label, explanation) in legacy {
+            let presentation = try #require(DurableImportAccountOutcomeSection.presentation(
+                outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
+                accountDecisionCode: decision.rawValue
+            ))
+            #expect(presentation == ImportAccountOutcomePresentation(
+                label: label,
+                explanation: explanation
+            ))
+        }
+    }
+
+    @Test @MainActor func durableAccountSectionRendersEveryAccountRelatedRejection() throws {
+        let expected: [(ImportAttemptOutcome, String, String)] = [
+            (
+                .accountChoiceRequired,
+                "Choose an account",
+                "No existing account owns this verified identifier. Choose an eligible account or create a new one."
+            ),
+            (
+                .identifierOwnershipConflict,
+                "Identifier ownership conflict",
+                "Verified identifier ownership changed or conflicted before confirmation. No financial history was written."
+            ),
+            (
+                .identityAmbiguity,
+                "Account match ambiguous",
+                "One verified identifier is associated with more than one account. No account was selected."
+            ),
+            (
+                .identityConflict,
+                "Account identity conflict",
+                "Verified identifiers point to different accounts. No account was selected."
+            ),
+            (
+                .staleAccountChoice,
+                "Account choice out of date",
+                "The selected account is no longer available or eligible. Prepare or review the import again."
+            ),
+            (
+                .staleProviderGeneration,
+                "Preparation out of date",
+                "Persistence changed after preparation. Prepare the import again."
+            )
+        ]
+
+        for (outcome, label, explanation) in expected {
+            let presentation = try #require(DurableImportAccountOutcomeSection.presentation(
+                outcomeCode: outcome.rawValue,
+                accountDecisionCode: ImportAttemptAccountDecision.noFinancialMutation.rawValue
+            ))
+            #expect(presentation == ImportAccountOutcomePresentation(
+                label: label,
+                explanation: explanation
+            ))
+        }
+    }
+
+    @Test @MainActor func durableAccountSectionUsesUnavailableForApplicableUnknownValues() throws {
+        let unavailable = ImportAccountOutcomePresentation(
+            label: "Account outcome unavailable",
+            explanation: "Detailed account-association information is unavailable."
+        )
+        let hostileValues = [
+            "001234567890123",
+            "XXXX-9876",
+            "repository-account-private-123",
+            "candidate-account-private-456",
+            "private-statement.csv",
+            "/Users/private/Documents/statement.csv",
+            "sha256:private-fingerprint-value",
+            "SQLITE_CONSTRAINT: identifiers.identifier",
+            "committed",
+            "rejected_recorded"
+        ]
+
+        for hostileValue in hostileValues {
+            let unknownDecision = try #require(DurableImportAccountOutcomeSection.presentation(
+                outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
+                accountDecisionCode: hostileValue
+            ))
+            let unknownOutcome = try #require(DurableImportAccountOutcomeSection.presentation(
+                outcomeCode: hostileValue,
+                accountDecisionCode: ImportAttemptAccountDecision.matchedExisting.rawValue
+            ))
+            #expect(unknownDecision == unavailable)
+            #expect(unknownOutcome == unavailable)
+            let visibleAndAccessibleText = [
+                unknownDecision.label,
+                unknownDecision.explanation,
+                unknownDecision.accessibilityText,
+                unknownOutcome.label,
+                unknownOutcome.explanation,
+                unknownOutcome.accessibilityText
+            ].joined(separator: " ")
+            #expect(!visibleAndAccessibleText.localizedCaseInsensitiveContains(hostileValue))
+        }
+    }
+
+    @Test @MainActor func unrelatedDurableOutcomesOmitTheAccountSection() {
+        let unrelated: [ImportAttemptOutcome] = [
+            .reviewedPartialPlanStale,
+            .partialImportUnsupportedEvidence,
+            .validationFailure,
+            .persistenceFailure,
+            .exactStatementDuplicate,
+            .existingEligibleAxisUPIEvent,
+            .repeatedEligibleIncomingEvidence,
+            .transactionEventOwnershipConflict,
+            .repositoryIntegrityConflict,
+            .sqliteContention
+        ]
+
+        for outcome in unrelated {
+            #expect(DurableImportAccountOutcomeSection.presentation(
+                outcomeCode: outcome.rawValue,
+                accountDecisionCode: ImportAttemptAccountDecision.matchedExisting.rawValue
+            ) == nil)
         }
     }
 

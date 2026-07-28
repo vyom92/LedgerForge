@@ -191,15 +191,26 @@ struct ImportPersistenceMapper {
             accountId: selectedAccountId,
             fingerprint: fingerprint
         )
+        let identifiers = FinancialIdentityResolver.strongVerifiedIdentifiers(
+            from: financialDocument.financialIdentifiers
+        ).map {
+            ConfirmedImportIdentifierCandidateDTO(
+                scheme: $0.kind.rawValue,
+                normalizedValue: $0.normalizedValue,
+                provenanceCode: $0.provenance.rawValue
+            )
+        }
+        let accountOutcome = ImportAccountOutcome.confirmed(
+            advisoryIdentity: advisoryIdentity,
+            accountChoice: accountChoice,
+            eligibleIdentifierCount: identifiers.count
+        )
         let successfulAttempt = ImportAttemptDTO(
             workspaceId: workspaceId,
             createdAtISO: payload.completedAtISO,
             outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
             coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
-            accountDecisionCode: {
-                if case .useExistingAccount = accountChoice { return ImportAttemptAccountDecision.selectedExisting.rawValue }
-                return ImportAttemptAccountDecision.resolvedOrCreated.rawValue
-            }(),
+            accountDecisionCode: accountOutcome.successfulAttemptDecision.rawValue,
             guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
             persistenceCode: ImportAttemptPersistence.committed.rawValue,
             transactionCount: payload.transactions.count,
@@ -211,13 +222,6 @@ struct ImportPersistenceMapper {
             recognizedExistingRowCount: 0,
             blockedRowCount: 0
         )
-        let identifiers = FinancialIdentityResolver.strongVerifiedIdentifiers(from: financialDocument.financialIdentifiers).map {
-            ConfirmedImportIdentifierCandidateDTO(
-                scheme: $0.kind.rawValue,
-                normalizedValue: $0.normalizedValue,
-                provenanceCode: $0.provenance.rawValue
-            )
-        }
         let templates = zip(payload.transactions, financialDocument.transactions).map { transaction, source in
             ConfirmedImportTransactionTemplateDTO(
                 transaction: transaction,

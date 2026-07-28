@@ -265,8 +265,8 @@ struct FinancialIdentityResolver {
 
     private func logOutcome(_ outcome: IdentityResolutionOutcome) {
         switch outcome {
-        case .resolved(let accountId):
-            developerConsole?.info(.database, "Identity resolver returned Resolved", metadata: ["accountId": accountId])
+        case .resolved:
+            developerConsole?.info(.database, "Identity resolver returned Resolved")
         case .noMatch:
             developerConsole?.info(.database, "Identity resolver returned No Match")
         case .ambiguous(let candidates):
