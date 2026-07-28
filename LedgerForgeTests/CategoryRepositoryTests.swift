@@ -203,21 +203,15 @@ struct CategoryRepositoryTests {
     @Test func populatedV7UpgradesToV8WithoutChangingExistingImportTruth() throws {
         try withTemporaryCategoryDatabase { path in
             let v7 = try SQLiteRepositoryProvider(path: path, migrations: Array(allMigrations.prefix(7)))
-            let v7Provider = DatabaseProvider(
-                workspaceRepo: v7.workspaceRepo,
-                transactionRepo: v7.transactionRepo,
-                accountRepo: v7.accountRepo,
-                importSessionRepo: v7.importSessionRepo,
-                confirmedImportRepo: v7.confirmedImportRepo,
-                generationToken: v7.generationToken,
-                persistenceState: .verifiedSQLite
-            )
-            let seeded = try seedTrustedTransaction(in: v7Provider, suffix: "category-v7-upgrade")
-            let transactionBefore = try v7Provider.transactionRepo.trustedTransactions(workspaceId: seeded.workspaceID)
-            let attemptsBefore = try v7Provider.importSessionRepo.importAttempts(workspaceId: seeded.workspaceID)
+            let seeded = try seedCategoryMigrationV7Truth(in: v7.database)
+            let transactionBefore = try v7.transactionRepo.trustedTransactions(workspaceId: seeded.workspaceID)
+            let attemptsBefore = try v7.importSessionRepo.importAttempts(workspaceId: seeded.workspaceID)
+            #expect(try v7.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 7)
+            #expect(transactionBefore.count == 1)
+            #expect(attemptsBefore.count == 1)
             v7.database.close()
 
-            let v8 = try SQLiteRepositoryProvider(path: path)
+            let v8 = try SQLiteRepositoryProvider(path: path, migrations: Array(allMigrations.prefix(8)))
             defer { v8.database.close() }
             #expect(try v8.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 8)
             #expect(try v8.categoryRepo.categories(workspaceId: seeded.workspaceID).isEmpty)
@@ -483,13 +477,74 @@ private func createCategory(
     ))
 }
 
+/// Establishes only the fixed pre-V8 truth required by the isolated category
+/// migration test. The current confirmed-import repository requires V9 and is
+/// deliberately not a compatibility layer for this historical schema.
+private func seedCategoryMigrationV7Truth(
+    in database: SQLiteDatabase
+) throws -> SeededCategoryTransaction {
+    let workspaceID = "category-v7-workspace"
+    let accountID = "category-v7-account"
+    let sessionID = "category-v7-session"
+    let documentID = "category-v7-document"
+    let normalizedDocumentID = "category-v7-normalized-document"
+    let normalizedRowID = "category-v7-normalized-row"
+    let transactionID = "category-v7-transaction"
+    let createdAt = "2026-07-26T00:00:00Z"
+    let rawTextDigest = "7777777777777777777777777777777777777777777777777777777777777777"
+    let normalizedDigest = "category-v7-normalized-record"
+
+    try database.executePrepared(
+        sql: "INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?);",
+        params: [workspaceID, "Category V7 Migration", createdAt]
+    )
+    try database.executePrepared(
+        sql: "INSERT INTO accounts (id, workspace_id, name, native_currency, created_at) VALUES (?, ?, ?, ?, ?);",
+        params: [accountID, workspaceID, "Category V7 Account", "INR", createdAt]
+    )
+    try database.executePrepared(
+        sql: "INSERT INTO import_sessions (id, workspace_id, started_at, completed_at, validation_status, created_at, reader_version, parser_version, layout_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        params: [sessionID, workspaceID, createdAt, createdAt, "passed", createdAt, "v7-fixture-reader", "v7-fixture-parser", "v7-fixture-layout"]
+    )
+    try database.executePrepared(
+        sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, mime_type, size_bytes, sha256, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
+        params: [documentID, workspaceID, sessionID, "category-v7.csv", "text/csv", 1, rawTextDigest, createdAt]
+    )
+    try database.executePrepared(
+        sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, created_at) VALUES (?, ?, ?, ?, ?, ?);",
+        params: ["category-v7-fingerprint", documentID, sessionID, DocumentFingerprintDTO.rawTextSHA256Algorithm, rawTextDigest, createdAt]
+    )
+    try database.executePrepared(
+        sql: "INSERT INTO normalized_documents (id, import_session_id, document_id, normalized_json, schema_version, created_at, profile_id, profile_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
+        params: [normalizedDocumentID, sessionID, documentID, "{\"fixture\":\"category-v7\"}", "trusted-source-v1", createdAt, "category.v7.fixture", "1"]
+    )
+    try database.executePrepared(
+        sql: "INSERT INTO normalized_rows (id, normalized_document_id, row_index, row_original, created_at, record_digest) VALUES (?, ?, ?, ?, ?, ?);",
+        params: [normalizedRowID, normalizedDocumentID, 1, "{\"fixture\":\"category-v7-row\"}", createdAt, normalizedDigest]
+    )
+    try database.executePrepared(
+        sql: "INSERT INTO transactions (id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, description, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, financial_date_role, statement_timezone_evidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        params: [transactionID, workspaceID, accountID, sessionID, documentID, normalizedRowID, "2026-07-26", "Category V7 trusted transaction", "INR", 12_345, "123.45", "credit", 12_345, 1, 1, createdAt, createdAt, "transaction_date", "unknown"]
+    )
+    try database.executePrepared(
+        sql: "INSERT INTO transaction_raw_rows (id, transaction_id, normalized_row_id, contribution_type, created_at) VALUES (?, ?, ?, ?, ?);",
+        params: ["category-v7-transaction-row", transactionID, normalizedRowID, "transaction", createdAt]
+    )
+    try database.executePrepared(
+        sql: "INSERT INTO import_attempts (id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, source_row_count, imported_transaction_count, recognized_existing_row_count, blocked_row_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        params: ["category-v7-attempt", workspaceID, createdAt, ImportAttemptOutcome.successfulImport.rawValue, ImportAttemptCoverage.evaluatedSupportedOnly.rawValue, ImportAttemptAccountDecision.resolvedOrCreated.rawValue, ImportAttemptGuidance.importCompleted.rawValue, ImportAttemptPersistence.committed.rawValue, 1, accountID, sessionID, documentID, 1, 1, 0, 0]
+    )
+
+    return SeededCategoryTransaction(workspaceID: workspaceID, transactionID: transactionID)
+}
+
 private func seedTrustedTransaction(
     in provider: DatabaseProvider,
     suffix: String
 ) throws -> SeededCategoryTransaction {
     let base = confirmedImportPlan(
         generationToken: provider.generationToken,
-        fingerprint: "category-fingerprint-\(suffix)",
+        fingerprint: confirmedImportFixtureDigest(seed: "category-fingerprint-\(suffix)"),
         suffix: suffix
     )
     let template = base.transactionTemplates[0]

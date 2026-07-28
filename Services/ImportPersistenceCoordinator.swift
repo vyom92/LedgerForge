@@ -71,6 +71,21 @@ struct PreviouslyImportedStatement: Equatable {
     let accountDisplayName: String?
 }
 
+enum SourceSnapshotRejectionKind: Equatable, Sendable {
+    case acquisitionFailed
+    case integrityFailed
+}
+
+struct SourceSnapshotRejectionRecord: Equatable, Sendable {
+    let importAttemptId: String?
+    let persistence: ImportAttemptPersistence
+
+    static let auditWriteUnavailable = SourceSnapshotRejectionRecord(
+        importAttemptId: nil,
+        persistence: .auditWriteUnavailable
+    )
+}
+
 protocol ImportPersistenceCoordinating {
     func persistValidatedImport(
         financialDocument: FinancialDocument,
@@ -105,6 +120,7 @@ protocol ImportPersistenceCoordinating {
 
     func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement?
     func recordValidationFailure(fileName: String, transactionCount: Int) -> String?
+    func recordSourceSnapshotRejection(_ kind: SourceSnapshotRejectionKind) -> SourceSnapshotRejectionRecord
 
     func persistValidatedImport(
         financialDocument: FinancialDocument,
@@ -122,6 +138,24 @@ protocol ImportPersistenceCoordinating {
         accountChoice: ImportAccountChoice?,
         providerGeneration: ProviderGenerationToken
     ) throws -> ImportPersistenceResult
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ImportPersistenceResult
+
+    func reviewPartialImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> PartialImportReviewResult
 }
 
 enum ImportAccountChoice: Equatable {
@@ -367,6 +401,9 @@ enum ImportAccountOutcomePresentationMapper {
 
 extension ImportPersistenceCoordinating {
     func recordValidationFailure(fileName: String, transactionCount: Int) -> String? { nil }
+    func recordSourceSnapshotRejection(_ kind: SourceSnapshotRejectionKind) -> SourceSnapshotRejectionRecord {
+        .auditWriteUnavailable
+    }
     func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
         throw ImportPersistenceCoordinationError.fingerprintRequired
     }
@@ -379,6 +416,31 @@ extension ImportPersistenceCoordinating {
         accountChoice: ImportAccountChoice? = nil
     ) throws -> ImportPersistenceResult {
         throw ImportPersistenceCoordinationError.fingerprintRequired
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ImportPersistenceResult {
+        guard let authority = fingerprintSet.duplicateAuthority else {
+            throw ImportPersistenceCoordinationError.invalidFingerprint
+        }
+        return try persistValidatedImport(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            fingerprint: ExactStatementFingerprint(
+                algorithm: authority.algorithm,
+                digest: authority.digest,
+                byteCount: authority.byteCount
+            ),
+            accountChoice: accountChoice,
+            providerGeneration: providerGeneration
+        )
     }
 
     func persistValidatedImport(
@@ -414,6 +476,31 @@ extension ImportPersistenceCoordinating {
         providerGeneration: ProviderGenerationToken
     ) throws -> PartialImportReviewResult {
         .unsupportedEvidence
+    }
+
+    func reviewPartialImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> PartialImportReviewResult {
+        guard let authority = fingerprintSet.duplicateAuthority else {
+            throw ImportPersistenceCoordinationError.invalidFingerprint
+        }
+        return try reviewPartialImport(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            fingerprint: ExactStatementFingerprint(
+                algorithm: authority.algorithm,
+                digest: authority.digest,
+                byteCount: authority.byteCount
+            ),
+            accountChoice: accountChoice,
+            providerGeneration: providerGeneration
+        )
     }
 
     func persistReviewedPartialImport(
@@ -568,7 +655,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         financialDocument: FinancialDocument,
         importSession: ImportSession,
         validation: ImportValidationResult,
-        fingerprint: ExactStatementFingerprint,
+        fingerprintSet: PreparedDocumentFingerprintSet,
         accountChoice: ImportAccountChoice?,
         providerGeneration: ProviderGenerationToken
     ) throws -> ConfirmedImportPlanDTO {
@@ -616,7 +703,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             financialDocument: financialDocument,
             importSession: importSession,
             validation: validation,
-            fingerprint: fingerprint,
+            fingerprintSet: fingerprintSet,
             providerGeneration: providerGeneration,
             advisoryIdentity: advisoryIdentity,
             accountChoice: confirmedChoice,
@@ -707,6 +794,28 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         }
     }
 
+    func recordSourceSnapshotRejection(_ kind: SourceSnapshotRejectionKind) -> SourceSnapshotRejectionRecord {
+        let provider = databaseProviderProvider()
+        let outcome: ImportAttemptOutcome = kind == .acquisitionFailed
+            ? .sourceSnapshotAcquisitionFailed
+            : .sourceSnapshotIntegrityFailed
+        guard let attemptID = recordAttempt(
+            provider: provider,
+            outcome: outcome,
+            coverage: .unsupportedOrUnevaluated,
+            decision: .noFinancialMutation,
+            guidance: .prepareAgain,
+            persistence: .rejectedRecorded,
+            transactionCount: 0
+        ) else {
+            return .auditWriteUnavailable
+        }
+        return SourceSnapshotRejectionRecord(
+            importAttemptId: attemptID,
+            persistence: .rejectedRecorded
+        )
+    }
+
     func persistValidatedImport(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
@@ -732,11 +841,44 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         accountChoice: ImportAccountChoice? = nil,
         providerGeneration: ProviderGenerationToken
     ) throws -> ImportPersistenceResult {
+        try persistValidatedImport(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            fingerprintSet: PreparedDocumentFingerprintSet(fingerprints: [
+                VersionedDocumentFingerprint(
+                    algorithm: fingerprint.algorithm,
+                    digest: fingerprint.digest,
+                    byteCount: fingerprint.byteCount,
+                    isDuplicateAuthority: true
+                )
+            ]),
+            accountChoice: accountChoice,
+            providerGeneration: providerGeneration
+        )
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice? = nil,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ImportPersistenceResult {
         guard validation.passed else {
             return .skipped
         }
 
-        try validate(fingerprint: fingerprint)
+        try validate(fingerprintSet: fingerprintSet)
+        guard let authority = fingerprintSet.duplicateAuthority else {
+            throw ImportPersistenceCoordinationError.invalidFingerprint
+        }
+        let fingerprint = ExactStatementFingerprint(
+            algorithm: authority.algorithm,
+            digest: authority.digest,
+            byteCount: authority.byteCount
+        )
         let provider = databaseProviderProvider()
         guard provider.persistenceState.isUsable else {
             throw ImportPersistenceCoordinationError.persistenceUnavailable
@@ -746,7 +888,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             financialDocument: financialDocument,
             importSession: importSession,
             validation: validation,
-            fingerprint: fingerprint,
+            fingerprintSet: fingerprintSet,
             accountChoice: accountChoice,
             providerGeneration: providerGeneration,
         )
@@ -767,8 +909,33 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         accountChoice: ImportAccountChoice?,
         providerGeneration: ProviderGenerationToken
     ) throws -> PartialImportReviewResult {
+        try reviewPartialImport(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            fingerprintSet: PreparedDocumentFingerprintSet(fingerprints: [
+                VersionedDocumentFingerprint(
+                    algorithm: fingerprint.algorithm,
+                    digest: fingerprint.digest,
+                    byteCount: fingerprint.byteCount,
+                    isDuplicateAuthority: true
+                )
+            ]),
+            accountChoice: accountChoice,
+            providerGeneration: providerGeneration
+        )
+    }
+
+    func reviewPartialImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> PartialImportReviewResult {
         guard validation.passed else { return .unsupportedEvidence }
-        try validate(fingerprint: fingerprint)
+        try validate(fingerprintSet: fingerprintSet)
         let provider = databaseProviderProvider()
         guard provider.persistenceState.isUsable else {
             throw ImportPersistenceCoordinationError.persistenceUnavailable
@@ -778,7 +945,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             financialDocument: financialDocument,
             importSession: importSession,
             validation: validation,
-            fingerprint: fingerprint,
+            fingerprintSet: fingerprintSet,
             accountChoice: accountChoice,
             providerGeneration: providerGeneration
         )
@@ -842,6 +1009,16 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         guard fingerprint.algorithm == ExactStatementFingerprint.algorithm,
               fingerprint.digest.count == 64,
               fingerprint.digest.allSatisfy({ $0.isHexDigit && !$0.isUppercase }) else {
+            throw ImportPersistenceCoordinationError.invalidFingerprint
+        }
+    }
+
+    private func validate(fingerprintSet: PreparedDocumentFingerprintSet) throws {
+        guard fingerprintSet.isValid,
+              fingerprintSet.fingerprints.allSatisfy({
+                  DocumentFingerprintDTO.approvedAlgorithms.contains($0.algorithm)
+              }),
+              fingerprintSet.duplicateAuthority?.algorithm == ExactStatementFingerprint.algorithm else {
             throw ImportPersistenceCoordinationError.invalidFingerprint
         }
     }

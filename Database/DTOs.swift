@@ -3,7 +3,7 @@
 
 import Foundation
 
-nonisolated enum ImportAttemptOutcome: String, CaseIterable { case successfulImport = "successful_import", partialImportCommitted = "partial_import_committed", reviewedPartialPlanStale = "reviewed_partial_plan_stale", partialImportUnsupportedEvidence = "partial_import_unsupported_evidence", validationFailure = "validation_failure", persistenceFailure = "persistence_failure", exactStatementDuplicate = "exact_statement_duplicate", existingEligibleAxisUPIEvent = "existing_eligible_axis_upi_event", repeatedEligibleIncomingEvidence = "repeated_eligible_incoming_evidence", transactionEventOwnershipConflict = "transaction_event_ownership_conflict", repositoryIntegrityConflict = "repository_integrity_conflict", accountChoiceRequired = "account_choice_required", identifierOwnershipConflict = "identifier_ownership_conflict", identityAmbiguity = "identity_ambiguity", identityConflict = "identity_conflict", staleAccountChoice = "stale_account_choice", staleProviderGeneration = "stale_provider_generation", sqliteContention = "sqlite_contention" }
+nonisolated enum ImportAttemptOutcome: String, CaseIterable { case successfulImport = "successful_import", partialImportCommitted = "partial_import_committed", reviewedPartialPlanStale = "reviewed_partial_plan_stale", partialImportUnsupportedEvidence = "partial_import_unsupported_evidence", validationFailure = "validation_failure", persistenceFailure = "persistence_failure", exactStatementDuplicate = "exact_statement_duplicate", existingEligibleAxisUPIEvent = "existing_eligible_axis_upi_event", repeatedEligibleIncomingEvidence = "repeated_eligible_incoming_evidence", transactionEventOwnershipConflict = "transaction_event_ownership_conflict", repositoryIntegrityConflict = "repository_integrity_conflict", accountChoiceRequired = "account_choice_required", identifierOwnershipConflict = "identifier_ownership_conflict", identityAmbiguity = "identity_ambiguity", identityConflict = "identity_conflict", staleAccountChoice = "stale_account_choice", staleProviderGeneration = "stale_provider_generation", sqliteContention = "sqlite_contention", sourceSnapshotAcquisitionFailed = "source_snapshot_acquisition_failed", sourceSnapshotIntegrityFailed = "source_snapshot_integrity_failed" }
 nonisolated enum ImportAttemptCoverage: String, CaseIterable { case evaluatedSupportedOnly = "evaluated_supported_only", allRowsSupportedAxisUPIReviewed = "all_rows_supported_axis_upi_reviewed", unsupportedOrUnevaluated = "unsupported_or_unevaluated" }
 nonisolated enum ImportAttemptAccountDecision: String, CaseIterable { case matchedExisting = "matched_existing", userSelectedExisting = "user_selected_existing", createdNew = "created_new", resolvedOrCreated = "resolved_or_created", selectedExisting = "selected_existing", noFinancialMutation = "no_financial_mutation", sideEffectsMayExist = "side_effects_may_exist" }
 nonisolated enum ImportAttemptGuidance: String, CaseIterable { case importCompleted = "import_completed", partialImportCompleted = "partial_import_completed", reviewPriorImport = "review_prior_import", supportedEventBlocked = "supported_event_blocked", correctValidationAndRetry = "correct_validation_and_retry", persistenceUnavailable = "persistence_unavailable", integrityReviewRequired = "integrity_review_required", prepareAgain = "prepare_again", retryConfirmation = "retry_confirmation" }
@@ -315,8 +315,29 @@ public struct ImportedDocumentDTO: nonisolated Equatable, Sendable {
     public let filename: String
     public let mimeType: String?
     public let sizeBytes: Int64?
-    public let sha256: String
+    public let legacyRawTextSHA256: String
+    public var sha256: String { legacyRawTextSHA256 }
     public let createdAtISO: String
+
+    public init(
+        id: String,
+        workspaceId: String,
+        importSessionId: String,
+        filename: String,
+        mimeType: String?,
+        sizeBytes: Int64?,
+        legacyRawTextSHA256: String,
+        createdAtISO: String
+    ) {
+        self.id = id
+        self.workspaceId = workspaceId
+        self.importSessionId = importSessionId
+        self.filename = filename
+        self.mimeType = mimeType
+        self.sizeBytes = sizeBytes
+        self.legacyRawTextSHA256 = legacyRawTextSHA256
+        self.createdAtISO = createdAtISO
+    }
 
     public init(
         id: String,
@@ -328,24 +349,31 @@ public struct ImportedDocumentDTO: nonisolated Equatable, Sendable {
         sha256: String,
         createdAtISO: String
     ) {
-        self.id = id
-        self.workspaceId = workspaceId
-        self.importSessionId = importSessionId
-        self.filename = filename
-        self.mimeType = mimeType
-        self.sizeBytes = sizeBytes
-        self.sha256 = sha256
-        self.createdAtISO = createdAtISO
+        self.init(
+            id: id,
+            workspaceId: workspaceId,
+            importSessionId: importSessionId,
+            filename: filename,
+            mimeType: mimeType,
+            sizeBytes: sizeBytes,
+            legacyRawTextSHA256: sha256,
+            createdAtISO: createdAtISO
+        )
     }
 }
 
 public struct DocumentFingerprintDTO: nonisolated Equatable, Sendable {
+    public static let rawTextSHA256Algorithm = "ledgerforge.raw-text.sha256.v1"
+    public static let sourceBytesSHA256Algorithm = "ledgerforge.source-bytes.sha256.v1"
+    public static let approvedAlgorithms = Set([rawTextSHA256Algorithm, sourceBytesSHA256Algorithm])
+
     public let id: String
     public let documentId: String
     public let importSessionId: String
     public let algorithm: String
     public let fingerprint: String
     public let fingerprintData: String?
+    public let isDuplicateAuthority: Bool
     public let createdAtISO: String
 
     public init(
@@ -355,6 +383,7 @@ public struct DocumentFingerprintDTO: nonisolated Equatable, Sendable {
         algorithm: String,
         fingerprint: String,
         fingerprintData: String?,
+        isDuplicateAuthority: Bool = true,
         createdAtISO: String
     ) {
         self.id = id
@@ -363,6 +392,7 @@ public struct DocumentFingerprintDTO: nonisolated Equatable, Sendable {
         self.algorithm = algorithm
         self.fingerprint = fingerprint
         self.fingerprintData = fingerprintData
+        self.isDuplicateAuthority = isDuplicateAuthority
         self.createdAtISO = createdAtISO
     }
 }

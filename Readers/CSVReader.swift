@@ -12,8 +12,15 @@ final class CSVReader: DocumentReader {
             }
         }
 
-        return try String(contentsOf: url, encoding: .utf8)
+        return try read(data: Data(contentsOf: url))
 
+    }
+
+    func read(data: Data) throws -> String {
+        guard let text = String(data: data, encoding: .utf8) else {
+            throw CocoaError(.fileReadInapplicableStringEncoding)
+        }
+        return text
     }
 
 }

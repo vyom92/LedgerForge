@@ -7,6 +7,41 @@ import Testing
 @MainActor
 struct ImportRepositoryIntegrationTests {
 
+    @Test func csvImportPersistsOneRawTextDuplicateAuthority() throws {
+        let folder = try temporaryFolder(named: "LedgerForgePacket2CSVAuthority")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let sqlite = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("authority.sqlite").path)
+        defer { sqlite.database.close() }
+        let handles = ImportRepositoryHandles(
+            workspaceRepo: sqlite.workspaceRepo,
+            accountRepo: sqlite.accountRepo,
+            importSessionRepo: sqlite.importSessionRepo,
+            transactionRepo: sqlite.transactionRepo,
+            confirmedImportRepo: sqlite.confirmedImportRepo,
+            generationToken: sqlite.generationToken
+        )
+        let fixture = makeValidFixture()
+
+        let result = try makePersistenceCoordinator(provider: handles).persistValidatedImport(
+            financialDocument: fixture.financialDocument,
+            importSession: fixture.importSession,
+            validation: fixture.validation,
+            fingerprint: fixture.fingerprint,
+            accountChoice: .createNewAccount
+        )
+
+        #expect(result.persisted)
+        let row = try #require(try sqlite.database.query(
+            sql: "SELECT d.sha256, f.algorithm, f.fingerprint, f.is_duplicate_authority FROM documents d JOIN document_fingerprints f ON f.document_id = d.id WHERE d.import_session_id = ?;",
+            params: [fixture.importSession.id.uuidString]
+        ) { ($0.string(at: 0) ?? "", $0.string(at: 1) ?? "", $0.string(at: 2) ?? "", $0.bool(at: 3)) }.first)
+        #expect(row.0 == fixture.fingerprint.digest)
+        #expect(row.1 == DocumentFingerprintDTO.rawTextSHA256Algorithm)
+        #expect(row.2 == fixture.fingerprint.digest)
+        #expect(row.3)
+        #expect(try sqlite.database.queryInt("SELECT COUNT(*) FROM document_fingerprints WHERE import_session_id = '\(fixture.importSession.id.uuidString)';") == 1)
+    }
+
     @Test func validImportPersistsValidatedRepositoryRecords() async throws {
         try runForEachProvider { provider in
             let fixture = makeValidFixture()

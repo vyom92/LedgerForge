@@ -255,6 +255,7 @@ private func seedSprint30Repository(_ provider: DatabaseProvider) throws {
             )
         ]
     )
+    let sprint30FingerprintDigest = "462be1cd5a1e7d6cd8386ca159cbd844a4f4c0047dd35f0b0df4c4a2750c42c2"
     let document = ImportedDocumentDTO(
         id: "document-sprint-30",
         workspaceId: workspace.id,
@@ -262,16 +263,17 @@ private func seedSprint30Repository(_ provider: DatabaseProvider) throws {
         filename: "sprint-30.csv",
         mimeType: nil,
         sizeBytes: nil,
-        sha256: "sprint-30-fingerprint",
+        sha256: sprint30FingerprintDigest,
         createdAtISO: "2026-07-12T00:03:00Z"
     )
     let fingerprint = DocumentFingerprintDTO(
         id: "fingerprint-sprint-30",
         documentId: document.id,
         importSessionId: session.id,
-        algorithm: "sha256",
-        fingerprint: "sprint-30-fingerprint",
+        algorithm: DocumentFingerprintDTO.rawTextSHA256Algorithm,
+        fingerprint: sprint30FingerprintDigest,
         fingerprintData: nil,
+        isDuplicateAuthority: true,
         createdAtISO: "2026-07-12T00:03:00Z"
     )
     let normalizedDocument = NormalizedDocumentDTO(

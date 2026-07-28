@@ -106,12 +106,30 @@ public struct IdentifierObservationDTO: nonisolated Equatable, Sendable {
 /// final transaction-event identities.
 public struct ConfirmedImportHistoryTemplateDTO: nonisolated Equatable, Sendable {
     public let document: ImportedDocumentDTO
-    public let fingerprint: DocumentFingerprintDTO
+    public let fingerprints: [DocumentFingerprintDTO]
     public let importSession: ImportSessionDTO
     public let completedAtISO: String
     public let successfulAttempt: ImportAttemptDTO
     public let normalizedDocument: NormalizedDocumentDTO?
     public let normalizedRows: [NormalizedRowDTO]
+
+    public init(
+        document: ImportedDocumentDTO,
+        fingerprints: [DocumentFingerprintDTO],
+        importSession: ImportSessionDTO,
+        completedAtISO: String,
+        successfulAttempt: ImportAttemptDTO,
+        normalizedDocument: NormalizedDocumentDTO? = nil,
+        normalizedRows: [NormalizedRowDTO] = []
+    ) {
+        self.document = document
+        self.fingerprints = fingerprints.sorted(by: Self.fingerprintOrder)
+        self.importSession = importSession
+        self.completedAtISO = completedAtISO
+        self.successfulAttempt = successfulAttempt
+        self.normalizedDocument = normalizedDocument
+        self.normalizedRows = normalizedRows
+    }
 
     public init(
         document: ImportedDocumentDTO,
@@ -122,13 +140,80 @@ public struct ConfirmedImportHistoryTemplateDTO: nonisolated Equatable, Sendable
         normalizedDocument: NormalizedDocumentDTO? = nil,
         normalizedRows: [NormalizedRowDTO] = []
     ) {
-        self.document = document
-        self.fingerprint = fingerprint
-        self.importSession = importSession
-        self.completedAtISO = completedAtISO
-        self.successfulAttempt = successfulAttempt
-        self.normalizedDocument = normalizedDocument
-        self.normalizedRows = normalizedRows
+        self.init(
+            document: document,
+            fingerprints: [fingerprint],
+            importSession: importSession,
+            completedAtISO: completedAtISO,
+            successfulAttempt: successfulAttempt,
+            normalizedDocument: normalizedDocument,
+            normalizedRows: normalizedRows
+        )
+    }
+
+    public var duplicateAuthorityFingerprint: DocumentFingerprintDTO? {
+        let authorities = fingerprints.filter(\.isDuplicateAuthority)
+        return authorities.count == 1 ? authorities[0] : nil
+    }
+
+    public var fingerprint: DocumentFingerprintDTO {
+        duplicateAuthorityFingerprint ?? fingerprints[0]
+    }
+
+    public func validateFingerprints() throws {
+        guard fingerprints.allSatisfy({ !$0.id.isEmpty }) else {
+            throw DocumentFingerprintValidationError.emptyIdentifier
+        }
+        guard fingerprints.allSatisfy({
+            $0.documentId == document.id && $0.importSessionId == importSession.id
+        }) else {
+            throw DocumentFingerprintValidationError.relationshipMismatch
+        }
+        guard fingerprints.allSatisfy({ DocumentFingerprintDTO.approvedAlgorithms.contains($0.algorithm) }) else {
+            throw DocumentFingerprintValidationError.unsupportedAlgorithm
+        }
+        let lowercaseHex = CharacterSet(charactersIn: "0123456789abcdef")
+        guard fingerprints.allSatisfy({ fingerprint in
+            fingerprint.fingerprint.utf8.count == 64 &&
+            fingerprint.fingerprint.unicodeScalars.allSatisfy(lowercaseHex.contains)
+        }) else {
+            throw DocumentFingerprintValidationError.malformedDigest
+        }
+        guard Set(fingerprints.map(\.id)).count == fingerprints.count else {
+            throw DocumentFingerprintValidationError.duplicateIdentifier
+        }
+        guard Set(fingerprints.map(\.algorithm)).count == fingerprints.count else {
+            throw DocumentFingerprintValidationError.duplicateAlgorithm
+        }
+        guard fingerprints.filter(\.isDuplicateAuthority).count == 1 else {
+            throw DocumentFingerprintValidationError.invalidAuthorityCount
+        }
+    }
+
+    nonisolated private static func fingerprintOrder(_ lhs: DocumentFingerprintDTO, _ rhs: DocumentFingerprintDTO) -> Bool {
+        lhs.algorithm == rhs.algorithm ? lhs.id < rhs.id : lhs.algorithm < rhs.algorithm
+    }
+}
+
+public enum DocumentFingerprintValidationError: Error, nonisolated Equatable, LocalizedError {
+    case emptyIdentifier
+    case relationshipMismatch
+    case unsupportedAlgorithm
+    case malformedDigest
+    case duplicateIdentifier
+    case duplicateAlgorithm
+    case invalidAuthorityCount
+
+    public var errorDescription: String? {
+        switch self {
+        case .emptyIdentifier: return "A document fingerprint identifier is missing."
+        case .relationshipMismatch: return "Document fingerprint relationships are inconsistent."
+        case .unsupportedAlgorithm: return "A document fingerprint algorithm is unsupported."
+        case .malformedDigest: return "A document fingerprint digest is malformed."
+        case .duplicateIdentifier: return "Document fingerprint identifiers must be unique."
+        case .duplicateAlgorithm: return "A document fingerprint algorithm is duplicated."
+        case .invalidAuthorityCount: return "Exactly one document fingerprint must be duplicate authority."
+        }
     }
 }
 
@@ -277,8 +362,6 @@ public struct ReviewedPartialImportPlanDTO: nonisolated Equatable, Sendable {
             basePlan.providerGeneration.value.uuidString.lowercased(),
             basePlan.workspace.id,
             existingAccountId,
-            basePlan.historyTemplate.fingerprint.algorithm,
-            basePlan.historyTemplate.fingerprint.fingerprint,
             profile?.profileId ?? "",
             profile?.profileVersion ?? "",
             basePlan.declaredStatementStartISO ?? "",
@@ -293,6 +376,16 @@ public struct ReviewedPartialImportPlanDTO: nonisolated Equatable, Sendable {
             String(basePlan.closingBalanceMinor ?? 0),
             basePlan.closingBalanceDecimal ?? ""
         ]
+        for fingerprint in basePlan.historyTemplate.fingerprints {
+            components.append(contentsOf: [
+                fingerprint.id,
+                fingerprint.algorithm,
+                fingerprint.fingerprint,
+                fingerprint.isDuplicateAuthority ? "1" : "0",
+                fingerprint.documentId,
+                fingerprint.importSessionId
+            ])
+        }
         for row in rows.sorted(by: { $0.sourceOrdinal < $1.sourceOrdinal }) {
             components.append(contentsOf: [
                 row.normalizedRowId,

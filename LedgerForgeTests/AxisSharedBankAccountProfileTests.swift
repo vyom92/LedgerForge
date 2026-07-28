@@ -347,7 +347,7 @@ struct AxisSharedBankAccountProfileTests {
             let base = confirmedImportPlan(
                 generationToken: provider.generationToken,
                 identifier: "LEGACY-AXIS-PROFILE",
-                fingerprint: UUID().uuidString,
+                fingerprint: confirmedImportFixtureDigest(seed: UUID().uuidString),
                 suffix: UUID().uuidString
             )
             let plan = replacingProfile(

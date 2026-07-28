@@ -250,7 +250,9 @@ struct ImportOutcomePresentationTests {
             (.identityConflict, "Account identity conflict", "Account identity conflicts across accounts. No new financial history was written"),
             (.staleAccountChoice, "Account choice out of date", "The prepared account choice is no longer current. No new financial history was written"),
             (.staleProviderGeneration, "Persistence changed", "Persistence changed after preparation. No new financial history was written"),
-            (.sqliteContention, "Persistence busy", "Confirmation did not win persistence contention. No new financial history was written")
+            (.sqliteContention, "Persistence busy", "Confirmation did not win persistence contention. No new financial history was written"),
+            (.sourceSnapshotAcquisitionFailed, "Source could not be read", "Source snapshot acquisition failed. No financial history was written"),
+            (.sourceSnapshotIntegrityFailed, "Prepared source could not be verified", "Source snapshot integrity verification failed. No financial history was written")
         ]
 
         #expect(Set(expected.map { $0.0 }) == Set(ImportAttemptOutcome.allCases))
@@ -264,6 +266,14 @@ struct ImportOutcomePresentationTests {
             #expect(presentation.explanation == expectedExplanation)
             #expect(!presentation.label.contains(outcome.rawValue))
             #expect(!presentation.explanation.contains(outcome.rawValue))
+        }
+
+        let snapshotPresentationText = expected
+            .filter { $0.0 == .sourceSnapshotAcquisitionFailed || $0.0 == .sourceSnapshotIntegrityFailed }
+            .flatMap { [$0.1, $0.2] }
+            .joined(separator: "|")
+        for prohibited in ["/private/", "private.csv", String(repeating: "a", count: 64), "ledgerforge.", "SQLite"] {
+            #expect(!snapshotPresentationText.localizedCaseInsensitiveContains(prohibited))
         }
     }
 

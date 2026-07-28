@@ -20,6 +20,7 @@ struct ImportLifecycleTests {
             from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv"),
             requestId: requestID
         ) { progress.append($0) }
+        defer { engine.cancelPreparedImport(prepared) }
 
         #expect(prepared.validation.passed)
         #expect(progress.map(\.requestId) == Array(repeating: requestID, count: 7))
@@ -72,6 +73,45 @@ struct ImportLifecycleTests {
         owner.cancel()
         owner.cancel()
         #expect(owner.activeOperationID == nil)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func preparedSourceSupersessionConsumesOnlyTheOldSnapshotWithoutRecordingRejection() async throws {
+        LedgerForgeApp.configureInMemoryPersistenceForTesting()
+        let persistence = SupersessionPersistenceProbe()
+        let engine = ImportEngine(
+            importPersistenceCoordinator: persistence,
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            providerGenerationProvider: { ProviderGenerationToken() },
+            forcedHydration: {
+                RepositoryStoreHydrationResult(didHydrate: true, accountCount: 0, transactionCount: 0)
+            },
+            rejectedAttemptHydration: {}
+        )
+        let source = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+
+        let sourceA = try await engine.prepareImport(from: source)
+        engine.cancelPreparedImport(sourceA)
+        #expect(throws: SourceContentSnapshotError.invalidated) {
+            try sourceA.sourceSnapshot.withBytes { $0 }
+        }
+
+        let sourceB = try await engine.prepareImport(from: source)
+        let supersededResult = await engine.commitPreparedImport(sourceA)
+
+        #expect(supersededResult.errorMessage == ImportEngineCommitError.alreadyCommitted.localizedDescription)
+        #expect(persistence.persistInvocationCount == 0)
+        #expect(persistence.rejectionInvocationCount == 0)
+        #expect(try sourceB.sourceSnapshot.withBytes { !$0.isEmpty })
+
+        let replacementResult = await engine.commitPreparedImport(sourceB)
+
+        #expect(replacementResult.persisted)
+        #expect(persistence.persistInvocationCount == 1)
+        #expect(persistence.rejectionInvocationCount == 0)
+        #expect(throws: SourceContentSnapshotError.invalidated) {
+            try sourceB.sourceSnapshot.withBytes { $0 }
+        }
     }
 }
 
@@ -128,5 +168,54 @@ private final class PreparationOnlyPersistenceCoordinator: ImportPersistenceCoor
 
     func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
         nil
+    }
+}
+
+private final class SupersessionPersistenceProbe: ImportPersistenceCoordinating {
+    private(set) var persistInvocationCount = 0
+    private(set) var rejectionInvocationCount = 0
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult
+    ) throws -> ImportPersistenceResult {
+        .skipped
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        accountChoice: ImportAccountChoice?
+    ) throws -> ImportPersistenceResult {
+        .skipped
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ImportPersistenceResult {
+        persistInvocationCount += 1
+        return ImportPersistenceResult(
+            persisted: true,
+            workspaceId: "workspace",
+            accountId: "account",
+            importSessionId: importSession.id.uuidString,
+            transactionCount: financialDocument.transactions.count
+        )
+    }
+
+    func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
+        nil
+    }
+
+    func recordSourceSnapshotRejection(_ kind: SourceSnapshotRejectionKind) -> SourceSnapshotRejectionRecord {
+        rejectionInvocationCount += 1
+        return .auditWriteUnavailable
     }
 }

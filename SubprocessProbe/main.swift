@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Darwin
 
@@ -30,8 +31,9 @@ struct LedgerForgeSubprocessProbe {
         let accountID = scenario == "event" ? "probe-existing-account" : scenario == "account" ? "probe-account-account-shared" : "probe-account-\(scenario)-\(suffix)"
         let account = AccountDTO(id: accountID, workspaceId: workspace.id, name: "Probe", nativeCurrency: "INR", createdAtISO: now)
         let session = ImportSessionDTO(id: "probe-session-\(scenario)-\(suffix)", workspaceId: workspace.id, startedAtISO: now)
-        let document = ImportedDocumentDTO(id: "probe-document-\(scenario)-\(suffix)", workspaceId: workspace.id, importSessionId: session.id, filename: "probe", mimeType: nil, sizeBytes: nil, sha256: "probe-fingerprint-\(scenario)-\(suffix)", createdAtISO: now)
-        let fingerprint = DocumentFingerprintDTO(id: "probe-fingerprint-\(scenario)-\(suffix)", documentId: document.id, importSessionId: session.id, algorithm: "sha256", fingerprint: "probe-fingerprint-\(scenario)-\(suffix)", fingerprintData: nil, createdAtISO: now)
+        let fingerprintDigest = probeFixtureDigest(seed: "probe-fingerprint-\(scenario)-\(suffix)")
+        let document = ImportedDocumentDTO(id: "probe-document-\(scenario)-\(suffix)", workspaceId: workspace.id, importSessionId: session.id, filename: "probe", mimeType: nil, sizeBytes: nil, sha256: fingerprintDigest, createdAtISO: now)
+        let fingerprint = DocumentFingerprintDTO(id: "probe-fingerprint-\(scenario)-\(suffix)", documentId: document.id, importSessionId: session.id, algorithm: DocumentFingerprintDTO.rawTextSHA256Algorithm, fingerprint: fingerprintDigest, fingerprintData: nil, isDuplicateAuthority: true, createdAtISO: now)
         let attempt = ImportAttemptDTO(id: "probe-attempt-\(scenario)-\(suffix)", workspaceId: workspace.id, createdAtISO: now, outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue, accountDecisionCode: ImportAttemptAccountDecision.resolvedOrCreated.rawValue, guidanceCode: ImportAttemptGuidance.importCompleted.rawValue, persistenceCode: ImportAttemptPersistence.committed.rawValue, transactionCount: 1, accountId: account.id, importSessionId: session.id, documentId: document.id)
         let transactionID = scenario == "event" ? (variant == "1" ? "11111111-1111-1111-1111-111111111111" : "22222222-2222-2222-2222-222222222222") : "probe-transaction-\(scenario)-\(suffix)"
         let normalizedDocument = NormalizedDocumentDTO(id: "probe-normalized-document-\(scenario)-\(suffix)", importSessionId: session.id, documentId: document.id, profileId: "probe", profileVersion: "1")
@@ -64,6 +66,12 @@ struct LedgerForgeSubprocessProbe {
 
     private static func writeLine(_ line: String) {
         FileHandle.standardOutput.write(Data(line.utf8) + Data([10]))
+    }
+
+    private static func probeFixtureDigest(seed: String) -> String {
+        SHA256.hash(data: Data(seed.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 }
 

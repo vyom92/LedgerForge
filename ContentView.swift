@@ -299,7 +299,8 @@ enum DurableImportAccountOutcomeSection {
                     .validationFailure, .persistenceFailure, .exactStatementDuplicate,
                     .existingEligibleAxisUPIEvent, .repeatedEligibleIncomingEvidence,
                     .transactionEventOwnershipConflict, .repositoryIntegrityConflict,
-                    .sqliteContention:
+                    .sqliteContention, .sourceSnapshotAcquisitionFailed,
+                    .sourceSnapshotIntegrityFailed:
                 return nil
             }
         }
@@ -485,6 +486,20 @@ struct DurableImportAttemptPresentation: Equatable {
                 label: "Persistence busy",
                 explanation: "Confirmation did not win persistence contention. No new financial history was written",
                 iconName: "hourglass",
+                tone: .warning
+            )
+        case .sourceSnapshotAcquisitionFailed:
+            return DurableImportPresentationValue(
+                label: "Source could not be read",
+                explanation: "Source snapshot acquisition failed. No financial history was written",
+                iconName: "doc.badge.exclamationmark",
+                tone: .warning
+            )
+        case .sourceSnapshotIntegrityFailed:
+            return DurableImportPresentationValue(
+                label: "Prepared source could not be verified",
+                explanation: "Source snapshot integrity verification failed. No financial history was written",
+                iconName: "checkmark.shield.trianglebadge.exclamationmark",
                 tone: .warning
             )
         }
@@ -2746,7 +2761,20 @@ struct ContentView: View {
         }
     }
 
+    private func consumePreparedImportBeforeSourceReplacement() -> Bool {
+        switch importState {
+        case .committing:
+            return false
+        case .previewReady(let preparedImport), .validationFailed(let preparedImport):
+            ImportEngine.shared.cancelPreparedImport(preparedImport)
+            return true
+        default:
+            return true
+        }
+    }
+
     private func beginPreparation(from url: URL) {
+        guard consumePreparedImportBeforeSourceReplacement() else { return }
         importAccountChoice = nil
         importIdentityReview = .unavailable
         partialImportReview = .ordinaryFullImport
@@ -2770,6 +2798,7 @@ struct ContentView: View {
 
 #if DEBUG
     private func beginPreparation(for fixture: DebugApprovedFixture) {
+        guard consumePreparedImportBeforeSourceReplacement() else { return }
         importAccountChoice = nil
         importIdentityReview = .unavailable
         partialImportReview = .ordinaryFullImport
@@ -2807,17 +2836,27 @@ struct ContentView: View {
                 importState = .preparing(fileName: displayName, phase: progress.phase)
             }
             guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
+                ImportEngine.shared.cancelPreparedImport(preparedImport)
                 return
             }
-            let identityReview: ImportIdentityReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
-                ? (try ImportEngine.shared.reviewPreparedImport(preparedImport))
-                : .unavailable
+            let identityReview: ImportIdentityReview
+            let preparedPartialReview: PartialImportReviewResult
+            do {
+                identityReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
+                    ? (try ImportEngine.shared.reviewPreparedImport(preparedImport))
+                    : .unavailable
+                preparedPartialReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
+                    ? (try ImportEngine.shared.reviewPreparedPartialImport(preparedImport))
+                    : .ordinaryFullImport
+            } catch {
+                ImportEngine.shared.cancelPreparedImport(preparedImport)
+                throw error
+            }
             importIdentityReview = identityReview
             importAccountChoice = ImportAccountConfirmationPolicy.initialChoice(for: identityReview)
-            partialImportReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
-                ? (try ImportEngine.shared.reviewPreparedPartialImport(preparedImport))
-                : .ordinaryFullImport
+            partialImportReview = preparedPartialReview
             guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
+                ImportEngine.shared.cancelPreparedImport(preparedImport)
                 return
             }
             selectedFile = displayName
@@ -2892,9 +2931,7 @@ struct ContentView: View {
             preparationOwner.cancel()
         case .previewReady(let preparedImport), .validationFailed(let preparedImport):
             fileName = preparedImport.fileName
-#if DEBUG
             ImportEngine.shared.cancelPreparedImport(preparedImport)
-#endif
         default:
             return
         }

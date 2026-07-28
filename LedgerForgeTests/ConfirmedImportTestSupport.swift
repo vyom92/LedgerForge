@@ -1,7 +1,14 @@
 // Shared privacy-safe fixtures for confirmed-import contract tests.
 
+import CryptoKit
 import Foundation
 @testable import LedgerForge
+
+func confirmedImportFixtureDigest(seed: String) -> String {
+    SHA256.hash(data: Data(seed.utf8))
+        .map { String(format: "%02x", $0) }
+        .joined()
+}
 
 func confirmedImportIdentifier(
     kind: FinancialIdentifierKind = .institutionAccountId,
@@ -15,11 +22,13 @@ func confirmedImportIdentifier(
     )
 }
 
+/// Builds a valid accepted-plan fixture. `fingerprint` must already be the final
+/// canonical 64-character lowercase hexadecimal digest.
 func confirmedImportPlan(
     generationToken: ProviderGenerationToken,
     accountChoice: ConfirmedImportAccountChoiceDTO = .createProposedAccount,
     identifier: String = "AXIS-CONTRACT-001",
-    fingerprint: String = "confirmed-import-fixture",
+    fingerprint: String = "0df90e3384fb7f7e88ad6738009c16011aba35da7bd1e371b6fd06d3b8a81ce7",
     suffix: String = "confirmed",
     institutionID: String? = nil
 ) -> ConfirmedImportPlanDTO {
@@ -28,7 +37,7 @@ func confirmedImportPlan(
     let account = AccountDTO(id: "account-\(suffix)", workspaceId: workspace.id, name: "Confirmed", institutionId: institutionID, nativeCurrency: "INR", createdAtISO: now)
     let session = ImportSessionDTO(id: "session-\(suffix)", workspaceId: workspace.id, startedAtISO: now)
     let document = ImportedDocumentDTO(id: "document-\(suffix)", workspaceId: workspace.id, importSessionId: session.id, filename: "fixture.csv", mimeType: "text/csv", sizeBytes: 1, sha256: fingerprint, createdAtISO: now)
-    let fingerprintDTO = DocumentFingerprintDTO(id: "fingerprint-\(suffix)", documentId: document.id, importSessionId: session.id, algorithm: "sha256", fingerprint: fingerprint, fingerprintData: nil, createdAtISO: now)
+    let fingerprintDTO = DocumentFingerprintDTO(id: "fingerprint-\(suffix)", documentId: document.id, importSessionId: session.id, algorithm: DocumentFingerprintDTO.rawTextSHA256Algorithm, fingerprint: fingerprint, fingerprintData: nil, isDuplicateAuthority: true, createdAtISO: now)
     let attempt = ImportAttemptDTO(id: "attempt-\(suffix)", workspaceId: workspace.id, createdAtISO: now, outcomeCode: ImportAttemptOutcome.successfulImport.rawValue, coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue, accountDecisionCode: ImportAttemptAccountDecision.resolvedOrCreated.rawValue, guidanceCode: ImportAttemptGuidance.importCompleted.rawValue, persistenceCode: ImportAttemptPersistence.committed.rawValue, transactionCount: 1, accountId: account.id, importSessionId: session.id, documentId: document.id)
     let transactionID = suffix == "confirmed" ? "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA" : UUID().uuidString
     let normalizedDocument = NormalizedDocumentDTO(id: "normalized-document-\(suffix)", importSessionId: session.id, documentId: document.id, profileId: "fixture", profileVersion: "1")

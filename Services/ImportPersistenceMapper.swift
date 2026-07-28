@@ -14,6 +14,7 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
     case missingParserProfileProvenance
     case malformedParserProfileProvenance
     case conflictingParserProfileProvenance
+    case invalidFingerprintSet
 
     var errorDescription: String? {
         switch self {
@@ -37,6 +38,8 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
             return "Import persistence requires an exact nonempty parser profile identifier and version."
         case .conflictingParserProfileProvenance:
             return "Import persistence found conflicting parser profile provenance."
+        case .invalidFingerprintSet:
+            return "Import persistence requires a valid prepared fingerprint set."
         }
     }
 }
@@ -46,6 +49,7 @@ struct ImportPersistencePayload {
     let account: AccountDTO
     let document: ImportedDocumentDTO
     let fingerprint: DocumentFingerprintDTO
+    let fingerprints: [DocumentFingerprintDTO]
     let importSession: ImportSessionDTO
     let completedAtISO: String
     let normalizedDocument: NormalizedDocumentDTO
@@ -85,8 +89,39 @@ struct ImportPersistenceMapper {
         accountId: String,
         fingerprint: ExactStatementFingerprint
     ) throws -> ImportPersistencePayload {
+        try payload(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            accountId: accountId,
+            fingerprintSet: PreparedDocumentFingerprintSet(fingerprints: [
+                VersionedDocumentFingerprint(
+                    algorithm: fingerprint.algorithm,
+                    digest: fingerprint.digest,
+                    byteCount: fingerprint.byteCount,
+                    isDuplicateAuthority: true
+                )
+            ])
+        )
+    }
+
+    func payload(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        accountId: String,
+        fingerprintSet: PreparedDocumentFingerprintSet
+    ) throws -> ImportPersistencePayload {
         guard validation.passed else {
             throw ImportPersistenceError.validationFailed
+        }
+        guard fingerprintSet.isValid,
+              let rawFingerprint = fingerprintSet.duplicateAuthority,
+              rawFingerprint.algorithm == DocumentFingerprintDTO.rawTextSHA256Algorithm,
+              fingerprintSet.fingerprints.allSatisfy({
+                  DocumentFingerprintDTO.approvedAlgorithms.contains($0.algorithm)
+              }) else {
+            throw ImportPersistenceError.invalidFingerprintSet
         }
 
         let importedAtISO = dateFormatter.string(from: importSession.importedAt)
@@ -105,10 +140,25 @@ struct ImportPersistenceMapper {
             importSessionId: importSessionId,
             filename: importSession.fileName,
             mimeType: "text/csv",
-            sizeBytes: fingerprint.byteCount,
-            sha256: fingerprint.digest,
+            sizeBytes: rawFingerprint.byteCount,
+            legacyRawTextSHA256: rawFingerprint.digest,
             createdAtISO: importedAtISO
         )
+
+        // Only privacy-safe digest DTOs cross into persistence. Snapshot bytes,
+        // transient byte counts, and external URL metadata remain engine-owned.
+        let fingerprints = fingerprintSet.fingerprints.enumerated().map { index, fingerprint in
+            DocumentFingerprintDTO(
+                id: "fingerprint-\(importSession.id.uuidString.lowercased())-\(index)",
+                documentId: documentId,
+                importSessionId: importSessionId,
+                algorithm: fingerprint.algorithm,
+                fingerprint: fingerprint.digest,
+                fingerprintData: nil,
+                isDuplicateAuthority: fingerprint.isDuplicateAuthority,
+                createdAtISO: importedAtISO
+            )
+        }
 
         let normalizedDocumentID = "normalized-document-\(importSession.id.uuidString.lowercased())"
         let parserProfile = try requiredParserProfile(
@@ -141,15 +191,8 @@ struct ImportPersistenceMapper {
             workspace: workspace(createdAt: importSession.importedAt),
             account: account,
             document: document,
-            fingerprint: DocumentFingerprintDTO(
-                id: "fingerprint-\(importSession.id.uuidString.lowercased())",
-                documentId: documentId,
-                importSessionId: importSessionId,
-                algorithm: fingerprint.algorithm,
-                fingerprint: fingerprint.digest,
-                fingerprintData: nil,
-                createdAtISO: importedAtISO
-            ),
+            fingerprint: fingerprints.first(where: \.isDuplicateAuthority)!,
+            fingerprints: fingerprints,
             importSession: ImportSessionDTO(
                 id: importSessionId,
                 workspaceId: workspaceId,
@@ -184,12 +227,41 @@ struct ImportPersistenceMapper {
         accountChoice: ConfirmedImportAccountChoiceDTO,
         selectedAccountId: String
     ) throws -> ConfirmedImportPlanDTO {
+        try confirmedImportPlan(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            fingerprintSet: PreparedDocumentFingerprintSet(fingerprints: [
+                VersionedDocumentFingerprint(
+                    algorithm: fingerprint.algorithm,
+                    digest: fingerprint.digest,
+                    byteCount: fingerprint.byteCount,
+                    isDuplicateAuthority: true
+                )
+            ]),
+            providerGeneration: providerGeneration,
+            advisoryIdentity: advisoryIdentity,
+            accountChoice: accountChoice,
+            selectedAccountId: selectedAccountId
+        )
+    }
+
+    func confirmedImportPlan(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        providerGeneration: ProviderGenerationToken,
+        advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO,
+        accountChoice: ConfirmedImportAccountChoiceDTO,
+        selectedAccountId: String
+    ) throws -> ConfirmedImportPlanDTO {
         let payload = try payload(
             financialDocument: financialDocument,
             importSession: importSession,
             validation: validation,
             accountId: selectedAccountId,
-            fingerprint: fingerprint
+            fingerprintSet: fingerprintSet
         )
         let identifiers = FinancialIdentityResolver.strongVerifiedIdentifiers(
             from: financialDocument.financialIdentifiers
@@ -237,7 +309,7 @@ struct ImportPersistenceMapper {
             identifiers: identifiers,
             historyTemplate: ConfirmedImportHistoryTemplateDTO(
                 document: payload.document,
-                fingerprint: payload.fingerprint,
+                fingerprints: payload.fingerprints,
                 importSession: payload.importSession,
                 completedAtISO: payload.completedAtISO,
                 successfulAttempt: successfulAttempt,

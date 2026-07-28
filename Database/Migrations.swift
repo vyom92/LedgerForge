@@ -543,7 +543,46 @@ BEGIN
 END;
 """)
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8]
+public let migrationV9 = Migration(
+    version: 9,
+    name: "versioned_document_fingerprint_authority",
+    sql: """
+ALTER TABLE document_fingerprints
+  ADD COLUMN is_duplicate_authority INTEGER NOT NULL DEFAULT 0
+  CHECK(is_duplicate_authority IN (0, 1));
+
+UPDATE document_fingerprints
+SET is_duplicate_authority = 1;
+
+DROP INDEX idx_documents_sha256;
+DROP INDEX idx_doc_fingerprint_unique;
+
+CREATE UNIQUE INDEX idx_document_fingerprints_document_algorithm
+  ON document_fingerprints(document_id, algorithm);
+
+CREATE UNIQUE INDEX idx_document_fingerprints_one_authority
+  ON document_fingerprints(document_id)
+  WHERE is_duplicate_authority = 1;
+
+CREATE INDEX idx_document_fingerprints_authority_lookup
+  ON document_fingerprints(algorithm, fingerprint, is_duplicate_authority);
+""",
+    preflightChecks: [
+        MigrationPreflightCheck(issueCode: "ambiguous-document-fingerprint-authority") { database in
+            try database.queryInt("""
+                SELECT COUNT(*)
+                FROM (
+                  SELECT document_id
+                  FROM document_fingerprints
+                  GROUP BY document_id
+                  HAVING COUNT(*) > 1
+                );
+                """) == 0
+        }
+    ]
+)
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

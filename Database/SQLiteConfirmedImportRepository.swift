@@ -21,6 +21,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             return .repositoryIntegrityConflict
         }
         do {
+            try plan.historyTemplate.validateFingerprints()
             return try reviewPartialImport(plan, planID: UUID().uuidString)
         } catch {
             return .repositoryIntegrityConflict
@@ -30,12 +31,14 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     func commitReviewedPartialImport(_ reviewedPlan: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult {
         guard consumePlan(reviewedPlan.id),
               reviewedPlan.basePlan.providerGeneration == generationToken,
-              reviewedPlan.hasValidDigest() else {
+              reviewedPlan.hasValidDigest(),
+              (try? reviewedPlan.basePlan.historyTemplate.validateFingerprints()) != nil,
+              let authority = reviewedPlan.basePlan.historyTemplate.duplicateAuthorityFingerprint else {
             return .reviewedPartialPlanStale
         }
         do {
             try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-            if try count("SELECT COUNT(*) FROM document_fingerprints WHERE algorithm = ? AND fingerprint = ?;", [reviewedPlan.basePlan.historyTemplate.fingerprint.algorithm, reviewedPlan.basePlan.historyTemplate.fingerprint.fingerprint]) > 0 {
+            if try count("SELECT COUNT(*) FROM document_fingerprints WHERE algorithm = ? AND fingerprint = ? AND is_duplicate_authority = 1;", [authority.algorithm, authority.fingerprint]) > 0 {
                 try db.execute(sql: "ROLLBACK;")
                 return .reviewedPartialPlanStale
             }
@@ -80,6 +83,9 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
 
     func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
         guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+        guard (try? plan.historyTemplate.validateFingerprints()) != nil else {
+            return .repositoryIntegrityConflict
+        }
         do {
             try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
             let result = try commitInsideTransaction(plan)
@@ -108,8 +114,6 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               plan.historyTemplate.document.workspaceId == plan.workspace.id,
               plan.historyTemplate.document.importSessionId == plan.historyTemplate.importSession.id,
               plan.historyTemplate.importSession.workspaceId == plan.workspace.id,
-              plan.historyTemplate.fingerprint.documentId == plan.historyTemplate.document.id,
-              plan.historyTemplate.fingerprint.importSessionId == plan.historyTemplate.importSession.id,
               plan.historyTemplate.successfulAttempt.workspaceId == plan.workspace.id,
               plan.historyTemplate.normalizedDocument != nil,
               Set(plan.transactionTemplates.map { $0.transaction.id }).count == plan.transactionTemplates.count,
@@ -121,7 +125,10 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               !hasDuplicateIdentifierCandidates(plan.identifiers) else {
             return .repositoryIntegrityConflict
         }
-        if try count("SELECT COUNT(*) FROM document_fingerprints WHERE algorithm = ? AND fingerprint = ?;", [plan.historyTemplate.fingerprint.algorithm, plan.historyTemplate.fingerprint.fingerprint]) > 0 {
+        guard let authority = plan.historyTemplate.duplicateAuthorityFingerprint else {
+            return .repositoryIntegrityConflict
+        }
+        if try count("SELECT COUNT(*) FROM document_fingerprints WHERE algorithm = ? AND fingerprint = ? AND is_duplicate_authority = 1;", [authority.algorithm, authority.fingerprint]) > 0 {
             return .exactDuplicate
         }
 
@@ -220,8 +227,10 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     private func insert(history: ConfirmedImportHistoryTemplateDTO, transactions: [TransactionDTO], events: [TransactionEventIdentityDTO], observations: [(String, ConfirmedImportIdentifierCandidateDTO)]) throws {
         let document = history.document
         try db.executePrepared(sql: "INSERT INTO import_sessions (id, workspace_id, user_visible_name, started_at, validation_status, created_at, reader_version, parser_version, layout_version) VALUES (?,?,?,?,?,?,?,?,?);", params: [history.importSession.id, history.importSession.workspaceId, history.importSession.userVisibleName ?? NSNull(), history.importSession.startedAtISO, history.importSession.validationStatus, history.importSession.startedAtISO, history.importSession.readerVersion ?? NSNull(), history.importSession.parserVersion ?? NSNull(), history.importSession.layoutVersion ?? NSNull()])
-        try db.executePrepared(sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, mime_type, size_bytes, sha256, storage_path, extracted_text_snippet, page_count, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?);", params: [document.id, document.workspaceId, document.importSessionId, document.filename, document.mimeType ?? NSNull(), document.sizeBytes ?? NSNull(), document.sha256, NSNull(), NSNull(), NSNull(), document.createdAtISO])
-        try db.executePrepared(sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, fingerprint_data, created_at) VALUES (?,?,?,?,?,?,?);", params: [history.fingerprint.id, history.fingerprint.documentId, history.fingerprint.importSessionId, history.fingerprint.algorithm, history.fingerprint.fingerprint, history.fingerprint.fingerprintData ?? NSNull(), history.fingerprint.createdAtISO])
+        try db.executePrepared(sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, mime_type, size_bytes, sha256, storage_path, extracted_text_snippet, page_count, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?);", params: [document.id, document.workspaceId, document.importSessionId, document.filename, document.mimeType ?? NSNull(), document.sizeBytes ?? NSNull(), document.legacyRawTextSHA256, NSNull(), NSNull(), NSNull(), document.createdAtISO])
+        for fingerprint in history.fingerprints {
+            try db.executePrepared(sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, fingerprint_data, created_at, is_duplicate_authority) VALUES (?,?,?,?,?,?,?,?);", params: [fingerprint.id, fingerprint.documentId, fingerprint.importSessionId, fingerprint.algorithm, fingerprint.fingerprint, fingerprint.fingerprintData ?? NSNull(), fingerprint.createdAtISO, fingerprint.isDuplicateAuthority ? 1 : 0])
+        }
         guard let normalized = history.normalizedDocument else { throw RepositoryError.relationshipViolation("Trusted source provenance is missing its normalized document.") }
         try db.executePrepared(sql: "INSERT INTO normalized_documents (id, import_session_id, document_id, normalized_json, schema_version, created_at, profile_id, profile_version) VALUES (?,?,?,?,?,?,?,?);", params: [normalized.id, normalized.importSessionId, normalized.documentId, "{\"profile\":\"\(normalized.profileId)\",\"version\":\"\(normalized.profileVersion)\"}", "trusted-source-v1", history.completedAtISO, normalized.profileId, normalized.profileVersion])
         for row in history.normalizedRows {
@@ -381,8 +390,10 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
 
         let document = history.document
         try db.executePrepared(sql: "INSERT INTO import_sessions (id, workspace_id, user_visible_name, started_at, validation_status, created_at, reader_version, parser_version, layout_version) VALUES (?,?,?,?,?,?,?,?,?);", params: [history.importSession.id, history.importSession.workspaceId, history.importSession.userVisibleName ?? NSNull(), history.importSession.startedAtISO, history.importSession.validationStatus, history.importSession.startedAtISO, history.importSession.readerVersion ?? NSNull(), history.importSession.parserVersion ?? NSNull(), history.importSession.layoutVersion ?? NSNull()])
-        try db.executePrepared(sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, mime_type, size_bytes, sha256, storage_path, extracted_text_snippet, page_count, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?);", params: [document.id, document.workspaceId, document.importSessionId, document.filename, document.mimeType ?? NSNull(), document.sizeBytes ?? NSNull(), document.sha256, NSNull(), NSNull(), NSNull(), document.createdAtISO])
-        try db.executePrepared(sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, fingerprint_data, created_at) VALUES (?,?,?,?,?,?,?);", params: [history.fingerprint.id, history.fingerprint.documentId, history.fingerprint.importSessionId, history.fingerprint.algorithm, history.fingerprint.fingerprint, history.fingerprint.fingerprintData ?? NSNull(), history.fingerprint.createdAtISO])
+        try db.executePrepared(sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, mime_type, size_bytes, sha256, storage_path, extracted_text_snippet, page_count, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?);", params: [document.id, document.workspaceId, document.importSessionId, document.filename, document.mimeType ?? NSNull(), document.sizeBytes ?? NSNull(), document.legacyRawTextSHA256, NSNull(), NSNull(), NSNull(), document.createdAtISO])
+        for fingerprint in history.fingerprints {
+            try db.executePrepared(sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, fingerprint_data, created_at, is_duplicate_authority) VALUES (?,?,?,?,?,?,?,?);", params: [fingerprint.id, fingerprint.documentId, fingerprint.importSessionId, fingerprint.algorithm, fingerprint.fingerprint, fingerprint.fingerprintData ?? NSNull(), fingerprint.createdAtISO, fingerprint.isDuplicateAuthority ? 1 : 0])
+        }
         try db.executePrepared(sql: "INSERT INTO normalized_documents (id, import_session_id, document_id, normalized_json, schema_version, created_at, profile_id, profile_version) VALUES (?,?,?,?,?,?,?,?);", params: [normalizedDocument.id, normalizedDocument.importSessionId, normalizedDocument.documentId, "{\"profile\":\"\(normalizedDocument.profileId)\",\"version\":\"\(normalizedDocument.profileVersion)\"}", "trusted-source-v1", history.completedAtISO, normalizedDocument.profileId, normalizedDocument.profileVersion])
         for row in history.normalizedRows {
             try db.executePrepared(sql: "INSERT INTO normalized_rows (id, normalized_document_id, row_index, row_original, extracted_text, created_at, record_digest) VALUES (?,?,?,?,?,?,?);", params: [row.id, row.normalizedDocumentId, row.sourceOrdinal, "{\"digest\":\"\(row.digest)\"}", NSNull(), history.completedAtISO, row.digest])

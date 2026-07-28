@@ -106,6 +106,7 @@ enum ImportEngineCommitError: Error, LocalizedError, Equatable {
     case alreadyCommitted
     case persistenceSkipped
     case fingerprintMismatch
+    case sourceSnapshotIntegrityFailed
 
     var errorDescription: String? {
         switch self {
@@ -117,6 +118,8 @@ enum ImportEngineCommitError: Error, LocalizedError, Equatable {
             return "Import persistence was skipped."
         case .fingerprintMismatch:
             return "Prepared statement content no longer matches its exact-content fingerprint."
+        case .sourceSnapshotIntegrityFailed:
+            return "Prepared source content could not be verified. Prepare the import again."
         }
     }
 
@@ -134,6 +137,8 @@ struct PreparedImport: Identifiable {
     let validation: ImportValidationResult
     let importSession: ImportSession
     let fingerprint: ExactStatementFingerprint
+    let sourceSnapshot: SourceContentSnapshot
+    let fingerprintSet: PreparedDocumentFingerprintSet
     let advisoryPreviousImport: PreviouslyImportedStatement?
     let providerGeneration: ProviderGenerationToken
 
@@ -149,6 +154,8 @@ struct PreparedImport: Identifiable {
         validation: ImportValidationResult,
         importSession: ImportSession,
         fingerprint: ExactStatementFingerprint? = nil,
+        sourceSnapshot: SourceContentSnapshot? = nil,
+        fingerprintSet: PreparedDocumentFingerprintSet? = nil,
         advisoryPreviousImport: PreviouslyImportedStatement? = nil,
         providerGeneration: ProviderGenerationToken = DatabaseProvider.shared.generationToken
     ) {
@@ -162,7 +169,14 @@ struct PreparedImport: Identifiable {
         self.financialDocument = financialDocument
         self.validation = validation
         self.importSession = importSession
-        self.fingerprint = fingerprint ?? ExactStatementFingerprint(text: rawContents)
+        let resolvedFingerprint = fingerprint ?? ExactStatementFingerprint(text: rawContents)
+        let resolvedSnapshot = sourceSnapshot ?? SourceContentSnapshot(bytes: Data(rawContents.utf8))
+        self.fingerprint = resolvedFingerprint
+        self.sourceSnapshot = resolvedSnapshot
+        self.fingerprintSet = fingerprintSet ?? PreparedDocumentFingerprintSet(
+            rawText: resolvedFingerprint,
+            sourceBytes: resolvedSnapshot.sourceByteFingerprint
+        )
         self.advisoryPreviousImport = advisoryPreviousImport
         self.providerGeneration = providerGeneration
     }
@@ -197,6 +211,7 @@ final class ImportEngine {
     static let shared = ImportEngine()
 
     private let importCoordinator: any ImportFramework.ImportCoordinator
+    private let sourceSnapshotAcquirer: (URL) throws -> SourceContentSnapshot
     private let importPersistenceCoordinatorFactory: () -> ImportPersistenceCoordinating
     private let persistenceStateProvider: () -> PersistenceState
     private let providerGenerationProvider: () -> ProviderGenerationToken
@@ -215,6 +230,7 @@ final class ImportEngine {
             readerRegistry: DefaultReaderRegistry(),
             passwordProvider: DefaultPasswordProvider()
         ),
+        sourceSnapshotAcquirer: ((URL) throws -> SourceContentSnapshot)? = nil,
         importPersistenceCoordinator: ImportPersistenceCoordinating? = nil,
         developerConsole: DeveloperConsole = .shared,
         persistenceStateProvider: @escaping () -> PersistenceState = { DatabaseProvider.shared.persistenceState },
@@ -228,6 +244,7 @@ final class ImportEngine {
         reconciliationGate: ConfirmedImportReconciliationGate = ConfirmedImportReconciliationGate()
     ) {
         self.importCoordinator = importCoordinator
+        self.sourceSnapshotAcquirer = sourceSnapshotAcquirer ?? Self.acquireSourceSnapshot
         self.developerConsole = developerConsole
         self.persistenceStateProvider = persistenceStateProvider
         self.providerGenerationProvider = providerGenerationProvider
@@ -253,7 +270,7 @@ final class ImportEngine {
 
     func importFileAndReturnResult(from url: URL) async -> ImportEngineResult {
         let entryCountBeforeImport = developerConsole.entries.count
-        developerConsole.info(.`import`, "Import started", metadata: ["file": url.lastPathComponent])
+        developerConsole.info(.`import`, "Import started")
 
         do {
             let preparedImport = try await prepareImport(from: url)
@@ -270,6 +287,19 @@ final class ImportEngine {
             }
             return result
 
+        } catch let error as SourceContentSnapshotError {
+            developerConsole.error(
+                .`import`,
+                "Import failed",
+                metadata: ["outcome": ImportAttemptOutcome.sourceSnapshotAcquisitionFailed.rawValue]
+            )
+            return ImportEngineResult(
+                fileName: "Selected document",
+                transactionCount: 0,
+                validationPassed: false,
+                persisted: false,
+                errorMessage: error.localizedDescription
+            )
         } catch {
 
             if developerConsole.entries.count == entryCountBeforeImport + 1 {
@@ -309,9 +339,29 @@ final class ImportEngine {
         }
 #endif
         try publishPreparationProgress(.openingSource, requestId: requestId, progress: progress)
-        let contents = try await readTextDocument(from: url)
+        let snapshot: SourceContentSnapshot
+        do {
+            snapshot = try acquireSourceSnapshot(from: url)
+        } catch {
+            let record = importPersistenceCoordinatorFactory().recordSourceSnapshotRejection(.acquisitionFailed)
+            if record.importAttemptId != nil {
+                try? rejectedAttemptHydration()
+            }
+            developerConsole.error(.`import`, "Source snapshot acquisition failed")
+            throw error
+        }
+        var transfersSnapshot = false
+        defer {
+            if !transfersSnapshot { snapshot.invalidate() }
+        }
+        try Task.checkCancellation()
+        let contents = try await readTextDocument(from: url, snapshot: snapshot)
         try Task.checkCancellation()
         let fingerprint = ExactStatementFingerprint(text: contents)
+        let fingerprintSet = PreparedDocumentFingerprintSet(
+            rawText: fingerprint,
+            sourceBytes: snapshot.sourceByteFingerprint
+        )
 
         guard !contents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             developerConsole.error(.`import`, "Imported document is empty.")
@@ -410,6 +460,8 @@ final class ImportEngine {
             validation: validation,
             importSession: importSession,
             fingerprint: fingerprint,
+            sourceSnapshot: snapshot,
+            fingerprintSet: fingerprintSet,
             advisoryPreviousImport: advisoryPreviousImport,
             providerGeneration: preparationGeneration
         )
@@ -418,6 +470,7 @@ final class ImportEngine {
         lifecycleLeases[preparedImport.id] = lifecycleLease
         transfersLifecycleLease = true
 #endif
+        transfersSnapshot = true
         return preparedImport
     }
 
@@ -450,7 +503,7 @@ final class ImportEngine {
             financialDocument: preparedImport.financialDocument,
             importSession: preparedImport.importSession,
             validation: preparedImport.validation,
-            fingerprint: preparedImport.fingerprint,
+            fingerprintSet: preparedImport.fingerprintSet,
             accountChoice: accountChoice,
             providerGeneration: preparedImport.providerGeneration
         )
@@ -461,6 +514,17 @@ final class ImportEngine {
         accountChoice: ImportAccountChoice?,
         reviewedPartialPlan: ReviewedPartialImportPlanDTO? = nil
     ) async -> ImportEngineResult {
+        guard markPreparedImportCommitted(preparedImport.id) else {
+            developerConsole.warning(.`import`, "Prepared import already consumed")
+            return ImportEngineResult(
+                fileName: preparedImport.fileName,
+                transactionCount: preparedImport.transactionCount,
+                validationPassed: preparedImport.validation.passed,
+                persisted: false,
+                errorMessage: ImportEngineCommitError.alreadyCommitted.localizedDescription
+            )
+        }
+        defer { preparedImport.sourceSnapshot.invalidate() }
 #if DEBUG
         let lifecycleLease = lifecycleLeases[preparedImport.id]
         lifecycleLease?.transition(to: .confirmedPersistence)
@@ -469,6 +533,37 @@ final class ImportEngine {
             lifecycleLeases.removeValue(forKey: preparedImport.id)
         }
 #endif
+        let recomputedRawFingerprint = ExactStatementFingerprint(text: preparedImport.rawContents)
+        let recomputedFingerprintSet: PreparedDocumentFingerprintSet?
+        do {
+            recomputedFingerprintSet = PreparedDocumentFingerprintSet(
+                rawText: recomputedRawFingerprint,
+                sourceBytes: try preparedImport.sourceSnapshot.recomputedSourceByteFingerprint()
+            )
+        } catch {
+            recomputedFingerprintSet = nil
+        }
+        guard preparedImport.fingerprintSet.isValid,
+              recomputedRawFingerprint == preparedImport.fingerprint,
+              recomputedFingerprintSet == preparedImport.fingerprintSet else {
+            let record = importPersistenceCoordinatorFactory().recordSourceSnapshotRejection(.integrityFailed)
+            if record.importAttemptId != nil {
+                try? rejectedAttemptHydration()
+            }
+            developerConsole.error(.`import`, "Prepared source snapshot integrity verification failed")
+            return ImportEngineResult(
+                fileName: preparedImport.fileName,
+                transactionCount: preparedImport.transactionCount,
+                validationPassed: preparedImport.validation.passed,
+                persisted: false,
+                errorMessage: ImportEngineCommitError.sourceSnapshotIntegrityFailed.localizedDescription,
+                accountId: nil,
+                importSessionId: nil,
+                redactedIdentifier: nil,
+                previousImport: nil,
+                importAttemptId: record.importAttemptId
+            )
+        }
         guard persistenceStateProvider().isUsable else {
             developerConsole.error(.database, "Import blocked because persistence is unavailable")
             return ImportEngineResult(
@@ -506,36 +601,6 @@ final class ImportEngine {
             )
         }
 
-        guard ExactStatementFingerprint(text: preparedImport.rawContents) == preparedImport.fingerprint else {
-            developerConsole.error(.`import`, "Prepared exact-content fingerprint verification failed")
-            return ImportEngineResult(
-                fileName: preparedImport.fileName,
-                transactionCount: preparedImport.transactionCount,
-                validationPassed: true,
-                persisted: false,
-                errorMessage: ImportEngineCommitError.fingerprintMismatch.localizedDescription,
-                accountId: nil,
-                importSessionId: nil,
-                redactedIdentifier: nil,
-                previousImport: nil
-            )
-        }
-
-        guard markPreparedImportCommitted(preparedImport.id) else {
-            developerConsole.warning(.`import`, "Prepared import already committed", metadata: ["file": preparedImport.fileName])
-            return ImportEngineResult(
-                fileName: preparedImport.fileName,
-                transactionCount: preparedImport.transactionCount,
-                validationPassed: true,
-                persisted: false,
-                errorMessage: ImportEngineCommitError.alreadyCommitted.localizedDescription,
-                accountId: nil,
-                importSessionId: nil,
-                redactedIdentifier: nil,
-                previousImport: nil
-            )
-        }
-
         var persistenceResult = ImportPersistenceResult.skipped
         var persistenceErrorMessage: String?
         do {
@@ -549,7 +614,7 @@ final class ImportEngine {
                     financialDocument: preparedImport.financialDocument,
                     importSession: preparedImport.importSession,
                     validation: preparedImport.validation,
-                    fingerprint: preparedImport.fingerprint,
+                    fingerprintSet: preparedImport.fingerprintSet,
                     accountChoice: accountChoice,
                     providerGeneration: preparedImport.providerGeneration
                 )
@@ -566,7 +631,7 @@ final class ImportEngine {
                 developerConsole.error(.database, "Repository persistence skipped")
             }
         } catch {
-            developerConsole.error(.database, "Repository persistence failed", metadata: ["error": error.localizedDescription])
+            developerConsole.error(.database, "Repository persistence failed")
             if let failure = error as? ImportPersistenceCommitFailure {
                 persistenceErrorMessage = failure.originalError.localizedDescription
                 persistenceResult = ImportPersistenceResult(
@@ -670,11 +735,13 @@ final class ImportEngine {
         return true
     }
 
-#if DEBUG
     func cancelPreparedImport(_ preparedImport: PreparedImport) {
+        guard markPreparedImportCommitted(preparedImport.id) else { return }
+        preparedImport.sourceSnapshot.invalidate()
+#if DEBUG
         lifecycleLeases.removeValue(forKey: preparedImport.id)?.finish()
-    }
 #endif
+    }
 
     private func publishPreparationProgress(
         _ phase: ImportProgressPhase,
@@ -692,10 +759,38 @@ final class ImportEngine {
         )
     }
 
-    private func readTextDocument(from url: URL) async throws -> String {
+    private func acquireSourceSnapshot(from url: URL) throws -> SourceContentSnapshot {
+        do {
+            return try sourceSnapshotAcquirer(url)
+        } catch let error as SourceContentSnapshotError {
+            throw error
+        } catch {
+            throw SourceContentSnapshotError.acquisitionFailed
+        }
+    }
+
+    nonisolated private static func acquireSourceSnapshot(from url: URL) throws -> SourceContentSnapshot {
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            return SourceContentSnapshot(bytes: try Data(contentsOf: url))
+        } catch {
+            throw SourceContentSnapshotError.acquisitionFailed
+        }
+    }
+
+    private func readTextDocument(
+        from url: URL,
+        snapshot: SourceContentSnapshot
+    ) async throws -> String {
         try Task.checkCancellation()
         let request = ImportRequest(fileURL: url)
-        let result = await importCoordinator.importDocument(request)
+        let result = await importCoordinator.importDocument(request, snapshot: snapshot)
         try Task.checkCancellation()
 
         guard result.status == .succeeded, let rawDocument = result.rawDocument else {

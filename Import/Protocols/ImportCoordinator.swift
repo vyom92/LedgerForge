@@ -5,6 +5,9 @@ import Foundation
 
 public extension ImportFramework {
     protocol ImportCoordinator: Sendable {
-        func importDocument(_ request: ImportRequest) async -> ImportResult
+        func importDocument(
+            _ request: ImportRequest,
+            snapshot: SourceContentSnapshot
+        ) async -> ImportResult
     }
 }

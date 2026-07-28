@@ -54,8 +54,8 @@ struct ConfirmedImportAtomicityTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         let provider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("institutions.sqlite").path, migrations: allMigrations)
         defer { provider.database.close() }
-        let accepted = confirmedImportPlan(generationToken: provider.generationToken, identifier: "institution-conflict", fingerprint: "institution-conflict-first", suffix: "institution-first", institutionID: "Existing Bank")
-        let contender = confirmedImportPlan(generationToken: provider.generationToken, identifier: "institution-conflict", fingerprint: "institution-conflict-second", suffix: "institution-second", institutionID: "Contender Bank")
+        let accepted = confirmedImportPlan(generationToken: provider.generationToken, identifier: "institution-conflict", fingerprint: confirmedImportFixtureDigest(seed: "institution-conflict-first"), suffix: "institution-first", institutionID: "Existing Bank")
+        let contender = confirmedImportPlan(generationToken: provider.generationToken, identifier: "institution-conflict", fingerprint: confirmedImportFixtureDigest(seed: "institution-conflict-second"), suffix: "institution-second", institutionID: "Contender Bank")
 
         #expect(provider.confirmedImportRepo.commitConfirmedImport(accepted) == .committed(receipt(for: accepted)))
         #expect(provider.confirmedImportRepo.commitConfirmedImport(contender) == .identifierOwnershipConflict)
@@ -68,8 +68,8 @@ struct ConfirmedImportAtomicityTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         let provider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("institutions.sqlite").path, migrations: allMigrations)
         defer { provider.database.close() }
-        let accepted = confirmedImportPlan(generationToken: provider.generationToken, identifier: "institution-duplicate", fingerprint: "institution-duplicate", suffix: "institution-duplicate-first", institutionID: "Existing Bank")
-        let duplicate = confirmedImportPlan(generationToken: provider.generationToken, identifier: "institution-duplicate-second", fingerprint: "institution-duplicate", suffix: "institution-duplicate-second", institutionID: "Unexpected Bank")
+        let accepted = confirmedImportPlan(generationToken: provider.generationToken, identifier: "institution-duplicate", fingerprint: confirmedImportFixtureDigest(seed: "institution-duplicate"), suffix: "institution-duplicate-first", institutionID: "Existing Bank")
+        let duplicate = confirmedImportPlan(generationToken: provider.generationToken, identifier: "institution-duplicate-second", fingerprint: confirmedImportFixtureDigest(seed: "institution-duplicate"), suffix: "institution-duplicate-second", institutionID: "Unexpected Bank")
 
         #expect(provider.confirmedImportRepo.commitConfirmedImport(accepted) == .committed(receipt(for: accepted)))
         #expect(provider.confirmedImportRepo.commitConfirmedImport(duplicate) == .exactDuplicate)
@@ -84,8 +84,8 @@ struct ConfirmedImportAtomicityTests {
         let first = try SQLiteRepositoryProvider(path: path, migrations: allMigrations)
         let second = try SQLiteRepositoryProvider(path: path, migrations: allMigrations)
         defer { first.database.close(); second.database.close() }
-        let firstPlan = confirmedImportPlan(generationToken: first.generationToken, identifier: "institution-concurrent-first", fingerprint: "institution-concurrent-first", suffix: "institution-concurrent-first", institutionID: "Shared Bank")
-        let secondPlan = confirmedImportPlan(generationToken: second.generationToken, identifier: "institution-concurrent-second", fingerprint: "institution-concurrent-second", suffix: "institution-concurrent-second", institutionID: "Shared Bank")
+        let firstPlan = confirmedImportPlan(generationToken: first.generationToken, identifier: "institution-concurrent-first", fingerprint: confirmedImportFixtureDigest(seed: "institution-concurrent-first"), suffix: "institution-concurrent-first", institutionID: "Shared Bank")
+        let secondPlan = confirmedImportPlan(generationToken: second.generationToken, identifier: "institution-concurrent-second", fingerprint: confirmedImportFixtureDigest(seed: "institution-concurrent-second"), suffix: "institution-concurrent-second", institutionID: "Shared Bank")
         let lock = NSLock()
         var results = [ConfirmedImportRepositoryResult]()
         let group = DispatchGroup()
@@ -113,10 +113,10 @@ struct ConfirmedImportAtomicityTests {
         let memory = InMemoryRepositoryProvider()
         defer { sqlite.database.close() }
 
-        let sqliteFirst = confirmedImportPlan(generationToken: sqlite.generationToken, identifier: "ownership-race", fingerprint: "ownership-first", suffix: "sqlite-first")
-        let sqliteSecond = confirmedImportPlan(generationToken: sqlite.generationToken, identifier: "ownership-race", fingerprint: "ownership-second", suffix: "sqlite-second")
-        let memoryFirst = confirmedImportPlan(generationToken: memory.generationToken, identifier: "ownership-race", fingerprint: "ownership-first", suffix: "memory-first")
-        let memorySecond = confirmedImportPlan(generationToken: memory.generationToken, identifier: "ownership-race", fingerprint: "ownership-second", suffix: "memory-second")
+        let sqliteFirst = confirmedImportPlan(generationToken: sqlite.generationToken, identifier: "ownership-race", fingerprint: confirmedImportFixtureDigest(seed: "ownership-first"), suffix: "sqlite-first")
+        let sqliteSecond = confirmedImportPlan(generationToken: sqlite.generationToken, identifier: "ownership-race", fingerprint: confirmedImportFixtureDigest(seed: "ownership-second"), suffix: "sqlite-second")
+        let memoryFirst = confirmedImportPlan(generationToken: memory.generationToken, identifier: "ownership-race", fingerprint: confirmedImportFixtureDigest(seed: "ownership-first"), suffix: "memory-first")
+        let memorySecond = confirmedImportPlan(generationToken: memory.generationToken, identifier: "ownership-race", fingerprint: confirmedImportFixtureDigest(seed: "ownership-second"), suffix: "memory-second")
 
         let sqliteFirstResult = sqlite.confirmedImportRepo.commitConfirmedImport(sqliteFirst)
         let memoryFirstResult = memory.confirmedImportRepo.commitConfirmedImport(memoryFirst)

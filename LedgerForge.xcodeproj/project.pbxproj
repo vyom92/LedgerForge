@@ -117,6 +117,7 @@
 		D57000143057000000000001 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000043057000000000001 /* CategoryManagementView.swift */; };
 		F58000010000000000000001 /* ImportFailureSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58000020000000000000001 /* ImportFailureSummary.swift */; };
 		F58000030000000000000001 /* DebugImportVerificationWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58000040000000000000001 /* DebugImportVerificationWorkspaceView.swift */; };
+		F63000020000000000000001 /* SourceContentSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63000010000000000000001 /* SourceContentSnapshot.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -269,6 +270,7 @@
 		D57000043057000000000001 /* CategoryManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementView.swift; sourceTree = "<group>"; };
 		F58000020000000000000001 /* ImportFailureSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFailureSummary.swift; sourceTree = "<group>"; };
 		F58000040000000000000001 /* DebugImportVerificationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugImportVerificationWorkspaceView.swift; sourceTree = "<group>"; };
+		F63000010000000000000001 /* SourceContentSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceContentSnapshot.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -348,6 +350,7 @@
 		281BB1662FFC4C88006E7424 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				F63000010000000000000001 /* SourceContentSnapshot.swift */,
 				281BB17D2FFC4D26006E7424 /* ImportRequest.swift */,
 				281BB17F2FFC4D3F006E7424 /* RawDocument.swift */,
 				281BB1812FFC4D40006E7424 /* ImportResult.swift */,
@@ -854,6 +857,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F63000020000000000000001 /* SourceContentSnapshot.swift in Sources */,
 				D57000113057000000000001 /* Category.swift in Sources */,
 				D57000123057000000000001 /* CategoryStore.swift in Sources */,
 				D57000133057000000000001 /* CategoryManagementCoordinator.swift in Sources */,

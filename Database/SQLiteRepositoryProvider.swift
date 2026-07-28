@@ -1443,7 +1443,7 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
                     payload.document.filename,
                     payload.document.mimeType ?? NSNull(),
                     payload.document.sizeBytes ?? NSNull(),
-                    payload.document.sha256,
+                    payload.document.legacyRawTextSHA256,
                     NSNull(),
                     NSNull(),
                     NSNull(),
@@ -1451,7 +1451,7 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
                 ]
             )
             try db.executePrepared(
-                sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, fingerprint_data, created_at) VALUES (?,?,?,?,?,?,?);",
+                sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, fingerprint_data, created_at, is_duplicate_authority) VALUES (?,?,?,?,?,?,?,?);",
                 params: [
                     payload.fingerprint.id,
                     payload.fingerprint.documentId,
@@ -1459,7 +1459,8 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
                     payload.fingerprint.algorithm,
                     payload.fingerprint.fingerprint,
                     payload.fingerprint.fingerprintData ?? NSNull(),
-                    payload.fingerprint.createdAtISO
+                    payload.fingerprint.createdAtISO,
+                    payload.fingerprint.isDuplicateAuthority ? 1 : 0
                 ]
             )
             try db.executePrepared(
@@ -1555,7 +1556,9 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
           (SELECT a.name FROM accounts a WHERE a.id = (SELECT t.account_id FROM transactions t WHERE t.import_session_id = df.import_session_id AND t.account_id IS NOT NULL ORDER BY t.id LIMIT 1))
         FROM document_fingerprints df
         INNER JOIN import_sessions s ON s.id = df.import_session_id
-        WHERE df.algorithm = ? AND df.fingerprint = ? AND s.validation_status = 'passed'
+        WHERE df.algorithm = ? AND df.fingerprint = ?
+          AND df.is_duplicate_authority = 1
+          AND s.validation_status = 'passed'
         LIMIT 1;
         """
         return try db.query(sql: sql, params: [algorithm, fingerprint]) { row in
@@ -1574,7 +1577,7 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
               payload.importSession.workspaceId == payload.document.workspaceId,
               payload.fingerprint.documentId == payload.document.id,
               payload.fingerprint.importSessionId == payload.importSession.id,
-              payload.document.sha256 == payload.fingerprint.fingerprint,
+              payload.document.legacyRawTextSHA256 == payload.fingerprint.fingerprint,
               payload.fingerprint.fingerprintData == nil else {
             throw RepositoryError.relationshipViolation("Atomic import-history document relationships are inconsistent.")
         }

@@ -488,7 +488,7 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
               payload.importSession.workspaceId == payload.document.workspaceId,
               payload.fingerprint.documentId == payload.document.id,
               payload.fingerprint.importSessionId == payload.importSession.id,
-              payload.document.sha256 == payload.fingerprint.fingerprint,
+              payload.document.legacyRawTextSHA256 == payload.fingerprint.fingerprint,
               payload.fingerprint.fingerprintData == nil else {
             throw RepositoryError.relationshipViolation("Atomic import-history document relationships are inconsistent.")
         }
@@ -497,8 +497,8 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
               state.importSessions[payload.importSession.id] == nil else {
             throw RepositoryError.relationshipViolation("Atomic import-history identifiers already exist.")
         }
-        guard !state.documents.values.contains(where: { $0.sha256 == payload.document.sha256 }),
-              !state.documentFingerprints.values.contains(where: {
+        guard !state.documentFingerprints.values.contains(where: {
+                  $0.isDuplicateAuthority &&
                   $0.algorithm == payload.fingerprint.algorithm && $0.fingerprint == payload.fingerprint.fingerprint
               }) else {
             throw RepositoryError.relationshipViolation("Atomic import-history fingerprint is not unique.")
@@ -583,7 +583,7 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
         fingerprint: String
     ) -> PriorImportedStatementDTO? {
         guard let storedFingerprint = state.documentFingerprints.values.first(where: {
-            $0.algorithm == algorithm && $0.fingerprint == fingerprint
+            $0.isDuplicateAuthority && $0.algorithm == algorithm && $0.fingerprint == fingerprint
         }),
         let session = state.importSessions[storedFingerprint.importSessionId],
         session.validationStatus == "passed" else {
@@ -623,6 +623,9 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         guard plan.providerGeneration == generationToken else {
             return .repositoryIntegrityConflict
         }
+        guard (try? plan.historyTemplate.validateFingerprints()) != nil else {
+            return .repositoryIntegrityConflict
+        }
         return reviewPartialImportWithoutLock(plan, planID: UUID().uuidString)
     }
 
@@ -631,13 +634,16 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         defer { state.stateLock.unlock() }
         guard consumedPartialPlanIDs.insert(reviewed.id).inserted,
               reviewed.basePlan.providerGeneration == generationToken,
-              reviewed.hasValidDigest() else {
+              reviewed.hasValidDigest(),
+              (try? reviewed.basePlan.historyTemplate.validateFingerprints()) != nil,
+              let authority = reviewed.basePlan.historyTemplate.duplicateAuthorityFingerprint else {
             return .reviewedPartialPlanStale
         }
         let plan = reviewed.basePlan
         guard !state.documentFingerprints.values.contains(where: {
-            $0.algorithm == plan.historyTemplate.fingerprint.algorithm &&
-            $0.fingerprint == plan.historyTemplate.fingerprint.fingerprint
+            $0.isDuplicateAuthority &&
+            $0.algorithm == authority.algorithm &&
+            $0.fingerprint == authority.fingerprint
         }) else { return .reviewedPartialPlanStale }
         guard case .eligible(let current) = reviewPartialImportWithoutLock(
             plan,
@@ -701,7 +707,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         }
 
         guard documents[history.document.id] == nil,
-              fingerprints[history.fingerprint.id] == nil,
+              history.fingerprints.allSatisfy({ fingerprints[$0.id] == nil }),
               sessions[history.importSession.id] == nil,
               normalizedDocuments[normalizedDocument.id] == nil,
               history.normalizedRows.allSatisfy({ normalizedRows[$0.id] == nil }) else {
@@ -709,8 +715,12 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         }
         documents[history.document.id] = history.document
         if injectedFailure == .document { return .repositoryIntegrityConflict }
-        fingerprints[history.fingerprint.id] = history.fingerprint
-        if injectedFailure == .fingerprint { return .repositoryIntegrityConflict }
+        for (index, fingerprint) in history.fingerprints.enumerated() {
+            fingerprints[fingerprint.id] = fingerprint
+            if index == min(1, history.fingerprints.count - 1), injectedFailure == .fingerprint {
+                return .repositoryIntegrityConflict
+            }
+        }
         sessions[history.importSession.id] = ImportSessionRecordDTO(
             id: history.importSession.id,
             workspaceId: history.importSession.workspaceId,
@@ -877,13 +887,15 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         defer { state.stateLock.unlock() }
 
         guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+        guard (try? plan.historyTemplate.validateFingerprints()) != nil,
+              let authority = plan.historyTemplate.duplicateAuthorityFingerprint else {
+            return .repositoryIntegrityConflict
+        }
         guard plan.transactionTemplates.allSatisfy(\.isAccountIndependent),
               plan.transactionTemplates.allSatisfy({ $0.transaction.workspaceId == plan.workspace.id }),
               plan.historyTemplate.document.workspaceId == plan.workspace.id,
               plan.historyTemplate.document.importSessionId == plan.historyTemplate.importSession.id,
               plan.historyTemplate.importSession.workspaceId == plan.workspace.id,
-              plan.historyTemplate.fingerprint.documentId == plan.historyTemplate.document.id,
-              plan.historyTemplate.fingerprint.importSessionId == plan.historyTemplate.importSession.id,
               plan.historyTemplate.successfulAttempt.workspaceId == plan.workspace.id,
               plan.historyTemplate.normalizedDocument != nil,
               !plan.historyTemplate.normalizedRows.isEmpty,
@@ -895,8 +907,9 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             return .repositoryIntegrityConflict
         }
         guard !state.documentFingerprints.values.contains(where: {
-            $0.algorithm == plan.historyTemplate.fingerprint.algorithm &&
-            $0.fingerprint == plan.historyTemplate.fingerprint.fingerprint
+            $0.isDuplicateAuthority &&
+            $0.algorithm == authority.algorithm &&
+            $0.fingerprint == authority.fingerprint
         }) else { return .exactDuplicate }
 
         var workspaces = state.workspaces
@@ -1023,7 +1036,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
 
         let history = plan.historyTemplate
         guard documents[history.document.id] == nil,
-              fingerprints[history.fingerprint.id] == nil,
+              history.fingerprints.allSatisfy({ fingerprints[$0.id] == nil }),
               sessions[history.importSession.id] == nil,
               let normalizedDocument = history.normalizedDocument,
               normalizedDocument.importSessionId == history.importSession.id,
@@ -1047,8 +1060,12 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
 
         documents[history.document.id] = history.document
         if injectedFailure == .document { return .repositoryIntegrityConflict }
-        fingerprints[history.fingerprint.id] = history.fingerprint
-        if injectedFailure == .fingerprint { return .repositoryIntegrityConflict }
+        for (index, fingerprint) in history.fingerprints.enumerated() {
+            fingerprints[fingerprint.id] = fingerprint
+            if index == min(1, history.fingerprints.count - 1), injectedFailure == .fingerprint {
+                return .repositoryIntegrityConflict
+            }
+        }
         sessions[history.importSession.id] = ImportSessionRecordDTO(
             id: history.importSession.id, workspaceId: history.importSession.workspaceId,
             userVisibleName: history.importSession.userVisibleName, startedAtISO: history.importSession.startedAtISO,
