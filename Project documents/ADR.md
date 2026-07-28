@@ -25,12 +25,12 @@ When reading this file:
 4. use `PROJECT_STATE.md` for verified implementation reality;
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
-**Status alignment date:** 2026-07-26
-**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb` — Sprint 59 cycle-close baseline
-**Latest verified production implementation:** Sprint 58 Deterministic Import Verification Workspace
-**Latest completed numbered outcome:** Sprint 59 architecture-only ADR-041 acceptance
+**Status alignment date:** 2026-07-28
+**Repository ref reviewed:** `main@7e1345e3817d3c3e91c24f881b962a48279fd73b` — Sprint 63 implementation closure
+**Latest verified production implementation:** Sprint 63 Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
+**Latest completed numbered outcome:** Sprint 63
 **Latest accepted ADR:** ADR-041
-**Current migration:** V8
+**Current migration:** V9
 
 No alignment note authorizes implementation.
 
@@ -78,7 +78,7 @@ No alignment note authorizes implementation.
 | ADR-038 | Atomic Confirmed Import and Durable Identifier Ownership | Accepted and implemented in Sprint 50. | Migration V5, provider-owned atomic confirmed import, durable identifier ownership/observations, provider parity and subprocess contention acceptance are operational. |
 | ADR-039 | Trusted Statement Dates and Durable Source Provenance | Accepted and implemented in Sprint 52, with Sprint 52A corrective closure. | Migration V6, StatementDate, date-role/timezone evidence, parser-profile provenance, source ordinal/digest relationships and strict hydration are operational. |
 | ADR-040 | Explicit Reviewed Partial-Overlap Import | Accepted; architecture and V7 compatibility structures remain readable and validated, but the former Axis production partial-overlap family is suspended. | Mixed supported overlap currently fails closed pending new immutable source evidence and an independently derived direction/event oracle. |
-| ADR-041 | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority | Accepted architecture; implementation pending. | No production implementation in Sprint 59. The binary-fingerprint foundation must precede production PDF support. |
+| ADR-041 | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority | Accepted and implemented in Sprint 63. | Immutable source snapshots and exact source-byte fingerprint authority are operational for new CSV preparation, confirmation and persistence; production PDF support remains unsupported. |
 
 ## Alignment Policy
 
@@ -4731,6 +4731,15 @@ This decision does not authorize historical repair, arbitrary row selection, own
 ## Status
 
 Accepted
+
+## Current Alignment — 2026-07-28
+
+- **Reviewed implementation ref:** `7e1345e3817d3c3e91c24f881b962a48279fd73b`.
+- **Latest production implementation:** Sprint 63; latest completed numbered increment: Sprint 63; current migration: V9.
+- **Decision standing:** Accepted and implemented in Sprint 63.
+- **Operational boundary:** New CSV preparation, confirmation and persistence use one transient immutable `SourceContentSnapshot` and exact `ledgerforge.source-bytes.sha256.v1` source-byte authority. The raw-text `ledgerforge.raw-text.sha256.v1` fingerprint remains the CSV duplicate authority; source-byte is the secondary CSV fingerprint.
+- **Compatibility:** Existing historical raw-text-only documents remain valid and unchanged. Source bytes remain transient, confirmation remains bound to the retained snapshot, and no historical source-byte reconstruction or durable source-byte storage is performed.
+- **Production-support boundary:** No production PDF support is established by this implementation.
 
 ## Context
 

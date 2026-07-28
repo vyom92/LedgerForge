@@ -54,10 +54,10 @@ A work item becomes executable only when Chat supplies one complete approved pro
 
 ## Full Candidate Verification Audit
 
-**Audit date:** 2026-07-26
-**Current pushed ref:** `main@b661472a58fc24144361322f1853b8001437a3eb`
-**Latest verified production implementation:** Sprint 58 — Deterministic Import Verification Workspace
-**Latest completed numbered outcome:** Sprint 59 — ADR-041 architecture-only acceptance
+**Audit date:** 2026-07-28
+**Current pushed ref:** `main@7e1345e3817d3c3e91c24f881b962a48279fd73b`
+**Latest verified production implementation:** Sprint 63 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
+**Latest completed numbered outcome:** Sprint 63
 **Latest repository maintenance:** `a0ceb0c0cea5d09e7c2baecc93d9c8c0d984125c` safe disposable development-database reset
 **Candidate entries reviewed:** 155  
 **Fresh build/test/runtime evidence:** None; this was a read-only planning audit.
@@ -79,7 +79,7 @@ Material corrections in this revision include:
 - repository-hygiene work narrowed after tracked Xcode user data was removed;
 - backup/restore promoted to targeted discovery after the database lifecycle and migration-integrity foundations matured;
 - Sprint 57A category reconciliation closure and Sprint 58 deterministic DEBUG-only import verification completion;
-- ADR-041 selection of source-byte authority, with the implementation foundation still unscheduled and production PDF support still blocked;
+- Sprint 63 implementation and acceptance of the ADR-041 source-byte foundation, with production PDF support still blocked;
 - the Axis direction-audit subfamily narrowed because no retained affected historical database is currently identified.
 
 This audit does not authorize execution, assign sprint numbers or supersede the roadmap.
@@ -589,7 +589,7 @@ Targeted discovery must determine:
 - account-identity evidence;
 - source-date, order and provenance compatibility with ADR-039;
 - independent financial-truth acceptance;
-- exact dependencies on `FW-P1-18` and the selected reader authority.
+- exact dependencies on the accepted ADR-041 source-byte foundation and the selected reader authority.
 
 Fixture availability makes discovery eligible. It does not establish production HDFC support.
 
@@ -766,14 +766,14 @@ Do not claim production card support from fixture integration, schema capacity, 
 
 ## FW-P1-10 — Production PDF Statement Support
 
-**Status:** Blocked  
-**Discovery:** Complete  
-**Planning state:** Implementation remains blocked by the unimplemented source-byte foundation.
-**Depends on:** Accepted ADR-041; implementation and acceptance of the immutable source-snapshot and source-byte fingerprint foundation; selection and revalidation of one approved PDF family; and ordinary URL-driven production-path acceptance.
+**Status:** Ready for discovery
+**Discovery:** Complete
+**Planning state:** Sprint 64 discovery must select and revalidate one exact PDF family before implementation.
+**Depends on:** Accepted ADR-041; exact-family readiness; independent source truth; reader/profile validation; and ordinary URL-driven production-path acceptance.
 
 Promote PDF from extraction foundation to a production-supported import source.
 
-After the ADR-041 foundation is implemented, planning must select one fixture-backed PDF family and require:
+Sprint 64 discovery must select one fixture-backed PDF family and require:
 
 - approved PDF content entering the unified import pipeline;
 - consistent picker, source-format registry and reader behavior;
@@ -888,42 +888,6 @@ Investigate scanned or image-only statements.
 OCR output remains untrusted until deterministic parsing and validation succeed.
 
 ---
-
-## FW-P1-18 — Binary-Document Fingerprint Semantics
-
-**Status:** Ready for discovery
-**Discovery:** Representation decision complete in ADR-041.
-**Planning state:** Remaining implementation-foundation discovery only.
-**Depends on:** Accepted ADR-041 and a targeted schema/lifecycle contract for the unimplemented foundation.
-
-Define deterministic exact-content fingerprint input for binary documents when reader-produced text is absent, incomplete or unsuitable as exact-content authority.
-
-ADR-041 selects exact source bytes under `ledgerforge.source-bytes.sha256.v1`. Remaining discovery must define:
-
-- immutable source-content ownership through preparation and confirmation;
-- metadata that may change without changing represented statement content;
-- encrypted and password-protected documents;
-- format-specific container differences;
-- coexistence with `ledgerforge.raw-text.sha256.v1`;
-- versioned algorithm selection;
-- commit-time revalidation;
-- SQLite/In-Memory parity;
-- privacy-safe diagnostics.
-
-The remaining discovery must also resolve:
-
-- the legacy role of `documents.sha256`;
-- migration or compatibility shape without inventing V9;
-- singular-to-multiple fingerprint ownership across plans and providers;
-- `SourceContentSnapshot` storage and security-scope ownership;
-- cleanup and concurrent preparation;
-- confirmation-time snapshot revalidation;
-- typed rejected outcomes;
-- SQLite/In-Memory parity and zero-residue acceptance.
-
-Binary fingerprinting must never be inferred from parsed transactions, totals, filenames, paths or presentation metadata.
-
-No historical fingerprint reconstruction is authorized. The source-byte foundation remains unimplemented and must be accepted before it can form the implementation portion of `FW-P1-10`.
 
 ---
 
