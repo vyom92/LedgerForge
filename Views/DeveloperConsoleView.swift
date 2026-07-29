@@ -14,9 +14,14 @@ struct DeveloperConsoleView: View {
     @ObservedObject private var accountStore = AccountStore.shared
     @ObservedObject private var transactionStore = TransactionStore.shared
 #if DEBUG
+    @ObservedObject private var profileViewModel: DeveloperDatabaseProfileViewModel
     private let onLaunchFixture: (DebugApprovedFixture) -> Void
 
-    init(onLaunchFixture: @escaping (DebugApprovedFixture) -> Void = { _ in }) {
+    init(
+        profileViewModel: DeveloperDatabaseProfileViewModel,
+        onLaunchFixture: @escaping (DebugApprovedFixture) -> Void = { _ in }
+    ) {
+        self.profileViewModel = profileViewModel
         self.onLaunchFixture = onLaunchFixture
     }
 #endif
@@ -57,6 +62,9 @@ struct DeveloperConsoleView: View {
                 VStack(spacing: 14) {
                     runtimeInspectorPanel
                     repositorySummaryPanel
+#if DEBUG
+                    databaseProfilePanel
+#endif
                     toolsPanel
                 }
                 .frame(width: 330)
@@ -70,16 +78,18 @@ struct DeveloperConsoleView: View {
         .background(LFTheme.backgroundGradient)
 #if DEBUG
         .confirmationDialog(
-            "Reset Development Database?",
+            profileViewModel.resetActionLabel.map { "\($0)?" } ?? "Reset Development Profile?",
             isPresented: $showsResetConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Reset Development Database", role: .destructive) {
-                resetDevelopmentDatabase()
+            if let resetActionLabel = profileViewModel.resetActionLabel {
+                Button(resetActionLabel, role: .destructive) {
+                    resetActiveProfile()
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Only the canonical Debug development database is replaced. A verified lifecycle-owned backup is created first. Non-development and Release data are excluded, and the empty database remains empty after relaunch.")
+            Text("Only the active development profile is recreated. Current Database is never reset by this control.")
         }
 #endif
         .onChange(of: selectedLevel) { _, _ in
@@ -328,30 +338,6 @@ struct DeveloperConsoleView: View {
                     reloadData()
                 }
 
-#if DEBUG
-                LFConsoleButton(
-                    title: "Start Temporary Empty Session",
-                    systemImage: "sparkles",
-                    fill: LFTheme.surfaceRaised.opacity(0.65),
-                    isFullWidth: true,
-                    isDisabled: isRunningRepositoryAction || DevelopmentDatabaseLifecycleCoordinator.shared.isOperationInProgress
-                ) {
-                    startTemporaryEmptySession()
-                }
-
-                LFConsoleButton(
-                    title: "Reset Development Database",
-                    systemImage: "exclamationmark.triangle",
-                    fill: LFTheme.danger,
-                    foreground: .white,
-                    isFullWidth: true,
-                    showsBorder: false,
-                    isDisabled: isRunningRepositoryAction || DevelopmentDatabaseLifecycleCoordinator.shared.isOperationInProgress
-                ) {
-                    showsResetConfirmation = true
-                }
-#endif
-
                 if let actionError {
                     Text(actionError)
                         .font(.caption)
@@ -361,6 +347,81 @@ struct DeveloperConsoleView: View {
             }
         }
     }
+
+#if DEBUG
+    private var databaseProfilePanel: some View {
+        LFPanel(title: "Database Profile") {
+            VStack(alignment: .leading, spacing: 10) {
+                LFInfoRow(title: "Active", value: profileViewModel.activeProfileLabel, verticalPadding: 4)
+                if let sourceSchema = profileViewModel.activeSourceSchemaLabel {
+                    LFInfoRow(title: "Source Schema", value: sourceSchema, verticalPadding: 4)
+                }
+                LFInfoRow(title: "Current Schema", value: profileViewModel.currentSchemaLabel, verticalPadding: 4)
+
+                Picker(
+                    "Profile",
+                    selection: Binding(
+                        get: { profileViewModel.selectedProfileKind },
+                        set: { profileViewModel.selectProfile($0) }
+                    )
+                ) {
+                    ForEach(DevelopmentDatabaseProfileKind.allCases, id: \.rawValue) { kind in
+                        Text(kind.displayName).tag(kind)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                if profileViewModel.showsMigrationSourceSelection {
+                    Picker(
+                        "Source Version",
+                        selection: Binding(
+                            get: { profileViewModel.selectedMigrationSourceVersion },
+                            set: { profileViewModel.selectMigrationSourceVersion($0) }
+                        )
+                    ) {
+                        ForEach(profileViewModel.availableMigrationSourceVersions, id: \.self) { version in
+                            Text("V\(version)").tag(version)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                LFConsoleButton(
+                    title: "Activate",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    fill: LFTheme.primary,
+                    foreground: .white,
+                    isFullWidth: true,
+                    showsBorder: false,
+                    isDisabled: isRunningRepositoryAction || DevelopmentDatabaseLifecycleCoordinator.shared.isOperationInProgress
+                ) {
+                    profileViewModel.activateSelectedProfile()
+                }
+
+                if let resetActionLabel = profileViewModel.resetActionLabel {
+                    LFConsoleButton(
+                        title: resetActionLabel,
+                        systemImage: "exclamationmark.triangle",
+                        fill: LFTheme.danger,
+                        foreground: .white,
+                        isFullWidth: true,
+                        showsBorder: false,
+                        isDisabled: isRunningRepositoryAction || DevelopmentDatabaseLifecycleCoordinator.shared.isOperationInProgress
+                    ) {
+                        showsResetConfirmation = true
+                    }
+                }
+
+                if let message = profileViewModel.operationState.message {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(LFTheme.warning)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+#endif
 
     private func applyLevelFilter() {
         switch selectedLevel {
@@ -414,39 +475,19 @@ struct DeveloperConsoleView: View {
     }
 
 #if DEBUG
-    private func resetDevelopmentDatabase() {
+    private func resetActiveProfile() {
         isRunningRepositoryAction = true
         actionError = nil
-        let lifecycleResult = LedgerForgeApp.resetDevelopmentDatabase()
-        switch lifecycleResult {
-        case .permanentResetCompleted(let result):
-            hydrationStatus = "Reset hydration completed"
-            latestRefreshResult = "\(result.accountCount) account(s), \(result.transactionCount) transaction(s)"
-            DeveloperConsole.shared.info(.database, "Development database reset", metadata: ["accounts": "\(result.accountCount)", "transactions": "\(result.transactionCount)"])
-        default:
-            hydrationStatus = "Reset failed"
-            latestRefreshResult = "Reset failed"
-            actionError = "The development database lifecycle operation could not complete (\(lifecycleResult.description))."
-            DeveloperConsole.shared.error(.database, "Development database reset failed", metadata: ["result": lifecycleResult.description])
-        }
-        isRunningRepositoryAction = false
-    }
-
-    private func startTemporaryEmptySession() {
-        isRunningRepositoryAction = true
-        actionError = nil
-        let lifecycleResult = LedgerForgeApp.startTemporaryEmptySession()
-        switch lifecycleResult {
-        case .temporarySessionStarted(let result):
-            hydrationStatus = "Temporary session hydration completed"
-            latestRefreshResult = "\(result.accountCount) account(s), \(result.transactionCount) transaction(s)"
-            DeveloperConsole.shared.info(.database, "Temporary empty session started", metadata: ["accounts": "\(result.accountCount)", "transactions": "\(result.transactionCount)"])
-        default:
-            hydrationStatus = "Temporary session failed"
-            latestRefreshResult = "Temporary session failed"
-            actionError = "The temporary development session could not start (\(lifecycleResult.description))."
-            DeveloperConsole.shared.error(.database, "Temporary empty session failed", metadata: ["result": lifecycleResult.description])
-        }
+        profileViewModel.resetActiveProfile()
+        let resetCommitted = profileViewModel.operationState == .resetSucceeded
+            || profileViewModel.operationState == .resetSucceededWithCleanupWarning
+        hydrationStatus = resetCommitted
+            ? "Profile reset hydration completed"
+            : "Profile reset unavailable"
+        latestRefreshResult = profileViewModel.operationState.message ?? "Profile reset completed"
+        actionError = resetCommitted
+            ? nil
+            : profileViewModel.operationState.message
         isRunningRepositoryAction = false
     }
 #endif
@@ -485,6 +526,10 @@ private enum CategoryPicker: Hashable {
 
 struct DeveloperConsoleView_Previews: PreviewProvider {
     static var previews: some View {
+#if DEBUG
+        DeveloperConsoleView(profileViewModel: DeveloperDatabaseProfileViewModel())
+#else
         DeveloperConsoleView()
+#endif
     }
 }

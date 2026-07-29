@@ -152,6 +152,10 @@ struct PersistenceAvailabilityTests {
         #expect(LedgerForgeApp.configurePersistence(path: path))
         #expect(DatabaseProvider.shared.persistenceState == .verifiedSQLite)
         #expect(try DatabaseProvider.shared.accountRepo.accounts(workspaceId: "default-workspace").isEmpty)
+#if DEBUG
+        #expect(DevelopmentDatabaseLifecycleCoordinator.shared.activeProfile?.kind == .current)
+        #expect(DevelopmentDatabaseLifecycleCoordinator.shared.currentDatabaseURL == URL(fileURLWithPath: path).standardizedFileURL)
+#endif
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -173,7 +177,8 @@ struct PersistenceAvailabilityTests {
             .unavailable(.migrationIntegrityFailed),
             .intentionalNonDurable(.testMemory),
             .intentionalNonDurable(.debugMemory),
-            .intentionalNonDurable(.debugTemporarySQLite)
+            .intentionalNonDurable(.debugTemporarySQLite),
+            .intentionalNonDurable(.debugMigrationSandboxSQLite)
         ]
 
         #expect(PersistenceState.verifiedSQLite.displayName == "Verified SQLite")

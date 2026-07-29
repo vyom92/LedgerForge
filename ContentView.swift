@@ -126,6 +126,24 @@ private enum AppShellSection: String, CaseIterable {
     }
 }
 
+#if DEBUG
+private enum ProtectedImportIntent {
+    case presentFileImporter
+    case prepareURL(URL)
+    case prepareFixture(DebugApprovedFixture)
+    case confirm(PreparedImport)
+
+    var protectedAction: DevelopmentProtectedAction {
+        switch self {
+        case .presentFileImporter, .prepareURL, .prepareFixture:
+            return .importPreparation
+        case .confirm:
+            return .importConfirmation
+        }
+    }
+}
+#endif
+
 enum ImportPresentationState {
     case idle
     case preparing(fileName: String, phase: ImportProgressPhase)
@@ -434,22 +452,16 @@ struct DurableImportAttemptPresentation: Equatable {
                 tone: .warning
             )
         case .accountChoiceRequired:
-            let accountPresentation = ImportAccountOutcomePresentationMapper.presentation(
-                outcomeCode: outcome.rawValue
-            )
             return DurableImportPresentationValue(
-                label: accountPresentation.label,
-                explanation: accountPresentation.explanation,
+                label: "Choose an account",
+                explanation: "No existing account owns this verified identifier. Choose an eligible account or create a new one.",
                 iconName: "person.crop.circle.badge.questionmark",
                 tone: .warning
             )
         case .identifierOwnershipConflict:
-            let accountPresentation = ImportAccountOutcomePresentationMapper.presentation(
-                outcomeCode: outcome.rawValue
-            )
             return DurableImportPresentationValue(
-                label: accountPresentation.label,
-                explanation: accountPresentation.explanation,
+                label: "Identifier ownership conflict",
+                explanation: "Verified identifier ownership changed or conflicted before confirmation. No financial history was written.",
                 iconName: "person.crop.circle.badge.exclamationmark",
                 tone: .warning
             )
@@ -795,7 +807,12 @@ struct ContentView: View {
     @ObservedObject private var importAttemptStore: ImportAttemptStore = .shared
     @State private var selectedSection: AppShellSection = .dashboard
     @State private var didStartRepositoryHydration = false
-    @State private var developerModeEnabled = false
+#if DEBUG
+    @StateObject private var developerDatabaseProfileViewModel = DeveloperDatabaseProfileViewModel()
+    @State private var pendingProtectedImportIntent: ProtectedImportIntent?
+    @State private var developmentAcknowledgementChallenge: DevelopmentProfileAcknowledgementChallenge?
+    @State private var developmentActionMessage: String?
+#endif
 
     var body: some View {
         HStack(spacing: 0) {
@@ -811,6 +828,13 @@ struct ContentView: View {
                 Rectangle()
                     .fill(LFTheme.divider)
                     .frame(height: 1)
+
+#if DEBUG
+                if let activeProfile = developerDatabaseProfileViewModel.activeProfile,
+                   let warning = DeveloperDatabaseProfileWarningView(profile: activeProfile) {
+                    warning
+                }
+#endif
 
                 content
             }
@@ -829,7 +853,11 @@ struct ContentView: View {
         ) { result in
             switch result {
             case .success(let url):
+#if DEBUG
+                requestProtectedImportAction(.prepareURL(url))
+#else
                 beginPreparation(from: url)
+#endif
 
             case .failure(let error):
                 let summary = ImportFailureSummary.from(error)
@@ -841,6 +869,45 @@ struct ContentView: View {
         .task {
             hydrateDashboardOnce()
         }
+#if DEBUG
+        .confirmationDialog(
+            DevelopmentProfileAcknowledgementPresentation.title,
+            isPresented: Binding(
+                get: { developmentAcknowledgementChallenge != nil && pendingProtectedImportIntent != nil },
+                set: { if !$0 { cancelDevelopmentProfileAcknowledgement() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) {
+                approveDevelopmentProfileAcknowledgement()
+            }
+            Button("Cancel", role: .cancel) {
+                cancelDevelopmentProfileAcknowledgement()
+            }
+        } message: {
+            Text(DevelopmentProfileAcknowledgementPresentation.message)
+        }
+        .confirmationDialog(
+            DevelopmentProfileAcknowledgementPresentation.title,
+            isPresented: Binding(
+                get: { accountsViewModel.requiresDevelopmentProfileAcknowledgement },
+                set: { if !$0 { accountsViewModel.cancelDevelopmentProfileAcknowledgement() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) {
+                accountsViewModel.approveDevelopmentProfileAcknowledgement()
+            }
+            Button("Cancel", role: .cancel) {
+                accountsViewModel.cancelDevelopmentProfileAcknowledgement()
+            }
+        } message: {
+            Text(DevelopmentProfileAcknowledgementPresentation.message)
+        }
+        .onChange(of: developerDatabaseProfileViewModel.publicationEpoch) { _, _ in
+            clearStaleImportPresentationAfterProfileChange()
+        }
+#endif
     }
 
     private var sidebar: some View {
@@ -890,9 +957,11 @@ struct ContentView: View {
 
             sidebarGroup([.settings])
 
-            if developerModeEnabled {
+#if DEBUG
+            if developerDatabaseProfileViewModel.developerModeEnabled {
                 sidebarButton(.developer)
             }
+#endif
 
             Spacer()
 
@@ -932,8 +1001,7 @@ struct ContentView: View {
             toolbarButton("Filters pending", systemImage: "line.3.horizontal.decrease", disabled: true)
 
             Button {
-                showingImporter = true
-                selectedSection = .imports
+                requestFileSelection()
             } label: {
                 Label("Import Statement", systemImage: "square.and.arrow.down")
                     .font(.subheadline.weight(.semibold))
@@ -968,8 +1036,8 @@ struct ContentView: View {
             settingsContent
         case .developer:
 #if DEBUG
-            DeveloperConsoleView { fixture in
-                beginPreparation(for: fixture)
+            DeveloperConsoleView(profileViewModel: developerDatabaseProfileViewModel) { fixture in
+                requestProtectedImportAction(.prepareFixture(fixture))
             }
 #else
             DeveloperConsoleView()
@@ -1046,8 +1114,7 @@ struct ContentView: View {
                                     actionTitle: "Import Statement",
                                     systemImage: "wallet.pass"
                                 ) {
-                                    showingImporter = true
-                                    selectedSection = .imports
+                                    requestFileSelection()
                                 }
                             } else {
                                 ForEach(accountsViewModel.accounts) { account in
@@ -1071,6 +1138,19 @@ struct ContentView: View {
         VStack(spacing: 18) {
             importStepper
 
+#if DEBUG
+            if let developmentActionMessage {
+                Text(developmentActionMessage)
+                    .font(.caption)
+                    .foregroundStyle(LFTheme.warning)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(LFTheme.warning.opacity(0.10))
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+            }
+#endif
+
             HStack(alignment: .top, spacing: 18) {
                 LFPanel {
                     ScrollView {
@@ -1082,7 +1162,7 @@ struct ContentView: View {
                                 .foregroundStyle(LFTheme.textSecondary)
 
                             Button {
-                                showingImporter = true
+                                requestFileSelection()
                             } label: {
                                 VStack(spacing: 14) {
                                     Image(systemName: "icloud.and.arrow.up")
@@ -1209,14 +1289,31 @@ struct ContentView: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top, spacing: 18) {
+#if DEBUG
                     VStack(spacing: 18) {
                         LFPanel(title: "Application") {
                             VStack(spacing: 0) {
-                                settingsToggleRow("Developer Mode", icon: "chevron.left.forwardslash.chevron.right", isOn: $developerModeEnabled)
+                                settingsToggleRow(
+                                    "Developer Mode",
+                                    icon: "chevron.left.forwardslash.chevron.right",
+                                    isOn: Binding(
+                                        get: { developerDatabaseProfileViewModel.developerModeEnabled },
+                                        set: { updateDeveloperMode($0) }
+                                    )
+                                )
+                                if let message = developerDatabaseProfileViewModel.operationState.message {
+                                    Text(message)
+                                        .font(.caption)
+                                        .foregroundStyle(LFTheme.warning)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 12)
+                                        .padding(.bottom, 10)
+                                }
                             }
                         }
                     }
                     .frame(width: 330)
+#endif
 
                     VStack(spacing: 18) {
                         LFPanel(title: "System Information") {
@@ -1362,8 +1459,7 @@ struct ContentView: View {
         LFPanel(title: "Quick Actions") {
             VStack(spacing: 4) {
                 LFActionRow(title: "Import Statement", systemImage: "square.and.arrow.down") {
-                    showingImporter = true
-                    selectedSection = .imports
+                    requestFileSelection()
                 }
                 LFActionRow(title: "Add Account", systemImage: "plus") {
                     selectedSection = .accounts
@@ -2406,9 +2502,13 @@ struct ContentView: View {
             switch importState {
             case .previewReady(let preparedImport):
                 Button {
+#if DEBUG
+                    requestProtectedImportAction(.confirm(preparedImport))
+#else
                     Task {
                         await confirmPreparedImport(preparedImport)
                     }
+#endif
                 } label: {
                     Label(importConfirmationLabel, systemImage: "checkmark.circle")
                         .labelStyle(.titleAndIcon)
@@ -2441,7 +2541,11 @@ struct ContentView: View {
             case .failed(_, _, let retrySourceURL) where retrySourceURL != nil:
                 Button {
                     if let retrySourceURL {
+#if DEBUG
+                        requestProtectedImportAction(.prepareURL(retrySourceURL))
+#else
                         beginPreparation(from: retrySourceURL)
+#endif
                     }
                 } label: {
                     Label("Retry Preparation", systemImage: "arrow.clockwise")
@@ -2760,6 +2864,94 @@ struct ContentView: View {
             DeveloperConsole.shared.log(error.localizedDescription)
         }
     }
+
+    private func requestFileSelection() {
+        selectedSection = .imports
+#if DEBUG
+        requestProtectedImportAction(.presentFileImporter)
+#else
+        showingImporter = true
+#endif
+    }
+
+#if DEBUG
+    private func updateDeveloperMode(_ requestedValue: Bool) {
+        developerDatabaseProfileViewModel.setDeveloperModeEnabled(requestedValue)
+        if !developerDatabaseProfileViewModel.developerModeEnabled,
+           selectedSection == .developer {
+            selectedSection = .settings
+        }
+    }
+
+    private func requestProtectedImportAction(_ intent: ProtectedImportIntent) {
+        developmentActionMessage = nil
+        switch DevelopmentProfileAcknowledgementGate.shared.authorization(
+            for: intent.protectedAction
+        ) {
+        case .allowed:
+            executeProtectedImportIntent(intent)
+        case .acknowledgementRequired(let challenge):
+            pendingProtectedImportIntent = intent
+            developmentAcknowledgementChallenge = challenge
+        case .developmentDatabaseUnavailable:
+            developmentActionMessage = "The development database is unavailable."
+            selectedSection = .imports
+        }
+    }
+
+    private func executeProtectedImportIntent(_ intent: ProtectedImportIntent) {
+        switch intent {
+        case .presentFileImporter:
+            showingImporter = true
+            selectedSection = .imports
+        case .prepareURL(let url):
+            beginPreparation(from: url)
+        case .prepareFixture(let fixture):
+            beginPreparation(for: fixture)
+        case .confirm(let preparedImport):
+            Task { await confirmPreparedImport(preparedImport) }
+        }
+    }
+
+    private func approveDevelopmentProfileAcknowledgement() {
+        guard let challenge = developmentAcknowledgementChallenge,
+              let intent = pendingProtectedImportIntent else { return }
+        switch DevelopmentProfileAcknowledgementGate.shared.acknowledge(challenge) {
+        case .granted, .noAcknowledgementRequired:
+            pendingProtectedImportIntent = nil
+            developmentAcknowledgementChallenge = nil
+            executeProtectedImportIntent(intent)
+        case .staleGeneration, .developmentDatabaseUnavailable:
+            pendingProtectedImportIntent = nil
+            developmentAcknowledgementChallenge = nil
+            developmentActionMessage = "The active development database changed. Start the action again."
+            selectedSection = .imports
+        }
+    }
+
+    private func cancelDevelopmentProfileAcknowledgement() {
+        pendingProtectedImportIntent = nil
+        developmentAcknowledgementChallenge = nil
+    }
+
+    private func clearStaleImportPresentationAfterProfileChange() {
+        switch importState {
+        case .committing:
+            return
+        case .preparing:
+            preparationOwner.cancel()
+        case .previewReady(let preparedImport), .validationFailed(let preparedImport):
+            ImportEngine.shared.cancelPreparedImport(preparedImport)
+        default:
+            break
+        }
+        importState = .idle
+        selectedFile = "No statement imported"
+        importIdentityReview = .unavailable
+        importAccountChoice = nil
+        partialImportReview = .ordinaryFullImport
+    }
+#endif
 
     private func consumePreparedImportBeforeSourceReplacement() -> Bool {
         switch importState {

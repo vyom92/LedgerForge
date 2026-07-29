@@ -3,9 +3,30 @@
 
 import SwiftUI
 
+private enum CategoryMutationIntent {
+    case create(name: String)
+    case rename(categoryID: String, name: String)
+    case setArchived(categoryID: String, isArchived: Bool)
+    case delete(categoryID: String)
+
+#if DEBUG
+    var protectedAction: DevelopmentProtectedAction {
+        switch self {
+        case .create: return .categoryCreate
+        case .rename: return .categoryRename
+        case .setArchived(_, let isArchived): return isArchived ? .categoryArchive : .categoryRestore
+        case .delete: return .categoryDelete
+        }
+    }
+#endif
+}
+
 struct CategoryManagementView: View {
     @ObservedObject private var categoryStore: CategoryStore
     private let coordinator: CategoryManaging
+#if DEBUG
+    private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
+#endif
 
     @State private var newName = ""
     @State private var editingCategoryID: String?
@@ -13,7 +34,24 @@ struct CategoryManagementView: View {
     @State private var categoryPendingDeletion: Category?
     @State private var message: String?
     @State private var categoryReconciliationRequired = false
+#if DEBUG
+    @State private var pendingMutation: CategoryMutationIntent?
+    @State private var acknowledgementChallenge: DevelopmentProfileAcknowledgementChallenge?
+#endif
 
+#if DEBUG
+    @MainActor
+    init(
+        categoryStore: CategoryStore? = nil,
+        coordinator: CategoryManaging? = nil,
+        acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil
+    ) {
+        let resolvedStore = categoryStore ?? .shared
+        self.categoryStore = resolvedStore
+        self.coordinator = coordinator ?? CategoryManagementCoordinator(categoryStore: resolvedStore)
+        self.acknowledgementGate = acknowledgementGate ?? .shared
+    }
+#else
     @MainActor
     init(
         categoryStore: CategoryStore? = nil,
@@ -23,6 +61,7 @@ struct CategoryManagementView: View {
         self.categoryStore = resolvedStore
         self.coordinator = coordinator ?? CategoryManagementCoordinator(categoryStore: resolvedStore)
     }
+#endif
 
     var body: some View {
         LFPanel(title: "Category Management") {
@@ -78,9 +117,7 @@ struct CategoryManagementView: View {
         ) {
             Button("Delete", role: .destructive) {
                 guard let category = categoryPendingDeletion else { return }
-                perform {
-                    try coordinator.deleteUnused(categoryID: category.id)
-                }
+                request(.delete(categoryID: category.id))
                 categoryPendingDeletion = nil
             }
             Button("Cancel", role: .cancel) {
@@ -89,6 +126,25 @@ struct CategoryManagementView: View {
         } message: {
             Text("Only unused categories can be deleted. Assigned transactions are never changed.")
         }
+#if DEBUG
+        .confirmationDialog(
+            DevelopmentProfileAcknowledgementPresentation.title,
+            isPresented: Binding(
+                get: { acknowledgementChallenge != nil && pendingMutation != nil },
+                set: { if !$0 { cancelDevelopmentProfileAcknowledgement() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) {
+                approveDevelopmentProfileAcknowledgement()
+            }
+            Button("Cancel", role: .cancel) {
+                cancelDevelopmentProfileAcknowledgement()
+            }
+        } message: {
+            Text(DevelopmentProfileAcknowledgementPresentation.message)
+        }
+#endif
     }
 
     @ViewBuilder
@@ -141,12 +197,10 @@ struct CategoryManagementView: View {
                 .help("Rename")
 
                 Button {
-                    perform {
-                        _ = try coordinator.setArchived(
-                            categoryID: category.id,
-                            isArchived: !category.isArchived
-                        )
-                    }
+                    request(.setArchived(
+                        categoryID: category.id,
+                        isArchived: !category.isArchived
+                    ))
                 } label: {
                     Image(systemName: category.isArchived ? "arrow.uturn.backward" : "archivebox")
                 }
@@ -168,31 +222,67 @@ struct CategoryManagementView: View {
     }
 
     private func create() {
-        let candidate = newName
-        perform {
-            _ = try coordinator.create(name: candidate)
-            newName = ""
-        }
+        request(.create(name: newName))
     }
 
     private func saveRename(_ category: Category) {
-        let candidate = editedName
-        perform {
-            _ = try coordinator.rename(categoryID: category.id, name: candidate)
-            editingCategoryID = nil
-        }
+        request(.rename(categoryID: category.id, name: editedName))
     }
 
     private func isInUse(_ category: Category) -> Bool {
         categoryStore.snapshot.assignments.values.contains(category.id)
     }
 
-    private func perform(_ action: () throws -> Void) {
+    private func request(_ intent: CategoryMutationIntent) {
+#if DEBUG
+        switch acknowledgementGate.authorization(for: intent.protectedAction) {
+        case .allowed:
+            execute(intent)
+        case .acknowledgementRequired(let challenge):
+            pendingMutation = intent
+            acknowledgementChallenge = challenge
+        case .developmentDatabaseUnavailable:
+            message = "The development database is unavailable."
+        }
+#else
+        execute(intent)
+#endif
+    }
+
+    private func execute(_ intent: CategoryMutationIntent) {
         do {
-            try action()
+            switch intent {
+            case .create(let name):
+                _ = try coordinator.create(name: name)
+                newName = ""
+            case .rename(let categoryID, let name):
+                _ = try coordinator.rename(categoryID: categoryID, name: name)
+                editingCategoryID = nil
+            case .setArchived(let categoryID, let isArchived):
+                _ = try coordinator.setArchived(categoryID: categoryID, isArchived: isArchived)
+            case .delete(let categoryID):
+                try coordinator.deleteUnused(categoryID: categoryID)
+            }
             message = nil
             categoryReconciliationRequired = false
         } catch {
+#if DEBUG
+            if let coordinatorError = error as? CategoryManagementCoordinatorError {
+                switch coordinatorError {
+                case .acknowledgementRequired(let challenge):
+                    pendingMutation = intent
+                    acknowledgementChallenge = challenge
+                    return
+                case .staleDevelopmentProfile:
+                    pendingMutation = nil
+                    acknowledgementChallenge = nil
+                    message = "The active development database changed. Start the category action again."
+                    return
+                default:
+                    break
+                }
+            }
+#endif
             message = error.localizedDescription
             if let error = error as? CategoryManagementCoordinatorError {
                 categoryReconciliationRequired = switch error {
@@ -202,6 +292,28 @@ struct CategoryManagementView: View {
             }
         }
     }
+
+#if DEBUG
+    private func approveDevelopmentProfileAcknowledgement() {
+        guard let challenge = acknowledgementChallenge,
+              let intent = pendingMutation else { return }
+        switch acknowledgementGate.acknowledge(challenge) {
+        case .granted, .noAcknowledgementRequired:
+            pendingMutation = nil
+            acknowledgementChallenge = nil
+            execute(intent)
+        case .staleGeneration, .developmentDatabaseUnavailable:
+            pendingMutation = nil
+            acknowledgementChallenge = nil
+            message = "The active development database changed. Start the category action again."
+        }
+    }
+
+    private func cancelDevelopmentProfileAcknowledgement() {
+        pendingMutation = nil
+        acknowledgementChallenge = nil
+    }
+#endif
 
     private func retryCanonicalHydration() {
         do {

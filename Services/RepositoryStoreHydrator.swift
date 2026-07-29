@@ -2,7 +2,49 @@
 // RepositoryStoreHydrator.swift
 
 import CryptoKit
+import Combine
 import Foundation
+
+/// A small observable backing wrapper that supports installing a value without
+/// notifying synchronous subscribers. Publication is released explicitly only
+/// after every value participating in a repository runtime snapshot is coherent.
+@propertyWrapper
+final class ObserverAtomicPublished<Value> {
+    private var value: Value
+    private let updates = PassthroughSubject<Value, Never>()
+
+    init(wrappedValue: Value) {
+        value = wrappedValue
+    }
+
+    var wrappedValue: Value {
+        get { value }
+        set {
+            value = newValue
+            updates.send(newValue)
+        }
+    }
+
+    var projectedValue: AnyPublisher<Value, Never> {
+        Deferred { [weak self] () -> AnyPublisher<Value, Never> in
+            guard let self else {
+                return Empty<Value, Never>(completeImmediately: true).eraseToAnyPublisher()
+            }
+            return self.updates
+                .prepend(self.value)
+                .eraseToAnyPublisher()
+        }
+        .eraseToAnyPublisher()
+    }
+
+    func installWithoutObservation(_ value: Value) {
+        self.value = value
+    }
+
+    func publishInstalledValue() {
+        updates.send(value)
+    }
+}
 
 struct RepositoryStoreHydrationResult: Equatable {
     let didHydrate: Bool
@@ -29,6 +71,43 @@ struct RepositoryStoreHydrationResult: Equatable {
         self.importAttemptCount = importAttemptCount
         self.categoryCount = categoryCount
         self.categoryAssignmentCount = categoryAssignmentCount
+    }
+}
+
+/// Complete immutable repository projection prepared before any observer-visible
+/// runtime store changes. Only `RepositoryStoreHydrator` can construct it.
+struct RepositoryRuntimeSnapshot {
+    let accounts: [Account]
+    let transactions: [Transaction]
+    let importSessions: [RepositoryImportSession]
+    let importAttempts: [RepositoryImportAttempt]
+    let categorySnapshot: CategorySnapshot
+    let hydrationResult: RepositoryStoreHydrationResult
+    let providerGeneration: ProviderGenerationToken?
+
+    fileprivate init(
+        accounts: [Account],
+        transactions: [Transaction],
+        importSessions: [RepositoryImportSession],
+        importAttempts: [RepositoryImportAttempt],
+        categorySnapshot: CategorySnapshot,
+        providerGeneration: ProviderGenerationToken?
+    ) {
+        self.accounts = accounts
+        self.transactions = transactions
+        self.importSessions = importSessions
+        self.importAttempts = importAttempts
+        self.categorySnapshot = categorySnapshot
+        self.providerGeneration = providerGeneration
+        self.hydrationResult = RepositoryStoreHydrationResult(
+            didHydrate: true,
+            accountCount: accounts.count,
+            transactionCount: transactions.count,
+            importSessionCount: importSessions.count,
+            importAttemptCount: importAttempts.count,
+            categoryCount: categorySnapshot.categories.count,
+            categoryAssignmentCount: categorySnapshot.assignments.count
+        )
     }
 }
 
@@ -185,6 +264,17 @@ final class RepositoryStoreHydrator {
             )
         }
 
+        let snapshot = try stageHydration()
+        publish(snapshot)
+        return snapshot.hydrationResult
+    }
+
+    /// Reads and validates one explicit provider generation without changing any
+    /// global or injected runtime store.
+    func stageHydration() throws -> RepositoryRuntimeSnapshot {
+        guard persistenceState.isUsable else {
+            throw RepositoryStoreHydrationError.persistenceUnavailable
+        }
         let transactionDTOs = try transactionRepo.trustedTransactions(workspaceId: workspaceId)
         let accountDTOs = try accountRepo.accounts(workspaceId: workspaceId)
         let categoryDTOs = try categoryRepo.categories(workspaceId: workspaceId)
@@ -215,26 +305,53 @@ final class RepositoryStoreHydrator {
             workspaceID: workspaceId
         )
 
-        // All repository reads and mappings complete before any runtime store changes.
-        accountStore.replaceAccounts(accounts)
-        transactionStore.replaceTransactions(transactions)
-        importSessionStore.replaceImportSessions(importSessions)
-        importAttemptStore.replaceAttempts(importAttempts)
-        categoryStore.replaceSnapshot(categorySnapshot)
-        if let providerGeneration {
+        return RepositoryRuntimeSnapshot(
+            accounts: accounts,
+            transactions: transactions,
+            importSessions: importSessions,
+            importAttempts: importAttempts,
+            categorySnapshot: categorySnapshot,
+            providerGeneration: providerGeneration
+        )
+    }
+
+    /// Synchronously publishes a previously validated complete snapshot. This
+    /// method performs no repository work and acquires no lifecycle lease.
+    @MainActor
+    func publish(_ snapshot: RepositoryRuntimeSnapshot) {
+        installSnapshotWithoutObservation(snapshot)
+        notifyObserversOfInstalledSnapshot()
+    }
+
+    /// Installs every runtime-store backing value without emitting an
+    /// `ObservableObject` or property-publisher notification.
+    @MainActor
+    func installSnapshotWithoutObservation(_ snapshot: RepositoryRuntimeSnapshot) {
+        accountStore.installAccountsWithoutObservation(snapshot.accounts)
+        transactionStore.installTransactionsWithoutObservation(
+            snapshot.transactions,
+            validation: nil
+        )
+        importSessionStore.installImportSessionsWithoutObservation(snapshot.importSessions)
+        importAttemptStore.installAttemptsWithoutObservation(snapshot.importAttempts)
+        categoryStore.installSnapshotWithoutObservation(snapshot.categorySnapshot)
+        if let providerGeneration = snapshot.providerGeneration {
             categoryReconciliationGate?.clearAfterCanonicalHydration(for: providerGeneration)
         }
         hasHydrated = true
+    }
 
-        return RepositoryStoreHydrationResult(
-            didHydrate: true,
-            accountCount: accounts.count,
-            transactionCount: transactions.count,
-            importSessionCount: importSessions.count,
-            importAttemptCount: importAttempts.count,
-            categoryCount: categorySnapshot.categories.count,
-            categoryAssignmentCount: categorySnapshot.assignments.count
-        )
+    /// Releases legacy store notifications only after the complete snapshot has
+    /// already been installed. Every synchronous callback therefore reads the
+    /// same complete backing state, even though legacy notifications are sent
+    /// sequentially for compatibility.
+    @MainActor
+    func notifyObserversOfInstalledSnapshot() {
+        accountStore.notifyAccountsOfInstalledValue()
+        transactionStore.notifyTransactionsOfInstalledValues()
+        importSessionStore.notifyImportSessionsOfInstalledValue()
+        importAttemptStore.notifyAttemptsOfInstalledValue()
+        categoryStore.notifySnapshotOfInstalledValue()
     }
 
     private static func categorySnapshot(

@@ -115,6 +115,11 @@
 		D57000123057000000000001 /* CategoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000023057000000000001 /* CategoryStore.swift */; };
 		D57000133057000000000001 /* CategoryManagementCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000033057000000000001 /* CategoryManagementCoordinator.swift */; };
 		D57000143057000000000001 /* CategoryManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000043057000000000001 /* CategoryManagementView.swift */; };
+		DBA00002305D000000000001 /* DevelopmentDatabaseProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA00001305D000000000001 /* DevelopmentDatabaseProfiles.swift */; };
+		DBA00005305D000000000001 /* DevelopmentDatabaseProfilePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA00004305D000000000001 /* DevelopmentDatabaseProfilePreferences.swift */; };
+		DBB00002305E000000000001 /* DeveloperDatabaseProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB00001305E000000000001 /* DeveloperDatabaseProfileViewModel.swift */; };
+		DBB00004305E000000000001 /* DeveloperDatabaseProfileWarningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB00003305E000000000001 /* DeveloperDatabaseProfileWarningView.swift */; };
+		DBB00006305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB00005305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift */; };
 		F58000010000000000000001 /* ImportFailureSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58000020000000000000001 /* ImportFailureSummary.swift */; };
 		F58000030000000000000001 /* DebugImportVerificationWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58000040000000000000001 /* DebugImportVerificationWorkspaceView.swift */; };
 		F63000020000000000000001 /* SourceContentSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63000010000000000000001 /* SourceContentSnapshot.swift */; };
@@ -268,6 +273,11 @@
 		D57000023057000000000001 /* CategoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryStore.swift; sourceTree = "<group>"; };
 		D57000033057000000000001 /* CategoryManagementCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementCoordinator.swift; sourceTree = "<group>"; };
 		D57000043057000000000001 /* CategoryManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementView.swift; sourceTree = "<group>"; };
+		DBA00001305D000000000001 /* DevelopmentDatabaseProfiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentDatabaseProfiles.swift; sourceTree = "<group>"; };
+		DBA00004305D000000000001 /* DevelopmentDatabaseProfilePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentDatabaseProfilePreferences.swift; sourceTree = "<group>"; };
+		DBB00001305E000000000001 /* DeveloperDatabaseProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperDatabaseProfileViewModel.swift; sourceTree = "<group>"; };
+		DBB00003305E000000000001 /* DeveloperDatabaseProfileWarningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperDatabaseProfileWarningView.swift; sourceTree = "<group>"; };
+		DBB00005305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentProfileAcknowledgementGate.swift; sourceTree = "<group>"; };
 		F58000020000000000000001 /* ImportFailureSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFailureSummary.swift; sourceTree = "<group>"; };
 		F58000040000000000000001 /* DebugImportVerificationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugImportVerificationWorkspaceView.swift; sourceTree = "<group>"; };
 		F63000010000000000000001 /* SourceContentSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceContentSnapshot.swift; sourceTree = "<group>"; };
@@ -499,6 +509,8 @@
 		288EB0DE2FF7A3D100F09BC9 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				DBB00005305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift */,
+				DBA00004305D000000000001 /* DevelopmentDatabaseProfilePreferences.swift */,
 				D57000033057000000000001 /* CategoryManagementCoordinator.swift */,
 				28B5217C3003E9D30007B840 /* IdentityResolver.swift */,
 				28B87B342FFB31FC009BEE8C /* Services/ImportValidator.swift */,
@@ -545,6 +557,7 @@
 		288EB0E22FF7A3D400F09BC9 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				DBB00001305E000000000001 /* DeveloperDatabaseProfileViewModel.swift */,
 				28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */,
 				28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */,
 				37A100202FFDA6CB00C12A68 /* AccountsViewModel.swift */,
@@ -555,6 +568,7 @@
 		288EB0E32FF7A3D500F09BC9 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				DBB00003305E000000000001 /* DeveloperDatabaseProfileWarningView.swift */,
 				D57000043057000000000001 /* CategoryManagementView.swift */,
 				28B87B252FFB24C3009BEE8C /* TransactionListView.swift */,
 				288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */,
@@ -568,6 +582,7 @@
 		288EB0E42FF7A3D500F09BC9 /* Database */ = {
 			isa = PBXGroup;
 			children = (
+				DBA00001305D000000000001 /* DevelopmentDatabaseProfiles.swift */,
 				281BB1362FFC4160006E7424 /* Repository.swift */,
 				281BB1372FFC4184006E7424 /* SQLiteDatabase.swift */,
 				281BB1382FFC41A3006E7424 /* SQLiteRepositoryProvider.swift */,
@@ -857,6 +872,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DBB00002305E000000000001 /* DeveloperDatabaseProfileViewModel.swift in Sources */,
+				DBB00004305E000000000001 /* DeveloperDatabaseProfileWarningView.swift in Sources */,
+				DBB00006305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift in Sources */,
+				DBA00002305D000000000001 /* DevelopmentDatabaseProfiles.swift in Sources */,
+				DBA00005305D000000000001 /* DevelopmentDatabaseProfilePreferences.swift in Sources */,
 				F63000020000000000000001 /* SourceContentSnapshot.swift in Sources */,
 				D57000113057000000000001 /* Category.swift in Sources */,
 				D57000123057000000000001 /* CategoryStore.swift in Sources */,

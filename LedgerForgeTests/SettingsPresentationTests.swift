@@ -94,6 +94,30 @@ struct SettingsPresentationTests {
     @Test func applicationVersionHasDeterministicUnavailableFallback() {
         #expect(SettingsPresentation.applicationVersion(infoDictionary: nil) == "Unavailable")
     }
+
+#if DEBUG
+    @Test func developerProfileSettingsCopyIsBoundedAndCurrentHasNoResetAction() {
+        let current = DevelopmentDatabaseProfileDescriptor(
+            kind: .current,
+            displayName: DevelopmentDatabaseProfileKind.current.displayName,
+            persistenceClassification: .stableCurrent,
+            canReset: false,
+            migrationSourceVersion: nil,
+            verifiedCurrentSchemaVersion: 9
+        )
+        let copy = [
+            current.displayName,
+            current.currentSchemaLabel,
+            DeveloperDatabaseProfileOperationState.activationBlocked.message ?? ""
+        ].joined(separator: " ")
+
+        #expect(current.resetActionLabel == nil)
+        #expect(!copy.contains("/"))
+        #expect(!copy.lowercased().contains("sqlite"))
+        #expect(!copy.lowercased().contains("uuid"))
+        #expect(!copy.lowercased().contains("token"))
+    }
+#endif
 }
 
 private func attempt(

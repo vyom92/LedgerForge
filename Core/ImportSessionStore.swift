@@ -10,13 +10,15 @@ final class ImportSessionStore: ObservableObject {
 
     static let shared = ImportSessionStore()
 
-    @Published private(set) var importSessions: [RepositoryImportSession] = []
+    let objectWillChange = ObservableObjectPublisher()
+    @ObserverAtomicPublished private(set) var importSessions: [RepositoryImportSession] = []
 
     init() {}
 
     func replaceImportSessions(_ importSessions: [RepositoryImportSession]) {
         let update = {
-            self.importSessions = importSessions
+            self.installImportSessionsWithoutObservation(importSessions)
+            self.notifyImportSessionsOfInstalledValue()
         }
 
         if Thread.isMainThread {
@@ -25,16 +27,37 @@ final class ImportSessionStore: ObservableObject {
             DispatchQueue.main.async(execute: update)
         }
     }
+
+    func installImportSessionsWithoutObservation(_ importSessions: [RepositoryImportSession]) {
+        _importSessions.installWithoutObservation(importSessions)
+    }
+
+    func notifyImportSessionsOfInstalledValue() {
+        objectWillChange.send()
+        _importSessions.publishInstalledValue()
+    }
 }
 
 /// Runtime destination for durable import-attempt summaries. RepositoryStoreHydrator
 /// is its only producer, preserving the persistence-to-runtime boundary.
 final class ImportAttemptStore: ObservableObject {
     static let shared = ImportAttemptStore()
-    @Published private(set) var attempts: [RepositoryImportAttempt] = []
+    let objectWillChange = ObservableObjectPublisher()
+    @ObserverAtomicPublished private(set) var attempts: [RepositoryImportAttempt] = []
     init() {}
     func replaceAttempts(_ attempts: [RepositoryImportAttempt]) {
-        let update = { self.attempts = attempts }
+        let update = {
+            self.installAttemptsWithoutObservation(attempts)
+            self.notifyAttemptsOfInstalledValue()
+        }
         if Thread.isMainThread { update() } else { DispatchQueue.main.async(execute: update) }
+    }
+
+    func installAttemptsWithoutObservation(_ attempts: [RepositoryImportAttempt]) {
+        _attempts.installWithoutObservation(attempts)
+    }
+    func notifyAttemptsOfInstalledValue() {
+        objectWillChange.send()
+        _attempts.publishInstalledValue()
     }
 }

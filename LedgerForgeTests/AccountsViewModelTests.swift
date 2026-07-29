@@ -144,6 +144,73 @@ struct AccountsViewModelTests {
         stores.transactions.replaceTransactions([second, first])
         #expect(viewModel.recentActivity.map(\.description) == ["Document B ordinal 1", "Document A ordinal 99"])
     }
+
+#if DEBUG
+    @Test func cancellationAndStaleGenerationCauseZeroDisplayNameMutation() {
+        let coordinator = RecordingMetadataCoordinator()
+        let stores = PresentationStores()
+        stores.accounts.replaceAccounts([
+            runtimeAccount(repositoryID: "account-a", name: "Alpha", balance: 100)
+        ])
+        let firstGeneration = ProviderGenerationToken()
+        var state = DevelopmentProfileAcknowledgementState(
+            providerGeneration: firstGeneration,
+            profileKind: .temporarySession
+        )
+        let gate = DevelopmentProfileAcknowledgementGate(stateProvider: { state })
+        let viewModel = makeViewModel(
+            coordinator: coordinator,
+            stores: stores,
+            acknowledgementGate: gate
+        )
+
+        viewModel.beginDisplayNameEdit()
+        viewModel.displayNameDraft = "Renamed"
+        viewModel.saveDisplayName()
+        #expect(viewModel.requiresDevelopmentProfileAcknowledgement)
+        #expect(coordinator.callCount == 0)
+
+        viewModel.cancelDevelopmentProfileAcknowledgement()
+        #expect(!viewModel.requiresDevelopmentProfileAcknowledgement)
+        #expect(coordinator.callCount == 0)
+
+        viewModel.saveDisplayName()
+        state = DevelopmentProfileAcknowledgementState(
+            providerGeneration: ProviderGenerationToken(),
+            profileKind: .temporarySession
+        )
+        viewModel.approveDevelopmentProfileAcknowledgement()
+        #expect(viewModel.presentationState == .developmentProfileChanged)
+        #expect(coordinator.callCount == 0)
+    }
+
+    @Test func approvalExecutesRetainedDisplayNameMutationOnce() {
+        let coordinator = RecordingMetadataCoordinator()
+        let stores = PresentationStores()
+        stores.accounts.replaceAccounts([
+            runtimeAccount(repositoryID: "account-a", name: "Alpha", balance: 100)
+        ])
+        let generation = ProviderGenerationToken()
+        let state = DevelopmentProfileAcknowledgementState(
+            providerGeneration: generation,
+            profileKind: .persistentDebug
+        )
+        let gate = DevelopmentProfileAcknowledgementGate(stateProvider: { state })
+        let viewModel = makeViewModel(
+            coordinator: coordinator,
+            stores: stores,
+            acknowledgementGate: gate
+        )
+
+        viewModel.beginDisplayNameEdit()
+        viewModel.displayNameDraft = "Approved"
+        viewModel.saveDisplayName()
+        viewModel.approveDevelopmentProfileAcknowledgement()
+
+        #expect(coordinator.callCount == 1)
+        #expect(!viewModel.requiresDevelopmentProfileAcknowledgement)
+    }
+#endif
 }
 
 @MainActor
@@ -166,13 +233,15 @@ private struct PresentationStores {
 @MainActor
 private func makeViewModel(
     coordinator: AccountMetadataCoordinating,
-    stores: PresentationStores
+    stores: PresentationStores,
+    acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil
 ) -> AccountsViewModel {
     AccountsViewModel(
         accountStore: stores.accounts,
         transactionStore: stores.transactions,
         importSessionStore: stores.importSessions,
-        metadataCoordinator: coordinator
+        metadataCoordinator: coordinator,
+        acknowledgementGate: acknowledgementGate ?? .shared
     )
 }
 

@@ -18,16 +18,20 @@ final class TransactionStore: ObservableObject {
 
     static let shared = TransactionStore()
 
-    @Published private(set) var transactions: [Transaction] = []
-    @Published private(set) var lastValidation: ImportValidationResult?
+    let objectWillChange = ObservableObjectPublisher()
+    @ObserverAtomicPublished private(set) var transactions: [Transaction] = []
+    @ObserverAtomicPublished private(set) var lastValidation: ImportValidationResult?
 
     init() {}
 
     // Replace all transactions after a successful import and store validation result.
     func replaceTransactions(_ transactions: [Transaction], validation: ImportValidationResult? = nil) {
         let update = {
-            self.transactions = transactions
-            self.lastValidation = validation
+            self.installTransactionsWithoutObservation(
+                transactions,
+                validation: validation
+            )
+            self.notifyTransactionsOfInstalledValues()
         }
 
         if Thread.isMainThread {
@@ -35,6 +39,20 @@ final class TransactionStore: ObservableObject {
         } else {
             DispatchQueue.main.async(execute: update)
         }
+    }
+
+    func installTransactionsWithoutObservation(
+        _ transactions: [Transaction],
+        validation: ImportValidationResult?
+    ) {
+        _transactions.installWithoutObservation(transactions)
+        _lastValidation.installWithoutObservation(validation)
+    }
+
+    func notifyTransactionsOfInstalledValues() {
+        objectWillChange.send()
+        _transactions.publishInstalledValue()
+        _lastValidation.publishInstalledValue()
     }
     
     // Simple search by description, account, file, or bank (case-insensitive)

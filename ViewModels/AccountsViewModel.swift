@@ -65,6 +65,10 @@ enum AccountDetailPresentationState: Equatable {
     case validationFailed
     case saveFailed
     case savedButRefreshFailed
+#if DEBUG
+    case acknowledgementRequired
+    case developmentProfileChanged
+#endif
 
     var message: String? {
         switch self {
@@ -78,8 +82,20 @@ enum AccountDetailPresentationState: Equatable {
             return "The display name could not be saved. Runtime data was not changed."
         case .savedButRefreshFailed:
             return "The display name was saved, but the account detail could not refresh. Retry or relaunch to load persisted data."
+#if DEBUG
+        case .acknowledgementRequired:
+            return "Acknowledge the active development database profile before saving the display name."
+        case .developmentProfileChanged:
+            return "The active development database changed. Start the display-name change again."
+#endif
         }
     }
+}
+
+private struct PendingAccountDisplayNameMutation {
+    let accountID: String
+    let workspaceID: String
+    let displayName: String
 }
 
 @MainActor
@@ -96,11 +112,18 @@ final class AccountsViewModel: ObservableObject {
     @Published var displayNameDraft = ""
     @Published private(set) var editState: AccountDisplayNameEditState = .idle
     @Published private(set) var presentationState: AccountDetailPresentationState = .ready
+#if DEBUG
+    @Published private(set) var acknowledgementChallenge: DevelopmentProfileAcknowledgementChallenge?
+#endif
 
     private let accountStore: AccountStore
     private let transactionStore: TransactionStore
     private let importSessionStore: ImportSessionStore
     private let metadataCoordinator: AccountMetadataCoordinating
+#if DEBUG
+    private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
+    private var pendingDisplayNameMutation: PendingAccountDisplayNameMutation?
+#endif
     private var cancellables = Set<AnyCancellable>()
 
     convenience init() {
@@ -112,6 +135,36 @@ final class AccountsViewModel: ObservableObject {
         )
     }
 
+#if DEBUG
+    init(
+        accountStore: AccountStore,
+        transactionStore: TransactionStore,
+        importSessionStore: ImportSessionStore,
+        metadataCoordinator: AccountMetadataCoordinating,
+        acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil
+    ) {
+        self.accountStore = accountStore
+        self.transactionStore = transactionStore
+        self.importSessionStore = importSessionStore
+        self.metadataCoordinator = metadataCoordinator
+        self.acknowledgementGate = acknowledgementGate ?? .shared
+
+        accountStore.$accounts
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.refreshPresentation() }
+            .store(in: &cancellables)
+        transactionStore.$transactions
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.refreshPresentation() }
+            .store(in: &cancellables)
+        importSessionStore.$importSessions
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.refreshPresentation() }
+            .store(in: &cancellables)
+
+        refreshPresentation()
+    }
+#else
     init(
         accountStore: AccountStore,
         transactionStore: TransactionStore,
@@ -138,6 +191,7 @@ final class AccountsViewModel: ObservableObject {
 
         refreshPresentation()
     }
+#endif
 
     var isEditingDisplayName: Bool {
         editState == .editing
@@ -163,6 +217,9 @@ final class AccountsViewModel: ObservableObject {
     }
 
     func cancelDisplayNameEdit() {
+#if DEBUG
+        discardPendingAcknowledgement()
+#endif
         editState = .idle
         displayNameDraft = selectedAccount?.displayName ?? ""
         presentationState = .ready
@@ -189,22 +246,93 @@ final class AccountsViewModel: ObservableObject {
             return
         }
 
+        let mutation = PendingAccountDisplayNameMutation(
+            accountID: repositoryAccountID,
+            workspaceID: workspaceID,
+            displayName: trimmedDraft
+        )
+#if DEBUG
+        switch acknowledgementGate.authorization(for: .accountDisplayNameMutation) {
+        case .allowed:
+            performDisplayNameMutation(mutation)
+        case .acknowledgementRequired(let challenge):
+            pendingDisplayNameMutation = mutation
+            acknowledgementChallenge = challenge
+            presentationState = .acknowledgementRequired
+        case .developmentDatabaseUnavailable:
+            presentationState = .saveFailed
+        }
+#else
+        performDisplayNameMutation(mutation)
+#endif
+    }
+
+#if DEBUG
+    var requiresDevelopmentProfileAcknowledgement: Bool {
+        acknowledgementChallenge != nil && pendingDisplayNameMutation != nil
+    }
+
+    func approveDevelopmentProfileAcknowledgement() {
+        guard let challenge = acknowledgementChallenge,
+              let mutation = pendingDisplayNameMutation else { return }
+        switch acknowledgementGate.acknowledge(challenge) {
+        case .granted, .noAcknowledgementRequired:
+            discardPendingAcknowledgement()
+            performDisplayNameMutation(mutation)
+        case .staleGeneration, .developmentDatabaseUnavailable:
+            discardPendingAcknowledgement()
+            presentationState = .developmentProfileChanged
+        }
+    }
+
+    func cancelDevelopmentProfileAcknowledgement() {
+        discardPendingAcknowledgement()
+        presentationState = .ready
+    }
+
+    private func discardPendingAcknowledgement() {
+        acknowledgementChallenge = nil
+        pendingDisplayNameMutation = nil
+    }
+#endif
+
+    private func performDisplayNameMutation(_ mutation: PendingAccountDisplayNameMutation) {
         do {
             _ = try metadataCoordinator.updateDisplayName(
-                accountId: repositoryAccountID,
-                workspaceId: workspaceID,
-                displayName: trimmedDraft
+                accountId: mutation.accountID,
+                workspaceId: mutation.workspaceID,
+                displayName: mutation.displayName
             )
             editState = .idle
             displayNameDraft = ""
             presentationState = .ready
             refreshPresentation()
-        } catch AccountMetadataCoordinatorError.savedButRefreshFailed {
-            editState = .idle
-            displayNameDraft = ""
-            presentationState = .savedButRefreshFailed
         } catch {
-            presentationState = .saveFailed
+#if DEBUG
+            if let coordinatorError = error as? AccountMetadataCoordinatorError {
+                switch coordinatorError {
+                case .acknowledgementRequired(let challenge):
+                    pendingDisplayNameMutation = mutation
+                    acknowledgementChallenge = challenge
+                    presentationState = .acknowledgementRequired
+                    return
+                case .staleDevelopmentProfile:
+                    discardPendingAcknowledgement()
+                    presentationState = .developmentProfileChanged
+                    return
+                default:
+                    break
+                }
+            }
+#endif
+            if let coordinatorError = error as? AccountMetadataCoordinatorError,
+               coordinatorError == .savedButRefreshFailed {
+                editState = .idle
+                displayNameDraft = ""
+                presentationState = .savedButRefreshFailed
+            } else {
+                presentationState = .saveFailed
+            }
         }
     }
 

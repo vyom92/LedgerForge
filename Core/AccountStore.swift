@@ -14,13 +14,15 @@ final class AccountStore: ObservableObject {
 
     static let shared = AccountStore()
 
-    @Published private(set) var accounts: [Account] = []
+    let objectWillChange = ObservableObjectPublisher()
+    @ObserverAtomicPublished private(set) var accounts: [Account] = []
 
     init() {}
 
     func replaceAccounts(_ accounts: [Account]) {
         let update = {
-            self.accounts = accounts
+            self.installAccountsWithoutObservation(accounts)
+            self.notifyAccountsOfInstalledValue()
         }
 
         if Thread.isMainThread {
@@ -28,6 +30,15 @@ final class AccountStore: ObservableObject {
         } else {
             DispatchQueue.main.async(execute: update)
         }
+    }
+
+    func installAccountsWithoutObservation(_ accounts: [Account]) {
+        _accounts.installWithoutObservation(accounts)
+    }
+
+    func notifyAccountsOfInstalledValue() {
+        objectWillChange.send()
+        _accounts.publishInstalledValue()
     }
 
     // MARK: - Querying
@@ -77,6 +88,7 @@ final class AccountStore: ObservableObject {
         )
 
         DispatchQueue.main.async {
+            self.objectWillChange.send()
             self.accounts.append(account)
         }
 
@@ -130,6 +142,7 @@ final class AccountStore: ObservableObject {
 
             DispatchQueue.main.async {
                 if let idx = self.accounts.firstIndex(where: { $0.id == updated.id }) {
+                    self.objectWillChange.send()
                     self.accounts[idx] = updated
                 }
             }
@@ -174,6 +187,7 @@ final class AccountStore: ObservableObject {
             if let lastImport = lastImport {
                 updated.lastImport = lastImport
             }
+            self.objectWillChange.send()
             self.accounts[idx] = updated
         }
     }
@@ -185,6 +199,7 @@ final class AccountStore: ObservableObject {
             guard let idx = self.accounts.firstIndex(where: { $0.id == id }) else { return }
             var updated = self.accounts[idx]
             updated.status = .archived
+            self.objectWillChange.send()
             self.accounts[idx] = updated
         }
     }

@@ -51,6 +51,9 @@ struct ImportEngineResult: Equatable {
     let recognizedExistingRowCount: Int?
     let isPartialImport: Bool
     let accountOutcome: ImportAccountOutcome
+#if DEBUG
+    private(set) var developmentProtectedActionOutcome: DevelopmentProtectedActionOutcome?
+#endif
 
     init(
         fileName: String,
@@ -86,6 +89,9 @@ struct ImportEngineResult: Equatable {
         self.recognizedExistingRowCount = recognizedExistingRowCount
         self.isPartialImport = isPartialImport
         self.accountOutcome = accountOutcome
+#if DEBUG
+        self.developmentProtectedActionOutcome = nil
+#endif
     }
 
     var succeeded: Bool {
@@ -99,6 +105,16 @@ struct ImportEngineResult: Equatable {
     var requiresImportAttemptRefresh: Bool { importAttemptId != nil && !persisted }
 
     var requiresReconciliation: Bool { hydrationOutcome == .committedReconciliationRequired }
+
+#if DEBUG
+    func settingDevelopmentProtectedActionOutcome(
+        _ outcome: DevelopmentProtectedActionOutcome
+    ) -> ImportEngineResult {
+        var result = self
+        result.developmentProtectedActionOutcome = outcome
+        return result
+    }
+#endif
 }
 
 enum ImportEngineCommitError: Error, LocalizedError, Equatable {
@@ -219,12 +235,60 @@ final class ImportEngine {
     private let rejectedAttemptHydration: () throws -> Void
     private let reconciliationGate: ConfirmedImportReconciliationGate
     private let developerConsole: DeveloperConsole
+#if DEBUG
+    private let developmentProfileAcknowledgementGate: DevelopmentProfileAcknowledgementGate
+#endif
     private let committedPreparedImportLock = NSLock()
     private var committedPreparedImportIDs: Set<UUID> = []
 #if DEBUG
-    private var lifecycleLeases: [UUID: DevelopmentDatabaseActivityLease] = [:]
+    private struct LivePreparedImport {
+        let sourceSnapshot: SourceContentSnapshot
+        let lifecycleLease: DevelopmentDatabaseActivityLease
+    }
+
+    private var livePreparedImports: [UUID: LivePreparedImport] = [:]
 #endif
 
+#if DEBUG
+    init(
+        importCoordinator: any ImportFramework.ImportCoordinator = DefaultImportCoordinator(
+            readerRegistry: DefaultReaderRegistry(),
+            passwordProvider: DefaultPasswordProvider()
+        ),
+        sourceSnapshotAcquirer: ((URL) throws -> SourceContentSnapshot)? = nil,
+        importPersistenceCoordinator: ImportPersistenceCoordinating? = nil,
+        developerConsole: DeveloperConsole = .shared,
+        persistenceStateProvider: @escaping () -> PersistenceState = { DatabaseProvider.shared.persistenceState },
+        providerGenerationProvider: @escaping () -> ProviderGenerationToken = { DatabaseProvider.shared.generationToken },
+        forcedHydration: @escaping () throws -> RepositoryStoreHydrationResult = {
+            try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
+        },
+        rejectedAttemptHydration: @escaping () throws -> Void = {
+            try RepositoryStoreHydrator().hydrateImportAttempts()
+        },
+        reconciliationGate: ConfirmedImportReconciliationGate = ConfirmedImportReconciliationGate(),
+        developmentProfileAcknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil
+    ) {
+        self.importCoordinator = importCoordinator
+        self.sourceSnapshotAcquirer = sourceSnapshotAcquirer ?? Self.acquireSourceSnapshot
+        self.developerConsole = developerConsole
+        self.persistenceStateProvider = persistenceStateProvider
+        self.providerGenerationProvider = providerGenerationProvider
+        self.forcedHydration = forcedHydration
+        self.rejectedAttemptHydration = rejectedAttemptHydration
+        self.reconciliationGate = reconciliationGate
+        self.developmentProfileAcknowledgementGate = developmentProfileAcknowledgementGate ?? .shared
+        if let importPersistenceCoordinator {
+            self.importPersistenceCoordinatorFactory = {
+                importPersistenceCoordinator
+            }
+        } else {
+            self.importPersistenceCoordinatorFactory = {
+                DefaultImportPersistenceCoordinator()
+            }
+        }
+    }
+#else
     init(
         importCoordinator: any ImportFramework.ImportCoordinator = DefaultImportCoordinator(
             readerRegistry: DefaultReaderRegistry(),
@@ -261,6 +325,7 @@ final class ImportEngine {
             }
         }
     }
+#endif
 
     func importFile(from url: URL) {
         Task {
@@ -327,10 +392,16 @@ final class ImportEngine {
         requestId: UUID = UUID(),
         progress: @escaping (ImportProgress) -> Void = { _ in }
     ) async throws -> PreparedImport {
+        let preparationGeneration = providerGenerationProvider()
+#if DEBUG
+        try developmentProfileAcknowledgementGate.requireAuthorization(
+            for: .importPreparation,
+            providerGeneration: preparationGeneration
+        )
+#endif
         guard persistenceStateProvider().isUsable else {
             throw PersistenceWorkflowError.unavailable
         }
-        let preparationGeneration = providerGenerationProvider()
 #if DEBUG
         let lifecycleLease = try DevelopmentDatabaseActivityGate.shared.begin(.importPreparation)
         var transfersLifecycleLease = false
@@ -466,8 +537,11 @@ final class ImportEngine {
             providerGeneration: preparationGeneration
         )
 #if DEBUG
-        lifecycleLease.transition(to: .preparedAwaitingConfirmation)
-        lifecycleLeases[preparedImport.id] = lifecycleLease
+        await lifecycleLease.transition(to: .preparedAwaitingConfirmation)
+        livePreparedImports[preparedImport.id] = LivePreparedImport(
+            sourceSnapshot: snapshot,
+            lifecycleLease: lifecycleLease
+        )
         transfersLifecycleLease = true
 #endif
         transfersSnapshot = true
@@ -514,6 +588,38 @@ final class ImportEngine {
         accountChoice: ImportAccountChoice?,
         reviewedPartialPlan: ReviewedPartialImportPlanDTO? = nil
     ) async -> ImportEngineResult {
+#if DEBUG
+        do {
+            try developmentProfileAcknowledgementGate.requireAuthorization(
+                for: .importConfirmation,
+                providerGeneration: providerGenerationProvider()
+            )
+        } catch DevelopmentProfileAcknowledgementError.acknowledgementRequired {
+            return ImportEngineResult(
+                fileName: preparedImport.fileName,
+                transactionCount: preparedImport.transactionCount,
+                validationPassed: preparedImport.validation.passed,
+                persisted: false,
+                errorMessage: "Acknowledge the active development database profile before confirming this import."
+            ).settingDevelopmentProtectedActionOutcome(.acknowledgementRequired)
+        } catch DevelopmentProfileAcknowledgementError.staleGeneration {
+            return ImportEngineResult(
+                fileName: preparedImport.fileName,
+                transactionCount: preparedImport.transactionCount,
+                validationPassed: preparedImport.validation.passed,
+                persisted: false,
+                errorMessage: "The active development database changed. Prepare the import again."
+            ).settingDevelopmentProtectedActionOutcome(.staleGeneration)
+        } catch {
+            return ImportEngineResult(
+                fileName: preparedImport.fileName,
+                transactionCount: preparedImport.transactionCount,
+                validationPassed: preparedImport.validation.passed,
+                persisted: false,
+                errorMessage: "The development database is unavailable."
+            ).settingDevelopmentProtectedActionOutcome(.developmentDatabaseUnavailable)
+        }
+#endif
         guard markPreparedImportCommitted(preparedImport.id) else {
             developerConsole.warning(.`import`, "Prepared import already consumed")
             return ImportEngineResult(
@@ -526,11 +632,11 @@ final class ImportEngine {
         }
         defer { preparedImport.sourceSnapshot.invalidate() }
 #if DEBUG
-        let lifecycleLease = lifecycleLeases[preparedImport.id]
-        lifecycleLease?.transition(to: .confirmedPersistence)
+        let lifecycleLease = livePreparedImports[preparedImport.id]?.lifecycleLease
+        await lifecycleLease?.transition(to: .confirmedPersistence)
         defer {
             lifecycleLease?.finish()
-            lifecycleLeases.removeValue(forKey: preparedImport.id)
+            livePreparedImports.removeValue(forKey: preparedImport.id)
         }
 #endif
         let recomputedRawFingerprint = ExactStatementFingerprint(text: preparedImport.rawContents)
@@ -739,9 +845,31 @@ final class ImportEngine {
         guard markPreparedImportCommitted(preparedImport.id) else { return }
         preparedImport.sourceSnapshot.invalidate()
 #if DEBUG
-        lifecycleLeases.removeValue(forKey: preparedImport.id)?.finish()
+        livePreparedImports.removeValue(forKey: preparedImport.id)?.lifecycleLease.finish()
 #endif
     }
+
+#if DEBUG
+    /// Consumes only prepared-awaiting-confirmation objects while the lifecycle
+    /// gate's exclusive-pending barrier prevents new provider work.
+    func invalidatePreparedImportsForProfileSwitch(
+        _ permit: DevelopmentDatabasePreparedImportDrainPermit
+    ) -> DevelopmentPreparedImportInvalidationResult {
+        let prepared = livePreparedImports.sorted { $0.key.uuidString < $1.key.uuidString }
+        var invalidatedCount = 0
+        for (id, ownership) in prepared {
+            guard markPreparedImportCommitted(id) else {
+                livePreparedImports.removeValue(forKey: id)?.lifecycleLease.finish()
+                continue
+            }
+            ownership.sourceSnapshot.invalidate()
+            ownership.lifecycleLease.finish()
+            livePreparedImports.removeValue(forKey: id)
+            invalidatedCount += 1
+        }
+        return DevelopmentPreparedImportInvalidationResult(invalidatedCount: invalidatedCount)
+    }
+#endif
 
     private func publishPreparationProgress(
         _ phase: ImportProgressPhase,

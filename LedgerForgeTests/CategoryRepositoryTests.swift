@@ -21,6 +21,73 @@ struct CategoryRepositoryTests {
         #expect(try coordinator.retryCanonicalHydration() == .notRequired)
     }
 
+#if DEBUG
+    @Test(.globalRuntimeStateIsolation)
+    func directCategoryCoordinatorCallCannotBypassAcknowledgement() throws {
+        let provider = DatabaseProvider(inMemory: true)
+        let state = DevelopmentProfileAcknowledgementState(
+            providerGeneration: provider.generationToken,
+            profileKind: .migrationSandbox
+        )
+        let gate = DevelopmentProfileAcknowledgementGate(stateProvider: { state })
+        let categoryStore = CategoryStore()
+        let coordinator = CategoryManagementCoordinator(
+            provider: { provider },
+            categoryStore: categoryStore,
+            acknowledgementGate: gate
+        )
+
+        let challenge: DevelopmentProfileAcknowledgementChallenge
+        do {
+            _ = try coordinator.create(name: "Blocked")
+            Issue.record("Expected acknowledgement requirement")
+            return
+        } catch CategoryManagementCoordinatorError.acknowledgementRequired(let value) {
+            challenge = value
+        }
+
+        #expect(try provider.categoryRepo.categories(workspaceId: "default-workspace").isEmpty)
+        #expect(categoryStore.categories.isEmpty)
+        #expect(gate.acknowledge(challenge) == .granted)
+        #expect(try coordinator.create(name: "Approved"))
+        #expect(try provider.categoryRepo.categories(workspaceId: "default-workspace").map(\.name) == ["Approved"])
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func everyCategoryAndTransactionMutationEntryPointUsesAcknowledgementGate() {
+        let provider = DatabaseProvider(inMemory: true)
+        let state = DevelopmentProfileAcknowledgementState(
+            providerGeneration: provider.generationToken,
+            profileKind: .temporarySession
+        )
+        let gate = DevelopmentProfileAcknowledgementGate(stateProvider: { state })
+        let coordinator = CategoryManagementCoordinator(
+            provider: { provider },
+            categoryStore: CategoryStore(),
+            acknowledgementGate: gate
+        )
+
+        func expectAcknowledgement(_ operation: () throws -> Void) {
+            do {
+                try operation()
+                Issue.record("Expected acknowledgement requirement")
+            } catch CategoryManagementCoordinatorError.acknowledgementRequired {
+                // Expected before repository access.
+            } catch {
+                Issue.record("Unexpected error: \(error.localizedDescription)")
+            }
+        }
+
+        expectAcknowledgement { _ = try coordinator.create(name: "Create") }
+        expectAcknowledgement { _ = try coordinator.rename(categoryID: "category", name: "Rename") }
+        expectAcknowledgement { _ = try coordinator.setArchived(categoryID: "category", isArchived: true) }
+        expectAcknowledgement { _ = try coordinator.setArchived(categoryID: "category", isArchived: false) }
+        expectAcknowledgement { try coordinator.deleteUnused(categoryID: "category") }
+        expectAcknowledgement { _ = try coordinator.setCategory(categoryID: "category", transactionID: "transaction") }
+        expectAcknowledgement { _ = try coordinator.setCategory(categoryID: nil, transactionID: "transaction") }
+    }
+#endif
+
     @Test func lifecycleAndAssignmentBehaviorMatchesAcrossProvidersWithoutFinancialMutation() throws {
         for kind in CategoryProviderKind.allCases {
             try withCategoryProvider(kind) { provider in

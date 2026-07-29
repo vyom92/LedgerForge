@@ -7,6 +7,69 @@ import Testing
 @MainActor
 struct RepositoryStoreHydratorTests {
 
+    @Test func stagedHydrationIsPureUntilOneCompleteSnapshotIsPublished() throws {
+        let provider = try seededProvider()
+        let stores = RuntimeStores()
+        let transactionRepo = HydrationFixtureTransactionRepo(transactions: [trustedTransaction()])
+        let hydrator = makeHydrator(
+            provider: provider,
+            stores: stores,
+            transactionRepo: transactionRepo
+        )
+
+        let snapshot = try hydrator.stageHydration()
+
+        #expect(stores.accounts.accounts.isEmpty)
+        #expect(stores.transactions.transactions.isEmpty)
+        #expect(stores.importSessions.importSessions.isEmpty)
+        #expect(stores.importAttempts.attempts.isEmpty)
+        #expect(stores.categories.snapshot == .empty)
+        #expect(snapshot.accounts.map { $0.repositoryAccountId } == ["account-dashboard"])
+        #expect(snapshot.transactions.map { $0.repositoryTransactionId } == ["transaction-trusted"])
+        #expect(snapshot.importSessions.map(\.id) == ["import-dashboard"])
+
+        transactionRepo.transactions = []
+        hydrator.publish(snapshot)
+
+        #expect(stores.accounts.accounts.map { $0.id } == snapshot.accounts.map { $0.id })
+        #expect(stores.accounts.accounts.map { $0.repositoryAccountId } == ["account-dashboard"])
+        #expect(stores.transactions.transactions.map { $0.id } == snapshot.transactions.map { $0.id })
+        #expect(stores.transactions.transactions.map { $0.repositoryTransactionId } == ["transaction-trusted"])
+        #expect(stores.importSessions.importSessions == snapshot.importSessions)
+        #expect(stores.importAttempts.attempts == snapshot.importAttempts)
+        #expect(stores.categories.snapshot == snapshot.categorySnapshot)
+        #expect(snapshot.hydrationResult.accountCount == 1)
+        #expect(snapshot.hydrationResult.transactionCount == 1)
+    }
+
+    @Test func stagedMappingFailurePreservesEveryRuntimeStore() throws {
+        let provider = try seededProvider()
+        let stores = RuntimeStores()
+        let transactionRepo = HydrationFixtureTransactionRepo(transactions: [trustedTransaction()])
+        let hydrator = makeHydrator(
+            provider: provider,
+            stores: stores,
+            transactionRepo: transactionRepo
+        )
+        _ = try hydrator.hydrateIfNeeded()
+        let accountsBefore = stores.accounts.accounts.map(HydratedAccountObservation.init)
+        let transactionsBefore = stores.transactions.transactions.map(HydratedTransactionObservation.init)
+        let sessionsBefore = stores.importSessions.importSessions
+        let attemptsBefore = stores.importAttempts.attempts
+        let categoriesBefore = stores.categories.snapshot
+
+        transactionRepo.transactions = [trustedTransaction(amountDecimal: "99.99")]
+        #expect(throws: RepositoryStoreHydrationError.self) {
+            _ = try hydrator.stageHydration()
+        }
+
+        #expect(stores.accounts.accounts.map(HydratedAccountObservation.init) == accountsBefore)
+        #expect(stores.transactions.transactions.map(HydratedTransactionObservation.init) == transactionsBefore)
+        #expect(stores.importSessions.importSessions == sessionsBefore)
+        #expect(stores.importAttempts.attempts == attemptsBefore)
+        #expect(stores.categories.snapshot == categoriesBefore)
+    }
+
     @Test func hydratorLoadsTrustedRepositoryDataIntoRuntimeStores() throws {
         let provider = try seededProvider()
         let stores = RuntimeStores()
@@ -209,6 +272,8 @@ private struct RuntimeStores {
     let accounts = AccountStore()
     let transactions = TransactionStore()
     let importSessions = ImportSessionStore()
+    let importAttempts = ImportAttemptStore()
+    let categories = CategoryStore()
 }
 
 private func makeHydrator(
@@ -220,9 +285,12 @@ private func makeHydrator(
         accountRepo: provider.accountRepo,
         importSessionRepo: provider.importSessionRepo,
         transactionRepo: transactionRepo,
+        categoryRepo: provider.categoryRepo,
         accountStore: stores.accounts,
         transactionStore: stores.transactions,
+        categoryStore: stores.categories,
         importSessionStore: stores.importSessions,
+        importAttemptStore: stores.importAttempts,
         workspaceId: "workspace-dashboard"
     )
 }
@@ -333,6 +401,96 @@ private func trustedRawRow(
         parserProfileId: parserProfileId,
         parserProfileVersion: parserProfileVersion
     )
+}
+
+private struct HydratedTransactionObservation: Equatable {
+    let id: UUID
+    let repositoryTransactionId: String?
+    let statementDate: String?
+    let description: String
+    let debit: Decimal?
+    let credit: Decimal?
+    let amount: Decimal
+    let balance: Decimal?
+    let currency: String
+    let account: String
+    let sourceBank: String
+    let sourceFile: String
+    let repositoryAccountId: String?
+    let repositoryImportSessionId: String?
+
+    init(_ transaction: Transaction) {
+        id = transaction.id
+        repositoryTransactionId = transaction.repositoryTransactionId
+        statementDate = transaction.statementDate?.canonical
+        description = transaction.description
+        debit = transaction.debit
+        credit = transaction.credit
+        amount = transaction.amount
+        balance = transaction.balance
+        currency = transaction.currency
+        account = transaction.account
+        sourceBank = transaction.sourceBank
+        sourceFile = transaction.sourceFile
+        repositoryAccountId = transaction.repositoryAccountId
+        repositoryImportSessionId = transaction.repositoryImportSessionId
+    }
+}
+
+private struct HydratedAccountObservation: Equatable {
+    let id: UUID
+    let repositoryAccountId: String?
+    let workspaceId: String?
+    let institution: String
+    let name: String
+    let nickname: String?
+    let type: String
+    let nativeCurrency: String
+    let timeZoneIdentifier: String
+    let currentBalance: Decimal
+    let includeInNetWorth: Bool
+    let baseCurrencyBalance: Decimal?
+    let exchangeRateToBaseCurrency: Decimal?
+    let status: String
+    let lastImport: TimeInterval?
+    let identitySummaries: [HydratedIdentityObservation]
+
+    init(_ account: Account) {
+        id = account.id
+        repositoryAccountId = account.repositoryAccountId
+        workspaceId = account.workspaceId
+        institution = account.institution
+        name = account.name
+        nickname = account.nickname
+        type = account.type.rawValue
+        nativeCurrency = account.nativeCurrency.code
+        timeZoneIdentifier = account.timeZoneIdentifier
+        currentBalance = account.currentBalance
+        includeInNetWorth = account.includeInNetWorth
+        baseCurrencyBalance = account.baseCurrencyBalance
+        exchangeRateToBaseCurrency = account.exchangeRateToBaseCurrency
+        status = account.status.rawValue
+        lastImport = account.lastImport?.timeIntervalSince1970
+        identitySummaries = account.identitySummaries.map(HydratedIdentityObservation.init)
+    }
+}
+
+private struct HydratedIdentityObservation: Equatable {
+    let id: String
+    let kind: String
+    let redactedValue: String
+    let strength: String
+    let verificationState: String
+    let provenance: String
+
+    init(_ summary: AccountIdentitySummary) {
+        id = summary.id
+        kind = summary.kind
+        redactedValue = summary.redactedValue
+        strength = summary.strength
+        verificationState = summary.verificationState
+        provenance = summary.provenance
+    }
 }
 
 /// Test-target-only read fixture. Production code cannot instantiate this type.

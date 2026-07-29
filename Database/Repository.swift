@@ -121,6 +121,9 @@ public enum PersistenceNonDurablePurpose: String, Equatable {
     case testMemory
     case debugMemory
     case debugTemporarySQLite
+#if DEBUG
+    case debugMigrationSandboxSQLite
+#endif
 }
 
 public enum PersistenceState: Equatable {
@@ -147,6 +150,10 @@ public enum PersistenceState: Equatable {
             return "Intentional Debug Memory"
         case .intentionalNonDurable(.debugTemporarySQLite):
             return "Temporary Debug SQLite"
+#if DEBUG
+        case .intentionalNonDurable(.debugMigrationSandboxSQLite):
+            return "Migration Sandbox SQLite"
+#endif
         }
     }
 
@@ -162,6 +169,10 @@ public enum PersistenceState: Equatable {
             return "An explicitly selected in-memory Debug provider is active."
         case .intentionalNonDurable(.debugTemporarySQLite):
             return "An explicitly selected temporary Debug database is active for this process."
+#if DEBUG
+        case .intentionalNonDurable(.debugMigrationSandboxSQLite):
+            return "An explicitly selected migrated Debug sandbox is active for this process."
+#endif
         }
     }
 
@@ -275,7 +286,6 @@ public final class DatabaseProvider {
     ) {
         self.persistenceState = persistenceState
         self.generationToken = generationToken
-        self.confirmedImportRepo = confirmedImportRepo
         let resolvedCategoryRepo = categoryRepo ?? PlaceholderCategoryRepo()
         if protectsGeneration {
             let validity = ProviderGenerationValidity()
@@ -285,6 +295,7 @@ public final class DatabaseProvider {
             self.categoryRepo = GenerationCheckedCategoryRepository(base: resolvedCategoryRepo, validity: validity)
             self.accountRepo = GenerationCheckedAccountRepository(base: accountRepo, validity: validity)
             self.importSessionRepo = GenerationCheckedImportSessionRepository(base: importSessionRepo, validity: validity)
+            self.confirmedImportRepo = GenerationCheckedConfirmedImportRepository(base: confirmedImportRepo, validity: validity)
             return
         }
         self.generationValidity = nil
@@ -293,21 +304,24 @@ public final class DatabaseProvider {
         self.categoryRepo = resolvedCategoryRepo
         self.accountRepo = accountRepo
         self.importSessionRepo = importSessionRepo
+        self.confirmedImportRepo = confirmedImportRepo
     }
 
     /// Convenience initializer for an isolated in-memory provider. This is
     /// intended for contract tests and non-persistent development fixtures.
-    public init(inMemory: Bool) {
+    public convenience init(inMemory: Bool) {
         let provider = InMemoryRepositoryProvider()
-        self.persistenceState = .intentionalNonDurable(.testMemory)
-        self.workspaceRepo = provider.workspaceRepo
-        self.transactionRepo = provider.transactionRepo
-        self.categoryRepo = provider.categoryRepo
-        self.accountRepo = provider.accountRepo
-        self.importSessionRepo = provider.importSessionRepo
-        self.generationToken = provider.generationToken
-        self.confirmedImportRepo = provider.confirmedImportRepo
-        self.generationValidity = nil
+        self.init(
+            workspaceRepo: provider.workspaceRepo,
+            transactionRepo: provider.transactionRepo,
+            categoryRepo: provider.categoryRepo,
+            accountRepo: provider.accountRepo,
+            importSessionRepo: provider.importSessionRepo,
+            confirmedImportRepo: provider.confirmedImportRepo,
+            generationToken: provider.generationToken,
+            persistenceState: .intentionalNonDurable(.testMemory),
+            protectsGeneration: true
+        )
     }
 
     static func unavailable(reason: PersistenceUnavailableReason) -> DatabaseProvider {
@@ -416,6 +430,40 @@ private struct GenerationCheckedImportSessionRepository: ImportSessionRepository
     func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? { try validity.check(); return try base.partialImportSummary(importSessionId: importSessionId) }
     func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] { try validity.check(); return try base.incomingRowDispositions(importSessionId: importSessionId) }
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult { try validity.check(); return try base.commitImportHistory(payload) }
+}
+
+private struct GenerationCheckedConfirmedImportRepository: ConfirmedImportRepository {
+    let base: ConfirmedImportRepository
+    let validity: ProviderGenerationValidity
+
+    func reviewPartialImport(_ plan: ConfirmedImportPlanDTO) -> PartialImportReviewResult {
+        do {
+            try validity.check()
+            return base.reviewPartialImport(plan)
+        } catch {
+            // The read-only review result predates the shared stale-generation
+            // case; fail closed without consulting the inactive provider.
+            return .repositoryIntegrityConflict
+        }
+    }
+
+    func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
+        do {
+            try validity.check()
+            return base.commitConfirmedImport(plan)
+        } catch {
+            return .staleProviderGeneration
+        }
+    }
+
+    func commitReviewedPartialImport(_ plan: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult {
+        do {
+            try validity.check()
+            return base.commitReviewedPartialImport(plan)
+        } catch {
+            return .staleProviderGeneration
+        }
+    }
 }
 
 // MARK: - Placeholder repos

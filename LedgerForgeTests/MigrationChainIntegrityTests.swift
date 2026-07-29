@@ -260,17 +260,26 @@ struct MigrationChainIntegrityTests {
         }
     }
 
-    @Test(arguments: [1, 2, 3, 4, 5])
-    func everySupportedPriorVersionUpgradesOrReopensToCurrent(_ priorVersion: Int) throws {
+    @Test(arguments: Array(1...8))
+    func everyRegisteredHistoricalPrefixIsExactBeforeOrdinaryReopenToCurrent(
+        _ priorVersion: Int
+    ) throws {
         try withTemporaryDatabase(named: "Upgrade-V\(priorVersion)") { path in
             let seed = SQLiteDatabase(path: path)
-            try seed.runMigrations(Array(allMigrations.prefix(priorVersion)))
-            seed.close()
+            let prefix = Array(allMigrations.prefix(priorVersion))
+            try seed.runMigrations(prefix)
+            let prefixRecords = try seed.validatedMigrationHistory(
+                against: prefix,
+                requiresCompleteChain: true
+            )
+            #expect(prefixRecords.compactMap(\.version) == Array(1...priorVersion))
+            #expect(try seed.queryInt("SELECT MAX(version) FROM schema_migrations;") == priorVersion)
+            try seed.checkpointAndClose()
 
             let provider = try SQLiteRepositoryProvider(path: path)
-            defer { provider.database.close() }
-
             try expectCurrentHistory(in: provider.database)
+            #expect(try provider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 9)
+            try provider.database.checkpointAndClose()
         }
     }
 

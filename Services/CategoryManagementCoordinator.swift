@@ -60,6 +60,10 @@ enum CategoryReconciliationRetryResult: Equatable {
 }
 
 enum CategoryManagementCoordinatorError: Error, Equatable, LocalizedError {
+#if DEBUG
+    case acknowledgementRequired(DevelopmentProfileAcknowledgementChallenge)
+    case staleDevelopmentProfile
+#endif
     case persistenceUnavailable
     case lifecycleUnavailable
     case repository(CategoryRepositoryError)
@@ -69,6 +73,12 @@ enum CategoryManagementCoordinatorError: Error, Equatable, LocalizedError {
 
     var errorDescription: String? {
         switch self {
+#if DEBUG
+        case .acknowledgementRequired:
+            return "Acknowledge the active development database profile before changing categories."
+        case .staleDevelopmentProfile:
+            return "The active development database changed. Start the category action again."
+#endif
         case .persistenceUnavailable:
             return "Categories are unavailable while persistence is unavailable."
         case .lifecycleUnavailable:
@@ -104,7 +114,36 @@ final class CategoryManagementCoordinator: CategoryManaging {
     private let categoryStore: CategoryStore
     private let reconciliationGate: CategoryReconciliationGate
     private let forcedHydration: (DatabaseProvider, CategoryStore, String) throws -> RepositoryStoreHydrationResult
+#if DEBUG
+    private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
+#endif
 
+#if DEBUG
+    init(
+        provider: (() -> DatabaseProvider)? = nil,
+        workspaceID: String = "default-workspace",
+        categoryStore: CategoryStore? = nil,
+        reconciliationGate: CategoryReconciliationGate? = nil,
+        forcedHydration: ((DatabaseProvider, CategoryStore, String) throws -> RepositoryStoreHydrationResult)? = nil,
+        acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil
+    ) {
+        let resolvedGate = reconciliationGate ?? CategoryReconciliationGate.shared
+        self.provider = provider ?? { DatabaseProvider.shared }
+        self.workspaceID = workspaceID
+        self.categoryStore = categoryStore ?? .shared
+        self.reconciliationGate = resolvedGate
+        self.acknowledgementGate = acknowledgementGate ?? .shared
+        self.forcedHydration = forcedHydration ?? { provider, categoryStore, workspaceID in
+            try RepositoryStoreHydrator(
+                databaseProvider: provider,
+                categoryStore: categoryStore,
+                workspaceId: workspaceID,
+                categoryReconciliationGate: resolvedGate,
+                participatesInLifecycleGate: false
+            ).hydrateIfNeeded(forceRefresh: true)
+        }
+    }
+#else
     init(
         provider: (() -> DatabaseProvider)? = nil,
         workspaceID: String = "default-workspace",
@@ -127,10 +166,11 @@ final class CategoryManagementCoordinator: CategoryManaging {
             ).hydrateIfNeeded(forceRefresh: true)
         }
     }
+#endif
 
     @discardableResult
     func create(name: String) throws -> Bool {
-        return try mutate { provider, now in
+        let operation: (DatabaseProvider, String) throws -> Bool = { provider, now in
             let validated = try CategoryName.validated(name)
             if try provider.workspaceRepo.workspace(id: self.workspaceID) == nil {
                 _ = try provider.workspaceRepo.upsertWorkspace(WorkspaceDTO(
@@ -147,11 +187,16 @@ final class CategoryManagementCoordinator: CategoryManaging {
             ))
             return true
         }
+#if DEBUG
+        return try mutate(protectedAction: .categoryCreate, operation)
+#else
+        return try mutate(operation)
+#endif
     }
 
     @discardableResult
     func rename(categoryID: String, name: String) throws -> Bool {
-        try mutate { provider, now in
+        let operation: (DatabaseProvider, String) throws -> Bool = { provider, now in
             try provider.categoryRepo.renameCategory(
                 id: categoryID,
                 workspaceId: self.workspaceID,
@@ -159,11 +204,16 @@ final class CategoryManagementCoordinator: CategoryManaging {
                 updatedAtISO: now
             )
         }
+#if DEBUG
+        return try mutate(protectedAction: .categoryRename, operation)
+#else
+        return try mutate(operation)
+#endif
     }
 
     @discardableResult
     func setArchived(categoryID: String, isArchived: Bool) throws -> Bool {
-        try mutate { provider, now in
+        let operation: (DatabaseProvider, String) throws -> Bool = { provider, now in
             try provider.categoryRepo.setCategoryArchived(
                 id: categoryID,
                 workspaceId: self.workspaceID,
@@ -171,24 +221,45 @@ final class CategoryManagementCoordinator: CategoryManaging {
                 updatedAtISO: now
             )
         }
+#if DEBUG
+        return try mutate(
+            protectedAction: isArchived ? .categoryArchive : .categoryRestore,
+            operation
+        )
+#else
+        return try mutate(operation)
+#endif
     }
 
     func deleteUnused(categoryID: String) throws {
-        _ = try mutate { provider, _ in
+        let operation: (DatabaseProvider, String) throws -> Bool = { provider, _ in
             try provider.categoryRepo.deleteUnusedCategory(id: categoryID, workspaceId: self.workspaceID)
             return true
         }
+#if DEBUG
+        _ = try mutate(protectedAction: .categoryDelete, operation)
+#else
+        _ = try mutate(operation)
+#endif
     }
 
     @discardableResult
     func setCategory(categoryID: String?, transactionID: String) throws -> Bool {
-        try mutate { provider, _ in
+        let operation: (DatabaseProvider, String) throws -> Bool = { provider, _ in
             try provider.categoryRepo.setCategory(
                 categoryId: categoryID,
                 transactionId: transactionID,
                 workspaceId: self.workspaceID
             )
         }
+#if DEBUG
+        return try mutate(
+            protectedAction: categoryID == nil ? .transactionCategoryClear : .transactionCategoryAssignment,
+            operation
+        )
+#else
+        return try mutate(operation)
+#endif
     }
 
     func retryCanonicalHydration() throws -> CategoryReconciliationRetryResult {
@@ -217,8 +288,11 @@ final class CategoryManagementCoordinator: CategoryManaging {
         }
     }
 
-    private func mutate(_ operation: (DatabaseProvider, String) throws -> Bool) throws -> Bool {
 #if DEBUG
+    private func mutate(
+        protectedAction: DevelopmentProtectedAction,
+        _ operation: (DatabaseProvider, String) throws -> Bool
+    ) throws -> Bool {
         let lease: DevelopmentDatabaseActivityLease
         do {
             lease = try DevelopmentDatabaseActivityGate.shared.begin(.repositoryWrite)
@@ -226,9 +300,34 @@ final class CategoryManagementCoordinator: CategoryManaging {
             throw CategoryManagementCoordinatorError.lifecycleUnavailable
         }
         defer { lease.finish() }
-#endif
 
         let currentProvider = provider()
+        do {
+            try acknowledgementGate.requireAuthorization(
+                for: protectedAction,
+                providerGeneration: currentProvider.generationToken
+            )
+        } catch DevelopmentProfileAcknowledgementError.acknowledgementRequired(let challenge) {
+            throw CategoryManagementCoordinatorError.acknowledgementRequired(challenge)
+        } catch DevelopmentProfileAcknowledgementError.staleGeneration {
+            throw CategoryManagementCoordinatorError.staleDevelopmentProfile
+        } catch {
+            throw CategoryManagementCoordinatorError.persistenceUnavailable
+        }
+        return try performMutation(using: currentProvider, operation)
+    }
+#else
+    private func mutate(
+        _ operation: (DatabaseProvider, String) throws -> Bool
+    ) throws -> Bool {
+        try performMutation(using: provider(), operation)
+    }
+#endif
+
+    private func performMutation(
+        using currentProvider: DatabaseProvider,
+        _ operation: (DatabaseProvider, String) throws -> Bool
+    ) throws -> Bool {
         guard currentProvider.persistenceState.isUsable else {
             throw CategoryManagementCoordinatorError.persistenceUnavailable
         }

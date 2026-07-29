@@ -137,6 +137,63 @@ struct ConfirmedImportHydrationTests {
         #expect(try first.transactionRepo.trustedTransactions(workspaceId: "default-workspace").isEmpty)
         #expect(try second.transactionRepo.trustedTransactions(workspaceId: "default-workspace").isEmpty)
     }
+
+    @Test(.globalRuntimeStateIsolation)
+    func invalidatedConfirmedImportRepositoryRejectsBeforeBaseOrSQLiteWork() throws {
+        let memory = InMemoryRepositoryProvider()
+        let probe = ConfirmedImportInvocationProbe()
+        let protected = DatabaseProvider(
+            workspaceRepo: memory.workspaceRepo,
+            transactionRepo: memory.transactionRepo,
+            categoryRepo: memory.categoryRepo,
+            accountRepo: memory.accountRepo,
+            importSessionRepo: memory.importSessionRepo,
+            confirmedImportRepo: probe,
+            generationToken: memory.generationToken,
+            persistenceState: .intentionalNonDurable(.testMemory),
+            protectsGeneration: true
+        )
+        let probePlan = confirmedImportPlan(generationToken: protected.generationToken, suffix: "generation-probe")
+        let capturedProbeRepository = protected.confirmedImportRepo
+        protected.invalidateGeneration()
+
+        #expect(capturedProbeRepository.commitConfirmedImport(probePlan) == .staleProviderGeneration)
+        #expect(probe.commitCount == 0)
+
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LedgerForge-ConfirmedGeneration-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: root)
+        try FileManager.default.createDirectory(
+            at: identity.canonicalDevelopmentURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let sqlite = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
+        let lifecycle = DevelopmentDatabaseLifecycleCoordinator(
+            identity: identity,
+            activityGate: DevelopmentDatabaseActivityGate()
+        )
+        defer { lifecycle.closeOwnedProvider() }
+        _ = try lifecycle.installInitialProvider(sqlite)
+        let sqliteRuntime = DatabaseProvider.shared
+        let sqlitePlan = confirmedImportPlan(
+            generationToken: sqliteRuntime.generationToken,
+            suffix: "generation-sqlite"
+        )
+        let capturedSQLiteRepository = sqliteRuntime.confirmedImportRepo
+        guard case .activated = lifecycle.activate(.persistentDebug) else {
+            Issue.record("Expected lifecycle switch before stale confirmed-import check")
+            return
+        }
+
+        #expect(capturedSQLiteRepository.commitConfirmedImport(sqlitePlan) == .staleProviderGeneration)
+        let inspection = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
+        #expect(try inspection.database.queryInt("SELECT COUNT(*) FROM workspaces;") == 0)
+        #expect(try inspection.database.queryInt("SELECT COUNT(*) FROM import_sessions;") == 0)
+        #expect(try inspection.database.queryInt("SELECT COUNT(*) FROM transactions;") == 0)
+        try inspection.database.checkpointAndClose()
+    }
 }
 
 private enum HydrationTestError: Error { case failed }
@@ -162,6 +219,28 @@ private final class HydrationPersistenceCoordinator: ImportPersistenceCoordinati
     }
 
     func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? { nil }
+}
+
+private final class ConfirmedImportInvocationProbe: ConfirmedImportRepository {
+    private(set) var reviewCount = 0
+    private(set) var commitCount = 0
+
+    func reviewPartialImport(_ plan: ConfirmedImportPlanDTO) -> PartialImportReviewResult {
+        reviewCount += 1
+        return .ordinaryFullImport
+    }
+
+    func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
+        commitCount += 1
+        return .repositoryIntegrityConflict
+    }
+
+    func commitReviewedPartialImport(
+        _ plan: ReviewedPartialImportPlanDTO
+    ) -> ConfirmedImportRepositoryResult {
+        commitCount += 1
+        return .repositoryIntegrityConflict
+    }
 }
 
 private func hydrationPreparedImport(

@@ -348,6 +348,34 @@ struct DeveloperDiagnosticsTests {
         ])
         #expect(visible.map(\.level) == [.info, .error, .error])
     }
+
+#if DEBUG
+    @Test("Development profile presentation never emits path or provider identity")
+    func developmentProfilePresentationPrivacy() {
+        let descriptor = DevelopmentDatabaseProfileDescriptor(
+            kind: .migrationSandbox,
+            displayName: DevelopmentDatabaseProfileKind.migrationSandbox.displayName,
+            persistenceClassification: .processOwnedMigrationSandbox,
+            canReset: true,
+            migrationSourceVersion: 7,
+            verifiedCurrentSchemaVersion: 9
+        )
+        let warning = DeveloperDatabaseProfileWarningPresentation(profile: descriptor)
+        let diagnosticText = [
+            descriptor.displayName,
+            descriptor.sourceSchemaLabel,
+            descriptor.currentSchemaLabel,
+            warning?.accessibilityLabel,
+            DevelopmentProfileAcknowledgementError.developmentDatabaseUnavailable.localizedDescription
+        ].compactMap { $0 }.joined(separator: " ")
+
+        #expect(!diagnosticText.contains("/"))
+        #expect(!diagnosticText.lowercased().contains("sqlite"))
+        #expect(!diagnosticText.lowercased().contains("uuid"))
+        #expect(!diagnosticText.lowercased().contains("token"))
+        #expect(!diagnosticText.lowercased().contains("fingerprint"))
+    }
+#endif
 }
 
 private final class DiagnosticPersistenceCoordinator: ImportPersistenceCoordinating {

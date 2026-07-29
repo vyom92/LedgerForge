@@ -65,6 +65,10 @@ private actor GlobalRuntimeStateGate {
 @MainActor
 private enum GlobalRuntimeStateCleanup {
     static func reset() {
+#if DEBUG
+        DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
+        DevelopmentProfileAcknowledgementGate.shared.resetForTesting()
+#endif
         DatabaseProvider.shared.invalidateGeneration()
         DatabaseProvider.shared = .unavailable(reason: .notInitialized)
         AccountStore.shared.replaceAccounts([])

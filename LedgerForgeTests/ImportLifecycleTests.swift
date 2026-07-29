@@ -113,6 +113,121 @@ struct ImportLifecycleTests {
             try sourceB.sourceSnapshot.withBytes { $0 }
         }
     }
+
+#if DEBUG
+    @Test(.globalRuntimeStateIsolation)
+    func directPreparationRequiresAcknowledgementBeforeSourceAcquisition() async {
+        LedgerForgeApp.configureInMemoryPersistenceForTesting()
+        let generation = ProviderGenerationToken()
+        let state = DevelopmentProfileAcknowledgementState(
+            providerGeneration: generation,
+            profileKind: .persistentDebug
+        )
+        let gate = DevelopmentProfileAcknowledgementGate(stateProvider: { state })
+        var acquisitionCount = 0
+        let engine = ImportEngine(
+            sourceSnapshotAcquirer: { _ in
+                acquisitionCount += 1
+                throw SourceContentSnapshotError.acquisitionFailed
+            },
+            importPersistenceCoordinator: PreparationOnlyPersistenceCoordinator(),
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            providerGenerationProvider: { generation },
+            developmentProfileAcknowledgementGate: gate
+        )
+
+        do {
+            _ = try await engine.prepareImport(from: URL(fileURLWithPath: "/not-opened.csv"))
+            Issue.record("Expected acknowledgement requirement")
+        } catch DevelopmentProfileAcknowledgementError.acknowledgementRequired {
+            // Expected typed, pre-I/O result.
+        } catch {
+            Issue.record("Unexpected error: \(error.localizedDescription)")
+        }
+
+        #expect(acquisitionCount == 0)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func directConfirmationRequiresFreshGenerationAcknowledgementWithoutConsumingPreview() async throws {
+        LedgerForgeApp.configureInMemoryPersistenceForTesting()
+        let firstGeneration = ProviderGenerationToken()
+        var currentGeneration = firstGeneration
+        var state = DevelopmentProfileAcknowledgementState(
+            providerGeneration: firstGeneration,
+            profileKind: .current
+        )
+        let gate = DevelopmentProfileAcknowledgementGate(stateProvider: { state })
+        let persistence = SupersessionPersistenceProbe()
+        let engine = ImportEngine(
+            importPersistenceCoordinator: persistence,
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            providerGenerationProvider: { currentGeneration },
+            developmentProfileAcknowledgementGate: gate
+        )
+        let prepared = try await engine.prepareImport(
+            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+        )
+        defer { engine.cancelPreparedImport(prepared) }
+
+        let secondGeneration = ProviderGenerationToken()
+        currentGeneration = secondGeneration
+        state = DevelopmentProfileAcknowledgementState(
+            providerGeneration: secondGeneration,
+            profileKind: .temporarySession
+        )
+
+        let result = await engine.commitPreparedImport(prepared)
+
+        #expect(result.developmentProtectedActionOutcome == .acknowledgementRequired)
+        #expect(!result.persisted)
+        #expect(persistence.persistInvocationCount == 0)
+        #expect(try prepared.sourceSnapshot.withBytes { !$0.isEmpty })
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func profileSwitchInvalidationConsumesPreparedImportBeforeProviderUseWithoutAuditWrite() async throws {
+        LedgerForgeApp.configureInMemoryPersistenceForTesting()
+        let persistence = SupersessionPersistenceProbe()
+        let engine = ImportEngine(
+            importPersistenceCoordinator: persistence,
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            providerGenerationProvider: { DatabaseProvider.shared.generationToken },
+            forcedHydration: {
+                RepositoryStoreHydrationResult(didHydrate: true, accountCount: 0, transactionCount: 0)
+            },
+            rejectedAttemptHydration: {}
+        )
+        let prepared = try await engine.prepareImport(
+            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+        )
+
+        let barrier = DevelopmentDatabaseActivityGate.shared.beginProfileSwitch {
+            engine.invalidatePreparedImportsForProfileSwitch($0)
+        }
+        guard case .acquired(let invalidation) = barrier else {
+            Issue.record("Expected prepared import to drain into exclusive ownership")
+            return
+        }
+        defer { DevelopmentDatabaseActivityGate.shared.finishExclusive(providerChanged: false) }
+
+        #expect(invalidation.invalidatedCount == 1)
+        #expect(!DevelopmentDatabaseActivityGate.shared.hasActiveOperations)
+        #expect(throws: SourceContentSnapshotError.invalidated) {
+            try prepared.sourceSnapshot.withBytes { $0 }
+        }
+        #expect(throws: DevelopmentDatabaseActivityError.self) {
+            _ = try DevelopmentDatabaseActivityGate.shared.begin(.repositoryWrite)
+        }
+
+        let result = await engine.commitPreparedImport(prepared)
+
+        #expect(result.errorMessage == ImportEngineCommitError.alreadyCommitted.localizedDescription)
+        #expect(!result.persisted)
+        #expect(persistence.persistInvocationCount == 0)
+        #expect(persistence.rejectionInvocationCount == 0)
+    }
+#endif
 }
 
 private actor ImportLifecycleCancellationProbe {

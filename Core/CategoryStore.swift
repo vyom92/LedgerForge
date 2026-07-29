@@ -9,7 +9,8 @@ import Foundation
 final class CategoryStore: ObservableObject {
     static let shared = CategoryStore()
 
-    @Published private(set) var snapshot: CategorySnapshot = .empty
+    let objectWillChange = ObservableObjectPublisher()
+    @ObserverAtomicPublished private(set) var snapshot: CategorySnapshot = .empty
 
     init() {}
 
@@ -22,11 +23,24 @@ final class CategoryStore: ObservableObject {
     }
 
     func replaceSnapshot(_ snapshot: CategorySnapshot) {
-        let update = { self.snapshot = snapshot }
+        let update = {
+            self.installSnapshotWithoutObservation(snapshot)
+            self.notifySnapshotOfInstalledValue()
+        }
         if Thread.isMainThread {
             update()
         } else {
             DispatchQueue.main.async(execute: update)
         }
+    }
+
+
+    func installSnapshotWithoutObservation(_ snapshot: CategorySnapshot) {
+        _snapshot.installWithoutObservation(snapshot)
+    }
+
+    func notifySnapshotOfInstalledValue() {
+        objectWillChange.send()
+        _snapshot.publishInstalledValue()
     }
 }

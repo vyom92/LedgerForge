@@ -7,9 +7,23 @@
 
 import SwiftUI
 
+#if DEBUG
+private final class DevelopmentDatabaseTerminationDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
+        }
+    }
+}
+#endif
+
 @main
 struct LedgerForgeApp: App {
+#if DEBUG
+    @NSApplicationDelegateAdaptor(DevelopmentDatabaseTerminationDelegate.self) private var terminationDelegate
+#else
     private static var sqliteProvider: SQLiteRepositoryProvider?
+#endif
 
     init() {
         if Self.usesIsolatedTestPersistence() {
@@ -27,15 +41,16 @@ struct LedgerForgeApp: App {
 
     @discardableResult
     static func configurePersistence(path: String? = nil) -> Bool {
-        sqliteProvider?.database.close()
 #if DEBUG
         DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
+#else
+        sqliteProvider?.database.close()
+        sqliteProvider = nil
 #endif
         DatabaseProvider.shared.invalidateGeneration()
         DatabaseProvider.shared = .unavailable(reason: .notInitialized)
-        sqliteProvider = nil
         do {
-            _ = try installSQLiteProvider(path: path)
+            try installSQLiteProvider(path: path)
             DeveloperConsole.shared.info(.database, "Persistence bootstrap verified")
             return true
         } catch {
@@ -53,11 +68,14 @@ struct LedgerForgeApp: App {
     static func configureInMemoryPersistenceForTesting() {
 #if DEBUG
         DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
-#endif
+#else
         sqliteProvider?.database.close()
+#endif
         DatabaseProvider.shared.invalidateGeneration()
         DatabaseProvider.shared = .intentionalNonDurable(.testMemory)
+#if !DEBUG
         sqliteProvider = nil
+#endif
     }
 
     static func usesIsolatedTestPersistence(
@@ -80,15 +98,23 @@ struct LedgerForgeApp: App {
     }
 #endif
 
-    @discardableResult
-    private static func installSQLiteProvider(path: String? = nil) throws -> SQLiteRepositoryProvider {
-        let provider = try SQLiteRepositoryProvider(path: path)
-        sqliteProvider = provider
+    private static func installSQLiteProvider(path: String? = nil) throws {
 #if DEBUG
-        DevelopmentDatabaseLifecycleCoordinator.shared.installInitialProvider(provider)
+        guard path == nil || usesIsolatedTestPersistence() else {
+            throw DevelopmentDatabaseProfileIdentityError.invalidProfile
+        }
+#endif
+        let provider = try SQLiteRepositoryProvider(path: path)
+#if DEBUG
+        let coordinator = DevelopmentDatabaseLifecycleCoordinator.shared
+        coordinator.loadRememberedSelection(from: DevelopmentDatabaseProfilePreferences())
+        try coordinator.installInitialProvider(
+            provider,
+            allowsTaskOwnedTestPath: usesIsolatedTestPersistence()
+        )
 #else
+        sqliteProvider = provider
         DatabaseProvider.shared = .verifiedSQLite(provider)
 #endif
-        return provider
     }
 }

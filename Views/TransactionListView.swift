@@ -7,17 +7,48 @@
 
 import SwiftUI
 
+private struct TransactionCategoryMutationIntent {
+    let categoryID: String?
+    let transactionID: String
+
+#if DEBUG
+    var protectedAction: DevelopmentProtectedAction {
+        categoryID == nil ? .transactionCategoryClear : .transactionCategoryAssignment
+    }
+#endif
+}
+
 struct TransactionListView: View {
 
     @StateObject private var viewModel = TransactionListViewModel()
     @ObservedObject private var categoryStore: CategoryStore
     private let categoryCoordinator: CategoryManaging
+#if DEBUG
+    private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
+#endif
     @State private var selectedTransactionID: Transaction.ID?
     @State private var categoryMessage: String?
     @State private var categoryReconciliationRequired = false
+#if DEBUG
+    @State private var pendingCategoryMutation: TransactionCategoryMutationIntent?
+    @State private var acknowledgementChallenge: DevelopmentProfileAcknowledgementChallenge?
+#endif
 
     private var filteredTransactions: [Transaction] { viewModel.filteredTransactions }
 
+#if DEBUG
+    @MainActor
+    init(
+        categoryStore: CategoryStore? = nil,
+        categoryCoordinator: CategoryManaging? = nil,
+        acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil
+    ) {
+        let resolvedStore = categoryStore ?? .shared
+        self.categoryStore = resolvedStore
+        self.categoryCoordinator = categoryCoordinator ?? CategoryManagementCoordinator(categoryStore: resolvedStore)
+        self.acknowledgementGate = acknowledgementGate ?? .shared
+    }
+#else
     @MainActor
     init(
         categoryStore: CategoryStore? = nil,
@@ -27,6 +58,7 @@ struct TransactionListView: View {
         self.categoryStore = resolvedStore
         self.categoryCoordinator = categoryCoordinator ?? CategoryManagementCoordinator(categoryStore: resolvedStore)
     }
+#endif
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -43,6 +75,25 @@ struct TransactionListView: View {
         .padding(28)
         .background(LFTheme.backgroundGradient)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+#if DEBUG
+        .confirmationDialog(
+            DevelopmentProfileAcknowledgementPresentation.title,
+            isPresented: Binding(
+                get: { acknowledgementChallenge != nil && pendingCategoryMutation != nil },
+                set: { if !$0 { cancelDevelopmentProfileAcknowledgement() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(DevelopmentProfileAcknowledgementPresentation.approvalLabel) {
+                approveDevelopmentProfileAcknowledgement()
+            }
+            Button("Cancel", role: .cancel) {
+                cancelDevelopmentProfileAcknowledgement()
+            }
+        } message: {
+            Text(DevelopmentProfileAcknowledgementPresentation.message)
+        }
+#endif
     }
 
     private var transactionRangeAndSummary: some View {
@@ -393,11 +444,56 @@ struct TransactionListView: View {
             categoryMessage = "Only persisted imported transactions can be classified."
             return
         }
+        requestCategoryMutation(
+            TransactionCategoryMutationIntent(
+                categoryID: categoryID,
+                transactionID: transactionID
+            )
+        )
+    }
+
+    private func requestCategoryMutation(_ intent: TransactionCategoryMutationIntent) {
+#if DEBUG
+        switch acknowledgementGate.authorization(for: intent.protectedAction) {
+        case .allowed:
+            executeCategoryMutation(intent)
+        case .acknowledgementRequired(let challenge):
+            pendingCategoryMutation = intent
+            acknowledgementChallenge = challenge
+        case .developmentDatabaseUnavailable:
+            categoryMessage = "The development database is unavailable."
+        }
+#else
+        executeCategoryMutation(intent)
+#endif
+    }
+
+    private func executeCategoryMutation(_ intent: TransactionCategoryMutationIntent) {
         do {
-            _ = try categoryCoordinator.setCategory(categoryID: categoryID, transactionID: transactionID)
+            _ = try categoryCoordinator.setCategory(
+                categoryID: intent.categoryID,
+                transactionID: intent.transactionID
+            )
             categoryMessage = nil
             categoryReconciliationRequired = false
         } catch {
+#if DEBUG
+            if let coordinatorError = error as? CategoryManagementCoordinatorError {
+                switch coordinatorError {
+                case .acknowledgementRequired(let challenge):
+                    pendingCategoryMutation = intent
+                    acknowledgementChallenge = challenge
+                    return
+                case .staleDevelopmentProfile:
+                    pendingCategoryMutation = nil
+                    acknowledgementChallenge = nil
+                    categoryMessage = "The active development database changed. Start the category change again."
+                    return
+                default:
+                    break
+                }
+            }
+#endif
             categoryMessage = error.localizedDescription
             if let error = error as? CategoryManagementCoordinatorError {
                 categoryReconciliationRequired = switch error {
@@ -407,6 +503,28 @@ struct TransactionListView: View {
             }
         }
     }
+
+#if DEBUG
+    private func approveDevelopmentProfileAcknowledgement() {
+        guard let challenge = acknowledgementChallenge,
+              let intent = pendingCategoryMutation else { return }
+        switch acknowledgementGate.acknowledge(challenge) {
+        case .granted, .noAcknowledgementRequired:
+            pendingCategoryMutation = nil
+            acknowledgementChallenge = nil
+            executeCategoryMutation(intent)
+        case .staleGeneration, .developmentDatabaseUnavailable:
+            pendingCategoryMutation = nil
+            acknowledgementChallenge = nil
+            categoryMessage = "The active development database changed. Start the category change again."
+        }
+    }
+
+    private func cancelDevelopmentProfileAcknowledgement() {
+        pendingCategoryMutation = nil
+        acknowledgementChallenge = nil
+    }
+#endif
 
     private func retryCanonicalHydration() {
         do {
