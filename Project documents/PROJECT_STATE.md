@@ -3,10 +3,11 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current pushed ref:** `main@7e1345e3817d3c3e91c24f881b962a48279fd73b` — Sprint 63 immutable source-snapshot implementation
-- **Current repository/documentation baseline under review:** `main@5475037006075a0cb218622ea209082e11afe7d9` — Sprint 64 blocked discovery documentation closure
+- **Current repository implementation baseline:** `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388` — DBP-01 Developer Database Profiles
+- **Documentation alignment:** Reconciled on 2026-07-29 against the DBP-01 implementation ref; this document intentionally does not embed its own later documentation-commit SHA
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration is included in the current pushed baseline; this task does not alter parser, fixture or historical financial data
 - **Latest verified production implementation:** Sprint 63 immutable source-snapshot and exact source-byte fingerprint authority
+- **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
@@ -16,6 +17,7 @@
 - **Accepted Sprint 63 implementation ref:** `7e1345e3817d3c3e91c24f881b962a48279fd73b`
 - **Latest accepted ADR:** ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
 - **Current migration:** V9
+- **DBP-01 classification:** Accepted DEBUG-only developer tooling and development-database lifecycle implementation; it is not a production financial capability, production database-profile feature, numbered sprint, Sprint 65, schema migration or personal-v1 adoption
 - **Sprint 55A:** Axis Bank Source-Truth Restoration, ending at `f3154dbd13a340714179da7f972a6accdd3aca54`; parallel shared-runtime-store isolation remains Sprint 55 acceptance/test infrastructure
 - **Sprint 57A:** Category Reconciliation Closure, complete at `251a547cb44712a789a9ad7b23a4eabca742900b`; no migration was added
 - **Sprint 58:** Deterministic Import Verification Workspace, complete at `4547083d4d81edc9b6bcd98c3a8e77ee1538e71a`; DEBUG-only ordinary-path verification with Release containment and an isolated exact-duplicate runtime check
@@ -62,6 +64,16 @@
 - **Axis source-truth runtime boundary:** no private original or canonical database is launched or copied; automated production-path coverage verifies conventional semantics, rejects contradictory evidence before accepted persistence and exercises SQLite/In-Memory persistence, hydration and reconstruction with disposable providers
 
 GitHub establishes pushed repository state only. It does not establish local worktree cleanliness, linked worktrees, local branches, stashes, staged or unstaged changes, untracked files or unpushed commits.
+
+---
+
+## Current Project Qualification
+
+LedgerForge is a private, single-user finance application that remains work in progress and is not currently used to store real financial data. Every current database is disposable development/test state until the user explicitly declares the personal-v1 adoption freeze.
+
+This qualification reduces backup, preservation and rollout ceremony during current development. It does not weaken deterministic financial semantics, migration correctness, database switching, provider-generation safety or Release privacy boundaries.
+
+Personal-v1 adoption remains undeclared. LedgerForge is not currently an active production financial database or a multi-user product rollout.
 
 ---
 
@@ -304,6 +316,17 @@ Settings retains:
 
 Sprint 45 Phase A provides a DEBUG-only `DevelopmentDatabaseLifecycleCoordinator` and activity gate.
 
+DBP-01 expands that lifecycle into four explicit DEBUG-only profiles:
+
+- Current Database retains the canonical Debug identity and is selected on ordinary launch;
+- Persistent Debug Database uses a separate stable application-owned identity;
+- Temporary Session uses a lifecycle-owned process-temporary identity;
+- Migration Sandbox uses a lifecycle-owned temporary identity constructed from a registered historical migration prefix.
+
+Profile activation is explicit. Candidate construction, migration and staged canonical hydration finish before one observer-atomic publication of provider generation, runtime stores, active profile and schema metadata. Active lifecycle work blocks switching, and repositories or confirmed-import work captured from a stale generation reject.
+
+Developer Mode is process-local and begins off on every launch. Remembered selection is passive until explicit activation, and disabling Developer Mode commits Current Database before the toggle becomes off. Non-current profiles show a bounded app-wide warning, and the first protected mutation in each non-current provider generation requires process-local, generation-scoped acknowledgement. Switching or reset clears that acknowledgement.
+
 Canonical identities:
 
 ```text
@@ -332,6 +355,8 @@ They affect only the current process and reconnect to canonical data after relau
 
 Automatic recovery restores the verified lifecycle backup. Failed recovery enters lifecycle-unavailable state.
 
+Current Database cannot be reset through profile controls. Non-current reset and recreation remain lifecycle-owned, and arbitrary or symlink-escaping paths are rejected.
+
 Lifecycle operations are excluded while any of the following is active:
 
 - import preparation;
@@ -341,7 +366,7 @@ Lifecycle operations are excluded while any of the following is active:
 - repository writes;
 - another lifecycle operation.
 
-Permanent reset, temporary sessions, recovery controls and approved-fixture controls are compile-time absent from optimized Release builds.
+All database-profile selection, warning, reset, acknowledgement and approved-fixture machinery is compile-time absent from optimized Release builds. DBP-01 added no migration and changed no financial parser or durable financial semantics.
 
 ### Repository metadata hygiene
 
@@ -539,6 +564,22 @@ American Express production parsing and durable card semantics remain unsupporte
 ---
 
 ## Recent Verified Changes
+
+### DBP-01 — Developer Database Profiles (Debug Development Tooling)
+
+**Ref**
+
+`2d86f91dc46b9e88bcdfea65c88ddf671968b388`
+
+**Verified scope**
+
+DBP-01 is an accepted DEBUG-only developer-tooling and development-database lifecycle implementation. It provides Current Database, Persistent Debug Database, Temporary Session and Migration Sandbox with explicit lifecycle-owned activation; observer-atomic publication; lifecycle-activity blocking and stale-generation rejection; process-local Developer Mode that starts off on launch; an app-wide non-current warning; first-protected-action acknowledgement per non-current provider generation; and lifecycle-owned non-current reset and recreation. Current Database cannot be reset through profile controls.
+
+All database-profile, warning, reset and acknowledgement machinery is absent from optimized Release. DBP-01 added no migration, changed no financial parser or durable financial semantics, established no production database-profile capability and did not declare personal-v1 adoption. Every current database remains disposable development/test state.
+
+Integrated acceptance verified the complete TestPlan with 547 logical tests, 592 execution instances, 68 suites and 55 parameter runs, with zero failures, skips or expected failures. A fresh Debug build, Debug static analysis and isolated disposable runtime verification passed. No private financial source or personal database was used.
+
+The final bounded Release-containment acceptance separately inspected seven authorized correction paths, passed 44 logical focused tests across 46 executions, passed an optimized whole-module `-O` arm64 Release build and passed direct binary `nm`, `strings` and bundled-resource inspection. No acknowledgement gate, Debug database-profile control, profile label, filename, namespace, sandbox control or fixture payload remained in Release. The complete TestPlan, static analysis and runtime walkthrough were not redundantly rerun after that final compile-boundary correction.
 
 ### Sprint 57 — Durable Categories and Manual Transaction Classification
 
@@ -793,7 +834,8 @@ Detailed implementation history remains in Git and accepted ADRs.
 
 ## Current Planning State
 
-- The current planning alignment is based on `main@5475037006075a0cb218622ea209082e11afe7d9`, completed Sprints 50–64, Migration V9 and accepted ADR-041.
+- The current planning alignment is based on implementation ref `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`, completed Sprints 50–64, completed DBP-01 Debug development tooling, Migration V9 and accepted ADR-041.
+- DBP-01 is complete and no DBP-01 implementation remains pending. It is a separate post-Sprint-64 Debug tooling increment, not a numbered sprint or Sprint 65; no sprint renumbering occurred.
 - Sprint 63 implementation of the ADR-041 source-snapshot and source-byte foundation is complete; no source-snapshot implementation remains in the unscheduled queue.
 - `FW-P1-10 — Production PDF Statement Support` is blocked after Sprint 64 discovery by the named lineage/oracle evidence gap. Sprint 65 implementation is blocked; production PDF, OCR, password workflow, generic Axis PDF support and cross-format equivalence remain unsupported.
 - `FW-P1-16` remains blocked until two equivalent formats are independently production-supported and a separate equivalence architecture is accepted.
@@ -804,7 +846,7 @@ Detailed implementation history remains in Git and accepted ADRs.
 - `FW-P2-21 — Deterministic Categorization Rules` is now eligible for bounded discovery; no rule behavior is implemented or authorized.
 - Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
 - `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.
-- Sprint 64 is complete as a blocked read-only discovery/documentation closure; no Sprint 65 implementation prompt is authorized. Developer Database Profiles remains a separate post-Sprint-64 maintenance increment and is not part of this documentation commit.
+- Sprint 64 remains the latest completed numbered outcome. Sprint 65 remains blocked by the Sprint 64 PDF lineage and independent-oracle evidence gap, production PDF support remains unsupported and no Sprint 65 implementation prompt is authorized.
 
 ---
 

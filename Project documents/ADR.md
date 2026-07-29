@@ -26,8 +26,9 @@ When reading this file:
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
 **Status alignment date:** 2026-07-29
-**Repository ref reviewed:** `main@5475037006075a0cb218622ea209082e11afe7d9` — Sprint 64 blocked discovery documentation closure
-**Latest verified production implementation:** Sprint 63 Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
+**Repository implementation ref reviewed:** `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388` — DBP-01 Developer Database Profiles
+**Latest verified production implementation:** Sprint 63 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
+**Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 **Latest completed numbered outcome:** Sprint 64
 **Latest accepted ADR:** ADR-041
 **Current migration:** V9
@@ -72,7 +73,7 @@ No alignment note authorizes implementation.
 | ADR-032 | Durable Import Attempt History and Rejected-Outcome Semantics | Accepted and implemented in Sprint 42; atomicity limitation superseded by ADR-038 implementation. | Durable attempts remain distinct from accepted import sessions. |
 | ADR-033 | Deterministic Money and Native-Currency Integrity | Accepted and implemented in Sprint 44. | Money, compiled catalog authority, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation are operational. |
 | ADR-034 | Document-Scoped Card Statement Evidence | Accepted architecture; not implemented. | Fixture evidence exists for American Express, CBQ and Axis card families. |
-| ADR-035 | Development Database Lifecycle and Recoverable Reset | Accepted and implemented in Sprint 45 Phase A. | DEBUG-only canonical/temporary database lifecycle, verified backup, recovery, activity exclusion and canonical hydration are operational. |
+| ADR-035 | Development Database Lifecycle and Recoverable Reset | Accepted and implemented in Sprint 45 Phase A; expanded by DBP-01 on 2026-07-29. | Four DEBUG-only profiles, lifecycle-owned observer-atomic switching and reset, non-current warnings and generation-scoped protected-action acknowledgement are operational; all profile machinery is absent from Release. |
 | ADR-036 | Category Identity, Assignment, and Mutable Transaction Metadata | Accepted and implemented in Sprint 57; reconciliation closure aligned 2026-07-26. | Flat durable categories, current assignments, canonical hydration and category-specific reconciliation blocking/retry are operational; hierarchy and parent selection remain deferred. |
 | ADR-037 | Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal | Accepted contract-first architecture; no executable mutation family implemented. | The shared lifecycle remains architecture-only. |
 | ADR-038 | Atomic Confirmed Import and Durable Identifier Ownership | Accepted and implemented in Sprint 50. | Migration V5, provider-owned atomic confirmed import, durable identifier ownership/observations, provider parity and subprocess contention acceptance are operational. |
@@ -2503,11 +2504,28 @@ ADR-034 does not implement card evidence models, parsers, persistence, migration
 
 # ADR-035 — Development Database Lifecycle and Recoverable Reset
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-07-29
 
-- **Decision standing:** Accepted and implemented in Sprint 45 Phase A.
-- **Implementation:** DEBUG-only canonical/temporary database lifecycle, verified backup, recovery, activity exclusion and canonical hydration are operational.
-- **Current qualification:** This added no schema migration and does not establish production backup, arbitrary restore or financial reversal.
+- **Decision standing:** Accepted and implemented in Sprint 45 Phase A; expanded by the accepted DBP-01 Debug development-tooling implementation.
+- **Implementation:** Four explicit DEBUG-only database profiles now use lifecycle-owned activation, observer-atomic publication, provider-generation protection, app-wide non-current warnings, bounded reset authority and first-protected-action acknowledgement.
+- **Release boundary:** Profile selection, lifecycle controls, warnings and acknowledgement machinery are compile-time absent from optimized Release builds.
+- **Current qualification:** DBP-01 added no schema migration, production database-profile capability, production backup, arbitrary restore, financial reversal or personal-v1 adoption.
+
+## Implementation Amendment — 2026-07-29
+
+- DBP-01 provides four DEBUG-only profiles: Current Database, Persistent Debug Database, Temporary Session and Migration Sandbox.
+- Current Database retains the existing canonical Debug identity. Persistent Debug Database uses a separate stable application-owned identity. Temporary Session and Migration Sandbox use lifecycle-owned temporary identities.
+- Profile construction rejects arbitrary paths and symlink-escaping identities. `DevelopmentDatabaseLifecycleCoordinator` remains the sole provider-switching and reset owner.
+- Candidate construction, migration and staged hydration complete before committed publication. Provider generation, runtime stores, active-profile state and schema metadata are observer-consistent before the first notification.
+- Active lifecycle work blocks provider switching. Repositories and confirmed-import work captured from a stale provider generation reject rather than mutating the replacement provider.
+- Ordinary launch activates Current Database. Developer Mode is process-local and begins disabled on each launch; remembered profile selection is passive until explicit activation.
+- Disabling Developer Mode commits Current Database before the toggle becomes off.
+- Every non-current profile produces one bounded app-wide warning. The first protected mutation in each non-current provider generation requires acknowledgement.
+- Acknowledgement is process-local and generation-scoped, and it is cleared by profile switching or reset.
+- Current Database cannot be reset through profile controls. Non-current reset and recreation use lifecycle-owned authority.
+- All profile, warning, reset and acknowledgement APIs, symbols, strings, controls and resources are compiled out of Release.
+- DBP-01 added no schema migration and changed no financial parser or durable financial semantics.
+- DBP-01 does not establish production backup, arbitrary restore, financial reversal, Release database-profile control or personal-v1 adoption.
 
 
 ## Status
