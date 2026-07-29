@@ -130,12 +130,17 @@ private enum AppShellSection: String, CaseIterable {
 private enum ProtectedImportIntent {
     case presentFileImporter
     case prepareURL(URL)
+    case prepareRecoveryURL(
+        URL,
+        contextID: UUID,
+        route: ConfirmedImportRecoveryRoute
+    )
     case prepareFixture(DebugApprovedFixture)
     case confirm(PreparedImport)
 
     var protectedAction: DevelopmentProtectedAction {
         switch self {
-        case .presentFileImporter, .prepareURL, .prepareFixture:
+        case .presentFileImporter, .prepareURL, .prepareRecoveryURL, .prepareFixture:
             return .importPreparation
         case .confirm:
             return .importConfirmation
@@ -190,6 +195,292 @@ enum ImportOutcomeTone: Equatable {
             return LFTheme.danger
         }
     }
+}
+
+enum ConfirmedImportRecoveryAction: Equatable, Sendable {
+    case prepareAgain
+    case retryCanonicalReconciliation
+    case retryCanonicalReconciliationThenPrepareAgain
+
+    var label: String {
+        switch self {
+        case .prepareAgain:
+            return "Prepare Again"
+        case .retryCanonicalReconciliation,
+                .retryCanonicalReconciliationThenPrepareAgain:
+            return "Retry Reconciliation"
+        }
+    }
+
+    fileprivate var requiresSourceURL: Bool {
+        switch self {
+        case .prepareAgain, .retryCanonicalReconciliationThenPrepareAgain:
+            return true
+        case .retryCanonicalReconciliation:
+            return false
+        }
+    }
+}
+
+struct ConfirmedImportRecoveryPresentation: Equatable {
+    let title: String
+    let explanation: String
+    let primaryAction: ConfirmedImportRecoveryAction?
+    let iconName: String
+    let tone: ImportOutcomeTone
+
+    var primaryActionLabel: String? {
+        primaryAction?.label
+    }
+
+    var accessibilityText: String {
+        [title, explanation, primaryActionLabel]
+            .compactMap { $0 }
+            .joined(separator: ". ")
+    }
+
+    func availablePrimaryAction(hasSourceURL: Bool) -> ConfirmedImportRecoveryAction? {
+        guard let primaryAction else { return nil }
+        return primaryAction.requiresSourceURL && !hasSourceURL ? nil : primaryAction
+    }
+}
+
+enum ConfirmedImportRecoveryPresentationMapper {
+    static func presentation(
+        for route: ConfirmedImportRecoveryRoute
+    ) -> ConfirmedImportRecoveryPresentation? {
+        switch route {
+        case .none:
+            return nil
+        case .prepareAgain(let reason):
+            return prepareAgainPresentation(for: reason)
+        case .retryCanonicalReconciliation:
+            return ConfirmedImportRecoveryPresentation(
+                title: "Saved — Reconciliation Required",
+                explanation: "The import was saved, but the current view could not be refreshed. Retrying reconciliation refreshes from durable state and does not import again.",
+                primaryAction: .retryCanonicalReconciliation,
+                iconName: "arrow.triangle.2.circlepath.circle.fill",
+                tone: .warning
+            )
+        case .retryCanonicalReconciliationThenPrepareAgain:
+            return ConfirmedImportRecoveryPresentation(
+                title: "Not Saved — Reconciliation Required",
+                explanation: "An earlier saved import still needs reconciliation, so no new import was saved. Retry Reconciliation refreshes durable state first; only after success, it starts a wholly fresh preparation from the retained source. A new confirmation is still required.",
+                primaryAction: .retryCanonicalReconciliationThenPrepareAgain,
+                iconName: "arrow.triangle.2.circlepath.circle.fill",
+                tone: .warning
+            )
+        case .reviewRequired(let reason):
+            return reviewPresentation(for: reason)
+        case .unavailable:
+            return ConfirmedImportRecoveryPresentation(
+                title: "Recovery Unavailable",
+                explanation: "Recovery is unavailable because this state cannot safely authorize another operation.",
+                primaryAction: nil,
+                iconName: "questionmark.circle.fill",
+                tone: .warning
+            )
+        }
+    }
+
+    private static func prepareAgainPresentation(
+        for reason: ConfirmedImportRecoveryReason
+    ) -> ConfirmedImportRecoveryPresentation {
+        let reasonCopy: (title: String, explanation: String, iconName: String)
+        switch reason {
+        case .sourceSnapshotIntegrityFailed:
+            reasonCopy = (
+                "Source Verification Changed",
+                "The prepared source evidence could not be verified.",
+                "checkmark.shield.trianglebadge.exclamationmark"
+            )
+        case .staleProviderGeneration:
+            reasonCopy = (
+                "Preparation Out of Date",
+                "Persistence changed after the preparation was created.",
+                "arrow.triangle.2.circlepath"
+            )
+        case .reviewedPartialPlanStale:
+            reasonCopy = (
+                "Reviewed Plan Out of Date",
+                "The reviewed partial-import plan is no longer current.",
+                "clock.badge.exclamationmark.fill"
+            )
+        case .persistenceContention:
+            reasonCopy = (
+                "Persistence Temporarily Busy",
+                "The confirmed write did not obtain exclusive persistence access.",
+                "hourglass"
+            )
+        case .persistenceUnavailable:
+            reasonCopy = (
+                "Persistence Unavailable",
+                "Durable persistence was unavailable for the confirmed operation.",
+                "externaldrive.badge.exclamationmark"
+            )
+        case .validationFailed, .exactStatementDuplicate, .transactionEventBlock,
+                .accountChoiceRequired, .accountChoiceStale, .identityAmbiguous,
+                .identityConflict, .identifierOwnershipConflict,
+                .repositoryIntegrityConflict:
+            return unavailablePresentationForMismatchedReason()
+        }
+
+        return ConfirmedImportRecoveryPresentation(
+            title: reasonCopy.title,
+            explanation: "\(reasonCopy.explanation) No new financial history was written. Prepare Again reads the selected source again, creates new source evidence, binds the preparation to current persistence, repeats validation, duplicate, identity, and account-choice review, and requires a new explicit confirmation.",
+            primaryAction: .prepareAgain,
+            iconName: reasonCopy.iconName,
+            tone: .warning
+        )
+    }
+
+    private static func reviewPresentation(
+        for reason: ConfirmedImportRecoveryReason
+    ) -> ConfirmedImportRecoveryPresentation {
+        switch reason {
+        case .validationFailed:
+            return reviewPresentation(
+                title: "Validation Review Required",
+                explanation: "The prepared content did not pass validation. Review the validation findings before beginning a separate import.",
+                iconName: "checkmark.shield.trianglebadge.exclamationmark"
+            )
+        case .exactStatementDuplicate:
+            return reviewPresentation(
+                title: "Already Imported",
+                explanation: "The statement matches a prior completed import. Review the prior import; no new import was saved.",
+                iconName: "doc.on.doc.fill"
+            )
+        case .transactionEventBlock:
+            return reviewPresentation(
+                title: "Transaction Review Required",
+                explanation: "Supported transaction-event checks blocked this statement. Review the bounded conflict before beginning a separate import.",
+                iconName: "arrow.left.arrow.right.circle.fill"
+            )
+        case .accountChoiceRequired:
+            return reviewPresentation(
+                title: "Account Choice Required",
+                explanation: "The prepared import needs an explicit eligible account decision. Review the account choices before beginning a separate import.",
+                iconName: "person.crop.circle.badge.questionmark"
+            )
+        case .accountChoiceStale:
+            return reviewPresentation(
+                title: "Account Choice Out of Date",
+                explanation: "The reviewed account choice is no longer available or eligible. Begin a separate preparation before choosing again.",
+                iconName: "person.crop.circle.badge.exclamationmark"
+            )
+        case .identityAmbiguous:
+            return reviewPresentation(
+                title: "Account Identity Ambiguous",
+                explanation: "Verified identity evidence does not resolve to one account. Review the account decision before beginning a separate import.",
+                iconName: "person.crop.circle.badge.questionmark"
+            )
+        case .identityConflict:
+            return reviewPresentation(
+                title: "Account Identity Conflict",
+                explanation: "Verified identity evidence conflicts with existing account ownership. Review the account decision before beginning a separate import.",
+                iconName: "person.crop.circle.badge.exclamationmark"
+            )
+        case .identifierOwnershipConflict:
+            return reviewPresentation(
+                title: "Identifier Ownership Conflict",
+                explanation: "Verified identifier ownership conflicts with the reviewed account decision. Review the account decision before beginning a separate import.",
+                iconName: "person.text.rectangle"
+            )
+        case .repositoryIntegrityConflict:
+            return reviewPresentation(
+                title: "Integrity Review Required",
+                explanation: "Repository integrity checks blocked the operation. Review the recorded outcome before beginning a separate import.",
+                iconName: "exclamationmark.shield.fill"
+            )
+        case .sourceSnapshotIntegrityFailed, .staleProviderGeneration,
+                .reviewedPartialPlanStale, .persistenceContention,
+                .persistenceUnavailable:
+            return unavailablePresentationForMismatchedReason()
+        }
+    }
+
+    private static func reviewPresentation(
+        title: String,
+        explanation: String,
+        iconName: String
+    ) -> ConfirmedImportRecoveryPresentation {
+        ConfirmedImportRecoveryPresentation(
+            title: title,
+            explanation: explanation,
+            primaryAction: nil,
+            iconName: iconName,
+            tone: .warning
+        )
+    }
+
+    private static func unavailablePresentationForMismatchedReason()
+        -> ConfirmedImportRecoveryPresentation {
+        ConfirmedImportRecoveryPresentation(
+            title: "Recovery Unavailable",
+            explanation: "Recovery is unavailable because this state cannot safely authorize another operation.",
+            primaryAction: nil,
+            iconName: "questionmark.circle.fill",
+            tone: .warning
+        )
+    }
+}
+
+enum ConfirmedImportRecoveryActionExecutionResult: Equatable {
+    case unavailable
+    case preparationRequested
+    case reconciliationSucceeded
+    case reconciliationFailed
+}
+
+final class ConfirmedImportRecoveryActionExecutor {
+    @MainActor private(set) var activeOperationID: UUID?
+
+    @MainActor
+    func execute(
+        _ action: ConfirmedImportRecoveryAction,
+        sourceURL: URL?,
+        retryCanonicalReconciliation: () async -> Bool,
+        requestOrdinaryPreparation: (URL) async -> Bool
+    ) async -> ConfirmedImportRecoveryActionExecutionResult {
+        guard activeOperationID == nil else { return .unavailable }
+        if action.requiresSourceURL && sourceURL == nil {
+            return .unavailable
+        }
+
+        let operationID = UUID()
+        activeOperationID = operationID
+        defer {
+            if activeOperationID == operationID {
+                activeOperationID = nil
+            }
+        }
+
+        switch action {
+        case .prepareAgain:
+            guard let sourceURL else { return .unavailable }
+            return await requestOrdinaryPreparation(sourceURL)
+                ? .preparationRequested
+                : .unavailable
+        case .retryCanonicalReconciliation:
+            return await retryCanonicalReconciliation()
+                ? .reconciliationSucceeded
+                : .reconciliationFailed
+        case .retryCanonicalReconciliationThenPrepareAgain:
+            guard let sourceURL else { return .unavailable }
+            guard await retryCanonicalReconciliation() else {
+                return .reconciliationFailed
+            }
+            return await requestOrdinaryPreparation(sourceURL)
+                ? .preparationRequested
+                : .unavailable
+        }
+    }
+}
+
+private struct ConfirmedImportRecoveryContext {
+    let id = UUID()
+    let route: ConfirmedImportRecoveryRoute
+    let sourceURL: URL?
 }
 
 extension ImportAccountOutcomePresentation {
@@ -574,17 +865,19 @@ struct ImportOutcomePresentation: Equatable {
     let previousAccountDisplayName: String?
     let isPreviouslyImported: Bool
     let transactionEventBlock: TransactionEventBlock?
-    var requiresReconciliation: Bool
+    var recoveryRoute: ConfirmedImportRecoveryRoute
     let isPartialImport: Bool
     let sourceRowCount: Int?
     let recognizedExistingRowCount: Int?
     let accountOutcomePresentation: ImportAccountOutcomePresentation?
+    var recoveryContextID: UUID?
 
     init(result: ImportEngineResult) {
         fileName = result.fileName
         transactionCount = result.transactionCount
         validationStatus = result.validationPassed ? "Validation Passed" : "Validation Failed"
-        allowsViewingTransactions = result.validationPassed && result.persisted && !result.requiresReconciliation
+        allowsViewingTransactions = Self.provesCommittedSuccess(result)
+            && (result.recoveryRoute == .none || result.recoveryRoute == .unavailable)
         accountId = result.accountId
         importSessionId = result.importSessionId
         redactedIdentifier = result.redactedIdentifier
@@ -592,54 +885,111 @@ struct ImportOutcomePresentation: Equatable {
         previousAccountDisplayName = result.previousImport?.accountDisplayName
         isPreviouslyImported = result.previousImport != nil
         transactionEventBlock = result.transactionEventBlock
-        requiresReconciliation = result.requiresReconciliation
+        recoveryRoute = result.recoveryRoute
         isPartialImport = result.isPartialImport
         sourceRowCount = result.sourceRowCount
         recognizedExistingRowCount = result.recognizedExistingRowCount
         accountOutcomePresentation = result.accountOutcome == .unavailable
             ? nil
             : ImportAccountOutcomePresentationMapper.presentation(for: result.accountOutcome)
+        recoveryContextID = nil
 
-        if result.previousImport != nil || result.transactionEventBlock != nil || result.persisted {
-            message = result.errorMessage?.isEmpty == false ? result.errorMessage : nil
-        } else {
+        if result.recoveryRoute == .unavailable && !result.persisted {
             let failure = result.validationPassed ? "Import persistence failed." : "Import validation failed."
             let history = result.importAttemptId != nil
                 ? "The failure was added to Import History."
                 : "The failure could not be added to Import History."
             message = "\(failure) \(history)"
+        } else {
+            message = nil
         }
 
-        if result.previousImport != nil {
+        switch result.recoveryRoute {
+        case .retryCanonicalReconciliation:
+            persistenceStatus = "Saved — Reconciliation Required"
+            iconName = "arrow.triangle.2.circlepath.circle.fill"
+            tone = .warning
+        case .retryCanonicalReconciliationThenPrepareAgain:
+            persistenceStatus = "Not Saved — Reconciliation Required"
+            iconName = "arrow.triangle.2.circlepath.circle.fill"
+            tone = .warning
+        case .prepareAgain:
+            persistenceStatus = "Not Saved — Fresh Preparation Required"
+            iconName = "arrow.clockwise.circle.fill"
+            tone = .warning
+        case .reviewRequired(.exactStatementDuplicate):
             persistenceStatus = "Previously Imported"
             iconName = "checkmark.circle.fill"
             tone = .warning
-        } else if result.transactionEventBlock != nil {
+        case .reviewRequired(.transactionEventBlock):
             persistenceStatus = "Statement Blocked"
             iconName = "exclamationmark.triangle.fill"
             tone = .warning
-        } else if result.requiresReconciliation {
-            persistenceStatus = "Committed — Reconciliation Required"
-            iconName = "arrow.triangle.2.circlepath.circle.fill"
-            tone = .warning
-        } else if result.validationPassed && result.persisted {
-            persistenceStatus = result.isPartialImport ? "Partial Import Succeeded" : "Persistence Succeeded"
-            iconName = "checkmark.circle.fill"
-            tone = .success
-        } else if result.validationPassed {
-            persistenceStatus = "Persistence Failed"
-            iconName = "exclamationmark.triangle.fill"
-            tone = .warning
-        } else {
+        case .reviewRequired(.validationFailed):
             persistenceStatus = "Not Persisted"
             iconName = "xmark.octagon.fill"
             tone = .danger
+        case .reviewRequired:
+            persistenceStatus = "Review Required"
+            iconName = "exclamationmark.triangle.fill"
+            tone = .warning
+        case .none:
+            if Self.provesCommittedSuccess(result) {
+                persistenceStatus = result.isPartialImport
+                    ? "Partial Import Succeeded"
+                    : "Persistence Succeeded"
+                iconName = "checkmark.circle.fill"
+                tone = .success
+            } else {
+                persistenceStatus = "Outcome Unavailable"
+                iconName = "questionmark.circle.fill"
+                tone = .warning
+            }
+        case .unavailable:
+            if Self.provesCommittedSuccess(result) {
+                persistenceStatus = result.isPartialImport
+                    ? "Partial Import Succeeded"
+                    : "Persistence Succeeded"
+                iconName = "checkmark.circle.fill"
+                tone = .success
+            } else if !result.validationPassed {
+                persistenceStatus = "Not Persisted"
+                iconName = "xmark.octagon.fill"
+                tone = .danger
+            } else if !result.persisted {
+                persistenceStatus = "Persistence Failed"
+                iconName = "exclamationmark.triangle.fill"
+                tone = .warning
+            } else {
+                persistenceStatus = "Outcome Unavailable"
+                iconName = "questionmark.circle.fill"
+                tone = .warning
+            }
         }
     }
 
+    var requiresReconciliation: Bool {
+        recoveryRoute == .retryCanonicalReconciliation
+    }
+
+    var recoveryPresentation: ConfirmedImportRecoveryPresentation? {
+        ConfirmedImportRecoveryPresentationMapper.presentation(for: recoveryRoute)
+    }
+
     var fileSubtitle: String {
-        if isPreviouslyImported {
+        switch recoveryRoute {
+        case .retryCanonicalReconciliation:
+            return "Import saved; the current view needs reconciliation"
+        case .retryCanonicalReconciliationThenPrepareAgain:
+            return "No new import was saved"
+        case .prepareAgain:
+            return "No new financial history was written"
+        case .reviewRequired(.exactStatementDuplicate):
             return "Previously imported — no new data written"
+        case .reviewRequired:
+            return "No new import was saved"
+        case .none, .unavailable:
+            break
         }
         if isPartialImport {
             return "Partial import — \(transactionCount) new, \(recognizedExistingRowCount ?? 0) already represented, \(sourceRowCount ?? transactionCount) source rows"
@@ -652,14 +1002,35 @@ struct ImportOutcomePresentation: Equatable {
     }
 
     func markingReconciled() -> ImportOutcomePresentation {
+        guard recoveryRoute == .retryCanonicalReconciliation else { return self }
         var copy = self
-        copy.requiresReconciliation = false
+        copy.recoveryRoute = .none
+        copy.recoveryContextID = nil
         copy.allowsViewingTransactions = true
-        copy.persistenceStatus = "Persistence Succeeded"
+        copy.persistenceStatus = isPartialImport ? "Partial Import Succeeded" : "Persistence Succeeded"
         copy.message = nil
         copy.iconName = "checkmark.circle.fill"
         copy.tone = .success
         return copy
+    }
+
+    private static func provesCommittedSuccess(_ result: ImportEngineResult) -> Bool {
+        guard result.validationPassed,
+              result.persisted,
+              result.hydrationOutcome == .committedAndHydrated,
+              result.errorMessage == nil,
+              result.previousImport == nil,
+              result.transactionEventBlock == nil else {
+            return false
+        }
+        switch result.accountOutcome {
+        case .matchedExisting, .userSelectedExisting, .createdNew, .unavailable:
+            return true
+        case .choiceRequired, .identityAmbiguous, .identityConflict,
+                .identifierOwnershipConflict, .staleAccountChoice,
+                .staleProviderGeneration:
+            return false
+        }
     }
 }
 
@@ -801,6 +1172,10 @@ struct ContentView: View {
     @State private var importIdentityReview: ImportIdentityReview = .unavailable
     @State private var importAccountChoice: ImportAccountChoice?
     @State private var partialImportReview: PartialImportReviewResult = .ordinaryFullImport
+    @State private var selectedImportSourceURL: URL?
+    @State private var confirmedImportRecoveryContext: ConfirmedImportRecoveryContext?
+    @State private var confirmedImportRecoveryActionRequestID: UUID?
+    @State private var confirmedImportRecoveryActionExecutor = ConfirmedImportRecoveryActionExecutor()
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @StateObject private var accountsViewModel = AccountsViewModel()
     @StateObject private var importHistoryViewModel = ImportHistoryViewModel()
@@ -861,6 +1236,8 @@ struct ContentView: View {
 
             case .failure(let error):
                 let summary = ImportFailureSummary.from(error)
+                selectedImportSourceURL = nil
+                confirmedImportRecoveryContext = nil
                 selectedFile = "Import failed"
                 importState = .failed(fileName: "Import failed", message: summary.displayText, retrySourceURL: nil)
                 selectedSection = .imports
@@ -2053,6 +2430,49 @@ struct ContentView: View {
                         LFStatusBadge(title: outcome.persistenceStatus, color: outcome.tone.color)
                     }
 
+                    if let recovery = outcome.recoveryPresentation {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: recovery.iconName)
+                                    .foregroundStyle(recovery.tone.color)
+                                    .frame(width: 20)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(recovery.title)
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(recovery.explanation)
+                                        .font(.caption)
+                                        .foregroundStyle(LFTheme.textSecondary)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(recovery.accessibilityText)
+
+                            if let action = availableConfirmedImportRecoveryAction(for: outcome) {
+                                Button {
+                                    performConfirmedImportRecoveryAction(action, for: outcome)
+                                } label: {
+                                    Label(action.label, systemImage: "arrow.clockwise")
+                                        .font(.subheadline.weight(.semibold))
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 10)
+                                        .frame(maxWidth: .infinity)
+                                        .background(LFTheme.surface)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(LFTheme.text)
+                                .disabled(
+                                    confirmedImportRecoveryActionRequestID != nil
+                                        || preparationOwner.activeOperationID != nil
+                                )
+                            }
+                        }
+                        .padding(12)
+                        .background(recovery.tone.color.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+
                     if let accountPresentation = outcome.accountOutcomePresentation {
                         ImportAccountOutcomeView(
                             presentation: accountPresentation,
@@ -2138,23 +2558,6 @@ struct ContentView: View {
                             .foregroundStyle(.white)
                             .contentShape(RoundedRectangle(cornerRadius: 8))
                         }
-                    }
-                    if outcome.requiresReconciliation {
-                        Button {
-                            if ImportEngine.shared.retryCanonicalHydration() {
-                                importState = .completed(outcome.markingReconciled())
-                            }
-                        } label: {
-                            Label("Retry Canonical Refresh", systemImage: "arrow.clockwise")
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                                .frame(maxWidth: .infinity)
-                                .background(LFTheme.surface)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(LFTheme.text)
                     }
                 }
             case .cancelled(let fileName):
@@ -2906,6 +3309,12 @@ struct ContentView: View {
             selectedSection = .imports
         case .prepareURL(let url):
             beginPreparation(from: url)
+        case .prepareRecoveryURL(let url, let contextID, let route):
+            beginRecoveryPreparation(
+                from: url,
+                contextID: contextID,
+                route: route
+            )
         case .prepareFixture(let fixture):
             beginPreparation(for: fixture)
         case .confirm(let preparedImport):
@@ -2945,6 +3354,11 @@ struct ContentView: View {
         default:
             break
         }
+        pendingProtectedImportIntent = nil
+        developmentAcknowledgementChallenge = nil
+        confirmedImportRecoveryActionRequestID = nil
+        confirmedImportRecoveryContext = nil
+        selectedImportSourceURL = nil
         importState = .idle
         selectedFile = "No statement imported"
         importIdentityReview = .unavailable
@@ -2965,8 +3379,131 @@ struct ContentView: View {
         }
     }
 
+    private func availableConfirmedImportRecoveryAction(
+        for outcome: ImportOutcomePresentation
+    ) -> ConfirmedImportRecoveryAction? {
+        guard let context = confirmedImportRecoveryContext,
+              context.route == outcome.recoveryRoute,
+              outcome.recoveryContextID == context.id,
+              let recoveryPresentation = outcome.recoveryPresentation else {
+            return nil
+        }
+        return recoveryPresentation.availablePrimaryAction(
+            hasSourceURL: context.sourceURL != nil
+        )
+    }
+
+    private func performConfirmedImportRecoveryAction(
+        _ action: ConfirmedImportRecoveryAction,
+        for outcome: ImportOutcomePresentation
+    ) {
+        guard confirmedImportRecoveryActionRequestID == nil,
+              preparationOwner.activeOperationID == nil,
+              case .completed(let currentOutcome) = importState,
+              currentOutcome.recoveryRoute == outcome.recoveryRoute,
+              currentOutcome.recoveryContextID == outcome.recoveryContextID,
+              let context = confirmedImportRecoveryContext,
+              context.route == outcome.recoveryRoute,
+              outcome.recoveryContextID == context.id,
+              availableConfirmedImportRecoveryAction(for: outcome) == action else {
+            return
+        }
+#if DEBUG
+        guard pendingProtectedImportIntent == nil,
+              developmentAcknowledgementChallenge == nil else {
+            return
+        }
+#endif
+
+        let requestID = UUID()
+        confirmedImportRecoveryActionRequestID = requestID
+        Task { @MainActor in
+            defer {
+                if confirmedImportRecoveryActionRequestID == requestID {
+                    confirmedImportRecoveryActionRequestID = nil
+                }
+            }
+
+            let execution = await confirmedImportRecoveryActionExecutor.execute(
+                action,
+                sourceURL: context.sourceURL,
+                retryCanonicalReconciliation: {
+                    guard confirmedImportRecoveryContext?.id == context.id,
+                          case .completed(let currentOutcome) = importState,
+                          currentOutcome.recoveryRoute == context.route,
+                          currentOutcome.recoveryContextID == context.id else {
+                        return false
+                    }
+                    return ImportEngine.shared.retryCanonicalHydration()
+                },
+                requestOrdinaryPreparation: { url in
+                    guard confirmedImportRecoveryContext?.id == context.id,
+                          case .completed(let currentOutcome) = importState,
+                          currentOutcome.recoveryRoute == context.route,
+                          currentOutcome.recoveryContextID == context.id else {
+                        return false
+                    }
+#if DEBUG
+                    requestProtectedImportAction(
+                        .prepareRecoveryURL(
+                            url,
+                            contextID: context.id,
+                            route: context.route
+                        )
+                    )
+                    if case .preparing = importState {
+                        return true
+                    }
+                    return pendingProtectedImportIntent != nil
+                        && developmentAcknowledgementChallenge != nil
+#else
+                    beginRecoveryPreparation(
+                        from: url,
+                        contextID: context.id,
+                        route: context.route
+                    )
+                    if case .preparing = importState {
+                        return true
+                    }
+                    return false
+#endif
+                }
+            )
+
+            guard execution == .reconciliationSucceeded,
+                  confirmedImportRecoveryContext?.id == context.id,
+                  case .completed(let reconciledOutcome) = importState,
+                  reconciledOutcome.recoveryRoute == .retryCanonicalReconciliation,
+                  reconciledOutcome.recoveryContextID == context.id else {
+                return
+            }
+            confirmedImportRecoveryContext = nil
+            selectedImportSourceURL = nil
+            importState = .completed(reconciledOutcome.markingReconciled())
+        }
+    }
+
+    private func beginRecoveryPreparation(
+        from url: URL,
+        contextID: UUID,
+        route: ConfirmedImportRecoveryRoute
+    ) {
+        guard let context = confirmedImportRecoveryContext,
+              context.id == contextID,
+              context.route == route,
+              context.sourceURL == url,
+              case .completed(let outcome) = importState,
+              outcome.recoveryRoute == route,
+              outcome.recoveryContextID == contextID else {
+            return
+        }
+        beginPreparation(from: url)
+    }
+
     private func beginPreparation(from url: URL) {
         guard consumePreparedImportBeforeSourceReplacement() else { return }
+        confirmedImportRecoveryContext = nil
+        selectedImportSourceURL = url
         importAccountChoice = nil
         importIdentityReview = .unavailable
         partialImportReview = .ordinaryFullImport
@@ -2991,6 +3528,8 @@ struct ContentView: View {
 #if DEBUG
     private func beginPreparation(for fixture: DebugApprovedFixture) {
         guard consumePreparedImportBeforeSourceReplacement() else { return }
+        confirmedImportRecoveryContext = nil
+        selectedImportSourceURL = nil
         importAccountChoice = nil
         importIdentityReview = .unavailable
         partialImportReview = .ordinaryFullImport
@@ -3111,6 +3650,17 @@ struct ContentView: View {
 
         var outcome = ImportOutcomePresentation(result: result)
         outcome.fileName = displayName
+        if let action = outcome.recoveryPresentation?.primaryAction {
+            let context = ConfirmedImportRecoveryContext(
+                route: outcome.recoveryRoute,
+                sourceURL: action.requiresSourceURL ? selectedImportSourceURL : nil
+            )
+            outcome.recoveryContextID = context.id
+            confirmedImportRecoveryContext = context
+        } else {
+            confirmedImportRecoveryContext = nil
+        }
+        selectedImportSourceURL = nil
         selectedFile = displayName
         importState = .completed(outcome)
     }
@@ -3130,6 +3680,8 @@ struct ContentView: View {
         importAccountChoice = nil
         importIdentityReview = .unavailable
         partialImportReview = .ordinaryFullImport
+        selectedImportSourceURL = nil
+        confirmedImportRecoveryContext = nil
         selectedFile = fileName
         importState = .cancelled(fileName: fileName)
     }

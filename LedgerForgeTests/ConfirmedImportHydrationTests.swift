@@ -23,8 +23,158 @@ struct ConfirmedImportHydrationTests {
         #expect(result.persisted)
         #expect(result.succeeded)
         #expect(result.hydrationOutcome == .committedAndHydrated)
+        #expect(result.recoveryRoute == .none)
         #expect(hydrationCount == 1)
         #expect(coordinator.persistCount == 1)
+    }
+
+    @Test func committedHydrationRecoveryActionReconcilesWithoutReimport() async throws {
+        let coordinator = HydrationPersistenceCoordinator()
+        let gate = ConfirmedImportReconciliationGate()
+        var hydrationShouldFail = true
+        let engine = ImportEngine(
+            importPersistenceCoordinator: coordinator,
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            forcedHydration: {
+                if hydrationShouldFail { throw HydrationTestError.failed }
+                return hydrationResult()
+            },
+            reconciliationGate: gate
+        )
+        let committed = await engine.commitPreparedImport(hydrationPreparedImport())
+        let presentation = try #require(
+            ConfirmedImportRecoveryPresentationMapper.presentation(
+                for: committed.recoveryRoute
+            )
+        )
+        let action = try #require(presentation.primaryAction)
+        let executor = ConfirmedImportRecoveryActionExecutor()
+        var preparationCount = 0
+
+        hydrationShouldFail = false
+        let execution = await executor.execute(
+            action,
+            sourceURL: nil,
+            retryCanonicalReconciliation: {
+                engine.retryCanonicalHydration()
+            },
+            requestOrdinaryPreparation: { _ in
+                preparationCount += 1
+                return true
+            }
+        )
+
+        #expect(committed.persisted)
+        #expect(committed.recoveryRoute == .retryCanonicalReconciliation)
+        #expect(action == .retryCanonicalReconciliation)
+        #expect(execution == .reconciliationSucceeded)
+        #expect(preparationCount == 0)
+        #expect(coordinator.persistCount == 1)
+        #expect(!gate.isBlocked)
+    }
+
+    @Test func blockedRecoveryReconcilesBeforeRequestingFreshExplicitPreview() async throws {
+        let coordinator = HydrationPersistenceCoordinator()
+        let gate = ConfirmedImportReconciliationGate()
+        var hydrationShouldFail = true
+        let engine = ImportEngine(
+            importPersistenceCoordinator: coordinator,
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            forcedHydration: {
+                if hydrationShouldFail { throw HydrationTestError.failed }
+                return hydrationResult()
+            },
+            reconciliationGate: gate
+        )
+
+        let committed = await engine.commitPreparedImport(hydrationPreparedImport())
+        let blockedPrepared = hydrationPreparedImport()
+        let blocked = await engine.commitPreparedImport(blockedPrepared)
+        let presentation = try #require(
+            ConfirmedImportRecoveryPresentationMapper.presentation(
+                for: blocked.recoveryRoute
+            )
+        )
+        let action = try #require(presentation.primaryAction)
+        let executor = ConfirmedImportRecoveryActionExecutor()
+        var events: [String] = []
+        var freshPreview: PreparedImport?
+
+        hydrationShouldFail = false
+        let execution = await executor.execute(
+            action,
+            sourceURL: blockedPrepared.sourceURL,
+            retryCanonicalReconciliation: {
+                events.append("reconcile")
+                return engine.retryCanonicalHydration()
+            },
+            requestOrdinaryPreparation: { url in
+                events.append("prepare")
+                #expect(url == blockedPrepared.sourceURL)
+                freshPreview = hydrationPreparedImport()
+                return true
+            }
+        )
+        let fresh = try #require(freshPreview)
+
+        #expect(committed.recoveryRoute == .retryCanonicalReconciliation)
+        #expect(blocked.recoveryRoute == .retryCanonicalReconciliationThenPrepareAgain)
+        #expect(action == .retryCanonicalReconciliationThenPrepareAgain)
+        #expect(execution == .preparationRequested)
+        #expect(events == ["reconcile", "prepare"])
+        #expect(fresh.id != blockedPrepared.id)
+        #expect(fresh.sourceSnapshot.id != blockedPrepared.sourceSnapshot.id)
+        #expect(coordinator.persistCount == 1)
+        #expect(!gate.isBlocked)
+
+        let explicitlyConfirmed = await engine.commitPreparedImport(fresh)
+
+        #expect(explicitlyConfirmed.recoveryRoute == .none)
+        #expect(explicitlyConfirmed.persisted)
+        #expect(coordinator.persistCount == 2)
+    }
+
+    @Test func blockedRecoveryFailureDoesNotBeginPreparationOrLoop() async throws {
+        let coordinator = HydrationPersistenceCoordinator()
+        let gate = ConfirmedImportReconciliationGate()
+        let engine = ImportEngine(
+            importPersistenceCoordinator: coordinator,
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            forcedHydration: { throw HydrationTestError.failed },
+            reconciliationGate: gate
+        )
+
+        _ = await engine.commitPreparedImport(hydrationPreparedImport())
+        let blockedPrepared = hydrationPreparedImport()
+        let blocked = await engine.commitPreparedImport(blockedPrepared)
+        let presentation = try #require(
+            ConfirmedImportRecoveryPresentationMapper.presentation(
+                for: blocked.recoveryRoute
+            )
+        )
+        let executor = ConfirmedImportRecoveryActionExecutor()
+        var reconciliationCount = 0
+        var preparationCount = 0
+
+        let execution = await executor.execute(
+            try #require(presentation.primaryAction),
+            sourceURL: blockedPrepared.sourceURL,
+            retryCanonicalReconciliation: {
+                reconciliationCount += 1
+                return engine.retryCanonicalHydration()
+            },
+            requestOrdinaryPreparation: { _ in
+                preparationCount += 1
+                return true
+            }
+        )
+
+        #expect(blocked.recoveryRoute == .retryCanonicalReconciliationThenPrepareAgain)
+        #expect(execution == .reconciliationFailed)
+        #expect(reconciliationCount == 1)
+        #expect(preparationCount == 0)
+        #expect(coordinator.persistCount == 1)
+        #expect(gate.isBlocked)
     }
 
     @Test func hydrationFailureBlocksLaterImportsUntilOneCanonicalRetrySucceeds() async {
@@ -32,9 +182,10 @@ struct ConfirmedImportHydrationTests {
         let gate = ConfirmedImportReconciliationGate()
         var hydrationShouldFail = true
         var hydrationCount = 0
+        var persistenceState: PersistenceState = .intentionalNonDurable(.testMemory)
         let engine = ImportEngine(
             importPersistenceCoordinator: coordinator,
-            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+            persistenceStateProvider: { persistenceState },
             forcedHydration: {
                 hydrationCount += 1
                 if hydrationShouldFail { throw HydrationTestError.failed }
@@ -43,24 +194,36 @@ struct ConfirmedImportHydrationTests {
             reconciliationGate: gate
         )
 
-        let committed = await engine.commitPreparedImport(hydrationPreparedImport())
+        let committedPrepared = hydrationPreparedImport()
+        let committed = await engine.commitPreparedImport(committedPrepared)
+        persistenceState = .unavailable(.databaseOpenFailed)
         let blocked = await engine.commitPreparedImport(hydrationPreparedImport())
 
         #expect(committed.persisted)
         #expect(!committed.succeeded)
         #expect(committed.requiresReconciliation)
-        #expect(blocked.requiresReconciliation)
+        #expect(committed.recoveryRoute == .retryCanonicalReconciliation)
+        #expect(!blocked.requiresReconciliation)
         #expect(!blocked.persisted)
+        #expect(blocked.hydrationOutcome == .notRequired)
+        #expect(blocked.recoveryRoute == .retryCanonicalReconciliationThenPrepareAgain)
         #expect(coordinator.persistCount == 1)
         #expect(!engine.retryCanonicalHydration())
         #expect(gate.isBlocked)
 
         hydrationShouldFail = false
+        persistenceState = .intentionalNonDurable(.testMemory)
         #expect(engine.retryCanonicalHydration())
         #expect(!gate.isBlocked)
 
+        let consumedConfirmation = await engine.commitPreparedImport(committedPrepared)
+        #expect(consumedConfirmation.recoveryRoute == .unavailable)
+        #expect(!consumedConfirmation.persisted)
+        #expect(coordinator.persistCount == 1)
+
         let next = await engine.commitPreparedImport(hydrationPreparedImport())
         #expect(next.succeeded)
+        #expect(next.recoveryRoute == .none)
         #expect(coordinator.persistCount == 2)
         #expect(hydrationCount == 4)
     }
@@ -87,6 +250,7 @@ struct ConfirmedImportHydrationTests {
         #expect(!result.persisted)
         #expect(result.importAttemptId == "attempt-rejected")
         #expect(!result.requiresReconciliation)
+        #expect(result.recoveryRoute == .unavailable)
     }
 
     @Test func reconciliationStateDoesNotLeakBetweenWorkflowInstances() async {
@@ -108,8 +272,10 @@ struct ConfirmedImportHydrationTests {
 
         #expect(blocked.persisted)
         #expect(blocked.requiresReconciliation)
+        #expect(blocked.recoveryRoute == .retryCanonicalReconciliation)
         #expect(unrelated.persisted)
         #expect(unrelated.hydrationOutcome == .committedAndHydrated)
+        #expect(unrelated.recoveryRoute == .none)
         #expect(unrelatedCoordinator.persistCount == 1)
     }
 
@@ -132,6 +298,7 @@ struct ConfirmedImportHydrationTests {
 
         #expect(!result.persisted)
         #expect(result.errorMessage == ImportPersistenceCoordinationError.staleProviderGeneration.localizedDescription)
+        #expect(result.recoveryRoute == .prepareAgain(.staleProviderGeneration))
         #expect(try first.accountRepo.accounts(workspaceId: "default-workspace").isEmpty)
         #expect(try second.accountRepo.accounts(workspaceId: "default-workspace").isEmpty)
         #expect(try first.transactionRepo.trustedTransactions(workspaceId: "default-workspace").isEmpty)

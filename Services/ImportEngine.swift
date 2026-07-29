@@ -28,6 +28,33 @@ struct ExactStatementFingerprint: Equatable, Sendable {
     }
 }
 
+enum ConfirmedImportRecoveryRoute: Equatable, Sendable {
+    case none
+    case prepareAgain(ConfirmedImportRecoveryReason)
+    case retryCanonicalReconciliation
+    case retryCanonicalReconciliationThenPrepareAgain
+    case reviewRequired(ConfirmedImportRecoveryReason)
+    case unavailable
+}
+
+enum ConfirmedImportRecoveryReason: Equatable, Sendable {
+    case sourceSnapshotIntegrityFailed
+    case staleProviderGeneration
+    case reviewedPartialPlanStale
+    case persistenceContention
+    case persistenceUnavailable
+
+    case validationFailed
+    case exactStatementDuplicate
+    case transactionEventBlock
+    case accountChoiceRequired
+    case accountChoiceStale
+    case identityAmbiguous
+    case identityConflict
+    case identifierOwnershipConflict
+    case repositoryIntegrityConflict
+}
+
 struct ImportEngineResult: Equatable {
     enum HydrationOutcome: Equatable {
         case notRequired
@@ -51,6 +78,7 @@ struct ImportEngineResult: Equatable {
     let recognizedExistingRowCount: Int?
     let isPartialImport: Bool
     let accountOutcome: ImportAccountOutcome
+    let recoveryRoute: ConfirmedImportRecoveryRoute
 #if DEBUG
     private(set) var developmentProtectedActionOutcome: DevelopmentProtectedActionOutcome?
 #endif
@@ -71,7 +99,8 @@ struct ImportEngineResult: Equatable {
         sourceRowCount: Int? = nil,
         recognizedExistingRowCount: Int? = nil,
         isPartialImport: Bool = false,
-        accountOutcome: ImportAccountOutcome = .unavailable
+        accountOutcome: ImportAccountOutcome = .unavailable,
+        recoveryRoute: ConfirmedImportRecoveryRoute = .unavailable
     ) {
         self.fileName = fileName
         self.transactionCount = transactionCount
@@ -89,13 +118,17 @@ struct ImportEngineResult: Equatable {
         self.recognizedExistingRowCount = recognizedExistingRowCount
         self.isPartialImport = isPartialImport
         self.accountOutcome = accountOutcome
+        self.recoveryRoute = recoveryRoute
 #if DEBUG
         self.developmentProtectedActionOutcome = nil
 #endif
     }
 
     var succeeded: Bool {
-        validationPassed && persisted && hydrationOutcome == .committedAndHydrated && errorMessage == nil
+        validationPassed
+            && persisted
+            && hydrationOutcome == .committedAndHydrated
+            && errorMessage == nil
     }
 
     var requiresHydration: Bool {
@@ -104,7 +137,9 @@ struct ImportEngineResult: Equatable {
 
     var requiresImportAttemptRefresh: Bool { importAttemptId != nil && !persisted }
 
-    var requiresReconciliation: Bool { hydrationOutcome == .committedReconciliationRequired }
+    var requiresReconciliation: Bool {
+        recoveryRoute == .retryCanonicalReconciliation
+    }
 
 #if DEBUG
     func settingDevelopmentProtectedActionOutcome(
@@ -639,6 +674,16 @@ final class ImportEngine {
             livePreparedImports.removeValue(forKey: preparedImport.id)
         }
 #endif
+        guard !reconciliationGate.isBlocked else {
+            return ImportEngineResult(
+                fileName: preparedImport.fileName,
+                transactionCount: preparedImport.transactionCount,
+                validationPassed: preparedImport.validation.passed,
+                persisted: false,
+                errorMessage: "Canonical reconciliation is required before another import can be confirmed.",
+                recoveryRoute: .retryCanonicalReconciliationThenPrepareAgain
+            )
+        }
         let recomputedRawFingerprint = ExactStatementFingerprint(text: preparedImport.rawContents)
         let recomputedFingerprintSet: PreparedDocumentFingerprintSet?
         do {
@@ -649,9 +694,30 @@ final class ImportEngine {
         } catch {
             recomputedFingerprintSet = nil
         }
+        let preparedFingerprints = preparedImport.fingerprintSet.fingerprints
+        let preparedRawFingerprint = preparedFingerprints.first {
+            $0.algorithm == ExactStatementFingerprint.algorithm
+        }
+        let preparedSourceFingerprint = preparedFingerprints.first {
+            $0.algorithm == SourceContentSnapshot.algorithm
+        }
         guard preparedImport.fingerprintSet.isValid,
-              recomputedRawFingerprint == preparedImport.fingerprint,
-              recomputedFingerprintSet == preparedImport.fingerprintSet else {
+              preparedFingerprints.count == 2,
+              preparedRawFingerprint?.isDuplicateAuthority == true,
+              preparedRawFingerprint?.digest == preparedImport.fingerprint.digest,
+              preparedRawFingerprint?.byteCount == preparedImport.fingerprint.byteCount,
+              preparedSourceFingerprint?.isDuplicateAuthority == false,
+              recomputedRawFingerprint == preparedImport.fingerprint else {
+            developerConsole.error(.`import`, "Prepared fingerprint contract is invalid")
+            return ImportEngineResult(
+                fileName: preparedImport.fileName,
+                transactionCount: preparedImport.transactionCount,
+                validationPassed: preparedImport.validation.passed,
+                persisted: false,
+                errorMessage: ImportEngineCommitError.sourceSnapshotIntegrityFailed.localizedDescription
+            )
+        }
+        guard recomputedFingerprintSet == preparedImport.fingerprintSet else {
             let record = importPersistenceCoordinatorFactory().recordSourceSnapshotRejection(.integrityFailed)
             if record.importAttemptId != nil {
                 try? rejectedAttemptHydration()
@@ -667,7 +733,8 @@ final class ImportEngine {
                 importSessionId: nil,
                 redactedIdentifier: nil,
                 previousImport: nil,
-                importAttemptId: record.importAttemptId
+                importAttemptId: record.importAttemptId,
+                recoveryRoute: .prepareAgain(.sourceSnapshotIntegrityFailed)
             )
         }
         guard persistenceStateProvider().isUsable else {
@@ -677,17 +744,8 @@ final class ImportEngine {
                 transactionCount: preparedImport.transactionCount,
                 validationPassed: preparedImport.validation.passed,
                 persisted: false,
-                errorMessage: PersistenceWorkflowError.unavailable.localizedDescription
-            )
-        }
-        guard !reconciliationGate.isBlocked else {
-            return ImportEngineResult(
-                fileName: preparedImport.fileName,
-                transactionCount: preparedImport.transactionCount,
-                validationPassed: preparedImport.validation.passed,
-                persisted: false,
-                errorMessage: "Canonical reconciliation is required before another import can be confirmed.",
-                hydrationOutcome: .committedReconciliationRequired
+                errorMessage: PersistenceWorkflowError.unavailable.localizedDescription,
+                recoveryRoute: .prepareAgain(.persistenceUnavailable)
             )
         }
         guard preparedImport.validation.passed else {
@@ -703,12 +761,14 @@ final class ImportEngine {
                 importSessionId: nil,
                 redactedIdentifier: nil,
                 previousImport: nil,
-                importAttemptId: attemptID
+                importAttemptId: attemptID,
+                recoveryRoute: .reviewRequired(.validationFailed)
             )
         }
 
         var persistenceResult = ImportPersistenceResult.skipped
         var persistenceErrorMessage: String?
+        var failureRecoveryRoute: ConfirmedImportRecoveryRoute?
         do {
             let importPersistenceCoordinator = importPersistenceCoordinatorFactory()
             if let reviewedPartialPlan {
@@ -740,6 +800,7 @@ final class ImportEngine {
             developerConsole.error(.database, "Repository persistence failed")
             if let failure = error as? ImportPersistenceCommitFailure {
                 persistenceErrorMessage = failure.originalError.localizedDescription
+                failureRecoveryRoute = Self.recoveryRoute(for: failure)
                 persistenceResult = ImportPersistenceResult(
                     persisted: false,
                     workspaceId: nil,
@@ -749,6 +810,9 @@ final class ImportEngine {
                     importAttemptId: failure.importAttemptId,
                     accountOutcome: failure.accountOutcome
                 )
+            } else if let coordinationError = error as? ImportPersistenceCoordinationError {
+                persistenceErrorMessage = coordinationError.localizedDescription
+                failureRecoveryRoute = Self.recoveryRoute(for: coordinationError)
             } else {
                 persistenceErrorMessage = error.localizedDescription
             }
@@ -771,6 +835,40 @@ final class ImportEngine {
             catch { developerConsole.warning(.database, "Import attempt refresh unavailable") }
         }
 
+        let recoveryRoute: ConfirmedImportRecoveryRoute
+        if persistenceResult.persisted {
+            if persistenceResult.previousImport != nil
+                || persistenceResult.transactionEventBlock != nil
+                || failureRecoveryRoute != nil
+                || !Self.isCommittedAccountOutcome(persistenceResult.accountOutcome) {
+                recoveryRoute = .unavailable
+            } else {
+                switch hydrationOutcome {
+                case .committedAndHydrated:
+                    recoveryRoute = .none
+                case .committedReconciliationRequired:
+                    recoveryRoute = .retryCanonicalReconciliation
+                case .notRequired:
+                    recoveryRoute = .unavailable
+                }
+            }
+        } else if persistenceResult.previousImport != nil {
+            recoveryRoute = persistenceResult.transactionEventBlock == nil
+                && failureRecoveryRoute == nil
+                && persistenceResult.accountOutcome == .unavailable
+                ? .reviewRequired(.exactStatementDuplicate)
+                : .unavailable
+        } else if let block = persistenceResult.transactionEventBlock {
+            recoveryRoute = failureRecoveryRoute == nil
+                && persistenceResult.accountOutcome == .unavailable
+                ? Self.recoveryRoute(for: block)
+                : .unavailable
+        } else if let failureRecoveryRoute {
+            recoveryRoute = failureRecoveryRoute
+        } else {
+            recoveryRoute = Self.recoveryRoute(for: persistenceResult.accountOutcome) ?? .unavailable
+        }
+
         return ImportEngineResult(
             fileName: preparedImport.fileName,
             transactionCount: persistenceResult.previousImport?.transactionCount ?? preparedImport.transactionCount,
@@ -789,7 +887,8 @@ final class ImportEngine {
             sourceRowCount: persistenceResult.sourceRowCount,
             recognizedExistingRowCount: persistenceResult.recognizedExistingRowCount,
             isPartialImport: persistenceResult.isPartialImport,
-            accountOutcome: persistenceResult.accountOutcome
+            accountOutcome: persistenceResult.accountOutcome,
+            recoveryRoute: recoveryRoute
         )
     }
 
@@ -816,6 +915,103 @@ final class ImportEngine {
             return "Transaction-event ownership conflict. No transaction history was written."
         case .repositoryIntegrityConflict:
             return "Repository integrity conflict. No transaction history was written."
+        }
+    }
+
+    private static func recoveryRoute(
+        for failure: ImportPersistenceCommitFailure
+    ) -> ConfirmedImportRecoveryRoute {
+        guard let coordinationError = failure.originalError as? ImportPersistenceCoordinationError else {
+            return .unavailable
+        }
+        let errorRoute = recoveryRoute(for: coordinationError)
+        guard errorRoute != .unavailable else { return .unavailable }
+        switch failure.accountOutcome {
+        case .matchedExisting, .userSelectedExisting, .createdNew:
+            return .unavailable
+        case .unavailable:
+            return errorRoute
+        default:
+            break
+        }
+        let accountRoute = recoveryRoute(for: failure.accountOutcome)
+        return accountRoute == errorRoute ? errorRoute : .unavailable
+    }
+
+    private static func recoveryRoute(
+        for error: ImportPersistenceCoordinationError
+    ) -> ConfirmedImportRecoveryRoute {
+        switch error {
+        case .ambiguousIdentity:
+            return .reviewRequired(.identityAmbiguous)
+        case .conflictingIdentity:
+            return .reviewRequired(.identityConflict)
+        case .explicitChoiceRequired:
+            return .reviewRequired(.accountChoiceRequired)
+        case .selectedAccountUnavailable, .selectedAccountWorkspaceMismatch,
+                .selectedAccountAlreadyIdentified, .staleIdentityDecision:
+            return .reviewRequired(.accountChoiceStale)
+        case .identifierOwnershipConflict:
+            return .reviewRequired(.identifierOwnershipConflict)
+        case .staleProviderGeneration:
+            return .prepareAgain(.staleProviderGeneration)
+        case .reviewedPartialPlanStale:
+            return .prepareAgain(.reviewedPartialPlanStale)
+        case .retryableContention:
+            return .prepareAgain(.persistenceContention)
+        case .persistenceUnavailable:
+            return .prepareAgain(.persistenceUnavailable)
+        case .repositoryIntegrityConflict:
+            return .reviewRequired(.repositoryIntegrityConflict)
+        case .transactionEventBlock:
+            return .reviewRequired(.transactionEventBlock)
+        case .resolvedAccountUnavailable, .resolvedAccountWorkspaceMismatch,
+                .resolvedWorkspaceUnavailable, .ineligibleIdentifierSet,
+                .fingerprintRequired, .invalidFingerprint, .unclassified:
+            return .unavailable
+        }
+    }
+
+    private static func recoveryRoute(
+        for outcome: ImportAccountOutcome
+    ) -> ConfirmedImportRecoveryRoute? {
+        switch outcome {
+        case .choiceRequired:
+            return .reviewRequired(.accountChoiceRequired)
+        case .identityAmbiguous:
+            return .reviewRequired(.identityAmbiguous)
+        case .identityConflict:
+            return .reviewRequired(.identityConflict)
+        case .identifierOwnershipConflict:
+            return .reviewRequired(.identifierOwnershipConflict)
+        case .staleAccountChoice:
+            return .reviewRequired(.accountChoiceStale)
+        case .staleProviderGeneration:
+            return .prepareAgain(.staleProviderGeneration)
+        case .matchedExisting, .userSelectedExisting, .createdNew, .unavailable:
+            return nil
+        }
+    }
+
+    private static func recoveryRoute(
+        for block: TransactionEventBlock
+    ) -> ConfirmedImportRecoveryRoute {
+        switch block {
+        case .existing, .repeatedIncoming, .ownershipConflict:
+            return .reviewRequired(.transactionEventBlock)
+        case .repositoryIntegrityConflict:
+            return .reviewRequired(.repositoryIntegrityConflict)
+        }
+    }
+
+    private static func isCommittedAccountOutcome(_ outcome: ImportAccountOutcome) -> Bool {
+        switch outcome {
+        case .matchedExisting, .userSelectedExisting, .createdNew, .unavailable:
+            return true
+        case .choiceRequired, .identityAmbiguous, .identityConflict,
+                .identifierOwnershipConflict, .staleAccountChoice,
+                .staleProviderGeneration:
+            return false
         }
     }
 

@@ -1032,27 +1032,16 @@ Discovery does not authorize deletion, broad rollback or backup-based undo.
 
 ---
 
-## FW-P1-28 — Confirmed-Persistence Recovery and Unsupported Retry
-
-**Status:** Ready for planning
-**Depends on:** Typed authoritative persistence-failure outcomes and repository-safe retry semantics
-
-Preparation now has truthful named stages, one owned cancellable operation, and bounded fresh retry for typed source-reading failures. Retain only the unscheduled recovery boundary:
-
-- determine whether any confirmed persistence failure can safely start a wholly fresh preparation without weakening authoritative repository checks;
-- retain unsupported retry families as unavailable until their typed outcome and safety evidence exist;
-- do not add persistence rollback, resumable jobs, batch queues or cancellation after confirmed persistence.
-
----
-
 ## FW-P1-29 — Better Validation Guidance
 
 **Status:** Ready for planning
 **Depends on:** Existing validation pipeline
 
-Present actionable, user-facing guidance while preserving detailed developer diagnostics separately.
+Provide broader validation education outside the confirmed-import immediate-result and recovery panel while preserving detailed developer diagnostics separately.
 
-Sprint 58 completed bounded privacy-safe preparation-failure summaries. Retain only broader validation education and unsupported-result guidance not already implemented. Confirmed-persistence retry remains scoped to FW-P1-28 and must not be duplicated here.
+Sprint 58 completed bounded privacy-safe preparation-failure summaries. Sprint 66 completed typed, privacy-safe confirmed-import recovery and review guidance for validation failure, exact duplicate, transaction-event block, account-choice review, stale account choice, identity ambiguity or conflict, identifier-ownership conflict and repository-integrity conflict; unknown, malformed, hostile and otherwise unavailable states fail closed.
+
+Retain only broader validation education and unsupported-result guidance outside those completed confirmed-import result surfaces. Do not duplicate Sprint 66 recovery actions, expose raw diagnostics or infer mutation authority from error text.
 
 ---
 

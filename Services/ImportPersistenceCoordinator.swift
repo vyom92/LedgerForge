@@ -539,9 +539,12 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
     case identifierOwnershipConflict
     case staleIdentityDecision
     case staleProviderGeneration
+    case reviewedPartialPlanStale
     case retryableContention
     case persistenceUnavailable
     case repositoryIntegrityConflict
+    case transactionEventBlock
+    case unclassified
 
     var errorDescription: String? {
         switch self {
@@ -575,12 +578,18 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
             return "The prepared account decision is no longer current."
         case .staleProviderGeneration:
             return "Persistence changed after preparation; prepare the import again."
+        case .reviewedPartialPlanStale:
+            return "The reviewed partial-import plan is no longer current. Prepare the import again."
         case .retryableContention:
             return "Persistence is busy. Retry confirmation."
         case .persistenceUnavailable:
             return "Persistence is unavailable. No financial history was written."
         case .repositoryIntegrityConflict:
             return "Repository integrity prevented confirmation. No financial history was written."
+        case .transactionEventBlock:
+            return "Supported transaction-event evidence requires review."
+        case .unclassified:
+            return "The confirmed import outcome is unavailable."
         }
     }
 
@@ -1090,6 +1099,10 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
 
     private func coordinationError(for result: ConfirmedImportRepositoryResult) -> ImportPersistenceCoordinationError {
         switch result {
+        case .committed, .partialCommitted, .exactDuplicate:
+            return .unclassified
+        case .repeatedIncomingEventEvidence, .existingEventDuplicate, .eventOwnershipConflict:
+            return .transactionEventBlock
         case .identityAmbiguous: return .ambiguousIdentity
         case .identityConflict: return .conflictingIdentity
         case .explicitAccountChoiceRequired: return .explicitChoiceRequired
@@ -1099,10 +1112,10 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         case .identifierOwnershipConflict: return .identifierOwnershipConflict
         case .staleIdentityDecision: return .staleIdentityDecision
         case .staleProviderGeneration: return .staleProviderGeneration
-        case .reviewedPartialPlanStale: return .staleProviderGeneration
+        case .reviewedPartialPlanStale: return .reviewedPartialPlanStale
         case .retryableContention: return .retryableContention
         case .persistenceUnavailable: return .persistenceUnavailable
-        default: return .repositoryIntegrityConflict
+        case .repositoryIntegrityConflict: return .repositoryIntegrityConflict
         }
     }
 
@@ -1120,7 +1133,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         case .selectedAccountUnavailable, .selectedAccountIneligible, .selectedAccountWorkspaceMismatch, .staleIdentityDecision: outcome = .staleAccountChoice; guidance = .integrityReviewRequired
         case .staleProviderGeneration: outcome = .staleProviderGeneration; guidance = .prepareAgain
         case .reviewedPartialPlanStale: outcome = .reviewedPartialPlanStale; guidance = .prepareAgain
-        case .retryableContention: outcome = .sqliteContention; guidance = .retryConfirmation
+        case .retryableContention: outcome = .sqliteContention; guidance = .prepareAgain
         default: outcome = .repositoryIntegrityConflict; guidance = .integrityReviewRequired
         }
         return recordAttempt(provider: provider, outcome: outcome, coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: guidance, persistence: .rejectedRecorded, transactionCount: count, accountId: accountId)

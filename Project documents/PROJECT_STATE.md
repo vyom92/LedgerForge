@@ -3,17 +3,17 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current repository implementation baseline:** `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388` — DBP-01 Developer Database Profiles
-- **Documentation alignment:** Reconciled on 2026-07-29 against the DBP-01 implementation ref; this document intentionally does not embed its own later documentation-commit SHA
+- **Current repository implementation baseline:** `main` at the single Sprint 66 completion commit containing this state update; its exact SHA is Git-authoritative and recorded in the closure report
+- **Documentation alignment:** Reconciled on 2026-07-30 in that same Sprint 66 completion commit; this document intentionally does not embed its own commit SHA
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration is included in the current pushed baseline; this task does not alter parser, fixture or historical financial data
-- **Latest verified production implementation:** Sprint 63 immutable source-snapshot and exact source-byte fingerprint authority
+- **Latest verified production implementation:** Sprint 66 typed confirmed-import recovery and truthful validation guidance
 - **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed numbered increment:** Sprint 64
+- **Latest verified completed numbered increment:** Sprint 66
 - **Accepted Sprint 63 implementation ref:** `7e1345e3817d3c3e91c24f881b962a48279fd73b`
 - **Latest accepted ADR:** ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
 - **Current migration:** V9
@@ -26,6 +26,7 @@
 - **Sprint 63:** Implemented and independently accepted the immutable source-snapshot and exact source-byte fingerprint foundation
 - **Sprint 64:** Completed the approved read-only Axis bank-account PDF readiness discovery. The strongest bounded candidate is the two-source account-neutral Axis bank-account PDF v1 family represented by retained NRO evidence. No production, migration, ADR, fixture, database or source change occurred; production PDF support was not established. No user resupply is required. Retained originals remain available for bounded future read-only evidence reconciliation.
 - **Sprint 64 blockers:** `BLOCK-PDF-LINEAGE-01` — exact private-original to sanitisation to committed-fixture lineage is not independently provable from retained records; `BLOCK-PDF-ORACLE-BINDING-02` — expected financial data exists but independent derivation and exact row-level binding to each original are not established; `UNCERTAINTY-PDF-DETERMINISM-03` — repeated extraction and multiline grouping are not proven; `UNCERTAINTY-PDF-SOURCE-CLASS-04` — text-based/unlocked was observed, but OCR/password classification is not fully recorded; `UNCERTAINTY-NRE-NRO-GRAMMAR-05` — shared NRE/NRO grammar cannot yet be claimed from lineage-backed evidence.
+- **Sprint 66:** Implemented typed confirmed-import recovery, privacy-safe route-specific guidance, wholly fresh preparation for eligible zero-commit outcomes and bounded canonical reconciliation without changing persistence architecture
 - **Sprint 60:** Completed the read-only account-outcome explanation contract across the bounded import workflow; no schema or historical rewrite occurred.
 - **Sprint 61:** Implemented privacy-safe durable account-outcome presentation and explicit eligible no-match account choice. FinancialIdentityResolver behavior is unchanged: parser-produced strong verified identifiers remain the sole identity authority, and eligible no-match cases require explicit Use Existing Account or Create New Account choice. No automatic account selection was introduced. Prospective successful durable account decisions are `matched_existing`, `user_selected_existing` and `created_new`; rejected outcomes include `account_choice_required`, `identifier_ownership_conflict`, `identity_ambiguity`, `identity_conflict`, `stale_account_choice` and `stale_provider_generation`. Historical `selected_existing` and `resolved_or_created` remain neutral and are not reinterpreted. One shared bounded presentation authority serves preparation, immediate result and Import History; hostile and unknown values fail closed to neutral unavailable presentation. Account IDs, candidate IDs, normalized identifiers, suffixes, filenames, paths, fingerprints, raw codes and unrestricted errors are excluded from account-outcome copy and accessibility text. SQLite/In-Memory parity and rejected-path zero accepted residue were verified. No schema or historical rewrite occurred.
 - **Sprint 61 integrated verification:** 466 top-level tests, 498 executions, 39 dynamic-parameter runs, 0 failures and 0 skips; Debug build, explicitly optimized whole-module Release build and Debug analysis passed. Isolated runtime acceptance used the approved sanitized Axis fixture against one fresh namespaced canonical V8 SQLite database. Preview, explicit choice, confirmation, immediate result, live Import History, quit/relaunch and hydration were verified. Runtime persisted and rehydrated 1 account, 4 transactions and 1 durable attempt. The task-owned namespace was removed recoverably after acceptance. No private source or user financial database was used. Manual linking, unlinking, reassignment, repair, account merge/split and raw identifier display remain excluded.
@@ -273,7 +274,9 @@ Cancelled preparation is neither trusted persistence nor durable attempt history
 
 Confirmed persistence is explicitly non-cancellable and remains repository-owned.
 
-No rollback, resumable import job, batch queue or cancellation after confirmed persistence exists. Confirmed-persistence retry remains unsupported pending typed authoritative safety evidence.
+Typed confirmed-import recovery distinguishes wholly fresh preparation for authorized zero-commit outcomes, canonical reconciliation for committed hydration failure, and reconciliation followed by wholly fresh preparation when confirmation was blocked by an earlier reconciliation requirement. Review-required, unknown, malformed, hostile and unavailable outcomes expose no mutation action.
+
+No rollback, compensation, resumable import job, batch queue, retry confirmation, automatic confirmation or cancellation after confirmed persistence exists.
 
 ### Financial presentation
 
@@ -565,6 +568,73 @@ American Express production parsing and durable card semantics remain unsupporte
 
 ## Recent Verified Changes
 
+### Sprint 66 — Typed Confirmed-Import Recovery and Truthful Validation Guidance
+
+**Ref**
+
+The single Sprint 66 completion commit containing this state update. Its exact SHA is Git-authoritative and recorded in the closure report.
+
+#### Outcome
+
+Sprint 66 implemented typed confirmed-persistence recovery and truthful validation guidance.
+
+#### Verified production behavior
+
+- Recovery eligibility is a closed typed contract. Localized error strings, filenames, paths and unrestricted errors are not recovery authority; unknown, malformed or hostile errors fail closed to unavailable.
+- Eligible zero-commit outcomes may offer only wholly fresh preparation. Fresh preparation re-enters the ordinary retained-URL path, reacquires the source bytes, creates a new immutable snapshot and source-byte fingerprint evidence, and re-runs validation, exact-duplicate, identity, account-choice and provider-generation checks.
+- Fresh preparation never reuses a consumed `PreparedImport`, reviewed partial plan, account choice or source snapshot, and never confirms automatically.
+- Committed persistence followed by hydration failure offers canonical reconciliation only. Reconciliation refreshes the view without reimporting the statement or duplicating accepted history.
+- A pre-existing reconciliation block is distinct from current committed persistence and explicitly records that the current attempt did not save a new import.
+- Reconciliation-then-preparation starts wholly fresh preparation only after reconciliation succeeds. A failed reconciliation remains blocked, starts no preparation and does not retry recursively.
+- Review-required and unavailable states expose no mutation action. A missing retained source URL suppresses Prepare Again even when the typed route otherwise permits fresh preparation.
+- DBP-01 acknowledgement remains required before source acquisition in a non-current Debug profile.
+- Process-local action ownership prevents duplicate dispatch, simultaneous preparation and reconciliation, and stale completion publication after a newer action begins.
+- Exact-duplicate presentation remains “Previously Imported,” not persistence failure.
+
+#### Persistence and financial boundary
+
+- No schema or migration changed, and no repository or provider API changed.
+- No rollback, compensation, resumable job, persisted job, batch queue, cancellation after committed persistence or generalized retry engine was introduced.
+- Provider-owned atomic confirmation remains authoritative, and durable commit remains distinct from canonical hydration.
+- Rejected zero-commit outcomes leave zero accepted financial residue. A committed hydration failure preserves the accepted commit.
+- Reconciliation creates no duplicate account, transaction, session, document, fingerprint, identifier or observation.
+- Historical durable guidance remains readable and was not rewritten.
+
+#### Acceptance correction
+
+The first canonical TestPlan run exposed one stale legacy duplicate-presentation test. The test-only correction supplied the typed exact-duplicate route to that previously imported regression case; no production code changed for the correction. The corrected stable implementation state then received the final authoritative acceptance run. This correction occurred before Sprint 66 acceptance and is part of Sprint 66, not Sprint 66A.
+
+#### Acceptance evidence
+
+- The focused four-suite run passed 49 logical tests across 49 executions, with zero parameter runs, failures, skips or expected failures.
+- The corrected canonical TestPlan passed 562 logical tests across 607 execution instances and 68 suites, including 55 dynamic parameter runs across 10 parameterized tests, with zero failures, skips or expected failures.
+- One fresh Debug build, one optimized whole-module `-O` arm64 Release build and Debug static analysis passed. Only pre-existing Swift 6 transition warnings in unrelated tests and the AppIntents metadata skip remained; no changed file produced a warning.
+- Disposable runtime Scenario A verified a zero-commit contention outcome, ordinary-path Prepare Again, new prepared-import and snapshot identities, recomputed source-byte evidence, cleared account choice, explicit confirmation gating and single-dispatch behavior under double activation.
+- Disposable runtime Scenario B verified that a committed hydration failure presented saved truth, offered reconciliation only and reconciled without a second preparation or persistence commit.
+- Disposable runtime Scenario C verified that a pre-existing reconciliation block saved no current import, failed reconciliation began no preparation or loop, and successful reconciliation then created a wholly fresh preview requiring a new account choice and explicit confirmation.
+- Disposable runtime Scenario D verified unavailable, exact-duplicate and missing-retained-URL outcomes with no unauthorized recovery mutation action. The exact duplicate left accepted financial counts unchanged and added only its bounded rejected attempt.
+- Disposable runtime Scenario E verified the DBP-01 non-current-profile acknowledgement before source acquisition.
+- Runtime SQLite evidence remained confined to the task-owned disposable root, the canonical Current Database was not opened or altered, and corrected automated coverage verified SQLite/In-Memory outcome parity and rejected-path zero accepted residue.
+- Build acceptance and Release containment used the normal signed sandboxed products. The isolated interactive runtime walkthrough used a re-signed unsandboxed copy of the passed Debug build solely because sandboxed launch did not honor the task-private home. Executable code was unchanged, but the runtime entitlement environment differed; the walkthrough therefore verifies the accepted code paths under disposable isolation rather than production sandbox-entitlement behavior.
+- Release inspection found no CSV, PDF, SQLite, database or fixture payload and no Debug acknowledgement machinery or private recovery material. Task-owned products were moved recoverably to Trash, no generated residue remained in the repository and no LedgerForge or `xcodebuild` process remained.
+
+#### Scope
+
+Sprint 66 changed exactly these implementation and test paths:
+
+- `Services/ImportEngine.swift`
+- `Services/ImportPersistenceCoordinator.swift`
+- `ContentView.swift`
+- `LedgerForgeTests/ImportLifecycleTests.swift`
+- `LedgerForgeTests/ConfirmedImportHydrationTests.swift`
+- `LedgerForgeTests/PersistenceAvailabilityTests.swift`
+- `LedgerForgeTests/SettingsPresentationTests.swift`
+- `LedgerForgeTests/ConfirmationGatedImportWorkflowTests.swift`
+
+#### Exclusions
+
+Sprint 66 did not implement retry confirmation, resume of a consumed preparation, rollback or compensation, persisted recovery jobs, batch importing, automatic confirmation, cancellation after committed persistence, generalized retry infrastructure, schema or migration changes, parser or import-format support, production PDF support, or Sprint 65.
+
 ### DBP-01 — Developer Database Profiles (Debug Development Tooling)
 
 **Ref**
@@ -844,19 +914,21 @@ Detailed implementation history remains in Git and accepted ADRs.
 
 ## Current Planning State
 
-- The current planning alignment is based on implementation ref `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`, completed Sprints 50–64, completed DBP-01 Debug development tooling, Migration V9 and accepted ADR-041.
+- The current planning alignment is based on the single Sprint 66 completion commit containing this state update, completed Sprints 50–64 and Sprint 66, completed DBP-01 Debug development tooling, Migration V9 and accepted ADR-041.
 - DBP-01 is complete and no DBP-01 implementation remains pending. It is a separate post-Sprint-64 Debug tooling increment, not a numbered sprint or Sprint 65; no sprint renumbering occurred.
 - Sprint 63 implementation of the ADR-041 source-snapshot and source-byte foundation is complete; no source-snapshot implementation remains in the unscheduled queue.
 - `FW-P1-10 — Production PDF Statement Support` is blocked after Sprint 64 discovery by the named lineage/oracle evidence gap. Sprint 65 implementation is blocked; production PDF, OCR, password workflow, generic Axis PDF support and cross-format equivalence remain unsupported.
 - `FW-P1-16` remains blocked until two equivalent formats are independently production-supported and a separate equivalence architecture is accepted.
 - `FW-P1-40 — Deterministic Approved-Fixture Launcher` was completed by Sprint 58 and is removed from the unscheduled queue.
 - `FW-P1-37` retains only broader structured diagnostics work not completed by Sprint 58; its bounded privacy-safe preparation-failure summary and Developer Console fixture-workflow slice is complete.
+- `FW-P1-28 — Confirmed-Persistence Recovery and Unsupported Retry` is complete in Sprint 66 and removed from the unscheduled queue.
+- `FW-P1-29 — Better Validation Guidance` retains only broader validation education outside the typed immediate-result and recovery guidance completed by Sprint 66.
 - Fixture-backed HDFC, CBQ and card families remain eligible for targeted discovery but are not production support.
 - `FW-P2-20 — Category Model and Management` is complete in Sprint 57 and removed from the unscheduled queue.
 - `FW-P2-21 — Deterministic Categorization Rules` is now eligible for bounded discovery; no rule behavior is implemented or authorized.
 - Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
 - `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.
-- Sprint 64 remains the latest completed numbered outcome. Sprint 65 remains blocked by the Sprint 64 PDF lineage and independent-oracle evidence gap, production PDF support remains unsupported and no Sprint 65 implementation prompt is authorized.
+- Sprint 66 is the latest completed numbered outcome. Sprint 65 remains blocked by the Sprint 64 PDF lineage and independent-oracle evidence gap, production PDF support remains unsupported and no Sprint 65 implementation prompt is authorized.
 
 ---
 

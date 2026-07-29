@@ -195,12 +195,20 @@ struct PersistenceAvailabilityTests {
     }
 
     @Test func importPreparationRejectsBeforeAttemptingToReadTheSource() async {
-        let engine = ImportEngine(persistenceStateProvider: { .unavailable(.databaseOpenFailed) })
+        var sourceAcquisitionCount = 0
+        let engine = ImportEngine(
+            sourceSnapshotAcquirer: { _ in
+                sourceAcquisitionCount += 1
+                throw SourceContentSnapshotError.acquisitionFailed
+            },
+            persistenceStateProvider: { .unavailable(.databaseOpenFailed) }
+        )
         let nonexistent = URL(fileURLWithPath: "/private/path-that-must-not-be-read/statement.csv")
 
         await #expect(throws: PersistenceWorkflowError.unavailable) {
             try await engine.prepareImport(from: nonexistent)
         }
+        #expect(sourceAcquisitionCount == 0)
     }
 
     @Test func preparedImportConfirmationRechecksAvailabilityBeforePersistence() async {
@@ -210,12 +218,88 @@ struct PersistenceAvailabilityTests {
             persistenceStateProvider: { .unavailable(.migrationIntegrityFailed) }
         )
 
-        let result = await engine.commitPreparedImport(makePreparedImport())
+        let prepared = makePreparedImport()
+        let result = await engine.commitPreparedImport(prepared)
 
         #expect(!result.persisted)
         #expect(result.validationPassed)
         #expect(result.errorMessage == PersistenceWorkflowError.unavailable.localizedDescription)
+        #expect(result.recoveryRoute == .prepareAgain(.persistenceUnavailable))
         #expect(persistence.persistCallCount == 0)
+        #expect(throws: SourceContentSnapshotError.invalidated) {
+            try prepared.sourceSnapshot.withBytes { $0 }
+        }
+    }
+
+    @Test func unavailableLikeLocalizedErrorCannotGainFreshPreparationEligibility() async {
+        let message = ImportPersistenceCoordinationError.persistenceUnavailable.localizedDescription
+        let persistence = HostileAvailabilityPersistenceCoordinator(message: message)
+        let engine = ImportEngine(
+            importPersistenceCoordinator: persistence,
+            developerConsole: DeveloperConsole(),
+            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
+        )
+        let prepared = makePreparedImport()
+
+        let result = await engine.commitPreparedImport(prepared)
+
+        #expect(!result.persisted)
+        #expect(result.errorMessage == message)
+        #expect(result.recoveryRoute == .unavailable)
+        #expect(persistence.persistCallCount == 1)
+        #expect(throws: SourceContentSnapshotError.invalidated) {
+            try prepared.sourceSnapshot.withBytes { $0 }
+        }
+    }
+
+    @Test func retryableContentionRecordsPrepareAgainWithoutAcceptedWrites() async throws {
+        let memory = InMemoryRepositoryProvider()
+        let confirmedRepository = RetryableContentionConfirmedImportRepository()
+        let provider = DatabaseProvider(
+            workspaceRepo: memory.workspaceRepo,
+            transactionRepo: memory.transactionRepo,
+            categoryRepo: memory.categoryRepo,
+            accountRepo: memory.accountRepo,
+            importSessionRepo: memory.importSessionRepo,
+            confirmedImportRepo: confirmedRepository,
+            generationToken: memory.generationToken,
+            persistenceState: .intentionalNonDurable(.testMemory)
+        )
+        let workspaceID = "default-workspace"
+        _ = try provider.workspaceRepo.upsertWorkspace(
+            WorkspaceDTO(
+                id: workspaceID,
+                name: "Default Workspace",
+                createdAtISO: "2026-07-29T00:00:00Z"
+            )
+        )
+        let coordinator = DefaultImportPersistenceCoordinator(databaseProvider: provider)
+        let engine = ImportEngine(
+            importPersistenceCoordinator: coordinator,
+            developerConsole: DeveloperConsole(),
+            persistenceStateProvider: { provider.persistenceState },
+            providerGenerationProvider: { provider.generationToken },
+            rejectedAttemptHydration: {}
+        )
+        let prepared = makePreparedImport(providerGeneration: provider.generationToken)
+
+        let result = await engine.commitPreparedImport(prepared)
+        let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspaceID)
+        let attempt = try #require(attempts.first)
+
+        #expect(attempts.count == 1)
+        #expect(result.recoveryRoute == .prepareAgain(.persistenceContention))
+        #expect(!result.persisted)
+        #expect(confirmedRepository.commitCount == 1)
+        #expect(attempt.outcomeCode == ImportAttemptOutcome.sqliteContention.rawValue)
+        #expect(attempt.guidanceCode == ImportAttemptGuidance.prepareAgain.rawValue)
+        #expect(attempt.guidanceCode != ImportAttemptGuidance.retryConfirmation.rawValue)
+        #expect(try provider.accountRepo.accounts(workspaceId: workspaceID).isEmpty)
+        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).isEmpty)
+        #expect(try provider.importSessionRepo.importSession(id: prepared.importSession.id.uuidString) == nil)
+        #expect(throws: SourceContentSnapshotError.invalidated) {
+            try prepared.sourceSnapshot.withBytes { $0 }
+        }
     }
 
     @Test func unavailableHydrationPreservesEveryExistingRuntimeStore() {
@@ -338,7 +422,9 @@ struct PersistenceAvailabilityTests {
         #expect(!text.localizedCaseInsensitiveContains("unable to open database"))
     }
 
-    private func makePreparedImport() -> PreparedImport {
+    private func makePreparedImport(
+        providerGeneration suppliedProviderGeneration: ProviderGenerationToken? = nil
+    ) -> PreparedImport {
         let transaction = Transaction(
             statementDate: try! StatementDate(canonical: "2027-03-13"),
             description: "Prepared credit",
@@ -349,7 +435,18 @@ struct PersistenceAvailabilityTests {
             currency: "INR",
             account: "Prepared Account",
             sourceBank: "Axis Bank",
-            sourceFile: "prepared.csv"
+            sourceFile: "prepared.csv",
+            statementTimezoneEvidence: .iana("Asia/Kolkata"),
+            sourceProvenance: [
+                TransactionSourceProvenance(
+                    normalizedDocumentID: "availability-normalized-document",
+                    normalizedRowID: "availability-normalized-row-1",
+                    sourceOrdinal: 1,
+                    normalizedRecordDigest: String.normalizedRecordDigest(values: ["availability", "1"]),
+                    parserProfileID: AxisBankAccountParser.profileID,
+                    parserProfileVersion: AxisBankAccountParser.profileVersion
+                )
+            ]
         )
         let document = FinancialDocument(
             sourceDocument: Document(
@@ -388,7 +485,8 @@ struct PersistenceAvailabilityTests {
                 parserName: document.parserName,
                 transactionCount: document.transactions.count,
                 validation: validation
-            )
+            ),
+            providerGeneration: suppliedProviderGeneration ?? DatabaseProvider.shared.generationToken
         )
     }
 }
@@ -403,5 +501,59 @@ private final class AvailabilityCountingPersistenceCoordinator: ImportPersistenc
     ) throws -> ImportPersistenceResult {
         persistCallCount += 1
         return .skipped
+    }
+}
+
+private struct HostileAvailabilityError: LocalizedError {
+    let errorDescription: String?
+}
+
+private final class HostileAvailabilityPersistenceCoordinator: ImportPersistenceCoordinating {
+    private let message: String
+    private(set) var persistCallCount = 0
+
+    init(message: String) {
+        self.message = message
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult
+    ) throws -> ImportPersistenceResult {
+        persistCallCount += 1
+        throw HostileAvailabilityError(errorDescription: message)
+    }
+
+    func persistValidatedImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ImportPersistenceResult {
+        persistCallCount += 1
+        throw HostileAvailabilityError(errorDescription: message)
+    }
+}
+
+private final class RetryableContentionConfirmedImportRepository: ConfirmedImportRepository {
+    private(set) var commitCount = 0
+
+    func reviewPartialImport(_ plan: ConfirmedImportPlanDTO) -> PartialImportReviewResult {
+        .ordinaryFullImport
+    }
+
+    func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
+        commitCount += 1
+        return .retryableContention
+    }
+
+    func commitReviewedPartialImport(
+        _ plan: ReviewedPartialImportPlanDTO
+    ) -> ConfirmedImportRepositoryResult {
+        commitCount += 1
+        return .retryableContention
     }
 }

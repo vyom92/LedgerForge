@@ -258,7 +258,8 @@ struct ConfirmationGatedImportWorkflowTests {
             errorMessage: nil,
             accountId: previous.accountId,
             importSessionId: previous.importSessionId,
-            previousImport: previous
+            previousImport: previous,
+            recoveryRoute: .reviewRequired(.exactStatementDuplicate)
         )
         let presentation = ImportOutcomePresentation(result: result)
 
