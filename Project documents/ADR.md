@@ -25,10 +25,10 @@ When reading this file:
 4. use `PROJECT_STATE.md` for verified implementation reality;
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
-**Status alignment date:** 2026-07-28
-**Repository ref reviewed:** `main@7e1345e3817d3c3e91c24f881b962a48279fd73b` — Sprint 63 implementation closure
+**Status alignment date:** 2026-07-29
+**Repository ref reviewed:** `main@5475037006075a0cb218622ea209082e11afe7d9` — Sprint 64 blocked discovery documentation closure
 **Latest verified production implementation:** Sprint 63 Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
-**Latest completed numbered outcome:** Sprint 63
+**Latest completed numbered outcome:** Sprint 64
 **Latest accepted ADR:** ADR-041
 **Current migration:** V9
 

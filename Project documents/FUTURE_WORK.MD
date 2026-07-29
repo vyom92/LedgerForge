@@ -766,14 +766,28 @@ Do not claim production card support from fixture integration, schema capacity, 
 
 ## FW-P1-10 — Production PDF Statement Support
 
-**Status:** Ready for discovery
-**Discovery:** Complete
-**Planning state:** Sprint 64 discovery must select and revalidate one exact PDF family before implementation.
+**Status:** Blocked
+**Discovery:** Sprint 64 complete
+**Planning state:** Sprint 65 implementation is blocked by the named Sprint 64 lineage and independent-oracle evidence gap.
 **Depends on:** Accepted ADR-041; exact-family readiness; independent source truth; reader/profile validation; and ordinary URL-driven production-path acceptance.
+
+The source-byte foundation dependency remains satisfied. Retain the exact-family, ordinary URL-driven, independent-oracle, reader/profile, privacy and optimized Release requirements below.
+
+Sprint 64's strongest bounded candidate is the two-source account-neutral Axis bank-account PDF v1 family represented by retained NRO evidence. Unblocking requires:
+
+- privacy-safe original/fixture digest binding;
+- a sanitisation transformation inventory;
+- field-preservation evidence;
+- independent row-oracle provenance;
+- repeated extraction and multiline-grouping evidence;
+- explicit text/OCR/password classification; and
+- account-neutral grammar evidence.
+
+No user resupply is requested. Visually similar or account-labelled PDFs cannot substitute, fixture presence is insufficient, and no Sprint 65 implementation prompt is authorized.
 
 Promote PDF from extraction foundation to a production-supported import source.
 
-Sprint 64 discovery must select one fixture-backed PDF family and require:
+The approved Sprint 64 discovery requirements remain the production gate and require:
 
 - approved PDF content entering the unified import pipeline;
 - consistent picker, source-format registry and reader behavior;

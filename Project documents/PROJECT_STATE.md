@@ -4,6 +4,7 @@
 
 - **Primary branch:** `main`
 - **Current pushed ref:** `main@7e1345e3817d3c3e91c24f881b962a48279fd73b` — Sprint 63 immutable source-snapshot implementation
+- **Current repository/documentation baseline under review:** `main@5475037006075a0cb218622ea209082e11afe7d9` — Sprint 64 blocked discovery documentation closure
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration is included in the current pushed baseline; this task does not alter parser, fixture or historical financial data
 - **Latest verified production implementation:** Sprint 63 immutable source-snapshot and exact source-byte fingerprint authority
 - **Non-implementation commits after Sprint 53:**
@@ -11,7 +12,7 @@
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed numbered increment:** Sprint 63
+- **Latest verified completed numbered increment:** Sprint 64
 - **Accepted Sprint 63 implementation ref:** `7e1345e3817d3c3e91c24f881b962a48279fd73b`
 - **Latest accepted ADR:** ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
 - **Current migration:** V9
@@ -21,6 +22,8 @@
 - **Sprint 59:** Accepted ADR-041 as an architecture-only source-snapshot and exact source-byte fingerprint contract; implementation was intentionally deferred to a later increment
 - **Sprint 62:** Accepted the ADR-041 immutable source snapshot and exact source-byte fingerprint architecture contract; no production implementation was included in Sprint 62
 - **Sprint 63:** Implemented and independently accepted the immutable source-snapshot and exact source-byte fingerprint foundation
+- **Sprint 64:** Completed the approved read-only Axis bank-account PDF readiness discovery. The strongest bounded candidate is the two-source account-neutral Axis bank-account PDF v1 family represented by retained NRO evidence. No production, migration, ADR, fixture, database or source change occurred; production PDF support was not established. No user resupply is required. Retained originals remain available for bounded future read-only evidence reconciliation.
+- **Sprint 64 blockers:** `BLOCK-PDF-LINEAGE-01` — exact private-original to sanitisation to committed-fixture lineage is not independently provable from retained records; `BLOCK-PDF-ORACLE-BINDING-02` — expected financial data exists but independent derivation and exact row-level binding to each original are not established; `UNCERTAINTY-PDF-DETERMINISM-03` — repeated extraction and multiline grouping are not proven; `UNCERTAINTY-PDF-SOURCE-CLASS-04` — text-based/unlocked was observed, but OCR/password classification is not fully recorded; `UNCERTAINTY-NRE-NRO-GRAMMAR-05` — shared NRE/NRO grammar cannot yet be claimed from lineage-backed evidence.
 - **Sprint 60:** Completed the read-only account-outcome explanation contract across the bounded import workflow; no schema or historical rewrite occurred.
 - **Sprint 61:** Implemented privacy-safe durable account-outcome presentation and explicit eligible no-match account choice. FinancialIdentityResolver behavior is unchanged: parser-produced strong verified identifiers remain the sole identity authority, and eligible no-match cases require explicit Use Existing Account or Create New Account choice. No automatic account selection was introduced. Prospective successful durable account decisions are `matched_existing`, `user_selected_existing` and `created_new`; rejected outcomes include `account_choice_required`, `identifier_ownership_conflict`, `identity_ambiguity`, `identity_conflict`, `stale_account_choice` and `stale_provider_generation`. Historical `selected_existing` and `resolved_or_created` remain neutral and are not reinterpreted. One shared bounded presentation authority serves preparation, immediate result and Import History; hostile and unknown values fail closed to neutral unavailable presentation. Account IDs, candidate IDs, normalized identifiers, suffixes, filenames, paths, fingerprints, raw codes and unrestricted errors are excluded from account-outcome copy and accessibility text. SQLite/In-Memory parity and rejected-path zero accepted residue were verified. No schema or historical rewrite occurred.
 - **Sprint 61 integrated verification:** 466 top-level tests, 498 executions, 39 dynamic-parameter runs, 0 failures and 0 skips; Debug build, explicitly optimized whole-module Release build and Debug analysis passed. Isolated runtime acceptance used the approved sanitized Axis fixture against one fresh namespaced canonical V8 SQLite database. Preview, explicit choice, confirmation, immediate result, live Import History, quit/relaunch and hydration were verified. Runtime persisted and rehydrated 1 account, 4 transactions and 1 durable attempt. The task-owned namespace was removed recoverably after acceptance. No private source or user financial database was used. Manual linking, unlinking, reassignment, repair, account merge/split and raw identifier display remain excluded.
@@ -790,9 +793,9 @@ Detailed implementation history remains in Git and accepted ADRs.
 
 ## Current Planning State
 
-- The current planning alignment is based on `main@7e1345e3817d3c3e91c24f881b962a48279fd73b`, completed Sprints 50–63, Migration V9 and accepted ADR-041.
+- The current planning alignment is based on `main@5475037006075a0cb218622ea209082e11afe7d9`, completed Sprints 50–64, Migration V9 and accepted ADR-041.
 - Sprint 63 implementation of the ADR-041 source-snapshot and source-byte foundation is complete; no source-snapshot implementation remains in the unscheduled queue.
-- `FW-P1-10 — Production PDF Statement Support` is the next conditional discovery outcome. Its implementation remains gated by exact-family readiness, independent source truth, reader/profile validation and ordinary URL-driven production-path acceptance under Sprint 64 discovery.
+- `FW-P1-10 — Production PDF Statement Support` is blocked after Sprint 64 discovery by the named lineage/oracle evidence gap. Sprint 65 implementation is blocked; production PDF, OCR, password workflow, generic Axis PDF support and cross-format equivalence remain unsupported.
 - `FW-P1-16` remains blocked until two equivalent formats are independently production-supported and a separate equivalence architecture is accepted.
 - `FW-P1-40 — Deterministic Approved-Fixture Launcher` was completed by Sprint 58 and is removed from the unscheduled queue.
 - `FW-P1-37` retains only broader structured diagnostics work not completed by Sprint 58; its bounded privacy-safe preparation-failure summary and Developer Console fixture-workflow slice is complete.
@@ -801,7 +804,7 @@ Detailed implementation history remains in Git and accepted ADRs.
 - `FW-P2-21 — Deterministic Categorization Rules` is now eligible for bounded discovery; no rule behavior is implemented or authorized.
 - Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
 - `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.
-- Sprint 64 is the next conditional discovery outcome; no Sprint 64 implementation is authorized.
+- Sprint 64 is complete as a blocked read-only discovery/documentation closure; no Sprint 65 implementation prompt is authorized. Developer Database Profiles remains a separate post-Sprint-64 maintenance increment and is not part of this documentation commit.
 
 ---
 
