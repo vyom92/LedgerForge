@@ -1,19 +1,20 @@
-# LedgerForge Agent Guide
+# LedgerForge Agent Bootstrap
 
-**Status:** Mandatory repository bootstrap and execution-policy entry point  
-**Alignment reviewed:** 2026-07-26
-**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb`
-**Latest verified implementation baseline:** `main@b661472a58fc24144361322f1853b8001437a3eb` - Sprint 58 production implementation; Sprint 59 ADR-041 architecture-only
+## Purpose
 
-## Project Overview
+This file is the mandatory repository entry point for LedgerForge agents.
 
-LedgerForge is a private, single-user, offline-first macOS financial application built with Swift and SwiftUI.
+Keep it short and stable. It is a map to repository authorities, not a copy of
+the architecture, roadmap, build manual or sprint history.
+
+LedgerForge is a private, single-user, offline-first macOS finance application
+built with Swift and SwiftUI.
 
 Apply this priority order:
 
 1. financial correctness;
 2. durable persistence;
-3. deterministic behavior;
+3. deterministic behaviour;
 4. explicit user control;
 5. privacy;
 6. recoverability;
@@ -30,54 +31,64 @@ A faster implementation never outranks a higher-priority invariant.
 For every repository task:
 
 1. Read this file.
-2. Read `Project documents/Project_Guide.md`.
-3. Read `Project documents/PROJECT_STATE.md`.
-4. Read the complete Chat-approved prompt in the current conversation.
-5. Load only the subject authorities required by that task.
-6. For sprint planning, read `Project documents/FUTURE_WORK.MD` before task-specific architecture evidence.
+2. Read the complete Chat-approved prompt supplied for the current task.
+3. Establish the exact repository ref being inspected or edited.
+4. Read the relevant sections of `Project documents/PROJECT_STATE.md`.
+5. Load only the additional authorities, code and tests required by the task.
+6. Read `Project documents/FUTURE_WORK.MD` only for sprint selection,
+   prioritisation or candidate-status work.
+7. Read relevant accepted entries in `Project documents/ADR.md` before changing
+   architecture, persistence, identity, import semantics or domain ownership.
 
-The complete Chat-approved prompt supplied directly in the current conversation is the sole execution contract.
+Do not load every repository document by default.
 
-Without one:
+`Project documents/Project_Guide.md` is not a mandatory bootstrap document.
+Read it only when the approved task requires workflow detail not covered here.
+
+The following files are retired and are not repository authorities:
+
+- `Project documents/Implementation.md`
+- `Project documents/Codex response.md`
+
+Do not read, update, recreate or infer an active sprint from either file.
+
+The complete Chat-approved prompt is the sole execution contract.
+
+Without an approved implementation prompt:
 
 - do not edit repository files;
-- do not build an implementation branch;
-- do not commit;
-- do not push;
-- do not create a pull request;
+- do not create branches or worktrees;
+- do not commit or push;
+- do not infer implementation authority from `FUTURE_WORK.MD`;
 - do not infer an active sprint from repository documents.
-
-There is no repository-stored active work contract.
 
 ---
 
 ## Authority Map
 
-| Question | Primary authority |
+| Question | Authority |
 |---|---|
-| What is verified now? | Exact repository evidence and `Project documents/PROJECT_STATE.md` |
-| What may be executed now? | The complete Chat-approved prompt in the current conversation |
-| What remains unscheduled? | `Project documents/FUTURE_WORK.MD` |
-| What architecture is accepted? | Accepted entries in `Project documents/ADR.md` and frozen Architecture |
-| What is the database design? | Database Architecture, accepted ADRs and registered migrations |
-| What is product direction? | `Project documents/Product Vision.md` |
-| What UI is approved? | Frozen UI/UX and approved assets |
-| What engineering, privacy and verification rules apply? | `Project documents/Engineering Standards.md` |
-| What build, Xcode and Git mechanics apply? | `Project documents/BUILD_AND_PROJECT_CONVENTIONS.md` |
-| What happened historically? | Git history and preserved historical ADR text |
-| What is true only in the local checkout? | Direct local evidence, normally through bounded Work investigation |
+| What is verified now? | Exact repository evidence and `PROJECT_STATE.md` |
+| What may be executed? | Complete Chat-approved prompt |
+| What remains unscheduled? | `FUTURE_WORK.MD` |
+| What architecture is accepted? | Accepted entries in `ADR.md` |
+| What is product direction? | `Product Vision.md` |
+| What UI is approved? | Frozen UI/UX documents and approved assets |
+| What engineering and privacy rules apply? | `Engineering Standards.md` |
+| What build, Xcode, test and Git rules apply? | `BUILD_AND_PROJECT_CONVENTIONS.md` |
+| What happened historically? | Git history |
+| What exists only locally? | Direct local evidence, normally through bounded Work investigation |
 
 When authorities conflict:
 
 1. identify the exact conflict;
-2. inspect the current exact ref;
-3. apply accepted ADRs where they supersede older frozen text;
-4. do not choose the most convenient interpretation;
+2. inspect the exact current ref;
+3. prefer current production evidence and accepted ADRs;
+4. do not select the most convenient interpretation;
 5. stop and return the unresolved decision to Chat.
 
-Memory, uploaded copies and earlier conversations provide context only.
-
-They never override current repository evidence.
+Memory, uploaded copies, reports and earlier conversations are context only.
+They never override current repository evidence or explicit user decisions.
 
 ---
 
@@ -87,584 +98,276 @@ They never override current repository evidence.
 
 Chat owns:
 
-- sprint planning;
-- prioritization;
-- architecture discussion and decisions;
-- execution-prompt preparation;
-- review of Work and Codex reports;
-- final acceptance.
+- sprint planning and prioritisation;
+- GitHub repository discovery;
+- architecture and financial-semantics decisions;
+- Work and Codex prompt preparation;
+- report verification;
+- implementation acceptance;
+- roadmap and authority reconciliation.
 
 Planning does not authorize implementation.
 
 ### Work
 
-Work is limited to bounded, read-only investigation when GitHub cannot efficiently establish a decision-critical fact.
+Work is read-only with respect to repository source and documentation.
 
-Before escalating, Chat states:
-
-1. the exact unknown;
-2. why it affects the decision;
-3. the bounded evidence Work must return.
-
-Work may investigate:
+Use Work only when GitHub cannot efficiently establish a named fact, including:
 
 - local or unpushed state;
-- linked worktrees;
-- filesystem and Xcode configuration;
-- build, test or runtime evidence;
-- broad cross-file tracing;
-- one unresolved architecture boundary.
+- worktrees, branches and stashes;
+- private-source or fixture lineage;
+- filesystem, Xcode, sandbox or toolchain configuration;
+- build, test, runtime or `.xcresult` evidence;
+- broad local tracing required to resolve one bounded unknown.
 
-Work does not:
+Before Work is used, Chat must state:
 
-- edit files;
-- select a sprint;
-- define architecture;
-- commit;
-- push;
-- create branches;
-- create worktrees;
-- create pull requests.
+1. the exact unresolved unknown;
+2. why it affects the decision;
+3. why GitHub cannot answer it;
+4. the bounded evidence Work must return.
+
+Work may create task-owned build, test and disposable runtime artifacts.
+Work does not edit repository files, choose sprint scope or perform Git writes.
 
 ### Codex
 
-Codex performs only the edits, builds, tests, documentation updates and Git operations authorized by the complete Chat-approved prompt.
+Codex performs only the source, test, documentation and Git operations explicitly
+authorized by the complete Chat-approved prompt.
 
-Codex reports evidence, limitations and residue directly in chat.
+Codex must not:
 
-### User Changes
-
-The user may edit repository files directly.
-
-Preserve legitimate compatible user work.
-
-Stop rather than discard, overwrite or absorb work that is:
-
-- unrelated;
-- ambiguous;
-- private or sensitive;
-- broken;
-- incompatible;
-- unexplained;
-- unsafe to combine;
-- uniquely owned by another branch, worktree or stash.
+- redesign the sprint;
+- widen support claims;
+- choose new architecture;
+- reinterpret source truth;
+- absorb unrelated local changes;
+- continue past a recorded stop condition.
 
 ---
 
-## Operating Model
+## Task Context Discipline
 
-LedgerForge uses a single-person, one-task-at-a-time repository workflow.
+One prompt or session should pursue one coherent outcome.
 
-Default model:
+Every Work or Codex prompt should identify:
+
+- exact baseline ref;
+- required branch and worktree state;
+- one outcome;
+- verified evidence;
+- relevant authorities;
+- included scope;
+- exclusions;
+- acceptance boundary;
+- named focused tests;
+- full-suite trigger, if any;
+- stop conditions;
+- required report fields.
+
+Do not paste complete roadmaps, full chat transcripts, unrelated ADR history,
+raw build logs or the complete repository handbook into ordinary task prompts.
+
+Inspect the smallest code and test boundary capable of completing or falsifying
+the approved outcome. Widen only when concrete evidence requires it, and report
+the widening.
+
+---
+
+## Financial Truth
+
+For financial imports, persistence, identity, balances, cards, salary,
+investments or valuation:
+
+- source semantics outrank fixtures and generated expected data;
+- production parser output must not be its own sole oracle;
+- preserve native currency, scale, direction, date meaning, source order,
+  balances, identifiers and provenance;
+- fail closed on malformed, ambiguous, conflicting or unsupported evidence;
+- verify zero accepted durable residue on rejection;
+- verify SQLite and In-Memory parity where both matter;
+- verify persistence, hydration, provider reconstruction, relaunch and
+  presentation;
+- never infer institution, format or layout support from similarity;
+- never invent dates, ordering, identifiers, balances or provenance;
+- keep sanitized fixtures in Git;
+- keep private originals isolated and read-only;
+- distinguish source truth, implementation behaviour, test evidence and
+  inference.
+
+A green test suite proves only the boundary and oracle it exercised.
+
+Preserve accepted architecture boundaries. Read the relevant ADR before changing
+readers, parsers, financial identifiers, validation, duplicate handling,
+persistence, hydration or presentation ownership.
+
+---
+
+## Git and Worktree Safety
+
+Default repository workflow:
 
 - one `main` branch;
 - one primary worktree;
-- one active repository-editing task;
+- one active editing task;
 - no feature branch;
-- no extra worktree;
 - no pull request;
-- direct commit and push to `origin/main` after validation.
+- direct validated commit and push to `origin/main`.
 
-A branch, worktree or pull request may be used only when:
+A branch, worktree or pull request requires:
 
-1. the user explicitly approves it;
-2. a repository-specific reason is recorded;
-3. the complete approved prompt requires the exception.
+1. explicit user approval;
+2. a repository-specific reason;
+3. an approved prompt requiring it.
 
-Generic tool advice or Git habit does not override this model.
+Before editing, verify:
 
----
-
-## Project Structure
-
-- `LedgerForgeApp.swift`, `ContentView.swift`: application bootstrap and root composition.
-- `Import/`: import workflow and orchestration seams.
-- `Readers/`: source-format access and extraction.
-- `Analyzers/`, `Normalizers/`: deterministic structural extraction support.
-- `Detectors/`: institution and document-family detection.
-- `Parsers/`: institution- and layout-specific financial interpretation.
-- `Models/`: domain values and typed outcomes.
-- `Services/`: validation, identity, workflow coordination, lifecycle and hydration support.
-- `Database/`: repositories, DTOs, SQLite and In-Memory providers, registered migrations.
-- `Core/`: shared runtime infrastructure.
-- `ViewModels/`, `Views/`: presentation projections and SwiftUI.
-- `LedgerForgeTests/`: automated tests and approved sanitized fixture evidence.
-- `LedgerForgeUITests/`: generic UI-test target, intentionally disabled unless separately authorized.
-- `Project documents/`: current state, planning, architecture, product, UI, engineering and build authorities.
-
-Folder location does not override the responsibility boundaries below.
-
----
-
-## Canonical Import Architecture
-
-Preserve this approved flow:
-
-```text
-ImportCoordinator
-    ↓
-PasswordProvider
-    ↓
-ReaderRegistry
-    ↓
-Reader
-    ↓
-RawDocument
-    ↓
-Institution Detection
-    ↓
-Statement Classification
-    ↓
-Parser Selection
-    ↓
-Statement Parser
-    ↓
-FinancialDocument
-    ↓
-Validation
-    ↓
-Exact-Content and Supported Transaction-Event Evaluation
-    ↓
-Account / Identity Review
-    ↓
-Explicit User Confirmation
-    ↓
-DatabaseProvider Confirmed-Import Operation
-    ↓
-Provider-Owned Atomic Persistence
-    ↓
-RepositoryStoreHydrator
-    ↓
-Runtime Stores
-    ↓
-ViewModels
-    ↓
-Views
-```
-
-### Ownership Rules
-
-- Readers understand source formats.
-- Readers perform authorized file access and extraction only.
-- Readers receive optional credentials from coordination.
-- Readers never access Keychain directly.
-- Readers do not interpret financial meaning.
-- Institution Detection uses approved extracted-content evidence.
-- Statement Classification identifies the document family.
-- Parser Selection chooses only an approved parser/profile.
-- Statement Parsers own financial interpretation.
-- Statement Parsers alone produce verified financial identifiers.
-- `FinancialDocument` is canonical parser output.
-- Validation is mandatory before accepted persistence.
-- Preparation and review are read-only.
-- Duplicate, event and identity results prepared before confirmation are advisory.
-- Explicit confirmation is required.
-- `DatabaseProvider` owns confirmation-time revalidation and the accepted atomic graph.
-- Repositories are the only SQLite boundary.
-- `RepositoryStoreHydrator` is the sole persistence-to-runtime boundary.
-- Runtime stores are projections, not durable truth.
-- ViewModels prepare presentation state.
-- Views present state and collect user intent.
-
-### Prohibited Bypasses
-
-Never:
-
-- access SQLite from Views, ViewModels or runtime stores;
-- bypass repositories;
-- coordinate one financial transaction through several UI-owned writes;
-- derive verified identifiers outside parsers;
-- use filenames, labels or weak presentation evidence as financial identity;
-- patch runtime stores to simulate persistence;
-- use parser output as its own sole validation oracle;
-- silently omit rejected transactions;
-- infer unsupported institution, layout or format support;
-- invent missing financial evidence;
-- treat fixture or schema presence as production support.
-
----
-
-## Financial Truth Invariants
-
-For financial-correctness work:
-
-- source semantics outrank derived fixtures and expected JSON;
-- production parser output must not be the sole oracle;
-- preserve native currency, scale, direction, printed date meaning, source order, balances, identifiers and provenance;
-- fail closed on malformed, ambiguous, conflicting or unsupported evidence;
-- verify zero accepted durable residue on rejection;
-- require SQLite and In-Memory parity where both matter;
-- verify persistence, hydration, provider reconstruction, relaunch and presentation;
-- never infer institution, layout or format support from structural similarity;
-- never invent historical dates, order, identifiers, observations or provenance;
-- keep sanitized fixtures in Git;
-- keep private originals isolated and read-only;
-- distinguish source truth, implementation behavior, test evidence and inference.
-
-A green suite proves only the boundary and oracle it exercises.
-
----
-
-## Mandatory Local Repository Gate
-
-Before every editing task, inspect the complete local state.
-
-At minimum:
-
-```bash
-git fetch origin --prune
-
-git branch --show-current
-git rev-parse HEAD
-git rev-parse main
-git rev-parse origin/main
-git rev-list --left-right --count main...origin/main
-
-git status --short
-git diff --stat
-git diff
-git diff --cached --stat
-git diff --cached
-
-git worktree list --porcelain
-git branch --all --verbose --no-abbrev
-git stash list
-```
-
-Also identify:
-
-- configured upstream;
-- detached HEAD;
-- merge in progress;
-- rebase in progress;
-- cherry-pick in progress;
-- revert in progress;
-- bisect in progress;
-- unmerged entries;
-- unexplained lock files.
-
-Before editing, confirm:
-
-- active branch is `main`;
-- local `main` and `origin/main` are synchronized unless the prompt explicitly resolves divergence;
-- staged files are understood;
-- unstaged files are understood;
-- untracked files are understood;
-- linked worktrees are understood;
-- local and remote branches are understood;
-- stashes are understood;
-- no unrelated repository task is active.
+- active branch and exact HEAD;
+- `main` and `origin/main` divergence;
+- staged, unstaged and untracked files;
+- linked worktrees;
+- local and remote branches;
+- stashes;
+- in-progress Git operations;
+- unexplained locks or task-owned processes.
 
 A dirty worktree is not automatically a failure.
-
 An unexplained dirty worktree is a stop condition.
-
----
-
-## Recovery Gate
-
-Before further Work or Codex execution, the repository recovery target is:
-
-- approved completed work consolidated onto `main`;
-- local and remote `main` synchronized;
-- only proven-safe redundant branches or worktrees removed;
-- one clean primary worktree;
-- no unexplained stash;
-- no unique unpushed commit elsewhere.
 
 Never:
 
-- reset unique work;
-- delete an unexplained branch;
-- prune an unexplained worktree;
+- reset or overwrite unique work;
+- delete an unexplained branch or worktree;
 - drop an unexplained stash;
-- overwrite a dirty file;
 - force-push;
-- rewrite published history.
+- rewrite published history;
+- stage unrelated paths;
+- commit private or generated residue.
 
-Stop on:
-
-- ambiguous branch;
-- dirty linked worktree;
-- unique commit;
-- unexplained stash;
-- staged content outside scope;
-- private or sensitive material;
-- untracked files with unclear purpose;
-- unresolved local and remote divergence.
-
-Tidiness is not proof that deletion is safe.
+Before push, fetch again and stop if `origin/main` advanced unexpectedly.
 
 ---
 
-## Direct-to-Main Execution
+## Validation Policy
 
-Perform the approved task directly on `main`.
+Use focused validation by default.
 
-Before committing:
+During implementation, Codex should:
 
-1. review the complete diff;
-2. run all required validation;
-3. confirm only authorized and compatible changes are included;
-4. verify privacy boundaries;
-5. verify documentation claims;
-6. fetch `origin` again;
-7. stop if `origin/main` advanced unexpectedly.
+- compile the smallest affected target;
+- run the explicitly named focused tests;
+- run adjacent suites only when the changed ownership boundary justifies them;
+- avoid rerunning an unchanged full suite.
 
-Stage explicit authorized paths:
+Work owns authoritative broader acceptance testing when the approved prompt
+requires it.
 
-```bash
-git add -- <authorized-paths>
-git diff --cached --stat
-git diff --cached
-```
+Run the complete `TestPlan.xctestplan` only when a recorded trigger applies,
+including:
 
-After validation:
+- final integrated acceptance after material cross-cutting changes;
+- migration, provider transaction, hydration, shared orchestration, concurrency
+  or global test-infrastructure changes;
+- an unexplained failure outside the changed area;
+- integration of several sequential implementation packets;
+- dedicated regression or cycle-close verification;
+- another concrete cross-area risk recorded by Chat.
 
-```bash
-git commit -m "<task-specific completed outcome>"
-git push origin main
-```
+Run at most one authoritative full-suite pass per stable implementation state.
+Another pass requires a material code change or named diagnostic hypothesis.
 
-Prefer one coherent commit for one approved task unless the prompt requires independently validated commits.
+Documentation-only work does not require executable validation unless it changes:
 
-Do not force-push.
+- project or target metadata;
+- schemes or TestPlan;
+- build settings;
+- fixtures or executable resources;
+- source, tests, schemas or migrations.
 
-Do not create or move a tag unless the prompt explicitly requires it.
-
----
-
-## Required Final State
-
-After push, verify:
-
-```bash
-git fetch origin --prune
-
-git branch --show-current
-git rev-parse HEAD
-git rev-parse origin/main
-git rev-list --left-right --count main...origin/main
-
-git status --short
-git worktree list --porcelain
-git branch --all --verbose --no-abbrev
-git stash list
-```
-
-A completed task ends with:
-
-- branch `main`;
-- `HEAD == origin/main`;
-- divergence `0 0`;
-- clean primary worktree;
-- no legitimate uncommitted change;
-- no unpushed commit;
-- no leftover task branch;
-- no leftover task worktree;
-- no unexplained stash;
-- no task-owned process where runtime verification occurred.
-
-Do not claim completion before the final gate passes.
+Do not claim validation that was not executed.
 
 ---
 
-## Privacy and Repository Safety
+## Privacy
 
 Never commit:
 
-- private financial statements;
-- credentials or passwords;
-- API tokens;
-- private keys;
-- unsanitized account identifiers;
+- private financial statements or private source mappings;
+- credentials, passwords, tokens or keys;
+- unsanitized financial identifiers;
 - private transaction evidence;
-- local SQLite databases;
-- SQLite `-wal` or `-shm` files;
-- DerivedData;
-- build products;
+- local SQLite databases, WAL or SHM files;
+- DerivedData or build products;
 - sensitive logs;
 - temporary files;
-- unexplained generated output;
-- source paths;
-- private fixture mappings;
-- user-specific Xcode state.
+- user-specific Xcode state;
+- unexplained generated output.
 
-Approved fixture evidence must remain sanitized, source-faithful and independently verified.
-
-Project-file edits must be authorized, minimal and Xcode-safe.
+Approved fixtures must remain sanitized, source-faithful and independently
+verified.
 
 Privacy uncertainty is a stop condition.
 
 ---
 
-## Baseline Build Configuration
-
-- Xcode project: `LedgerForge.xcodeproj`
-- Shared scheme: `LedgerForge`
-- Canonical test plan: `TestPlan.xctestplan`
-- Platform: macOS
-- Primary app target: `LedgerForge`
-- Primary test target: `LedgerForgeTests`
-- Generic UI-test target: `LedgerForgeUITests`, intentionally disabled unless separately authorized
-
-Canonical Debug build:
-
-```bash
-xcodebuild \
-  -project LedgerForge.xcodeproj \
-  -scheme LedgerForge \
-  -configuration Debug \
-  -destination 'platform=macOS' \
-  build
-```
-
-Canonical TestPlan execution:
-
-```bash
-xcodebuild \
-  -project LedgerForge.xcodeproj \
-  -scheme LedgerForge \
-  -destination 'platform=macOS' \
-  -testPlan TestPlan \
-  test
-```
-
-Use the approved prompt, Engineering Standards and Build Conventions for:
-
-- focused tests;
-- regression suites;
-- Release builds;
-- whole-module optimization;
-- static analysis;
-- migration tests;
-- runtime verification;
-- subprocess contention;
-- Xcode project-integrity checks.
-
-Do not claim a validation boundary that was not freshly executed.
-
----
-
-## Validation and Stop Conditions
-
-Before commit, at minimum:
-
-```bash
-git diff --check
-git status --short
-git diff --stat
-git diff
-git diff --cached --stat
-git diff --cached
-```
-
-Also:
-
-- scan for conflict markers;
-- verify privacy;
-- validate file references and links;
-- confirm migration and schema claims;
-- confirm implementation status is not overstated;
-- confirm production support is not overstated;
-- confirm only authorized files changed;
-- inspect fixture and expected-data changes against source authority.
-
-Documentation-only work may skip full executable validation only when unchanged:
-
-- Swift source;
-- tests;
-- schemas;
-- migrations;
-- fixtures;
-- Xcode project metadata;
-- schemes;
-- TestPlan;
-- build settings;
-- assets;
-- executable resources.
-
-A project, scheme, TestPlan or build-setting change requires project-integrity validation and an appropriate clean build.
+## Stop Conditions
 
 Stop and report when:
 
-- repository baseline differs materially from the prompt;
+- the repository baseline materially differs from the approved prompt;
 - local state is ambiguous;
 - unique work may be lost;
-- remote divergence is unresolved;
-- required architecture is absent or contradictory;
-- a migration requires guessing;
-- source truth is unavailable;
+- architecture is missing or contradictory;
+- a migration would require guessing;
+- source truth or an independent oracle is unavailable;
 - financial relationships cannot be preserved;
-- independent oracle is missing where required;
-- provider parity cannot be established;
-- zero-residue behavior cannot be proven;
+- provider parity or zero-residue behaviour cannot be established;
 - privacy-sensitive material appears;
 - required validation fails;
-- runtime process ownership is unclear;
-- complete diff cannot be explained;
-- scope expands beyond the approved outcome;
-- requested output would overstate support.
+- process or artifact ownership is unclear;
+- the complete diff cannot be explained;
+- scope must expand beyond the approved outcome;
+- the result would overstate production support.
 
-At a stop condition:
-
-- do not improvise around it;
-- do not reduce validation silently;
-- do not commit partial failed work as completed;
-- do not push;
-- report the exact unknown and bounded evidence required.
-
-Manual verification must distinguish:
-
-- passed;
-- pending;
-- unavailable;
-- explicitly accepted deferral.
+Do not silently weaken validation, invent a workaround or commit partial failed
+work as completed.
 
 ---
 
-## Durable Project Records
+## Durable Records
 
-- Verified implementation state belongs in `Project documents/PROJECT_STATE.md`.
-- Unscheduled work belongs in `Project documents/FUTURE_WORK.MD`.
-- Accepted architecture belongs in `Project documents/ADR.md`.
-- Frozen architecture alignment belongs in the Architecture documents.
-- Product direction belongs in `Project documents/Product Vision.md`.
-- UI authority belongs in Frozen UI/UX and approved assets.
-- Engineering policy belongs in `Project documents/Engineering Standards.md`.
-- Build, Xcode and Git mechanics belong in `Project documents/BUILD_AND_PROJECT_CONVENTIONS.md`.
+- Verified implementation state belongs in `PROJECT_STATE.md`.
+- Unscheduled work belongs in `FUTURE_WORK.MD`.
+- Accepted architecture belongs in `ADR.md`.
+- Product direction belongs in `Product Vision.md`.
+- UI authority belongs in frozen UI/UX documents and approved assets.
+- Engineering policy belongs in `Engineering Standards.md`.
+- Build, test, Xcode and Git mechanics belong in
+  `BUILD_AND_PROJECT_CONVENTIONS.md`.
 - Detailed implementation history belongs in Git.
 
-Do not copy every durable fact into every document.
-
-Conversation memory and uploaded copies remain context only.
+Do not duplicate every durable fact across documents.
 
 ---
 
-## Execution Report Minimum
+## Execution Report
 
-A Codex execution report includes:
+A Codex or Work report must include, where applicable:
 
-- starting ref;
-- ending ref;
+- starting and ending refs;
 - branch and worktree state;
 - pre-existing changes;
-- changed files;
-- included scope;
-- excluded scope;
-- migration impact;
-- ADR impact;
+- inspected or changed files;
+- included and excluded scope;
+- migration and ADR impact;
 - fixture and oracle authority;
-- validation commands and results;
+- commands and validation results;
 - runtime evidence;
-- documentation changes;
-- staged, unstaged and untracked residue;
-- commit SHA;
-- tag where applicable;
-- push result;
-- final `HEAD == origin/main`;
-- final worktree state;
+- residue and cleanup;
+- commit and push result;
 - limitations;
+- unresolved evidence;
 - falsification analysis.
 
 Classify material claims as:
@@ -674,29 +377,25 @@ Classify material claims as:
 - contradicted;
 - missing.
 
-A green suite is not acceptance evidence until its boundary and oracle independence are checked.
-
 ---
 
 ## Guide Maintenance
 
-Keep this file compact.
+Keep this file compact and stable.
 
-Update it only when:
+Do not add:
 
-- bootstrap order changes;
-- authority changes;
-- role ownership changes;
-- the canonical pipeline changes;
-- repository safety policy changes;
-- baseline build entry points change.
+- current sprint numbers;
+- current commit SHAs;
+- current migration versions;
+- current test counts;
+- institution support matrices;
+- full architecture diagrams;
+- complete command transcripts;
+- roadmap content;
+- historical sprint summaries.
 
-Detailed standards belong in their subject documents.
+Update this file only when bootstrap, authority, role ownership, repository safety
+or validation policy materially changes.
 
-This file routes and enforces.
-
-It should not become a duplicate of the entire repository handbook.
-
----
-
-## End of LedgerForge Agent Guide
+Detailed and mutable rules belong in their subject authorities.
