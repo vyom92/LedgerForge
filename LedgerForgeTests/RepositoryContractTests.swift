@@ -7,6 +7,63 @@ import Testing
 @MainActor
 struct RepositoryContractTests {
 
+    @Test func importedDocumentLookupUsesExactIDWithProviderParity() throws {
+        try runForEachProvider { provider in
+            let fixture = try seedWorkspace(provider)
+            let account = account(
+                id: "account-document-lookup",
+                workspaceId: fixture.workspaceId,
+                name: "Document Lookup Account",
+                currency: "INR"
+            )
+            _ = try provider.accountRepo.upsertAccount(account)
+            let history = atomicImportHistoryPayload(
+                workspaceId: fixture.workspaceId,
+                accountId: account.id,
+                suffix: "document-lookup"
+            )
+            _ = try provider.importSessionRepo.commitImportHistory(history)
+
+            #expect(try provider.importSessionRepo.importedDocument(id: history.document.id) == history.document)
+            #expect(try provider.importSessionRepo.importedDocument(id: "missing-document") == nil)
+        }
+    }
+
+    @Test func sqliteImportedDocumentLookupSurvivesProviderReconstruction() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LedgerForgeDocumentLookupTests")
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let databasePath = folder.appendingPathComponent("document-lookup.sqlite").path
+        let firstProvider = try SQLiteRepositoryProvider(path: databasePath)
+        let workspace = WorkspaceDTO(
+            id: "workspace-document-reopen",
+            name: "Document Reopen Workspace",
+            createdAtISO: "2026-08-01T00:00:00Z"
+        )
+        let account = account(
+            id: "account-document-reopen",
+            workspaceId: workspace.id,
+            name: "Document Reopen Account",
+            currency: "INR"
+        )
+        _ = try firstProvider.workspaceRepo.upsertWorkspace(workspace)
+        _ = try firstProvider.accountRepo.upsertAccount(account)
+        let history = atomicImportHistoryPayload(
+            workspaceId: workspace.id,
+            accountId: account.id,
+            suffix: "document-reopen"
+        )
+        _ = try firstProvider.importSessionRepo.commitImportHistory(history)
+        #expect(try firstProvider.importSessionRepo.importedDocument(id: history.document.id) == history.document)
+        firstProvider.database.close()
+
+        let reopenedProvider = try SQLiteRepositoryProvider(path: databasePath)
+        defer { reopenedProvider.database.close() }
+        #expect(try reopenedProvider.importSessionRepo.importedDocument(id: history.document.id) == history.document)
+    }
+
     @Test func importAttemptsUseBoundedCodesAndProviderParity() async throws {
         try runForEachProvider { provider in
             let fixture = try seedWorkspace(provider)

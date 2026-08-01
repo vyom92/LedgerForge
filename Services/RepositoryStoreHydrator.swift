@@ -285,13 +285,19 @@ final class RepositoryStoreHydrator {
             }
         )
         let importSessions = try referencedImportSessions(from: transactionDTOs)
+        let importedDocumentsByID = try referencedImportedDocuments(from: transactionDTOs)
         let importAttempts = try importSessionRepo.importAttempts(workspaceId: workspaceId).map(RepositoryImportAttempt.init)
         try Self.validatePartialAttemptConsistency(
             sessions: importSessions,
             attempts: importAttempts
         )
         let transactions = try transactionDTOs.map {
-            try Self.transaction(from: $0, accounts: accountDTOs)
+            try Self.transaction(
+                from: $0,
+                accounts: accountDTOs,
+                importedDocumentsByID: importedDocumentsByID,
+                workspaceID: workspaceId
+            )
         }
         let accounts = try Self.accounts(
             from: accountDTOs,
@@ -477,6 +483,17 @@ final class RepositoryStoreHydrator {
         }
     }
 
+    private func referencedImportedDocuments(from transactions: [TransactionDTO]) throws -> [String: ImportedDocumentDTO] {
+        let referencedDocumentIDs = Set(transactions.compactMap(\.documentId)).sorted()
+        var documentsByID: [String: ImportedDocumentDTO] = [:]
+        for documentID in referencedDocumentIDs {
+            if let document = try importSessionRepo.importedDocument(id: documentID) {
+                documentsByID[documentID] = document
+            }
+        }
+        return documentsByID
+    }
+
     private static func partialImportRuntime(
         sessionID: String,
         summary: PartialImportSummaryDTO?,
@@ -641,7 +658,12 @@ final class RepositoryStoreHydrator {
         }
     }
 
-    private static func transaction(from dto: TransactionDTO, accounts: [AccountDTO]) throws -> Transaction {
+    private static func transaction(
+        from dto: TransactionDTO,
+        accounts: [AccountDTO],
+        importedDocumentsByID: [String: ImportedDocumentDTO],
+        workspaceID: String
+    ) throws -> Transaction {
         guard let postedDate = try? StatementDate(canonical: dto.postedDateISO) else {
             throw RepositoryStoreHydrationError.invalidPostedDate(dto.postedDateISO)
         }
@@ -704,6 +726,18 @@ final class RepositoryStoreHydrator {
             throw RepositoryStoreHydrationError.invalidSourceProvenance(dto.id)
         }
 
+        let repositorySourceDocumentName: String?
+        if let documentID = dto.documentId,
+           let document = importedDocumentsByID[documentID],
+           document.id == documentID,
+           document.workspaceId == workspaceID,
+           document.importSessionId == dto.importSessionId {
+            let trimmedFilename = document.filename.trimmingCharacters(in: .whitespacesAndNewlines)
+            repositorySourceDocumentName = trimmedFilename.isEmpty ? nil : trimmedFilename
+        } else {
+            repositorySourceDocumentName = nil
+        }
+
         return Transaction(
             statementDate: postedDate,
             description: dto.description ?? "",
@@ -721,7 +755,8 @@ final class RepositoryStoreHydrator {
             sourceProvenance: provenance,
             repositoryAccountId: dto.accountId,
             repositoryImportSessionId: dto.importSessionId,
-            repositoryDocumentId: dto.documentId
+            repositoryDocumentId: dto.documentId,
+            repositorySourceDocumentName: repositorySourceDocumentName
         )
     }
 

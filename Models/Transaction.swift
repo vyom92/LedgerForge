@@ -180,6 +180,7 @@ struct Transaction: Identifiable {
     var repositoryAccountId: String? = nil
     var repositoryImportSessionId: String? = nil
     let repositoryDocumentId: String?
+    let repositorySourceDocumentName: String?
     var verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
 
     init(
@@ -200,6 +201,7 @@ struct Transaction: Identifiable {
         repositoryAccountId: String? = nil,
         repositoryImportSessionId: String? = nil,
         repositoryDocumentId: String? = nil,
+        repositorySourceDocumentName: String? = nil,
         verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
     ) {
         self.id = id
@@ -219,6 +221,7 @@ struct Transaction: Identifiable {
         self.repositoryAccountId = repositoryAccountId
         self.repositoryImportSessionId = repositoryImportSessionId
         self.repositoryDocumentId = repositoryDocumentId
+        self.repositorySourceDocumentName = repositorySourceDocumentName
         self.verifiedAxisUPIEventEvidence = verifiedAxisUPIEventEvidence
     }
 
@@ -241,6 +244,7 @@ struct Transaction: Identifiable {
         repositoryAccountId: String? = nil,
         repositoryImportSessionId: String? = nil,
         repositoryDocumentId: String? = nil,
+        repositorySourceDocumentName: String? = nil,
         verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
     ) {
         let postedMoney = try! Money(amount: amount, currency: currency)
@@ -262,6 +266,7 @@ struct Transaction: Identifiable {
             repositoryAccountId: repositoryAccountId,
             repositoryImportSessionId: repositoryImportSessionId,
             repositoryDocumentId: repositoryDocumentId,
+            repositorySourceDocumentName: repositorySourceDocumentName,
             verifiedAxisUPIEventEvidence: verifiedAxisUPIEventEvidence
         )
     }

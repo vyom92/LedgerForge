@@ -1198,7 +1198,7 @@ Persistent diagnostics must not become an application persistence mechanism or a
 **Status:** Candidate
 **Depends on:** Approved document-library and source-retention architecture
 
-Sprint 67 completed read-only transaction-detail presentation of authoritative account, source-document and import-session provenance through hydrated durable relationships.
+Sprint 67A corrected the completed read-only transaction-detail presentation so source-document metadata is bound to the transaction's exact durable imported-document record; import-session display labels are not document authority.
 
 Only source-document reopening, browsing or library behavior remains here. It requires a separately approved architecture and privacy boundary; filenames, raw source bytes, paths and display labels must not become durable identity.
 

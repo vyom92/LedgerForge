@@ -420,6 +420,11 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
         return state.importSessions[id]
     }
 
+    func importedDocument(id: String) throws -> ImportedDocumentDTO? {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.documents[id]
+    }
+
     func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? {
         state.stateLock.lock()
         defer { state.stateLock.unlock() }

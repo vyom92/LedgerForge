@@ -224,6 +224,7 @@ public protocol ImportSessionRepository {
     func createImportSession(_ payload: ImportSessionDTO) throws -> String
     func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws
     func importSession(id: String) throws -> ImportSessionRecordDTO?
+    func importedDocument(id: String) throws -> ImportedDocumentDTO?
     func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO?
     func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO]
     func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String
@@ -423,6 +424,7 @@ private struct GenerationCheckedImportSessionRepository: ImportSessionRepository
     func createImportSession(_ payload: ImportSessionDTO) throws -> String { try validity.check(); return try base.createImportSession(payload) }
     func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws { try validity.check(); try base.updateImportSession(id, updates: updates) }
     func importSession(id: String) throws -> ImportSessionRecordDTO? { try validity.check(); return try base.importSession(id: id) }
+    func importedDocument(id: String) throws -> ImportedDocumentDTO? { try validity.check(); return try base.importedDocument(id: id) }
     func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? { try validity.check(); return try base.priorImportedStatement(algorithm: algorithm, fingerprint: fingerprint) }
     func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] { try validity.check(); return try base.transactionEventOwners(keys: keys) }
     func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String { try validity.check(); return try base.recordImportAttempt(payload) }
@@ -552,6 +554,10 @@ struct PlaceholderImportSessionRepo: ImportSessionRepository {
     }
 
     func importSession(id: String) throws -> ImportSessionRecordDTO? {
+        throw RepositoryError.persistenceUnavailable
+    }
+
+    func importedDocument(id: String) throws -> ImportedDocumentDTO? {
         throw RepositoryError.persistenceUnavailable
     }
 

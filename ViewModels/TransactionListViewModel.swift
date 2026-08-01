@@ -132,14 +132,7 @@ final class TransactionListViewModel: ObservableObject {
             guard matches.count == 1 else { return nil }
             return matches[0]
         }
-        let sourceDocumentName: String
-        if transaction.repositoryDocumentId != nil,
-           let matchingSession,
-           let durableName = nonempty(matchingSession.sourceDocumentName) {
-            sourceDocumentName = durableName
-        } else {
-            sourceDocumentName = unavailable
-        }
+        let sourceDocumentName = nonempty(transaction.repositorySourceDocumentName) ?? unavailable
 
         let importedAt = matchingSession.flatMap { session in
             strictISO8601Date(session.completedAtISO ?? session.startedAtISO)

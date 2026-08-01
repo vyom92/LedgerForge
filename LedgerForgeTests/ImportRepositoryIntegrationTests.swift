@@ -606,9 +606,17 @@ struct ImportRepositoryIntegrationTests {
         #expect(persistedTransactions.allSatisfy {
             $0.rawRows.first?.parserProfileVersion == AxisBankAccountParser.profileVersion
         })
+        let authoritativeDocumentFilename = fixture.financialDocument.sourceDocument.filename
+        let nonauthoritativeSessionLabel = "Session display label must not become a document name"
+        try initialProvider.database.executePrepared(
+            sql: "UPDATE import_sessions SET user_visible_name = ? WHERE id = ?;",
+            params: [nonauthoritativeSessionLabel, fixture.importSession.id.uuidString]
+        )
+        try initialProvider.database.checkpointAndClose()
 
         resetRuntimeStoresForImportIntegration()
         let relaunchedProvider = try SQLiteRepositoryProvider(path: dbPath)
+        defer { relaunchedProvider.database.close() }
         let hydrator = RepositoryStoreHydrator(
             accountRepo: relaunchedProvider.accountRepo,
             importSessionRepo: relaunchedProvider.importSessionRepo,
@@ -626,17 +634,25 @@ struct ImportRepositoryIntegrationTests {
         #expect(TransactionStore.shared.transactions.count == 2)
         #expect(TransactionStore.shared.transactions.map(\.repositoryTransactionId) == persistedIDs.map(Optional.some))
         #expect(TransactionStore.shared.transactions.map(\.repositoryDocumentId) == persistedDocumentIDs)
+        #expect(TransactionStore.shared.transactions.allSatisfy { $0.repositorySourceDocumentName == authoritativeDocumentFilename })
+        #expect(ImportSessionStore.shared.importSessions.first?.sourceDocumentName == nonauthoritativeSessionLabel)
         #expect(TransactionStore.shared.transactions.allSatisfy { !$0.account.contains(".csv") })
         #expect(TransactionStore.shared.transactions.allSatisfy { $0.sourceBank == "Axis Bank" })
         #expect(TransactionStore.shared.transactions.map { $0.statementDate?.canonical } == persistedTransactions.map { Optional($0.postedDateISO) })
         #expect(TransactionStore.shared.transactions.map(\.financialDateRole) == persistedTransactions.map { FinancialDateRole(rawValue: $0.financialDateRole)! })
         #expect(TransactionStore.shared.transactions.map(\.statementTimezoneEvidence) == persistedTransactions.map { try! StatementTimezoneEvidence(validatingPersistenceCode: $0.statementTimezoneEvidence) })
         #expect(TransactionStore.shared.transactions.map(\.sourceProvenance) == persistedProvenance)
+        let detailViewModel = TransactionListViewModel()
+        let detailTransaction = try #require(TransactionStore.shared.transactions.first)
+        let detail = detailViewModel.detailPresentation(for: detailTransaction)
+        #expect(detail.sourceDocumentName == authoritativeDocumentFilename)
+        #expect(!detail.accessibilityText.contains(nonauthoritativeSessionLabel))
 
         let forced = try hydrator.hydrateIfNeeded(forceRefresh: true)
         #expect(forced.didHydrate)
         #expect(TransactionStore.shared.transactions.map(\.repositoryTransactionId) == persistedIDs.map(Optional.some))
         #expect(TransactionStore.shared.transactions.map(\.repositoryDocumentId) == persistedDocumentIDs)
+        #expect(TransactionStore.shared.transactions.allSatisfy { $0.repositorySourceDocumentName == authoritativeDocumentFilename })
         #expect(TransactionStore.shared.transactions.map(\.sourceProvenance) == persistedProvenance)
     }
 
@@ -1790,6 +1806,10 @@ private final class FailureInjectingImportSessionRepository: ImportSessionReposi
 
     func importSession(id: String) throws -> ImportSessionRecordDTO? {
         try base.importSession(id: id)
+    }
+
+    func importedDocument(id: String) throws -> ImportedDocumentDTO? {
+        try base.importedDocument(id: id)
     }
 
     func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? {

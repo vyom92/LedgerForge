@@ -242,7 +242,8 @@ struct TransactionListViewModelTests {
         #expect(presentation.statementDateRole == "Value date")
         #expect(presentation.accountDisplayName == "Everyday account")
         #expect(presentation.institution == "Axis Bank")
-        #expect(presentation.sourceDocumentName == "July statement.pdf")
+        #expect(presentation.sourceDocumentName == "July durable statement.pdf")
+        #expect(presentation.sourceDocumentName != detailSession().sourceDocumentName)
         #expect(presentation.importedAt != nil)
         #expect(presentation.importedAtText != "Unavailable")
         #expect(presentation.validation?.title == "Passed")
@@ -289,7 +290,7 @@ struct TransactionListViewModelTests {
 
         let presentation = viewModel.detailPresentation(for: transaction)
 
-        #expect(presentation.sourceDocumentName == "Unavailable")
+        #expect(presentation.sourceDocumentName == "July durable statement.pdf")
         #expect(presentation.importedAt == nil)
         #expect(presentation.importedAtText == "Unavailable")
         #expect(presentation.validation == nil)
@@ -313,7 +314,7 @@ struct TransactionListViewModelTests {
 
         let presentation = viewModel.detailPresentation(for: transaction)
 
-        #expect(presentation.sourceDocumentName == "July statement.pdf")
+        #expect(presentation.sourceDocumentName == "July durable statement.pdf")
         #expect(presentation.importedAt == nil)
         #expect(presentation.importedAtText == "Unavailable")
         #expect(presentation.validation == nil)
@@ -338,7 +339,7 @@ struct TransactionListViewModelTests {
 
         let presentation = viewModel.detailPresentation(for: transaction)
 
-        #expect(presentation.sourceDocumentName == "Unavailable")
+        #expect(presentation.sourceDocumentName == "July durable statement.pdf")
         #expect(presentation.importedAt == nil)
         #expect(presentation.validation == nil)
         #expect(!presentation.accessibilityText.contains("First statement.pdf"))
@@ -385,7 +386,8 @@ struct TransactionListViewModelTests {
             "normalized-row-internal",
             "record-digest-internal",
             "raw-parser-profile-internal",
-            "internal-source-path-sentinel"
+            "internal-source-path-sentinel",
+            "Import session label must not display.csv"
         ] {
             #expect(!presentedText.contains(prohibited), "Unexpected internal presentation: \(prohibited)")
         }
@@ -518,7 +520,8 @@ private func validationSession(id: String, status: String) -> RepositoryImportSe
 
 private func detailTransaction(
     repositoryImportSessionId: String? = "repository-session-internal",
-    repositoryDocumentId: String? = "repository-document-internal"
+    repositoryDocumentId: String? = "repository-document-internal",
+    repositorySourceDocumentName: String? = "July durable statement.pdf"
 ) -> Transaction {
     Transaction(
         statementDate: try! StatementDate(canonical: "2023-11-14"),
@@ -544,13 +547,14 @@ private func detailTransaction(
         )],
         repositoryAccountId: "repository-account-internal",
         repositoryImportSessionId: repositoryImportSessionId,
-        repositoryDocumentId: repositoryDocumentId
+        repositoryDocumentId: repositoryDocumentId,
+        repositorySourceDocumentName: repositoryDocumentId == nil ? nil : repositorySourceDocumentName
     )
 }
 
 private func detailSession(
     id: String = "repository-session-internal",
-    sourceDocumentName: String? = "July statement.pdf",
+    sourceDocumentName: String? = "Import session label must not display.csv",
     completedAtISO: String? = "2026-07-20T00:01:00Z",
     validationStatus: String = "passed"
 ) -> RepositoryImportSession {

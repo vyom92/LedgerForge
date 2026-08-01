@@ -93,6 +93,7 @@ struct RepositoryStoreHydratorTests {
         #expect(stores.transactions.transactions.first?.repositoryAccountId == "account-dashboard")
         #expect(stores.transactions.transactions.first?.repositoryImportSessionId == "import-dashboard")
         #expect(stores.transactions.transactions.first?.repositoryDocumentId == "document-dashboard")
+        #expect(stores.transactions.transactions.first?.repositorySourceDocumentName == "authoritative-dashboard.csv")
         #expect(stores.transactions.transactions.first?.repositoryTransactionId == "transaction-trusted")
         #expect(stores.importSessions.importSessions.map(\.id) == ["import-dashboard"])
 
@@ -207,6 +208,87 @@ struct RepositoryStoreHydratorTests {
         #expect(result.didHydrate)
         #expect(stores.transactions.transactions.count == 1)
         #expect(stores.transactions.transactions.first?.repositoryDocumentId == nil)
+        #expect(stores.transactions.transactions.first?.repositorySourceDocumentName == nil)
+    }
+
+    @Test func missingReferencedDocumentRemainsReadableAndNeutral() throws {
+        let provider = try seededProvider()
+        let stores = RuntimeStores()
+        let repository = HydrationFixtureImportSessionRepo(base: provider.importSessionRepo, documents: [:])
+        let hydrator = makeHydrator(provider: provider, stores: stores, importSessionRepo: repository)
+
+        _ = try hydrator.hydrateIfNeeded()
+
+        #expect(stores.transactions.transactions.first?.repositoryDocumentId == "document-dashboard")
+        #expect(stores.transactions.transactions.first?.repositorySourceDocumentName == nil)
+        #expect(repository.documentReadIDs == ["document-dashboard"])
+    }
+
+    @Test func inconsistentOrBlankReferencedDocumentRemainsReadableAndNeutral() throws {
+        let cases = [
+            importedDocument(importSessionId: "other-session"),
+            importedDocument(workspaceId: "other-workspace"),
+            importedDocument(filename: "  \n  ")
+        ]
+
+        for document in cases {
+            let provider = try seededProvider()
+            let stores = RuntimeStores()
+            let repository = HydrationFixtureImportSessionRepo(
+                base: provider.importSessionRepo,
+                documents: [document.id: document]
+            )
+            let hydrator = makeHydrator(provider: provider, stores: stores, importSessionRepo: repository)
+
+            _ = try hydrator.hydrateIfNeeded()
+
+            #expect(stores.transactions.transactions.first?.repositoryDocumentId == "document-dashboard")
+            #expect(stores.transactions.transactions.first?.repositorySourceDocumentName == nil)
+        }
+    }
+
+    @Test func stagedHydrationReadsEachReferencedDocumentOnceAndTrimsItsFilename() throws {
+        let provider = try seededProvider()
+        let stores = RuntimeStores()
+        let repository = HydrationFixtureImportSessionRepo(
+            base: provider.importSessionRepo,
+            documents: ["document-dashboard": importedDocument(filename: "  durable-statement.csv  ")]
+        )
+        let transactions = [
+            trustedTransaction(id: "transaction-a"),
+            trustedTransaction(id: "transaction-b", rawRows: [trustedRawRow(id: "raw-b", normalizedRowId: "row-b", sourceOrdinal: 2)])
+        ]
+        let hydrator = makeHydrator(
+            provider: provider,
+            stores: stores,
+            importSessionRepo: repository,
+            transactionRepo: HydrationFixtureTransactionRepo(transactions: transactions)
+        )
+
+        _ = try hydrator.hydrateIfNeeded()
+
+        #expect(repository.documentReadIDs == ["document-dashboard"])
+        #expect(stores.transactions.transactions.map(\.repositorySourceDocumentName) == ["durable-statement.csv", "durable-statement.csv"])
+    }
+
+    @Test func documentReadFailurePreservesPreviouslyPublishedCompleteSnapshot() throws {
+        let provider = try seededProvider()
+        let stores = RuntimeStores()
+        let repository = HydrationFixtureImportSessionRepo(
+            base: provider.importSessionRepo,
+            documents: ["document-dashboard": importedDocument()]
+        )
+        let hydrator = makeHydrator(provider: provider, stores: stores, importSessionRepo: repository)
+        _ = try hydrator.hydrateIfNeeded()
+        let before = stores.transactions.transactions.map(HydratedTransactionObservation.init)
+        repository.documentReadError = RepositoryError.persistenceUnavailable
+
+        #expect(throws: RepositoryError.self) {
+            _ = try hydrator.hydrateIfNeeded(forceRefresh: true)
+        }
+
+        #expect(stores.transactions.transactions.map(HydratedTransactionObservation.init) == before)
+        #expect(stores.transactions.transactions.first?.repositorySourceDocumentName == "authoritative-dashboard.csv")
     }
 
     @Test func forcedHydrationValidationFailurePreservesPublishedDocumentRelationship() throws {
@@ -318,11 +400,16 @@ private struct RuntimeStores {
 private func makeHydrator(
     provider: InMemoryRepositoryProvider,
     stores: RuntimeStores,
+    importSessionRepo: ImportSessionRepository? = nil,
     transactionRepo: TransactionRepository = HydrationFixtureTransactionRepo(transactions: [trustedTransaction()])
 ) -> RepositoryStoreHydrator {
-    RepositoryStoreHydrator(
+    let resolvedImportSessionRepo = importSessionRepo ?? HydrationFixtureImportSessionRepo(
+        base: provider.importSessionRepo,
+        documents: ["document-dashboard": importedDocument()]
+    )
+    return RepositoryStoreHydrator(
         accountRepo: provider.accountRepo,
-        importSessionRepo: provider.importSessionRepo,
+        importSessionRepo: resolvedImportSessionRepo,
         transactionRepo: transactionRepo,
         categoryRepo: provider.categoryRepo,
         accountStore: stores.accounts,
@@ -331,6 +418,24 @@ private func makeHydrator(
         importSessionStore: stores.importSessions,
         importAttemptStore: stores.importAttempts,
         workspaceId: "workspace-dashboard"
+    )
+}
+
+private func importedDocument(
+    id: String = "document-dashboard",
+    workspaceId: String = "workspace-dashboard",
+    importSessionId: String = "import-dashboard",
+    filename: String = "authoritative-dashboard.csv"
+) -> ImportedDocumentDTO {
+    ImportedDocumentDTO(
+        id: id,
+        workspaceId: workspaceId,
+        importSessionId: importSessionId,
+        filename: filename,
+        mimeType: "text/csv",
+        sizeBytes: 128,
+        legacyRawTextSHA256: String(repeating: "d", count: 64),
+        createdAtISO: "2026-07-08T00:02:30Z"
     )
 }
 
@@ -460,6 +565,7 @@ private struct HydratedTransactionObservation: Equatable {
     let repositoryAccountId: String?
     let repositoryImportSessionId: String?
     let repositoryDocumentId: String?
+    let repositorySourceDocumentName: String?
 
     init(_ transaction: Transaction) {
         id = transaction.id
@@ -477,7 +583,36 @@ private struct HydratedTransactionObservation: Equatable {
         repositoryAccountId = transaction.repositoryAccountId
         repositoryImportSessionId = transaction.repositoryImportSessionId
         repositoryDocumentId = transaction.repositoryDocumentId
+        repositorySourceDocumentName = transaction.repositorySourceDocumentName
     }
+}
+
+private final class HydrationFixtureImportSessionRepo: ImportSessionRepository {
+    private let base: ImportSessionRepository
+    private let documents: [String: ImportedDocumentDTO]
+    var documentReadError: Error?
+    private(set) var documentReadIDs: [String] = []
+
+    init(base: ImportSessionRepository, documents: [String: ImportedDocumentDTO]) {
+        self.base = base
+        self.documents = documents
+    }
+
+    func createImportSession(_ payload: ImportSessionDTO) throws -> String { try base.createImportSession(payload) }
+    func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws { try base.updateImportSession(id, updates: updates) }
+    func importSession(id: String) throws -> ImportSessionRecordDTO? { try base.importSession(id: id) }
+    func importedDocument(id: String) throws -> ImportedDocumentDTO? {
+        documentReadIDs.append(id)
+        if let documentReadError { throw documentReadError }
+        return documents[id]
+    }
+    func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? { try base.priorImportedStatement(algorithm: algorithm, fingerprint: fingerprint) }
+    func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] { try base.transactionEventOwners(keys: keys) }
+    func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String { try base.recordImportAttempt(payload) }
+    func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] { try base.importAttempts(workspaceId: workspaceId) }
+    func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? { try base.partialImportSummary(importSessionId: importSessionId) }
+    func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] { try base.incomingRowDispositions(importSessionId: importSessionId) }
+    func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult { try base.commitImportHistory(payload) }
 }
 
 private struct HydratedAccountObservation: Equatable {

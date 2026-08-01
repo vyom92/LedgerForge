@@ -1958,6 +1958,22 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
         }.first
     }
 
+    func importedDocument(id: String) throws -> ImportedDocumentDTO? {
+        let sql = "SELECT id, workspace_id, import_session_id, filename, mime_type, size_bytes, sha256, created_at FROM documents WHERE id = ?;"
+        return try db.query(sql: sql, params: [id]) { row in
+            ImportedDocumentDTO(
+                id: row.string(at: 0) ?? "",
+                workspaceId: row.string(at: 1) ?? "",
+                importSessionId: row.string(at: 2) ?? "",
+                filename: row.string(at: 3) ?? "",
+                mimeType: row.string(at: 4),
+                sizeBytes: row.int64(at: 5),
+                legacyRawTextSHA256: row.string(at: 6) ?? "",
+                createdAtISO: row.string(at: 7) ?? ""
+            )
+        }.first
+    }
+
     func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? {
         try priorImportedStatementWithoutTransaction(algorithm: algorithm, fingerprint: fingerprint)
     }
