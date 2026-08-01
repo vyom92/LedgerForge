@@ -154,6 +154,82 @@ enum ImportPresentationState {
     case failed(fileName: String, message: String, retrySourceURL: URL?)
 }
 
+enum ImportFooterPresentation {
+    enum Kind: Equatable {
+        case confirmation
+        case importing
+        case retryPreparation
+        case viewTransactions
+        case none
+    }
+
+    case confirmation(PreparedImport)
+    case importing
+    case retryPreparation(URL)
+    case viewTransactions
+    case none
+
+    static func presentation(for state: ImportPresentationState) -> Self {
+        switch state {
+        case .previewReady(let preparedImport):
+            return .confirmation(preparedImport)
+        case .committing:
+            return .importing
+        case .failed(_, _, let retrySourceURL?):
+            return .retryPreparation(retrySourceURL)
+        case .completed(let outcome) where outcome.allowsViewingTransactions:
+            return .viewTransactions
+        default:
+            return .none
+        }
+    }
+
+    var kind: Kind {
+        switch self {
+        case .confirmation:
+            return .confirmation
+        case .importing:
+            return .importing
+        case .retryPreparation:
+            return .retryPreparation
+        case .viewTransactions:
+            return .viewTransactions
+        case .none:
+            return .none
+        }
+    }
+}
+
+enum ValidationReviewPresentation {
+    enum Kind: Equatable {
+        case noStatementPrepared
+        case validationResults
+    }
+
+    case noStatementPrepared
+    case validationResults(PreparedImport)
+
+    static func presentation(for state: ImportPresentationState) -> Self {
+        switch state {
+        case .previewReady(let preparedImport),
+             .validationFailed(let preparedImport),
+             .committing(let preparedImport):
+            return .validationResults(preparedImport)
+        default:
+            return .noStatementPrepared
+        }
+    }
+
+    var kind: Kind {
+        switch self {
+        case .noStatementPrepared:
+            return .noStatementPrepared
+        case .validationResults:
+            return .validationResults
+        }
+    }
+}
+
 private extension ImportPresentationState {
     var isTerminal: Bool {
         switch self {
@@ -1308,10 +1384,6 @@ struct ContentView: View {
                 }
 
                 Spacer()
-
-                Image(systemName: "chevron.down")
-                    .font(.caption)
-                    .foregroundStyle(LFTheme.textSecondary)
             }
             .padding(.bottom, 22)
 
@@ -1703,10 +1775,6 @@ struct ContentView: View {
                             Text(formatCurrency(account.currentBalance, currencyCode: account.currencyCode))
                                 .font(.subheadline.weight(.medium))
                                 .monospacedDigit()
-
-                            Image(systemName: "chevron.right")
-                                .font(.caption2)
-                                .foregroundStyle(LFTheme.textSecondary)
                         }
                         .padding(.vertical, 10)
 
@@ -1810,8 +1878,6 @@ struct ContentView: View {
                                 .foregroundStyle(LFTheme.textSecondary)
                         }
                         Spacer()
-                        Image(systemName: "star")
-                            .foregroundStyle(LFTheme.warning)
                     }
 
                     if accountsViewModel.isEditingDisplayName {
@@ -2748,8 +2814,8 @@ struct ContentView: View {
 
     private var importFooterAction: some View {
         Group {
-            switch importState {
-            case .previewReady(let preparedImport):
+            switch ImportFooterPresentation.presentation(for: importState) {
+            case .confirmation(let preparedImport):
                 Button {
 #if DEBUG
                     requestProtectedImportAction(.confirm(preparedImport))
@@ -2778,7 +2844,7 @@ struct ContentView: View {
                     ) ||
                     partialReviewBlocksConfirmation
                 )
-            case .committing:
+            case .importing:
                 Label("Importing", systemImage: "hourglass")
                     .labelStyle(.titleAndIcon)
                     .font(.subheadline.weight(.semibold))
@@ -2787,15 +2853,13 @@ struct ContentView: View {
                     .padding(.vertical, 13)
                     .background(LFTheme.surface.opacity(0.65))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-            case .failed(_, _, let retrySourceURL) where retrySourceURL != nil:
+            case .retryPreparation(let retrySourceURL):
                 Button {
-                    if let retrySourceURL {
 #if DEBUG
-                        requestProtectedImportAction(.prepareURL(retrySourceURL))
+                    requestProtectedImportAction(.prepareURL(retrySourceURL))
 #else
-                        beginPreparation(from: retrySourceURL)
+                    beginPreparation(from: retrySourceURL)
 #endif
-                    }
                 } label: {
                     Label("Retry Preparation", systemImage: "arrow.clockwise")
                         .labelStyle(.titleAndIcon)
@@ -2808,7 +2872,7 @@ struct ContentView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
-            case .completed(let outcome) where outcome.allowsViewingTransactions:
+            case .viewTransactions:
                 Button {
                     selectedSection = .transactions
                 } label: {
@@ -2824,16 +2888,16 @@ struct ContentView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
-            default:
-                importFooterPendingAction
+            case .none:
+                EmptyView()
             }
         }
     }
 
     private var validationReviewPanel: some View {
         Group {
-            switch importState {
-            case .previewReady(let preparedImport), .validationFailed(let preparedImport), .committing(let preparedImport):
+            switch ValidationReviewPresentation.presentation(for: importState) {
+            case .validationResults(let preparedImport):
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(spacing: 8) {
                         LFStatusBadge(
@@ -2878,54 +2942,14 @@ struct ContentView: View {
                         }
                     }
                 }
-            default:
-                VStack(alignment: .leading, spacing: 12) {
-                    settingsPendingRow("File Password", value: "Resolved by password provider", icon: "lock")
-                    settingsPendingRow("Date Format", value: "DD MMM YYYY", icon: "calendar")
-                    settingsPendingRow("Duplicate Handling", value: "Existing repository path", icon: "rectangle.on.rectangle")
-                    settingsPendingRow("Create / Link Accounts", value: "Existing persistence mapper", icon: "link")
-                }
+            case .noStatementPrepared:
+                LFEmptyState(
+                    title: "No statement prepared",
+                    message: "Choose a statement file to see validation results.",
+                    systemImage: "doc.text"
+                )
             }
         }
-    }
-
-    private var importFooterPendingAction: some View {
-        Label("Awaiting confirmation", systemImage: "arrow.right")
-            .labelStyle(.titleAndIcon)
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(LFTheme.textSecondary)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 13)
-            .background(LFTheme.surface.opacity(0.65))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(LFTheme.border, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func settingsPendingRow(_ title: String, value: String, icon: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(LFTheme.textSecondary)
-                .frame(width: 22)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline)
-                Text(value)
-                    .font(.caption)
-                    .foregroundStyle(LFTheme.textSecondary)
-            }
-            Spacer()
-            Text("Pending")
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(LFTheme.textSecondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(LFTheme.surfaceRaised.opacity(0.65))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-        }
-        .padding(.vertical, 11)
     }
 
     private func settingsToggleRow(_ title: String, icon: String, isOn: Binding<Bool>) -> some View {

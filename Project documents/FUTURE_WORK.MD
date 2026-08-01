@@ -1453,6 +1453,8 @@ Archiving must not delete financial history.
 
 Support user-defined or deterministic grouping while preserving immutable account identity and complete account visibility.
 
+Sprint 68A removes an inert star only; it does not implement favourites or change this candidate.
+
 ---
 
 ## FW-P2-38 — Full Account Transaction-History Navigation
@@ -1468,6 +1470,8 @@ Support user-defined or deterministic grouping while preserving immutable accoun
 
 **Status:** Candidate
 **Depends on:** None
+
+Sprint 68A supplies one neutral idle Validation Review state only; broader empty-state and import guidance remain candidate work.
 
 ---
 
@@ -1587,6 +1591,8 @@ Define durable, privacy-safe preferences for:
 
 Preference changes must not rewrite imported financial truth.
 
+Sprint 68A removes a static dropdown implication only; it does not implement user profiles, workspace switching or durable preferences.
+
 Normal regional formatting may be discovered independently. Reporting-currency preferences depend on `FW-P3-33`.
 
 ---
@@ -1597,6 +1603,8 @@ Normal regional formatting may be discovered independently. Reporting-currency p
 **Depends on:** Stable date semantics and searchable presentation domains
 
 Implement the frozen contextual-toolbar direction for date range, filters and other page-specific controls.
+
+Sprint 68A leaves sorting and contextual filters unavailable; readiness is unchanged.
 
 The controls must:
 

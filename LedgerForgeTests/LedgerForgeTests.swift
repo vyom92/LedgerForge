@@ -42,6 +42,101 @@ struct LedgerForgeTests {
 #endif
     }
 
+    @Test func importPresentationMappingsKeepValidationAndFooterTruthful() throws {
+        let prepared = try sprint68APreparedImport(fileName: "prepared.csv", validationPassed: true)
+        let validationFailed = try sprint68APreparedImport(fileName: "invalid.csv", validationPassed: false)
+        let successfulOutcome = ImportOutcomePresentation(
+            result: ImportEngineResult(
+                fileName: "completed.csv",
+                transactionCount: 1,
+                validationPassed: true,
+                persisted: true,
+                errorMessage: nil
+            )
+        )
+        let unavailableOutcome = ImportOutcomePresentation(
+            result: ImportEngineResult(
+                fileName: "unavailable.csv",
+                transactionCount: 0,
+                validationPassed: false,
+                persisted: false,
+                errorMessage: "Import validation failed."
+            )
+        )
+
+        #expect(ValidationReviewPresentation.presentation(for: .idle).kind == .noStatementPrepared)
+        #expect(ValidationReviewPresentation.presentation(for: .preparing(fileName: "opening.csv", phase: .openingSource)).kind == .noStatementPrepared)
+        #expect(ValidationReviewPresentation.presentation(for: .previewReady(prepared)).kind == .validationResults)
+        #expect(ValidationReviewPresentation.presentation(for: .validationFailed(validationFailed)).kind == .validationResults)
+        #expect(ValidationReviewPresentation.presentation(for: .committing(prepared)).kind == .validationResults)
+        #expect(ValidationReviewPresentation.presentation(for: .completed(successfulOutcome)).kind == .noStatementPrepared)
+
+        #expect(ImportFooterPresentation.presentation(for: .previewReady(prepared)).kind == .confirmation)
+        #expect(ImportFooterPresentation.presentation(for: .validationFailed(validationFailed)).kind == .none)
+        #expect(ImportFooterPresentation.presentation(for: .committing(prepared)).kind == .importing)
+        #expect(ImportFooterPresentation.presentation(for: .failed(fileName: "retry.csv", message: "Read failed", retrySourceURL: URL(fileURLWithPath: "/tmp/retry.csv"))).kind == .retryPreparation)
+        #expect(ImportFooterPresentation.presentation(for: .failed(fileName: "not-retryable.csv", message: "Unsupported", retrySourceURL: nil)).kind == .none)
+        #expect(ImportFooterPresentation.presentation(for: .completed(successfulOutcome)).kind == .viewTransactions)
+        #expect(ImportFooterPresentation.presentation(for: .completed(unavailableOutcome)).kind == .none)
+        #expect(ImportFooterPresentation.presentation(for: .cancelled(fileName: "cancelled.csv")).kind == .none)
+    }
+
+    @Test func residualContentViewAffordancesAreAbsentFromTheirLocalPresentationSections() throws {
+        let source = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .appendingPathComponent("ContentView.swift"),
+            encoding: .utf8
+        )
+
+        let sidebar = try sprint68AContentViewSection(
+            source,
+            startingAt: "private var sidebar: some View",
+            endingBefore: "private var contextualToolbar: some View"
+        )
+        #expect(!sidebar.contains("chevron.down"))
+        #expect(!sidebar.contains("Menu("))
+
+        let dashboardAccounts = try sprint68AContentViewSection(
+            source,
+            startingAt: "private var dashboardAccountsCard: some View",
+            endingBefore: "private var importActivityCard: some View"
+        )
+        #expect(!dashboardAccounts.contains("Image(systemName: \"chevron.right\")"))
+        #expect(dashboardAccounts.contains("linkButton(\"View all\")"))
+
+        let accountDetail = try sprint68AContentViewSection(
+            source,
+            startingAt: "private var accountDetailPanel: some View",
+            endingBefore: "private var importStepper: some View"
+        )
+        #expect(!accountDetail.contains("Image(systemName: \"star\")"))
+        #expect(accountDetail.contains("Edit display name"))
+
+        let footer = try sprint68AContentViewSection(
+            source,
+            startingAt: "private var importFooterAction: some View",
+            endingBefore: "private var validationReviewPanel: some View"
+        )
+        #expect(footer.contains("ImportFooterPresentation.presentation(for: importState)"))
+        #expect(footer.contains("Retry Preparation"))
+        #expect(footer.contains("View Transactions"))
+        #expect(!footer.contains("Awaiting confirmation"))
+        #expect(!footer.contains("importFooterPendingAction"))
+
+        let validationReview = try sprint68AContentViewSection(
+            source,
+            startingAt: "private var validationReviewPanel: some View",
+            endingBefore: "private func settingsToggleRow"
+        )
+        #expect(validationReview.contains("No statement prepared"))
+        #expect(validationReview.contains("Choose a statement file to see validation results."))
+        for removedRow in ["File Password", "Date Format", "Duplicate Handling", "Create / Link Accounts", "Pending"] {
+            #expect(!validationReview.contains(removedRow))
+        }
+    }
+
     @Test(.globalRuntimeStateIsolation)
     func developmentDatabaseResetSwapsToFreshProviderAndHydratesEmptyRuntimeState() throws {
         resetSprint30RuntimeState()
@@ -210,6 +305,67 @@ struct LedgerForgeTests {
         console.clear()
         #expect(console.entries.isEmpty)
     }
+}
+
+private func sprint68APreparedImport(fileName: String, validationPassed: Bool) throws -> PreparedImport {
+    let currency = try CurrencyCode("INR")
+    let transaction = Transaction(
+        statementDate: try StatementDate(canonical: "2026-08-01"),
+        description: "Sprint 68A presentation fixture",
+        debit: nil,
+        credit: 1,
+        amount: 1,
+        balance: 1,
+        currency: currency.code,
+        account: "Axis",
+        sourceBank: "Axis",
+        sourceFile: fileName
+    )
+    let document = FinancialDocument(
+        sourceDocument: Document(
+            filename: fileName,
+            url: URL(fileURLWithPath: "/tmp/\(fileName)"),
+            fileType: "CSV",
+            importedAt: Date(timeIntervalSince1970: 1_704_067_200)
+        ),
+        metadata: DocumentMetadata(institution: .axis, documentType: .bankAccount, fileFormat: .csv, confidence: 1),
+        parserName: "Sprint 68A Presentation Parser",
+        bookedCurrency: currency,
+        transactions: [transaction]
+    )
+    let validation = ImportValidationResult(
+        rowsRead: 1,
+        transactionsParsed: 1,
+        statementCurrency: currency,
+        debitTotalMoney: nil,
+        creditTotalMoney: try Money(amount: 1, currency: currency),
+        openingBalanceMoney: nil,
+        closingBalanceMoney: nil,
+        passed: validationPassed,
+        issues: []
+    )
+    return PreparedImport(
+        sourceURL: document.sourceDocument.url,
+        rawContents: "date,amount",
+        fileName: fileName,
+        detectedInstitution: .axis,
+        detectedDocumentType: .bankAccount,
+        parserName: document.parserName,
+        financialDocument: document,
+        validation: validation,
+        importSession: ImportSession(fileName: fileName, parserName: document.parserName, transactionCount: 1, validation: validation)
+    )
+}
+
+private func sprint68AContentViewSection(
+    _ source: String,
+    startingAt startMarker: String,
+    endingBefore endMarker: String
+) throws -> String {
+    let start = try #require(source.range(of: startMarker))
+    let trailing = source[start.lowerBound...]
+    let end = try #require(trailing.range(of: endMarker))
+    return String(trailing[..<end.lowerBound])
 }
 
 private let sprint30WorkspaceId = "default-workspace"
