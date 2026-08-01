@@ -63,7 +63,7 @@ struct TransactionListView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             VStack(spacing: 14) {
-                transactionRangeAndSummary
+                transactionSummary
                 transactionFilterBar
                 transactionTable
             }
@@ -96,21 +96,9 @@ struct TransactionListView: View {
 #endif
     }
 
-    private var transactionRangeAndSummary: some View {
+    private var transactionSummary: some View {
         LFPanel {
             HStack(spacing: 14) {
-                HStack(spacing: 0) {
-                    rangeButton("All", selected: true)
-                    rangeButton("Today", disabled: true)
-                    rangeButton("Yesterday", disabled: true)
-                    rangeButton("This Week", disabled: true)
-                    rangeButton("This Month", disabled: true)
-                    rangeButton("Last Month", disabled: true)
-                    rangeButton("Custom", icon: "calendar", disabled: true)
-                }
-
-                Spacer()
-
                 ForEach(viewModel.currencySummaries) { summary in
                     transactionSummaryCard("\(summary.currency.code) Inflow", value: MoneyFormatting.display(summary.inflow), color: LFTheme.success)
                     transactionSummaryCard("\(summary.currency.code) Outflow", value: MoneyFormatting.display(summary.outflow), color: LFTheme.danger)
@@ -124,11 +112,6 @@ struct TransactionListView: View {
     private var transactionFilterBar: some View {
         LFPanel {
             HStack(spacing: 12) {
-                LFFilterChip(title: "Accounts", value: "Pending", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65), showsChevron: false)
-                LFFilterChip(title: "Categories", value: "Pending", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65), showsChevron: false)
-                LFFilterChip(title: "Types", value: "Pending", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65), showsChevron: false)
-                LFFilterChip(title: "Status", value: "Pending", width: 146, surface: LFTheme.backgroundDeep.opacity(0.65), showsChevron: false)
-
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(LFTheme.textSecondary)
@@ -177,8 +160,6 @@ struct TransactionListView: View {
         LFPanel {
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
-                    Image(systemName: "square")
-                        .frame(width: 20)
                     Text("Date")
                         .frame(width: 84, alignment: .leading)
                     Text("Description")
@@ -193,8 +174,6 @@ struct TransactionListView: View {
                         .frame(width: 96, alignment: .leading)
                     Text("Balance")
                         .frame(width: 112, alignment: .trailing)
-                    Image(systemName: "ellipsis")
-                        .frame(width: 18)
                 }
                 .font(.caption)
                 .foregroundStyle(LFTheme.textSecondary)
@@ -222,15 +201,6 @@ struct TransactionListView: View {
                 HStack {
                     Text("Showing \(filteredTransactions.count) of \(viewModel.transactions.count) transactions")
                     Spacer()
-                    Text("Pagination pending")
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(LFTheme.surfaceRaised.opacity(0.65))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 7)
-                                .stroke(LFTheme.border, lineWidth: 1)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 7))
                 }
                 .font(.caption)
                 .foregroundStyle(LFTheme.textSecondary)
@@ -261,8 +231,6 @@ struct TransactionListView: View {
                                     .monospacedDigit()
                             }
                             Spacer()
-                            Image(systemName: "star")
-                                .foregroundStyle(LFTheme.textSecondary)
                         }
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel(presentation.accessibilityText)
@@ -370,9 +338,6 @@ struct TransactionListView: View {
             selectedTransactionID = transaction.id
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(isSelected ? LFTheme.primaryHover : LFTheme.textSecondary)
-                    .frame(width: 20)
                 Text(formatDate(transaction.statementDate))
                     .frame(width: 84, alignment: .leading)
                 VStack(alignment: .leading, spacing: 2) {
@@ -410,9 +375,6 @@ struct TransactionListView: View {
                 Text(transaction.runningBalanceMoney.map { MoneyFormatting.display($0) } ?? "—")
                     .monospacedDigit()
                     .frame(width: 112, alignment: .trailing)
-                Image(systemName: "ellipsis")
-                    .foregroundStyle(LFTheme.textSecondary)
-                    .frame(width: 18)
             }
             .font(.caption)
             .padding(.vertical, 12)
@@ -528,7 +490,7 @@ struct TransactionListView: View {
                 }
             }
 #endif
-            categoryMessage = error.localizedDescription
+            categoryMessage = CategoryManagementPresentation.message(for: error)
             if let error = error as? CategoryManagementCoordinatorError {
                 categoryReconciliationRequired = switch error {
                 case .savedButRefreshFailed, .reconciliationRequired: true
@@ -572,7 +534,7 @@ struct TransactionListView: View {
             }
         } catch {
             categoryReconciliationRequired = true
-            categoryMessage = error.localizedDescription
+            categoryMessage = CategoryManagementPresentation.message(for: error)
         }
     }
 
@@ -599,23 +561,6 @@ struct TransactionListView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(selected ? color : LFTheme.text)
-    }
-
-    private func rangeButton(_ title: String, selected: Bool = false, icon: String? = nil, disabled: Bool = false) -> some View {
-        HStack(spacing: 6) {
-            Text(title)
-            if let icon {
-                Image(systemName: icon)
-            }
-        }
-        .font(.caption)
-        .foregroundStyle(disabled ? LFTheme.textSecondary.opacity(0.55) : LFTheme.text)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(selected ? AnyShapeStyle(LFTheme.primaryGradient) : AnyShapeStyle(Color.clear))
-        .overlay(Rectangle().stroke(LFTheme.divider, lineWidth: 1))
-        .opacity(disabled ? 0.65 : 1)
-        .help(disabled ? "Date range filters are planned for a future sprint." : "")
     }
 
     private func transactionSummaryCard(_ title: String, value: String, color: Color) -> some View {

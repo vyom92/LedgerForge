@@ -171,6 +171,51 @@ struct AccountIdentifierRepositoryTests {
         #expect(try provider.accountRepo.identifiers(accountId: fixture.secondaryAccountId, workspaceId: fixture.workspaceId).isEmpty)
         #expect(try sqliteProvider.database.queryInt("SELECT COUNT(*) FROM account_identifiers;") == 1)
     }
+
+    @Test(.globalRuntimeStateIsolation)
+    func sqliteIdentifierDiagnosticsBoundUnrecognizedSchemeAndIdentifierValues() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LedgerForgeIdentifierDiagnosticTests")
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let console = DeveloperConsole.shared
+        console._resetForTests()
+        defer { console._resetForTests() }
+
+        let provider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("identifiers.sqlite").path)
+        defer { provider.database.close() }
+        let handles = IdentifierRepositoryHandles(
+            workspaceRepo: provider.workspaceRepo,
+            accountRepo: provider.accountRepo
+        )
+        let fixture = try seedIdentifierWorkspace(handles)
+        let hostileScheme = "PARSER_PROFILE__sprint68__normalized"
+        let hostileIdentifier = "ACCOUNT__sprint68__identifier"
+        let identifier = AccountIdentifierDTO(
+            id: "identifier-diagnostic",
+            accountId: fixture.primaryAccountId,
+            workspaceId: fixture.workspaceId,
+            scheme: hostileScheme,
+            identifier: hostileIdentifier,
+            strength: "strong",
+            verificationState: "verified",
+            provenance: "administrative",
+            createdAtISO: timestamp
+        )
+
+        #expect(try provider.accountRepo.attachIdentifier(identifier) == identifier.id)
+        let entry = try #require(console.entries.last)
+        #expect(entry.message == "Account identifier attached")
+        #expect(entry.metadata == ["scheme": "Unknown", "identifier": "[redacted]"])
+
+        let visibleText = [entry.message, DeveloperConsole.metadataText(for: entry) ?? ""].joined(separator: " ")
+        #expect(!visibleText.contains(hostileScheme))
+        #expect(!visibleText.contains(hostileIdentifier))
+        #expect(!console.completeLogText.contains(hostileScheme))
+        #expect(!console.completeLogText.contains(hostileIdentifier))
+    }
 }
 
 private struct IdentifierRepositoryHandles {

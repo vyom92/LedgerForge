@@ -1478,31 +1478,6 @@ Support user-defined or deterministic grouping while preserving immutable accoun
 
 ---
 
-## FW-P2-42 — Remove Noisy Pending and Soon Placeholders
-
-**Status:** Ready for planning
-**Depends on:** None
-
-**Settings-only portion completed 2026-07-20:** removed the inactive Settings section list, unbacked default-preference rows and future-only Danger Zone actions. Functional Developer Mode and authoritative persistence, recovery, runtime and data information remain. The broader candidate stays open for non-Settings surfaces.
-
-Remove or replace user-facing elements that imply functionality or state that does not exist.
-
-Candidate cleanup includes:
-
-- pending and soon labels that provide no actionable information;
-- drag-and-drop wording where no drop interaction exists;
-- search-shaped presentation that is not an interactive search control;
-- buttons or actions that navigate only to unrelated placeholders;
-- controls that appear enabled but cannot complete their described outcome;
-- status language unsupported by repository or workflow state.
-
-Financial values, import outcomes and transaction-status defects remain governed by `FW-P0-23`.
-
-Unsupported dashboard analytics remain governed by `FW-P2-46`.
-
-
----
-
 ## FW-P2-43 — Better Account Icons
 
 **Status:** Candidate
@@ -1541,7 +1516,7 @@ Until those foundations exist:
 - chart labels must not imply categorization, transfer matching, forecasting or historical analysis that is not implemented;
 - sample data must remain unmistakably separate from repository data.
 
-Removal of misleading placeholders may be planned under `FW-P2-42`; that cleanup does not make interactive analytics ready.
+Sprint 68 removed the misleading placeholder presentation; that cleanup does not make interactive analytics ready.
 
 Future charts must preserve native-currency safety, provenance, deterministic calculations and the dependency boundaries of `FW-P3-10` and related analytical candidates.
 
@@ -1746,17 +1721,6 @@ Coverage should include:
 This item does not authorize automated repair.
 
 Production repair remains governed by `FW-P0-08`. Sprint 47 completed focused fail-closed startup and migration-chain verification tests; this candidate remains limited to the broader corruption and recovery regression matrix.
-
----
-
----
-
-## FW-P2-66 — Privacy Regression Tests
-
-**Status:** Ready for planning
-**Depends on:** None
-
-Protect against raw identifiers, passwords and source fragments entering presentation or diagnostics.
 
 ---
 

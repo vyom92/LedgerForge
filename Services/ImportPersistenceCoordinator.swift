@@ -611,7 +611,7 @@ struct ImportPersistenceCommitFailure: Error, LocalizedError {
     }
 
     var errorDescription: String? {
-        originalError.localizedDescription
+        "Confirmed import persistence failed."
     }
 }
 

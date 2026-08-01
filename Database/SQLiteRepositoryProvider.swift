@@ -1795,7 +1795,7 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
             if let current = existing.sorted(by: { $0.id < $1.id }).first {
                 try db.execute(sql: "COMMIT;")
                 DeveloperConsole.shared.info(.database, "Existing account identifier reused", metadata: [
-                    "scheme": identifier.scheme,
+                    "scheme": Self.diagnosticSchemeClassification(identifier.scheme),
                     "identifier": "[redacted]"
                 ])
                 return current.id
@@ -1813,7 +1813,7 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
             ])
             try db.execute(sql: "COMMIT;")
             DeveloperConsole.shared.info(.database, "Account identifier attached", metadata: [
-                "scheme": identifier.scheme,
+                "scheme": Self.diagnosticSchemeClassification(identifier.scheme),
                 "identifier": "[redacted]"
             ])
             return identifier.id
@@ -1821,7 +1821,7 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
             try? db.execute(sql: "ROLLBACK;")
             if case RepositoryError.conflictingAccountIdentifier(_, let scheme, _, _, _) = error {
                 DeveloperConsole.shared.warning(.database, "Conflicting account identifier rejected", metadata: [
-                    "scheme": scheme,
+                    "scheme": Self.diagnosticSchemeClassification(scheme),
                     "identifier": "[redacted]"
                 ])
             }
@@ -1875,6 +1875,24 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
             provenance: metadata["provenance"] ?? provenance,
             createdAtISO: row.string(at: 6) ?? ""
         )
+    }
+
+    private static func diagnosticSchemeClassification(_ scheme: String) -> String {
+        switch scheme {
+        case "iban",
+             "institution_account_id",
+             "broker_account_id",
+             "institution_issued_identifier",
+             "masked_pan",
+             "card_last_four",
+             "account_suffix",
+             "display_name",
+             "filename",
+             "institution_label":
+            return "Recognized"
+        default:
+            return "Unknown"
+        }
     }
 
     private static func provenanceJSON(for identifier: AccountIdentifierDTO) -> String {

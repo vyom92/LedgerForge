@@ -398,7 +398,7 @@ final class ImportEngine {
                 transactionCount: 0,
                 validationPassed: false,
                 persisted: false,
-                errorMessage: error.localizedDescription
+                errorMessage: Self.boundedPreparationFailureMessage(for: error)
             )
         } catch {
 
@@ -411,7 +411,7 @@ final class ImportEngine {
                 transactionCount: 0,
                 validationPassed: false,
                 persisted: false,
-                errorMessage: error.localizedDescription,
+                errorMessage: Self.boundedPreparationFailureMessage(for: error),
                 accountId: nil,
                 importSessionId: nil,
                 redactedIdentifier: nil,
@@ -535,20 +535,21 @@ final class ImportEngine {
         let metadata = selection.legacyMetadata
 
         developerConsole.info(.`import`, "Institution detected", metadata: ["institution": metadata.institution.rawValue])
-        developerConsole.info(.`import`, "Parser selected", metadata: ["parser": parser?.name ?? "None"])
+        developerConsole.info(
+            .`import`,
+            "Parser selected",
+            metadata: ["selection": parser == nil ? "Unavailable" : "Recognized"]
+        )
 
-        // Parser internals (Debug)
-        developerConsole.debug(.parser, "Detected document", metadata: [
+        developerConsole.debug(.parser, "Document structure recognized", metadata: [
             "format": metadata.fileFormat.rawValue,
             "rows": "\(document.rowCount)",
             "columns": "\(document.columnCount)",
             "headerRow": "\(document.headerRow ?? -1)",
-            "firstTxnRow": "\(document.firstTransactionRow ?? -1)",
-            "delimiter": String(document.delimiter ?? "?"),
-            "encoding": document.encoding ?? "Unknown"
+            "firstTransactionRow": "\(document.firstTransactionRow ?? -1)"
         ])
-        developerConsole.debug(.parser, "Normalization details", metadata: [
-            "normalizedRows": "\(normalizedRows.count)"
+        developerConsole.debug(.parser, "Normalization completed", metadata: [
+            "rows": "\(normalizedRows.count)"
         ])
 
         guard let parser else {
@@ -848,7 +849,7 @@ final class ImportEngine {
         } catch {
             developerConsole.error(.database, "Repository persistence failed")
             if let failure = error as? ImportPersistenceCommitFailure {
-                persistenceErrorMessage = failure.originalError.localizedDescription
+                persistenceErrorMessage = Self.boundedPersistenceFailureMessage(for: failure.originalError)
                 failureRecoveryRoute = Self.recoveryRoute(for: failure)
                 persistenceResult = ImportPersistenceResult(
                     persisted: false,
@@ -860,10 +861,10 @@ final class ImportEngine {
                     accountOutcome: failure.accountOutcome
                 )
             } else if let coordinationError = error as? ImportPersistenceCoordinationError {
-                persistenceErrorMessage = coordinationError.localizedDescription
+                persistenceErrorMessage = Self.boundedPersistenceFailureMessage(for: coordinationError)
                 failureRecoveryRoute = Self.recoveryRoute(for: coordinationError)
             } else {
-                persistenceErrorMessage = error.localizedDescription
+                persistenceErrorMessage = Self.boundedPersistenceFailureMessage(for: error)
             }
         }
 
@@ -964,6 +965,23 @@ final class ImportEngine {
             return "Transaction-event ownership conflict. No transaction history was written."
         case .repositoryIntegrityConflict:
             return "Repository integrity conflict. No transaction history was written."
+        }
+    }
+
+    private static func boundedPreparationFailureMessage(for error: Error) -> String {
+        ImportFailureSummary.from(error).displayText
+    }
+
+    private static func boundedPersistenceFailureMessage(for error: Error) -> String {
+        switch error {
+        case let error as ImportPersistenceCoordinationError:
+            return error.localizedDescription
+        case let error as ImportEngineCommitError:
+            return error.localizedDescription
+        case let error as PersistenceWorkflowError:
+            return error.localizedDescription
+        default:
+            return "The confirmed import could not be completed."
         }
     }
 

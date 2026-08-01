@@ -468,8 +468,12 @@ struct DeveloperConsoleView: View {
         } catch {
             hydrationStatus = "Forced refresh failed"
             latestRefreshResult = "Refresh failed"
-            actionError = error.localizedDescription
-            DeveloperConsole.shared.error(.runtime, "Runtime refresh failed", metadata: ["error": error.localizedDescription])
+            actionError = "Runtime refresh is unavailable."
+            DeveloperConsole.shared.error(
+                .runtime,
+                "Runtime refresh failed",
+                metadata: ["outcome": "Unavailable"]
+            )
         }
         isRunningRepositoryAction = false
     }

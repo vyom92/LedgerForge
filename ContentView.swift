@@ -78,20 +78,29 @@ enum StatementImportFileTypes {
     ]
 }
 
-private enum AppShellSection: String, CaseIterable {
+enum AppShellSection: String, CaseIterable {
     case dashboard = "Dashboard"
     case accounts = "Accounts"
     case transactions = "Transactions"
     case imports = "Import"
-    case insights = "Insights"
-    case budgets = "Budgets"
-    case reports = "Reports"
-    case investments = "Investments"
-    case timeline = "Financial Timeline"
-    case intelligence = "Financial Intelligence"
-    case automation = "Rules & Automation"
     case settings = "Settings"
     case developer = "Developer Console"
+
+    static let ordinaryNavigation: [AppShellSection] = [
+        .dashboard,
+        .accounts,
+        .transactions,
+        .imports,
+        .settings
+    ]
+
+    static func developerConsoleVisible(developerModeEnabled: Bool) -> Bool {
+#if DEBUG
+        return developerModeEnabled
+#else
+        return false
+#endif
+    }
 
     var systemImage: String {
         switch self {
@@ -103,33 +112,10 @@ private enum AppShellSection: String, CaseIterable {
             return "arrow.left.arrow.right.square"
         case .imports:
             return "square.and.arrow.down"
-        case .insights:
-            return "chart.xyaxis.line"
-        case .budgets:
-            return "shield"
-        case .reports:
-            return "doc.text"
-        case .investments:
-            return "arrow.up.right"
-        case .timeline:
-            return "scope"
-        case .intelligence:
-            return "cube.transparent"
-        case .automation:
-            return "wand.and.stars"
         case .settings:
             return "gearshape"
         case .developer:
             return "arrow.up.left.and.arrow.down.right"
-        }
-    }
-
-    var isFutureModule: Bool {
-        switch self {
-        case .insights, .budgets, .reports, .investments, .timeline, .intelligence, .automation:
-            return true
-        default:
-            return false
         }
     }
 }
@@ -1329,18 +1315,13 @@ struct ContentView: View {
             }
             .padding(.bottom, 22)
 
-            sidebarGroup([.dashboard, .accounts, .transactions, .imports])
-
-            sidebarSeparator
-
-            sidebarGroup([.insights, .budgets, .reports, .investments, .timeline, .intelligence, .automation])
-
-            sidebarSeparator
-
-            sidebarGroup([.settings])
+            sidebarGroup(AppShellSection.ordinaryNavigation)
 
 #if DEBUG
-            if developerDatabaseProfileViewModel.developerModeEnabled {
+            if AppShellSection.developerConsoleVisible(
+                developerModeEnabled: developerDatabaseProfileViewModel.developerModeEnabled
+            ) {
+                sidebarSeparator
                 sidebarButton(.developer)
             }
 #endif
@@ -1374,14 +1355,6 @@ struct ContentView: View {
 
             Spacer(minLength: 24)
 
-            if selectedSection == .dashboard || selectedSection == .transactions {
-                LFSearchField(placeholder: toolbarSearchPlaceholder)
-                    .frame(width: selectedSection == .transactions ? 420 : 280)
-            }
-
-            toolbarButton("Date range pending", systemImage: "calendar", disabled: true)
-            toolbarButton("Filters pending", systemImage: "line.3.horizontal.decrease", disabled: true)
-
             Button {
                 requestFileSelection()
             } label: {
@@ -1412,8 +1385,6 @@ struct ContentView: View {
             TransactionListView()
         case .imports:
             importWizardContent
-        case .insights, .budgets, .reports, .investments, .timeline, .intelligence, .automation:
-            futureModuleContent(selectedSection)
         case .settings:
             settingsContent
         case .developer:
@@ -1435,15 +1406,12 @@ struct ContentView: View {
                         metricCard(title: "\(summary.currency.code) Balance", value: MoneyFormatting.display(summary.balance), trend: "Repository-backed native balance", trendColor: LFTheme.success, systemImage: "chart.line.uptrend.xyaxis")
                         metricCard(title: "\(summary.currency.code) Inflow", value: MoneyFormatting.display(summary.income), trend: "Credited transactions", trendColor: LFTheme.success, systemImage: "arrow.down.circle")
                         metricCard(title: "\(summary.currency.code) Outflow", value: MoneyFormatting.display(summary.expenses), trend: "Debited transactions", trendColor: LFTheme.danger, systemImage: "arrow.up.circle")
-                        metricCard(title: "\(summary.currency.code) Cash Flow", value: MoneyFormatting.display(summary.cashFlow), trend: summary.cashFlow.amount >= .zero ? "Positive flow" : "Needs review", trendColor: summary.cashFlow.amount >= .zero ? LFTheme.success : LFTheme.danger, systemImage: "waveform.path.ecg")
+                        metricCard(title: "\(summary.currency.code) Net Transaction Flow", value: MoneyFormatting.display(summary.cashFlow), trend: "Credits minus debits", trendColor: LFTheme.info, systemImage: "arrow.left.arrow.right")
                     }
                 }
 
                 HStack(alignment: .top, spacing: 14) {
                     dashboardAccountsCard
-                        .frame(maxWidth: .infinity)
-
-                    spendingOverviewCard
                         .frame(maxWidth: .infinity)
 
                     VStack(spacing: 14) {
@@ -1453,13 +1421,8 @@ struct ContentView: View {
                     .frame(width: 324)
                 }
 
-                HStack(alignment: .top, spacing: 14) {
-                    recentTransactionsCard
-                        .frame(maxWidth: .infinity)
-
-                    cashFlowTrendCard
-                        .frame(width: 324)
-                }
+                recentTransactionsCard
+                    .frame(maxWidth: .infinity)
             }
             .padding(28)
         }
@@ -1473,20 +1436,11 @@ struct ContentView: View {
                     ForEach(accountsViewModel.nativeBalanceSummaries) { summary in
                         accountMetric("\(summary.money.currency.code) Balance", value: MoneyFormatting.display(summary.money), detail: "Native total across \(accountsViewModel.accounts.count) account(s)", icon: "wallet.pass")
                     }
-                    accountMetric("Credit Cards", value: "Not enabled", detail: "Planned module", icon: "creditcard", tint: LFTheme.danger)
-                    accountMetric("Investments", value: "Future", detail: "Out of Sprint 22 scope", icon: "chart.bar.xaxis", tint: LFTheme.primaryHover)
                 }
 
                 HStack(alignment: .top, spacing: 14) {
                     LFPanel {
                         VStack(alignment: .leading, spacing: 14) {
-                            HStack(spacing: 14) {
-                                LFSearchField(placeholder: "Search accounts...")
-                                LFFilterChip(title: "Types", value: "Pending", showsChevron: false)
-                                LFFilterChip(title: "Institutions", value: "Pending", showsChevron: false)
-                                LFFilterChip(title: "Status", value: "Pending", showsChevron: false)
-                            }
-
                             accountTableHeader
 
                             if accountsViewModel.accounts.isEmpty {
@@ -1547,14 +1501,11 @@ struct ContentView: View {
                                 requestFileSelection()
                             } label: {
                                 VStack(spacing: 14) {
-                                    Image(systemName: "icloud.and.arrow.up")
+                                    Image(systemName: "folder")
                                         .font(.system(size: 42, weight: .light))
                                         .foregroundStyle(LFTheme.primaryHover)
-                                    Text("Drag & drop files here")
+                                    Text("Choose a statement file")
                                         .font(.headline)
-                                    Text("or")
-                                        .font(.caption)
-                                        .foregroundStyle(LFTheme.textSecondary)
                                     Text("Browse Files")
                                         .font(.subheadline.weight(.semibold))
                                         .padding(.horizontal, 20)
@@ -1568,7 +1519,7 @@ struct ContentView: View {
                                 .background(LFTheme.primary.opacity(0.05))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(LFTheme.primary.opacity(0.75), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                                        .stroke(LFTheme.primary.opacity(0.75), lineWidth: 1)
                                 )
                             }
                             .buttonStyle(.plain)
@@ -1728,27 +1679,6 @@ struct ContentView: View {
         .background(LFTheme.backgroundGradient)
     }
 
-    private func futureModuleContent(_ section: AppShellSection) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            LFPanel {
-                LFEmptyState(
-                    title: "\(section.rawValue) is planned",
-                    message: "This approved shell reserves navigation for \(section.rawValue), but implementation belongs to a future sprint.",
-                    actionTitle: "Return to Dashboard",
-                    systemImage: section.systemImage
-                ) {
-                    selectedSection = .dashboard
-                }
-            }
-            .frame(width: 520)
-
-            Spacer()
-        }
-        .padding(28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(LFTheme.backgroundGradient)
-    }
-
     private var dashboardAccountsCard: some View {
         LFPanel(title: "Accounts", trailing: AnyView(linkButton("View all") { selectedSection = .accounts })) {
             VStack(spacing: 0) {
@@ -1789,38 +1719,6 @@ struct ContentView: View {
         }
     }
 
-    private var spendingOverviewCard: some View {
-        LFPanel(title: "Spending Overview", trailing: AnyView(Text("View full report").font(.caption).foregroundStyle(LFTheme.primaryHover))) {
-            HStack(spacing: 20) {
-                ZStack {
-                    Circle()
-                        .stroke(LFTheme.surfaceRaised, lineWidth: 18)
-                    Circle()
-                        .trim(from: 0, to: 0.72)
-                        .stroke(LFTheme.primaryGradient, style: StrokeStyle(lineWidth: 18, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    VStack(spacing: 4) {
-                        Text(formatCurrency(dashboardViewModel.snapshot.expenses))
-                            .font(.headline.weight(.semibold))
-                            .monospacedDigit()
-                        Text("Total Expenses")
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
-                    }
-                }
-                .frame(width: 170, height: 170)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    legendRow("Transfers", value: "39.4%", color: .blue)
-                    legendRow("Credit Card Payments", value: "24.4%", color: LFTheme.primary)
-                    legendRow("Shopping", value: "8.6%", color: LFTheme.danger)
-                    legendRow("Bills & Utilities", value: "7.8%", color: LFTheme.warning)
-                    legendRow("Food & Dining", value: "6.6%", color: LFTheme.success)
-                }
-            }
-        }
-    }
-
     private var importActivityCard: some View {
         let activity = importActivityPresentation
         return LFPanel(title: "Import Activity", trailing: AnyView(linkButton("View all imports") { selectedSection = .imports })) {
@@ -1842,9 +1740,6 @@ struct ContentView: View {
             VStack(spacing: 4) {
                 LFActionRow(title: "Import Statement", systemImage: "square.and.arrow.down") {
                     requestFileSelection()
-                }
-                LFActionRow(title: "Add Account", systemImage: "plus") {
-                    selectedSection = .accounts
                 }
                 LFActionRow(title: "View All Transactions", systemImage: "list.bullet") {
                     selectedSection = .transactions
@@ -1890,32 +1785,6 @@ struct ContentView: View {
 
                         Divider().overlay(LFTheme.divider)
                     }
-                }
-            }
-        }
-    }
-
-    private var cashFlowTrendCard: some View {
-        LFPanel(title: "Cash Flow Trend") {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .bottom, spacing: 10) {
-                    ForEach([0.50, 0.72, 0.45, 0.80], id: \.self) { height in
-                        VStack(spacing: 4) {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(LFTheme.success)
-                                .frame(width: 20, height: CGFloat(82 * height))
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(LFTheme.danger)
-                                .frame(width: 20, height: CGFloat(60 * (1.0 - height + 0.25)))
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, minHeight: 116)
-
-                HStack(spacing: 12) {
-                    legendRow("Income", value: "", color: LFTheme.success)
-                    legendRow("Expenses", value: "", color: LFTheme.danger)
-                    legendRow("Cash Flow", value: "", color: LFTheme.primary)
                 }
             }
         }
@@ -2223,14 +2092,6 @@ struct ContentView: View {
                     .font(.system(size: 14, weight: selectedSection == section ? .semibold : .regular))
                     .lineLimit(1)
                 Spacer()
-                if section.isFutureModule {
-                    Text("Soon")
-                        .font(.caption2.weight(.medium))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 4)
-                        .background(LFTheme.primary.opacity(0.28))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
@@ -2244,26 +2105,6 @@ struct ContentView: View {
         .buttonStyle(.plain)
         .foregroundStyle(selectedSection == section ? .white : LFTheme.text)
         .accessibilityLabel(section.rawValue)
-    }
-
-    private func toolbarButton(_ title: String, systemImage: String, disabled: Bool = false) -> some View {
-        Button {
-            // Contextual controls are visual placeholders until their feature sprints.
-        } label: {
-            Label(title, systemImage: systemImage)
-                .font(.subheadline)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 10)
-                .background(LFTheme.surface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7)
-                        .stroke(LFTheme.border, lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(disabled ? LFTheme.textSecondary : LFTheme.text)
-        .disabled(disabled)
     }
 
     private func metricCard(title: String, value: String, trend: String, trendColor: Color, systemImage: String) -> some View {
@@ -3227,21 +3068,10 @@ struct ContentView: View {
             return "All your transactions, in one place"
         case .imports:
             return "Import statements in a few simple steps"
-        case .insights, .budgets, .reports, .investments, .timeline, .intelligence, .automation:
-            return "Reserved for future modules"
         case .settings:
             return "Configure LedgerForge to work the way you do"
         case .developer:
             return "Advanced diagnostics and inspection"
-        }
-    }
-
-    private var toolbarSearchPlaceholder: String {
-        switch selectedSection {
-        case .transactions:
-            return "Search transactions, merchants, categories, or notes..."
-        default:
-            return "Search..."
         }
     }
 
@@ -3268,8 +3098,11 @@ struct ContentView: View {
             dashboardViewModel.markHydrationCompleted(result)
         } catch {
             dashboardViewModel.markHydrationFailed(error)
-            DeveloperConsole.shared.log("Dashboard Hydration: FAILED")
-            DeveloperConsole.shared.log(error.localizedDescription)
+            DeveloperConsole.shared.error(
+                .runtime,
+                "Dashboard hydration failed",
+                metadata: ["outcome": "Unavailable"]
+            )
         }
     }
 

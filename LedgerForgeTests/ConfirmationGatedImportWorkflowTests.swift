@@ -155,7 +155,7 @@ struct ConfirmationGatedImportWorkflowTests {
 
         #expect(result.validationPassed)
         #expect(!result.persisted)
-        #expect(result.errorMessage == "Repository write failed.")
+        #expect(result.errorMessage == "The confirmed import could not be completed.")
         #expect(persistence.persistCallCount == 1)
         #expect(DocumentStore.shared.rows == originalDocumentRows)
         #expect(TransactionStore.shared.transactions.map(\.id) == originalTransactionIds)

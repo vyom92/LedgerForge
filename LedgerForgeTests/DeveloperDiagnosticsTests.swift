@@ -207,6 +207,81 @@ struct DeveloperDiagnosticsTests {
         #expect((copied as NSString).range(of: "Detected delimiter").location < (copied as NSString).range(of: "Import completed").location)
     }
 
+    @Test("Bounded diagnostic presentation excludes hostile values from visible and copied output")
+    func boundedDiagnosticPresentationExcludesHostileValues() {
+        let hostileSentinels = [
+            "PASSWORD__sprint68__secret",
+            "ACCOUNT__sprint68__identifier",
+            "/private/sprint68/statement.sqlite",
+            "SELECT * FROM import_sessions",
+            "RAW_SOURCE__sprint68__fragment",
+            "PARSER_PROFILE__sprint68__normalized"
+        ]
+        let hostileError = HostileDiagnosticError(errorDescription: hostileSentinels.joined(separator: " | "))
+        let preparation = ImportFailureSummary.from(hostileError)
+        let categoryPresentation = CategoryManagementPresentation.message(for: hostileError)
+        let entries = [
+            DeveloperLogEntry(
+                id: 1,
+                sequence: 1,
+                timestamp: Date(timeIntervalSince1970: 1_804_896_000),
+                level: .error,
+                category: .runtime,
+                message: "Dashboard hydration failed",
+                metadata: ["outcome": "Unavailable"]
+            ),
+            DeveloperLogEntry(
+                id: 2,
+                sequence: 2,
+                timestamp: Date(timeIntervalSince1970: 1_804_896_001),
+                level: .error,
+                category: .runtime,
+                message: "Runtime refresh failed",
+                metadata: ["outcome": "Unavailable"]
+            ),
+            DeveloperLogEntry(
+                id: 3,
+                sequence: 3,
+                timestamp: Date(timeIntervalSince1970: 1_804_896_002),
+                level: .error,
+                category: .`import`,
+                message: "Import preparation failed",
+                metadata: [
+                    "stage": preparation.stage.rawValue,
+                    "family": preparation.family.rawValue
+                ]
+            ),
+            DeveloperLogEntry(
+                id: 4,
+                sequence: 4,
+                timestamp: Date(timeIntervalSince1970: 1_804_896_003),
+                level: .info,
+                category: .database,
+                message: "Provider-owned confirmed import committed",
+                metadata: ["transactions": "4", "reason": "committed"]
+            )
+        ]
+
+        let visibleText = entries.map {
+            [$0.message, DeveloperConsole.metadataText(for: $0) ?? ""]
+                .joined(separator: " ")
+        }.joined(separator: "\n")
+        let copiedText = DeveloperConsole.logText(from: entries)
+
+        for sentinel in hostileSentinels {
+            #expect(!preparation.displayText.contains(sentinel))
+            #expect(!categoryPresentation.contains(sentinel))
+            #expect(!visibleText.contains(sentinel))
+            #expect(!copiedText.contains(sentinel))
+        }
+        #expect(categoryPresentation == "The category action could not be completed.")
+        #expect(visibleText.contains("Unavailable"))
+        #expect(visibleText.contains("stage: Preparation"))
+        #expect(visibleText.contains("Unknown preparation failure"))
+        #expect(visibleText.contains("transactions: 4"))
+        #expect(visibleText.contains("reason: committed"))
+    }
+
     @Test("Clear removes all entries and resets sequence numbers")
     func clearResets() async throws {
         let console = DeveloperConsole()
@@ -267,7 +342,7 @@ struct DeveloperDiagnosticsTests {
         #expect(console.entries.map { $0.sequence } == [1, 2]) // stored order unchanged
     }
 
-    @Test("Successful import emits concise lifecycle entries and debug parser internals", .globalRuntimeStateIsolation)
+    @Test("Successful import emits concise lifecycle entries and bounded parser diagnostics", .globalRuntimeStateIsolation)
     func successfulImportLifecycleDiagnostics() async throws {
         let console = DeveloperConsole()
         resetDiagnosticRuntimeStores()
@@ -306,9 +381,20 @@ struct DeveloperDiagnosticsTests {
         var debugFilter = DeveloperConsole.Filters()
         debugFilter.level = .exact(.debug)
         let debugMessages = DeveloperConsole.filteredEntries(console.entries, using: debugFilter).map(\.message)
-        #expect(debugMessages.contains("Detected document"))
-        #expect(debugMessages.contains("Normalization details"))
+        #expect(debugMessages.contains("Document structure recognized"))
+        #expect(debugMessages.contains("Normalization completed"))
         #expect(debugMessages.contains("Row count"))
+        #expect(!debugMessages.contains("Detected document"))
+        #expect(!debugMessages.contains("Normalization details"))
+
+        let parserSelection = try #require(console.entries.first { $0.message == "Parser selected" })
+        #expect(parserSelection.metadata?["selection"] == "Recognized")
+        let parserMetadata = console.entries
+            .filter { $0.category == .parser }
+            .compactMap(\.metadata)
+        #expect(parserMetadata.allSatisfy {
+            $0["delimiter"] == nil && $0["encoding"] == nil && $0["normalizedRows"] == nil
+        })
 
         let lifecycleSequences = defaultVisible.map(\.sequence)
         #expect(lifecycleSequences == lifecycleSequences.sorted())
@@ -429,4 +515,8 @@ private func diagnosticTransaction() -> Transaction {
         sourceBank: "Axis Bank",
         sourceFile: "diagnostics.csv"
     )
+}
+
+private struct HostileDiagnosticError: LocalizedError {
+    let errorDescription: String?
 }

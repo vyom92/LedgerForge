@@ -95,6 +95,15 @@ enum CategoryManagementCoordinatorError: Error, Equatable, LocalizedError {
     }
 }
 
+enum CategoryManagementPresentation {
+    static func message(for error: Error) -> String {
+        guard let error = error as? CategoryManagementCoordinatorError else {
+            return "The category action could not be completed."
+        }
+        return error.errorDescription ?? "The category action could not be completed."
+    }
+}
+
 @MainActor
 protocol CategoryManaging: AnyObject {
     @discardableResult func create(name: String) throws -> Bool

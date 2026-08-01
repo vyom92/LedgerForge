@@ -429,7 +429,8 @@ struct ImportLifecycleTests {
 
             let hostileResult = await hostileEngine.commitPreparedImport(hostilePrepared)
 
-            #expect(hostileResult.errorMessage == message)
+            #expect(hostileResult.errorMessage == "The confirmed import could not be completed.")
+            #expect(!hostileResult.errorMessage!.contains(message))
             #expect(hostileResult.recoveryRoute == .unavailable)
             #expect(hostilePersistence.persistInvocationCount == 1)
         }

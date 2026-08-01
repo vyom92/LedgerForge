@@ -283,7 +283,7 @@ struct CategoryManagementView: View {
                 }
             }
 #endif
-            message = error.localizedDescription
+            message = CategoryManagementPresentation.message(for: error)
             if let error = error as? CategoryManagementCoordinatorError {
                 categoryReconciliationRequired = switch error {
                 case .savedButRefreshFailed, .reconciliationRequired: true
@@ -327,7 +327,7 @@ struct CategoryManagementView: View {
             }
         } catch {
             categoryReconciliationRequired = true
-            message = error.localizedDescription
+            message = CategoryManagementPresentation.message(for: error)
         }
     }
 }

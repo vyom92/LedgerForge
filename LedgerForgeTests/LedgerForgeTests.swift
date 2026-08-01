@@ -18,6 +18,30 @@ struct LedgerForgeTests {
         // https://developer.apple.com/documentation/testing
     }
 
+    @Test func ordinaryNavigationContainsOnlyCurrentV1Destinations() {
+        #expect(AppShellSection.ordinaryNavigation == [
+            .dashboard,
+            .accounts,
+            .transactions,
+            .imports,
+            .settings
+        ])
+        #expect(AppShellSection.ordinaryNavigation.map(\.rawValue) == [
+            "Dashboard",
+            "Accounts",
+            "Transactions",
+            "Import",
+            "Settings"
+        ])
+        #expect(!AppShellSection.ordinaryNavigation.contains(.developer))
+        #expect(!AppShellSection.developerConsoleVisible(developerModeEnabled: false))
+#if DEBUG
+        #expect(AppShellSection.developerConsoleVisible(developerModeEnabled: true))
+#else
+        #expect(!AppShellSection.developerConsoleVisible(developerModeEnabled: true))
+#endif
+    }
+
     @Test(.globalRuntimeStateIsolation)
     func developmentDatabaseResetSwapsToFreshProviderAndHydratesEmptyRuntimeState() throws {
         resetSprint30RuntimeState()

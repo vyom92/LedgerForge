@@ -113,6 +113,22 @@ struct DashboardViewModelTests {
         #expect(viewModel.recentTransactionSummaries.first?.isCredit == true)
     }
 
+    @Test func nativeCurrencyNetTransactionFlowUsesMoney() throws {
+        let balance = try Money(amount: Decimal(800), currency: "INR")
+        let credits = try Money(amount: Decimal(125), currency: "INR")
+        let debits = try Money(amount: Decimal(45), currency: "INR")
+        let summary = DashboardCurrencySummary(
+            currency: balance.currency,
+            balance: balance,
+            income: credits,
+            expenses: debits
+        )
+
+        let expectedNetTransactionFlow = try Money(amount: Decimal(80), currency: "INR")
+        #expect(summary.cashFlow == expectedNetTransactionFlow)
+        #expect(summary.cashFlow.currency == balance.currency)
+    }
+
     @Test(.globalRuntimeStateIsolation)
     func recentTransactionSummaryPreservesNativeMoneyForDisplay() throws {
         resetDashboardStores()

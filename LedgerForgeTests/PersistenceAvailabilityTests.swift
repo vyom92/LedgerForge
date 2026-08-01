@@ -244,7 +244,8 @@ struct PersistenceAvailabilityTests {
         let result = await engine.commitPreparedImport(prepared)
 
         #expect(!result.persisted)
-        #expect(result.errorMessage == message)
+        #expect(result.errorMessage == "The confirmed import could not be completed.")
+        #expect(!result.errorMessage!.contains(message))
         #expect(result.recoveryRoute == .unavailable)
         #expect(persistence.persistCallCount == 1)
         #expect(throws: SourceContentSnapshotError.invalidated) {

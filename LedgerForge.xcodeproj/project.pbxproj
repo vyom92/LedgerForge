@@ -37,7 +37,6 @@
 		286D68F02FFFE6440078AAC5 /* AGENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 286D68EF2FFFE6440078AAC5 /* AGENTS.md */; };
 		286D68F32FFFF60E0078AAC5 /* LFTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68F22FFFF60E0078AAC5 /* LFTheme.swift */; };
 		286D68F52FFFF6300078AAC5 /* LFPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68F42FFFF6300078AAC5 /* LFPanel.swift */; };
-		286D68F72FFFF6560078AAC5 /* LFSearchField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68F62FFFF6560078AAC5 /* LFSearchField.swift */; };
 		286D68F92FFFF67D0078AAC5 /* LFStatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68F82FFFF67D0078AAC5 /* LFStatusBadge.swift */; };
 		286D68FB2FFFF6A60078AAC5 /* LFFilterChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68FA2FFFF6A60078AAC5 /* LFFilterChip.swift */; };
 		286D68FD2FFFF6C20078AAC5 /* LFInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68FC2FFFF6C20078AAC5 /* LFInfoRow.swift */; };
@@ -201,7 +200,6 @@
 		286D68EF2FFFE6440078AAC5 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
 		286D68F22FFFF60E0078AAC5 /* LFTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFTheme.swift; sourceTree = "<group>"; };
 		286D68F42FFFF6300078AAC5 /* LFPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFPanel.swift; sourceTree = "<group>"; };
-		286D68F62FFFF6560078AAC5 /* LFSearchField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFSearchField.swift; sourceTree = "<group>"; };
 		286D68F82FFFF67D0078AAC5 /* LFStatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFStatusBadge.swift; sourceTree = "<group>"; };
 		286D68FA2FFFF6A60078AAC5 /* LFFilterChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFFilterChip.swift; sourceTree = "<group>"; };
 		286D68FC2FFFF6C20078AAC5 /* LFInfoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFInfoRow.swift; sourceTree = "<group>"; };
@@ -428,7 +426,6 @@
 			children = (
 				286D68F22FFFF60E0078AAC5 /* LFTheme.swift */,
 				286D68F42FFFF6300078AAC5 /* LFPanel.swift */,
-				286D68F62FFFF6560078AAC5 /* LFSearchField.swift */,
 				286D68F82FFFF67D0078AAC5 /* LFStatusBadge.swift */,
 				286D68FA2FFFF6A60078AAC5 /* LFFilterChip.swift */,
 				286D68FC2FFFF6C20078AAC5 /* LFInfoRow.swift */,
@@ -925,7 +922,6 @@
 				37A100212FFDA6CB00C12A68 /* AccountsViewModel.swift in Sources */,
 				288EB1272FF7D96A00F09BC9 /* DocumentPreviewView.swift in Sources */,
 				288EB1242FF7D8A000F09BC9 /* Parsers/StatementParser.swift in Sources */,
-				286D68F72FFFF6560078AAC5 /* LFSearchField.swift in Sources */,
 				28B87B332FFB31C9009BEE8C /* ImportValidationResult.swift in Sources */,
 				286D68F92FFFF67D0078AAC5 /* LFStatusBadge.swift in Sources */,
 				2872790D2FFD286100468973 /* ParserSelection.swift in Sources */,
