@@ -802,7 +802,7 @@ struct ImportRepositoryIntegrationTests {
                 Issue.record("Expected ambiguous identity to reject persistence.")
             } catch let failure as ImportPersistenceCommitFailure {
                 #expect(failure.originalError as? ImportPersistenceCoordinationError == .ambiguousIdentity)
-                #expect(failure.localizedDescription == "Financial identity is ambiguous; import was not persisted.")
+                #expect(failure.localizedDescription == "Confirmed import persistence failed.")
                 #expect(failure.accountOutcome == .identityAmbiguous)
                 let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspace.id)
                 let attempt = try #require(attempts.first { $0.id == failure.importAttemptId })
@@ -882,7 +882,7 @@ struct ImportRepositoryIntegrationTests {
                 Issue.record("Expected conflicting identity to reject persistence.")
             } catch let failure as ImportPersistenceCommitFailure {
                 #expect(failure.originalError as? ImportPersistenceCoordinationError == .conflictingIdentity)
-                #expect(failure.localizedDescription == "Financial identity conflicts across accounts; import was not persisted.")
+                #expect(failure.localizedDescription == "Confirmed import persistence failed.")
                 #expect(failure.accountOutcome == .identityConflict)
                 let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspace.id)
                 let attempt = try #require(attempts.first { $0.id == failure.importAttemptId })
@@ -1087,8 +1087,10 @@ struct ImportRepositoryIntegrationTests {
                 validation: fixture.validation,
                 fingerprint: fixture.fingerprint
             )
-        } catch {
-            #expect(error.localizedDescription == "Financial identity is ambiguous; import was not persisted.")
+            Issue.record("Expected ambiguous identity to reject persistence.")
+        } catch let failure as ImportPersistenceCommitFailure {
+            #expect(failure.localizedDescription == "Confirmed import persistence failed.")
+            #expect(failure.originalError as? ImportPersistenceCoordinationError == .ambiguousIdentity)
         }
 
         let diagnosticText = developerConsole.entries.map { entry in
