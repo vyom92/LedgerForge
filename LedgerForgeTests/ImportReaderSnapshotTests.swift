@@ -1,4 +1,6 @@
 import AppKit
+import CoreGraphics
+import CoreText
 import Foundation
 import PDFKit
 import Testing
@@ -120,6 +122,78 @@ struct ImportReaderSnapshotTests {
         }
     }
 
+    @Test func pdfWhitespaceOnlySelectableTextFailsClosed() async throws {
+        let bytes = try selectablePDFData(text: "   \n\t  ")
+        let snapshot = SourceContentSnapshot(bytes: bytes)
+        let request = ImportRequest(
+            fileURL: URL(fileURLWithPath: "/snapshot-only/whitespace-only.pdf")
+        )
+
+        await #expect(
+            throws: ImportError.invalidDocument(
+                message: "PDF document contains no extractable text."
+            )
+        ) {
+            try await PDFDocumentReader().read(
+                request: request,
+                snapshot: snapshot,
+                password: nil
+            )
+        }
+    }
+
+    @Test func truncatedPDFShapedSnapshotFailsAsInvalidDocument() async throws {
+        let bytes = Data("%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n".utf8)
+        let snapshot = SourceContentSnapshot(bytes: bytes)
+        let request = ImportRequest(
+            fileURL: URL(fileURLWithPath: "/snapshot-only/truncated.pdf")
+        )
+
+        do {
+            _ = try await PDFDocumentReader().read(
+                request: request,
+                snapshot: snapshot,
+                password: nil
+            )
+            Issue.record("Expected truncated PDF-shaped bytes to fail closed.")
+        } catch let error as ImportError {
+            guard case .invalidDocument = error else {
+                Issue.record("Expected ImportError.invalidDocument, got \(error).")
+                return
+            }
+        }
+    }
+
+    @Test func identicalPDFSnapshotsExtractIdenticalTextDeterministically() async throws {
+        let bytes = try Data(contentsOf: FixtureLocator.axisPDF(
+            "axis_bank_nre_account_statement_baseline.pdf"
+        ))
+        let firstSnapshot = SourceContentSnapshot(bytes: bytes)
+        let secondSnapshot = SourceContentSnapshot(bytes: bytes)
+        defer {
+            firstSnapshot.invalidate()
+            secondSnapshot.invalidate()
+        }
+
+        let first = try await PDFDocumentReader().read(
+            request: ImportRequest(
+                fileURL: URL(fileURLWithPath: "/snapshot-only/first.pdf")
+            ),
+            snapshot: firstSnapshot,
+            password: nil
+        )
+        let second = try await PDFDocumentReader().read(
+            request: ImportRequest(
+                fileURL: URL(fileURLWithPath: "/snapshot-only/renamed.pdf")
+            ),
+            snapshot: secondSnapshot,
+            password: nil
+        )
+
+        #expect(first.content == second.content)
+        #expect(firstSnapshot.sourceByteFingerprint == secondSnapshot.sourceByteFingerprint)
+    }
+
     @Test func coordinatorPassesTheExactSnapshotInstanceToSelectedReader() async throws {
         let snapshot = SourceContentSnapshot(bytes: Data("coordinator snapshot".utf8))
         let request = ImportRequest(fileURL: URL(fileURLWithPath: "/snapshot-only/statement.csv"))
@@ -140,6 +214,41 @@ struct ImportReaderSnapshotTests {
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
+
+    private func selectablePDFData(text: String) throws -> Data {
+        let buffer = NSMutableData()
+        guard let consumer = CGDataConsumer(data: buffer as CFMutableData) else {
+            throw SnapshotPDFCreationError.creationFailed
+        }
+        var mediaBox = CGRect(x: 0, y: 0, width: 200, height: 200)
+        guard let context = CGContext(
+            consumer: consumer,
+            mediaBox: &mediaBox,
+            nil
+        ) else {
+            throw SnapshotPDFCreationError.creationFailed
+        }
+        context.beginPDFPage(nil)
+        context.textMatrix = .identity
+        let font = CTFontCreateWithName("Courier" as CFString, 10, nil)
+        let attributes = [kCTFontAttributeName: font] as CFDictionary
+        guard let attributed = CFAttributedStringCreate(
+            nil,
+            text as CFString,
+            attributes
+        ) else {
+            throw SnapshotPDFCreationError.creationFailed
+        }
+        context.textPosition = CGPoint(x: 20, y: 100)
+        CTLineDraw(CTLineCreateWithAttributedString(attributed), context)
+        context.endPDFPage()
+        context.closePDF()
+        return buffer as Data
+    }
+}
+
+private enum SnapshotPDFCreationError: Error {
+    case creationFailed
 }
 
 private struct SnapshotIdentityReaderRegistry: ImportFramework.ReaderRegistry {
@@ -161,9 +270,9 @@ private final class SnapshotIdentityReader: ImportFramework.DocumentReader, @unc
         snapshot: SourceContentSnapshot,
         password: String?
     ) async throws -> RawDocument {
-        lock.lock()
-        receivedSnapshot = snapshot
-        lock.unlock()
+        lock.withLock {
+            receivedSnapshot = snapshot
+        }
         return RawDocument(
             sourceURL: request.fileURL,
             fileName: request.fileName,
@@ -173,8 +282,8 @@ private final class SnapshotIdentityReader: ImportFramework.DocumentReader, @unc
     }
 
     func received(_ expected: SourceContentSnapshot) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return receivedSnapshot === expected
+        lock.withLock {
+            receivedSnapshot === expected
+        }
     }
 }

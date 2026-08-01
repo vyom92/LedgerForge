@@ -50,8 +50,8 @@ struct StatementParserSelectionTests {
         )
 
         #expect(selection.matched)
-        #expect(selection.parserName == "Axis Bank Account")
-        #expect(selection.parser is AxisBankAccountParser)
+        #expect(selection.parserName == "Axis Bank Account PDF")
+        #expect(selection.parser is AxisBankAccountPDFParser)
         #expect(selection.legacyMetadata.institution == .axis)
         #expect(selection.legacyMetadata.documentType == .bankAccount)
         #expect(selection.legacyMetadata.fileFormat == .pdf)

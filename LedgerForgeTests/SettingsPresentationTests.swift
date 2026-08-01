@@ -1,9 +1,18 @@
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import LedgerForge
 
 @MainActor
 struct SettingsPresentationTests {
+
+    @Test func ordinaryStatementImporterIncludesPDFWithoutDroppingExistingTypes() {
+        #expect(Set(StatementImportFileTypes.allowed) == Set([
+            UTType.commaSeparatedText,
+            UTType.pdf,
+            UTType.spreadsheet
+        ]))
+    }
 
     @Test func completedImportsReportsZeroWhenCancellationCreatesNoDurableAttempt() {
         #expect(

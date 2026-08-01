@@ -708,7 +708,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             confirmedChoice = .unspecified
             selectedAccountId = "account-\(importSession.id.uuidString.lowercased())"
         }
-        return try mapper.confirmedImportPlan(
+        let plan = try mapper.confirmedImportPlan(
             financialDocument: financialDocument,
             importSession: importSession,
             validation: validation,
@@ -718,6 +718,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             accountChoice: confirmedChoice,
             selectedAccountId: selectedAccountId
         )
+        try validate(confirmedPlan: plan)
+        return plan
     }
 
     func persistValidatedImport(
@@ -964,6 +966,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
     func persistReviewedPartialImport(
         _ plan: ReviewedPartialImportPlanDTO
     ) throws -> ImportPersistenceResult {
+        try validate(confirmedPlan: plan.basePlan)
         let provider = databaseProviderProvider()
         guard provider.persistenceState.isUsable else {
             throw ImportPersistenceCoordinationError.persistenceUnavailable
@@ -1015,7 +1018,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
     }
 
     private func validate(fingerprint: ExactStatementFingerprint) throws {
-        guard fingerprint.algorithm == ExactStatementFingerprint.algorithm,
+        guard DocumentFingerprintDTO.approvedAlgorithms.contains(fingerprint.algorithm),
               fingerprint.digest.count == 64,
               fingerprint.digest.allSatisfy({ $0.isHexDigit && !$0.isUppercase }) else {
             throw ImportPersistenceCoordinationError.invalidFingerprint
@@ -1026,8 +1029,30 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         guard fingerprintSet.isValid,
               fingerprintSet.fingerprints.allSatisfy({
                   DocumentFingerprintDTO.approvedAlgorithms.contains($0.algorithm)
-              }),
-              fingerprintSet.duplicateAuthority?.algorithm == ExactStatementFingerprint.algorithm else {
+              }) else {
+            throw ImportPersistenceCoordinationError.invalidFingerprint
+        }
+    }
+
+    private func validate(confirmedPlan plan: ConfirmedImportPlanDTO) throws {
+        do {
+            try plan.historyTemplate.validateFingerprints()
+        } catch {
+            throw ImportPersistenceCoordinationError.invalidFingerprint
+        }
+
+        let history = plan.historyTemplate
+        guard let sourceFormat = ImportPersistenceSourceFormat(
+            mimeType: history.document.mimeType
+        ),
+        let duplicateAuthority = history.duplicateAuthorityFingerprint,
+        duplicateAuthority.algorithm == sourceFormat.duplicateAuthorityAlgorithm,
+        let rawTextFingerprint = history.fingerprints.first(where: {
+            $0.algorithm == DocumentFingerprintDTO.rawTextSHA256Algorithm
+        }),
+        history.document.legacyRawTextSHA256 == rawTextFingerprint.fingerprint,
+        let sourceSize = history.document.sizeBytes,
+        sourceSize >= 0 else {
             throw ImportPersistenceCoordinationError.invalidFingerprint
         }
     }

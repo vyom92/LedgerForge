@@ -90,6 +90,9 @@
 		37A100212FFDA6CB00C12A68 /* AccountsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37A100202FFDA6CB00C12A68 /* AccountsViewModel.swift */; };
 		3A4400023004000000000001 /* Money.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400013004000000000001 /* Money.swift */; };
 		3A4400043004000000000001 /* MoneyFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A4400033004000000000001 /* MoneyFormatting.swift */; };
+		650000013065000000000001 /* AxisBankAccountPDFNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650000043065000000000001 /* AxisBankAccountPDFNormalizer.swift */; };
+		650000023065000000000001 /* AxisBankAccountPDFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650000053065000000000001 /* AxisBankAccountPDFParser.swift */; };
+		650000033065000000000001 /* AxisBankAccountSourceEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650000063065000000000001 /* AxisBankAccountSourceEvidence.swift */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
@@ -260,6 +263,9 @@
 		37A100202FFDA6CB00C12A68 /* AccountsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsViewModel.swift; sourceTree = "<group>"; };
 		3A4400013004000000000001 /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Money.swift; sourceTree = "<group>"; };
 		3A4400033004000000000001 /* MoneyFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyFormatting.swift; sourceTree = "<group>"; };
+		650000043065000000000001 /* AxisBankAccountPDFNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountPDFNormalizer.swift; sourceTree = "<group>"; };
+		650000053065000000000001 /* AxisBankAccountPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountPDFParser.swift; sourceTree = "<group>"; };
+		650000063065000000000001 /* AxisBankAccountSourceEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountSourceEvidence.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
 		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
@@ -529,6 +535,8 @@
 		288EB0DF2FF7A3D200F09BC9 /* Parsers */ = {
 			isa = PBXGroup;
 			children = (
+				650000053065000000000001 /* AxisBankAccountPDFParser.swift */,
+				650000063065000000000001 /* AxisBankAccountSourceEvidence.swift */,
 				288EB11C2FF7D00700F09BC9 /* Parsers/UnknownStatementParser.swift */,
 				288EB11B2FF7CFF600F09BC9 /* Parsers/AxisBankAccountParser.swift */,
 				288EB11A2FF7CFD500F09BC9 /* Parsers/StatementParserRegistry.swift */,
@@ -628,6 +636,7 @@
 		288EB12E2FF7E10200F09BC9 /* Normalizers */ = {
 			isa = PBXGroup;
 			children = (
+				650000043065000000000001 /* AxisBankAccountPDFNormalizer.swift */,
 				288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */,
 			);
 			path = Normalizers;
@@ -872,6 +881,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				650000013065000000000001 /* AxisBankAccountPDFNormalizer.swift in Sources */,
+				650000023065000000000001 /* AxisBankAccountPDFParser.swift in Sources */,
+				650000033065000000000001 /* AxisBankAccountSourceEvidence.swift in Sources */,
 				DBB00002305E000000000001 /* DeveloperDatabaseProfileViewModel.swift in Sources */,
 				DBB00004305E000000000001 /* DeveloperDatabaseProfileWarningView.swift in Sources */,
 				DBB00006305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift in Sources */,

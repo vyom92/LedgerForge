@@ -70,6 +70,14 @@ enum SettingsPresentation {
 }
 import UniformTypeIdentifiers
 
+enum StatementImportFileTypes {
+    static let allowed: [UTType] = [
+        .commaSeparatedText,
+        .pdf,
+        .spreadsheet
+    ]
+}
+
 private enum AppShellSection: String, CaseIterable {
     case dashboard = "Dashboard"
     case accounts = "Accounts"
@@ -1221,10 +1229,7 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .fileImporter(
             isPresented: $showingImporter,
-            allowedContentTypes: [
-                .commaSeparatedText,
-                .spreadsheet
-            ]
+            allowedContentTypes: StatementImportFileTypes.allowed
         ) { result in
             switch result {
             case .success(let url):

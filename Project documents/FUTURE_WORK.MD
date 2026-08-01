@@ -54,13 +54,13 @@ A work item becomes executable only when Chat supplies one complete approved pro
 
 ## Full Candidate Verification Audit
 
-**Audit date:** 2026-07-28
-**Current pushed ref:** `main@7e1345e3817d3c3e91c24f881b962a48279fd73b`
-**Latest verified production implementation:** Sprint 63 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
-**Latest completed numbered outcome:** Sprint 63
+**Audit date:** 2026-08-01
+**Current pushed ref:** Git-authoritative Sprint 65 acceptance commit; the exact ref is recorded by Git history rather than embedded here
+**Latest chronologically accepted production implementation:** Sprint 65 — Shared Axis Bank-Account PDF Production Path
+**Latest completed numbered outcome:** Sprint 66 (highest numbered; Sprint 65 is chronologically newest accepted)
 **Latest repository maintenance:** `a0ceb0c0cea5d09e7c2baecc93d9c8c0d984125c` safe disposable development-database reset
 **Candidate entries reviewed:** 155  
-**Fresh build/test/runtime evidence:** None; this was a read-only planning audit.
+**Fresh build/test/runtime evidence:** Sprint 65 focused, complete-TestPlan, build, Release-containment and signed-app private-pair evidence is recorded in `PROJECT_STATE.md`.
 
 **Current alignment — Axis source-truth restoration:** the Git-authoritative repository state is newer than this audit baseline. `PROJECT_STATE.md` records the active `axis.bank-account.csv@2` conventional direction contract and the suspension of provenance-less mixed partial overlap.
 
@@ -79,7 +79,8 @@ Material corrections in this revision include:
 - repository-hygiene work narrowed after tracked Xcode user data was removed;
 - backup/restore promoted to targeted discovery after the database lifecycle and migration-integrity foundations matured;
 - Sprint 57A category reconciliation closure and Sprint 58 deterministic DEBUG-only import verification completion;
-- Sprint 63 implementation and acceptance of the ADR-041 source-byte foundation, with production PDF support still blocked;
+- Sprint 63 implementation and acceptance of the ADR-041 source-byte foundation;
+- Sprint 65 acceptance of the exact selected Axis bank-account PDF grammar, with broader PDF layouts, OCR, password workflow and cross-format equivalence still excluded;
 - the Axis direction-audit subfamily narrowed because no retained affected historical database is currently identified.
 
 This audit does not authorize execution, assign sprint numbers or supersede the roadmap.
@@ -583,7 +584,7 @@ Near-term HDFC direction is bank-account statements only through the unified imp
 Targeted discovery must determine:
 
 - which approved HDFC layout and source format should be supported first;
-- whether PDF under `FW-P1-10` or spreadsheet support under `FW-P1-14` provides the smallest safe boundary;
+- whether an independent HDFC PDF boundary or spreadsheet support under `FW-P1-14` provides the smallest safe boundary;
 - institution-detection and statement-classification evidence;
 - parser/profile semantics and versioning;
 - account-identity evidence;
@@ -766,40 +767,13 @@ Do not claim production card support from fixture integration, schema capacity, 
 
 ## FW-P1-10 — Production PDF Statement Support
 
-**Status:** Blocked
-**Discovery:** Sprint 64 complete
-**Planning state:** Sprint 65 implementation is blocked by the named Sprint 64 lineage and independent-oracle evidence gap.
-**Depends on:** Accepted ADR-041; exact-family readiness; independent source truth; reader/profile validation; and ordinary URL-driven production-path acceptance.
+**Status:** Completed in Sprint 65 for the selected exact account-neutral Axis bank-account PDF grammar.
+**Discovery:** Sprint 64 complete; its lineage and independent-oracle blockers were closed only for the selected unlocked/selectable-text NRE/NRO family.
+**Planning state:** Removed from the unscheduled queue. The accepted production profile is `axis.bank-account.pdf@1` through the ordinary shared import path, with source-byte duplicate authority and no PDF-only persistence path.
 
-The source-byte foundation dependency remains satisfied. Retain the exact-family, ordinary URL-driven, independent-oracle, reader/profile, privacy and optimized Release requirements below.
+Sprint 65 verified the ordinary picker, immutable snapshot, reader, deterministic detection/classification, exact normalizer/parser, validation, explicit confirmation, provider-owned persistence, canonical hydration and quit/relaunch reconstruction. The two regenerated sanitized PDFs remain privacy-safe Git fixtures but are non-authoritative and unusable as original-source identity; the corresponding private originals remain the hard source-truth authority.
 
-Sprint 64's strongest bounded candidate is the two-source account-neutral Axis bank-account PDF v1 family represented by retained NRO evidence. Unblocking requires:
-
-- privacy-safe original/fixture digest binding;
-- a sanitisation transformation inventory;
-- field-preservation evidence;
-- independent row-oracle provenance;
-- repeated extraction and multiline-grouping evidence;
-- explicit text/OCR/password classification; and
-- account-neutral grammar evidence.
-
-No user resupply is requested. Visually similar or account-labelled PDFs cannot substitute, fixture presence is insufficient, and no Sprint 65 implementation prompt is authorized.
-
-Promote PDF from extraction foundation to a production-supported import source.
-
-The approved Sprint 64 discovery requirements remain the production gate and require:
-
-- approved PDF content entering the unified import pipeline;
-- consistent picker, source-format registry and reader behavior;
-- correct security-scoped URL access;
-- sandboxed opening through the production URL-driven preparation path;
-- deterministic institution detection, classification and parser/profile selection;
-- parser output matching an independent financial oracle;
-- source date, order and provenance fidelity;
-- Debug and optimized Release validation;
-- no PDF-only validation, repository or persistence path.
-
-PDF support is not production-ready merely because extraction code, approved fixtures or dormant reader infrastructure exists.
+Retain future work for other Axis PDF layouts, OCR, password-protected PDFs, generic PDF support, broader institution coverage and any cross-format equivalence policy. Matching PDF/CSV financial projections in Sprint 65 do not authorize cross-format duplicate suppression or an equivalence architecture.
 
 ---
 

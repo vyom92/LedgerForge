@@ -15,6 +15,10 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
     case malformedParserProfileProvenance
     case conflictingParserProfileProvenance
     case invalidFingerprintSet
+    case unsupportedPreparedSourceFormat
+    case conflictingPreparedSourceFormat
+    case missingLegacyRawTextFingerprint
+    case duplicateAuthorityFormatMismatch
 
     var errorDescription: String? {
         switch self {
@@ -40,6 +44,68 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
             return "Import persistence found conflicting parser profile provenance."
         case .invalidFingerprintSet:
             return "Import persistence requires a valid prepared fingerprint set."
+        case .unsupportedPreparedSourceFormat:
+            return "Import persistence does not support the prepared source format."
+        case .conflictingPreparedSourceFormat:
+            return "Import persistence found conflicting prepared source-format evidence."
+        case .missingLegacyRawTextFingerprint:
+            return "Import persistence requires the prepared raw-text fingerprint."
+        case .duplicateAuthorityFormatMismatch:
+            return "Import persistence found a source-format and duplicate-authority mismatch."
+        }
+    }
+}
+
+enum ImportPersistenceSourceFormat: Equatable, Sendable {
+    case csv
+    case pdf
+
+    var mimeType: String {
+        switch self {
+        case .csv:
+            return "text/csv"
+        case .pdf:
+            return "application/pdf"
+        }
+    }
+
+    var duplicateAuthorityAlgorithm: String {
+        switch self {
+        case .csv:
+            return DocumentFingerprintDTO.rawTextSHA256Algorithm
+        case .pdf:
+            return DocumentFingerprintDTO.sourceBytesSHA256Algorithm
+        }
+    }
+
+    init(preparedDocument financialDocument: FinancialDocument) throws {
+        switch financialDocument.metadata.fileFormat {
+        case .csv:
+            self = .csv
+        case .pdf:
+            self = .pdf
+        case .xls, .xlsx, .unknown:
+            throw ImportPersistenceError.unsupportedPreparedSourceFormat
+        }
+
+        let sourceDocumentFormat = FileFormat(
+            rawValue: financialDocument.sourceDocument.fileType
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .uppercased()
+        )
+        guard sourceDocumentFormat == financialDocument.metadata.fileFormat else {
+            throw ImportPersistenceError.conflictingPreparedSourceFormat
+        }
+    }
+
+    init?(mimeType: String?) {
+        switch mimeType {
+        case "text/csv":
+            self = .csv
+        case "application/pdf":
+            self = .pdf
+        default:
+            return nil
         }
     }
 }
@@ -115,13 +181,23 @@ struct ImportPersistenceMapper {
         guard validation.passed else {
             throw ImportPersistenceError.validationFailed
         }
+        let sourceFormat = try ImportPersistenceSourceFormat(
+            preparedDocument: financialDocument
+        )
         guard fingerprintSet.isValid,
-              let rawFingerprint = fingerprintSet.duplicateAuthority,
-              rawFingerprint.algorithm == DocumentFingerprintDTO.rawTextSHA256Algorithm,
               fingerprintSet.fingerprints.allSatisfy({
                   DocumentFingerprintDTO.approvedAlgorithms.contains($0.algorithm)
-              }) else {
+              }),
+              let duplicateAuthority = fingerprintSet.duplicateAuthority else {
             throw ImportPersistenceError.invalidFingerprintSet
+        }
+        guard duplicateAuthority.algorithm == sourceFormat.duplicateAuthorityAlgorithm else {
+            throw ImportPersistenceError.duplicateAuthorityFormatMismatch
+        }
+        guard let rawTextFingerprint = fingerprintSet.fingerprints.first(where: {
+            $0.algorithm == DocumentFingerprintDTO.rawTextSHA256Algorithm
+        }) else {
+            throw ImportPersistenceError.missingLegacyRawTextFingerprint
         }
 
         let importedAtISO = dateFormatter.string(from: importSession.importedAt)
@@ -139,9 +215,9 @@ struct ImportPersistenceMapper {
             workspaceId: workspaceId,
             importSessionId: importSessionId,
             filename: importSession.fileName,
-            mimeType: "text/csv",
-            sizeBytes: rawFingerprint.byteCount,
-            legacyRawTextSHA256: rawFingerprint.digest,
+            mimeType: sourceFormat.mimeType,
+            sizeBytes: duplicateAuthority.byteCount,
+            legacyRawTextSHA256: rawTextFingerprint.digest,
             createdAtISO: importedAtISO
         )
 

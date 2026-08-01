@@ -186,7 +186,12 @@ final class AxisBankAccountParser: StatementParser {
     ) -> Bool {
 
         return metadata.institution == .axis &&
-               metadata.documentType == .bankAccount
+               metadata.documentType == .bankAccount &&
+               (metadata.fileFormat == .csv ||
+                   metadata.fileFormat == .unknown) &&
+               document.fileType.caseInsensitiveCompare(
+                   FileFormat.csv.rawValue
+               ) == .orderedSame
     }
 
     func parse(
@@ -304,7 +309,8 @@ final class AxisBankAccountParser: StatementParser {
                         parserProfileVersion: Self.profileVersion
                     )
                 ],
-                verifiedAxisUPIEventEvidence: Self.eventEvidence(
+                verifiedAxisUPIEventEvidence:
+                    AxisBankAccountSourceEvidence.transactionEventEvidence(
                     narration: description,
                     direction: direction.transactionType
                 )
@@ -384,12 +390,8 @@ final class AxisBankAccountParser: StatementParser {
             case .candidate(let value):
                 let identifier: FinancialIdentifier
                 do {
-                    identifier = try FinancialIdentifier(
-                        kind: .institutionAccountId,
-                        rawValue: value,
-                        verificationState: .verified,
-                        provenance: .institutionStructuredField
-                    )
+                    identifier = try AxisBankAccountSourceEvidence
+                        .verifiedAccountIdentifier(value)
                 } catch {
                     throw AxisBankAccountParserError.invalidAccountIdentifier(
                         sourceOrdinal: fragment.sourceOrdinal
@@ -468,39 +470,15 @@ final class AxisBankAccountParser: StatementParser {
               match.numberOfRanges == 3,
               let startRange = Range(match.range(at: 1), in: periodText),
               let endRange = Range(match.range(at: 2), in: periodText),
-              let start = try? StatementDate.axisNRE(String(periodText[startRange])),
-              let end = try? StatementDate.axisNRE(String(periodText[endRange])),
-              let period = try? DeclaredStatementPeriod(start: start, end: end) else {
+              let period = try? AxisBankAccountSourceEvidence.declaredStatementPeriod(
+                  startText: String(periodText[startRange]),
+                  endText: String(periodText[endRange])
+              ) else {
             throw AxisBankAccountParserError.malformedDeclaredStatementPeriod(
                 sourceOrdinal: fragment.sourceOrdinal
             )
         }
         return period
-    }
-
-    private static func eventEvidence(
-        narration: String,
-        direction: TransactionType
-    ) -> AxisUPITransactionEventEvidence? {
-        let components = narration.split(separator: "/", omittingEmptySubsequences: false)
-        guard components.count >= 4, components[0] == "UPI" else { return nil }
-        let operation: AxisUPITransactionEventEvidence.Operation
-        switch components[1] {
-        case "P2A": operation = .p2a
-        case "P2M": operation = .p2m
-        default: return nil
-        }
-        let reference = String(components[2])
-        guard reference.count == 12,
-              reference.unicodeScalars.allSatisfy({ $0.value >= 48 && $0.value <= 57 }) else {
-            return nil
-        }
-        let subtype: AxisUPITransactionEventEvidence.LedgerSubtype
-        switch direction {
-        case .debit: subtype = .posting
-        case .credit: subtype = .creditAdjustment
-        }
-        return AxisUPITransactionEventEvidence(operation: operation, reference: reference, subtype: subtype)
     }
 
     private enum StatementAccountEvidence {

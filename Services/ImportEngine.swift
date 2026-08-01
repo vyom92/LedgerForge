@@ -377,13 +377,13 @@ final class ImportEngine {
 
             let result = await commitPreparedImport(preparedImport)
             if result.succeeded {
-                developerConsole.info(.`import`, "Import completed", metadata: ["file": result.fileName, "transactions": "\(result.transactionCount)"])
+                developerConsole.info(.`import`, "Import completed", metadata: ["transactions": "\(result.transactionCount)"])
             } else if result.previousImport != nil {
                 developerConsole.info(.`import`, "Previously imported statement blocked", metadata: ["transactions": "\(result.transactionCount)"])
             } else if result.transactionEventBlock != nil {
                 developerConsole.info(.`import`, "Verified transaction event blocked")
             } else {
-                developerConsole.error(.`import`, "Import failed", metadata: ["file": result.fileName, "error": result.errorMessage ?? "Unknown error"])
+                developerConsole.error(.`import`, "Import failed")
             }
             return result
 
@@ -403,9 +403,9 @@ final class ImportEngine {
         } catch {
 
             if developerConsole.entries.count == entryCountBeforeImport + 1 {
-                developerConsole.error(.`import`, error.localizedDescription, metadata: ["file": url.lastPathComponent])
+                developerConsole.error(.`import`, "Import preparation failed")
             }
-            developerConsole.error(.`import`, "Import failed", metadata: ["file": url.lastPathComponent, "error": error.localizedDescription])
+            developerConsole.error(.`import`, "Import failed")
             return ImportEngineResult(
                 fileName: url.lastPathComponent,
                 transactionCount: 0,
@@ -461,12 +461,25 @@ final class ImportEngine {
             if !transfersSnapshot { snapshot.invalidate() }
         }
         try Task.checkCancellation()
-        let contents = try await readTextDocument(from: url, snapshot: snapshot)
+        let rawDocument = try await readDocument(from: url, snapshot: snapshot)
         try Task.checkCancellation()
-        let fingerprint = ExactStatementFingerprint(text: contents)
-        let fingerprintSet = PreparedDocumentFingerprintSet(
-            rawText: fingerprint,
-            sourceBytes: snapshot.sourceByteFingerprint
+        guard case .text(let contents) = rawDocument.content else {
+            throw ImportError.invalidDocument(message: "Import expected extractable text document content.")
+        }
+        let sourceFormat = try Self.preparedSourceFormat(fileType: rawDocument.fileExtension)
+        let rawTextFingerprint = ExactStatementFingerprint(text: contents)
+        let fingerprintSet = try Self.preparedFingerprintSet(
+            rawText: rawTextFingerprint,
+            sourceBytes: snapshot.sourceByteFingerprint,
+            sourceFormat: sourceFormat
+        )
+        guard let duplicateAuthority = fingerprintSet.duplicateAuthority else {
+            throw ImportError.invalidDocument(message: "Import fingerprint authority is unavailable.")
+        }
+        let fingerprint = ExactStatementFingerprint(
+            algorithm: duplicateAuthority.algorithm,
+            digest: duplicateAuthority.digest,
+            byteCount: duplicateAuthority.byteCount
         )
 
         guard !contents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -475,33 +488,58 @@ final class ImportEngine {
         }
 
         try publishPreparationProgress(.detectingInstitution, requestId: requestId, progress: progress)
-        let metadata = InstitutionDetector().detect(from: contents)
+        let detection = InstitutionDetector().detectWithReasons(from: contents)
+        let institutionCandidate = detection.importCandidate
 
         try publishPreparationProgress(.classifyingStatement, requestId: requestId, progress: progress)
-        let analyzer = CSVAnalyzer()
-        let document = analyzer.analyze(
-            text: contents,
-            fileURL: url
+        let classification = try await StatementClassificationDetector().classify(
+            document: rawDocument,
+            institution: institutionCandidate
         )
 
-        let normalizer = CSVNormalizer()
-        let normalization = normalizer.normalizeWithSourceContext(
-            text: contents,
-            document: document
-        )
+        let document: Document
+        let normalizedRows: [NormalizedRow]
+        let normalizedHeader: NormalizedRow?
+        let sourceContext: NormalizedDocument.SourceContext
+        switch sourceFormat {
+        case .csv:
+            let csvDocument = CSVAnalyzer().analyze(text: contents, fileURL: url)
+            let normalization = CSVNormalizer().normalizeWithSourceContext(
+                text: contents,
+                document: csvDocument
+            )
+            document = csvDocument
+            normalizedRows = normalization.rows
+            normalizedHeader = normalization.header
+            sourceContext = normalization.sourceContext
+        case .pdf:
+            let normalization = try AxisBankAccountPDFNormalizer().normalize(
+                text: contents,
+                fileURL: url
+            )
+            document = normalization.document
+            normalizedRows = normalization.rows
+            normalizedHeader = normalization.header
+            sourceContext = normalization.sourceContext
+        case .xls, .xlsx, .unknown:
+            throw ImportError.unsupportedFile(extension: rawDocument.fileExtension)
+        }
 
         try publishPreparationProgress(.selectingParser, requestId: requestId, progress: progress)
-        let parser = StatementParserRegistry.shared.parser(
+        let selection = StatementParserSelector().selectParser(
             for: document,
-            metadata: metadata
+            institution: institutionCandidate,
+            classification: classification
         )
+        let parser = selection.parser
+        let metadata = selection.legacyMetadata
 
         developerConsole.info(.`import`, "Institution detected", metadata: ["institution": metadata.institution.rawValue])
         developerConsole.info(.`import`, "Parser selected", metadata: ["parser": parser?.name ?? "None"])
 
         // Parser internals (Debug)
         developerConsole.debug(.parser, "Detected document", metadata: [
-            "file": document.filename,
+            "format": metadata.fileFormat.rawValue,
             "rows": "\(document.rowCount)",
             "columns": "\(document.columnCount)",
             "headerRow": "\(document.headerRow ?? -1)",
@@ -510,7 +548,7 @@ final class ImportEngine {
             "encoding": document.encoding ?? "Unknown"
         ])
         developerConsole.debug(.parser, "Normalization details", metadata: [
-            "normalizedRows": "\(normalization.rows.count)"
+            "normalizedRows": "\(normalizedRows.count)"
         ])
 
         guard let parser else {
@@ -521,9 +559,9 @@ final class ImportEngine {
         let normalizedDocument = NormalizedDocument(
             document: document,
             metadata: metadata,
-            rows: normalization.rows,
-            header: normalization.header,
-            sourceContext: normalization.sourceContext
+            rows: normalizedRows,
+            header: normalizedHeader,
+            sourceContext: sourceContext
         )
 
         try publishPreparationProgress(.parsingFinancialContent, requestId: requestId, progress: progress)
@@ -687,9 +725,10 @@ final class ImportEngine {
         let recomputedRawFingerprint = ExactStatementFingerprint(text: preparedImport.rawContents)
         let recomputedFingerprintSet: PreparedDocumentFingerprintSet?
         do {
-            recomputedFingerprintSet = PreparedDocumentFingerprintSet(
+            recomputedFingerprintSet = try Self.preparedFingerprintSet(
                 rawText: recomputedRawFingerprint,
-                sourceBytes: try preparedImport.sourceSnapshot.recomputedSourceByteFingerprint()
+                sourceBytes: try preparedImport.sourceSnapshot.recomputedSourceByteFingerprint(),
+                sourceFormat: preparedImport.financialDocument.metadata.fileFormat
             )
         } catch {
             recomputedFingerprintSet = nil
@@ -701,13 +740,23 @@ final class ImportEngine {
         let preparedSourceFingerprint = preparedFingerprints.first {
             $0.algorithm == SourceContentSnapshot.algorithm
         }
+        let preparedAuthority = preparedImport.fingerprintSet.duplicateAuthority.map {
+            ExactStatementFingerprint(
+                algorithm: $0.algorithm,
+                digest: $0.digest,
+                byteCount: $0.byteCount
+            )
+        }
+        let sourceDocumentFormat = try? Self.preparedSourceFormat(
+            fileType: preparedImport.financialDocument.sourceDocument.fileType
+        )
         guard preparedImport.fingerprintSet.isValid,
               preparedFingerprints.count == 2,
-              preparedRawFingerprint?.isDuplicateAuthority == true,
-              preparedRawFingerprint?.digest == preparedImport.fingerprint.digest,
-              preparedRawFingerprint?.byteCount == preparedImport.fingerprint.byteCount,
-              preparedSourceFingerprint?.isDuplicateAuthority == false,
-              recomputedRawFingerprint == preparedImport.fingerprint else {
+              sourceDocumentFormat == preparedImport.financialDocument.metadata.fileFormat,
+              preparedAuthority == preparedImport.fingerprint,
+              preparedRawFingerprint?.digest == recomputedRawFingerprint.digest,
+              preparedRawFingerprint?.byteCount == recomputedRawFingerprint.byteCount,
+              preparedSourceFingerprint != nil else {
             developerConsole.error(.`import`, "Prepared fingerprint contract is invalid")
             return ImportEngineResult(
                 fileName: preparedImport.fileName,
@@ -750,7 +799,7 @@ final class ImportEngine {
         }
         guard preparedImport.validation.passed else {
             let attemptID = importPersistenceCoordinatorFactory().recordValidationFailure(fileName: preparedImport.fileName, transactionCount: preparedImport.transactionCount)
-            developerConsole.error(.validation, "Validation failed", metadata: ["file": preparedImport.fileName])
+            developerConsole.error(.validation, "Validation failed")
             return ImportEngineResult(
                 fileName: preparedImport.fileName,
                 transactionCount: preparedImport.transactionCount,
@@ -1108,10 +1157,10 @@ final class ImportEngine {
         }
     }
 
-    private func readTextDocument(
+    private func readDocument(
         from url: URL,
         snapshot: SourceContentSnapshot
-    ) async throws -> String {
+    ) async throws -> RawDocument {
         try Task.checkCancellation()
         let request = ImportRequest(fileURL: url)
         let result = await importCoordinator.importDocument(request, snapshot: snapshot)
@@ -1121,10 +1170,60 @@ final class ImportEngine {
             throw result.error ?? ImportError.unknown(message: "Import coordinator returned no document.")
         }
 
-        guard case .text(let contents) = rawDocument.content else {
-            throw ImportError.invalidDocument(message: "CSV import expected text document content.")
+        guard case .text = rawDocument.content else {
+            throw ImportError.invalidDocument(message: "Import expected extractable text document content.")
         }
 
-        return contents
+        return rawDocument
+    }
+
+    /// The extension routes into one format-specific reader, but it is not
+    /// financial support evidence by itself. A value reaches this seam only
+    /// after that reader has validated and extracted the retained snapshot;
+    /// detection, classification, normalization and parser checks still own
+    /// the supported-statement decision.
+    nonisolated private static func preparedSourceFormat(fileType: String) throws -> FileFormat {
+        switch fileType.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() {
+        case FileFormat.csv.rawValue:
+            return .csv
+        case FileFormat.pdf.rawValue:
+            return .pdf
+        default:
+            throw ImportError.unsupportedFile(extension: fileType.lowercased())
+        }
+    }
+
+    nonisolated private static func preparedFingerprintSet(
+        rawText: ExactStatementFingerprint,
+        sourceBytes: VersionedDocumentFingerprint,
+        sourceFormat: FileFormat
+    ) throws -> PreparedDocumentFingerprintSet {
+        let rawTextIsAuthority: Bool
+        let sourceBytesIsAuthority: Bool
+        switch sourceFormat {
+        case .csv:
+            rawTextIsAuthority = true
+            sourceBytesIsAuthority = false
+        case .pdf:
+            rawTextIsAuthority = false
+            sourceBytesIsAuthority = true
+        case .xls, .xlsx, .unknown:
+            throw ImportError.unsupportedFile(extension: sourceFormat.rawValue.lowercased())
+        }
+
+        return PreparedDocumentFingerprintSet(fingerprints: [
+            VersionedDocumentFingerprint(
+                algorithm: rawText.algorithm,
+                digest: rawText.digest,
+                byteCount: rawText.byteCount,
+                isDuplicateAuthority: rawTextIsAuthority
+            ),
+            VersionedDocumentFingerprint(
+                algorithm: sourceBytes.algorithm,
+                digest: sourceBytes.digest,
+                byteCount: sourceBytes.byteCount,
+                isDuplicateAuthority: sourceBytesIsAuthority
+            )
+        ])
     }
 }

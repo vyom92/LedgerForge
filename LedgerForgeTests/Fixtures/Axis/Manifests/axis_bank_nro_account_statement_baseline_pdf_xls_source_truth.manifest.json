@@ -16,6 +16,9 @@
     "pdf": "none",
     "xls": "none"
   },
+  "artifact_digests": {
+    "pdf_sha256": "bcb6c3859731c62c293370be7713f9fed615cf04f4485cc8ba2a0ea1747f7fdb"
+  },
   "neutral_private_source_labels": [
     "AXNRO-R1-PDF",
     "AXNRO-R1-XLS"
@@ -27,7 +30,8 @@
   },
   "pagination_assertions": {
     "pdf_page_count": 2,
-    "repeated_headers_preserved": true
+    "repeated_headers_present": false,
+    "table_header_pages": [1]
   },
   "extraction_order_assertions": {
     "pdf_text_operator_order_preserved": true,
@@ -43,7 +47,7 @@
   },
   "candidate_status": "validated",
   "fixture_class": "source-faithful sanitized fixture",
-  "cross_format_boundary": "Matching account identity and date range do not establish financial equivalence with the Range 1 CSV.",
+  "cross_format_boundary": "Matching account identity and date range do not establish financial equivalence with the Range 1 CSV. The corresponding private original PDF is the source-truth authority; this sanitized copy is non-authoritative and unusable as an original-source identity.",
   "csv_source_direction_contract": "Where the shared axis.bank-account.csv@2 layout is referenced, physical DR maps to canonical debit and physical CR maps to canonical credit; the PDF/XLS financial oracle remains independent.",
   "overlap_verification": {
     "csv": {

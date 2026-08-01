@@ -3,10 +3,10 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current repository implementation baseline:** `main` at the single Sprint 66 completion commit containing this state update; its exact SHA is Git-authoritative and recorded in the closure report
-- **Documentation alignment:** Reconciled on 2026-07-30 in that same Sprint 66 completion commit; this document intentionally does not embed its own commit SHA
-- **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration is included in the current pushed baseline; this task does not alter parser, fixture or historical financial data
-- **Latest verified production implementation:** Sprint 66 typed confirmed-import recovery and truthful validation guidance
+- **Current repository implementation baseline:** `main` at the Sprint 65 acceptance commit containing this state update; its exact SHA is Git-authoritative and recorded in the closure report
+- **Documentation alignment:** Reconciled on 2026-08-01 in the Sprint 65 acceptance commit; this document intentionally does not embed its own commit SHA
+- **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration and Sprint 65's clean-room PDF fixture replacement are included in the accepted baseline; no historical financial data was altered
+- **Latest chronologically accepted production implementation:** Sprint 65 shared Axis bank-account PDF import; Sprint 66 remains the highest numbered completed increment
 - **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
@@ -24,8 +24,9 @@
 - **Sprint 59:** Accepted ADR-041 as an architecture-only source-snapshot and exact source-byte fingerprint contract; implementation was intentionally deferred to a later increment
 - **Sprint 62:** Accepted the ADR-041 immutable source snapshot and exact source-byte fingerprint architecture contract; no production implementation was included in Sprint 62
 - **Sprint 63:** Implemented and independently accepted the immutable source-snapshot and exact source-byte fingerprint foundation
-- **Sprint 64:** Completed the approved read-only Axis bank-account PDF readiness discovery. The strongest bounded candidate is the two-source account-neutral Axis bank-account PDF v1 family represented by retained NRO evidence. No production, migration, ADR, fixture, database or source change occurred; production PDF support was not established. No user resupply is required. Retained originals remain available for bounded future read-only evidence reconciliation.
-- **Sprint 64 blockers:** `BLOCK-PDF-LINEAGE-01` — exact private-original to sanitisation to committed-fixture lineage is not independently provable from retained records; `BLOCK-PDF-ORACLE-BINDING-02` — expected financial data exists but independent derivation and exact row-level binding to each original are not established; `UNCERTAINTY-PDF-DETERMINISM-03` — repeated extraction and multiline grouping are not proven; `UNCERTAINTY-PDF-SOURCE-CLASS-04` — text-based/unlocked was observed, but OCR/password classification is not fully recorded; `UNCERTAINTY-NRE-NRO-GRAMMAR-05` — shared NRE/NRO grammar cannot yet be claimed from lineage-backed evidence.
+- **Sprint 64:** Completed the approved read-only Axis bank-account PDF readiness discovery. Its bounded candidate was the two-source account-neutral Axis bank-account PDF v1 family represented by retained NRO evidence.
+- **Sprint 65:** Implemented and accepted the exact shared `axis.bank-account.pdf@1` grammar through the ordinary import path. The selected NRE/NRO originals, regenerated sanitized fixtures and independent row-level financial baselines now establish the bounded production boundary; broader Axis PDF layouts remain unsupported.
+- **Sprint 65 blocker reconciliation:** `BLOCK-PDF-LINEAGE-01`, `BLOCK-PDF-ORACLE-BINDING-02`, `UNCERTAINTY-PDF-DETERMINISM-03`, `UNCERTAINTY-PDF-SOURCE-CLASS-04` and `UNCERTAINTY-NRE-NRO-GRAMMAR-05` are closed only for the selected unlocked/selectable-text grammar and its account-neutral NRE/NRO family. They remain open for other layouts, OCR, password-protected documents and generic Axis PDF support.
 - **Sprint 66:** Implemented typed confirmed-import recovery, privacy-safe route-specific guidance, wholly fresh preparation for eligible zero-commit outcomes and bounded canonical reconciliation without changing persistence architecture
 - **Sprint 60:** Completed the read-only account-outcome explanation contract across the bounded import workflow; no schema or historical rewrite occurred.
 - **Sprint 61:** Implemented privacy-safe durable account-outcome presentation and explicit eligible no-match account choice. FinancialIdentityResolver behavior is unchanged: parser-produced strong verified identifiers remain the sole identity authority, and eligible no-match cases require explicit Use Existing Account or Create New Account choice. No automatic account selection was introduced. Prospective successful durable account decisions are `matched_existing`, `user_selected_existing` and `created_new`; rejected outcomes include `account_choice_required`, `identifier_ownership_conflict`, `identity_ambiguity`, `identity_conflict`, `stale_account_choice` and `stale_provider_generation`. Historical `selected_existing` and `resolved_or_created` remain neutral and are not reinterpreted. One shared bounded presentation authority serves preparation, immediate result and Import History; hostile and unknown values fail closed to neutral unavailable presentation. Account IDs, candidate IDs, normalized identifiers, suffixes, filenames, paths, fingerprints, raw codes and unrestricted errors are excluded from account-outcome copy and accessibility text. SQLite/In-Memory parity and rejected-path zero accepted residue were verified. No schema or historical rewrite occurred.
@@ -36,7 +37,7 @@
 - **Latest verified implementation-adjacent maintenance repair:** P0 Axis bank-account source-truth restoration; new imports use `axis.bank-account.csv@2`, physical DR is debit/outflow and physical CR is credit/inflow, and header positions remain dynamically resolved
 - **Current overlap boundary:** ordinary no-overlap statements remain full imports, exact-content duplicates remain ADR-030 outcomes, and full supported event overlap remains whole-statement blocked; provenance-less mixed-overlap evidence is unsupported and cannot produce a new reviewed partial plan
 - **ADR-040/V7 alignment:** reviewed-plan, disposition, attempt-count and hydration structures remain readable and validated, but the former provenance-less Axis partial-import family is suspended; mixed supported overlap currently fails closed
-- **Source-byte boundary:** `ledgerforge.raw-text.sha256.v1` remains authoritative for existing CSV history; Sprint 63 operationalizes `ledgerforge.source-bytes.sha256.v1` through one transient immutable `SourceContentSnapshot` and a secondary CSV fingerprint, without establishing production PDF support
+- **Source-byte boundary:** existing CSV history remains authoritative under `ledgerforge.raw-text.sha256.v1` with `ledgerforge.source-bytes.sha256.v1` secondary; Sprint 65 makes `ledgerforge.source-bytes.sha256.v1` authoritative for PDF while retaining extracted-text fingerprinting only as secondary evidence, with one transient immutable `SourceContentSnapshot` and no durable raw PDF bytes
 - **Sprint 58 duplicate acceptance:** an isolated exact duplicate left accepted transactions, sessions, documents, fingerprints, account state, balance and hydrated presentation unchanged, adding only one durable rejected duplicate attempt
 - **Sprint 56 persistence:** Migration V7, immutable reviewed-plan digests, typed row dispositions, explicit attempt counts and strict hydration/relaunch reconstruction remain readable and validated for historical repository state, but no new partial session is authorized without lineage-backed overlap evidence
 - **Current exclusions:** unsupported institutions, profiles, currencies, event families, mixed or interleaved overlap, arbitrary omission, fuzzy candidates, ownership override and historical repair remain unavailable
@@ -45,10 +46,12 @@
 - **Sprint 57 UI:** Settings supports create, rename, archive, restore and permitted delete; transaction detail supports assign, change and clear, and transaction rows display the current category
 - **Sprint 57 exclusions:** automatic categorization, rules, suggestions, bulk editing, merge, delete-with-replacement, budgeting, analytics, reports, filtering, tags, splits and import behavior changes remain unavailable
 - **Canonical development database:** a disposable canonical database was successfully recreated through the registered migration chain at V9; no private database contents are recorded here
-- **Latest Axis source-truth automated result:** 426 top-level tests (458 parameterized executions), 0 failures and 0 skips in the complete signed canonical TestPlan
+- **Latest Sprint 65 focused result:** 381 tests across 43 suites passed; 0 failures, skips or expected failures; changed-file warnings 0 and analyzer diagnostics 0
+- **Latest Sprint 65 complete-TestPlan result:** 607 tests across 73 suites passed; 0 failures, skips or expected failures; changed-file warnings 0 and analyzer diagnostics 0; 9 pre-existing warnings remained
+- **Latest Axis source-truth automated result:** 426 top-level tests (458 parameterized executions), 0 failures and 0 skips in the complete signed canonical TestPlan before Sprint 65
 - **Latest Axis source-truth focused result:** 41 top-level tests (46 parameterized executions), 0 failures and 0 skips across direction, source-oracle, NRO evidence, overlap-quarantine, shared-profile and direct-provider fail-closed suites using SQLite and In-Memory providers
 - **Latest Axis source-truth build result:** fresh signed Debug and explicitly optimized Release builds plus Debug and Release static analysis pass
-- **Private-source verification:** two read-only NRE originals provide 94 observable conventional row-to-row balance deltas and two read-only NRO originals provide 35; no private source was copied, launched or committed
+- **Private-source verification:** Sprint 65 exercised four original PDF/CSV pairs through separate fresh signed-app profiles, explicit confirmation and quit/relaunch hydration. Redacted results: NRE1 PDF 46 rows versus CSV 47 with matching first 46 ordered projections and one non-duplicate CSV row outside the PDF date range; NRE2 49/49 full projection, identity and summary parity; NRO1 PDF 16 versus CSV 17 with matching first 16 ordered projections and one non-duplicate CSV row outside the PDF date range; NRO2 20/20 full projection, identity and summary parity. Original PDF parser success is the hard acceptance authority. No private source value, path, filename, database or copied evidence entered Git, documentation, result bundles, diagnostics or build products.
 - **Latest recorded automated result:** 433 top-level tests (465 parameterized executions), 0 failures and 0 skips in the complete signed canonical TestPlan for category reconciliation closure
 - **Latest focused category-reconciliation result:** 71 top-level tests (86 parameterized executions), 0 failures and 0 skips across category, hydrator, import-hydration, development-lifecycle and migration-integrity suites
 - **Latest recorded build result:** fresh signed Debug and explicitly optimized whole-module Release builds plus Debug and Release static analysis passed for the category reconciliation closure
@@ -62,7 +65,7 @@
 - **Sprint 56 test-host isolation:** `TestPlan.xctestplan` explicitly marks the app-hosted test process with `LEDGERFORGE_TEST_HOST=1`; `LedgerForgeApp` selects intentional test memory for that exact marker before resolving any default SQLite path, while unmarked Debug and Release launches retain normal persistence bootstrap
 - **Sprint 56 acceptance correction:** strict hydration now cross-checks each partial session against exactly one committed partial attempt and its document, transaction, source, imported, recognized and blocked counts before replacing any runtime store
 - **Sprint 56 runtime verification:** no canonical application launch was used; acceptance uses signed app-hosted tests with isolated providers and source/presentation verification
-- **Axis source-truth runtime boundary:** no private original or canonical database is launched or copied; automated production-path coverage verifies conventional semantics, rejects contradictory evidence before accepted persistence and exercises SQLite/In-Memory persistence, hydration and reconstruction with disposable providers
+- **Historical Axis source-truth runtime boundary:** prior automated acceptance did not launch private originals or a canonical database. Sprint 65 additionally performed the explicitly authorized signed-app acceptance against read-only originals through separate disposable profiles; no original was copied, committed or durably stored, and all task-owned profiles were removed recoverably after hydration.
 
 GitHub establishes pushed repository state only. It does not establish local worktree cleanliness, linked worktrees, local branches, stashes, staged or unstaged changes, untracked files or unpushed commits.
 
@@ -82,18 +85,28 @@ Personal-v1 adoption remains undeclared. LedgerForge is not currently an active 
 
 ### Supported import family
 
-Production import support is limited to the verified shared Axis bank-account CSV grammar represented by:
+Production import support is limited to the verified shared Axis bank-account CSV grammar and the exact selected Axis bank-account PDF grammar represented by:
 
 - the approved Axis Bank NRE CSV evidence;
 - the supplied shared-layout Axis Bank NRO CSV evidence.
+- the two selected unlocked/selectable-text Axis bank-account PDF families exercised in Sprint 65, with NRE/NRO labels treated as source data rather than profile identity.
 
 Both use one production `AxisBankAccountParser`.
+
+The selected PDFs use one account-neutral production `AxisBankAccountPDFParser`.
 
 New supported imports emit:
 
 ```text
 axis.bank-account.csv
 version 2
+```
+
+PDF imports emit:
+
+```text
+axis.bank-account.pdf
+version 1
 ```
 
 Historical durable provenance using:
@@ -105,7 +118,7 @@ version 1
 
 remains readable and is never rewritten merely to adopt the neutral forward profile.
 
-No broader Axis NRO, historical Axis layout, PDF, XLS, XLSX, card, HDFC, CBQ, American Express or other institution support is claimed.
+No broader Axis PDF layout, OCR, password-protected PDF, historical Axis layout, XLS, XLSX, card, HDFC, CBQ, American Express or other institution support is claimed.
 
 ### Trusted source semantics
 
@@ -113,6 +126,7 @@ Supported Axis imports preserve:
 
 - dynamic physical source-column position resolution without treating a source header label as a canonical financial role;
 - the `axis.bank-account.csv@2` direction contract in which physical DR decreases balance and maps to canonical debit/outflow, while physical CR increases balance and maps to canonical credit/inflow;
+- the selected Axis PDF grammar's exact `dd-MM-yyyy` statement dates, `Asia/Kolkata` date authority, source order, running-balance arithmetic, printed totals and opening/closing reconciliation;
 - strict date-only financial evidence;
 - Axis `Asia/Kolkata` date authority;
 - document-scoped source ordinal;
@@ -121,6 +135,7 @@ Supported Axis imports preserve:
 - durable transaction-to-source provenance;
 - source-supported same-document ordering;
 - source-supported running-balance interpretation.
+- PDF source-byte identity under `ledgerforge.source-bytes.sha256.v1`; extracted-text identity is retained only as non-authoritative secondary evidence.
 
 Printed transaction dates do not pass through `Foundation.Date`.
 
@@ -387,9 +402,9 @@ Shared Xcode configuration remains distinct from personal IDE state.
 
 ### Production format and institution limits
 
-- Production parser support is limited to the approved Axis bank-account CSV grammar.
+- Production parser support is limited to the approved Axis bank-account CSV grammar and the selected exact Axis bank-account PDF grammar.
 - General Axis NRO coverage and additional Axis layouts remain unsupported.
-- PDF is a text-extraction and statement-understanding foundation only.
+- Other Axis PDF layouts, OCR, password-protected PDFs and generic PDF statement support remain unsupported.
 - XLS, XLSX, TXT and OCR are not production-supported.
 - HDFC, CBQ, American Express and card-statement production parsing are unsupported.
 - No production password-entry or Keychain workflow exists.
@@ -567,6 +582,49 @@ American Express production parsing and durable card semantics remain unsupporte
 ---
 
 ## Recent Verified Changes
+
+### Sprint 65 — Shared Axis Bank-Account PDF Production Path
+
+**Ref**
+
+This state update is the durable record for the Sprint 65 acceptance commit; the exact Git ref is authoritative in history and intentionally is not embedded here.
+
+#### Outcome
+
+Sprint 65 promotes one exact account-neutral Axis bank-account PDF grammar through the existing ordinary URL-driven import path. It does not establish generic Axis PDF, OCR, password, spreadsheet or cross-format-equivalence support.
+
+#### Verified production behavior
+
+- The existing security-scoped immutable `SourceContentSnapshot` is shared by PDF extraction, source-byte fingerprinting and confirmation integrity checks.
+- The ordinary importer accepts PDF alongside CSV, dispatches PDF through the existing reader and exact Axis normalizer, then uses the shared detector, classifier, parser selector, validation, review, provider-owned confirmation and canonical hydration path.
+- The PDF profile is `axis.bank-account.pdf@1`; the existing CSV profile remains `axis.bank-account.csv@2`. NRE/NRO labels do not select a profile or durable identity authority.
+- PDF persistence uses `application/pdf`, makes `ledgerforge.source-bytes.sha256.v1` the single duplicate authority, retains `ledgerforge.raw-text.sha256.v1` only as a secondary fingerprint and records source size from the exact source bytes. CSV remains `text/csv` with raw-text duplicate authority and source bytes secondary.
+- The coordinator and mapper fail closed for missing, multiple, unapproved or format-mismatched authorities. No PDF-only repository, provider, schema or migration path was added, and no cross-format duplicate suppression was introduced.
+- The normalizer preserves page and row order, multiline particulars, printed references, branch evidence, declared period, opening/closing balances, printed totals and exact balance arithmetic; unsupported or contradictory evidence rejects before accepted persistence.
+
+#### Source and fixture authority
+
+- The two committed sanitized NRO PDFs were regenerated clean-room from the supplied read-only originals. Their independent expected JSON remained byte-identical; PDFKit, geometry, pagination, selectable-text, unlocked, privacy and `qpdf --check` gates passed; all four rendered pages were visually inspected.
+- The original PDFs are the hard source-truth authority. The regenerated sanitized PDFs remain Git fixtures for deterministic grammar and privacy tests but are explicitly non-authoritative and unusable as original-source identity, as recorded in both manifests.
+- Original NRO PDF persistence matched the independent row-level baselines: 16 and 20 ordered rows, with exact dates, debit/credit side, amount magnitudes, running balances, totals and closing balances. No production parser output was used to create either expected baseline.
+
+#### Persistence authority matrix
+
+| Source | Duplicate authority | Secondary fingerprint | Persisted media |
+| --- | --- | --- | --- |
+| CSV | `ledgerforge.raw-text.sha256.v1` | `ledgerforge.source-bytes.sha256.v1` | `text/csv` |
+| PDF | `ledgerforge.source-bytes.sha256.v1` | `ledgerforge.raw-text.sha256.v1` | `application/pdf` |
+
+#### Acceptance evidence
+
+- Focused acceptance passed 381 tests across 43 suites; the complete TestPlan passed 607 tests across 73 suites. Both had zero failures, skips and expected failures; changed-file warnings were zero and analyzer diagnostics were zero. Nine remaining warnings were pre-existing Swift 6 transition warnings.
+- Fresh signed Debug and optimized whole-module `-O` arm64 Release builds, Debug analysis and Release containment passed. Release products contained no PDFs, CSVs, fixtures, private originals, databases or copied source material.
+- Four original PDF/CSV pairs were each exercised through separate fresh signed sandboxed app profiles, ordinary file-picker selection, explicit confirmation, quit/relaunch and hydration. Redacted pair outcomes are recorded above; matching projections were treated as financial equivalence evidence only, never exact-content identity.
+- Task-owned namespaces, result bundles, render evidence and build products were moved recoverably to Trash after acceptance. The private originals remain read-only and unchanged. No private source value, path, filename, database, screenshot or raw diagnostic entered Git, documentation, result bundles or products.
+
+#### Scope
+
+Sprint 65 changed only the approved production, test, fixture/manifest and state-document paths: `ContentView.swift`, `Services/ImportEngine.swift`, `Services/ImportPersistenceMapper.swift`, `Services/ImportPersistenceCoordinator.swift`, `Parsers/AxisBankAccountParser.swift`, `Parsers/StatementParserRegistry.swift`, `Normalizers/AxisBankAccountPDFNormalizer.swift`, `Parsers/AxisBankAccountPDFParser.swift`, `Parsers/AxisBankAccountSourceEvidence.swift`, `LedgerForge.xcodeproj/project.pbxproj`, the focused `LedgerForgeTests` files, the two regenerated sanitized PDF fixtures and their manifests, `PROJECT_STATE.md` and `FUTURE_WORK.MD`. No ADR, DTO, repository protocol, schema or migration changed; V9 remains current.
 
 ### Sprint 66 — Typed Confirmed-Import Recovery and Truthful Validation Guidance
 
@@ -914,10 +972,10 @@ Detailed implementation history remains in Git and accepted ADRs.
 
 ## Current Planning State
 
-- The current planning alignment is based on the single Sprint 66 completion commit containing this state update, completed Sprints 50–64 and Sprint 66, completed DBP-01 Debug development tooling, Migration V9 and accepted ADR-041.
+- The current planning alignment is based on the Sprint 65 acceptance recorded in this state update, the highest-numbered Sprint 66 completion, completed Sprints 50–64, completed DBP-01 Debug development tooling, Migration V9 and accepted ADR-041.
 - DBP-01 is complete and no DBP-01 implementation remains pending. It is a separate post-Sprint-64 Debug tooling increment, not a numbered sprint or Sprint 65; no sprint renumbering occurred.
 - Sprint 63 implementation of the ADR-041 source-snapshot and source-byte foundation is complete; no source-snapshot implementation remains in the unscheduled queue.
-- `FW-P1-10 — Production PDF Statement Support` is blocked after Sprint 64 discovery by the named lineage/oracle evidence gap. Sprint 65 implementation is blocked; production PDF, OCR, password workflow, generic Axis PDF support and cross-format equivalence remain unsupported.
+- `FW-P1-10 — Production PDF Statement Support` is completed and removed from the unscheduled queue by Sprint 65 for the selected exact account-neutral Axis bank-account grammar. Other Axis PDF layouts, OCR, password workflow, generic Axis PDF support and cross-format equivalence remain unsupported.
 - `FW-P1-16` remains blocked until two equivalent formats are independently production-supported and a separate equivalence architecture is accepted.
 - `FW-P1-40 — Deterministic Approved-Fixture Launcher` was completed by Sprint 58 and is removed from the unscheduled queue.
 - `FW-P1-37` retains only broader structured diagnostics work not completed by Sprint 58; its bounded privacy-safe preparation-failure summary and Developer Console fixture-workflow slice is complete.
@@ -928,7 +986,7 @@ Detailed implementation history remains in Git and accepted ADRs.
 - `FW-P2-21 — Deterministic Categorization Rules` is now eligible for bounded discovery; no rule behavior is implemented or authorized.
 - Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
 - `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.
-- Sprint 66 is the latest completed numbered outcome. Sprint 65 remains blocked by the Sprint 64 PDF lineage and independent-oracle evidence gap, production PDF support remains unsupported and no Sprint 65 implementation prompt is authorized.
+- Sprint 65 is the latest chronologically accepted production implementation; Sprint 66 remains the highest-numbered completed outcome. The selected PDF boundary is accepted, while broader PDF layouts, OCR, password workflow and cross-format equivalence remain unscheduled or blocked.
 
 ---
 

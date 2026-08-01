@@ -16,7 +16,8 @@ final class StatementParserRegistry {
 
         parsers = [
 
-            AxisBankAccountParser()
+            AxisBankAccountParser(),
+            AxisBankAccountPDFParser()
 
         ]
 
