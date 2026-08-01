@@ -720,7 +720,8 @@ final class RepositoryStoreHydrator {
             statementTimezoneEvidence: timezoneEvidence,
             sourceProvenance: provenance,
             repositoryAccountId: dto.accountId,
-            repositoryImportSessionId: dto.importSessionId
+            repositoryImportSessionId: dto.importSessionId,
+            repositoryDocumentId: dto.documentId
         )
     }
 

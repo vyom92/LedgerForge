@@ -221,6 +221,214 @@ struct TransactionListViewModelTests {
     }
 
     @MainActor
+    @Test
+    func completeDurableRelationshipsProduceAuthoritativeTransactionDetail() throws {
+        let transactionStore = TransactionStore()
+        let importSessionStore = ImportSessionStore()
+        let transaction = detailTransaction()
+        transactionStore.replaceTransactions([transaction], validation: .empty)
+        importSessionStore.replaceImportSessions([detailSession()])
+        let viewModel = TransactionListViewModel(
+            transactionStore: transactionStore,
+            importSessionStore: importSessionStore
+        )
+
+        let presentation = viewModel.detailPresentation(for: transaction)
+
+        #expect(presentation.signedAmount == MoneyFormatting.signedDisplay(transaction.money, isCredit: true))
+        #expect(presentation.nativeCurrency == "INR")
+        #expect(presentation.direction == "Credit")
+        #expect(presentation.statementDate == "14 Nov 23")
+        #expect(presentation.statementDateRole == "Value date")
+        #expect(presentation.accountDisplayName == "Everyday account")
+        #expect(presentation.institution == "Axis Bank")
+        #expect(presentation.sourceDocumentName == "July statement.pdf")
+        #expect(presentation.importedAt != nil)
+        #expect(presentation.importedAtText != "Unavailable")
+        #expect(presentation.validation?.title == "Passed")
+        #expect(presentation.validation?.detail == "This imported transaction passed validation.")
+        #expect(presentation.runningBalance == MoneyFormatting.display(try Money(amount: Decimal(string: "1234.56")!, currency: "INR")))
+        #expect(presentation.provenanceAvailability == .complete)
+    }
+
+    @MainActor
+    @Test
+    func documentPresentationRequiresDurableDocumentRelationship() {
+        let transactionStore = TransactionStore()
+        let importSessionStore = ImportSessionStore()
+        let transaction = detailTransaction(repositoryDocumentId: nil)
+        transactionStore.replaceTransactions([transaction], validation: .empty)
+        importSessionStore.replaceImportSessions([detailSession()])
+        let viewModel = TransactionListViewModel(
+            transactionStore: transactionStore,
+            importSessionStore: importSessionStore
+        )
+
+        let presentation = viewModel.detailPresentation(for: transaction)
+
+        #expect(presentation.sourceDocumentName == "Unavailable")
+        #expect(presentation.importedAt != nil)
+        #expect(presentation.validation?.title == "Passed")
+        #expect(presentation.provenanceAvailability == .partial)
+    }
+
+    @MainActor
+    @Test
+    func missingReferencedSessionNeverSubstitutesAnUnrelatedSession() {
+        let transactionStore = TransactionStore()
+        let importSessionStore = ImportSessionStore()
+        let transaction = detailTransaction(repositoryImportSessionId: "missing-session")
+        transactionStore.replaceTransactions([transaction], validation: .empty)
+        importSessionStore.replaceImportSessions([
+            detailSession(id: "unrelated-session", sourceDocumentName: "Unrelated statement.csv")
+        ])
+        let viewModel = TransactionListViewModel(
+            transactionStore: transactionStore,
+            importSessionStore: importSessionStore
+        )
+
+        let presentation = viewModel.detailPresentation(for: transaction)
+
+        #expect(presentation.sourceDocumentName == "Unavailable")
+        #expect(presentation.importedAt == nil)
+        #expect(presentation.importedAtText == "Unavailable")
+        #expect(presentation.validation == nil)
+        #expect(!presentation.accessibilityText.contains("Unrelated statement.csv"))
+    }
+
+    @MainActor
+    @Test
+    func malformedImportTimestampAndUnknownValidationFailClosed() {
+        let transactionStore = TransactionStore()
+        let importSessionStore = ImportSessionStore()
+        let transaction = detailTransaction()
+        transactionStore.replaceTransactions([transaction], validation: .empty)
+        importSessionStore.replaceImportSessions([
+            detailSession(completedAtISO: "not-a-timestamp", validationStatus: "unexpected")
+        ])
+        let viewModel = TransactionListViewModel(
+            transactionStore: transactionStore,
+            importSessionStore: importSessionStore
+        )
+
+        let presentation = viewModel.detailPresentation(for: transaction)
+
+        #expect(presentation.sourceDocumentName == "July statement.pdf")
+        #expect(presentation.importedAt == nil)
+        #expect(presentation.importedAtText == "Unavailable")
+        #expect(presentation.validation == nil)
+        #expect(presentation.provenanceAvailability == .partial)
+    }
+
+    @MainActor
+    @Test
+    func conflictingMatchingSessionsFailClosedWithoutChoosingOne() {
+        let transactionStore = TransactionStore()
+        let importSessionStore = ImportSessionStore()
+        let transaction = detailTransaction()
+        transactionStore.replaceTransactions([transaction], validation: .empty)
+        importSessionStore.replaceImportSessions([
+            detailSession(sourceDocumentName: "First statement.pdf"),
+            detailSession(sourceDocumentName: "Second statement.pdf")
+        ])
+        let viewModel = TransactionListViewModel(
+            transactionStore: transactionStore,
+            importSessionStore: importSessionStore
+        )
+
+        let presentation = viewModel.detailPresentation(for: transaction)
+
+        #expect(presentation.sourceDocumentName == "Unavailable")
+        #expect(presentation.importedAt == nil)
+        #expect(presentation.validation == nil)
+        #expect(!presentation.accessibilityText.contains("First statement.pdf"))
+        #expect(!presentation.accessibilityText.contains("Second statement.pdf"))
+    }
+
+    @MainActor
+    @Test
+    func internalIdentifiersAndParserEvidenceNeverEnterDetailText() {
+        let transactionStore = TransactionStore()
+        let importSessionStore = ImportSessionStore()
+        let transaction = detailTransaction()
+        transactionStore.replaceTransactions([transaction], validation: .empty)
+        importSessionStore.replaceImportSessions([detailSession()])
+        let viewModel = TransactionListViewModel(
+            transactionStore: transactionStore,
+            importSessionStore: importSessionStore
+        )
+        let presentation = viewModel.detailPresentation(for: transaction)
+        let presentedText = [
+            presentation.description,
+            presentation.signedAmount,
+            presentation.nativeCurrency,
+            presentation.direction,
+            presentation.statementDate,
+            presentation.statementDateRole,
+            presentation.accountDisplayName,
+            presentation.institution,
+            presentation.sourceDocumentName,
+            presentation.importedAtText,
+            presentation.validation?.title ?? "",
+            presentation.validation?.detail ?? "",
+            presentation.runningBalance,
+            presentation.provenanceAvailability.title,
+            presentation.accessibilityText
+        ].joined(separator: " ")
+
+        for prohibited in [
+            "repository-transaction-internal",
+            "repository-account-internal",
+            "repository-document-internal",
+            "repository-session-internal",
+            "normalized-document-internal",
+            "normalized-row-internal",
+            "record-digest-internal",
+            "raw-parser-profile-internal",
+            "internal-source-path-sentinel"
+        ] {
+            #expect(!presentedText.contains(prohibited), "Unexpected internal presentation: \(prohibited)")
+        }
+    }
+
+    @MainActor
+    @Test
+    func historicalTransactionWithoutDurableProvenanceRemainsUsableAndNeutral() {
+        let transactionStore = TransactionStore()
+        let importSessionStore = ImportSessionStore()
+        let transaction = Transaction(
+            statementDate: try! StatementDate(canonical: "2023-11-14"),
+            description: "Historical adjustment",
+            debit: 25,
+            credit: nil,
+            amount: -25,
+            balance: nil,
+            currency: "INR",
+            account: "Legacy account label",
+            sourceBank: "Legacy institution label",
+            sourceFile: "legacy.csv"
+        )
+        transactionStore.replaceTransactions([transaction], validation: .empty)
+        let viewModel = TransactionListViewModel(
+            transactionStore: transactionStore,
+            importSessionStore: importSessionStore
+        )
+
+        let presentation = viewModel.detailPresentation(for: transaction)
+
+        #expect(presentation.signedAmount == MoneyFormatting.signedDisplay(transaction.money, isCredit: false))
+        #expect(presentation.direction == "Debit")
+        #expect(presentation.statementDate == "14 Nov 23")
+        #expect(presentation.accountDisplayName == "Unavailable")
+        #expect(presentation.institution == "Unavailable")
+        #expect(presentation.sourceDocumentName == "Unavailable")
+        #expect(presentation.importedAt == nil)
+        #expect(presentation.validation == nil)
+        #expect(presentation.runningBalance == "Unavailable")
+        #expect(presentation.provenanceAvailability == .unavailable)
+    }
+
+    @MainActor
     private func waitForViewModelUpdate() async {
         await withCheckedContinuation { continuation in
             DispatchQueue.main.async {
@@ -305,5 +513,54 @@ private func validationSession(id: String, status: String) -> RepositoryImportSe
         completedAtISO: "2026-07-20T00:01:00Z",
         validationStatus: status,
         parserVersion: "Parser"
+    )
+}
+
+private func detailTransaction(
+    repositoryImportSessionId: String? = "repository-session-internal",
+    repositoryDocumentId: String? = "repository-document-internal"
+) -> Transaction {
+    Transaction(
+        statementDate: try! StatementDate(canonical: "2023-11-14"),
+        description: "Salary credit",
+        debit: nil,
+        credit: Decimal(string: "234.56")!,
+        amount: Decimal(string: "234.56")!,
+        balance: Decimal(string: "1234.56")!,
+        currency: "INR",
+        account: "Everyday account",
+        sourceBank: "Axis Bank",
+        sourceFile: "internal-source-path-sentinel",
+        repositoryTransactionId: "repository-transaction-internal",
+        financialDateRole: .valueDate,
+        statementTimezoneEvidence: .iana("Asia/Kolkata"),
+        sourceProvenance: [TransactionSourceProvenance(
+            normalizedDocumentID: "normalized-document-internal",
+            normalizedRowID: "normalized-row-internal",
+            sourceOrdinal: 9,
+            normalizedRecordDigest: "record-digest-internal",
+            parserProfileID: "raw-parser-profile-internal",
+            parserProfileVersion: "99"
+        )],
+        repositoryAccountId: "repository-account-internal",
+        repositoryImportSessionId: repositoryImportSessionId,
+        repositoryDocumentId: repositoryDocumentId
+    )
+}
+
+private func detailSession(
+    id: String = "repository-session-internal",
+    sourceDocumentName: String? = "July statement.pdf",
+    completedAtISO: String? = "2026-07-20T00:01:00Z",
+    validationStatus: String = "passed"
+) -> RepositoryImportSession {
+    RepositoryImportSession(
+        id: id,
+        workspaceId: "workspace",
+        sourceDocumentName: sourceDocumentName,
+        startedAtISO: "2026-07-20T00:00:00Z",
+        completedAtISO: completedAtISO,
+        validationStatus: validationStatus,
+        parserVersion: "raw-parser-profile-internal"
     )
 }

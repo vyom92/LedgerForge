@@ -92,6 +92,7 @@ struct RepositoryStoreHydratorTests {
         #expect(stores.accounts.accounts.first?.workspaceId == "workspace-dashboard")
         #expect(stores.transactions.transactions.first?.repositoryAccountId == "account-dashboard")
         #expect(stores.transactions.transactions.first?.repositoryImportSessionId == "import-dashboard")
+        #expect(stores.transactions.transactions.first?.repositoryDocumentId == "document-dashboard")
         #expect(stores.transactions.transactions.first?.repositoryTransactionId == "transaction-trusted")
         #expect(stores.importSessions.importSessions.map(\.id) == ["import-dashboard"])
 
@@ -165,6 +166,8 @@ struct RepositoryStoreHydratorTests {
 
         #expect(initial.repositoryTransactionId == "transaction-trusted")
         #expect(refreshed.repositoryTransactionId == "transaction-trusted")
+        #expect(initial.repositoryDocumentId == "document-dashboard")
+        #expect(refreshed.repositoryDocumentId == "document-dashboard")
         #expect(initial.id == refreshed.id)
     }
 
@@ -185,6 +188,42 @@ struct RepositoryStoreHydratorTests {
         #expect(stores.transactions.transactions.first?.description == "Trusted credit")
         #expect(stores.transactions.transactions.first?.credit == Decimal(25))
         #expect(stores.transactions.transactions.first?.account == "Axis NRE")
+        #expect(stores.transactions.transactions.first?.repositoryDocumentId == "document-dashboard")
+    }
+
+    @Test func legacyTransactionWithoutDocumentRelationshipRemainsReadable() throws {
+        let provider = try seededProvider()
+        let stores = RuntimeStores()
+        let hydrator = makeHydrator(
+            provider: provider,
+            stores: stores,
+            transactionRepo: HydrationFixtureTransactionRepo(
+                transactions: [trustedTransaction(documentId: nil)]
+            )
+        )
+
+        let result = try hydrator.hydrateIfNeeded()
+
+        #expect(result.didHydrate)
+        #expect(stores.transactions.transactions.count == 1)
+        #expect(stores.transactions.transactions.first?.repositoryDocumentId == nil)
+    }
+
+    @Test func forcedHydrationValidationFailurePreservesPublishedDocumentRelationship() throws {
+        let provider = try seededProvider()
+        let stores = RuntimeStores()
+        let transactionRepo = HydrationFixtureTransactionRepo(transactions: [trustedTransaction()])
+        let hydrator = makeHydrator(provider: provider, stores: stores, transactionRepo: transactionRepo)
+        _ = try hydrator.hydrateIfNeeded()
+        let before = stores.transactions.transactions.map(HydratedTransactionObservation.init)
+        transactionRepo.transactions = [trustedTransaction(documentId: "replacement-document", amountDecimal: "99.99")]
+
+        #expect(throws: RepositoryStoreHydrationError.self) {
+            _ = try hydrator.hydrateIfNeeded(forceRefresh: true)
+        }
+
+        #expect(stores.transactions.transactions.map(HydratedTransactionObservation.init) == before)
+        #expect(stores.transactions.transactions.first?.repositoryDocumentId == "document-dashboard")
     }
     @Test func hydratorUsesLatestDatedRunningBalanceForAccountBalance() throws {
         let provider = try seededProvider()
@@ -353,6 +392,7 @@ private func seededProvider() throws -> InMemoryRepositoryProvider {
 
 private func trustedTransaction(
     id: String = "transaction-trusted",
+    documentId: String? = "document-dashboard",
     amountMinor: Int64 = 100_00,
     runningBalanceMinor: Int64 = 1_050_00,
     postedDateISO: String = "2026-07-08",
@@ -366,6 +406,7 @@ private func trustedTransaction(
         workspaceId: "workspace-dashboard",
         accountId: "account-dashboard",
         importSessionId: "import-dashboard",
+        documentId: documentId,
         postedDateISO: postedDateISO,
         financialDateRole: financialDateRole,
         statementTimezoneEvidence: statementTimezoneEvidence,
@@ -418,6 +459,7 @@ private struct HydratedTransactionObservation: Equatable {
     let sourceFile: String
     let repositoryAccountId: String?
     let repositoryImportSessionId: String?
+    let repositoryDocumentId: String?
 
     init(_ transaction: Transaction) {
         id = transaction.id
@@ -434,6 +476,7 @@ private struct HydratedTransactionObservation: Equatable {
         sourceFile = transaction.sourceFile
         repositoryAccountId = transaction.repositoryAccountId
         repositoryImportSessionId = transaction.repositoryImportSessionId
+        repositoryDocumentId = transaction.repositoryDocumentId
     }
 }
 

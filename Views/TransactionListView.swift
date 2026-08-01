@@ -241,86 +241,120 @@ struct TransactionListView: View {
 
     private var transactionDetailPanel: some View {
         LFPanel {
-            VStack(alignment: .leading, spacing: 16) {
-                if let selected = selectedTransaction {
-                    HStack(spacing: 12) {
-                        Image(systemName: selected.credit != nil ? "arrow.down" : "arrow.up")
-                            .foregroundStyle(selected.credit != nil ? LFTheme.success : LFTheme.danger)
-                            .frame(width: 46, height: 46)
-                            .background((selected.credit != nil ? LFTheme.success : LFTheme.danger).opacity(0.13))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(selected.description)
-                                .font(.headline)
-                                .lineLimit(2)
-                            Text(formatSigned(selected))
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(selected.credit != nil ? LFTheme.success : LFTheme.danger)
-                                .monospacedDigit()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    if let selected = selectedTransaction {
+                        let presentation = viewModel.detailPresentation(for: selected)
+                        HStack(spacing: 12) {
+                            Image(systemName: presentation.direction == "Credit" ? "arrow.down" : "arrow.up")
+                                .foregroundStyle(presentation.direction == "Credit" ? LFTheme.success : LFTheme.danger)
+                                .frame(width: 46, height: 46)
+                                .background((presentation.direction == "Credit" ? LFTheme.success : LFTheme.danger).opacity(0.13))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(presentation.description)
+                                    .font(.headline)
+                                    .lineLimit(2)
+                                Text(presentation.signedAmount)
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundStyle(presentation.direction == "Credit" ? LFTheme.success : LFTheme.danger)
+                                    .monospacedDigit()
+                            }
+                            Spacer()
+                            Image(systemName: "star")
+                                .foregroundStyle(LFTheme.textSecondary)
                         }
-                        Spacer()
-                        Image(systemName: "star")
-                            .foregroundStyle(LFTheme.textSecondary)
-                    }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(presentation.accessibilityText)
 
-                    if let validation = viewModel.validationPresentation(for: selected) {
-                        LFStatusBadge(
-                            title: validation.title,
-                            color: validation.isPassed ? LFTheme.success : LFTheme.warning
-                        )
-                    }
+                        detailSection("Transaction") {
+                            LFInfoRow(title: "Direction", value: presentation.direction, titleWidth: 100, verticalPadding: 0)
+                            LFInfoRow(title: presentation.statementDateRole, value: presentation.statementDate, titleWidth: 100, verticalPadding: 0)
+                            LFInfoRow(title: "Description", value: presentation.description, titleWidth: 100, verticalPadding: 0)
+                            LFInfoRow(title: "Native currency", value: presentation.nativeCurrency, titleWidth: 100, verticalPadding: 0)
+                            LFInfoRow(title: "Balance After", value: presentation.runningBalance, titleWidth: 100, verticalPadding: 0)
+                        }
 
-                    Divider().overlay(LFTheme.divider)
+                        detailSection("Account and category") {
+                            LFInfoRow(title: "Account", value: presentation.accountDisplayName, titleWidth: 100, verticalPadding: 0)
+                            LFInfoRow(title: "Institution", value: presentation.institution, titleWidth: 100, verticalPadding: 0)
+                            categoryPicker(for: selected, titleWidth: 100)
+                        }
 
-                    LFInfoRow(title: "Date", value: formatDate(selected.statementDate), titleWidth: 86, verticalPadding: 0)
-                    LFInfoRow(title: "Account", value: selected.account, titleWidth: 86, verticalPadding: 0)
-                    categoryPicker(for: selected)
-                    LFInfoRow(title: "Type", value: selected.credit != nil ? "Credit" : "Debit", titleWidth: 86, verticalPadding: 0)
-                    LFInfoRow(title: "Description", value: selected.description, titleWidth: 86, verticalPadding: 0)
-                    LFInfoRow(title: "Source", value: selected.sourceBank, titleWidth: 86, verticalPadding: 0)
-                    LFInfoRow(title: "Balance After", value: selected.runningBalanceMoney.map { MoneyFormatting.display($0) } ?? "—", titleWidth: 86, verticalPadding: 0)
+                        detailSection("Import provenance") {
+                            LFInfoRow(title: "Availability", value: presentation.provenanceAvailability.title, titleWidth: 100, verticalPadding: 0)
+                            LFInfoRow(title: "Source document", value: presentation.sourceDocumentName, titleWidth: 100, verticalPadding: 0)
+                            LFInfoRow(title: "Imported", value: presentation.importedAtText, titleWidth: 100, verticalPadding: 0)
+                        }
 
-                    if let categoryMessage {
-                        Text(categoryMessage)
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.warning)
-                    }
+                        detailSection("Validation") {
+                            if let validation = presentation.validation {
+                                LFStatusBadge(
+                                    title: validation.title,
+                                    color: validation.isPassed ? LFTheme.success : LFTheme.warning
+                                )
+                                Text(validation.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(LFTheme.textSecondary)
+                            } else {
+                                LFInfoRow(title: "Outcome", value: "Unavailable", titleWidth: 100, verticalPadding: 0)
+                                Text("Validation is unavailable for this imported transaction.")
+                                    .font(.caption)
+                                    .foregroundStyle(LFTheme.textSecondary)
+                            }
+                        }
 
-                    if categoryReconciliationRequired {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Your category change was saved, but the app could not refresh. Further category changes are temporarily blocked until the repository is refreshed.")
+                        if let categoryMessage {
+                            Text(categoryMessage)
                                 .font(.caption)
                                 .foregroundStyle(LFTheme.warning)
-                            Button("Retry refresh", action: retryCanonicalHydration)
-                                .buttonStyle(.bordered)
                         }
-                    }
 
-                    Divider().overlay(LFTheme.divider)
-
-                    if let validation = viewModel.validationPresentation(for: selected) {
-                        Text("Validation")
-                            .font(.headline)
-                        Text(validation.detail)
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
+                        if categoryReconciliationRequired {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Your category change was saved, but the app could not refresh. Further category changes are temporarily blocked until the repository is refreshed.")
+                                    .font(.caption)
+                                    .foregroundStyle(LFTheme.warning)
+                                Button("Retry refresh", action: retryCanonicalHydration)
+                                    .buttonStyle(.bordered)
+                            }
+                        }
+                    } else {
+                        VStack(spacing: 12) {
+                            Image(systemName: "cursorarrow.click")
+                                .font(.system(size: 34))
+                                .foregroundStyle(LFTheme.primaryHover)
+                            Text("Select a transaction")
+                                .font(.headline)
+                            Text("Details appear here without leaving the transaction table.")
+                                .font(.caption)
+                                .foregroundStyle(LFTheme.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 260)
                     }
-                } else {
-                    VStack(spacing: 12) {
-                        Image(systemName: "cursorarrow.click")
-                            .font(.system(size: 34))
-                            .foregroundStyle(LFTheme.primaryHover)
-                        Text("Select a transaction")
-                            .font(.headline)
-                        Text("Details appear here without leaving the transaction table.")
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 260)
                 }
             }
         }
+    }
+
+    private func detailSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+            content()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LFTheme.surfaceRaised.opacity(0.7))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(LFTheme.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private var selectedTransaction: Transaction? {
@@ -393,11 +427,11 @@ struct TransactionListView: View {
         .buttonStyle(.plain)
     }
 
-    private func categoryPicker(for transaction: Transaction) -> some View {
+    private func categoryPicker(for transaction: Transaction, titleWidth: CGFloat = 86) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text("Category")
                 .foregroundStyle(LFTheme.textSecondary)
-                .frame(width: 86, alignment: .leading)
+                .frame(width: titleWidth, alignment: .leading)
             Picker(
                 "Category",
                 selection: Binding<String?>(

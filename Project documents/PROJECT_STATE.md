@@ -3,17 +3,17 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current repository implementation baseline:** `main` at the Sprint 65 acceptance commit containing this state update; its exact SHA is Git-authoritative and recorded in the closure report
-- **Documentation alignment:** Reconciled on 2026-08-01 in the Sprint 65 acceptance commit; this document intentionally does not embed its own commit SHA
+- **Current repository implementation baseline:** `main` at the Sprint 67 acceptance commit containing this state update; its exact SHA is Git-authoritative and recorded in the closure report
+- **Documentation alignment:** Reconciled on 2026-08-01 in the Sprint 67 acceptance commit; this document intentionally does not embed its own commit SHA
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration and Sprint 65's clean-room PDF fixture replacement are included in the accepted baseline; no historical financial data was altered
-- **Latest chronologically accepted production implementation:** Sprint 65 shared Axis bank-account PDF import; Sprint 66 remains the highest numbered completed increment
+- **Latest chronologically accepted production implementation:** Sprint 67 transaction provenance and clearer detail
 - **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed numbered increment:** Sprint 66
+- **Latest verified completed numbered increment:** Sprint 67
 - **Accepted Sprint 63 implementation ref:** `7e1345e3817d3c3e91c24f881b962a48279fd73b`
 - **Latest accepted ADR:** ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
 - **Current migration:** V9
@@ -28,6 +28,7 @@
 - **Sprint 65:** Implemented and accepted the exact shared `axis.bank-account.pdf@1` grammar through the ordinary import path. The selected NRE/NRO originals, regenerated sanitized fixtures and independent row-level financial baselines now establish the bounded production boundary; broader Axis PDF layouts remain unsupported.
 - **Sprint 65 blocker reconciliation:** `BLOCK-PDF-LINEAGE-01`, `BLOCK-PDF-ORACLE-BINDING-02`, `UNCERTAINTY-PDF-DETERMINISM-03`, `UNCERTAINTY-PDF-SOURCE-CLASS-04` and `UNCERTAINTY-NRE-NRO-GRAMMAR-05` are closed only for the selected unlocked/selectable-text grammar and its account-neutral NRE/NRO family. They remain open for other layouts, OCR, password-protected documents and generic Axis PDF support.
 - **Sprint 66:** Implemented typed confirmed-import recovery, privacy-safe route-specific guidance, wholly fresh preparation for eligible zero-commit outcomes and bounded canonical reconciliation without changing persistence architecture
+- **Sprint 67:** Preserved the durable imported-document relationship through canonical hydration and added one typed, privacy-safe transaction-detail projection for account, source-document and import-session provenance; missing legacy evidence remains neutral
 - **Sprint 60:** Completed the read-only account-outcome explanation contract across the bounded import workflow; no schema or historical rewrite occurred.
 - **Sprint 61:** Implemented privacy-safe durable account-outcome presentation and explicit eligible no-match account choice. FinancialIdentityResolver behavior is unchanged: parser-produced strong verified identifiers remain the sole identity authority, and eligible no-match cases require explicit Use Existing Account or Create New Account choice. No automatic account selection was introduced. Prospective successful durable account decisions are `matched_existing`, `user_selected_existing` and `created_new`; rejected outcomes include `account_choice_required`, `identifier_ownership_conflict`, `identity_ambiguity`, `identity_conflict`, `stale_account_choice` and `stale_provider_generation`. Historical `selected_existing` and `resolved_or_created` remain neutral and are not reinterpreted. One shared bounded presentation authority serves preparation, immediate result and Import History; hostile and unknown values fail closed to neutral unavailable presentation. Account IDs, candidate IDs, normalized identifiers, suffixes, filenames, paths, fingerprints, raw codes and unrestricted errors are excluded from account-outcome copy and accessibility text. SQLite/In-Memory parity and rejected-path zero accepted residue were verified. No schema or historical rewrite occurred.
 - **Sprint 61 integrated verification:** 466 top-level tests, 498 executions, 39 dynamic-parameter runs, 0 failures and 0 skips; Debug build, explicitly optimized whole-module Release build and Debug analysis passed. Isolated runtime acceptance used the approved sanitized Axis fixture against one fresh namespaced canonical V8 SQLite database. Preview, explicit choice, confirmation, immediate result, live Import History, quit/relaunch and hydration were verified. Runtime persisted and rehydrated 1 account, 4 transactions and 1 durable attempt. The task-owned namespace was removed recoverably after acceptance. No private source or user financial database was used. Manual linking, unlinking, reassignment, repair, account merge/split and raw identifier display remain excluded.
@@ -48,6 +49,9 @@
 - **Canonical development database:** a disposable canonical database was successfully recreated through the registered migration chain at V9; no private database contents are recorded here
 - **Latest Sprint 65 focused result:** 381 tests across 43 suites passed; 0 failures, skips or expected failures; changed-file warnings 0 and analyzer diagnostics 0
 - **Latest Sprint 65 complete-TestPlan result:** 607 tests across 73 suites passed; 0 failures, skips or expected failures; changed-file warnings 0 and analyzer diagnostics 0; 9 pre-existing warnings remained
+- **Latest Sprint 67 focused result:** 36 tests across 3 suites passed with zero failures; hydration, forced refresh, atomic failure preservation, detail presentation, existing filters, confirmed-import recovery and SQLite relaunch coverage were included
+- **Latest Sprint 67 complete-TestPlan result:** 616 tests across 73 suites passed with zero failures; one fresh Debug build passed, with only the pre-existing AppIntents metadata notice and unrelated Swift 6 transition warnings
+- **Sprint 67 runtime verification:** one fresh namespaced V9 SQLite database imported the approved sanitized Axis NRE fixture through the ordinary Debug workflow; selected transaction detail showed authoritative account, institution, source document, import time, Money, direction, statement date, running balance, category and validation before and after quit/relaunch. The database held 1 account, 4 transactions, 1 document and 1 session, with all 4 transactions retaining account/document/session relationships. The task-owned namespace and build artifacts were moved recoverably to Trash.
 - **Latest Axis source-truth automated result:** 426 top-level tests (458 parameterized executions), 0 failures and 0 skips in the complete signed canonical TestPlan before Sprint 65
 - **Latest Axis source-truth focused result:** 41 top-level tests (46 parameterized executions), 0 failures and 0 skips across direction, source-oracle, NRO evidence, overlap-quarantine, shared-profile and direct-provider fail-closed suites using SQLite and In-Memory providers
 - **Latest Axis source-truth build result:** fresh signed Debug and explicitly optimized Release builds plus Debug and Release static analysis pass
@@ -692,6 +696,42 @@ Sprint 66 changed exactly these implementation and test paths:
 #### Exclusions
 
 Sprint 66 did not implement retry confirmation, resume of a consumed preparation, rollback or compensation, persisted recovery jobs, batch importing, automatic confirmation, cancellation after committed persistence, generalized retry infrastructure, schema or migration changes, parser or import-format support, production PDF support, or Sprint 65.
+
+### Sprint 67 — Transaction Provenance and Clearer Detail
+
+**Ref**
+
+The single Sprint 67 acceptance commit containing this state update. Its exact SHA is Git-authoritative and recorded in the closure report.
+
+#### Outcome
+
+Sprint 67 added one repository-backed transaction-detail experience without changing financial semantics, persistence ownership or schema.
+
+#### Verified production behavior
+
+- `TransactionDTO.documentId` now survives ordinary hydration, forced hydration, provider reconstruction and relaunch as immutable runtime `repositoryDocumentId`; `RepositoryStoreHydrator` remains the sole persistence-to-runtime boundary.
+- `TransactionListViewModel` owns one typed projection derived only from the hydrated transaction, its exact matching hydrated import session, Money and trusted statement-date authorities.
+- Account presentation requires the durable account relationship. Source-document presentation requires the durable document relationship, one exact matching import session and nonempty durable document metadata. Import time and validation fail closed independently when malformed, unknown, missing or conflicting.
+- The detail panel retains signed native-currency Money and manual category behavior while presenting bounded Transaction, Account and category, Import provenance and Validation sections. “Direction” and “Institution” replace developer-oriented or ambiguous terminology.
+- Repository, normalized-document and normalized-row IDs, digests, raw parser-profile IDs, paths and source fragments are absent from visible and accessibility text. Historical or synthetic transactions without durable provenance remain readable and present neutral Unavailable states.
+
+#### Authority and compatibility boundary
+
+- Displayed amount and currency come from hydrated `Money`; direction comes from its hydrated debit/credit role; date and role come from `StatementDate` and `FinancialDateRole`; balance comes from hydrated running-balance Money.
+- Account name and institution come from the hydrated transaction only when `repositoryAccountId` exists. Source-document name and import evidence come from the exact hydrated `RepositoryImportSession` only when the required durable relationships exist.
+- No migration or ADR was added. V9 and ADR-041 remain current. No backfill, repair or durable source-byte presentation was performed.
+
+#### Acceptance evidence
+
+- One fresh Debug build passed.
+- The final focused run passed 36 tests across 3 suites with zero failures. It covered document-ID mapping, forced hydration, legacy nil compatibility, atomic failure preservation, complete and unavailable detail projections, conflicting and unrelated sessions, malformed timestamps, unknown validation, internal-text exclusion, search/toggles, confirmed-import recovery and SQLite relaunch reconstruction.
+- The single final canonical TestPlan run passed 616 tests across 73 suites with zero failures.
+- Isolated runtime acceptance imported the approved sanitized Axis NRE fixture into one fresh namespaced SQLite database, verified the complete selected-transaction detail and accessibility truth, quit and relaunched, then verified the same hydrated provenance. Bounded SQLite inspection found 1 account, 4 transactions, 1 document and 1 session; all 4 transactions retained nonnull account, document and session relationships.
+- The task-owned app process was stopped. The namespace, DerivedData and logs were moved recoverably to Trash. No private source, user database, generated result bundle or repository identifier entered Git or presentation.
+
+#### Scope and exclusions
+
+Sprint 67 changed the runtime transaction model, canonical hydrator, transaction-list presentation authority and view, focused hydration/presentation/relaunch tests, and this bounded state/queue reconciliation. It did not add source-document reopening, raw source retention, a document library, editable imported values, notes, tags, splits, provenance mutation, account relationship mutation, automatic categorization, new filters, analytics, dashboard work, diagnostics persistence, backup/restore, a migration or an ADR.
 
 ### DBP-01 — Developer Database Profiles (Debug Development Tooling)
 

@@ -179,6 +179,7 @@ struct Transaction: Identifiable {
     /// Immutable persistence references retained exclusively through repository hydration.
     var repositoryAccountId: String? = nil
     var repositoryImportSessionId: String? = nil
+    let repositoryDocumentId: String?
     var verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
 
     init(
@@ -198,6 +199,7 @@ struct Transaction: Identifiable {
         sourceProvenance: [TransactionSourceProvenance] = [],
         repositoryAccountId: String? = nil,
         repositoryImportSessionId: String? = nil,
+        repositoryDocumentId: String? = nil,
         verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
     ) {
         self.id = id
@@ -216,6 +218,7 @@ struct Transaction: Identifiable {
         self.sourceFile = sourceFile
         self.repositoryAccountId = repositoryAccountId
         self.repositoryImportSessionId = repositoryImportSessionId
+        self.repositoryDocumentId = repositoryDocumentId
         self.verifiedAxisUPIEventEvidence = verifiedAxisUPIEventEvidence
     }
 
@@ -237,6 +240,7 @@ struct Transaction: Identifiable {
         sourceProvenance: [TransactionSourceProvenance] = [],
         repositoryAccountId: String? = nil,
         repositoryImportSessionId: String? = nil,
+        repositoryDocumentId: String? = nil,
         verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
     ) {
         let postedMoney = try! Money(amount: amount, currency: currency)
@@ -257,6 +261,7 @@ struct Transaction: Identifiable {
             sourceProvenance: sourceProvenance,
             repositoryAccountId: repositoryAccountId,
             repositoryImportSessionId: repositoryImportSessionId,
+            repositoryDocumentId: repositoryDocumentId,
             verifiedAxisUPIEventEvidence: verifiedAxisUPIEventEvidence
         )
     }

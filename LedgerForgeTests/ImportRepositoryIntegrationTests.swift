@@ -586,6 +586,7 @@ struct ImportRepositoryIntegrationTests {
         #expect(persistence.persisted)
         let persistedTransactions = try initialProvider.transactionRepo.trustedTransactions(workspaceId: "workspace-import-integration")
         let persistedIDs = persistedTransactions.map(\.id)
+        let persistedDocumentIDs = persistedTransactions.map(\.documentId)
         let persistedProvenance = persistedTransactions.map { transaction in
             transaction.rawRows.map { raw in
                 TransactionSourceProvenance(
@@ -624,6 +625,7 @@ struct ImportRepositoryIntegrationTests {
         #expect(AccountStore.shared.accounts.first?.institution == "Axis Bank")
         #expect(TransactionStore.shared.transactions.count == 2)
         #expect(TransactionStore.shared.transactions.map(\.repositoryTransactionId) == persistedIDs.map(Optional.some))
+        #expect(TransactionStore.shared.transactions.map(\.repositoryDocumentId) == persistedDocumentIDs)
         #expect(TransactionStore.shared.transactions.allSatisfy { !$0.account.contains(".csv") })
         #expect(TransactionStore.shared.transactions.allSatisfy { $0.sourceBank == "Axis Bank" })
         #expect(TransactionStore.shared.transactions.map { $0.statementDate?.canonical } == persistedTransactions.map { Optional($0.postedDateISO) })
@@ -634,6 +636,7 @@ struct ImportRepositoryIntegrationTests {
         let forced = try hydrator.hydrateIfNeeded(forceRefresh: true)
         #expect(forced.didHydrate)
         #expect(TransactionStore.shared.transactions.map(\.repositoryTransactionId) == persistedIDs.map(Optional.some))
+        #expect(TransactionStore.shared.transactions.map(\.repositoryDocumentId) == persistedDocumentIDs)
         #expect(TransactionStore.shared.transactions.map(\.sourceProvenance) == persistedProvenance)
     }
 

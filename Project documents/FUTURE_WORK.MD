@@ -1193,23 +1193,14 @@ Persistent diagnostics must not become an application persistence mechanism or a
 
 # P2 — Transaction Experience and Reconciliation
 
-## FW-P2-01 — Transaction Source and Provenance View
+## FW-P2-01 — Source-Document Reopening
 
-**Status:** Ready for planning
-**Depends on:** Trusted document and import-session relationships
+**Status:** Candidate
+**Depends on:** Approved document-library and source-retention architecture
 
-Show the account, source document and import session from which a transaction originated.
+Sprint 67 completed read-only transaction-detail presentation of authoritative account, source-document and import-session provenance through hydrated durable relationships.
 
-The approved durable-attempt-history increment exposes trusted provenance only within import-attempt history and detail. Dedicated transaction-detail provenance and broader source-document presentation remain future work.
-
----
-
-## FW-P2-02 — Improved Transaction Detail Layout
-
-**Status:** Ready for planning
-**Depends on:** None
-
-Use the available detail space more effectively and remove developer-oriented terminology.
+Only source-document reopening, browsing or library behavior remains here. It requires a separately approved architecture and privacy boundary; filenames, raw source bytes, paths and display labels must not become durable identity.
 
 ---
 
