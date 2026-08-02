@@ -3,8 +3,8 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current repository implementation baseline:** `main` at the Sprint 68A residual truthful UI correction commit containing this state update; its exact SHA is Git-authoritative and recorded in the closure report
-- **Documentation alignment:** Reconciled on 2026-08-01 in the Sprint 68A closure commit; this document intentionally does not embed its own commit SHA
+- **Current repository implementation baseline:** `main` at the accepted Sprint 69 closure `6873d6c50e63042819a41b859254ff149a8bda3d`; this document intentionally does not embed the later documentation-cycle-close commit SHA
+- **Documentation alignment:** Reconciled after accepted Sprint 68B, the DBP-01 maintenance correction and Sprint 69; Git remains authoritative for the documentation-cycle-close ref
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration and Sprint 65's clean-room PDF fixture replacement are included in the accepted baseline; no historical financial data was altered
 - **Latest chronologically accepted production implementation:** Sprint 68A residual truthful UI correction
 - **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `2d86f91dc46b9e88bcdfea65c88ddf671968b388`
@@ -13,7 +13,7 @@
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed numbered increment:** Sprint 68A
+- **Latest verified completed numbered increment:** Sprint 69 — deterministic macOS validation entry points and local cycle-close
 - **Accepted Sprint 63 implementation ref:** `7e1345e3817d3c3e91c24f881b962a48279fd73b`
 - **Latest accepted ADR:** ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
 - **Current migration:** V9
@@ -33,6 +33,10 @@
 - **Sprint 68:** Removed future-module navigation, global and account placeholder search/filter chrome, disabled transaction ranges and inert row affordances, unsupported dashboard spending/trend presentation, the misleading Add Account action and unimplemented drag-and-drop copy. Repository-backed balances, native-currency transaction summaries, account editing, transaction search/toggles/category assignment, ordinary import workflow and Developer Mode containment remain.
 - **Sprint 68 privacy boundary:** Production diagnostic emitters now use fixed messages, typed outcomes, enum values and counts; generic preparation/persistence failures fail closed to bounded presentation. Raw parser names, delimiter/encoding context and unrecognized account-identifier schemes do not reach Developer Console presentation, metadata or copied text.
 - **Sprint 68A:** Corrected residual truthful UI from Sprint 68 by replacing the idle Validation Review's four fabricated Pending rows with one neutral empty state, removing the `Awaiting confirmation` footer pseudo-action, the static profile dropdown chevron, dashboard account-row chevrons and the account-detail favourite star. Real validation results, confirmation gating, retry and transaction actions, account editing, transaction search/toggles/category assignment, ordinary import and Developer Mode containment remain.
+- **Sprint 68B:** Test-only correction to Sprint 68's bounded persistence-error contract. The generic public wrapper message remains, while typed identity outcomes and durable-attempt authority remain preserved.
+- **DBP-01 maintenance correction:** Test lifecycle ownership was corrected so successful prepared imports have explicit terminal ownership and shared lifecycle-gate tests use target-wide isolation. It changed no production lifecycle behaviour, migration or ADR.
+- **Sprint 69 repository interface:** `./script/validate.sh`, `./script/build_and_run.sh` and the Codex Run action are repository-verified local interfaces at the Sprint 69 baseline. The action invokes `./script/build_and_run.sh --verify`.
+- **Sprint 69 acceptance-evidence classification:** The scripts, configuration and tests are repository-verifiable at the baseline; the build, test, process and runtime results recorded below are reported local execution evidence and were not re-executed by this documentation-only update.
 - **Sprint 60:** Completed the read-only account-outcome explanation contract across the bounded import workflow; no schema or historical rewrite occurred.
 - **Sprint 61:** Implemented privacy-safe durable account-outcome presentation and explicit eligible no-match account choice. FinancialIdentityResolver behavior is unchanged: parser-produced strong verified identifiers remain the sole identity authority, and eligible no-match cases require explicit Use Existing Account or Create New Account choice. No automatic account selection was introduced. Prospective successful durable account decisions are `matched_existing`, `user_selected_existing` and `created_new`; rejected outcomes include `account_choice_required`, `identifier_ownership_conflict`, `identity_ambiguity`, `identity_conflict`, `stale_account_choice` and `stale_provider_generation`. Historical `selected_existing` and `resolved_or_created` remain neutral and are not reinterpreted. One shared bounded presentation authority serves preparation, immediate result and Import History; hostile and unknown values fail closed to neutral unavailable presentation. Account IDs, candidate IDs, normalized identifiers, suffixes, filenames, paths, fingerprints, raw codes and unrestricted errors are excluded from account-outcome copy and accessibility text. SQLite/In-Memory parity and rejected-path zero accepted residue were verified. No schema or historical rewrite occurred.
 - **Sprint 61 integrated verification:** 466 top-level tests, 498 executions, 39 dynamic-parameter runs, 0 failures and 0 skips; Debug build, explicitly optimized whole-module Release build and Debug analysis passed. Isolated runtime acceptance used the approved sanitized Axis fixture against one fresh namespaced canonical V8 SQLite database. Preview, explicit choice, confirmation, immediate result, live Import History, quit/relaunch and hydration were verified. Runtime persisted and rehydrated 1 account, 4 transactions and 1 durable attempt. The task-owned namespace was removed recoverably after acceptance. No private source or user financial database was used. Manual linking, unlinking, reassignment, repair, account merge/split and raw identifier display remain excluded.
@@ -69,9 +73,9 @@
 - **Latest Axis source-truth focused result:** 41 top-level tests (46 parameterized executions), 0 failures and 0 skips across direction, source-oracle, NRO evidence, overlap-quarantine, shared-profile and direct-provider fail-closed suites using SQLite and In-Memory providers
 - **Latest Axis source-truth build result:** fresh signed Debug and explicitly optimized Release builds plus Debug and Release static analysis pass
 - **Private-source verification:** Sprint 65 exercised four original PDF/CSV pairs through separate fresh signed-app profiles, explicit confirmation and quit/relaunch hydration. Redacted results: NRE1 PDF 46 rows versus CSV 47 with matching first 46 ordered projections and one non-duplicate CSV row outside the PDF date range; NRE2 49/49 full projection, identity and summary parity; NRO1 PDF 16 versus CSV 17 with matching first 16 ordered projections and one non-duplicate CSV row outside the PDF date range; NRO2 20/20 full projection, identity and summary parity. Original PDF parser success is the hard acceptance authority. No private source value, path, filename, database or copied evidence entered Git, documentation, result bundles, diagnostics or build products.
-- **Latest recorded automated result:** 433 top-level tests (465 parameterized executions), 0 failures and 0 skips in the complete signed canonical TestPlan for category reconciliation closure
+- **Latest reported local automated result:** Sprint 69's canonical complete TestPlan recorded 628/628 tests passed with zero failures and zero skips
 - **Latest focused category-reconciliation result:** 71 top-level tests (86 parameterized executions), 0 failures and 0 skips across category, hydrator, import-hydration, development-lifecycle and migration-integrity suites
-- **Latest recorded build result:** fresh signed Debug and explicitly optimized whole-module Release builds plus Debug and Release static analysis passed for the category reconciliation closure
+- **Latest reported local build result:** Sprint 69 fresh Debug and Release builds passed before the reported canonical TestPlan result
 - **Post-Sprint 57 runtime verification:** an isolated fresh Debug launch created a category, imported the approved sanitized Axis fixture, assigned that category to a trusted transaction, quit/relaunched and verified the category and assignment persisted; the task-owned process was stopped and only its isolated database set was moved to Trash
 - **Previous Sprint 55 automated result:** 409 top-level tests across 49 suites, 0 failures and 0 unexpected skips in each of three consecutive exact canonical default-parallel TestPlan runs
 - **Latest focused Sprint 55 results:** 41 Axis direction, fixture-oracle and confirmation-gate tests across 5 suites plus 64 adjacent event, validation, repository, atomicity and hydration tests across 6 suites, all with 0 failures and 0 unexpected skips
@@ -491,9 +495,9 @@ Axis bank-account imports accepted with `axis.bank-account.csv@1` from Sprint 55
 
 - Generic UI tests remain intentionally disabled.
 - Supported UI behavior relies on the documented automated and manual acceptance boundaries.
-- Manual launches can attach to a stale DerivedData build when multiple LedgerForge processes exist.
-- No repository-owned deterministic singleton kill/build/run entry point currently exists.
-- The permanent singleton launch and macOS smoke-validation workflow remains future maintenance work.
+- Unmanaged manual launches can attach to a stale DerivedData build when multiple LedgerForge processes exist.
+- `./script/build_and_run.sh` is the repository-owned exact-singleton local build/run entry point; its contract resolves one fresh Debug bundle and process before UI attachment.
+- `./script/validate.sh` is the repository-owned local build/test entry point. CI, generic UI smoke automation, commit-status protection and distribution/notarization remain open maintenance work.
 
 ---
 
@@ -599,6 +603,51 @@ American Express production parsing and durable card semantics remain unsupporte
 ---
 
 ## Recent Verified Changes
+
+### Sprint 68B, DBP-01 Maintenance Correction and Sprint 69 — Local Validation Closure
+
+**Ref and evidence classification**
+
+The repository implementation closure preceding this documentation-only update is
+`main@6873d6c50e63042819a41b859254ff149a8bda3d`. The scripts, Codex Run action,
+test changes and documentation present at that ref are repository-verifiable.
+The acceptance execution results below are reported local evidence from the
+accepted closure; this documentation-only update did not rerun builds or tests.
+
+**Repository-verified scope**
+
+- Sprint 68B is a test-only bounded persistence-error-contract correction. It
+  retains the generic public wrapper message while preserving typed identity
+  outcomes and durable-attempt authority.
+- The DBP-01 maintenance correction gives successful prepared imports explicit
+  test lifecycle ownership and uses target-wide isolation for shared
+  lifecycle-gate coverage. It changes no production lifecycle behaviour,
+  migration or ADR.
+- Sprint 69 provides `./script/validate.sh` for the canonical local build/test
+  interface and `./script/build_and_run.sh` for exact-singleton local Debug
+  Run/stop verification. The Codex Run action invokes
+  `./script/build_and_run.sh --verify`.
+
+**Reported local acceptance evidence**
+
+- The two modified containing suites passed 36/36 tests, Account Metadata
+  passed 4/4, and each fresh interference combination passed three consecutive
+  times: Account Metadata plus Axis Shared (11/11 each) and Account Metadata
+  plus the unconfirmed-preparation test (5/5 each). All reported zero failures
+  and zero unexpected skips.
+- Fresh Debug and Release builds passed. The canonical complete TestPlan
+  recorded 628/628 tests passed with zero failures and zero skips.
+- The reported isolated Run built a fresh Debug bundle, verified one PID and
+  executable path against that bundle, used the intentional non-durable
+  `LEDGERFORGE_RUN_HOST=1` marker, found no open SQLite, WAL or SHM database
+  files, then stopped with zero exact-name LedgerForge processes and no
+  task-owned `xcodebuild` process.
+
+**Open boundary**
+
+CI, generic UI smoke automation, commit-status protection, enabling or
+replacing the disabled UI-test target, and distribution/notarization remain
+open. Migration V9 and ADR-041 remain unchanged.
 
 ### Sprint 65 — Shared Axis Bank-Account PDF Production Path
 
@@ -1050,7 +1099,7 @@ Detailed implementation history remains in Git and accepted ADRs.
 
 ## Current Planning State
 
-- The current planning alignment is based on the Sprint 65 acceptance recorded in this state update, the highest-numbered Sprint 66 completion, completed Sprints 50–64, completed DBP-01 Debug development tooling, Migration V9 and accepted ADR-041.
+- The current planning alignment is based on completed Sprints 50–69, including the Sprint 68B test-only correction, the DBP-01 maintenance correction and the Sprint 69 local validation closure, together with Migration V9 and accepted ADR-041.
 - DBP-01 is complete and no DBP-01 implementation remains pending. It is a separate post-Sprint-64 Debug tooling increment, not a numbered sprint or Sprint 65; no sprint renumbering occurred.
 - Sprint 63 implementation of the ADR-041 source-snapshot and source-byte foundation is complete; no source-snapshot implementation remains in the unscheduled queue.
 - `FW-P1-10 — Production PDF Statement Support` is completed and removed from the unscheduled queue by Sprint 65 for the selected exact account-neutral Axis bank-account grammar. Other Axis PDF layouts, OCR, password workflow, generic Axis PDF support and cross-format equivalence remain unsupported.
@@ -1064,7 +1113,7 @@ Detailed implementation history remains in Git and accepted ADRs.
 - `FW-P2-21 — Deterministic Categorization Rules` is now eligible for bounded discovery; no rule behavior is implemented or authorized.
 - Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
 - `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.
-- Sprint 65 is the latest chronologically accepted production implementation; Sprint 66 remains the highest-numbered completed outcome. The selected PDF boundary is accepted, while broader PDF layouts, OCR, password workflow and cross-format equivalence remain unscheduled or blocked.
+- Sprint 68A remains the latest chronologically accepted production UI implementation; Sprint 69 is the highest-numbered completed increment and closes the local validation-entry-point boundary only. The selected PDF boundary is accepted, while broader PDF layouts, OCR, password workflow and cross-format equivalence remain unscheduled or blocked.
 
 ---
 
