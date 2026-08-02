@@ -1104,7 +1104,8 @@ struct ImportRepositoryIntegrationTests {
         #expect(diagnosticText.contains("Ambiguous"))
     }
 
-    @Test func exactAxisReimportIsBlockedDurablyWithBoundedProvenance() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func exactAxisReimportIsBlockedDurablyWithBoundedProvenance() async throws {
         let folder = try temporaryFolder(named: "LedgerForgeExactReimportTests")
         defer { try? FileManager.default.removeItem(at: folder) }
         let databaseURL = folder.appendingPathComponent("exact-reimport.sqlite")
@@ -1270,7 +1271,8 @@ struct ImportRepositoryIntegrationTests {
         }
     }
 
-    @Test func preparationWithoutConfirmationLeavesNoDurableFingerprint() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func preparationWithoutConfirmationLeavesNoDurableFingerprint() async throws {
         let folder = try temporaryFolder(named: "LedgerForgeCancelledPreparationTests")
         defer { try? FileManager.default.removeItem(at: folder) }
         let provider = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("cancelled.sqlite").path)
@@ -1291,6 +1293,7 @@ struct ImportRepositoryIntegrationTests {
         let prepared = try await engine.prepareImport(
             from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
         )
+        defer { engine.cancelPreparedImport(prepared) }
 
         #expect(prepared.validation.passed)
         #expect(try provider.importSessionRepo.priorImportedStatement(

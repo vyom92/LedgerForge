@@ -7,7 +7,8 @@ import Testing
 struct AxisSharedBankAccountProfileTests {
     private let workspaceID = "workspace-axis-shared-profile"
 
-    @Test func productionPathAndIndependentOraclesAcceptSharedNREAndNROLayout() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func productionPathAndIndependentOraclesAcceptSharedNREAndNROLayout() async throws {
         let provider = DatabaseProvider(inMemory: true)
         let coordinator = persistenceCoordinator(provider)
         let engine = importEngine(provider, coordinator: coordinator)
@@ -22,6 +23,7 @@ struct AxisSharedBankAccountProfileTests {
         var parsedIdentifiers: [String: String] = [:]
         for (name, count) in fixtures {
             let prepared = try await engine.prepareImport(from: FixtureLocator.axisCSV(name))
+            defer { engine.cancelPreparedImport(prepared) }
             let identifier = try #require(prepared.financialDocument.financialIdentifiers.first)
 
             #expect(prepared.detectedInstitution == .axis)
@@ -60,6 +62,7 @@ struct AxisSharedBankAccountProfileTests {
         ] {
             let oracle = try CleanRoomAxisBankCSVOracle.load(csv: csv, expected: expected)
             let prepared = try await engine.prepareImport(from: FixtureLocator.axisCSV(csv))
+            defer { engine.cancelPreparedImport(prepared) }
             #expect(oracle.transactions == prepared.financialDocument.transactions.map(CleanRoomAxisTransaction.init))
             #expect(oracle.openingBalance == prepared.validation.openingBalance)
             #expect(oracle.closingBalance == prepared.validation.closingBalance)
@@ -83,6 +86,7 @@ struct AxisSharedBankAccountProfileTests {
                 "axis_bank_nro_account_statement_baseline_csv_source_truth.csv"
             )
         )
+        defer { ImportEngine.shared.cancelPreparedImport(prepared) }
 
         #expect(prepared.validation.passed)
         #expect(prepared.financialDocument.transactions.first?.credit == Decimal(4_221))
@@ -110,11 +114,15 @@ struct AxisSharedBankAccountProfileTests {
         #expect(nroBaseline.customerID == nroExtended.customerID)
     }
 
-    @Test func mapperDerivesOneExactProfileAndRejectsMissingMalformedOrConflictingPairs() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func mapperDerivesOneExactProfileAndRejectsMissingMalformedOrConflictingPairs() async throws {
         let provider = DatabaseProvider(inMemory: true)
         let coordinator = persistenceCoordinator(provider)
-        let prepared = try await importEngine(provider, coordinator: coordinator)
-            .prepareImport(from: FixtureLocator.axisCSV("axis_bank_nro_account_statement_baseline_csv_source_truth.csv"))
+        let engine = importEngine(provider, coordinator: coordinator)
+        let prepared = try await engine.prepareImport(
+            from: FixtureLocator.axisCSV("axis_bank_nro_account_statement_baseline_csv_source_truth.csv")
+        )
+        defer { engine.cancelPreparedImport(prepared) }
         let mapper = ImportPersistenceMapper(workspaceId: workspaceID, workspaceName: "Axis Shared Profile")
         let payload = try mapper.payload(
             financialDocument: prepared.financialDocument,
@@ -195,9 +203,11 @@ struct AxisSharedBankAccountProfileTests {
             let nreFirst = try await engine.prepareImport(
                 from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
             )
+            defer { engine.cancelPreparedImport(nreFirst) }
             let nroFirst = try await engine.prepareImport(
                 from: FixtureLocator.axisCSV("axis_bank_nro_account_statement_baseline_csv_source_truth.csv")
             )
+            defer { engine.cancelPreparedImport(nroFirst) }
             let nreIdentifier = try #require(nreFirst.financialDocument.financialIdentifiers.first)
             let nroIdentifier = try #require(nroFirst.financialDocument.financialIdentifiers.first)
 
@@ -236,6 +246,7 @@ struct AxisSharedBankAccountProfileTests {
             let nroLater = try await engine.prepareImport(
                 from: FixtureLocator.axisCSV("axis_bank_nro_account_statement_extended.csv")
             )
+            defer { engine.cancelPreparedImport(nroLater) }
             let laterNROResolution = try FinancialIdentityResolver(
                 accountRepository: provider.accountRepo,
                 developerConsole: nil
@@ -258,6 +269,7 @@ struct AxisSharedBankAccountProfileTests {
             let nreLater = try await engine.prepareImport(
                 from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_overlap.csv")
             )
+            defer { engine.cancelPreparedImport(nreLater) }
             let laterNREResolution = try FinancialIdentityResolver(
                 accountRepository: provider.accountRepo,
                 developerConsole: nil
@@ -370,15 +382,18 @@ struct AxisSharedBankAccountProfileTests {
         }
     }
 
-    @Test func sharedProfileConfirmedImportFailuresLeaveZeroAcceptedResidue() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func sharedProfileConfirmedImportFailuresLeaveZeroAcceptedResidue() async throws {
         let preparationProvider = DatabaseProvider(inMemory: true)
         let preparationCoordinator = persistenceCoordinator(preparationProvider)
-        let prepared = try await importEngine(
+        let engine = importEngine(
             preparationProvider,
             coordinator: preparationCoordinator
-        ).prepareImport(
+        )
+        let prepared = try await engine.prepareImport(
             from: FixtureLocator.axisCSV("axis_bank_nre_private_source_semantics.csv")
         )
+        defer { engine.cancelPreparedImport(prepared) }
         let mapper = ImportPersistenceMapper(
             workspaceId: workspaceID,
             workspaceName: "Axis Shared Profile"
