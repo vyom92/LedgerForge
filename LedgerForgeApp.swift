@@ -26,8 +26,8 @@ struct LedgerForgeApp: App {
 #endif
 
     init() {
-        if Self.usesIsolatedTestPersistence() {
-            Self.configureInMemoryPersistenceForTesting()
+        if let isolatedPurpose = Self.isolatedPersistencePurpose() {
+            Self.configureInMemoryPersistence(for: isolatedPurpose)
         } else {
             Self.configurePersistence()
         }
@@ -66,26 +66,48 @@ struct LedgerForgeApp: App {
     }
 
     static func configureInMemoryPersistenceForTesting() {
+        configureInMemoryPersistence(for: .testMemory)
+    }
+
+    private static func configureInMemoryPersistence(for purpose: PersistenceNonDurablePurpose) {
 #if DEBUG
         DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
 #else
         sqliteProvider?.database.close()
 #endif
         DatabaseProvider.shared.invalidateGeneration()
-        DatabaseProvider.shared = .intentionalNonDurable(.testMemory)
+        DatabaseProvider.shared = .intentionalNonDurable(purpose)
 #if !DEBUG
         sqliteProvider = nil
+#endif
+    }
+
+    static func isolatedPersistencePurpose(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> PersistenceNonDurablePurpose? {
+#if DEBUG
+        if environment["LEDGERFORGE_TEST_HOST"] == "1" {
+            return .testMemory
+        }
+        if environment["LEDGERFORGE_RUN_HOST"] == "1" {
+            return .debugMemory
+        }
+        return nil
+#else
+        nil
 #endif
     }
 
     static func usesIsolatedTestPersistence(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
-#if DEBUG
-        environment["LEDGERFORGE_TEST_HOST"] == "1"
-#else
-        false
-#endif
+        isolatedPersistencePurpose(environment: environment) == .testMemory
+    }
+
+    static func usesIsolatedRunPersistence(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        isolatedPersistencePurpose(environment: environment) == .debugMemory
     }
 
 #if DEBUG

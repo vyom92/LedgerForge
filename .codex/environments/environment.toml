@@ -4,3 +4,8 @@ name = "LedgerForge"
 
 [setup]
 script = ""
+
+[[actions]]
+name = "Run"
+icon = "run"
+command = "./script/build_and_run.sh --verify"

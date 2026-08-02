@@ -487,6 +487,27 @@ A project-file change is not documentation-only work.
 
 # 13. Canonical Build Commands
 
+## Repository-owned entry points
+
+When the repository-owned scripts are present, use them as the preferred local
+interface:
+
+```bash
+./script/validate.sh build-debug
+./script/validate.sh build-release
+./script/validate.sh test-focused LedgerForgeTests/<SuiteOrTest>
+./script/validate.sh test-full
+./script/validate.sh cycle-close
+./script/build_and_run.sh --verify
+./script/build_and_run.sh --stop
+```
+
+They create task-owned isolated artifacts, preserve the exact project, scheme,
+destination and test-plan contract below, and make one safe singleton Debug Run
+path available. They do not replace the Xcode project, shared scheme or
+`TestPlan.xctestplan` as build and test truth. The raw `xcodebuild` commands in
+this document remain the underlying truth and the troubleshooting reference.
+
 ## Debug build
 
 ```bash
@@ -787,7 +808,14 @@ After runtime verification:
 - preserve unrelated processes;
 - report process cleanup.
 
-No permanent repository-owned singleton launch script currently exists.
+`script/build_and_run.sh` is the repository-owned exact-singleton local launch
+entry point. It accepts only `LedgerForge` processes whose resolved executable,
+bundle shape and bundle identifier all match the expected app; ambiguous or
+partial-name processes are never signalled. `--verify` builds through
+`script/validate.sh`, resolves the fresh bundle through Xcode build settings,
+uses a process-local DEBUG run-host marker, then proves one PID resolves to that
+fresh executable. `--stop` only performs the verified termination sequence and
+zero-instance proof.
 
 ---
 

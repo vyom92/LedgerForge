@@ -1784,7 +1784,41 @@ Candidate outcomes include:
 
 The exact script names, CI provider and command interface require discovery. This candidate must not create an alternate build configuration that diverges from Xcode project truth.
 
-Sprint 53 runtime verification required this singleton process-isolation sequence to prevent attachment to stale binaries from other DerivedData roots. No authorized repository launch script existed to narrow during that sprint, so the permanent project-owned entry point remains a separate follow-up under this candidate.
+Sprint 53 runtime verification required this singleton process-isolation sequence to prevent attachment to stale binaries from other DerivedData roots. No authorized repository launch script existed during that sprint; Sprint 69 owns the completed local boundary below.
+
+### Sprint 69 completed boundary
+
+Completed:
+
+- canonical local build and test entry point;
+- exact-singleton local Run entry point;
+- Codex Run action;
+- deterministic local cycle-close validation: fresh Debug and Release builds
+  passed, and the canonical complete TestPlan recorded 628 executed tests with
+  zero failures and zero skips;
+- final local Run evidence: `build_and_run.sh --verify` built a fresh Debug
+  bundle, verified one PID against that bundle's executable, used the explicit
+  non-durable `LEDGERFORGE_RUN_HOST=1` marker, and found no open SQLite, WAL or
+  SHM database files; `--stop` then proved zero exact-name LedgerForge
+  processes and no task-owned `xcodebuild` process;
+- Sprint 68B was a test-only correction to the bounded persistence-error
+  contract: the generic public wrapper message remains, while typed identity
+  outcomes and durable-attempt authority remain preserved;
+- DBP-01 maintenance correction: every successful prepared import in the
+  bounded tests has explicit cancellation ownership, affected tests use
+  target-wide runtime-state isolation, and the scheduler-interference coverage
+  was created and passed. No production lifecycle behaviour, migration or ADR
+  changed.
+
+Still open:
+
+- CI provider setup;
+- commit-status protection;
+- generic UI smoke automation;
+- enabling or replacing the disabled UI-test target;
+- distribution, notarization or deployment.
+
+Sprint 69 does not close this broader candidate or authorize those remaining outcomes.
 
 ---
 

@@ -165,10 +165,20 @@ struct PersistenceAvailabilityTests {
         #expect(DatabaseProvider.shared.persistenceState == .intentionalNonDurable(.testMemory))
     }
 
-    @Test func testHostConfigurationSelectsIsolatedPersistenceOnlyWhenExplicitlyEnabled() {
-        #expect(LedgerForgeApp.usesIsolatedTestPersistence(environment: [:]) == false)
-        #expect(LedgerForgeApp.usesIsolatedTestPersistence(environment: ["LEDGERFORGE_TEST_HOST": "0"]) == false)
+    @Test func isolatedPersistenceHostMarkersAreExactAndDebugOnly() {
+        #expect(LedgerForgeApp.isolatedPersistencePurpose(environment: [:]) == nil)
+        #expect(LedgerForgeApp.isolatedPersistencePurpose(environment: ["LEDGERFORGE_TEST_HOST": "0"]) == nil)
+        #expect(LedgerForgeApp.isolatedPersistencePurpose(environment: ["LEDGERFORGE_RUN_HOST": "0"]) == nil)
+        #expect(LedgerForgeApp.isolatedPersistencePurpose(environment: ["UNRELATED_MARKER": "1"]) == nil)
+
         #expect(LedgerForgeApp.usesIsolatedTestPersistence(environment: ["LEDGERFORGE_TEST_HOST": "1"]))
+        #expect(LedgerForgeApp.isolatedPersistencePurpose(environment: ["LEDGERFORGE_TEST_HOST": "1"]) == .testMemory)
+        #expect(LedgerForgeApp.usesIsolatedRunPersistence(environment: ["LEDGERFORGE_RUN_HOST": "1"]))
+        #expect(LedgerForgeApp.isolatedPersistencePurpose(environment: ["LEDGERFORGE_RUN_HOST": "1"]) == .debugMemory)
+        #expect(LedgerForgeApp.isolatedPersistencePurpose(environment: [
+            "LEDGERFORGE_TEST_HOST": "1",
+            "LEDGERFORGE_RUN_HOST": "1"
+        ]) == .testMemory)
     }
 
     @Test func persistencePresentationIsTruthfulBoundedAndPathFree() {
