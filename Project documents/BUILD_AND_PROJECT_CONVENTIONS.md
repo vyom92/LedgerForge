@@ -485,6 +485,32 @@ A project-file change is not documentation-only work.
 
 ---
 
+## Local static Legacy XLS dependency
+
+`Vendor/LegacyXLS` is the only approved legacy XLS reader dependency. It vendors
+the required libxls 1.6.3 source files from `libxls/libxls` tag `v1.6.3` at
+commit `c199d132494833da696b58aa4acf3fc5a36d930b` under the BSD 2-clause
+license. The verbatim upstream `LICENSE` and the repository
+`THIRD_PARTY_NOTICE.md` must remain present.
+
+The checked-in local Swift package builds a static C target from only
+`xlstool.c`, `endian.c`, `locale.c`, `ole.c`, `xls.c`, the required headers and
+the narrow LedgerForge bridge. Its deterministic macOS configuration requires
+no application-build-time Autotools step. The only external link boundary is
+the macOS system `iconv` library. `xls.c` additionally rejects worksheet
+dimensions above 10,000 rows, 256 columns or 1,000,000 cells before allocating
+the cell table.
+
+For a Release acceptance, inspect the application with `otool -L`, inspect the
+bundle contents and confirm the bridge/libxls symbols are present in the app
+executable. No libxls dynamic library, Homebrew libxls, Java, Python or
+LibreOffice runtime may be copied into or required by the app. Changing the
+libxls version, source set, safety patch, linkage or supported workbook boundary
+requires an explicitly approved task and fresh Debug, Release and dependency
+inspection evidence.
+
+---
+
 # 13. Canonical Build Commands
 
 ## Repository-owned entry points

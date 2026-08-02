@@ -47,15 +47,14 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
     }
 
     func detectInstitution(in document: RawDocument) async throws -> ImportInstitutionCandidate {
-        guard case .text(let text) = document.content else {
-            return ImportInstitutionCandidate(
-                institutionCode: nil,
-                confidence: 0.0,
-                reasons: ["RawDocument did not contain extracted text."]
-            )
+        guard case .data = document.content else {
+            return detect(from: document.searchableText).importCandidate
         }
-
-        return detect(from: text).importCandidate
+        return ImportInstitutionCandidate(
+            institutionCode: nil,
+            confidence: 0.0,
+            reasons: ["RawDocument did not contain extracted text."]
+        )
     }
 
     private static func normalized(_ text: String) -> String {

@@ -1,0 +1,5 @@
+Sources/CLegacyXLS/include/xls.h -whitespace
+Sources/CLegacyXLS/src/endian.c -whitespace
+Sources/CLegacyXLS/src/ole.c -whitespace
+Sources/CLegacyXLS/src/xls.c -whitespace
+Sources/CLegacyXLS/src/xlstool.c -whitespace

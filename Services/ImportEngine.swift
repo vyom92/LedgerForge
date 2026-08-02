@@ -463,9 +463,7 @@ final class ImportEngine {
         try Task.checkCancellation()
         let rawDocument = try await readDocument(from: url, snapshot: snapshot)
         try Task.checkCancellation()
-        guard case .text(let contents) = rawDocument.content else {
-            throw ImportError.invalidDocument(message: "Import expected extractable text document content.")
-        }
+        let contents = rawDocument.searchableText
         let sourceFormat = try Self.preparedSourceFormat(fileType: rawDocument.fileExtension)
         let rawTextFingerprint = ExactStatementFingerprint(text: contents)
         let fingerprintSet = try Self.preparedFingerprintSet(
@@ -521,7 +519,15 @@ final class ImportEngine {
             normalizedRows = normalization.rows
             normalizedHeader = normalization.header
             sourceContext = normalization.sourceContext
-        case .xls, .xlsx, .unknown:
+        case .xls:
+            let normalization = try AxisBankAccountXLSNormalizer().normalize(
+                rawDocument: rawDocument
+            )
+            document = normalization.document
+            normalizedRows = normalization.rows
+            normalizedHeader = normalization.header
+            sourceContext = normalization.sourceContext
+        case .xlsx, .unknown:
             throw ImportError.unsupportedFile(extension: rawDocument.fileExtension)
         }
 
@@ -1188,7 +1194,12 @@ final class ImportEngine {
             throw result.error ?? ImportError.unknown(message: "Import coordinator returned no document.")
         }
 
-        guard case .text = rawDocument.content else {
+        switch rawDocument.content {
+        case .text:
+            break
+        case .tabular where !rawDocument.searchableText.isEmpty:
+            break
+        case .tabular, .data:
             throw ImportError.invalidDocument(message: "Import expected extractable text document content.")
         }
 
@@ -1206,6 +1217,8 @@ final class ImportEngine {
             return .csv
         case FileFormat.pdf.rawValue:
             return .pdf
+        case FileFormat.xls.rawValue:
+            return .xls
         default:
             throw ImportError.unsupportedFile(extension: fileType.lowercased())
         }
@@ -1222,10 +1235,10 @@ final class ImportEngine {
         case .csv:
             rawTextIsAuthority = true
             sourceBytesIsAuthority = false
-        case .pdf:
+        case .pdf, .xls:
             rawTextIsAuthority = false
             sourceBytesIsAuthority = true
-        case .xls, .xlsx, .unknown:
+        case .xlsx, .unknown:
             throw ImportError.unsupportedFile(extension: sourceFormat.rawValue.lowercased())
         }
 

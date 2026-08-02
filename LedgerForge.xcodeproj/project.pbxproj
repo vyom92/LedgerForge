@@ -92,6 +92,10 @@
 		650000013065000000000001 /* AxisBankAccountPDFNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650000043065000000000001 /* AxisBankAccountPDFNormalizer.swift */; };
 		650000023065000000000001 /* AxisBankAccountPDFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650000053065000000000001 /* AxisBankAccountPDFParser.swift */; };
 		650000033065000000000001 /* AxisBankAccountSourceEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650000063065000000000001 /* AxisBankAccountSourceEvidence.swift */; };
+		710000013071000000000001 /* LegacyXLSDocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 710000113071000000000001 /* LegacyXLSDocumentReader.swift */; };
+		710000023071000000000001 /* AxisBankAccountXLSNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 710000123071000000000001 /* AxisBankAccountXLSNormalizer.swift */; };
+		710000033071000000000001 /* AxisBankAccountXLSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 710000133071000000000001 /* AxisBankAccountXLSParser.swift */; };
+		710000043071000000000001 /* LegacyXLS in Frameworks */ = {isa = PBXBuildFile; productRef = 710000233071000000000001 /* LegacyXLS */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
@@ -264,6 +268,9 @@
 		650000043065000000000001 /* AxisBankAccountPDFNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountPDFNormalizer.swift; sourceTree = "<group>"; };
 		650000053065000000000001 /* AxisBankAccountPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountPDFParser.swift; sourceTree = "<group>"; };
 		650000063065000000000001 /* AxisBankAccountSourceEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountSourceEvidence.swift; sourceTree = "<group>"; };
+		710000113071000000000001 /* LegacyXLSDocumentReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyXLSDocumentReader.swift; sourceTree = "<group>"; };
+		710000123071000000000001 /* AxisBankAccountXLSNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountXLSNormalizer.swift; sourceTree = "<group>"; };
+		710000133071000000000001 /* AxisBankAccountXLSParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountXLSParser.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
 		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
@@ -320,6 +327,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				710000043071000000000001 /* LegacyXLS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -414,6 +422,7 @@
 		286242562FFCE80D00B8AA66 /* Readers */ = {
 			isa = PBXGroup;
 			children = (
+				710000113071000000000001 /* LegacyXLSDocumentReader.swift */,
 				286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */,
 				286242542FFCE80D00B8AA66 /* DefaultReaderRegistry.swift */,
 				286242552FFCE80D00B8AA66 /* PDFDocumentReader.swift */,
@@ -532,6 +541,7 @@
 		288EB0DF2FF7A3D200F09BC9 /* Parsers */ = {
 			isa = PBXGroup;
 			children = (
+				710000133071000000000001 /* AxisBankAccountXLSParser.swift */,
 				650000053065000000000001 /* AxisBankAccountPDFParser.swift */,
 				650000063065000000000001 /* AxisBankAccountSourceEvidence.swift */,
 				288EB11C2FF7D00700F09BC9 /* Parsers/UnknownStatementParser.swift */,
@@ -633,6 +643,7 @@
 		288EB12E2FF7E10200F09BC9 /* Normalizers */ = {
 			isa = PBXGroup;
 			children = (
+				710000123071000000000001 /* AxisBankAccountXLSNormalizer.swift */,
 				650000043065000000000001 /* AxisBankAccountPDFNormalizer.swift */,
 				288EB12F2FF7E11200F09BC9 /* CSVNormalizer.swift */,
 			);
@@ -692,6 +703,7 @@
 			);
 			name = LedgerForge;
 			packageProductDependencies = (
+				710000233071000000000001 /* LegacyXLS */,
 			);
 			productName = LedgerForge;
 			productReference = 288EB0AD2FF7955200F09BC9 /* LedgerForge.app */;
@@ -794,6 +806,9 @@
 			);
 			mainGroup = 288EB0A42FF7955200F09BC9;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				710000223071000000000001 /* XCLocalSwiftPackageReference "Vendor/LegacyXLS" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 288EB0AE2FF7955200F09BC9 /* Products */;
 			projectDirPath = "";
@@ -878,6 +893,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				710000013071000000000001 /* LegacyXLSDocumentReader.swift in Sources */,
+				710000023071000000000001 /* AxisBankAccountXLSNormalizer.swift in Sources */,
+				710000033071000000000001 /* AxisBankAccountXLSParser.swift in Sources */,
 				650000013065000000000001 /* AxisBankAccountPDFNormalizer.swift in Sources */,
 				650000023065000000000001 /* AxisBankAccountPDFParser.swift in Sources */,
 				650000033065000000000001 /* AxisBankAccountSourceEvidence.swift in Sources */,
@@ -1452,6 +1470,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		710000223071000000000001 /* XCLocalSwiftPackageReference "Vendor/LegacyXLS" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Vendor/LegacyXLS;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		710000233071000000000001 /* LegacyXLS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 710000223071000000000001 /* XCLocalSwiftPackageReference "Vendor/LegacyXLS" */;
+			productName = LegacyXLS;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 288EB0A52FF7955200F09BC9 /* Project object */;
 }

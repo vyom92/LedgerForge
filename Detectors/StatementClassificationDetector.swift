@@ -17,15 +17,14 @@ struct StatementClassificationDetector: ImportFramework.StatementClassifier {
         document: RawDocument,
         institution: ImportInstitutionCandidate?
     ) async throws -> StatementClassification {
-        guard case .text(let text) = document.content else {
+        if case .data = document.content {
             return StatementClassification(
                 documentType: .unknown,
                 confidence: 0.0,
                 reasons: ["RawDocument did not contain extracted text."]
             )
         }
-
-        let normalizedText = Self.normalized(text)
+        let normalizedText = Self.normalized(document.searchableText)
 
         for rule in rules {
             if let classification = rule.classify(

@@ -59,6 +59,7 @@ enum ImportPersistenceError: Error, LocalizedError, Equatable {
 enum ImportPersistenceSourceFormat: Equatable, Sendable {
     case csv
     case pdf
+    case xls
 
     var mimeType: String {
         switch self {
@@ -66,6 +67,8 @@ enum ImportPersistenceSourceFormat: Equatable, Sendable {
             return "text/csv"
         case .pdf:
             return "application/pdf"
+        case .xls:
+            return "application/vnd.ms-excel"
         }
     }
 
@@ -73,7 +76,7 @@ enum ImportPersistenceSourceFormat: Equatable, Sendable {
         switch self {
         case .csv:
             return DocumentFingerprintDTO.rawTextSHA256Algorithm
-        case .pdf:
+        case .pdf, .xls:
             return DocumentFingerprintDTO.sourceBytesSHA256Algorithm
         }
     }
@@ -84,7 +87,9 @@ enum ImportPersistenceSourceFormat: Equatable, Sendable {
             self = .csv
         case .pdf:
             self = .pdf
-        case .xls, .xlsx, .unknown:
+        case .xls:
+            self = .xls
+        case .xlsx, .unknown:
             throw ImportPersistenceError.unsupportedPreparedSourceFormat
         }
 
@@ -104,6 +109,8 @@ enum ImportPersistenceSourceFormat: Equatable, Sendable {
             self = .csv
         case "application/pdf":
             self = .pdf
+        case "application/vnd.ms-excel":
+            self = .xls
         default:
             return nil
         }

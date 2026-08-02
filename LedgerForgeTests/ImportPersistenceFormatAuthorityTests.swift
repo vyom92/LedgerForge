@@ -102,6 +102,37 @@ struct ImportPersistenceFormatAuthorityMapperTests {
     }
 
     @Test
+    func xlsSourceByteAuthorityUsesLegacyExcelMediaAndKeepsRawTextLegacySemantics() throws {
+        let fixture = try makeFormatAuthorityFixture(format: .xls, seed: "xls-mapper")
+        let fingerprints = formatAuthorityFingerprints(
+            rawAuthority: false,
+            sourceAuthority: true,
+            rawSeed: "xls-mapper-projection",
+            sourceSeed: "xls-mapper-source-bytes"
+        )
+
+        let payload = try ImportPersistenceMapper().payload(
+            financialDocument: fixture.financialDocument,
+            importSession: fixture.importSession,
+            validation: fixture.validation,
+            accountId: "xls-mapper-account",
+            fingerprintSet: fingerprints
+        )
+        let raw = try #require(fingerprints.fingerprints.first {
+            $0.algorithm == DocumentFingerprintDTO.rawTextSHA256Algorithm
+        })
+        let source = try #require(fingerprints.duplicateAuthority)
+
+        #expect(payload.document.mimeType == "application/vnd.ms-excel")
+        #expect(payload.document.sizeBytes == source.byteCount)
+        #expect(payload.document.legacyRawTextSHA256 == raw.digest)
+        #expect(payload.fingerprint.algorithm == DocumentFingerprintDTO.sourceBytesSHA256Algorithm)
+        #expect(payload.fingerprints.filter(\.isDuplicateAuthority).map(\.algorithm) == [
+            DocumentFingerprintDTO.sourceBytesSHA256Algorithm
+        ])
+    }
+
+    @Test
     func formatAuthorityMismatchesFailClosed() throws {
         let csv = try makeFormatAuthorityFixture(format: .csv, seed: "csv-wrong-authority")
         let pdf = try makeFormatAuthorityFixture(format: .pdf, seed: "pdf-wrong-authority")
@@ -311,9 +342,10 @@ struct ImportPersistenceFormatAuthorityCoordinatorTests {
         )?.importSessionId == fixture.importSession.id.uuidString)
     }
 
-    @Test(arguments: FormatAuthorityProviderKind.allCases)
-    func pdfAcceptanceAndExactReimportHaveProviderParity(
-        providerKind: FormatAuthorityProviderKind
+    @Test(arguments: FormatAuthorityProviderKind.allCases, [FileFormat.pdf, .xls])
+    func sourceByteAuthorityAcceptanceAndExactReimportHaveProviderParity(
+        providerKind: FormatAuthorityProviderKind,
+        format: FileFormat
     ) throws {
         let context = try FormatAuthorityProviderContext(providerKind)
         defer { context.cleanup() }
@@ -325,20 +357,20 @@ struct ImportPersistenceFormatAuthorityCoordinatorTests {
             )
         )
         let first = try makeFormatAuthorityFixture(
-            format: .pdf,
-            seed: "\(providerKind.rawValue)-pdf-first",
-            identifierSeed: "\(providerKind.rawValue)-pdf-identity"
+            format: format,
+            seed: "\(providerKind.rawValue)-\(format.rawValue)-first",
+            identifierSeed: "\(providerKind.rawValue)-\(format.rawValue)-identity"
         )
         let duplicate = try makeFormatAuthorityFixture(
-            format: .pdf,
-            seed: "\(providerKind.rawValue)-pdf-renamed",
-            identifierSeed: "\(providerKind.rawValue)-pdf-identity"
+            format: format,
+            seed: "\(providerKind.rawValue)-\(format.rawValue)-renamed",
+            identifierSeed: "\(providerKind.rawValue)-\(format.rawValue)-identity"
         )
         let fingerprints = formatAuthorityFingerprints(
             rawAuthority: false,
             sourceAuthority: true,
-            rawSeed: "\(providerKind.rawValue)-pdf-extracted-text",
-            sourceSeed: "\(providerKind.rawValue)-pdf-source-bytes"
+            rawSeed: "\(providerKind.rawValue)-\(format.rawValue)-projection",
+            sourceSeed: "\(providerKind.rawValue)-\(format.rawValue)-source-bytes"
         )
         let source = try #require(fingerprints.duplicateAuthority)
         let raw = try #require(fingerprints.fingerprints.first {
@@ -424,7 +456,10 @@ struct ImportPersistenceFormatAuthorityCoordinatorTests {
                 )
             }
             #expect(documents.count == 1)
-            #expect(documents.first?.mimeType == "application/pdf")
+            let expectedMIME = format == .pdf
+                ? "application/pdf"
+                : "application/vnd.ms-excel"
+            #expect(documents.first?.mimeType == expectedMIME)
             #expect(documents.first?.sizeBytes == source.byteCount)
             #expect(documents.first?.legacyRawTextSHA256 == raw.digest)
             #expect(documents.first?.legacyRawTextSHA256 != source.digest)
@@ -446,11 +481,13 @@ struct ImportPersistenceFormatAuthorityCoordinatorTests {
         }
     }
 
-    @Test
-    func pdfSQLiteReopenReconstructsHydratedStoresAndParserProvenance() throws {
+    @Test(arguments: [FileFormat.pdf, .xls])
+    func sourceByteFormatSQLiteReopenReconstructsHydratedStoresAndParserProvenance(
+        format: FileFormat
+    ) throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent(
-                "LedgerForge-PDF-FormatAuthority-Relaunch-\(UUID().uuidString)"
+                "LedgerForge-\(format.rawValue)-FormatAuthority-Relaunch-\(UUID().uuidString)"
             )
         try FileManager.default.createDirectory(
             at: directory,
@@ -472,14 +509,14 @@ struct ImportPersistenceFormatAuthorityCoordinatorTests {
             )
         )
         let fixture = try makeFormatAuthorityFixture(
-            format: .pdf,
-            seed: "pdf-relaunch"
+            format: format,
+            seed: "\(format.rawValue)-relaunch"
         )
         let fingerprints = formatAuthorityFingerprints(
             rawAuthority: false,
             sourceAuthority: true,
-            rawSeed: "pdf-relaunch-raw",
-            sourceSeed: "pdf-relaunch-source"
+            rawSeed: "\(format.rawValue)-relaunch-raw",
+            sourceSeed: "\(format.rawValue)-relaunch-source"
         )
 
         let accepted = try coordinator.persistValidatedImport(
@@ -504,11 +541,14 @@ struct ImportPersistenceFormatAuthorityCoordinatorTests {
         let persistedTransaction = try #require(persisted.first)
         let persistedRawRow = try #require(persistedTransaction.rawRows.first)
         #expect(persisted.count == 1)
-        #expect(persistedRawRow.parserProfileId == AxisBankAccountPDFParser.profileID)
-        #expect(
-            persistedRawRow.parserProfileVersion ==
-                AxisBankAccountPDFParser.profileVersion
-        )
+        let expectedProfileID = format == .pdf
+            ? AxisBankAccountPDFParser.profileID
+            : AxisBankAccountXLSParser.profileID
+        let expectedProfileVersion = format == .pdf
+            ? AxisBankAccountPDFParser.profileVersion
+            : AxisBankAccountXLSParser.profileVersion
+        #expect(persistedRawRow.parserProfileId == expectedProfileID)
+        #expect(persistedRawRow.parserProfileVersion == expectedProfileVersion)
 
         let accounts = AccountStore()
         let transactions = TransactionStore()
@@ -537,14 +577,8 @@ struct ImportPersistenceFormatAuthorityCoordinatorTests {
         let hydratedProvenance = try #require(
             transactions.transactions.first?.sourceProvenance.first
         )
-        #expect(
-            hydratedProvenance.parserProfileID ==
-                AxisBankAccountPDFParser.profileID
-        )
-        #expect(
-            hydratedProvenance.parserProfileVersion ==
-                AxisBankAccountPDFParser.profileVersion
-        )
+        #expect(hydratedProvenance.parserProfileID == expectedProfileID)
+        #expect(hydratedProvenance.parserProfileVersion == expectedProfileVersion)
     }
 
     @Test(arguments: FormatAuthorityProviderKind.allCases)
@@ -912,7 +946,11 @@ private func makeFormatAuthorityFixture(
         fileExtension = "pdf"
         profileID = "axis.bank-account.pdf"
         profileVersion = "1"
-    case .xls, .xlsx, .unknown:
+    case .xls:
+        fileExtension = "xls"
+        profileID = AxisBankAccountXLSParser.profileID
+        profileVersion = AxisBankAccountXLSParser.profileVersion
+    case .xlsx, .unknown:
         fileExtension = "dat"
         profileID = "unsupported.fixture"
         profileVersion = "1"

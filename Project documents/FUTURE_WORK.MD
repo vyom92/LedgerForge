@@ -549,7 +549,7 @@ Each family may require a separate ADR and implementation increment. No family m
 **Status:** Candidate
 **Depends on:** Approved fixtures for each layout
 
-**Supplied shared-layout Axis NRO CSV slice completed 2026-07-23; source truth restored 2026-07-26:** new supported NRE and NRO bank-account CSV imports use `axis.bank-account.csv` version `2` with physical DR as debit and physical CR as credit. Two distinct full institution account identifiers preserve separate durable accounts. Version `1` is historical-only provenance and may require separate integrity detection. This completion does not establish broader Axis NRO, PDF, XLS, XLSX or card support.
+**Supplied shared-layout Axis NRO CSV slice completed 2026-07-23; source truth restored 2026-07-26; bounded PDF and XLS slices subsequently completed:** supported NRE and NRO bank-account CSV imports use `axis.bank-account.csv` version `2`; the selected account-neutral PDF grammar uses `axis.bank-account.pdf@1`; and the exact Axis NRO XLS grammar uses `axis.bank-account.xls@1`. Physical DR is debit and physical CR is credit. Two distinct full institution account identifiers preserve separate durable accounts. CSV version `1` is historical-only provenance and may require separate integrity detection. These completions do not establish broader Axis NRO layouts, XLSX, generic spreadsheets or card support.
 
 Expand deterministic Axis coverage in dependency and fixture-readiness order:
 
@@ -819,22 +819,11 @@ The user must control whether the password is used once, stored, replaced or dis
 
 ## FW-P1-14 — XLS and XLSX Support
 
-**Status:** Ready for discovery  
-**Fixture state:** Approved spreadsheet evidence exists, including HDFC XLS bank-account fixtures.  
-**Implementation blockers:** Selection of the first production spreadsheet family and approval of an XLS or XLSX reader/extraction authority.
+**Status:** Partially completed by Sprint 71 for one exact XLS profile
+**Completed boundary:** The native static OLE2/BIFF8 reader and `axis.bank-account.xls@1` support the committed exact Axis NRO XLS grammar through the ordinary import pipeline. Exact source bytes are duplicate authority. The baseline contains 16 transactions versus 17 in the corresponding Range-1 CSV; the extended XLS contains 20 transactions, with 16 shared rows and 4 extended-only rows in source order. Unsupported encryption, multiple or hidden worksheets, formulas, boolean/error cells, malformed values and non-exact layouts fail closed before accepted writes.
+**Remaining boundary:** XLSX/OOXML, generic spreadsheet mapping, HDFC and other institution/layout support, formula-result handling, macros, password workflow, multi-sheet/hidden-sheet support, user-authored mappings and cross-format equivalence remain unsupported and require separate approved discovery or implementation increments.
 
-Targeted discovery must determine:
-
-- whether XLS and XLSX require separate readers and increments;
-- the smallest fixture-backed first family;
-- deterministic sheet, row, cell-type, date, numeric-scale and formula-result handling;
-- source-row evidence and malformed-workbook behavior;
-- sandbox access and production URL-driven preparation;
-- exact-content fingerprint authority for the selected container;
-- parser/profile selection and independent financial truth;
-- privacy, library, licensing and Release implications.
-
-Spreadsheet readers must feed the existing universal import pipeline. Fixture availability authorizes discovery, not production support.
+The accepted libxls reader authority is limited to version 1.6.3 at commit `c199d132494833da696b58aa4acf3fc5a36d930b`, statically vendored under its BSD 2-clause license and linked only to system `iconv`. It does not authorize a generic XLS support claim or any XLSX reader. Spreadsheet readers continue to feed the universal import pipeline. Fixture availability outside the exact completed Axis NRO grammar authorizes discovery, not production support.
 
 ---
 
