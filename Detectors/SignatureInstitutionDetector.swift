@@ -22,7 +22,13 @@ struct InstitutionDetectionResult: Equatable, Sendable {
 struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
     private let rules: [InstitutionDetectionRule]
 
-    init(rules: [InstitutionDetectionRule] = [.hdfcBankAccount, .axisBankAccount]) {
+    init(
+        rules: [InstitutionDetectionRule] = [
+            .hdfcBankAccountPDF,
+            .hdfcBankAccountXLS,
+            .axisBankAccount
+        ]
+    ) {
         self.rules = rules
     }
 
@@ -104,7 +110,28 @@ struct InstitutionDetectionRule: Equatable, Sendable {
         ]
     )
 
-    static let hdfcBankAccount = InstitutionDetectionRule(
+    static let hdfcBankAccountPDF = InstitutionDetectionRule(
+        institution: .hdfc,
+        documentType: .bankAccount,
+        confidence: 0.99,
+        requiredMatchCount: 3,
+        signatures: [
+            InstitutionSignature(
+                token: "HDFC BANK LIMITED",
+                reason: "Matched the exact HDFC PDF bank name."
+            ),
+            InstitutionSignature(
+                token: "STATEMENT OF ACCOUNT",
+                reason: "Matched the exact HDFC PDF account-statement title."
+            ),
+            InstitutionSignature(
+                token: "DATE NARRATION CHQ./REF.NO. VALUE DT WITHDRAWAL AMT. DEPOSIT AMT. CLOSING BALANCE",
+                reason: "Matched the exact HDFC bank-statement header."
+            )
+        ]
+    )
+
+    static let hdfcBankAccountXLS = InstitutionDetectionRule(
         institution: .hdfc,
         documentType: .bankAccount,
         confidence: 0.99,

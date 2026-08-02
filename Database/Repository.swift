@@ -231,20 +231,33 @@ public protocol ImportSessionRepository {
     func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO]
     func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO?
     func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO]
+    func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO]
+    func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO]
+    func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO]
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult
 }
 
 public extension ImportSessionRepository {
     func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? { nil }
     func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] { [] }
+    func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO] { [] }
+    func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO] { [] }
+    func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] { [] }
 }
 
 /// This deliberately does not expose a generic transaction closure. Providers
 /// own the full accepted-import graph and may only return bounded outcomes.
 public protocol ConfirmedImportRepository {
     func reviewPartialImport(_ plan: ConfirmedImportPlanDTO) -> PartialImportReviewResult
+    func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult
     func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult
     func commitReviewedPartialImport(_ plan: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult
+}
+
+public extension ConfirmedImportRepository {
+    func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult {
+        .notApplicable
+    }
 }
 
 public struct PartialImportSessionUpdate {
@@ -431,6 +444,9 @@ private struct GenerationCheckedImportSessionRepository: ImportSessionRepository
     func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] { try validity.check(); return try base.importAttempts(workspaceId: workspaceId) }
     func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? { try validity.check(); return try base.partialImportSummary(importSessionId: importSessionId) }
     func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] { try validity.check(); return try base.incomingRowDispositions(importSessionId: importSessionId) }
+    func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO] { try validity.check(); return try base.statementFinancialProjections(workspaceId: workspaceId) }
+    func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO] { try validity.check(); return try base.statementEquivalenceGroups(workspaceId: workspaceId) }
+    func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] { try validity.check(); return try base.statementEquivalenceMembers(workspaceId: workspaceId) }
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult { try validity.check(); return try base.commitImportHistory(payload) }
 }
 
@@ -446,6 +462,15 @@ private struct GenerationCheckedConfirmedImportRepository: ConfirmedImportReposi
             // The read-only review result predates the shared stale-generation
             // case; fail closed without consulting the inactive provider.
             return .repositoryIntegrityConflict
+        }
+    }
+
+    func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult {
+        do {
+            try validity.check()
+            return base.reviewStatementEquivalence(plan)
+        } catch {
+            return .evidenceUnavailable
         }
     }
 

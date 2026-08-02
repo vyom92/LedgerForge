@@ -2038,6 +2038,89 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
         }
     }
 
+    func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO] {
+        let rows = try db.query(
+            sql: "SELECT id, account_id, document_id, import_session_id, algorithm, digest, institution_code, statement_family_code, parser_profile_id, parser_profile_version, source_format_code, statement_start_date, statement_end_date, native_currency, event_count, opening_balance_minor, opening_balance_decimal, debit_count, credit_count, debit_total_minor, debit_total_decimal, credit_total_minor, credit_total_decimal, closing_balance_minor, closing_balance_decimal, created_at FROM statement_financial_projections WHERE workspace_id = ? ORDER BY created_at, id;",
+            params: [workspaceId]
+        ) { row in
+            (
+                row.string(at: 0) ?? "", row.string(at: 1) ?? "", row.string(at: 2) ?? "", row.string(at: 3) ?? "",
+                row.string(at: 4) ?? "", row.string(at: 5) ?? "", row.string(at: 6) ?? "", row.string(at: 7) ?? "",
+                row.string(at: 8) ?? "", row.string(at: 9) ?? "", row.string(at: 10) ?? "", row.string(at: 11) ?? "",
+                row.string(at: 12) ?? "", row.string(at: 13) ?? "", Int(row.int64(at: 14) ?? 0), row.int64(at: 15) ?? 0,
+                row.string(at: 16) ?? "", Int(row.int64(at: 17) ?? 0), Int(row.int64(at: 18) ?? 0), row.int64(at: 19) ?? 0,
+                row.string(at: 20) ?? "", row.int64(at: 21) ?? 0, row.string(at: 22) ?? "", row.int64(at: 23) ?? 0,
+                row.string(at: 24) ?? "", row.string(at: 25) ?? ""
+            )
+        }
+        return try rows.map { record in
+            let events = try db.query(
+                sql: "SELECT id, event_ordinal, statement_date, value_date, direction, signed_amount_minor, signed_amount_decimal, running_balance_minor, running_balance_decimal, reference FROM statement_financial_projection_events WHERE projection_id = ? ORDER BY event_ordinal;",
+                params: [record.0]
+            ) { row in
+                StatementFinancialProjectionEventDTO(
+                    id: row.string(at: 0) ?? "", ordinal: Int(row.int64(at: 1) ?? 0),
+                    statementDateISO: row.string(at: 2) ?? "", valueDateISO: row.string(at: 3) ?? "",
+                    direction: row.string(at: 4) ?? "", signedAmountMinor: row.int64(at: 5) ?? 0,
+                    signedAmountDecimal: row.string(at: 6) ?? "", runningBalanceMinor: row.int64(at: 7) ?? 0,
+                    runningBalanceDecimal: row.string(at: 8) ?? "", reference: row.string(at: 9)
+                )
+            }
+            return StatementFinancialProjectionRecordDTO(
+                projection: StatementFinancialProjectionDTO(
+                    id: record.0, algorithmIdentifier: record.4, digest: record.5,
+                    institutionCode: record.6, statementFamilyCode: record.7,
+                    parserProfileID: record.8, parserProfileVersion: record.9,
+                    sourceFormatCode: record.10, statementStartDateISO: record.11,
+                    statementEndDateISO: record.12, nativeCurrency: record.13,
+                    eventCount: record.14, openingBalanceMinor: record.15,
+                    openingBalanceDecimal: record.16, debitCount: record.17,
+                    creditCount: record.18, debitTotalMinor: record.19,
+                    debitTotalDecimal: record.20, creditTotalMinor: record.21,
+                    creditTotalDecimal: record.22, closingBalanceMinor: record.23,
+                    closingBalanceDecimal: record.24, events: events
+                ),
+                workspaceID: workspaceId,
+                accountID: record.1,
+                documentID: record.2,
+                importSessionID: record.3,
+                createdAtISO: record.25
+            )
+        }
+    }
+
+    func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO] {
+        try db.query(
+            sql: "SELECT id, account_id, institution_code, statement_family_code, statement_start_date, statement_end_date, native_currency, projection_algorithm, projection_digest, authoritative_projection_id, created_at FROM statement_equivalence_groups WHERE workspace_id = ? ORDER BY created_at, id;",
+            params: [workspaceId]
+        ) { row in
+            StatementEquivalenceGroupDTO(
+                id: row.string(at: 0) ?? "", workspaceID: workspaceId,
+                accountID: row.string(at: 1) ?? "", institutionCode: row.string(at: 2) ?? "",
+                statementFamilyCode: row.string(at: 3) ?? "", statementStartDateISO: row.string(at: 4) ?? "",
+                statementEndDateISO: row.string(at: 5) ?? "", nativeCurrency: row.string(at: 6) ?? "",
+                projectionAlgorithm: row.string(at: 7) ?? "", projectionDigest: row.string(at: 8) ?? "",
+                authoritativeProjectionID: row.string(at: 9) ?? "", createdAtISO: row.string(at: 10) ?? ""
+            )
+        }
+    }
+
+    func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] {
+        try db.query(
+            sql: "SELECT m.id, m.group_id, m.projection_id, m.role, m.source_format_code, m.created_at FROM statement_equivalence_members m JOIN statement_equivalence_groups g ON g.id = m.group_id WHERE g.workspace_id = ? ORDER BY m.created_at, m.id;",
+            params: [workspaceId]
+        ) { row in
+            guard let role = StatementEquivalenceMemberRole(rawValue: row.string(at: 3) ?? "") else {
+                throw RepositoryError.relationshipViolation("Statement equivalence member role is invalid.")
+            }
+            return StatementEquivalenceMemberDTO(
+                id: row.string(at: 0) ?? "", groupID: row.string(at: 1) ?? "",
+                projectionID: row.string(at: 2) ?? "", role: role,
+                sourceFormatCode: row.string(at: 4) ?? "", createdAtISO: row.string(at: 5) ?? ""
+            )
+        }
+    }
+
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
         try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
         do {

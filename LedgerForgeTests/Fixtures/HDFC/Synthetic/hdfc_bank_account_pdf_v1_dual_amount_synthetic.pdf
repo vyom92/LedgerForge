@@ -1,0 +1,124 @@
+%PDF-1.3
+%“Œ‹ž ReportLab Generated PDF document (opensource)
+1 0 obj
+<<
+/F1 2 0 R
+>>
+endobj
+2 0 obj
+<<
+/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
+>>
+endobj
+3 0 obj
+<<
+/Contents 7 0 R /MediaBox [ 0 0 841.8898 595.2756 ] /Parent 6 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+4 0 obj
+<<
+/PageMode /UseNone /Pages 6 0 R /Type /Catalog
+>>
+endobj
+5 0 obj
+<<
+/Author (LedgerForge fixture generator) /CreationDate (D:20000101000000+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20000101000000+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+  /Subject (unspecified) /Title (Invented HDFC bank-account PDF mechanics fixture) /Trapped /False
+>>
+endobj
+6 0 obj
+<<
+/Count 1 /Kids [ 3 0 R ] /Type /Pages
+>>
+endobj
+7 0 obj
+<<
+/Length 2703
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 8 Tf 9.6 TL ET
+BT /F1 8 Tf 9.6 TL ET
+BT 1 0 0 1 34 570 Tm (HDFC BANK LIMITED) Tj T* ET
+BT 1 0 0 1 470 570 Tm (Statement of account) Tj T* ET
+BT 1 0 0 1 340 548 Tm (Account Branch : TEST BRANCH) Tj T* ET
+BT 1 0 0 1 340 532 Tm (Address : HDFC BANK ,TEST BRANCH) Tj T* ET
+BT 1 0 0 1 340 516 Tm (City : TEST CITY) Tj T* ET
+BT 1 0 0 1 340 500 Tm (State : TEST STATE) Tj T* ET
+BT 1 0 0 1 340 484 Tm (Phone no. : 000/00000000) Tj T* ET
+BT 1 0 0 1 340 468 Tm (Email :) Tj T* ET
+BT 1 0 0 1 340 452 Tm (OD Limit : 0.00 Currency : INR) Tj T* ET
+BT 1 0 0 1 340 436 Tm (Cust ID : 123456789) Tj T* ET
+BT 1 0 0 1 340 420 Tm (Account No : 11112222333344 NR Others) Tj T* ET
+BT 1 0 0 1 34 404 Tm (Statement From : 01/04/2025 To : 31/03/2026) Tj T* ET
+BT 1 0 0 1 290 570 Tm (Page No . : 1) Tj T* ET
+BT 1 0 0 1 34 380 Tm (Date) Tj T* ET
+BT 1 0 0 1 68 380 Tm (Narration) Tj T* ET
+BT 1 0 0 1 285 380 Tm (Chq./Ref.No.) Tj T* ET
+BT 1 0 0 1 362 380 Tm (Value Dt) Tj T* ET
+BT 1 0 0 1 442 380 Tm (Withdrawal Amt.) Tj T* ET
+BT 1 0 0 1 520 380 Tm (Deposit Amt.) Tj T* ET
+BT 1 0 0 1 590 380 Tm (Closing Balance) Tj T* ET
+BT 1 0 0 1 34 355 Tm (04/04/25) Tj T* ET
+BT 1 0 0 1 68 355 Tm (Synthetic debit) Tj T* ET
+BT 1 0 0 1 68 343 Tm (event) Tj T* ET
+BT 1 0 0 1 285 355 Tm (REV0001) Tj T* ET
+BT 1 0 0 1 362 355 Tm (03/04/25) Tj T* ET
+BT 1 0 0 1 459.984 355 Tm (10.25) Tj T* ET
+BT 1 0 0 1 542.432 355 Tm (1.00) Tj T* ET
+BT 1 0 0 1 601.536 355 Tm (989.75) Tj T* ET
+BT 1 0 0 1 34 313 Tm (05/04/25) Tj T* ET
+BT 1 0 0 1 68 313 Tm (Synthetic credit event) Tj T* ET
+BT 1 0 0 1 285 313 Tm (CREDIT1) Tj T* ET
+BT 1 0 0 1 362 313 Tm (05/04/25) Tj T* ET
+BT 1 0 0 1 537.984 313 Tm (20.50) Tj T* ET
+BT 1 0 0 1 597.088 313 Tm (1010.25) Tj T* ET
+BT 1 0 0 1 34 271 Tm (06/04/25) Tj T* ET
+BT 1 0 0 1 68 271 Tm (Synthetic reversal debit) Tj T* ET
+BT 1 0 0 1 285 271 Tm (REPEAT9) Tj T* ET
+BT 1 0 0 1 362 271 Tm (06/04/25) Tj T* ET
+BT 1 0 0 1 464.432 271 Tm (5.00) Tj T* ET
+BT 1 0 0 1 597.088 271 Tm (1005.25) Tj T* ET
+BT 1 0 0 1 34 229 Tm (07/04/25) Tj T* ET
+BT 1 0 0 1 68 229 Tm (Synthetic reversal credit) Tj T* ET
+BT 1 0 0 1 285 229 Tm (REPEAT9) Tj T* ET
+BT 1 0 0 1 362 229 Tm (07/04/25) Tj T* ET
+BT 1 0 0 1 542.432 229 Tm (5.00) Tj T* ET
+BT 1 0 0 1 597.088 229 Tm (1010.25) Tj T* ET
+BT 1 0 0 1 68 170 Tm (STATEMENT SUMMARY  :-) Tj T* ET
+BT 1 0 0 1 68 150 Tm (Opening Balance Dr Count Cr Count Debits Credits Closing Bal) Tj T* ET
+BT 1 0 0 1 68 134 Tm (1000.00 2 2 15.25 25.50 1010.25) Tj T* ET
+BT 1 0 0 1 68 100 Tm (This is a computer generated statement and does not require signature.) Tj T* ET
+BT 1 0 0 1 68 84 Tm (HDFC BANK LIMITED) Tj T* ET
+BT 1 0 0 1 68 68 Tm (--- End Of Statement ---) Tj T* ET
+ 
+endstream
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000061 00000 n 
+0000000092 00000 n 
+0000000199 00000 n 
+0000000402 00000 n 
+0000000470 00000 n 
+0000000791 00000 n 
+0000000850 00000 n 
+trailer
+<<
+/ID 
+[<d4fa94786d63a568742e6811c7cda504><d4fa94786d63a568742e6811c7cda504>]
+% ReportLab generated PDF document -- digest (opensource)
+
+/Info 5 0 R
+/Root 4 0 R
+/Size 8
+>>
+startxref
+3604
+%%EOF

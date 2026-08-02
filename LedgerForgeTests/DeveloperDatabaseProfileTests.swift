@@ -95,7 +95,7 @@ struct DeveloperDatabaseProfileTests {
         #expect(!identity.authorizesCleanup(of: temporary))
     }
 
-    @Test(arguments: [0, 9, 10, Int.max])
+    @Test(arguments: [0, 10, Int.max])
     func migrationSandboxRejectsNonHistoricalSourceVersions(_ version: Int) {
         #expect(throws: DevelopmentDatabaseProfileDomainError.invalidMigrationSourceVersion) {
             _ = try DevelopmentDatabaseProfile.resolve(.migrationSandbox(sourceVersion: version))
@@ -111,7 +111,7 @@ struct DeveloperDatabaseProfileTests {
         )
 
         #expect(descriptor.displayName == "Migration Sandbox")
-        #expect(descriptor.migrationSourceVersion == 8)
+        #expect(descriptor.migrationSourceVersion == 9)
         #expect(!String(describing: DevelopmentDatabaseProfileActivationResult.activityBlocked).contains("/"))
         #expect(!String(describing: DevelopmentDatabaseProfileActivationResult.migrationFailed).contains("sqlite"))
     }
@@ -152,7 +152,7 @@ struct DeveloperDatabaseProfileTests {
 
         let preferences = DevelopmentDatabaseProfilePreferences(defaults: defaults)
         #expect(preferences.rememberedDevelopmentProfile == .persistentDebug)
-        #expect(preferences.rememberedMigrationSourceVersion == 8)
+        #expect(preferences.rememberedMigrationSourceVersion == 9)
     }
 
     @Test(.globalRuntimeStateIsolation)

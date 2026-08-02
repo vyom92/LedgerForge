@@ -77,6 +77,7 @@ struct ImportEngineResult: Equatable {
     let sourceRowCount: Int?
     let recognizedExistingRowCount: Int?
     let isPartialImport: Bool
+    let isEquivalentSupportingSource: Bool
     let accountOutcome: ImportAccountOutcome
     let recoveryRoute: ConfirmedImportRecoveryRoute
 #if DEBUG
@@ -99,6 +100,7 @@ struct ImportEngineResult: Equatable {
         sourceRowCount: Int? = nil,
         recognizedExistingRowCount: Int? = nil,
         isPartialImport: Bool = false,
+        isEquivalentSupportingSource: Bool = false,
         accountOutcome: ImportAccountOutcome = .unavailable,
         recoveryRoute: ConfirmedImportRecoveryRoute = .unavailable
     ) {
@@ -117,6 +119,7 @@ struct ImportEngineResult: Equatable {
         self.sourceRowCount = sourceRowCount
         self.recognizedExistingRowCount = recognizedExistingRowCount
         self.isPartialImport = isPartialImport
+        self.isEquivalentSupportingSource = isEquivalentSupportingSource
         self.accountOutcome = accountOutcome
         self.recoveryRoute = recoveryRoute
 #if DEBUG
@@ -191,6 +194,7 @@ struct PreparedImport: Identifiable {
     let sourceSnapshot: SourceContentSnapshot
     let fingerprintSet: PreparedDocumentFingerprintSet
     let advisoryPreviousImport: PreviouslyImportedStatement?
+    let statementEquivalenceReview: StatementEquivalenceReviewResult
     let providerGeneration: ProviderGenerationToken
 
     init(
@@ -208,6 +212,7 @@ struct PreparedImport: Identifiable {
         sourceSnapshot: SourceContentSnapshot? = nil,
         fingerprintSet: PreparedDocumentFingerprintSet? = nil,
         advisoryPreviousImport: PreviouslyImportedStatement? = nil,
+        statementEquivalenceReview: StatementEquivalenceReviewResult = .notApplicable,
         providerGeneration: ProviderGenerationToken = DatabaseProvider.shared.generationToken
     ) {
         self.id = id
@@ -229,6 +234,7 @@ struct PreparedImport: Identifiable {
             sourceBytes: resolvedSnapshot.sourceByteFingerprint
         )
         self.advisoryPreviousImport = advisoryPreviousImport
+        self.statementEquivalenceReview = statementEquivalenceReview
         self.providerGeneration = providerGeneration
     }
 
@@ -511,14 +517,31 @@ final class ImportEngine {
             normalizedHeader = normalization.header
             sourceContext = normalization.sourceContext
         case .pdf:
-            let normalization = try AxisBankAccountPDFNormalizer().normalize(
-                text: contents,
-                fileURL: url
-            )
-            document = normalization.document
-            normalizedRows = normalization.rows
-            normalizedHeader = normalization.header
-            sourceContext = normalization.sourceContext
+            switch institutionCandidate.institutionCode {
+            case Institution.axis.rawValue:
+                let normalization = try AxisBankAccountPDFNormalizer().normalize(
+                    text: contents,
+                    fileURL: url
+                )
+                document = normalization.document
+                normalizedRows = normalization.rows
+                normalizedHeader = normalization.header
+                sourceContext = normalization.sourceContext
+            case Institution.hdfc.rawValue:
+                let normalization = try snapshot.withBytes {
+                    try HDFCBankAccountPDFNormalizer().normalize(
+                        text: contents,
+                        sourceBytes: $0,
+                        fileURL: url
+                    )
+                }
+                document = normalization.document
+                normalizedRows = normalization.rows
+                normalizedHeader = normalization.header
+                sourceContext = normalization.sourceContext
+            default:
+                throw ImportError.invalidDocument(message: "No suitable PDF normalizer found.")
+            }
         case .xls:
             switch institutionCandidate.institutionCode {
             case Institution.axis.rawValue:
@@ -611,6 +634,16 @@ final class ImportEngine {
         let advisoryPreviousImport = validation.passed
             ? try importPersistenceCoordinatorFactory().priorImportedStatement(fingerprint: fingerprint)
             : nil
+        let statementEquivalenceReview = validation.passed && advisoryPreviousImport == nil
+            ? try importPersistenceCoordinatorFactory().reviewStatementEquivalence(
+                financialDocument: financialDocument,
+                importSession: importSession,
+                validation: validation,
+                fingerprintSet: fingerprintSet,
+                accountChoice: nil,
+                providerGeneration: preparationGeneration
+            )
+            : .notApplicable
         try Task.checkCancellation()
 
         try publishPreparationProgress(.preparingConfirmationPreview, requestId: requestId, progress: progress)
@@ -629,6 +662,7 @@ final class ImportEngine {
             sourceSnapshot: snapshot,
             fingerprintSet: fingerprintSet,
             advisoryPreviousImport: advisoryPreviousImport,
+            statementEquivalenceReview: statementEquivalenceReview,
             providerGeneration: preparationGeneration
         )
 #if DEBUG
@@ -942,7 +976,7 @@ final class ImportEngine {
 
         return ImportEngineResult(
             fileName: preparedImport.fileName,
-            transactionCount: persistenceResult.previousImport?.transactionCount ?? preparedImport.transactionCount,
+            transactionCount: persistenceResult.previousImport?.transactionCount ?? persistenceResult.transactionCount,
             validationPassed: true,
             persisted: persistenceResult.persisted,
             errorMessage: persistenceErrorMessage,
@@ -958,6 +992,7 @@ final class ImportEngine {
             sourceRowCount: persistenceResult.sourceRowCount,
             recognizedExistingRowCount: persistenceResult.recognizedExistingRowCount,
             isPartialImport: persistenceResult.isPartialImport,
+            isEquivalentSupportingSource: persistenceResult.isEquivalentSupportingSource,
             accountOutcome: persistenceResult.accountOutcome,
             recoveryRoute: recoveryRoute
         )
@@ -1050,6 +1085,9 @@ final class ImportEngine {
         case .persistenceUnavailable:
             return .prepareAgain(.persistenceUnavailable)
         case .repositoryIntegrityConflict:
+            return .reviewRequired(.repositoryIntegrityConflict)
+        case .statementEquivalenceConflict, .statementEquivalenceEvidenceUnavailable,
+                .equivalentFormatAlreadyRecorded:
             return .reviewRequired(.repositoryIntegrityConflict)
         case .transactionEventBlock:
             return .reviewRequired(.transactionEventBlock)

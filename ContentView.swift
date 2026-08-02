@@ -674,7 +674,9 @@ enum DurableImportAccountOutcomeSection {
                     outcomeCode: outcomeCode,
                     accountDecisionCode: accountDecisionCode
                 )
-            case .reviewedPartialPlanStale, .partialImportUnsupportedEvidence,
+            case .equivalentSourceRecorded, .statementEquivalenceConflict,
+                    .statementEquivalenceEvidenceUnavailable, .equivalentFormatAlreadyRecorded,
+                    .reviewedPartialPlanStale, .partialImportUnsupportedEvidence,
                     .validationFailure, .persistenceFailure, .exactStatementDuplicate,
                     .existingEligibleAxisUPIEvent, .repeatedEligibleIncomingEvidence,
                     .transactionEventOwnershipConflict, .repositoryIntegrityConflict,
@@ -741,6 +743,34 @@ struct DurableImportAttemptPresentation: Equatable {
                 explanation: "Persisted \(transactionCount) transaction(s)",
                 iconName: "checkmark.circle.fill",
                 tone: .success
+            )
+        case .equivalentSourceRecorded:
+            return DurableImportPresentationValue(
+                label: "Equivalent source recorded",
+                explanation: "Recorded equivalent source evidence and persisted 0 additional transactions",
+                iconName: "checkmark.seal.fill",
+                tone: .success
+            )
+        case .statementEquivalenceConflict:
+            return DurableImportPresentationValue(
+                label: "Statement equivalence conflict",
+                explanation: "The same statement period differs financially across formats. No new financial history was written",
+                iconName: "exclamationmark.triangle.fill",
+                tone: .danger
+            )
+        case .statementEquivalenceEvidenceUnavailable:
+            return DurableImportPresentationValue(
+                label: "Equivalence evidence unavailable",
+                explanation: "Existing overlapping history lacks exact projection evidence. No new financial history was written",
+                iconName: "questionmark.diamond.fill",
+                tone: .warning
+            )
+        case .equivalentFormatAlreadyRecorded:
+            return DurableImportPresentationValue(
+                label: "Format already recorded",
+                explanation: "This source format is already represented for the statement period. No new financial history was written",
+                iconName: "doc.on.doc.fill",
+                tone: .warning
             )
         case .partialImportCommitted:
             return DurableImportPresentationValue(
@@ -899,6 +929,8 @@ struct DurableImportAttemptPresentation: Equatable {
         switch guidance {
         case .importCompleted:
             return "Import completed"
+        case .equivalentSourceRecorded:
+            return "Equivalent source evidence recorded; no additional transactions were created"
         case .partialImportCompleted:
             return "Reviewed partial import completed"
         case .reviewPriorImport:
@@ -937,6 +969,7 @@ struct ImportOutcomePresentation: Equatable {
     let transactionEventBlock: TransactionEventBlock?
     var recoveryRoute: ConfirmedImportRecoveryRoute
     let isPartialImport: Bool
+    let isEquivalentSupportingSource: Bool
     let sourceRowCount: Int?
     let recognizedExistingRowCount: Int?
     let accountOutcomePresentation: ImportAccountOutcomePresentation?
@@ -947,6 +980,7 @@ struct ImportOutcomePresentation: Equatable {
         transactionCount = result.transactionCount
         validationStatus = result.validationPassed ? "Validation Passed" : "Validation Failed"
         allowsViewingTransactions = Self.provesCommittedSuccess(result)
+            && !result.isEquivalentSupportingSource
             && (result.recoveryRoute == .none || result.recoveryRoute == .unavailable)
         accountId = result.accountId
         importSessionId = result.importSessionId
@@ -957,6 +991,7 @@ struct ImportOutcomePresentation: Equatable {
         transactionEventBlock = result.transactionEventBlock
         recoveryRoute = result.recoveryRoute
         isPartialImport = result.isPartialImport
+        isEquivalentSupportingSource = result.isEquivalentSupportingSource
         sourceRowCount = result.sourceRowCount
         recognizedExistingRowCount = result.recognizedExistingRowCount
         accountOutcomePresentation = result.accountOutcome == .unavailable
@@ -1005,9 +1040,9 @@ struct ImportOutcomePresentation: Equatable {
             tone = .warning
         case .none:
             if Self.provesCommittedSuccess(result) {
-                persistenceStatus = result.isPartialImport
-                    ? "Partial Import Succeeded"
-                    : "Persistence Succeeded"
+                persistenceStatus = result.isEquivalentSupportingSource
+                    ? "Equivalent Source Recorded"
+                    : (result.isPartialImport ? "Partial Import Succeeded" : "Persistence Succeeded")
                 iconName = "checkmark.circle.fill"
                 tone = .success
             } else {
@@ -1017,9 +1052,9 @@ struct ImportOutcomePresentation: Equatable {
             }
         case .unavailable:
             if Self.provesCommittedSuccess(result) {
-                persistenceStatus = result.isPartialImport
-                    ? "Partial Import Succeeded"
-                    : "Persistence Succeeded"
+                persistenceStatus = result.isEquivalentSupportingSource
+                    ? "Equivalent Source Recorded"
+                    : (result.isPartialImport ? "Partial Import Succeeded" : "Persistence Succeeded")
                 iconName = "checkmark.circle.fill"
                 tone = .success
             } else if !result.validationPassed {
@@ -1063,6 +1098,9 @@ struct ImportOutcomePresentation: Equatable {
         }
         if isPartialImport {
             return "Partial import — \(transactionCount) new, \(recognizedExistingRowCount ?? 0) already represented, \(sourceRowCount ?? transactionCount) source rows"
+        }
+        if isEquivalentSupportingSource {
+            return "Equivalent source evidence recorded — 0 additional transactions"
         }
         if allowsViewingTransactions {
             return "Imported \(transactionCount) transaction(s)"
@@ -2397,6 +2435,16 @@ struct ContentView: View {
 
                     LFInfoRow(title: "Transactions", value: "\(outcome.transactionCount)")
 
+                    if outcome.isEquivalentSupportingSource {
+                        Text("LedgerForge recorded this document as a supporting equivalent source. The previously accepted source remains authoritative and no additional financial history was written.")
+                            .font(.caption)
+                            .foregroundStyle(LFTheme.textSecondary)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(LFTheme.success.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+
                     if outcome.isPreviouslyImported {
                         if let completedAtISO = outcome.previousImportCompletedAtISO {
                             LFInfoRow(title: "Prior Import", value: completedAtISO)
@@ -2436,7 +2484,7 @@ struct ContentView: View {
                         }
                     }
 
-                    if outcome.allowsViewingTransactions || outcome.isPreviouslyImported {
+                    if outcome.allowsViewingTransactions || outcome.isPreviouslyImported || outcome.isEquivalentSupportingSource {
                         if let accountId = outcome.accountId,
                            accountsViewModel.accounts.contains(where: { $0.id == accountId }) {
                             Button {
@@ -2603,6 +2651,41 @@ struct ContentView: View {
 
             importIdentityReviewPanel(preparedImport)
 
+            switch preparedImport.statementEquivalenceReview {
+            case .equivalent:
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Equivalent statement source", systemImage: "checkmark.seal.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(LFTheme.success)
+                    Text("This PDF/XLS statement is financially identical to an accepted source. Confirmation records durable supporting evidence, preserves the existing source as authoritative, and writes 0 additional transactions.")
+                        .font(.caption)
+                        .foregroundStyle(LFTheme.textSecondary)
+                }
+                .padding(12)
+                .background(LFTheme.success.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            case .conflict:
+                statementEquivalenceBlockingPanel(
+                    title: "Statement equivalence conflict",
+                    explanation: "An accepted source for this account and statement period differs financially. Confirmation is blocked and no new financial history can be written.",
+                    tone: .danger
+                )
+            case .evidenceUnavailable:
+                statementEquivalenceBlockingPanel(
+                    title: "Equivalence evidence unavailable",
+                    explanation: "Overlapping accepted history cannot be proved equivalent with the exact projection contract. Confirmation is blocked for integrity review.",
+                    tone: .warning
+                )
+            case .formatAlreadyRecorded:
+                statementEquivalenceBlockingPanel(
+                    title: "Source format already represented",
+                    explanation: "This statement period already has an accepted source in the same format. Confirmation is blocked.",
+                    tone: .warning
+                )
+            case .notApplicable, .firstAcceptedSource:
+                EmptyView()
+            }
+
             if case .eligible(let plan) = partialImportReview {
                 partialImportReviewPanel(plan, preparedImport: preparedImport)
             }
@@ -2688,10 +2771,41 @@ struct ContentView: View {
     }
 
     private var importConfirmationLabel: String {
+        if case .previewReady(let preparedImport) = importState,
+           case .equivalent = preparedImport.statementEquivalenceReview {
+            return "Record Equivalent Source"
+        }
         if case .eligible(let plan) = partialImportReview {
             return "Import \(plan.importedCount) new transaction\(plan.importedCount == 1 ? "" : "s")"
         }
         return "Confirm Import"
+    }
+
+    private func statementEquivalenceBlockingPanel(
+        title: String,
+        explanation: String,
+        tone: ImportOutcomeTone
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tone.color)
+            Text(explanation)
+                .font(.caption)
+                .foregroundStyle(LFTheme.textSecondary)
+        }
+        .padding(12)
+        .background(tone.color.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func statementEquivalenceBlocksConfirmation(_ preparedImport: PreparedImport) -> Bool {
+        switch preparedImport.statementEquivalenceReview {
+        case .conflict, .evidenceUnavailable, .formatAlreadyRecorded:
+            return true
+        case .notApplicable, .firstAcceptedSource, .equivalent:
+            return false
+        }
     }
 
     private var partialReviewBlocksConfirmation: Bool {
@@ -2842,7 +2956,8 @@ struct ContentView: View {
                         review: importIdentityReview,
                         choice: importAccountChoice
                     ) ||
-                    partialReviewBlocksConfirmation
+                    partialReviewBlocksConfirmation ||
+                    statementEquivalenceBlocksConfirmation(preparedImport)
                 )
             case .importing:
                 Label("Importing", systemImage: "hourglass")

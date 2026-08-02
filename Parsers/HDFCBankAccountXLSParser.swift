@@ -103,11 +103,27 @@ final class HDFCBankAccountXLSParser: StatementParser {
     }
 
     func parse(document: NormalizedDocument) throws -> FinancialDocument {
+        try parse(
+            document: document,
+            fileFormat: .xls,
+            parserProfileID: Self.profileID,
+            parserProfileVersion: Self.profileVersion,
+            parserName: name
+        )
+    }
+
+    func parse(
+        document: NormalizedDocument,
+        fileFormat: FileFormat,
+        parserProfileID: String,
+        parserProfileVersion: String,
+        parserName: String
+    ) throws -> FinancialDocument {
         guard document.metadata.institution == .hdfc,
               document.metadata.documentType == .bankAccount,
-              document.metadata.fileFormat == .xls,
+              document.metadata.fileFormat == fileFormat,
               document.document.fileType.caseInsensitiveCompare(
-                  FileFormat.xls.rawValue
+                  fileFormat.rawValue
               ) == .orderedSame else {
             throw HDFCBankAccountXLSParserError.unsupportedDocumentFormat
         }
@@ -294,8 +310,8 @@ final class HDFCBankAccountXLSParser: StatementParser {
                             normalizedRecordDigest: String.normalizedRecordDigest(
                                 values: row.values
                             ),
-                            parserProfileID: Self.profileID,
-                            parserProfileVersion: Self.profileVersion
+                            parserProfileID: parserProfileID,
+                            parserProfileVersion: parserProfileVersion
                         )
                     ]
                 )
@@ -324,7 +340,7 @@ final class HDFCBankAccountXLSParser: StatementParser {
         return FinancialDocument(
             sourceDocument: document.document,
             metadata: document.metadata,
-            parserName: name,
+            parserName: parserName,
             bookedCurrency: currency,
             declaredStatementPeriod: period,
             transactions: transactions,
@@ -386,7 +402,7 @@ final class HDFCBankAccountXLSParser: StatementParser {
         }
         guard let currencyCaptures = Self.captures(
             currencyValues[4],
-            #"^OD Limit\s*:[0-9,.]+\s+Currency\s*:\s*([A-Z]{3})$"#
+            #"^OD Limit\s*:\s*[0-9,.]+\s+Currency\s*:\s*([A-Z]{3})$"#
         ) else {
             throw HDFCBankAccountXLSParserError.malformedCurrency(
                 sourceOrdinal: currency.sourceOrdinal

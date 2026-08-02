@@ -16,7 +16,7 @@ struct DocumentFingerprintMigrationTests {
 
         try setup.database.runMigrations(allMigrations)
 
-        #expect(try setup.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 9)
+        #expect(try setup.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 10)
         let afterFingerprint = try v9FingerprintRows(setup.database)
         #expect(afterFingerprint.count == beforeFingerprint.count)
         for (before, after) in zip(beforeFingerprint, afterFingerprint) {

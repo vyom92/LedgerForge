@@ -16,6 +16,15 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         self.generationToken = generationToken
     }
 
+    func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult {
+        guard plan.providerGeneration == generationToken else { return .evidenceUnavailable }
+        do {
+            return try reviewStatementEquivalenceInsideTransaction(plan, resolvedAccountID: nil)
+        } catch {
+            return .evidenceUnavailable
+        }
+    }
+
     func reviewPartialImport(_ plan: ConfirmedImportPlanDTO) -> PartialImportReviewResult {
         guard plan.providerGeneration == generationToken else {
             return .repositoryIntegrityConflict
@@ -90,7 +99,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
             let result = try commitInsideTransaction(plan)
             switch result {
-            case .committed:
+            case .committed, .equivalentSourceRecorded:
                 try db.execute(sql: "COMMIT;")
             default:
                 try db.execute(sql: "ROLLBACK;")
@@ -177,6 +186,24 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             account = existing
         }
 
+        let equivalenceReview = try reviewStatementEquivalenceInsideTransaction(
+            plan,
+            resolvedAccountID: account.id
+        )
+        let isSupportingSource: Bool
+        switch equivalenceReview {
+        case .notApplicable, .firstAcceptedSource:
+            isSupportingSource = false
+        case .equivalent:
+            isSupportingSource = true
+        case .conflict:
+            return .statementEquivalenceConflict
+        case .evidenceUnavailable:
+            return .statementEquivalenceEvidenceUnavailable
+        case .formatAlreadyRecorded:
+            return .equivalentFormatAlreadyRecorded
+        }
+
         var observations = [(String, ConfirmedImportIdentifierCandidateDTO)]()
         for candidate in plan.identifiers {
             let ownerRows = try db.query(sql: "SELECT account_id FROM account_identifiers WHERE workspace_id = ? AND scheme = ? AND identifier = ?;", params: [plan.workspace.id, candidate.scheme, candidate.normalizedValue]) { $0.string(at: 0) ?? "" }
@@ -194,7 +221,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         let history = plan.historyTemplate
         var transactions = [TransactionDTO]()
         var events = [TransactionEventIdentityDTO]()
-        for template in plan.transactionTemplates {
+        for template in plan.transactionTemplates where !isSupportingSource {
             let transaction = finalTransaction(template.transaction, accountID: account.id, history: history)
             transactions.append(transaction)
             if let evidence = template.eventEvidence {
@@ -220,11 +247,30 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               history.successfulAttempt.importSessionId == history.importSession.id,
               history.successfulAttempt.documentId == history.document.id else { return .repositoryIntegrityConflict }
 
-        try insert(history: history, transactions: transactions, events: events, observations: observations)
-        return .committed(ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id))
+        try insert(
+            history: history,
+            transactions: transactions,
+            events: events,
+            observations: observations,
+            projection: plan.statementFinancialProjection,
+            equivalenceReview: equivalenceReview,
+            workspaceID: plan.workspace.id,
+            accountID: account.id
+        )
+        let receipt = ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id)
+        return isSupportingSource ? .equivalentSourceRecorded(receipt) : .committed(receipt)
     }
 
-    private func insert(history: ConfirmedImportHistoryTemplateDTO, transactions: [TransactionDTO], events: [TransactionEventIdentityDTO], observations: [(String, ConfirmedImportIdentifierCandidateDTO)]) throws {
+    private func insert(
+        history: ConfirmedImportHistoryTemplateDTO,
+        transactions: [TransactionDTO],
+        events: [TransactionEventIdentityDTO],
+        observations: [(String, ConfirmedImportIdentifierCandidateDTO)],
+        projection: StatementFinancialProjectionDTO?,
+        equivalenceReview: StatementEquivalenceReviewResult,
+        workspaceID: String,
+        accountID: String
+    ) throws {
         let document = history.document
         try db.executePrepared(sql: "INSERT INTO import_sessions (id, workspace_id, user_visible_name, started_at, validation_status, created_at, reader_version, parser_version, layout_version) VALUES (?,?,?,?,?,?,?,?,?);", params: [history.importSession.id, history.importSession.workspaceId, history.importSession.userVisibleName ?? NSNull(), history.importSession.startedAtISO, history.importSession.validationStatus, history.importSession.startedAtISO, history.importSession.readerVersion ?? NSNull(), history.importSession.parserVersion ?? NSNull(), history.importSession.layoutVersion ?? NSNull()])
         try db.executePrepared(sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, mime_type, size_bytes, sha256, storage_path, extracted_text_snippet, page_count, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?);", params: [document.id, document.workspaceId, document.importSessionId, document.filename, document.mimeType ?? NSNull(), document.sizeBytes ?? NSNull(), document.legacyRawTextSHA256, NSNull(), NSNull(), NSNull(), document.createdAtISO])
@@ -246,9 +292,288 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         for (ownershipID, candidate) in observations {
             try db.executePrepared(sql: "INSERT INTO account_identifier_observations (id, ownership_id, import_session_id, document_id, parser_provenance_code, association_authority_code, created_at) VALUES (?,?,?,?,?,?,?);", params: [UUID().uuidString, ownershipID, history.importSession.id, history.document.id, candidate.provenanceCode, "confirmed-import", history.completedAtISO])
         }
-        let attempt = history.successfulAttempt
+        if let projection {
+            try insertStatementProjection(
+                projection,
+                workspaceID: workspaceID,
+                accountID: accountID,
+                documentID: history.document.id,
+                importSessionID: history.importSession.id,
+                createdAtISO: history.completedAtISO
+            )
+            try insertStatementEquivalenceMembership(
+                projection,
+                review: equivalenceReview,
+                workspaceID: workspaceID,
+                accountID: accountID,
+                createdAtISO: history.completedAtISO
+            )
+        }
+        let attempt: ImportAttemptDTO
+        if case .equivalent(let authoritativeImportSessionID) = equivalenceReview {
+            attempt = ImportAttemptDTO(
+                id: history.successfulAttempt.id,
+                workspaceId: workspaceID,
+                createdAtISO: history.completedAtISO,
+                outcomeCode: ImportAttemptOutcome.equivalentSourceRecorded.rawValue,
+                coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+                accountDecisionCode: ImportAttemptAccountDecision.noFinancialMutation.rawValue,
+                guidanceCode: ImportAttemptGuidance.equivalentSourceRecorded.rawValue,
+                persistenceCode: ImportAttemptPersistence.committed.rawValue,
+                transactionCount: 0,
+                accountId: accountID,
+                importSessionId: history.importSession.id,
+                documentId: history.document.id,
+                relatedImportSessionId: authoritativeImportSessionID,
+                sourceRowCount: projection?.eventCount,
+                importedTransactionCount: 0,
+                recognizedExistingRowCount: projection?.eventCount,
+                blockedRowCount: 0
+            )
+        } else {
+            attempt = history.successfulAttempt
+        }
         try db.executePrepared(sql: "INSERT INTO import_attempts (id, workspace_id, created_at, outcome_code, coverage_code, account_decision_code, guidance_code, persistence_code, transaction_count, account_id, import_session_id, document_id, related_import_session_id, source_row_count, imported_transaction_count, recognized_existing_row_count, blocked_row_count) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [attempt.id, attempt.workspaceId, attempt.createdAtISO, attempt.outcomeCode, attempt.coverageCode, attempt.accountDecisionCode, attempt.guidanceCode, attempt.persistenceCode, attempt.transactionCount, attempt.accountId ?? NSNull(), attempt.importSessionId ?? NSNull(), attempt.documentId ?? NSNull(), attempt.relatedImportSessionId ?? NSNull(), attempt.sourceRowCount ?? NSNull(), attempt.importedTransactionCount ?? NSNull(), attempt.recognizedExistingRowCount ?? NSNull(), attempt.blockedRowCount ?? NSNull()])
         try db.executePrepared(sql: "UPDATE import_sessions SET validation_status = ?, completed_at = ?, updated_at = ? WHERE id = ?;", params: ["passed", history.completedAtISO, history.completedAtISO, history.importSession.id])
+    }
+
+    private func reviewStatementEquivalenceInsideTransaction(
+        _ plan: ConfirmedImportPlanDTO,
+        resolvedAccountID: String?
+    ) throws -> StatementEquivalenceReviewResult {
+        guard let projection = plan.statementFinancialProjection else { return .notApplicable }
+        guard projection.isValid(),
+              let normalized = plan.historyTemplate.normalizedDocument,
+              normalized.profileId == projection.parserProfileID,
+              normalized.profileVersion == projection.parserProfileVersion,
+              plan.historyTemplate.normalizedRows.count == projection.eventCount,
+              plan.transactionTemplates.count == projection.eventCount,
+              plan.declaredStatementStartISO == projection.statementStartDateISO,
+              plan.declaredStatementEndISO == projection.statementEndDateISO,
+              plan.proposedAccount.nativeCurrency == projection.nativeCurrency else {
+            return .evidenceUnavailable
+        }
+
+        let accountID: String?
+        if let resolvedAccountID {
+            accountID = resolvedAccountID
+        } else if case .useExistingAccount(let existingAccountID) = plan.accountChoice {
+            accountID = existingAccountID
+        } else {
+            accountID = nil
+        }
+        guard let accountID else { return .firstAcceptedSource }
+
+        let groupRows = try db.query(
+            sql: "SELECT id, projection_algorithm, projection_digest, authoritative_projection_id FROM statement_equivalence_groups WHERE workspace_id = ? AND account_id = ? AND institution_code = ? AND statement_family_code = ? AND statement_start_date = ? AND statement_end_date = ? AND native_currency = ? LIMIT 1;",
+            params: [plan.workspace.id, accountID, projection.institutionCode, projection.statementFamilyCode, projection.statementStartDateISO, projection.statementEndDateISO, projection.nativeCurrency]
+        ) { row in
+            (row.string(at: 0) ?? "", row.string(at: 1) ?? "", row.string(at: 2) ?? "", row.string(at: 3) ?? "")
+        }
+        if let group = groupRows.first {
+            if try count(
+                "SELECT COUNT(*) FROM statement_equivalence_members WHERE group_id = ? AND source_format_code = ?;",
+                [group.0, projection.sourceFormatCode]
+            ) > 0 {
+                return .formatAlreadyRecorded
+            }
+            guard group.1 == projection.algorithmIdentifier,
+                  group.2 == projection.digest,
+                  let authoritative = try loadStatementProjection(id: group.3),
+                  financiallyEquivalent(authoritative.projection, projection) else {
+                return .conflict
+            }
+            return .equivalent(authoritativeImportSessionID: authoritative.importSessionID)
+        }
+
+        if try hasPreV10ExactEventOverlap(projection, accountID: accountID) {
+            return .evidenceUnavailable
+        }
+        return .firstAcceptedSource
+    }
+
+    private func loadStatementProjection(id: String) throws -> StatementFinancialProjectionRecordDTO? {
+        let records = try db.query(
+            sql: "SELECT id, workspace_id, account_id, document_id, import_session_id, algorithm, digest, institution_code, statement_family_code, parser_profile_id, parser_profile_version, source_format_code, statement_start_date, statement_end_date, native_currency, event_count, opening_balance_minor, opening_balance_decimal, debit_count, credit_count, debit_total_minor, debit_total_decimal, credit_total_minor, credit_total_decimal, closing_balance_minor, closing_balance_decimal, created_at FROM statement_financial_projections WHERE id = ? LIMIT 1;",
+            params: [id]
+        ) { row in
+            (
+                row.string(at: 0) ?? "", row.string(at: 1) ?? "", row.string(at: 2) ?? "",
+                row.string(at: 3) ?? "", row.string(at: 4) ?? "", row.string(at: 5) ?? "",
+                row.string(at: 6) ?? "", row.string(at: 7) ?? "", row.string(at: 8) ?? "",
+                row.string(at: 9) ?? "", row.string(at: 10) ?? "", row.string(at: 11) ?? "",
+                row.string(at: 12) ?? "", row.string(at: 13) ?? "", row.string(at: 14) ?? "",
+                Int(row.int64(at: 15) ?? 0), row.int64(at: 16) ?? 0, row.string(at: 17) ?? "",
+                Int(row.int64(at: 18) ?? 0), Int(row.int64(at: 19) ?? 0), row.int64(at: 20) ?? 0,
+                row.string(at: 21) ?? "", row.int64(at: 22) ?? 0, row.string(at: 23) ?? "",
+                row.int64(at: 24) ?? 0, row.string(at: 25) ?? "", row.string(at: 26) ?? ""
+            )
+        }
+        guard let record = records.first else { return nil }
+        let projectionEvents = try db.query(
+            sql: "SELECT id, event_ordinal, statement_date, value_date, direction, signed_amount_minor, signed_amount_decimal, running_balance_minor, running_balance_decimal, reference FROM statement_financial_projection_events WHERE projection_id = ? ORDER BY event_ordinal;",
+            params: [id]
+        ) { row in
+            StatementFinancialProjectionEventDTO(
+                id: row.string(at: 0) ?? "",
+                ordinal: Int(row.int64(at: 1) ?? 0),
+                statementDateISO: row.string(at: 2) ?? "",
+                valueDateISO: row.string(at: 3) ?? "",
+                direction: row.string(at: 4) ?? "",
+                signedAmountMinor: row.int64(at: 5) ?? 0,
+                signedAmountDecimal: row.string(at: 6) ?? "",
+                runningBalanceMinor: row.int64(at: 7) ?? 0,
+                runningBalanceDecimal: row.string(at: 8) ?? "",
+                reference: row.string(at: 9)
+            )
+        }
+        let projection = StatementFinancialProjectionDTO(
+            id: record.0, algorithmIdentifier: record.5, digest: record.6,
+            institutionCode: record.7, statementFamilyCode: record.8,
+            parserProfileID: record.9, parserProfileVersion: record.10,
+            sourceFormatCode: record.11, statementStartDateISO: record.12,
+            statementEndDateISO: record.13, nativeCurrency: record.14,
+            eventCount: record.15, openingBalanceMinor: record.16,
+            openingBalanceDecimal: record.17, debitCount: record.18,
+            creditCount: record.19, debitTotalMinor: record.20,
+            debitTotalDecimal: record.21, creditTotalMinor: record.22,
+            creditTotalDecimal: record.23, closingBalanceMinor: record.24,
+            closingBalanceDecimal: record.25, events: projectionEvents
+        )
+        return StatementFinancialProjectionRecordDTO(
+            projection: projection,
+            workspaceID: record.1,
+            accountID: record.2,
+            documentID: record.3,
+            importSessionID: record.4,
+            createdAtISO: record.26
+        )
+    }
+
+    private func hasPreV10ExactEventOverlap(
+        _ projection: StatementFinancialProjectionDTO,
+        accountID: String
+    ) throws -> Bool {
+        let sessionIDs = try db.query(
+            sql: "SELECT DISTINCT t.import_session_id FROM transactions t JOIN normalized_documents n ON n.import_session_id = t.import_session_id LEFT JOIN statement_financial_projections p ON p.import_session_id = t.import_session_id WHERE t.account_id = ? AND n.profile_id IN ('hdfc.bank-account.pdf','hdfc.bank-account.xls') AND p.id IS NULL;",
+            params: [accountID]
+        ) { $0.string(at: 0) ?? "" }
+        for sessionID in sessionIDs where !sessionID.isEmpty {
+            let existingEvents = try db.query(
+                sql: "SELECT t.posted_date, t.value_date, t.direction, t.amount_minor, t.amount_decimal, t.running_balance_minor, t.reference FROM transactions t LEFT JOIN normalized_rows r ON r.id = t.original_row_id WHERE t.account_id = ? AND t.import_session_id = ? ORDER BY COALESCE(r.row_index, 2147483647), t.id;",
+                params: [accountID, sessionID]
+            ) { row in
+                (row.string(at: 0) ?? "", row.string(at: 1) ?? "", row.string(at: 2) ?? "", row.int64(at: 3) ?? 0, row.string(at: 4) ?? "", row.int64(at: 5) ?? 0, row.string(at: 6))
+            }
+            guard existingEvents.count == projection.events.count else { continue }
+            var matches = true
+            for (existing, incoming) in zip(existingEvents, projection.events) {
+                if existing.0 != incoming.statementDateISO ||
+                    existing.1 != incoming.valueDateISO ||
+                    existing.2 != incoming.direction ||
+                    existing.3 != incoming.signedAmountMinor ||
+                    existing.4 != incoming.signedAmountDecimal ||
+                    existing.5 != incoming.runningBalanceMinor ||
+                    existing.6 != incoming.reference {
+                    matches = false
+                    break
+                }
+            }
+            if matches { return true }
+        }
+        return false
+    }
+
+    private func financiallyEquivalent(
+        _ lhs: StatementFinancialProjectionDTO,
+        _ rhs: StatementFinancialProjectionDTO
+    ) -> Bool {
+        guard lhs.algorithmIdentifier == rhs.algorithmIdentifier,
+              lhs.digest == rhs.digest,
+              lhs.institutionCode == rhs.institutionCode,
+              lhs.statementFamilyCode == rhs.statementFamilyCode,
+              lhs.statementStartDateISO == rhs.statementStartDateISO,
+              lhs.statementEndDateISO == rhs.statementEndDateISO,
+              lhs.nativeCurrency == rhs.nativeCurrency,
+              lhs.eventCount == rhs.eventCount,
+              lhs.openingBalanceMinor == rhs.openingBalanceMinor,
+              lhs.openingBalanceDecimal == rhs.openingBalanceDecimal,
+              lhs.debitCount == rhs.debitCount,
+              lhs.creditCount == rhs.creditCount,
+              lhs.debitTotalMinor == rhs.debitTotalMinor,
+              lhs.debitTotalDecimal == rhs.debitTotalDecimal,
+              lhs.creditTotalMinor == rhs.creditTotalMinor,
+              lhs.creditTotalDecimal == rhs.creditTotalDecimal,
+              lhs.closingBalanceMinor == rhs.closingBalanceMinor,
+              lhs.closingBalanceDecimal == rhs.closingBalanceDecimal else { return false }
+        return zip(lhs.events, rhs.events).allSatisfy { left, right in
+            left.ordinal == right.ordinal && left.statementDateISO == right.statementDateISO &&
+            left.valueDateISO == right.valueDateISO && left.direction == right.direction &&
+            left.signedAmountMinor == right.signedAmountMinor &&
+            left.signedAmountDecimal == right.signedAmountDecimal &&
+            left.runningBalanceMinor == right.runningBalanceMinor &&
+            left.runningBalanceDecimal == right.runningBalanceDecimal &&
+            left.reference == right.reference
+        }
+    }
+
+    private func insertStatementProjection(
+        _ projection: StatementFinancialProjectionDTO,
+        workspaceID: String,
+        accountID: String,
+        documentID: String,
+        importSessionID: String,
+        createdAtISO: String
+    ) throws {
+        guard projection.isValid() else { throw RepositoryError.relationshipViolation("Statement financial projection is invalid.") }
+        try db.executePrepared(
+            sql: "INSERT INTO statement_financial_projections (id, workspace_id, account_id, document_id, import_session_id, algorithm, digest, institution_code, statement_family_code, parser_profile_id, parser_profile_version, source_format_code, statement_start_date, statement_end_date, native_currency, event_count, opening_balance_minor, opening_balance_decimal, debit_count, credit_count, debit_total_minor, debit_total_decimal, credit_total_minor, credit_total_decimal, closing_balance_minor, closing_balance_decimal, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+            params: [projection.id, workspaceID, accountID, documentID, importSessionID, projection.algorithmIdentifier, projection.digest, projection.institutionCode, projection.statementFamilyCode, projection.parserProfileID, projection.parserProfileVersion, projection.sourceFormatCode, projection.statementStartDateISO, projection.statementEndDateISO, projection.nativeCurrency, projection.eventCount, projection.openingBalanceMinor, projection.openingBalanceDecimal, projection.debitCount, projection.creditCount, projection.debitTotalMinor, projection.debitTotalDecimal, projection.creditTotalMinor, projection.creditTotalDecimal, projection.closingBalanceMinor, projection.closingBalanceDecimal, createdAtISO]
+        )
+        for event in projection.events {
+            try db.executePrepared(
+                sql: "INSERT INTO statement_financial_projection_events (id, projection_id, event_ordinal, statement_date, value_date, direction, signed_amount_minor, signed_amount_decimal, running_balance_minor, running_balance_decimal, reference, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: [event.id, projection.id, event.ordinal, event.statementDateISO, event.valueDateISO, event.direction, event.signedAmountMinor, event.signedAmountDecimal, event.runningBalanceMinor, event.runningBalanceDecimal, event.reference ?? NSNull(), createdAtISO]
+            )
+        }
+    }
+
+    private func insertStatementEquivalenceMembership(
+        _ projection: StatementFinancialProjectionDTO,
+        review: StatementEquivalenceReviewResult,
+        workspaceID: String,
+        accountID: String,
+        createdAtISO: String
+    ) throws {
+        let groupID: String
+        let role: StatementEquivalenceMemberRole
+        switch review {
+        case .firstAcceptedSource:
+            groupID = "statement-equivalence-group-\(projection.id)"
+            role = .authoritative
+            try db.executePrepared(
+                sql: "INSERT INTO statement_equivalence_groups (id, workspace_id, account_id, institution_code, statement_family_code, statement_start_date, statement_end_date, native_currency, projection_algorithm, projection_digest, authoritative_projection_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: [groupID, workspaceID, accountID, projection.institutionCode, projection.statementFamilyCode, projection.statementStartDateISO, projection.statementEndDateISO, projection.nativeCurrency, projection.algorithmIdentifier, projection.digest, projection.id, createdAtISO]
+            )
+        case .equivalent:
+            guard let existingGroupID = try db.query(
+                sql: "SELECT id FROM statement_equivalence_groups WHERE workspace_id = ? AND account_id = ? AND institution_code = ? AND statement_family_code = ? AND statement_start_date = ? AND statement_end_date = ? AND native_currency = ? LIMIT 1;",
+                params: [workspaceID, accountID, projection.institutionCode, projection.statementFamilyCode, projection.statementStartDateISO, projection.statementEndDateISO, projection.nativeCurrency],
+                map: { $0.string(at: 0) ?? "" }
+            ).first, !existingGroupID.isEmpty else {
+                throw RepositoryError.relationshipViolation("Statement equivalence group is unavailable.")
+            }
+            groupID = existingGroupID
+            role = .supporting
+        case .notApplicable:
+            return
+        case .conflict, .evidenceUnavailable, .formatAlreadyRecorded:
+            throw RepositoryError.relationshipViolation("Statement equivalence review cannot be persisted.")
+        }
+        try db.executePrepared(
+            sql: "INSERT INTO statement_equivalence_members (id, group_id, projection_id, role, source_format_code, created_at) VALUES (?,?,?,?,?,?);",
+            params: ["statement-equivalence-member-\(projection.id)", groupID, projection.id, role.rawValue, projection.sourceFormatCode, createdAtISO]
+        )
     }
 
     private func reviewPartialImport(

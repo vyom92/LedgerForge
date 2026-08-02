@@ -76,6 +76,13 @@ enum FixtureLocator {
             .appendingPathComponent(fileName)
     }
 
+    static func hdfcSyntheticPDF(_ fileName: String) -> URL {
+        fixturesRoot
+            .appendingPathComponent("HDFC")
+            .appendingPathComponent("Synthetic")
+            .appendingPathComponent(fileName)
+    }
+
     static func cbqBankAccountPDF(_ fileName: String) -> URL {
         cbqBankAccountRoot.appendingPathComponent("PDF").appendingPathComponent("v1").appendingPathComponent(fileName)
     }

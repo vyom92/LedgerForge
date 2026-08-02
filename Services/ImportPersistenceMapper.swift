@@ -383,6 +383,11 @@ struct ImportPersistenceMapper {
                 eventEvidence: source.verifiedAxisUPIEventEvidence.map(Self.confirmedEventEvidence(from:))
             )
         }
+        let statementProjection = try statementFinancialProjectionDTO(
+            financialDocument: financialDocument,
+            normalizedDocument: payload.normalizedDocument,
+            importSessionID: payload.importSession.id
+        )
         return ConfirmedImportPlanDTO(
             providerGeneration: providerGeneration,
             workspace: payload.workspace,
@@ -405,8 +410,66 @@ struct ImportPersistenceMapper {
             openingBalanceMinor: try validation.openingBalanceMoney.map { try $0.minorUnits() },
             openingBalanceDecimal: try validation.openingBalanceMoney.map { try $0.canonicalDecimalString() },
             closingBalanceMinor: try validation.closingBalanceMoney.map { try $0.minorUnits() },
-            closingBalanceDecimal: try validation.closingBalanceMoney.map { try $0.canonicalDecimalString() }
+            closingBalanceDecimal: try validation.closingBalanceMoney.map { try $0.canonicalDecimalString() },
+            statementFinancialProjection: statementProjection
         )
+    }
+
+    private func statementFinancialProjectionDTO(
+        financialDocument: FinancialDocument,
+        normalizedDocument: NormalizedDocumentDTO,
+        importSessionID: String
+    ) throws -> StatementFinancialProjectionDTO? {
+        guard financialDocument.metadata.institution == .hdfc,
+              financialDocument.metadata.documentType == .bankAccount,
+              [.pdf, .xls].contains(financialDocument.metadata.fileFormat) else {
+            return nil
+        }
+        let projection = try StatementFinancialProjection.make(from: financialDocument)
+        let sourceFormatCode = financialDocument.metadata.fileFormat == .pdf ? "pdf" : "xls"
+        let projectionID = "statement-projection-\(importSessionID.lowercased())"
+        let events = try projection.events.map { event in
+            StatementFinancialProjectionEventDTO(
+                id: "\(projectionID)-event-\(event.ordinal)",
+                ordinal: event.ordinal,
+                statementDateISO: event.statementDate.canonical,
+                valueDateISO: event.valueDate.canonical,
+                direction: event.direction.rawValue,
+                signedAmountMinor: try event.signedAmount.minorUnits(),
+                signedAmountDecimal: try event.signedAmount.canonicalDecimalString(),
+                runningBalanceMinor: try event.runningBalance.minorUnits(),
+                runningBalanceDecimal: try event.runningBalance.canonicalDecimalString(),
+                reference: event.reference
+            )
+        }
+        let dto = StatementFinancialProjectionDTO(
+            id: projectionID,
+            digest: projection.digest,
+            institutionCode: projection.institutionCode,
+            statementFamilyCode: projection.statementFamilyCode,
+            parserProfileID: normalizedDocument.profileId,
+            parserProfileVersion: normalizedDocument.profileVersion,
+            sourceFormatCode: sourceFormatCode,
+            statementStartDateISO: projection.statementPeriod.start.canonical,
+            statementEndDateISO: projection.statementPeriod.end.canonical,
+            nativeCurrency: projection.nativeCurrency.code,
+            eventCount: projection.eventCount,
+            openingBalanceMinor: try projection.openingBalance.minorUnits(),
+            openingBalanceDecimal: try projection.openingBalance.canonicalDecimalString(),
+            debitCount: projection.debitCount,
+            creditCount: projection.creditCount,
+            debitTotalMinor: try projection.debitTotal.minorUnits(),
+            debitTotalDecimal: try projection.debitTotal.canonicalDecimalString(),
+            creditTotalMinor: try projection.creditTotal.minorUnits(),
+            creditTotalDecimal: try projection.creditTotal.canonicalDecimalString(),
+            closingBalanceMinor: try projection.closingBalance.minorUnits(),
+            closingBalanceDecimal: try projection.closingBalance.canonicalDecimalString(),
+            events: events
+        )
+        guard dto.isValid() else {
+            throw ImportPersistenceError.conflictingTransactionProvenance
+        }
+        return dto
     }
 
     private func accountDTO(

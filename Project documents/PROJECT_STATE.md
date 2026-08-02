@@ -4,19 +4,19 @@
 
 - **Primary branch:** `main`
 - **Current repository implementation baseline:** Sprint 72 was implemented and verified from required pushed baseline `main@812dd2dd5745a1f0ea271c620bf8ccc604a590b2`; Git remains authoritative for the final Sprint 72 commit ref
-- **Documentation alignment:** Reconciled after verified Sprint 72 implementation and cycle-close acceptance
+- **Documentation alignment:** Reconciled for the Sprint 73 implementation and acceptance boundary
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration and Sprint 65's clean-room PDF fixture replacement are included in the accepted baseline; no historical financial data was altered
-- **Latest chronologically accepted production implementation:** Sprint 72 exact HDFC NRE/NRO legacy-XLS v1 support
+- **Latest chronologically accepted production implementation:** Sprint 73 exact HDFC PDF v1 and whole-statement HDFC PDF/XLS equivalence
 - **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed numbered increment:** Sprint 72 — Exact HDFC NRE/NRO Legacy-XLS v1 Support
+- **Latest verified completed numbered increment:** Sprint 73 — Exact HDFC PDF v1 and Whole-Statement Cross-Format Equivalence
 - **Accepted Sprint 63 implementation ref:** `7e1345e3817d3c3e91c24f881b962a48279fd73b`
-- **Latest accepted ADR:** ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
-- **Current migration:** V9
+- **Latest accepted ADR:** ADR-042 — Exact Cross-Format Statement Equivalence and Supporting-Source Persistence
+- **Current migration:** V10
 - **DBP-01 classification:** Accepted DEBUG-only developer tooling and development-database lifecycle implementation; it is not a production financial capability, production database-profile feature, numbered sprint, Sprint 65, schema migration or personal-v1 adoption
 - **Sprint 55A:** Axis Bank Source-Truth Restoration, ending at `f3154dbd13a340714179da7f972a6accdd3aca54`; parallel shared-runtime-store isolation remains Sprint 55 acceptance/test infrastructure
 - **Sprint 57A:** Category Reconciliation Closure, complete at `251a547cb44712a789a9ad7b23a4eabca742900b`; no migration was added
@@ -42,6 +42,8 @@
 - **Sprint 71 source truth:** The committed independent evidence verifies 16 baseline XLS transactions, 20 extended XLS transactions, 16 shared ordered rows and 4 extended-only ordered rows. The Range-1 CSV legitimately contains 17 transactions while its XLS contains 16; no fixture or expected evidence was changed to manufacture parity.
 - **Sprint 71 fail-closed boundary:** Invalid or truncated containers, encryption, multiple or hidden worksheets, formulas, boolean/error cells, missing/duplicate/ambiguous/reordered headers, malformed monetary values and unsupported near-match layouts reject before accepted financial writes. Workbook bytes remain confined to the transient immutable source snapshot.
 - **Sprint 72:** Added the exact shared `hdfc.bank-account.xls@1` HDFC NRE/NRO legacy-XLS grammar through the accepted reader and ordinary detector, classifier, parser-selection, preview, explicit-confirmation, provider, hydration and relaunch pipeline. Exact source bytes remain the XLS duplicate authority; no PDF/XLS cross-format suppression was added.
+- **Sprint 73:** Added the exact native selectable-text `hdfc.bank-account.pdf@1` grammar and the first durable exact whole-statement equivalence contract for the approved HDFC PDF/XLS v1 pair. The first accepted source remains transaction and provenance authority; a later exact-equivalent other-format source retains its own accepted evidence and creates zero transactions.
+- **Sprint 73A test-only closure:** Corrected three stale Developer Database Profile expectations after Migration V10. V9 is the newest and default historical migration-sandbox source, V8 remains historical, and V10 remains current. Sprint 73A changed no production, parser, migration, ADR, persistence, fixture, source-truth or financial behaviour. The replacement cycle-close passed a fresh Debug build, fresh optimized Release build and the complete TestPlan with 670 tests across 81 suites and zero failures.
 - **Sprint 72 source semantics:** `Date` is the authoritative transaction date, `Value Dt` is retained separately, `Withdrawal Amt.` is debit/outflow, `Deposit Amt.` is credit/inflow, and source physical row order plus source ordinals are preserved. Printed period, opening/closing balances, debit/credit counts and totals reconcile independently for each statement.
 - **Sprint 72 identity and fail-closed boundary:** Only the parser-produced verified full account number is emitted through the strong institution-account identifier contract. Shared customer identity and product metadata are excluded from account resolution. Missing, malformed, duplicate, reordered, near-match or ambiguous grammar, amount, date, identifier and summary evidence fails closed with zero accepted financial residue.
 - **Sprint 72 private-source acceptance:** Four private-original XLS/PDF source families were verified locally through an independent paired-PDF oracle: 62, 16, 76 and 7 ordered rows, 161 total. Requested row-field mismatches, printed-summary mismatches and two annual-to-recent continuity mismatches were all zero. No private source value, path, filename, identifier, narration or reference entered Git or repository documentation; task-owned source-derived artifacts and private-test result bundles were removed after verification.
@@ -88,6 +90,13 @@
 - **Sprint 71 Release boundary:** The arm64 Release app contains the XLS bridge and libxls symbols statically in the executable, links the system `libiconv`, contains no libxls dynamic library and requires no bundled Java, Python or LibreOffice runtime. The repository contains the verbatim upstream license and concise third-party notice. Migration remains V9 and ADR-041 remains the latest accepted ADR.
 - **Sprint 72 acceptance evidence:** The consolidated focused boundary discovered and executed 207 tests across 29 selected suites with zero failures. The single authoritative cycle-close passed fresh Debug and optimized Release builds plus 655 tests across 79 complete-TestPlan suites with zero failures or unexpected skips. SQLite and In-Memory outcomes matched; exact-byte duplicate rejection, atomic confirmed persistence, canonical hydration, provider reconstruction and SQLite close/reopen relaunch preservation passed.
 - **Sprint 72 migration and ADR impact:** Migration remains V9 and ADR-041 remains the latest accepted ADR. HDFC PDF production support remains the separately bounded Sprint 73 outcome; HDFC CSV, XLSX, cards, generic HDFC layouts and cross-format suppression remain unsupported.
+- **Sprint 73 implementation boundary:** `ledgerforge.statement-financial-projection.sha256.v1` deterministically covers institution, statement family, declared period, INR, derived opening balance, debit/credit counts and totals, closing balance, and every ordered event's ordinal, statement date, value date, direction, signed Money, running balance and explicit reference absence. It excludes filenames, source fingerprints, parser profile, physical ordinals, narration, display account name, customer identity and inferred NRE/NRO subtype.
+- **Sprint 73 provider behavior:** SQLite and In-Memory resolve the exact account/family/period/currency group inside the provider-owned confirmed-import transaction. First-source and supporting-source graphs are atomic; supporting acceptance records `equivalent_source_recorded`, zero imported transactions, a second document/session/source-byte fingerprint/projection/member and an identifier observation without changing existing transactions, categories or authority. Exact bytes still return `exact_statement_duplicate`; projection conflict, missing pre-V10 evidence and represented byte-different format return `statement_equivalence_conflict`, `statement_equivalence_evidence_unavailable` and `equivalent_format_already_recorded` respectively.
+- **Sprint 73 migration and ADR impact:** Additive Migration V10 introduces source projections, contiguous ordered projection events, equivalence groups and authoritative/supporting members with restrictive relationships and no historical backfill. ADR-042 is the latest accepted ADR. Existing V9 history remains readable; complete HDFC event overlap without durable V10 evidence fails closed rather than inventing period or equivalence truth.
+- **Sprint 73 private-source acceptance:** All four retained PDF/XLS pairs matched at 62, 16, 76 and 7 ordered rows, 161 total. Direct field mismatches, printed-summary mismatches and production projection mismatches were zero. Both PDF→XLS and XLS→PDF orders retained one transaction set and two source records per pair; SQLite close/reopen and canonical hydration preserved the graph. Only aggregate counts are recorded.
+- **Sprint 73 focused verification:** The final consolidated boundary passed 358 tests across 39 suites with zero failures. It covered the ordinary HDFC PDF URL route, exact PDF/XLS projection, Migration V10, SQLite/In-Memory equivalence parity, supporting-write rollback injection, source snapshots and fingerprints, identity ownership, confirmed-import atomicity, canonical hydration, provider reconstruction and result/history presentation.
+- **Sprint 73 runtime verification:** One representative 7-row private pair was exercised through the signed Debug app on an isolated Persistent Debug Database at V10. PDF-first explicit confirmation created 7 authoritative transactions; the paired XLS presented and committed `equivalent_source_recorded` with 0 new transactions and no transaction-navigation action. Live Import History distinguished both outcomes, and quit/relaunch plus profile reactivation hydrated the same 7/0 aggregate counts and both durable outcomes.
+- **Sprint 73 exact exclusions:** No fuzzy or narration similarity, partial overlap, same-format semantic acceptance, Axis/CBQ/card equivalence, authority switching, source replacement, provenance reassignment, historical repair/backfill, OCR, password workflow, HDFC CSV/XLSX/cards, generic PDF/spreadsheet parsing or document-byte storage is implemented.
 - **Post-Sprint 57 runtime verification:** an isolated fresh Debug launch created a category, imported the approved sanitized Axis fixture, assigned that category to a trusted transaction, quit/relaunched and verified the category and assignment persisted; the task-owned process was stopped and only its isolated database set was moved to Trash
 - **Previous Sprint 55 automated result:** 409 top-level tests across 49 suites, 0 failures and 0 unexpected skips in each of three consecutive exact canonical default-parallel TestPlan runs
 - **Latest focused Sprint 55 results:** 41 Axis direction, fixture-oracle and confirmation-gate tests across 5 suites plus 64 adjacent event, validation, repository, atomicity and hydration tests across 6 suites, all with 0 failures and 0 unexpected skips
@@ -151,7 +160,12 @@ version 1
 
 remains readable and is never rewritten merely to adopt the neutral forward profile.
 
-No broader Axis PDF/XLS layout, OCR, password-protected statement, historical Axis layout, XLSX, card, HDFC PDF/CSV/XLSX, generic HDFC layout, CBQ, American Express or other institution support is claimed.
+The exact retained native-text HDFC bank-account PDF grammar is supported as
+`hdfc.bank-account.pdf@1`, paired only with `hdfc.bank-account.xls@1` for exact
+whole-statement equivalence. No broader Axis PDF/XLS layout, OCR,
+password-protected statement, historical Axis layout, XLSX, card, HDFC
+CSV/XLSX, changed or generic HDFC layout, CBQ, American Express or other
+institution support is claimed.
 
 ### Trusted source semantics
 
@@ -225,7 +239,7 @@ Production publishes a SQLite repository only after:
 - pending migrations execute successfully;
 - the final migration chain revalidates.
 
-The active chain ends at V9. Migration V7 adds explicit partial-attempt counts, durable partial-import summaries and one typed incoming-row disposition per normalized source row for ADR-040. Additive Migration V8 adds workspace-owned categories and a separate restrictive current transaction-category assignment relationship without changing imported financial rows or provenance. Migration V9 adds versioned document-fingerprint authority and the source-byte fingerprint relationship without storing source bytes.
+The active chain ends at V10. Migration V7 adds explicit partial-attempt counts, durable partial-import summaries and one typed incoming-row disposition per normalized source row for ADR-040. Additive Migration V8 adds workspace-owned categories and a separate restrictive current transaction-category assignment relationship without changing imported financial rows or provenance. Migration V9 adds versioned document-fingerprint authority and the source-byte fingerprint relationship without storing source bytes. Additive Migration V10 adds exact statement projections, ordered projection events, equivalence groups and authoritative/supporting members without backfilling existing history.
 
 Open, initialization, migration-integrity or migration-execution failure installs centrally rejecting unavailable repositories rather than silently substituting an in-memory repository.
 
@@ -560,7 +574,19 @@ Each approved PDF/XLS pair reconciles against its independent financial baseline
 
 The evidence preserves verified financial, pagination, geometry and multiline relationships while intentionally not preserving original PDF object identity.
 
-Production supports only the exact retained HDFC NRE/NRO OLE2/BIFF8 grammar as `hdfc.bank-account.xls@1`. The four private-original families were independently verified locally at 62, 16, 76 and 7 ordered rows with zero requested row-field, summary or continuity mismatches. The shared grammar does not infer NRE/NRO subtype from filenames, transaction similarity, customer identity or the neutral printed product label; the two account families remain distinct through their verified account-number identifiers. HDFC PDF remains Sprint 73, and other HDFC formats and layouts remain unsupported.
+Production supports the exact retained HDFC NRE/NRO OLE2/BIFF8 grammar as
+`hdfc.bank-account.xls@1` and the exact paired native selectable-text grammar as
+`hdfc.bank-account.pdf@1`. The four private-original pairs were independently
+verified locally at 62, 16, 76 and 7 ordered rows, 161 total, with zero direct
+row-field, printed-summary or production-projection mismatches. Both import
+orders produce one financial event set: the first format remains authoritative
+for transactions and provenance and the later exact-equivalent format is
+durable supporting evidence with zero transactions. The shared semantics do
+not infer NRE/NRO subtype from filenames, transaction similarity, customer
+identity or the neutral printed product label; the account families remain
+distinct through their verified account-number identifiers. HDFC CSV, XLSX,
+cards, OCR, locked/password-protected PDFs and other HDFC layouts remain
+unsupported.
 
 ### CBQ bank-account evidence
 
@@ -1112,22 +1138,22 @@ Detailed implementation history remains in Git and accepted ADRs.
 
 ## Current Planning State
 
-- The current planning alignment is based on completed Sprints 50–72, including the Sprint 68B test-only correction, the DBP-01 maintenance correction, the Sprint 69 local validation closure and the bounded Sprint 71 and Sprint 72 XLS increments, together with Migration V9 and accepted ADR-041.
+- The current planning alignment is based on completed Sprints 50–73, including the Sprint 68B test-only correction, the DBP-01 maintenance correction, the Sprint 69 local validation closure, the bounded Sprint 71 and Sprint 72 XLS increments and Sprint 73 exact HDFC PDF/XLS equivalence, together with Migration V10 and accepted ADR-042.
 - DBP-01 is complete and no DBP-01 implementation remains pending. It is a separate post-Sprint-64 Debug tooling increment, not a numbered sprint or Sprint 65; no sprint renumbering occurred.
 - Sprint 63 implementation of the ADR-041 source-snapshot and source-byte foundation is complete; no source-snapshot implementation remains in the unscheduled queue.
 - `FW-P1-10 — Production PDF Statement Support` is completed and removed from the unscheduled queue by Sprint 65 for the selected exact account-neutral Axis bank-account grammar. Other Axis PDF layouts, OCR, password workflow, generic Axis PDF support and cross-format equivalence remain unsupported.
 - `FW-P1-14 — XLS and XLSX Support` is partially completed for the exact Axis NRO XLS v1 profile delivered by Sprint 71 and the exact shared HDFC NRE/NRO legacy-XLS v1 profile delivered by Sprint 72. XLSX, generic spreadsheets, other institutions and other layouts remain unscheduled.
-- `FW-P1-16` remains blocked pending a separately accepted equivalence architecture and implementation authorization. Sprint 71 does not treat independently supported Axis NRO PDF and XLS sources as cross-format duplicates.
+- `FW-P1-16` is partially completed only for the exact HDFC PDF/XLS v1 pair under ADR-042. Axis PDF/CSV/XLS, CBQ, cards, same-format semantic duplicates, partial overlap and every other cross-format relationship remain future work.
 - `FW-P1-40 — Deterministic Approved-Fixture Launcher` was completed by Sprint 58 and is removed from the unscheduled queue.
 - `FW-P1-37` retains only broader structured diagnostics work not completed by Sprint 58; its bounded privacy-safe preparation-failure summary and Developer Console fixture-workflow slice is complete.
 - `FW-P1-28 — Confirmed-Persistence Recovery and Unsupported Retry` is complete in Sprint 66 and removed from the unscheduled queue.
 - `FW-P1-29 — Better Validation Guidance` retains only broader validation education outside the typed immediate-result and recovery guidance completed by Sprint 66.
-- HDFC PDF remains the separately bounded Sprint 73 outcome. Fixture-backed CBQ, HDFC card and other card families remain eligible for targeted discovery but are not production support.
+- The exact retained HDFC PDF v1 slice is complete. Fixture-backed CBQ, HDFC card and other card families remain eligible for targeted discovery but are not production support; the separately planned CBQ partial-overlap work for Sprints 74–75 remains future work.
 - `FW-P2-20 — Category Model and Management` is complete in Sprint 57 and removed from the unscheduled queue.
 - `FW-P2-21 — Deterministic Categorization Rules` is now eligible for bounded discovery; no rule behavior is implemented or authorized.
 - Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
 - `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.
-- Sprint 68A remains the latest accepted production UI implementation; Sprint 72 is the highest-numbered completed increment. The selected Axis PDF, exact Axis NRO XLS and exact shared HDFC NRE/NRO legacy-XLS boundaries are accepted, while broader PDF/XLS layouts, XLSX, OCR, password workflow, generic spreadsheet support and cross-format equivalence remain unscheduled or blocked.
+- Sprint 73 is the highest-numbered completed increment. The selected Axis PDF, exact Axis NRO XLS and exact shared HDFC NRE/NRO PDF/XLS boundaries are accepted, while broader PDF/XLS layouts, XLSX, OCR, password workflow, generic spreadsheet support and cross-format equivalence beyond the exact HDFC pair remain unscheduled or blocked.
 
 ---
 

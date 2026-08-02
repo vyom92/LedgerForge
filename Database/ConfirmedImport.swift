@@ -217,6 +217,286 @@ public enum DocumentFingerprintValidationError: Error, nonisolated Equatable, Lo
     }
 }
 
+public struct StatementFinancialProjectionEventDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let ordinal: Int
+    public let statementDateISO: String
+    public let valueDateISO: String
+    public let direction: String
+    public let signedAmountMinor: Int64
+    public let signedAmountDecimal: String
+    public let runningBalanceMinor: Int64
+    public let runningBalanceDecimal: String
+    public let reference: String?
+
+    public init(
+        id: String,
+        ordinal: Int,
+        statementDateISO: String,
+        valueDateISO: String,
+        direction: String,
+        signedAmountMinor: Int64,
+        signedAmountDecimal: String,
+        runningBalanceMinor: Int64,
+        runningBalanceDecimal: String,
+        reference: String?
+    ) {
+        self.id = id
+        self.ordinal = ordinal
+        self.statementDateISO = statementDateISO
+        self.valueDateISO = valueDateISO
+        self.direction = direction
+        self.signedAmountMinor = signedAmountMinor
+        self.signedAmountDecimal = signedAmountDecimal
+        self.runningBalanceMinor = runningBalanceMinor
+        self.runningBalanceDecimal = runningBalanceDecimal
+        self.reference = reference
+    }
+}
+
+public struct StatementFinancialProjectionDTO: nonisolated Equatable, Sendable {
+    public static let algorithm = "ledgerforge.statement-financial-projection.sha256.v1"
+
+    public let id: String
+    public let algorithmIdentifier: String
+    public let digest: String
+    public let institutionCode: String
+    public let statementFamilyCode: String
+    public let parserProfileID: String
+    public let parserProfileVersion: String
+    public let sourceFormatCode: String
+    public let statementStartDateISO: String
+    public let statementEndDateISO: String
+    public let nativeCurrency: String
+    public let eventCount: Int
+    public let openingBalanceMinor: Int64
+    public let openingBalanceDecimal: String
+    public let debitCount: Int
+    public let creditCount: Int
+    public let debitTotalMinor: Int64
+    public let debitTotalDecimal: String
+    public let creditTotalMinor: Int64
+    public let creditTotalDecimal: String
+    public let closingBalanceMinor: Int64
+    public let closingBalanceDecimal: String
+    public let events: [StatementFinancialProjectionEventDTO]
+
+    public init(
+        id: String,
+        algorithmIdentifier: String = Self.algorithm,
+        digest: String,
+        institutionCode: String,
+        statementFamilyCode: String,
+        parserProfileID: String,
+        parserProfileVersion: String,
+        sourceFormatCode: String,
+        statementStartDateISO: String,
+        statementEndDateISO: String,
+        nativeCurrency: String,
+        eventCount: Int,
+        openingBalanceMinor: Int64,
+        openingBalanceDecimal: String,
+        debitCount: Int,
+        creditCount: Int,
+        debitTotalMinor: Int64,
+        debitTotalDecimal: String,
+        creditTotalMinor: Int64,
+        creditTotalDecimal: String,
+        closingBalanceMinor: Int64,
+        closingBalanceDecimal: String,
+        events: [StatementFinancialProjectionEventDTO]
+    ) {
+        self.id = id
+        self.algorithmIdentifier = algorithmIdentifier
+        self.digest = digest
+        self.institutionCode = institutionCode
+        self.statementFamilyCode = statementFamilyCode
+        self.parserProfileID = parserProfileID
+        self.parserProfileVersion = parserProfileVersion
+        self.sourceFormatCode = sourceFormatCode
+        self.statementStartDateISO = statementStartDateISO
+        self.statementEndDateISO = statementEndDateISO
+        self.nativeCurrency = nativeCurrency
+        self.eventCount = eventCount
+        self.openingBalanceMinor = openingBalanceMinor
+        self.openingBalanceDecimal = openingBalanceDecimal
+        self.debitCount = debitCount
+        self.creditCount = creditCount
+        self.debitTotalMinor = debitTotalMinor
+        self.debitTotalDecimal = debitTotalDecimal
+        self.creditTotalMinor = creditTotalMinor
+        self.creditTotalDecimal = creditTotalDecimal
+        self.closingBalanceMinor = closingBalanceMinor
+        self.closingBalanceDecimal = closingBalanceDecimal
+        self.events = events.sorted { $0.ordinal < $1.ordinal }
+    }
+
+    public func isValid() -> Bool {
+        let lowercaseHex = CharacterSet(charactersIn: "0123456789abcdef")
+        guard algorithmIdentifier == Self.algorithm,
+              digest.utf8.count == 64,
+              digest.unicodeScalars.allSatisfy(lowercaseHex.contains),
+              institutionCode == "hdfc",
+              statementFamilyCode == "hdfc.bank-account",
+              ["hdfc.bank-account.pdf", "hdfc.bank-account.xls"].contains(parserProfileID),
+              parserProfileVersion == "1",
+              ["pdf", "xls"].contains(sourceFormatCode),
+              parserProfileID.hasSuffix(".\(sourceFormatCode)"),
+              !id.isEmpty,
+              !events.isEmpty,
+              eventCount == events.count,
+              eventCount == debitCount + creditCount,
+              debitCount >= 0,
+              creditCount >= 0,
+              events.map(\.ordinal) == Array(1...events.count),
+              (try? StatementDate(canonical: statementStartDateISO)) != nil,
+              (try? StatementDate(canonical: statementEndDateISO)) != nil,
+              statementStartDateISO <= statementEndDateISO,
+              (try? CurrencyCode(nativeCurrency)) != nil,
+              moneyMatches(openingBalanceDecimal, minor: openingBalanceMinor),
+              moneyMatches(debitTotalDecimal, minor: debitTotalMinor),
+              moneyMatches(creditTotalDecimal, minor: creditTotalMinor),
+              moneyMatches(closingBalanceDecimal, minor: closingBalanceMinor),
+              debitTotalMinor >= 0,
+              creditTotalMinor >= 0 else { return false }
+
+        var computedDebitCount = 0
+        var computedCreditCount = 0
+        var computedDebitTotal: Int64 = 0
+        var computedCreditTotal: Int64 = 0
+        for event in events {
+            guard !event.id.isEmpty,
+                  (try? StatementDate(canonical: event.statementDateISO)) != nil,
+                  (try? StatementDate(canonical: event.valueDateISO)) != nil,
+                  moneyMatches(event.signedAmountDecimal, minor: event.signedAmountMinor),
+                  moneyMatches(event.runningBalanceDecimal, minor: event.runningBalanceMinor) else {
+                return false
+            }
+            switch event.direction {
+            case "debit":
+                guard event.signedAmountMinor < 0 else { return false }
+                computedDebitCount += 1
+                let magnitude = Int64.zero.subtractingReportingOverflow(event.signedAmountMinor)
+                guard !magnitude.overflow else { return false }
+                let addition = computedDebitTotal.addingReportingOverflow(magnitude.partialValue)
+                guard !addition.overflow else { return false }
+                computedDebitTotal = addition.partialValue
+            case "credit":
+                guard event.signedAmountMinor > 0 else { return false }
+                computedCreditCount += 1
+                let addition = computedCreditTotal.addingReportingOverflow(event.signedAmountMinor)
+                guard !addition.overflow else { return false }
+                computedCreditTotal = addition.partialValue
+            default:
+                return false
+            }
+        }
+        guard let firstEvent = events.first else { return false }
+        let derivedOpening = firstEvent.runningBalanceMinor.subtractingReportingOverflow(
+            firstEvent.signedAmountMinor
+        )
+        guard !derivedOpening.overflow,
+              computedDebitCount == debitCount,
+              computedCreditCount == creditCount,
+              computedDebitTotal == debitTotalMinor,
+              computedCreditTotal == creditTotalMinor,
+              events.last?.runningBalanceMinor == closingBalanceMinor,
+              derivedOpening.partialValue == openingBalanceMinor else {
+            return false
+        }
+        return digest == calculatedDigest()
+    }
+
+    private func moneyMatches(_ decimal: String, minor: Int64) -> Bool {
+        guard let money = try? Money(canonicalDecimal: decimal, currency: nativeCurrency),
+              let exactMinor = try? money.minorUnits() else { return false }
+        return exactMinor == minor
+    }
+
+    private func calculatedDigest() -> String {
+        var fields = [
+            algorithmIdentifier,
+            institutionCode,
+            statementFamilyCode,
+            statementStartDateISO,
+            statementEndDateISO,
+            nativeCurrency,
+            String(eventCount),
+            openingBalanceDecimal,
+            String(debitCount),
+            String(creditCount),
+            debitTotalDecimal,
+            creditTotalDecimal,
+            closingBalanceDecimal
+        ]
+        for event in events {
+            fields.append(contentsOf: [
+                String(event.ordinal),
+                event.statementDateISO,
+                event.valueDateISO,
+                event.direction,
+                nativeCurrency,
+                event.signedAmountDecimal,
+                nativeCurrency,
+                event.runningBalanceDecimal,
+                event.reference == nil ? "0" : "1",
+                event.reference ?? ""
+            ])
+        }
+        let payload = fields.map { "\($0.utf8.count):\($0)" }.joined()
+        return SHA256.hash(data: Data(payload.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+}
+
+public enum StatementEquivalenceMemberRole: String, nonisolated Equatable, Sendable {
+    case authoritative
+    case supporting
+}
+
+public struct StatementFinancialProjectionRecordDTO: nonisolated Equatable, Sendable {
+    public let projection: StatementFinancialProjectionDTO
+    public let workspaceID: String
+    public let accountID: String
+    public let documentID: String
+    public let importSessionID: String
+    public let createdAtISO: String
+}
+
+public struct StatementEquivalenceGroupDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let workspaceID: String
+    public let accountID: String
+    public let institutionCode: String
+    public let statementFamilyCode: String
+    public let statementStartDateISO: String
+    public let statementEndDateISO: String
+    public let nativeCurrency: String
+    public let projectionAlgorithm: String
+    public let projectionDigest: String
+    public let authoritativeProjectionID: String
+    public let createdAtISO: String
+}
+
+public struct StatementEquivalenceMemberDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let groupID: String
+    public let projectionID: String
+    public let role: StatementEquivalenceMemberRole
+    public let sourceFormatCode: String
+    public let createdAtISO: String
+}
+
+public enum StatementEquivalenceReviewResult: nonisolated Equatable, Sendable {
+    case notApplicable
+    case firstAcceptedSource
+    case equivalent(authoritativeImportSessionID: String)
+    case conflict
+    case evidenceUnavailable
+    case formatAlreadyRecorded
+}
+
 public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
     public let providerGeneration: ProviderGenerationToken
     public let workspace: WorkspaceDTO
@@ -232,8 +512,9 @@ public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
     public let openingBalanceDecimal: String?
     public let closingBalanceMinor: Int64?
     public let closingBalanceDecimal: String?
+    public let statementFinancialProjection: StatementFinancialProjectionDTO?
 
-    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], historyTemplate: ConfirmedImportHistoryTemplateDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO], declaredStatementStartISO: String? = nil, declaredStatementEndISO: String? = nil, openingBalanceMinor: Int64? = nil, openingBalanceDecimal: String? = nil, closingBalanceMinor: Int64? = nil, closingBalanceDecimal: String? = nil) {
+    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], historyTemplate: ConfirmedImportHistoryTemplateDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO], declaredStatementStartISO: String? = nil, declaredStatementEndISO: String? = nil, openingBalanceMinor: Int64? = nil, openingBalanceDecimal: String? = nil, closingBalanceMinor: Int64? = nil, closingBalanceDecimal: String? = nil, statementFinancialProjection: StatementFinancialProjectionDTO? = nil) {
         self.providerGeneration = providerGeneration
         self.workspace = workspace
         self.proposedAccount = proposedAccount
@@ -248,6 +529,7 @@ public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
         self.openingBalanceDecimal = openingBalanceDecimal
         self.closingBalanceMinor = closingBalanceMinor
         self.closingBalanceDecimal = closingBalanceDecimal
+        self.statementFinancialProjection = statementFinancialProjection
     }
 }
 
@@ -439,6 +721,7 @@ public struct ConfirmedImportReceiptDTO: nonisolated Equatable, Sendable {
 
 public enum ConfirmedImportRepositoryResult: nonisolated Equatable, Sendable, CustomStringConvertible {
     case committed(ConfirmedImportReceiptDTO)
+    case equivalentSourceRecorded(ConfirmedImportReceiptDTO)
     case partialCommitted(ConfirmedImportReceiptDTO)
     case exactDuplicate
     case repeatedIncomingEventEvidence
@@ -454,6 +737,9 @@ public enum ConfirmedImportRepositoryResult: nonisolated Equatable, Sendable, Cu
     case staleIdentityDecision
     case staleProviderGeneration
     case reviewedPartialPlanStale
+    case statementEquivalenceConflict
+    case statementEquivalenceEvidenceUnavailable
+    case equivalentFormatAlreadyRecorded
     case repositoryIntegrityConflict
     case retryableContention
     case persistenceUnavailable
@@ -461,6 +747,7 @@ public enum ConfirmedImportRepositoryResult: nonisolated Equatable, Sendable, Cu
     public var description: String {
         switch self {
         case .committed: return "Confirmed import committed."
+        case .equivalentSourceRecorded: return "Equivalent supporting source recorded."
         case .partialCommitted: return "Reviewed partial import committed."
         case .exactDuplicate: return "The statement was already imported."
         case .repeatedIncomingEventEvidence: return "Incoming transaction evidence conflicts within this import."
@@ -476,6 +763,9 @@ public enum ConfirmedImportRepositoryResult: nonisolated Equatable, Sendable, Cu
         case .staleIdentityDecision: return "The prepared account decision is no longer current."
         case .staleProviderGeneration: return "The persistence provider changed before confirmation."
         case .reviewedPartialPlanStale: return "The reviewed partial-import plan is no longer current."
+        case .statementEquivalenceConflict: return "Exact statement equivalence conflicts."
+        case .statementEquivalenceEvidenceUnavailable: return "Exact statement equivalence evidence is unavailable."
+        case .equivalentFormatAlreadyRecorded: return "This statement format is already represented."
         case .repositoryIntegrityConflict: return "Repository integrity prevented confirmation."
         case .retryableContention: return "Persistence is busy; retry confirmation."
         case .persistenceUnavailable: return "Persistence is unavailable."

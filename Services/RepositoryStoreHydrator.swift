@@ -124,6 +124,7 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
     case accountCurrencyMismatch
     case runningBalanceCurrencyMismatch
     case invalidPartialImport(String)
+    case invalidStatementEquivalence(String)
     case invalidCategoryState(String)
 
     var errorDescription: String? {
@@ -152,6 +153,8 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
             return "A running-balance currency does not match its account."
         case .invalidPartialImport:
             return "Persisted partial-import provenance is invalid. Runtime data was not replaced."
+        case .invalidStatementEquivalence:
+            return "Persisted statement-equivalence evidence is invalid. Runtime data was not replaced."
         case .invalidCategoryState:
             return "Persisted category metadata is invalid. Runtime data was not replaced."
         }
@@ -287,11 +290,25 @@ final class RepositoryStoreHydrator {
                 (accountDTO.id, try Self.identitySummaries(from: accountRepo.identifiers(accountId: accountDTO.id, workspaceId: workspaceId)))
             }
         )
-        let importSessions = try referencedImportSessions(from: transactionDTOs)
         let importedDocumentsByID = try referencedImportedDocuments(from: transactionDTOs)
         let importAttempts = try importSessionRepo.importAttempts(workspaceId: workspaceId).map(RepositoryImportAttempt.init)
+        let statementProjections = try importSessionRepo.statementFinancialProjections(workspaceId: workspaceId)
+        let statementGroups = try importSessionRepo.statementEquivalenceGroups(workspaceId: workspaceId)
+        let statementMembers = try importSessionRepo.statementEquivalenceMembers(workspaceId: workspaceId)
+        let importSessions = try referencedImportSessions(
+            from: transactionDTOs,
+            statementProjections: statementProjections
+        )
         try Self.validatePartialAttemptConsistency(
             sessions: importSessions,
+            attempts: importAttempts
+        )
+        try validateStatementEquivalenceConsistency(
+            projections: statementProjections,
+            groups: statementGroups,
+            members: statementMembers,
+            accounts: accountDTOs,
+            transactions: transactionDTOs,
             attempts: importAttempts
         )
         let transactions = try transactionDTOs.map {
@@ -448,18 +465,105 @@ final class RepositoryStoreHydrator {
         }
     }
 
-    private func referencedImportSessions(from transactions: [TransactionDTO]) throws -> [RepositoryImportSession] {
-        let referencedSessionIDs = Set(
+    private func validateStatementEquivalenceConsistency(
+        projections: [StatementFinancialProjectionRecordDTO],
+        groups: [StatementEquivalenceGroupDTO],
+        members: [StatementEquivalenceMemberDTO],
+        accounts: [AccountDTO],
+        transactions: [TransactionDTO],
+        attempts: [RepositoryImportAttempt]
+    ) throws {
+        guard Set(projections.map(\.projection.id)).count == projections.count,
+              Set(groups.map(\.id)).count == groups.count,
+              Set(members.map(\.id)).count == members.count,
+              Set(members.map(\.projectionID)).count == members.count else {
+            throw RepositoryStoreHydrationError.invalidStatementEquivalence("duplicate identity")
+        }
+        let accountIDs = Set(accounts.map(\.id))
+        let projectionByID = Dictionary(uniqueKeysWithValues: projections.map { ($0.projection.id, $0) })
+        for record in projections {
+            guard record.workspaceID == workspaceId,
+                  accountIDs.contains(record.accountID),
+                  record.projection.isValid(),
+                  let session = try importSessionRepo.importSession(id: record.importSessionID),
+                  session.workspaceId == workspaceId,
+                  let document = try importSessionRepo.importedDocument(id: record.documentID),
+                  document.workspaceId == workspaceId,
+                  document.importSessionId == record.importSessionID else {
+                throw RepositoryStoreHydrationError.invalidStatementEquivalence("projection relationship")
+            }
+        }
+        for group in groups {
+            let groupMembers = members.filter { $0.groupID == group.id }
+            guard group.workspaceID == workspaceId,
+                  accountIDs.contains(group.accountID),
+                  groupMembers.count >= 1,
+                  groupMembers.count <= 2,
+                  Set(groupMembers.map(\.sourceFormatCode)).count == groupMembers.count,
+                  groupMembers.filter({ $0.role == .authoritative }).count == 1,
+                  let authoritative = projectionByID[group.authoritativeProjectionID],
+                  authoritative.accountID == group.accountID,
+                  authoritative.projection.algorithmIdentifier == group.projectionAlgorithm,
+                  authoritative.projection.digest == group.projectionDigest,
+                  groupMembers.contains(where: {
+                      $0.role == .authoritative && $0.projectionID == group.authoritativeProjectionID
+                  }) else {
+                throw RepositoryStoreHydrationError.invalidStatementEquivalence("group relationship")
+            }
+            for member in groupMembers {
+                guard let record = projectionByID[member.projectionID],
+                      record.accountID == group.accountID,
+                      record.projection.institutionCode == group.institutionCode,
+                      record.projection.statementFamilyCode == group.statementFamilyCode,
+                      record.projection.statementStartDateISO == group.statementStartDateISO,
+                      record.projection.statementEndDateISO == group.statementEndDateISO,
+                      record.projection.nativeCurrency == group.nativeCurrency,
+                      record.projection.algorithmIdentifier == group.projectionAlgorithm,
+                      record.projection.digest == group.projectionDigest,
+                      record.projection.sourceFormatCode == member.sourceFormatCode else {
+                    throw RepositoryStoreHydrationError.invalidStatementEquivalence("member relationship")
+                }
+                let ownedTransactions = transactions.filter {
+                    $0.importSessionId == record.importSessionID || $0.documentId == record.documentID
+                }
+                switch member.role {
+                case .authoritative:
+                    guard ownedTransactions.count == record.projection.eventCount else {
+                        throw RepositoryStoreHydrationError.invalidStatementEquivalence("authoritative transaction ownership")
+                    }
+                case .supporting:
+                    guard ownedTransactions.isEmpty,
+                          attempts.contains(where: {
+                              $0.importSessionId == record.importSessionID &&
+                              $0.outcomeCode == ImportAttemptOutcome.equivalentSourceRecorded.rawValue &&
+                              $0.transactionCount == 0
+                          }) else {
+                        throw RepositoryStoreHydrationError.invalidStatementEquivalence("supporting transaction ownership")
+                    }
+                }
+            }
+        }
+        guard Set(members.map(\.projectionID)) == Set(projections.map(\.projection.id)) else {
+            throw RepositoryStoreHydrationError.invalidStatementEquivalence("orphan projection")
+        }
+    }
+
+    private func referencedImportSessions(
+        from transactions: [TransactionDTO],
+        statementProjections: [StatementFinancialProjectionRecordDTO]
+    ) throws -> [RepositoryImportSession] {
+        var referencedSessionIDs = Set(
             transactions.compactMap { transaction -> String? in
                 guard transaction.accountId != nil, let importSessionId = transaction.importSessionId else {
                     return nil
                 }
                 return importSessionId
             }
-        ).sorted()
+        )
+        referencedSessionIDs.formUnion(statementProjections.map(\.importSessionID))
 
         let transactionsByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
-        return try referencedSessionIDs.compactMap { sessionID in
+        return try referencedSessionIDs.sorted().compactMap { sessionID in
             guard let session = try importSessionRepo.importSession(id: sessionID),
                   session.workspaceId == workspaceId else {
                 return nil

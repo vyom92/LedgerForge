@@ -25,6 +25,24 @@ struct ImportOutcomePresentationTests {
         #expect(presentation.allowsViewingTransactions)
     }
 
+    @Test func equivalentSupportingSourceShowsZeroTransactionsAndNoTransactionNavigation() {
+        let presentation = ImportOutcomePresentation(
+            result: ImportEngineResult(
+                fileName: "supporting.pdf",
+                transactionCount: 0,
+                validationPassed: true,
+                persisted: true,
+                errorMessage: nil,
+                isEquivalentSupportingSource: true
+            )
+        )
+
+        #expect(presentation.transactionCount == 0)
+        #expect(presentation.persistenceStatus == "Equivalent Source Recorded")
+        #expect(presentation.isEquivalentSupportingSource)
+        #expect(!presentation.allowsViewingTransactions)
+    }
+
     @Test func validationFailureShowsNotPersistedAndHidesTransactionsAction() {
         let presentation = ImportOutcomePresentation(
             result: ImportEngineResult(
@@ -234,6 +252,10 @@ struct ImportOutcomePresentationTests {
     @Test func everyKnownDurableOutcomeHasIndependentBoundedPresentation() {
         let expected: [(ImportAttemptOutcome, String, String)] = [
             (.successfulImport, "Import completed", "Persisted 2 transaction(s)"),
+            (.equivalentSourceRecorded, "Equivalent source recorded", "Recorded equivalent source evidence and persisted 0 additional transactions"),
+            (.statementEquivalenceConflict, "Statement equivalence conflict", "The same statement period differs financially across formats. No new financial history was written"),
+            (.statementEquivalenceEvidenceUnavailable, "Equivalence evidence unavailable", "Existing overlapping history lacks exact projection evidence. No new financial history was written"),
+            (.equivalentFormatAlreadyRecorded, "Format already recorded", "This source format is already represented for the statement period. No new financial history was written"),
             (.partialImportCommitted, "Partial import completed", "Persisted 2 new transaction(s) from a reviewed partial statement"),
             (.reviewedPartialPlanStale, "Partial review out of date", "Repository truth changed after review. No new financial history was written"),
             (.partialImportUnsupportedEvidence, "Partial import unavailable", "The complete statement does not meet the supported partial-import evidence boundary"),
@@ -497,6 +519,7 @@ struct ImportOutcomePresentationTests {
     @Test func everyKnownGuidanceHasIndependentBoundedPresentation() {
         let expected: [(ImportAttemptGuidance, String)] = [
             (.importCompleted, "Import completed"),
+            (.equivalentSourceRecorded, "Equivalent source evidence recorded; no additional transactions were created"),
             (.partialImportCompleted, "Reviewed partial import completed"),
             (.reviewPriorImport, "Review the prior import"),
             (.supportedEventBlocked, "Review the supported transaction-event block"),

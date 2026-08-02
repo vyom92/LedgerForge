@@ -32,6 +32,12 @@ public final class InMemoryRepositoryProvider {
         state.confirmedImportFailureInjection = point
         state.stateLock.unlock()
     }
+
+    func injectSupportingSourceFailure(after point: SupportingSourceFailureInjectionPoint?) {
+        state.stateLock.lock()
+        state.supportingSourceFailureInjection = point
+        state.stateLock.unlock()
+    }
 }
 
 enum ConfirmedImportFailureInjectionPoint: CaseIterable {
@@ -48,6 +54,20 @@ enum ConfirmedImportFailureInjectionPoint: CaseIterable {
     case partialSummary
     case successfulAttempt
     case sessionCompletion
+}
+
+enum SupportingSourceFailureInjectionPoint: CaseIterable {
+    case document
+    case fingerprint
+    case importSession
+    case normalizedDocument
+    case normalizedRows
+    case projection
+    case projectionEvents
+    case identifierObservation
+    case equivalenceMember
+    case successfulAttempt
+    case completion
 }
 
 private final class InMemoryRepositoryState {
@@ -71,7 +91,11 @@ private final class InMemoryRepositoryState {
     var partialImportSummaries: [String: PartialImportSummaryDTO] = [:]
     var incomingRowDispositions: [String: IncomingRowDispositionDTO] = [:]
     var identifierObservations: [String: IdentifierObservationDTO] = [:]
+    var statementFinancialProjections: [String: StatementFinancialProjectionRecordDTO] = [:]
+    var statementEquivalenceGroups: [String: StatementEquivalenceGroupDTO] = [:]
+    var statementEquivalenceMembers: [String: StatementEquivalenceMemberDTO] = [:]
     var confirmedImportFailureInjection: ConfirmedImportFailureInjectionPoint?
+    var supportingSourceFailureInjection: SupportingSourceFailureInjectionPoint?
 }
 
 private final class InMemoryCategoryRepo: CategoryRepository {
@@ -475,6 +499,30 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
             .sorted { $0.sourceOrdinal < $1.sourceOrdinal }
     }
 
+    func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.statementFinancialProjections.values
+            .filter { $0.workspaceID == workspaceId }
+            .sorted { $0.projection.id < $1.projection.id }
+    }
+
+    func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.statementEquivalenceGroups.values
+            .filter { $0.workspaceID == workspaceId }
+            .sorted { $0.id < $1.id }
+    }
+
+    func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        let groupIDs = Set(state.statementEquivalenceGroups.values
+            .filter { $0.workspaceID == workspaceId }
+            .map(\.id))
+        return state.statementEquivalenceMembers.values
+            .filter { groupIDs.contains($0.groupID) }
+            .sorted { $0.id < $1.id }
+    }
+
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
         state.stateLock.lock()
         defer { state.stateLock.unlock() }
@@ -632,6 +680,15 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             return .repositoryIntegrityConflict
         }
         return reviewPartialImportWithoutLock(plan, planID: UUID().uuidString)
+    }
+
+    func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult {
+        state.stateLock.lock()
+        defer { state.stateLock.unlock() }
+        guard plan.providerGeneration == generationToken else {
+            return .evidenceUnavailable
+        }
+        return reviewStatementEquivalenceWithoutLock(plan)
     }
 
     func commitReviewedPartialImport(_ reviewed: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult {
@@ -929,7 +986,11 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         var eventIdentities = state.transactionEventIdentities
         var attempts = state.importAttempts
         var observations = state.identifierObservations
+        var statementProjections = state.statementFinancialProjections
+        var equivalenceGroups = state.statementEquivalenceGroups
+        var equivalenceMembers = state.statementEquivalenceMembers
         let injectedFailure = state.confirmedImportFailureInjection
+        let supportingFailure = state.supportingSourceFailureInjection
 
         let ownerSets = plan.identifiers.map { candidate in
             Set(identifiers.values.filter {
@@ -976,6 +1037,28 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             account = existing
         }
 
+        let equivalenceReview = reviewStatementEquivalenceWithoutLock(
+            plan,
+            resolvedAccountID: account.id
+        )
+        let isSupportingSource: Bool
+        switch equivalenceReview {
+        case .notApplicable, .firstAcceptedSource:
+            isSupportingSource = false
+        case .equivalent:
+            guard case .useExistingAccount(let selectedAccountID) = plan.accountChoice,
+                  selectedAccountID == account.id else {
+                return .statementEquivalenceEvidenceUnavailable
+            }
+            isSupportingSource = true
+        case .conflict:
+            return .statementEquivalenceConflict
+        case .evidenceUnavailable:
+            return .statementEquivalenceEvidenceUnavailable
+        case .formatAlreadyRecorded:
+            return .equivalentFormatAlreadyRecorded
+        }
+
         for candidate in plan.identifiers {
             let matching = identifiers.values.filter {
                 $0.workspaceId == plan.workspace.id && $0.scheme == candidate.scheme && $0.identifier == candidate.normalizedValue
@@ -1003,11 +1086,14 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             )
             observations["\(ownership.id)|\(observation.importSessionId)|\(observation.documentId)"] = observation
             if injectedFailure == .observation { return .repositoryIntegrityConflict }
+            if isSupportingSource, supportingFailure == .identifierObservation {
+                return .repositoryIntegrityConflict
+            }
         }
 
         var finalTransactions = [TransactionDTO]()
         var finalEvents = [TransactionEventIdentityDTO]()
-        for template in plan.transactionTemplates {
+        for template in plan.transactionTemplates where !isSupportingSource {
             let transaction = withFinalRelationships(
                 template.transaction,
                 accountID: account.id,
@@ -1065,9 +1151,14 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
 
         documents[history.document.id] = history.document
         if injectedFailure == .document { return .repositoryIntegrityConflict }
+        if isSupportingSource, supportingFailure == .document { return .repositoryIntegrityConflict }
         for (index, fingerprint) in history.fingerprints.enumerated() {
             fingerprints[fingerprint.id] = fingerprint
             if index == min(1, history.fingerprints.count - 1), injectedFailure == .fingerprint {
+                return .repositoryIntegrityConflict
+            }
+            if index == min(1, history.fingerprints.count - 1),
+               isSupportingSource, supportingFailure == .fingerprint {
                 return .repositoryIntegrityConflict
             }
         }
@@ -1079,24 +1170,279 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             layoutVersion: history.importSession.layoutVersion
         )
         if injectedFailure == .importSession { return .repositoryIntegrityConflict }
+        if isSupportingSource, supportingFailure == .importSession { return .repositoryIntegrityConflict }
         normalizedDocuments[normalizedDocument.id] = normalizedDocument
+        if isSupportingSource, supportingFailure == .normalizedDocument { return .repositoryIntegrityConflict }
         history.normalizedRows.forEach { normalizedRows[$0.id] = $0 }
+        if isSupportingSource, supportingFailure == .normalizedRows { return .repositoryIntegrityConflict }
+
+        if let projection = plan.statementFinancialProjection {
+            guard projection.isValid(), statementProjections[projection.id] == nil else {
+                return .repositoryIntegrityConflict
+            }
+            statementProjections[projection.id] = StatementFinancialProjectionRecordDTO(
+                projection: projection,
+                workspaceID: plan.workspace.id,
+                accountID: account.id,
+                documentID: history.document.id,
+                importSessionID: history.importSession.id,
+                createdAtISO: history.completedAtISO
+            )
+            if isSupportingSource, supportingFailure == .projection { return .repositoryIntegrityConflict }
+            if isSupportingSource, supportingFailure == .projectionEvents { return .repositoryIntegrityConflict }
+        }
         finalTransactions.forEach { transactions[$0.id] = $0 }
         if injectedFailure == .transactions { return .repositoryIntegrityConflict }
         finalEvents.forEach { eventIdentities[$0.id] = $0 }
         if injectedFailure == .eventIdentities { return .repositoryIntegrityConflict }
-        attempts[history.successfulAttempt.id] = history.successfulAttempt
+        if let projection = plan.statementFinancialProjection {
+            switch equivalenceReview {
+            case .firstAcceptedSource:
+                let group = StatementEquivalenceGroupDTO(
+                    id: "statement-equivalence-group-\(projection.id)",
+                    workspaceID: plan.workspace.id,
+                    accountID: account.id,
+                    institutionCode: projection.institutionCode,
+                    statementFamilyCode: projection.statementFamilyCode,
+                    statementStartDateISO: projection.statementStartDateISO,
+                    statementEndDateISO: projection.statementEndDateISO,
+                    nativeCurrency: projection.nativeCurrency,
+                    projectionAlgorithm: projection.algorithmIdentifier,
+                    projectionDigest: projection.digest,
+                    authoritativeProjectionID: projection.id,
+                    createdAtISO: history.completedAtISO
+                )
+                guard equivalenceGroups[group.id] == nil else { return .repositoryIntegrityConflict }
+                equivalenceGroups[group.id] = group
+                let member = StatementEquivalenceMemberDTO(
+                    id: "statement-equivalence-member-\(projection.id)",
+                    groupID: group.id,
+                    projectionID: projection.id,
+                    role: .authoritative,
+                    sourceFormatCode: projection.sourceFormatCode,
+                    createdAtISO: history.completedAtISO
+                )
+                equivalenceMembers[member.id] = member
+            case .equivalent:
+                guard let group = matchingEquivalenceGroup(
+                    projection,
+                    workspaceID: plan.workspace.id,
+                    accountID: account.id,
+                    groups: equivalenceGroups
+                ) else { return .repositoryIntegrityConflict }
+                let member = StatementEquivalenceMemberDTO(
+                    id: "statement-equivalence-member-\(projection.id)",
+                    groupID: group.id,
+                    projectionID: projection.id,
+                    role: .supporting,
+                    sourceFormatCode: projection.sourceFormatCode,
+                    createdAtISO: history.completedAtISO
+                )
+                guard !equivalenceMembers.values.contains(where: {
+                    $0.groupID == group.id && ($0.projectionID == projection.id || $0.sourceFormatCode == projection.sourceFormatCode)
+                }) else { return .equivalentFormatAlreadyRecorded }
+                equivalenceMembers[member.id] = member
+                if supportingFailure == .equivalenceMember {
+                    return .repositoryIntegrityConflict
+                }
+            case .notApplicable, .conflict, .evidenceUnavailable, .formatAlreadyRecorded:
+                return .repositoryIntegrityConflict
+            }
+        }
+        let acceptedAttempt: ImportAttemptDTO
+        if isSupportingSource,
+           case .equivalent(let authoritativeImportSessionID) = equivalenceReview {
+            acceptedAttempt = ImportAttemptDTO(
+                id: history.successfulAttempt.id,
+                workspaceId: plan.workspace.id,
+                createdAtISO: history.completedAtISO,
+                outcomeCode: ImportAttemptOutcome.equivalentSourceRecorded.rawValue,
+                coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+                accountDecisionCode: ImportAttemptAccountDecision.noFinancialMutation.rawValue,
+                guidanceCode: ImportAttemptGuidance.equivalentSourceRecorded.rawValue,
+                persistenceCode: ImportAttemptPersistence.committed.rawValue,
+                transactionCount: 0,
+                accountId: account.id,
+                importSessionId: history.importSession.id,
+                documentId: history.document.id,
+                relatedImportSessionId: authoritativeImportSessionID,
+                sourceRowCount: plan.statementFinancialProjection?.eventCount,
+                importedTransactionCount: 0,
+                recognizedExistingRowCount: plan.statementFinancialProjection?.eventCount,
+                blockedRowCount: 0
+            )
+        } else {
+            acceptedAttempt = history.successfulAttempt
+        }
+        attempts[acceptedAttempt.id] = acceptedAttempt
         if injectedFailure == .successfulAttempt { return .repositoryIntegrityConflict }
+        if isSupportingSource, supportingFailure == .successfulAttempt { return .repositoryIntegrityConflict }
         if injectedFailure == .partialDispositions { return .repositoryIntegrityConflict }
         if injectedFailure == .partialSummary { return .repositoryIntegrityConflict }
         if injectedFailure == .sessionCompletion { return .repositoryIntegrityConflict }
+        if isSupportingSource, supportingFailure == .completion { return .repositoryIntegrityConflict }
 
         state.workspaces = workspaces; state.accounts = accounts; state.accountIdentifiers = identifiers
         state.identifierObservations = observations; state.documents = documents; state.documentFingerprints = fingerprints
         state.importSessions = sessions; state.normalizedDocuments = normalizedDocuments; state.normalizedRows = normalizedRows
         state.transactions = transactions; state.transactionEventIdentities = eventIdentities
         state.importAttempts = attempts
-        return .committed(ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id))
+        state.statementFinancialProjections = statementProjections
+        state.statementEquivalenceGroups = equivalenceGroups
+        state.statementEquivalenceMembers = equivalenceMembers
+        let receipt = ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id)
+        return isSupportingSource ? .equivalentSourceRecorded(receipt) : .committed(receipt)
+    }
+
+    private func reviewStatementEquivalenceWithoutLock(
+        _ plan: ConfirmedImportPlanDTO,
+        resolvedAccountID: String? = nil
+    ) -> StatementEquivalenceReviewResult {
+        guard let projection = plan.statementFinancialProjection else {
+            return .notApplicable
+        }
+        guard projection.isValid(),
+              let normalized = plan.historyTemplate.normalizedDocument,
+              normalized.profileId == projection.parserProfileID,
+              normalized.profileVersion == projection.parserProfileVersion,
+              plan.historyTemplate.normalizedRows.count == projection.eventCount,
+              plan.transactionTemplates.count == projection.eventCount,
+              plan.declaredStatementStartISO == projection.statementStartDateISO,
+              plan.declaredStatementEndISO == projection.statementEndDateISO,
+              plan.proposedAccount.nativeCurrency == projection.nativeCurrency else {
+            return .evidenceUnavailable
+        }
+
+        let accountID: String?
+        if let resolvedAccountID {
+            accountID = resolvedAccountID
+        } else if case .useExistingAccount(let existingAccountID) = plan.accountChoice {
+            accountID = existingAccountID
+        } else {
+            accountID = nil
+        }
+        guard let accountID else { return .firstAcceptedSource }
+
+        if let group = matchingEquivalenceGroup(
+            projection,
+            workspaceID: plan.workspace.id,
+            accountID: accountID,
+            groups: state.statementEquivalenceGroups
+        ) {
+            if state.statementEquivalenceMembers.values.contains(where: {
+                $0.groupID == group.id && $0.sourceFormatCode == projection.sourceFormatCode
+            }) {
+                return .formatAlreadyRecorded
+            }
+            guard group.projectionAlgorithm == projection.algorithmIdentifier,
+                  group.projectionDigest == projection.digest,
+                  let authoritative = state.statementFinancialProjections[group.authoritativeProjectionID],
+                  financiallyEquivalent(authoritative.projection, projection) else {
+                return .conflict
+            }
+            return .equivalent(authoritativeImportSessionID: authoritative.importSessionID)
+        }
+
+        if hasPreV10ExactEventOverlap(projection, accountID: accountID) {
+            return .evidenceUnavailable
+        }
+        return .firstAcceptedSource
+    }
+
+    private func matchingEquivalenceGroup(
+        _ projection: StatementFinancialProjectionDTO,
+        workspaceID: String,
+        accountID: String,
+        groups: [String: StatementEquivalenceGroupDTO]
+    ) -> StatementEquivalenceGroupDTO? {
+        groups.values.first {
+            $0.workspaceID == workspaceID &&
+            $0.accountID == accountID &&
+            $0.institutionCode == projection.institutionCode &&
+            $0.statementFamilyCode == projection.statementFamilyCode &&
+            $0.statementStartDateISO == projection.statementStartDateISO &&
+            $0.statementEndDateISO == projection.statementEndDateISO &&
+            $0.nativeCurrency == projection.nativeCurrency
+        }
+    }
+
+    private func financiallyEquivalent(
+        _ lhs: StatementFinancialProjectionDTO,
+        _ rhs: StatementFinancialProjectionDTO
+    ) -> Bool {
+        lhs.algorithmIdentifier == rhs.algorithmIdentifier &&
+        lhs.digest == rhs.digest &&
+        lhs.institutionCode == rhs.institutionCode &&
+        lhs.statementFamilyCode == rhs.statementFamilyCode &&
+        lhs.statementStartDateISO == rhs.statementStartDateISO &&
+        lhs.statementEndDateISO == rhs.statementEndDateISO &&
+        lhs.nativeCurrency == rhs.nativeCurrency &&
+        lhs.eventCount == rhs.eventCount &&
+        lhs.openingBalanceMinor == rhs.openingBalanceMinor &&
+        lhs.openingBalanceDecimal == rhs.openingBalanceDecimal &&
+        lhs.debitCount == rhs.debitCount &&
+        lhs.creditCount == rhs.creditCount &&
+        lhs.debitTotalMinor == rhs.debitTotalMinor &&
+        lhs.debitTotalDecimal == rhs.debitTotalDecimal &&
+        lhs.creditTotalMinor == rhs.creditTotalMinor &&
+        lhs.creditTotalDecimal == rhs.creditTotalDecimal &&
+        lhs.closingBalanceMinor == rhs.closingBalanceMinor &&
+        lhs.closingBalanceDecimal == rhs.closingBalanceDecimal &&
+        zip(lhs.events, rhs.events).allSatisfy { left, right in
+            left.ordinal == right.ordinal &&
+            left.statementDateISO == right.statementDateISO &&
+            left.valueDateISO == right.valueDateISO &&
+            left.direction == right.direction &&
+            left.signedAmountMinor == right.signedAmountMinor &&
+            left.signedAmountDecimal == right.signedAmountDecimal &&
+            left.runningBalanceMinor == right.runningBalanceMinor &&
+            left.runningBalanceDecimal == right.runningBalanceDecimal &&
+            left.reference == right.reference
+        }
+    }
+
+    private func hasPreV10ExactEventOverlap(
+        _ projection: StatementFinancialProjectionDTO,
+        accountID: String
+    ) -> Bool {
+        let projectedSessionIDs = Set(state.statementFinancialProjections.values.map(\.importSessionID))
+        let hdfcSessionIDs = Set(state.normalizedDocuments.values.filter {
+            $0.profileId == "hdfc.bank-account.xls" || $0.profileId == "hdfc.bank-account.pdf"
+        }.map(\.importSessionId))
+        let candidateSessionIDs: Set<String> = Set(state.transactions.values.compactMap { transaction -> String? in
+            guard transaction.accountId == accountID,
+                  let sessionID = transaction.importSessionId,
+                  hdfcSessionIDs.contains(sessionID),
+                  !projectedSessionIDs.contains(sessionID) else { return nil }
+            return sessionID
+        })
+        for sessionID in candidateSessionIDs {
+            let transactions = state.transactions.values
+                .filter { $0.accountId == accountID && $0.importSessionId == sessionID }
+                .sorted {
+                    ($0.rawRows.first?.sourceOrdinal ?? Int.max) <
+                    ($1.rawRows.first?.sourceOrdinal ?? Int.max)
+                }
+            guard transactions.count == projection.events.count else { continue }
+            var allEventsMatch = true
+            for (transaction, event) in zip(transactions, projection.events) {
+                let matches = transaction.postedDateISO == event.statementDateISO &&
+                    transaction.valueDateISO == event.valueDateISO &&
+                    transaction.direction == event.direction &&
+                    transaction.amountMinor == event.signedAmountMinor &&
+                    transaction.amountDecimal == event.signedAmountDecimal &&
+                    transaction.runningBalanceMinor == event.runningBalanceMinor &&
+                    transaction.reference == event.reference
+                if !matches {
+                    allEventsMatch = false
+                    break
+                }
+            }
+            if allEventsMatch {
+                return true
+            }
+        }
+        return false
     }
 
     private func reviewPartialImportWithoutLock(

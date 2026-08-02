@@ -545,7 +545,7 @@ private func createCategory(
 }
 
 /// Establishes only the fixed pre-V8 truth required by the isolated category
-/// migration test. The current confirmed-import repository requires V9 and is
+/// migration test. The current confirmed-import repository requires V10 and is
 /// deliberately not a compatibility layer for this historical schema.
 private func seedCategoryMigrationV7Truth(
     in database: SQLiteDatabase

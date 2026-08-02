@@ -15,6 +15,7 @@ struct ImportPersistenceResult: Equatable {
     let sourceRowCount: Int?
     let recognizedExistingRowCount: Int?
     let isPartialImport: Bool
+    let isEquivalentSupportingSource: Bool
     let accountOutcome: ImportAccountOutcome
 
     init(
@@ -29,6 +30,7 @@ struct ImportPersistenceResult: Equatable {
         sourceRowCount: Int? = nil,
         recognizedExistingRowCount: Int? = nil,
         isPartialImport: Bool = false,
+        isEquivalentSupportingSource: Bool = false,
         accountOutcome: ImportAccountOutcome = .unavailable
     ) {
         self.persisted = persisted
@@ -42,6 +44,7 @@ struct ImportPersistenceResult: Equatable {
         self.sourceRowCount = sourceRowCount
         self.recognizedExistingRowCount = recognizedExistingRowCount
         self.isPartialImport = isPartialImport
+        self.isEquivalentSupportingSource = isEquivalentSupportingSource
         self.accountOutcome = accountOutcome
     }
 
@@ -156,6 +159,15 @@ protocol ImportPersistenceCoordinating {
         accountChoice: ImportAccountChoice?,
         providerGeneration: ProviderGenerationToken
     ) throws -> PartialImportReviewResult
+
+    func reviewStatementEquivalence(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> StatementEquivalenceReviewResult
 }
 
 enum ImportAccountChoice: Equatable {
@@ -478,6 +490,17 @@ extension ImportPersistenceCoordinating {
         .unsupportedEvidence
     }
 
+    func reviewStatementEquivalence(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> StatementEquivalenceReviewResult {
+        .notApplicable
+    }
+
     func reviewPartialImport(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
@@ -540,6 +563,9 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
     case staleIdentityDecision
     case staleProviderGeneration
     case reviewedPartialPlanStale
+    case statementEquivalenceConflict
+    case statementEquivalenceEvidenceUnavailable
+    case equivalentFormatAlreadyRecorded
     case retryableContention
     case persistenceUnavailable
     case repositoryIntegrityConflict
@@ -580,6 +606,12 @@ enum ImportPersistenceCoordinationError: Error, LocalizedError, Equatable {
             return "Persistence changed after preparation; prepare the import again."
         case .reviewedPartialPlanStale:
             return "The reviewed partial-import plan is no longer current. Prepare the import again."
+        case .statementEquivalenceConflict:
+            return "The other-format statement covers the same period but its financial projection differs. No financial history was written."
+        case .statementEquivalenceEvidenceUnavailable:
+            return "Existing history overlaps this statement, but exact cross-format equivalence evidence is unavailable. No financial history was written."
+        case .equivalentFormatAlreadyRecorded:
+            return "This statement format is already represented in the equivalence group. No financial history was written."
         case .retryableContention:
             return "Persistence is busy. Retry confirmation."
         case .persistenceUnavailable:
@@ -963,6 +995,32 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         return provider.confirmedImportRepo.reviewPartialImport(plan)
     }
 
+    func reviewStatementEquivalence(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> StatementEquivalenceReviewResult {
+        guard validation.passed else { return .notApplicable }
+        try validate(fingerprintSet: fingerprintSet)
+        let provider = databaseProviderProvider()
+        guard provider.persistenceState.isUsable else {
+            throw ImportPersistenceCoordinationError.persistenceUnavailable
+        }
+        let plan = try makeConfirmedPlan(
+            provider: provider,
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            fingerprintSet: fingerprintSet,
+            accountChoice: accountChoice,
+            providerGeneration: providerGeneration
+        )
+        return provider.confirmedImportRepo.reviewStatementEquivalence(plan)
+    }
+
     func persistReviewedPartialImport(
         _ plan: ReviewedPartialImportPlanDTO
     ) throws -> ImportPersistenceResult {
@@ -1095,6 +1153,18 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             )
             developerConsole?.info(.database, "Provider-owned confirmed import committed", metadata: ["transactions": "\(count)"])
             return ImportPersistenceResult(persisted: true, workspaceId: receipt.workspaceId, accountId: receipt.accountId, importSessionId: receipt.importSessionId, transactionCount: count, importAttemptId: plan.historyTemplate.successfulAttempt.id, accountOutcome: accountOutcome)
+        case .equivalentSourceRecorded(let receipt):
+            developerConsole?.info(.database, "Equivalent supporting statement source recorded", metadata: ["transactions": "0"])
+            return ImportPersistenceResult(
+                persisted: true,
+                workspaceId: receipt.workspaceId,
+                accountId: receipt.accountId,
+                importSessionId: receipt.importSessionId,
+                transactionCount: 0,
+                importAttemptId: plan.historyTemplate.successfulAttempt.id,
+                isEquivalentSupportingSource: true,
+                accountOutcome: .matchedExisting
+            )
         case .exactDuplicate:
             let previous = try provider.importSessionRepo.priorImportedStatement(algorithm: fingerprint.algorithm, fingerprint: fingerprint.digest)
             let attemptID = recordAttempt(provider: provider, outcome: .exactStatementDuplicate, coverage: .evaluatedSupportedOnly, decision: .noFinancialMutation, guidance: .reviewPriorImport, persistence: .rejectedRecorded, transactionCount: previous?.transactionCount ?? count, accountId: previous?.accountId, relatedImportSessionId: previous?.importSessionId)
@@ -1124,7 +1194,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
 
     private func coordinationError(for result: ConfirmedImportRepositoryResult) -> ImportPersistenceCoordinationError {
         switch result {
-        case .committed, .partialCommitted, .exactDuplicate:
+        case .committed, .equivalentSourceRecorded, .partialCommitted, .exactDuplicate:
             return .unclassified
         case .repeatedIncomingEventEvidence, .existingEventDuplicate, .eventOwnershipConflict:
             return .transactionEventBlock
@@ -1138,6 +1208,9 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         case .staleIdentityDecision: return .staleIdentityDecision
         case .staleProviderGeneration: return .staleProviderGeneration
         case .reviewedPartialPlanStale: return .reviewedPartialPlanStale
+        case .statementEquivalenceConflict: return .statementEquivalenceConflict
+        case .statementEquivalenceEvidenceUnavailable: return .statementEquivalenceEvidenceUnavailable
+        case .equivalentFormatAlreadyRecorded: return .equivalentFormatAlreadyRecorded
         case .retryableContention: return .retryableContention
         case .persistenceUnavailable: return .persistenceUnavailable
         case .repositoryIntegrityConflict: return .repositoryIntegrityConflict
@@ -1158,6 +1231,9 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         case .selectedAccountUnavailable, .selectedAccountIneligible, .selectedAccountWorkspaceMismatch, .staleIdentityDecision: outcome = .staleAccountChoice; guidance = .integrityReviewRequired
         case .staleProviderGeneration: outcome = .staleProviderGeneration; guidance = .prepareAgain
         case .reviewedPartialPlanStale: outcome = .reviewedPartialPlanStale; guidance = .prepareAgain
+        case .statementEquivalenceConflict: outcome = .statementEquivalenceConflict; guidance = .integrityReviewRequired
+        case .statementEquivalenceEvidenceUnavailable: outcome = .statementEquivalenceEvidenceUnavailable; guidance = .integrityReviewRequired
+        case .equivalentFormatAlreadyRecorded: outcome = .equivalentFormatAlreadyRecorded; guidance = .reviewPriorImport
         case .retryableContention: outcome = .sqliteContention; guidance = .prepareAgain
         default: outcome = .repositoryIntegrityConflict; guidance = .integrityReviewRequired
         }

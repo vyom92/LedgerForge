@@ -582,7 +582,190 @@ CREATE INDEX idx_document_fingerprints_authority_lookup
     ]
 )
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9]
+public let migrationV10 = Migration(
+    version: 10,
+    name: "exact_cross_format_statement_equivalence",
+    sql: """
+CREATE TABLE statement_financial_projections (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  document_id TEXT NOT NULL UNIQUE,
+  import_session_id TEXT NOT NULL UNIQUE,
+  algorithm TEXT NOT NULL,
+  digest TEXT NOT NULL CHECK(length(digest) = 64 AND digest NOT GLOB '*[^0-9a-f]*'),
+  institution_code TEXT NOT NULL,
+  statement_family_code TEXT NOT NULL CHECK(length(statement_family_code) > 0),
+  parser_profile_id TEXT NOT NULL CHECK(length(parser_profile_id) > 0),
+  parser_profile_version TEXT NOT NULL CHECK(length(parser_profile_version) > 0),
+  source_format_code TEXT NOT NULL CHECK(source_format_code IN ('pdf', 'xls')),
+  statement_start_date DATE NOT NULL,
+  statement_end_date DATE NOT NULL,
+  native_currency TEXT NOT NULL,
+  event_count INTEGER NOT NULL CHECK(event_count > 0),
+  opening_balance_minor INTEGER NOT NULL,
+  opening_balance_decimal TEXT NOT NULL CHECK(length(opening_balance_decimal) > 0),
+  debit_count INTEGER NOT NULL CHECK(debit_count >= 0),
+  credit_count INTEGER NOT NULL CHECK(credit_count >= 0),
+  debit_total_minor INTEGER NOT NULL CHECK(debit_total_minor >= 0),
+  debit_total_decimal TEXT NOT NULL CHECK(length(debit_total_decimal) > 0),
+  credit_total_minor INTEGER NOT NULL CHECK(credit_total_minor >= 0),
+  credit_total_decimal TEXT NOT NULL CHECK(length(credit_total_decimal) > 0),
+  closing_balance_minor INTEGER NOT NULL,
+  closing_balance_decimal TEXT NOT NULL CHECK(length(closing_balance_decimal) > 0),
+  created_at DATETIME NOT NULL,
+  CHECK(statement_start_date <= statement_end_date),
+  CHECK(event_count = debit_count + credit_count),
+  CHECK(algorithm = 'ledgerforge.statement-financial-projection.sha256.v1'),
+  CHECK(institution_code = 'hdfc'),
+  CHECK(statement_family_code = 'hdfc.bank-account'),
+  CHECK(parser_profile_id = 'hdfc.bank-account.' || source_format_code),
+  CHECK(parser_profile_version = '1'),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_statement_projection_group_lookup
+  ON statement_financial_projections(workspace_id, account_id, statement_family_code, statement_start_date, statement_end_date, native_currency);
+
+CREATE TABLE statement_financial_projection_events (
+  id TEXT PRIMARY KEY,
+  projection_id TEXT NOT NULL,
+  event_ordinal INTEGER NOT NULL CHECK(event_ordinal > 0),
+  statement_date DATE NOT NULL,
+  value_date DATE NOT NULL,
+  direction TEXT NOT NULL CHECK(direction IN ('debit', 'credit')),
+  signed_amount_minor INTEGER NOT NULL,
+  signed_amount_decimal TEXT NOT NULL CHECK(length(signed_amount_decimal) > 0),
+  running_balance_minor INTEGER NOT NULL,
+  running_balance_decimal TEXT NOT NULL CHECK(length(running_balance_decimal) > 0),
+  reference TEXT,
+  created_at DATETIME NOT NULL,
+  UNIQUE(projection_id, event_ordinal),
+  CHECK((direction = 'debit' AND signed_amount_minor < 0) OR
+        (direction = 'credit' AND signed_amount_minor > 0)),
+  FOREIGN KEY(projection_id) REFERENCES statement_financial_projections(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE statement_equivalence_groups (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  institution_code TEXT NOT NULL,
+  statement_family_code TEXT NOT NULL,
+  statement_start_date DATE NOT NULL,
+  statement_end_date DATE NOT NULL,
+  native_currency TEXT NOT NULL,
+  projection_algorithm TEXT NOT NULL,
+  projection_digest TEXT NOT NULL CHECK(length(projection_digest) = 64 AND projection_digest NOT GLOB '*[^0-9a-f]*'),
+  authoritative_projection_id TEXT NOT NULL UNIQUE,
+  created_at DATETIME NOT NULL,
+  CHECK(statement_start_date <= statement_end_date),
+  UNIQUE(workspace_id, account_id, institution_code, statement_family_code, statement_start_date, statement_end_date, native_currency),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(authoritative_projection_id) REFERENCES statement_financial_projections(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE statement_equivalence_members (
+  id TEXT PRIMARY KEY,
+  group_id TEXT NOT NULL,
+  projection_id TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL CHECK(role IN ('authoritative', 'supporting')),
+  source_format_code TEXT NOT NULL CHECK(source_format_code IN ('pdf', 'xls')),
+  created_at DATETIME NOT NULL,
+  UNIQUE(group_id, source_format_code),
+  FOREIGN KEY(group_id) REFERENCES statement_equivalence_groups(id) ON DELETE RESTRICT,
+  FOREIGN KEY(projection_id) REFERENCES statement_financial_projections(id) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX idx_statement_equivalence_one_authoritative_member
+  ON statement_equivalence_members(group_id)
+  WHERE role = 'authoritative';
+
+CREATE TRIGGER validate_statement_projection_relationships
+BEFORE INSERT ON statement_financial_projections
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM accounts a
+    WHERE a.id = NEW.account_id AND a.workspace_id = NEW.workspace_id
+  ) THEN RAISE(ABORT, 'statement projection account relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d
+    WHERE d.id = NEW.document_id
+      AND d.workspace_id = NEW.workspace_id
+      AND d.import_session_id = NEW.import_session_id
+  ) THEN RAISE(ABORT, 'statement projection document relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM import_sessions s
+    WHERE s.id = NEW.import_session_id AND s.workspace_id = NEW.workspace_id
+  ) THEN RAISE(ABORT, 'statement projection session relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_statement_equivalence_group
+BEFORE INSERT ON statement_equivalence_groups
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM statement_financial_projections p
+    WHERE p.id = NEW.authoritative_projection_id
+      AND p.workspace_id = NEW.workspace_id
+      AND p.account_id = NEW.account_id
+      AND p.institution_code = NEW.institution_code
+      AND p.statement_family_code = NEW.statement_family_code
+      AND p.statement_start_date = NEW.statement_start_date
+      AND p.statement_end_date = NEW.statement_end_date
+      AND p.native_currency = NEW.native_currency
+      AND p.algorithm = NEW.projection_algorithm
+      AND p.digest = NEW.projection_digest
+      AND (SELECT COUNT(*) FROM statement_financial_projection_events e WHERE e.projection_id = p.id) = p.event_count
+  ) THEN RAISE(ABORT, 'statement equivalence authoritative projection invalid') END;
+END;
+
+CREATE TRIGGER validate_statement_equivalence_member
+BEFORE INSERT ON statement_equivalence_members
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1
+    FROM statement_equivalence_groups g
+    JOIN statement_financial_projections p ON p.id = NEW.projection_id
+    WHERE g.id = NEW.group_id
+      AND p.workspace_id = g.workspace_id
+      AND p.account_id = g.account_id
+      AND p.institution_code = g.institution_code
+      AND p.statement_family_code = g.statement_family_code
+      AND p.statement_start_date = g.statement_start_date
+      AND p.statement_end_date = g.statement_end_date
+      AND p.native_currency = g.native_currency
+      AND p.algorithm = g.projection_algorithm
+      AND p.digest = g.projection_digest
+      AND p.source_format_code = NEW.source_format_code
+      AND (SELECT COUNT(*) FROM statement_financial_projection_events e WHERE e.projection_id = p.id) = p.event_count
+  ) THEN RAISE(ABORT, 'statement equivalence member projection invalid') END;
+  SELECT CASE WHEN NEW.role = 'authoritative' AND NOT EXISTS (
+    SELECT 1 FROM statement_equivalence_groups g
+    WHERE g.id = NEW.group_id AND g.authoritative_projection_id = NEW.projection_id
+  ) THEN RAISE(ABORT, 'statement equivalence authoritative member invalid') END;
+  SELECT CASE WHEN NEW.role = 'supporting' AND EXISTS (
+    SELECT 1 FROM statement_equivalence_groups g
+    WHERE g.id = NEW.group_id AND g.authoritative_projection_id = NEW.projection_id
+  ) THEN RAISE(ABORT, 'statement equivalence supporting member invalid') END;
+  SELECT CASE WHEN NEW.role = 'authoritative' AND (
+    SELECT COUNT(*) FROM transactions t
+    JOIN statement_financial_projections p ON p.id = NEW.projection_id
+    WHERE t.import_session_id = p.import_session_id AND t.document_id = p.document_id
+  ) != (
+    SELECT event_count FROM statement_financial_projections p WHERE p.id = NEW.projection_id
+  ) THEN RAISE(ABORT, 'statement equivalence authoritative transaction ownership invalid') END;
+  SELECT CASE WHEN NEW.role = 'supporting' AND EXISTS (
+    SELECT 1 FROM transactions t
+    JOIN statement_financial_projections p ON p.id = NEW.projection_id
+    WHERE t.import_session_id = p.import_session_id OR t.document_id = p.document_id
+  ) THEN RAISE(ABORT, 'statement equivalence supporting transaction ownership invalid') END;
+END;
+"""
+)
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

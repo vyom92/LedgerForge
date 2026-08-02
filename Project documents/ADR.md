@@ -25,13 +25,13 @@ When reading this file:
 4. use `PROJECT_STATE.md` for verified implementation reality;
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
-**Status alignment date:** 2026-07-29
-**Repository implementation ref reviewed:** `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388` — DBP-01 Developer Database Profiles
-**Latest verified production implementation:** Sprint 63 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
+**Status alignment date:** 2026-08-02
+**Repository implementation ref reviewed:** `main@f0ae452c0f35241f5bdb6752d5f503f6ed8b62f6` — Sprint 72 baseline
+**Latest verified production implementation:** Sprint 73 — Exact HDFC PDF v1 and Whole-Statement Cross-Format Equivalence
 **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`
-**Latest completed numbered outcome:** Sprint 64
-**Latest accepted ADR:** ADR-041
-**Current migration:** V9
+**Latest completed numbered outcome:** Sprint 73
+**Latest accepted ADR:** ADR-042
+**Current migration:** V10
 
 No alignment note authorizes implementation.
 
@@ -80,6 +80,7 @@ No alignment note authorizes implementation.
 | ADR-039 | Trusted Statement Dates and Durable Source Provenance | Accepted and implemented in Sprint 52, with Sprint 52A corrective closure. | Migration V6, StatementDate, date-role/timezone evidence, parser-profile provenance, source ordinal/digest relationships and strict hydration are operational. |
 | ADR-040 | Explicit Reviewed Partial-Overlap Import | Accepted; architecture and V7 compatibility structures remain readable and validated, but the former Axis production partial-overlap family is suspended. | Mixed supported overlap currently fails closed pending new immutable source evidence and an independently derived direction/event oracle. |
 | ADR-041 | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority | Accepted and implemented in Sprint 63. | Immutable source snapshots and exact source-byte fingerprint authority are operational for new CSV preparation, confirmation and persistence; production PDF support remains unsupported. |
+| ADR-042 | Exact Cross-Format Statement Equivalence and Supporting-Source Persistence | Accepted and implemented in Sprint 73. | Exact whole-statement equivalence is operational only for the independently approved HDFC bank-account PDF/XLS v1 pair. |
 
 ## Alignment Policy
 
@@ -4972,3 +4973,125 @@ This ADR does not authorize:
 - cross-format duplicate suppression;
 - durable storage of complete source files;
 - changes to existing CSV fingerprint outcomes.
+
+### Current Alignment — 2026-08-02
+
+Sprint 73 preserves ADR-041 exact source-byte identity as the duplicate
+authority for PDF and XLS while adding ADR-042 as a separate, format-neutral
+financial-equivalence contract. No existing fingerprint or historical source
+record is reinterpreted.
+
+---
+
+# ADR-042 — Exact Cross-Format Statement Equivalence and Supporting-Source Persistence
+
+**Status:** Accepted and implemented in Sprint 73
+**Date:** 2026-08-02
+**Decision owners:** LedgerForge architecture and financial correctness
+**Migration:** Additive V10
+
+## Context
+
+Exact source-byte identity answers whether the same source container was
+already accepted. It cannot answer whether two independently supported source
+formats are financially identical representations of one statement.
+
+The exact retained HDFC bank-account PDF and legacy-XLS v1 profiles are the
+first independently verified pair for which LedgerForge can answer the second
+question without fuzzy matching. Accepting both sources as ordinary imports
+would duplicate the same financial events; discarding the later source would
+lose useful source evidence.
+
+## Decision
+
+LedgerForge adopts a bounded exact whole-statement equivalence contract with
+these rules:
+
+1. Exact source-byte identity and cross-format financial equivalence remain
+   separate concepts.
+2. Existing exact-byte duplicate handling remains governed by the source-byte
+   fingerprint authority established by ADR-041.
+3. Cross-format equivalence is available only to independently supported,
+   explicitly paired parser profiles. Sprint 73 authorizes only
+   `hdfc.bank-account.pdf@1` with `hdfc.bank-account.xls@1`.
+4. Equivalence is exact, ordered and deterministic under
+   `ledgerforge.statement-financial-projection.sha256.v1`; it is not fuzzy
+   matching.
+5. The first accepted source remains authoritative for transactions,
+   narration and transaction provenance.
+6. A later exact-equivalent source is accepted as supporting evidence and
+   creates zero transactions.
+7. Both accepted sources retain separate documents, import sessions,
+   source-byte fingerprints, parser provenance, normalized evidence,
+   projections and attempt evidence.
+8. Supporting-source acceptance is one provider-owned atomic operation in
+   both SQLite and In-Memory implementations.
+9. Any projection mismatch, ambiguity, account conflict, unsupported source
+   relationship or already represented format fails closed.
+10. Migration V10 does not infer or backfill projections, printed periods,
+    equivalence groups or members for existing history.
+11. ADR-040 and Migration V7 partial-import structures are not reused for
+    whole-statement equivalence.
+12. Same-format byte-different semantic duplicates remain unsupported.
+13. The first-source authority is immutable in this increment; source
+    replacement, authority switching and provenance reassignment are absent.
+14. A future institution or format pair may reuse the architecture only after
+    its own independent source approval and bounded implementation decision.
+
+## Exact projection boundary
+
+The projection header contains the algorithm, institution, statement family,
+declared period, currency, event count, derived opening balance, debit and
+credit counts and totals, and closing balance. Each ordered event contains its
+one-based ordinal, statement date, value date, direction, exact signed Money,
+exact running balance and printed reference with explicit nil preservation.
+
+The projection excludes filenames, source fingerprints, parser profile,
+physical source ordinals, narration, display account names, customer identity
+and inferred account subtype. Strong parser-produced account identity and the
+durable account relationship are validated separately.
+
+## Persistence and transaction authority
+
+Migration V10 adds source projections and ordered projection events plus one
+equivalence group and its authoritative/supporting members. Relationship
+constraints and provider validation require one authoritative member, at most
+one member per approved format, exact group/projection agreement, authoritative
+transaction ownership and zero supporting transaction ownership.
+
+At confirmation the provider revalidates the current account, fingerprints,
+projection and group state. With no group it atomically persists the ordinary
+confirmed import and authoritative membership. With a matching group it
+atomically persists the supporting source graph, identifier observation and
+`equivalent_source_recorded` attempt with zero transactions. Transaction-time
+state outranks preparation advisory state.
+
+If complete ordered HDFC events overlap pre-V10 history that has no durable
+projection, confirmation returns
+`statement_equivalence_evidence_unavailable` without inventing a group or
+accepted source residue. A same-period projection mismatch returns
+`statement_equivalence_conflict`; a represented byte-different format returns
+`equivalent_format_already_recorded`; an identical source remains the existing
+`exact_statement_duplicate` outcome.
+
+## Consequences
+
+- Both approved source containers can be retained without duplicating
+  financial events.
+- The first accepted source remains the only transaction provenance authority.
+- Exact equivalence can be reconstructed and validated after SQLite reopen and
+  canonical hydration.
+- Historical V9 data remains readable and unchanged.
+- Equivalence evidence is intentionally unavailable for old history whose
+  printed period and projection were never durably captured.
+- New pairs require independent source truth; architectural reuse alone does
+  not establish production support.
+
+## Exclusions
+
+ADR-042 does not authorize fuzzy matching, narration or merchant similarity,
+partial overlap, CBQ or Axis equivalence, card statements, same-format semantic
+duplicate acceptance, user override, source replacement, authority switching,
+transaction provenance reassignment, historical repair or backfill, account
+merge, OCR, password workflows, generic PDF/spreadsheet parsing, document-byte
+storage or generic mutation infrastructure.
