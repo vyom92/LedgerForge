@@ -18,7 +18,8 @@ final class StatementParserRegistry {
 
             AxisBankAccountParser(),
             AxisBankAccountPDFParser(),
-            AxisBankAccountXLSParser()
+            AxisBankAccountXLSParser(),
+            HDFCBankAccountXLSParser()
 
         ]
 

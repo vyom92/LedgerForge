@@ -139,11 +139,13 @@ struct Transaction: Identifiable {
     let repositoryTransactionId: String?
 
     let statementDate: StatementDate?
+    let valueDate: StatementDate?
     let financialDateRole: FinancialDateRole
     let statementTimezoneEvidence: StatementTimezoneEvidence
     let sourceProvenance: [TransactionSourceProvenance]
 
     var description: String
+    let reference: String?
 
     let debitMoney: Money?
     let creditMoney: Money?
@@ -185,7 +187,9 @@ struct Transaction: Identifiable {
 
     init(
         statementDate: StatementDate?,
+        valueDate: StatementDate? = nil,
         description: String,
+        reference: String? = nil,
         debitMoney: Money?,
         creditMoney: Money?,
         money: Money,
@@ -207,10 +211,12 @@ struct Transaction: Identifiable {
         self.id = id
         self.repositoryTransactionId = repositoryTransactionId
         self.statementDate = statementDate
+        self.valueDate = valueDate
         self.financialDateRole = financialDateRole
         self.statementTimezoneEvidence = statementTimezoneEvidence
         self.sourceProvenance = sourceProvenance
         self.description = description
+        self.reference = reference
         self.debitMoney = debitMoney
         self.creditMoney = creditMoney
         self.money = money
@@ -227,7 +233,9 @@ struct Transaction: Identifiable {
 
     init(
         statementDate: StatementDate?,
+        valueDate: StatementDate? = nil,
         description: String,
+        reference: String? = nil,
         debit: Decimal?,
         credit: Decimal?,
         amount: Decimal,
@@ -250,7 +258,9 @@ struct Transaction: Identifiable {
         let postedMoney = try! Money(amount: amount, currency: currency)
         self.init(
             statementDate: statementDate,
+            valueDate: valueDate,
             description: description,
+            reference: reference,
             debitMoney: try! debit.map { try Money(amount: $0, currency: currency) },
             creditMoney: try! credit.map { try Money(amount: $0, currency: currency) },
             money: postedMoney,

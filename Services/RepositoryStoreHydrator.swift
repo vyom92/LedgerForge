@@ -115,6 +115,7 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
     case persistenceUnavailable
     case unsupportedCurrency(String)
     case invalidPostedDate(String)
+    case invalidValueDate(String)
     case invalidFinancialDateRole(String)
     case invalidStatementTimezoneEvidence(String)
     case invalidSourceProvenance(String)
@@ -133,6 +134,8 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
             return "Currency \(currency) is not supported by dashboard hydration."
         case .invalidPostedDate(let value):
             return "Transaction posted date \(value) could not be read."
+        case .invalidValueDate(let value):
+            return "Transaction value date \(value) could not be read."
         case .invalidFinancialDateRole:
             return "Transaction financial date role could not be read."
         case .invalidStatementTimezoneEvidence:
@@ -667,6 +670,15 @@ final class RepositoryStoreHydrator {
         guard let postedDate = try? StatementDate(canonical: dto.postedDateISO) else {
             throw RepositoryStoreHydrationError.invalidPostedDate(dto.postedDateISO)
         }
+        let valueDate: StatementDate?
+        if let value = dto.valueDateISO {
+            guard let parsed = try? StatementDate(canonical: value) else {
+                throw RepositoryStoreHydrationError.invalidValueDate(value)
+            }
+            valueDate = parsed
+        } else {
+            valueDate = nil
+        }
 
         guard let accountDTO = accounts.first(where: { $0.id == dto.accountId }) else {
             throw RepositoryStoreHydrationError.accountCurrencyMismatch
@@ -740,7 +752,9 @@ final class RepositoryStoreHydrator {
 
         return Transaction(
             statementDate: postedDate,
+            valueDate: valueDate,
             description: dto.description ?? "",
+            reference: dto.reference,
             debitMoney: dto.direction == "debit" ? absoluteAmount : nil,
             creditMoney: dto.direction == "credit" ? absoluteAmount : nil,
             money: decimalMoney,

@@ -22,7 +22,7 @@ struct InstitutionDetectionResult: Equatable, Sendable {
 struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
     private let rules: [InstitutionDetectionRule]
 
-    init(rules: [InstitutionDetectionRule] = [.axisBankAccount]) {
+    init(rules: [InstitutionDetectionRule] = [.hdfcBankAccount, .axisBankAccount]) {
         self.rules = rules
     }
 
@@ -69,6 +69,7 @@ struct InstitutionDetectionRule: Equatable, Sendable {
     let institution: Institution
     let documentType: DocumentType
     let confidence: Double
+    let requiredMatchCount: Int
     let signatures: [InstitutionSignature]
 
     func detect(in normalizedText: String) -> InstitutionDetectionResult? {
@@ -76,7 +77,7 @@ struct InstitutionDetectionRule: Equatable, Sendable {
             normalizedText.contains(signature.normalizedToken) ? signature.reason : nil
         }
 
-        guard !matchedReasons.isEmpty else {
+        guard matchedReasons.count >= requiredMatchCount else {
             return nil
         }
 
@@ -95,10 +96,32 @@ struct InstitutionDetectionRule: Equatable, Sendable {
         institution: .axis,
         documentType: .bankAccount,
         confidence: 0.98,
+        requiredMatchCount: 1,
         signatures: [
             InstitutionSignature(token: "AXIS BANK", reason: "Matched Axis Bank name."),
             InstitutionSignature(token: "UTIB", reason: "Matched Axis Bank IFSC prefix."),
             InstitutionSignature(token: "STATEMENT OF AXIS ACCOUNT", reason: "Matched Axis account statement title.")
+        ]
+    )
+
+    static let hdfcBankAccount = InstitutionDetectionRule(
+        institution: .hdfc,
+        documentType: .bankAccount,
+        confidence: 0.99,
+        requiredMatchCount: 3,
+        signatures: [
+            InstitutionSignature(
+                token: "HDFC BANK LTD.",
+                reason: "Matched HDFC Bank name."
+            ),
+            InstitutionSignature(
+                token: "STATEMENT OF ACCOUNTS",
+                reason: "Matched HDFC account-statement title."
+            ),
+            InstitutionSignature(
+                token: "DATE NARRATION CHQ./REF.NO. VALUE DT WITHDRAWAL AMT. DEPOSIT AMT. CLOSING BALANCE",
+                reason: "Matched the exact HDFC bank-statement header."
+            )
         ]
     )
 }

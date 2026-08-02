@@ -575,16 +575,14 @@ Do not generalize the existing parser without fixture-backed evidence.
 
 ## FW-P1-02 — HDFC Parser Family
 
-**Status:** Ready for discovery  
-**Fixture state:** Clean-room HDFC bank-account PDF and XLS evidence, manifests and expected financial baselines are integrated.  
-**Implementation blockers:** Selection of the first supported HDFC layout and source format, plus the applicable production reader/fingerprint architecture.
+**Status:** Partially completed; PDF remains ready for planning
+**Completed boundary:** Sprint 72 supports only the exact retained shared HDFC NRE/NRO OLE2/BIFF8 grammar as `hdfc.bank-account.xls@1` through the ordinary import pipeline. Exact source bytes are duplicate authority, transaction `Date` and `Value Dt` remain distinct, withdrawal/deposit direction is explicit, and only verified account-number evidence authorizes account identity.
+**Remaining boundary:** HDFC PDF is the next separately bounded bank-account format. HDFC CSV, XLSX, credit cards, generic HDFC layouts and PDF/XLS cross-format suppression remain unsupported.
 
 Near-term HDFC direction is bank-account statements only through the unified import pipeline. Card support remains separate future work.
 
-Targeted discovery must determine:
+The remaining HDFC PDF boundary must determine:
 
-- which approved HDFC layout and source format should be supported first;
-- whether an independent HDFC PDF boundary or spreadsheet support under `FW-P1-14` provides the smallest safe boundary;
 - institution-detection and statement-classification evidence;
 - parser/profile semantics and versioning;
 - account-identity evidence;
@@ -592,7 +590,7 @@ Targeted discovery must determine:
 - independent financial-truth acceptance;
 - exact dependencies on the accepted ADR-041 source-byte foundation and the selected reader authority.
 
-Fixture availability makes discovery eligible. It does not establish production HDFC support.
+Sprint 72 establishes no HDFC production support beyond `hdfc.bank-account.xls@1`.
 
 ---
 
@@ -819,11 +817,11 @@ The user must control whether the password is used once, stored, replaced or dis
 
 ## FW-P1-14 — XLS and XLSX Support
 
-**Status:** Partially completed by Sprint 71 for one exact XLS profile
-**Completed boundary:** The native static OLE2/BIFF8 reader and `axis.bank-account.xls@1` support the committed exact Axis NRO XLS grammar through the ordinary import pipeline. Exact source bytes are duplicate authority. The baseline contains 16 transactions versus 17 in the corresponding Range-1 CSV; the extended XLS contains 20 transactions, with 16 shared rows and 4 extended-only rows in source order. Unsupported encryption, multiple or hidden worksheets, formulas, boolean/error cells, malformed values and non-exact layouts fail closed before accepted writes.
-**Remaining boundary:** XLSX/OOXML, generic spreadsheet mapping, HDFC and other institution/layout support, formula-result handling, macros, password workflow, multi-sheet/hidden-sheet support, user-authored mappings and cross-format equivalence remain unsupported and require separate approved discovery or implementation increments.
+**Status:** Partially completed by Sprints 71 and 72 for two exact XLS profiles
+**Completed boundary:** The native static OLE2/BIFF8 reader supports the exact `axis.bank-account.xls@1` Axis NRO grammar and the exact shared `hdfc.bank-account.xls@1` HDFC NRE/NRO grammar through the ordinary import pipeline. Exact source bytes are duplicate authority. Unsupported encryption, multiple or hidden worksheets, formulas, boolean/error cells, malformed values and non-exact layouts fail closed before accepted writes.
+**Remaining boundary:** XLSX/OOXML, generic spreadsheet mapping, other HDFC XLS layouts, other institution/layout support, formula-result handling, macros, password workflow, multi-sheet/hidden-sheet support, user-authored mappings and cross-format equivalence remain unsupported and require separate approved discovery or implementation increments.
 
-The accepted libxls reader authority is limited to version 1.6.3 at commit `c199d132494833da696b58aa4acf3fc5a36d930b`, statically vendored under its BSD 2-clause license and linked only to system `iconv`. It does not authorize a generic XLS support claim or any XLSX reader. Spreadsheet readers continue to feed the universal import pipeline. Fixture availability outside the exact completed Axis NRO grammar authorizes discovery, not production support.
+The accepted libxls reader authority is limited to version 1.6.3 at commit `c199d132494833da696b58aa4acf3fc5a36d930b`, statically vendored under its BSD 2-clause license and linked only to system `iconv`. It does not authorize a generic XLS support claim or any XLSX reader. Spreadsheet readers continue to feed the universal import pipeline. Fixture availability outside the exact completed Axis NRO and HDFC NRE/NRO grammars authorizes discovery, not production support.
 
 ---
 
@@ -1666,12 +1664,12 @@ Profiling output must remain separate from financial truth and must not retain s
 
 ## FW-P2-61 — Institution, Layout and Format Regression Matrix
 
-**Status:** Blocked  
-**Depends on:** Additional production-supported institution, layout or format families.
+**Status:** Ready for discovery
+**Dependency now satisfied by:** Exact Axis CSV/PDF/XLS and exact HDFC legacy-XLS production families.
 
-Create a systematic regression matrix only when more than the current supported Axis bank-account CSV grammar exists in production.
+Create a systematic regression matrix across the current exact supported institution, layout and format families.
 
-The integrated HDFC, CBQ and card fixtures may inform future discovery, but fixture presence alone does not satisfy this production-support dependency.
+The integrated CBQ, HDFC PDF/card and other card fixtures may inform future discovery, but fixture presence alone does not establish additional production support.
 
 Expand currency regression coverage once a second production currency exists; do not create a separate mixed-currency regression candidate.
 

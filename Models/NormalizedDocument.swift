@@ -28,6 +28,16 @@ struct NormalizedDocument {
 
         let preTransactionFragments: [SourceFragment]
 
+        let postTransactionFragments: [SourceFragment]
+
+        init(
+            preTransactionFragments: [SourceFragment],
+            postTransactionFragments: [SourceFragment] = []
+        ) {
+            self.preTransactionFragments = preTransactionFragments
+            self.postTransactionFragments = postTransactionFragments
+        }
+
         static let empty = SourceContext(preTransactionFragments: [])
 
     }

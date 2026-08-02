@@ -520,13 +520,28 @@ final class ImportEngine {
             normalizedHeader = normalization.header
             sourceContext = normalization.sourceContext
         case .xls:
-            let normalization = try AxisBankAccountXLSNormalizer().normalize(
-                rawDocument: rawDocument
-            )
-            document = normalization.document
-            normalizedRows = normalization.rows
-            normalizedHeader = normalization.header
-            sourceContext = normalization.sourceContext
+            switch institutionCandidate.institutionCode {
+            case Institution.axis.rawValue:
+                let normalization = try AxisBankAccountXLSNormalizer().normalize(
+                    rawDocument: rawDocument
+                )
+                document = normalization.document
+                normalizedRows = normalization.rows
+                normalizedHeader = normalization.header
+                sourceContext = normalization.sourceContext
+            case Institution.hdfc.rawValue:
+                let normalization = try HDFCBankAccountXLSNormalizer().normalize(
+                    rawDocument: rawDocument
+                )
+                document = normalization.document
+                normalizedRows = normalization.rows
+                normalizedHeader = normalization.header
+                sourceContext = normalization.sourceContext
+            default:
+                throw ImportError.invalidDocument(
+                    message: "No suitable XLS normalizer found."
+                )
+            }
         case .xlsx, .unknown:
             throw ImportError.unsupportedFile(extension: rawDocument.fileExtension)
         }
