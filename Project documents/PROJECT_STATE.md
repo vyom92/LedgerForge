@@ -3,7 +3,7 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current repository implementation baseline:** Sprint 72 was implemented and verified from required pushed baseline `main@812dd2dd5745a1f0ea271c620bf8ccc604a590b2`; Git remains authoritative for the final Sprint 72 commit ref
+- **Current repository implementation baseline:** Sprint 73 and Sprint 73A are accepted at main@31d493e421869d6a825aa2db576f82c2be3bdb68
 - **Documentation alignment:** Reconciled for the Sprint 73 implementation and acceptance boundary
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration and Sprint 65's clean-room PDF fixture replacement are included in the accepted baseline; no historical financial data was altered
 - **Latest chronologically accepted production implementation:** Sprint 73 exact HDFC PDF v1 and whole-statement HDFC PDF/XLS equivalence

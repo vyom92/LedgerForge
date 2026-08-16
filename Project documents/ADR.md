@@ -26,7 +26,7 @@ When reading this file:
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
 **Status alignment date:** 2026-08-02
-**Repository implementation ref reviewed:** `main@f0ae452c0f35241f5bdb6752d5f503f6ed8b62f6` — Sprint 72 baseline
+**Repository implementation ref reviewed:** Repository implementation ref reviewed: main@31d493e421869d6a825aa2db576f82c2be3bdb68 — Sprint 73 accepted implementation
 **Latest verified production implementation:** Sprint 73 — Exact HDFC PDF v1 and Whole-Statement Cross-Format Equivalence
 **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 **Latest completed numbered outcome:** Sprint 73
