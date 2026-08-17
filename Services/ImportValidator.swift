@@ -11,17 +11,38 @@ import Foundation
 final class ImportValidator {
 
     static func validate(financialDocument: FinancialDocument) -> ImportValidationResult {
-        validate(transactions: financialDocument.transactions, statementCurrency: financialDocument.bookedCurrency)
+        let usesRowAssociatedBalancesWithoutSourceOrderRecurrence =
+            financialDocument.metadata.institution == .cbq
+                && financialDocument.metadata.documentType == .bankAccount
+                && financialDocument.metadata.fileFormat == .xls
+                && !financialDocument.transactions.isEmpty
+                && financialDocument.transactions.allSatisfy { transaction in
+                    !transaction.sourceProvenance.isEmpty
+                        && transaction.sourceProvenance.allSatisfy {
+                            $0.parserProfileID == CBQCurrentAccountXLSParser.profileID
+                                && $0.parserProfileVersion == CBQCurrentAccountXLSParser.profileVersion
+                        }
+                }
+        return validate(
+            transactions: financialDocument.transactions,
+            statementCurrency: financialDocument.bookedCurrency,
+            reconcileSourceOrderBalances: !usesRowAssociatedBalancesWithoutSourceOrderRecurrence
+        )
     }
 
     static func validate(transactions: [Transaction]) -> ImportValidationResult {
         let currencies = Set(transactions.map(\.money.currency))
-        return validate(transactions: transactions, statementCurrency: currencies.count == 1 ? currencies.first : nil)
+        return validate(
+            transactions: transactions,
+            statementCurrency: currencies.count == 1 ? currencies.first : nil,
+            reconcileSourceOrderBalances: true
+        )
     }
 
     private static func validate(
         transactions: [Transaction],
-        statementCurrency: CurrencyCode?
+        statementCurrency: CurrencyCode?,
+        reconcileSourceOrderBalances: Bool
     ) -> ImportValidationResult {
 
         var issues: [ValidationIssue] = []
@@ -93,7 +114,7 @@ final class ImportValidator {
         let creditTotalMoney = try? moneySum(transactions.compactMap(\.creditMoney), currency: statementCurrency)
 
         let firstTransaction = transactions.first
-        let openingBalanceMoney: Money? = {
+        let openingBalanceMoney: Money? = reconcileSourceOrderBalances ? {
             guard let first = firstTransaction,
                   let firstBalance = first.runningBalanceMoney else {
                 return nil
@@ -102,11 +123,13 @@ final class ImportValidator {
             if let debit = first.debitMoney { opening = (try? opening + debit) ?? opening }
             if let credit = first.creditMoney { opening = (try? opening - credit) ?? opening }
             return opening
-        }()
+        }() : nil
 
-        let closingBalanceMoney = transactions.last?.runningBalanceMoney
+        let closingBalanceMoney = reconcileSourceOrderBalances
+            ? transactions.last?.runningBalanceMoney
+            : nil
 
-        if transactions.count > 1 {
+        if reconcileSourceOrderBalances, transactions.count > 1 {
             for index in 1..<transactions.count {
                 let previous = transactions[index - 1]
                 let current = transactions[index]

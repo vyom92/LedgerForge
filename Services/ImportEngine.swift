@@ -560,6 +560,14 @@ final class ImportEngine {
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
                 sourceContext = normalization.sourceContext
+            case Institution.cbq.rawValue:
+                let normalization = try CBQCurrentAccountXLSNormalizer().normalize(
+                    rawDocument: rawDocument
+                )
+                document = normalization.document
+                normalizedRows = normalization.rows
+                normalizedHeader = normalization.header
+                sourceContext = normalization.sourceContext
             default:
                 throw ImportError.invalidDocument(
                     message: "No suitable XLS normalizer found."

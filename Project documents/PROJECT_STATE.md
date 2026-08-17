@@ -3,17 +3,17 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current repository implementation baseline:** Sprint 73 and Sprint 73A are accepted at main@31d493e421869d6a825aa2db576f82c2be3bdb68
-- **Documentation alignment:** Reconciled for the Sprint 73 implementation and acceptance boundary
+- **Current repository implementation baseline:** Sprint 74 exact CBQ current-account transaction-history legacy-XLS v1 support; the implementation commit is recorded by Git history
+- **Documentation alignment:** Reconciled for the Sprint 74 implementation and acceptance boundary
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration and Sprint 65's clean-room PDF fixture replacement are included in the accepted baseline; no historical financial data was altered
-- **Latest chronologically accepted production implementation:** Sprint 73 exact HDFC PDF v1 and whole-statement HDFC PDF/XLS equivalence
+- **Latest chronologically accepted production implementation:** Sprint 74 exact CBQ current-account transaction-history legacy-XLS v1
 - **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed numbered increment:** Sprint 73 — Exact HDFC PDF v1 and Whole-Statement Cross-Format Equivalence
+- **Latest verified completed numbered increment:** Sprint 74 — Exact CBQ Current-Account Transaction-History XLS v1 Support
 - **Accepted Sprint 63 implementation ref:** `7e1345e3817d3c3e91c24f881b962a48279fd73b`
 - **Latest accepted ADR:** ADR-042 — Exact Cross-Format Statement Equivalence and Supporting-Source Persistence
 - **Current migration:** V10
@@ -44,6 +44,11 @@
 - **Sprint 72:** Added the exact shared `hdfc.bank-account.xls@1` HDFC NRE/NRO legacy-XLS grammar through the accepted reader and ordinary detector, classifier, parser-selection, preview, explicit-confirmation, provider, hydration and relaunch pipeline. Exact source bytes remain the XLS duplicate authority; no PDF/XLS cross-format suppression was added.
 - **Sprint 73:** Added the exact native selectable-text `hdfc.bank-account.pdf@1` grammar and the first durable exact whole-statement equivalence contract for the approved HDFC PDF/XLS v1 pair. The first accepted source remains transaction and provenance authority; a later exact-equivalent other-format source retains its own accepted evidence and creates zero transactions.
 - **Sprint 73A test-only closure:** Corrected three stale Developer Database Profile expectations after Migration V10. V9 is the newest and default historical migration-sandbox source, V8 remains historical, and V10 remains current. Sprint 73A changed no production, parser, migration, ADR, persistence, fixture, source-truth or financial behaviour. The replacement cycle-close passed a fresh Debug build, fresh optimized Release build and the complete TestPlan with 670 tests across 81 suites and zero failures.
+- **Sprint 74:** Added exact `cbq.current-account.xls@1` support for the retained CBQ current-account transaction-history legacy-XLS grammar through the ordinary direct-URL reader, detector, classifier, parser-selection, validation, explicit-confirmation, provider, hydration and relaunch path. Signed QAR amounts, descending physical source order, same-date ambiguity and every printed row-associated balance are preserved without inventing a statement period, value date, timestamp or source-order balance recurrence.
+- **Sprint 74 identity and source boundary:** One parser-owned verified full printed institution account identifier is the sole strong account identity. Holder text and filename are not identity. Blank merged-cell placeholders are retained as physical blanks, while hidden cells carrying financial or textual evidence continue to fail closed. Exact source bytes remain duplicate authority.
+- **Sprint 74 private-source acceptance:** The bound 61-row legacy-XLS source passed the ordinary `ImportEngine.prepareImport(from:)` path. All 61 dates, signed amounts and row-associated balances matched an independently extracted six-page selectable-text PDF projection in source order with zero mismatches. Preparation wrote nothing; confirmation produced one accepted event set; exact-byte reimport produced no duplicate financial events; In-Memory and SQLite graphs matched; SQLite close/reopen and canonical hydration preserved the complete graph. No private source value, identifier, path, filename, narration, reference or oracle digest entered Git or repository documentation, and task-owned private artifacts were removed after verification.
+- **Sprint 74 focused acceptance:** The final changed reader/CBQ boundary passed 19 tests across 4 suites; the broader adjacent legacy-XLS, Axis/HDFC XLS, detection, classification, selection and validation boundary passed 52 tests across 10 suites. The new CBQ synthetic surface passed 13 tests across 3 suites before the merged-placeholder correction and is subsumed by the final focused boundary.
+- **Sprint 74 cycle-close acceptance:** The single authoritative cycle-close passed a fresh Debug build, fresh optimized Release build and the complete TestPlan with 683 tests across 84 suites and zero failures.
 - **Sprint 72 source semantics:** `Date` is the authoritative transaction date, `Value Dt` is retained separately, `Withdrawal Amt.` is debit/outflow, `Deposit Amt.` is credit/inflow, and source physical row order plus source ordinals are preserved. Printed period, opening/closing balances, debit/credit counts and totals reconcile independently for each statement.
 - **Sprint 72 identity and fail-closed boundary:** Only the parser-produced verified full account number is emitted through the strong institution-account identifier contract. Shared customer identity and product metadata are excluded from account resolution. Missing, malformed, duplicate, reordered, near-match or ambiguous grammar, amount, date, identifier and summary evidence fails closed with zero accepted financial residue.
 - **Sprint 72 private-source acceptance:** Four private-original XLS/PDF source families were verified locally through an independent paired-PDF oracle: 62, 16, 76 and 7 ordered rows, 161 total. Requested row-field mismatches, printed-summary mismatches and two annual-to-recent continuity mismatches were all zero. No private source value, path, filename, identifier, narration or reference entered Git or repository documentation; task-owned source-derived artifacts and private-test result bundles were removed after verification.
@@ -164,8 +169,12 @@ The exact retained native-text HDFC bank-account PDF grammar is supported as
 `hdfc.bank-account.pdf@1`, paired only with `hdfc.bank-account.xls@1` for exact
 whole-statement equivalence. No broader Axis PDF/XLS layout, OCR,
 password-protected statement, historical Axis layout, XLSX, card, HDFC
-CSV/XLSX, changed or generic HDFC layout, CBQ, American Express or other
-institution support is claimed.
+CSV/XLSX, changed or generic HDFC layout, American Express or other institution
+support is claimed. CBQ production support is limited to the exact retained
+current-account transaction-history legacy-XLS grammar as
+`cbq.current-account.xls@1`; CBQ monthly-statement PDF, transaction-history PDF,
+cards, generic or changed layouts and cross-format equivalence remain
+unsupported.
 
 ### Trusted source semantics
 

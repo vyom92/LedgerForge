@@ -95,6 +95,13 @@ enum FixtureLocator {
         cbqBankAccountRoot.appendingPathComponent("Manifests").appendingPathComponent(fileName)
     }
 
+    static func cbqSyntheticXLS(_ fileName: String) -> URL {
+        fixturesRoot
+            .appendingPathComponent("CBQ")
+            .appendingPathComponent("Synthetic")
+            .appendingPathComponent(fileName)
+    }
+
     static func cbqCreditCardPDF(_ fileName: String, layoutVersion: String) -> URL {
         cbqCreditCardRoot.appendingPathComponent("PDF").appendingPathComponent(layoutVersion).appendingPathComponent(fileName)
     }

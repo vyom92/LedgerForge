@@ -26,6 +26,7 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
         rules: [InstitutionDetectionRule] = [
             .hdfcBankAccountPDF,
             .hdfcBankAccountXLS,
+            .cbqCurrentAccountXLS,
             .axisBankAccount
         ]
     ) {
@@ -148,6 +149,27 @@ struct InstitutionDetectionRule: Equatable, Sendable {
             InstitutionSignature(
                 token: "DATE NARRATION CHQ./REF.NO. VALUE DT WITHDRAWAL AMT. DEPOSIT AMT. CLOSING BALANCE",
                 reason: "Matched the exact HDFC bank-statement header."
+            )
+        ]
+    )
+
+    static let cbqCurrentAccountXLS = InstitutionDetectionRule(
+        institution: .cbq,
+        documentType: .bankAccount,
+        confidence: 0.99,
+        requiredMatchCount: 3,
+        signatures: [
+            InstitutionSignature(
+                token: "TRANSACTION HISTORY",
+                reason: "Matched the exact CBQ transaction-history title."
+            ),
+            InstitutionSignature(
+                token: "CURRENT ACCOUNT-RETAIL",
+                reason: "Matched the exact CBQ current-account product evidence."
+            ),
+            InstitutionSignature(
+                token: "DATE DETAILS AMOUNT BALANCE",
+                reason: "Matched the exact CBQ current-account transaction header."
             )
         ]
     )

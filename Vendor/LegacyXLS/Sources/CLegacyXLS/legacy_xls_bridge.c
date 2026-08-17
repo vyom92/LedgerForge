@@ -163,7 +163,15 @@ LF_XLS_DOCUMENT *lf_xls_open_buffer(
                 lf_xls_set_error(out_error, LF_XLS_ERROR_BOOLEAN_OR_ERROR_CELL);
                 return NULL;
             }
-            if (cell->isHidden != 0U) {
+            /* libxls also marks non-anchor placeholders in merged ranges as
+               hidden. Those placeholders carry no source value and are safe
+               to retain as physical blanks. Continue to fail closed whenever
+               a hidden cell carries string or numeric evidence. */
+            if (cell->isHidden != 0U
+                && ((cell->str != NULL && cell->str[0] != '\0')
+                    || cell->id == XLS_RECORD_RK
+                    || cell->id == XLS_RECORD_MULRK
+                    || cell->id == XLS_RECORD_NUMBER)) {
                 lf_xls_release_parts(workbook, worksheet);
                 lf_xls_set_error(out_error, LF_XLS_ERROR_HIDDEN_CELL);
                 return NULL;

@@ -88,12 +88,14 @@ struct StatementClassificationRule: Equatable, Sendable {
         signatures: [
             StatementClassificationSignature(token: "STATEMENT OF ACCOUNT", reason: "Matched account statement title."),
             StatementClassificationSignature(token: "STATEMENT OF AXIS ACCOUNT", reason: "Matched Axis account statement title."),
+            StatementClassificationSignature(token: "TRANSACTION HISTORY", reason: "Matched transaction-history title."),
+            StatementClassificationSignature(token: "CURRENT ACCOUNT-RETAIL", reason: "Matched current-account product evidence."),
             StatementClassificationSignature(token: "TRAN DATE", reason: "Matched transaction date column."),
             StatementClassificationSignature(token: "PARTICULARS", reason: "Matched transaction description column."),
             StatementClassificationSignature(token: "OPENING BALANCE", reason: "Matched opening balance label."),
             StatementClassificationSignature(token: "CLOSING BALANCE", reason: "Matched closing balance label.")
         ],
-        supportingInstitutionCodes: [Institution.axis.rawValue]
+        supportingInstitutionCodes: [Institution.axis.rawValue, Institution.cbq.rawValue]
     )
 
     static let creditCardStatement = StatementClassificationRule(

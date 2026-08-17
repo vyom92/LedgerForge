@@ -62,6 +62,8 @@ A work item becomes executable only when Chat supplies one complete approved pro
 **Candidate entries reviewed:** 155  
 **Fresh build/test/runtime evidence:** Sprint 65 focused, complete-TestPlan, build, Release-containment and signed-app private-pair evidence is recorded in `PROJECT_STATE.md`.
 
+**Current alignment — 2026-08-17:** The 2026-08-01 155-candidate audit above is retained as historical and was not rerun. `main@31d493e421869d6a825aa2db576f82c2be3bdb68` is the accepted Sprint 73 production implementation; `main@9ea2a043ebf842e3ead6574bc29d59fe2ac45180` is a later documentation-only commit; Sprint 73A was test-only; ADR-042 and Migration V10 are current. Current implementation truth belongs to `PROJECT_STATE.md`.
+
 **Current alignment — Axis source-truth restoration:** the Git-authoritative repository state is newer than this audit baseline. `PROJECT_STATE.md` records the active `axis.bank-account.csv@2` conventional direction contract and the suspension of provenance-less mixed partial overlap.
 
 Every numbered candidate in this document was reviewed against the current pushed repository state, `PROJECT_STATE.md`, accepted ADRs, completed-sprint evidence, current fixture inventory and recent repository history.
@@ -591,9 +593,10 @@ original pairs remain the financial acceptance authority.
 
 ## FW-P1-03 — CBQ Parser Family
 
-**Status:** Ready for discovery  
+**Status:** Partially completed through the exact current-account transaction-history XLS v1 slice
 **Fixture state:** Clean-room CBQ current-account and credit-card evidence is integrated with separate expected baselines.  
-**Implementation blockers:** Selection of one family and production source format; card work also depends on the concrete card contract under `FW-P1-09`.
+**Completed boundary:** Sprint 74 supports only the retained CBQ current-account transaction-history OLE2/BIFF8 grammar as `cbq.current-account.xls@1`, with signed QAR amounts, physical source order, printed row-associated balances, exact-byte duplicate authority and one strong printed account identifier through the ordinary import, provider and hydration path.
+**Remaining boundary:** CBQ monthly-statement PDF and transaction-history PDF remain open. Sprint 75 overlap/equivalence work remains open and must not be inferred from the XLS support. The CBQ card family remains separate and depends on the concrete card contract under `FW-P1-09`. Generic, changed, XLSX and other CBQ layouts remain unsupported.
 
 Keep independent CBQ families:
 
@@ -610,7 +613,9 @@ Targeted discovery must not combine them merely because the institution is share
 - card-specific validation/persistence dependencies where applicable;
 - independent financial and source-provenance oracles.
 
-Fixture availability makes both families discoverable. Neither is production-supported.
+Fixture availability makes the remaining families discoverable. Only the exact
+Sprint 74 current-account transaction-history XLS v1 slice is
+production-supported.
 
 ---
 
