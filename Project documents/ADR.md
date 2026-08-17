@@ -26,12 +26,12 @@ When reading this file:
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
 **Status alignment date:** 2026-08-17
-**Repository implementation ref reviewed:** `main` — Sprint 75 implementation in this commit; the exact ref is recorded by Git history
-**Latest verified production implementation:** Sprint 75 — Exact CBQ Current-Account PDF Variants and Multi-Source Lineage
+**Repository implementation ref reviewed:** `main` — Sprint 76 implementation in this commit; the exact ref is recorded by Git history
+**Latest verified production implementation:** Sprint 76 — Shared Credit-Card Domain and Exact American Express PDF Support
 **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`
-**Latest completed numbered outcome:** Sprint 75
-**Latest accepted ADR:** ADR-043
-**Current migration:** V11
+**Latest completed numbered outcome:** Sprint 76
+**Latest accepted ADR:** ADR-044
+**Current migration:** V12
 
 No alignment note authorizes implementation.
 
@@ -63,7 +63,7 @@ No alignment note authorizes implementation.
 | ADR-022 | Preview Compatibility During Test Builds | Accepted and implemented as a toolchain-compatibility decision. | Historical Sprint 18 build compatibility evidence remains valid for that toolchain. |
 | ADR-023 | Frozen UI/UX Architecture | Accepted and implemented. | The frozen UI/UX hierarchy remains authoritative. |
 | ADR-024 | Repository Hydration Boundary | Accepted and implemented. | RepositoryStoreHydrator is the sole persistence-to-runtime boundary. |
-| ADR-025 | Stable Financial Entity Identity | Accepted and implemented, then extended by ADR-027, ADR-029, ADR-038, ADR-039 and ADR-043. | Strong parser-owned identifiers remain ownership authority; ADR-043 adds bounded CBQ masked source observations without treating unknown characters as owned identifiers. |
+| ADR-025 | Stable Financial Entity Identity | Accepted and implemented, then extended by ADR-027, ADR-029, ADR-038, ADR-039, ADR-043 and ADR-044. | Strong parser-owned identifiers remain ownership authority; bounded masked/source observations never become strong identifiers. |
 | ADR-026 | Structured Developer Diagnostics | Accepted and implemented in Sprint 31. | Structured diagnostics remain in-memory, bounded and privacy-safe. |
 | ADR-027 | Parser-Owned Financial Identifier Extraction | Accepted and implemented through Sprints 33, 35 and 36. | Verified financial identifiers originate exclusively in approved StatementParser implementations. |
 | ADR-028 | Bounded Parser Source Evidence | Accepted and implemented in Sprint 34. | Bounded transient pre-transaction source context supports parser-owned interpretation. |
@@ -72,7 +72,7 @@ No alignment note authorizes implementation.
 | ADR-031 | Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking | Accepted and implemented in Sprint 41; concurrency boundary extended by ADR-038 implementation. | ledgerforge.transaction-event.axis-upi-reference.v1 remains limited to approved account-scoped Axis UPI evidence. |
 | ADR-032 | Durable Import Attempt History and Rejected-Outcome Semantics | Accepted and implemented in Sprint 42; atomicity limitation superseded by ADR-038 implementation. | Durable attempts remain distinct from accepted import sessions. |
 | ADR-033 | Deterministic Money and Native-Currency Integrity | Accepted and implemented in Sprint 44. | Money, compiled catalog authority, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation are operational. |
-| ADR-034 | Document-Scoped Card Statement Evidence | Accepted architecture; not implemented. | Fixture evidence exists for American Express, CBQ and Axis card families. |
+| ADR-034 | Document-Scoped Card Statement Evidence | Accepted and implemented for the exact Sprint 76 American Express profile; refined by ADR-044. | The document-scoped evidence boundary is operational for `amex.credit-card.pdf@1`; no generic card-family support follows. |
 | ADR-035 | Development Database Lifecycle and Recoverable Reset | Accepted and implemented in Sprint 45 Phase A; expanded by DBP-01 on 2026-07-29. | Four DEBUG-only profiles, lifecycle-owned observer-atomic switching and reset, non-current warnings and generation-scoped protected-action acknowledgement are operational; all profile machinery is absent from Release. |
 | ADR-036 | Category Identity, Assignment, and Mutable Transaction Metadata | Accepted and implemented in Sprint 57; reconciliation closure aligned 2026-07-26. | Flat durable categories, current assignments, canonical hydration and category-specific reconciliation blocking/retry are operational; hierarchy and parent selection remain deferred. |
 | ADR-037 | Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal | Accepted contract-first architecture; no executable mutation family implemented. | The shared lifecycle remains architecture-only. |
@@ -82,6 +82,7 @@ No alignment note authorizes implementation.
 | ADR-041 | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority | Accepted and implemented in Sprint 63. | Immutable source snapshots and exact source-byte fingerprint authority are operational for supported CSV, PDF and XLS imports. |
 | ADR-042 | Exact Cross-Format Statement Equivalence and Supporting-Source Persistence | Accepted and implemented in Sprint 73. | Exact whole-statement equivalence is operational only for the independently approved HDFC bank-account PDF/XLS v1 pair. |
 | ADR-043 | Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts | Accepted and implemented in Sprint 75. | Exact CBQ history XLS, history PDF and monthly PDF sources coexist through bounded masked/full account resolution and one canonical transaction with durable per-source observations. |
+| ADR-044 | Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence | Accepted and implemented in Sprint 76. | A shared provider-owned card domain, Migration V12 and exact `amex.credit-card.pdf@1` support preserve liability effects, account/instrument identity, statement evidence and newest-source-date balance authority. |
 
 ## Alignment Policy
 
@@ -2380,11 +2381,11 @@ ADR-033 does not establish QAR production support, PDF or XLS/XLSX support, card
 
 # ADR-034 — Document-Scoped Card Statement Evidence
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-08-17
 
-- **Decision standing:** Accepted architecture; not implemented.
-- **Implementation:** Fixture evidence exists for American Express, CBQ and Axis card families.
-- **Current qualification:** No card evidence domain, migration, persistence, hydration, production parser or institution support is authorized by fixture presence.
+- **Decision standing:** Accepted and implemented for the exact Sprint 76 American Express profile; refined by ADR-044.
+- **Implementation:** `CardStatementEvidence` is operational through exact `amex.credit-card.pdf@1` parsing, card-aware validation, Migration V12 persistence, provider parity, hydration and bounded presentation.
+- **Current qualification:** ADR-044 supersedes ADR-034's historical persistence deferral only for the implemented shared foundation and exact American Express Middle East Platinum QAR native-text PDF family. CBQ, Axis and all other card profiles remain unsupported.
 
 
 ## Status
@@ -5304,3 +5305,177 @@ replacement, canonical provenance reassignment, account merge, historical
 repair or backfill, OCR, password workflows, image-only PDFs, generic PDF or
 spreadsheet parsing, XLSX, source-byte storage or private-source material in
 Git.
+
+---
+
+# ADR-044 — Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence
+
+## Status
+
+Accepted and implemented in Sprint 76
+
+## Context
+
+ADR-034 accepted a parser-owned, document-scoped card-statement evidence
+boundary but intentionally deferred durable account, instrument, persistence,
+hydration and production-profile decisions. Sprint 76 supplied the missing
+concrete contract and independent source evidence for one exact American
+Express Middle East Platinum QAR native-text PDF family.
+
+A card statement records activity against a liability account and may separate
+account-level rows from activity belonging to individual physical or virtual
+card instruments. Bank-account debit and credit semantics do not describe the
+effect of a card charge, payment or refund on the amount owed. Masked printed
+membership and card-account observations are useful continuity evidence, but
+they are not strong ownership identifiers.
+
+## Decision
+
+### Liability account and instrument domain
+
+The existing durable `Account` remains the liability account and uses the
+credit-card account type. No parallel `CardAccount` is created. One liability
+account owns zero or more immutable application-identified `CardInstrument`
+records and accepted card statements.
+
+A card instrument is distinct from the liability account, parser profile,
+statement document, product label and masked suffix. It may carry:
+
+- parser-produced strong identifiers with unique ownership;
+- exact source identity observations;
+- explicit historical relationships to other instruments;
+- the bounded lifecycle state `unknown`, `active`, `retired` or `replaced`.
+
+Masked observations never become strong identifiers. For the exact Amex
+profile, Membership Number is a liability-account observation and Card Account
+Number is an instrument observation. The first accepted statement requires
+explicit creation or selection. A later exact observation family/value may
+reuse the durable user-confirmed mapping unless stronger evidence conflicts.
+Changed weak evidence requires an explicit account and instrument decision.
+
+Instrument relationships are stored separately as `additional/concurrent`,
+`replacement`, `renewal` or `upgrade`. They are created only by explicit user
+authority or independently source-proven evidence. Lifecycle state, effective
+date and predecessor/successor relationships are never inferred from import
+order. Importing an older statement cannot change current lifecycle state or
+which statement controls the account balance. Strong-identifier conflicts fail
+closed.
+
+### Card financial semantics
+
+Card rows use `CardLiabilityEffect`:
+
+- `increasesAmountOwed` has positive canonical `Transaction.money`;
+- `decreasesAmountOwed` has negative canonical `Transaction.money`.
+
+Card transactions do not populate bank `debitMoney` or `creditMoney` merely to
+satisfy bank validation. Every accepted Amex financial row is either
+account-level or instrument-level. Account-level payments have no instrument
+relationship. Instrument-level rows resolve through their deterministic
+document-scoped section to exactly one confirmed durable instrument.
+
+`FinancialDocument.CardStatementEvidence` preserves the statement date,
+declared period, native currency, account observations, document-scoped
+instrument sections, per-transaction scope and liability effect, source
+Transaction Date, optional original merchant Money, typed summary components
+and reconciliation-rule identifier. Canonical posted Money is not duplicated.
+Missing FX rate, fee, markup or tax is not calculated or invented.
+
+For `amex.credit-card.pdf@1`, validation requires complete QAR posted Money,
+Posting Date, source Transaction Date, liability effect, scope, reference and
+row provenance for every financial row. Original merchant Money is complete or
+absent. The exact reconciliation rule is:
+
+```text
+Previous Balance - New Credits + New Debits = New Balance
+```
+
+Increase/decrease row totals must equal New Debits/New Credits respectively.
+The instrument net total excludes account-level payments. Transaction-level
+running balances are not required, and cross-statement continuity is not a
+standalone-statement prerequisite.
+
+### Atomic persistence and Migration V12
+
+The confirmed-import plan carries one bounded card plan. The provider owns one
+atomic write containing the account decision, instrument decision, strong
+identifiers where available, source observations, explicit relationships,
+statement, summaries, canonical transactions, card transaction evidence and
+the existing document/fingerprint/session/history graph. There is no
+post-commit card persistence phase.
+
+Immediately before commit, both providers revalidate source fingerprint,
+provider generation, account and instrument choices, current strong ownership,
+prior durable user-confirmed mappings, relationship authority and account/
+instrument compatibility. Stale, ambiguous or conflicting review leaves zero
+accepted financial residue. SQLite and In-Memory expose equivalent results.
+
+Additive Migration V12 leaves V1–V11 SQL unchanged and adds:
+
+- `card_instruments`;
+- `card_instrument_identifiers`;
+- `card_source_identity_observations`;
+- `card_instrument_relationships`;
+- `card_statements`;
+- `card_statement_summary_components`;
+- `card_transaction_evidence`.
+
+The schema enforces workspace/account ownership, unique strong instrument
+identity, one accepted source document per card statement, typed summary
+Money/date values, one-to-one trusted transaction evidence and the rule that an
+account-level row has no instrument while an instrument-level row belongs to
+an instrument owned by the same liability account. V12 performs no historical
+backfill.
+
+### Hydration, balance and presentation
+
+`RepositoryStoreHydrator` reads and validates the card graph with accounts,
+transactions, categories and import history, then publishes one
+observer-consistent snapshot including a dedicated `CardStore`. View models are
+not durable owners.
+
+Bank balances retain their existing running-balance authority. A credit-card
+account selects its current statement by the newest source statement end/date,
+never import time. Source amount owed is presented in runtime net-worth sign:
+an amount owed is negative and a credit balance is positive. Older statements
+imported later cannot replace newer balance authority.
+
+Presentation distinguishes amount owed, latest statement period, due date,
+instruments, transaction scope, charge/increase-owed and
+payment-or-credit/decrease-owed. Card charges and payments are not counted as
+ordinary bank income or expense. Native-currency account totals include the
+net-worth-signed card balance.
+
+### Exact production profile
+
+Sprint 76 accepts only `amex.credit-card.pdf@1`: the exact American Express
+Middle East Platinum QAR native selectable-text statement family exercised by
+the approved source evidence. The normalizer/parser preserves physical order,
+multiline narration and references, treats the pre-instrument payment as
+account-level, preserves optional original merchant Money, supports exact
+financial continuation pages and excludes rewards/final informational pages
+only after exact family-specific signatures. Changed headers, malformed rows or
+summaries, hostile financial content after a non-financial boundary and
+unsupported near matches fail closed.
+
+## Consequences
+
+- Account and instrument identity remain separate and explicit.
+- Weak printed observations can support durable user-confirmed continuity
+  without becoming ownership identifiers.
+- Card liability direction does not contaminate bank debit/credit semantics.
+- Accepted statement evidence remains reconstructable after SQLite reopen and
+  canonical hydration.
+- Current card balance is deterministic under out-of-order imports.
+- The shared foundation can host future exact card profiles only after their
+  own source, parser, validation and acceptance contracts are approved.
+
+## Exclusions
+
+ADR-044 does not authorize CBQ or Axis card parsing, XLS/XLSX card readers, a
+generic card parser/profile framework, generic masked account identity,
+rewards valuation or persistence, payment allocation, bank-card payment
+matching, refund/reversal matching, installments, loans, calculated FX,
+invented fees/markup/tax, account merge/split, historical repair/backfill,
+cloud or multi-user architecture, OCR, password workflows or generic card
+support. ADR-043 CBQ bank overlap does not generalize to cards.

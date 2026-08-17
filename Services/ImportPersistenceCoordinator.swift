@@ -170,9 +170,22 @@ protocol ImportPersistenceCoordinating {
     ) throws -> StatementEquivalenceReviewResult
 }
 
+enum ImportCardInstrumentChoice: Equatable {
+    case reuseExistingInstrument(instrumentId: String)
+    case createNewInstrument(
+        relationship: CardInstrumentRelationshipKind? = nil,
+        relatedInstrumentId: String? = nil
+    )
+}
+
 enum ImportAccountChoice: Equatable {
     case useExistingAccount(accountId: String)
     case createNewAccount
+    case createNewCardLiabilityAccountAndInstrument
+    case useExistingCardLiabilityAccount(
+        accountId: String,
+        instrumentChoice: ImportCardInstrumentChoice
+    )
 }
 
 enum ImportIdentityReview: Equatable, Sendable {
@@ -181,20 +194,25 @@ enum ImportIdentityReview: Equatable, Sendable {
     case choiceRequired(eligibleAccountIds: [String])
     case ambiguous
     case conflict
+    case cardChoiceRequired(eligibleLiabilityAccountIds: [String])
 
     var eligibleAccountIds: [String] {
-        guard case .choiceRequired(let eligibleAccountIds) = self else { return [] }
-        return eligibleAccountIds
+        switch self {
+        case .choiceRequired(let values), .cardChoiceRequired(let values): return values
+        default: return []
+        }
     }
 
     var requiresExplicitChoice: Bool {
-        if case .choiceRequired = self { return true }
-        return false
+        switch self {
+        case .choiceRequired, .cardChoiceRequired: return true
+        default: return false
+        }
     }
 
     var blocksConfirmation: Bool {
         switch self {
-        case .choiceRequired, .ambiguous, .conflict:
+        case .choiceRequired, .cardChoiceRequired, .ambiguous, .conflict:
             return true
         case .unavailable, .matchedExisting:
             return false
@@ -675,6 +693,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         accountRepo: AccountRepository,
         importSessionRepo: ImportSessionRepository,
         transactionRepo: TransactionRepository,
+        cardRepo: CardRepository = PlaceholderCardRepo(),
         confirmedImportRepo: ConfirmedImportRepository = PlaceholderConfirmedImportRepo(),
         generationToken: ProviderGenerationToken = ProviderGenerationToken(),
         mapper: ImportPersistenceMapper = ImportPersistenceMapper(),
@@ -684,6 +703,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             workspaceRepo: workspaceRepo,
             transactionRepo: transactionRepo,
             accountRepo: accountRepo,
+            cardRepo: cardRepo,
             importSessionRepo: importSessionRepo,
             confirmedImportRepo: confirmedImportRepo,
             generationToken: generationToken
@@ -700,6 +720,17 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         accountChoice: ImportAccountChoice?,
         providerGeneration: ProviderGenerationToken
     ) throws -> ConfirmedImportPlanDTO {
+        if financialDocument.cardStatementEvidence != nil {
+            return try makeCardConfirmedPlan(
+                provider: provider,
+                financialDocument: financialDocument,
+                importSession: importSession,
+                validation: validation,
+                fingerprintSet: fingerprintSet,
+                accountChoice: accountChoice,
+                providerGeneration: providerGeneration
+            )
+        }
         if isCBQSourceObservationImport(financialDocument) {
             let candidates = try cbqCompatibleAccountIDs(provider: provider, financialDocument: financialDocument)
             let proposedID = "account-\(importSession.id.uuidString.lowercased())"
@@ -724,6 +755,10 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                     selectedAccountId = selected
                 case .createNewAccount:
                     confirmedChoice = .createProposedAccount
+                    selectedAccountId = proposedID
+                case .createNewCardLiabilityAccountAndInstrument,
+                     .useExistingCardLiabilityAccount:
+                    confirmedChoice = .unspecified
                     selectedAccountId = proposedID
                 case nil:
                     confirmedChoice = .useExistingAccount(accountId: candidates[0])
@@ -778,6 +813,10 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 case .createNewAccount:
                     confirmedChoice = .createProposedAccount
                     selectedAccountId = proposedID
+                case .createNewCardLiabilityAccountAndInstrument,
+                     .useExistingCardLiabilityAccount:
+                    confirmedChoice = .unspecified
+                    selectedAccountId = proposedID
                 case nil:
                     confirmedChoice = .unspecified
                     selectedAccountId = proposedID
@@ -804,6 +843,96 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             advisoryIdentity: advisoryIdentity,
             accountChoice: confirmedChoice,
             selectedAccountId: selectedAccountId
+        )
+        try validate(confirmedPlan: plan)
+        return plan
+    }
+
+    private func makeCardConfirmedPlan(
+        provider: DatabaseProvider,
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        accountChoice: ImportAccountChoice?,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ConfirmedImportPlanDTO {
+        guard let evidence = financialDocument.cardStatementEvidence,
+              evidence.accountSourceIdentityObservations.count == 1,
+              evidence.instrumentSections.count == 1,
+              evidence.instrumentSections[0].sourceIdentityObservations.count == 1 else {
+            throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+        }
+        let snapshot = try provider.cardRepo.snapshot(workspaceId: mapper.workspaceId)
+        let accountObservation = evidence.accountSourceIdentityObservations[0]
+        let instrumentObservation = evidence.instrumentSections[0].sourceIdentityObservations[0]
+        let accountCandidates = Set(snapshot.sourceObservations.filter {
+            $0.subjectKind == CardSourceIdentitySubject.liabilityAccount.rawValue &&
+            $0.observationKind == accountObservation.kind.rawValue &&
+            $0.sourceValue == accountObservation.value
+        }.map(\.subjectId))
+        var mappings: [(accountID: String, instrumentID: String)] = []
+        for accountID in accountCandidates.sorted() {
+            let instruments = Set(snapshot.sourceObservations.filter { observation in
+                observation.subjectKind == CardSourceIdentitySubject.instrument.rawValue &&
+                observation.observationKind == instrumentObservation.kind.rawValue &&
+                observation.sourceValue == instrumentObservation.value &&
+                snapshot.instruments.contains(where: { instrument in
+                    instrument.id == observation.subjectId && instrument.liabilityAccountId == accountID
+                })
+            }.map(\.subjectId))
+            mappings.append(contentsOf: instruments.sorted().map { (accountID, $0) })
+        }
+
+        let proposedAccountID = "account-\(importSession.id.uuidString.lowercased())"
+        let selectedAccountID: String
+        let confirmedAccountChoice: ConfirmedImportAccountChoiceDTO
+        let instrumentChoice: ConfirmedCardInstrumentChoiceDTO
+        let authority: String
+        var relationshipKind: CardInstrumentRelationshipKind?
+        var relatedInstrumentID: String?
+        switch accountChoice {
+        case .createNewCardLiabilityAccountAndInstrument:
+            selectedAccountID = proposedAccountID
+            confirmedAccountChoice = .createProposedAccount
+            instrumentChoice = .createProposedInstrument
+            authority = "user_confirmed"
+        case .useExistingCardLiabilityAccount(let accountID, let choice):
+            selectedAccountID = accountID
+            confirmedAccountChoice = .useExistingAccount(accountId: accountID)
+            authority = "user_confirmed"
+            switch choice {
+            case .reuseExistingInstrument(let instrumentID):
+                instrumentChoice = .useExistingInstrument(instrumentId: instrumentID)
+            case .createNewInstrument(let relationship, let related):
+                instrumentChoice = .createProposedInstrument
+                relationshipKind = relationship
+                relatedInstrumentID = related
+            }
+        case nil where mappings.count == 1:
+            selectedAccountID = mappings[0].accountID
+            confirmedAccountChoice = .useExistingAccount(accountId: mappings[0].accountID)
+            instrumentChoice = .useExistingInstrument(instrumentId: mappings[0].instrumentID)
+            authority = "prior_user_confirmed_mapping"
+        default:
+            selectedAccountID = proposedAccountID
+            confirmedAccountChoice = .unspecified
+            instrumentChoice = .unspecified
+            authority = "user_confirmed"
+        }
+        let plan = try mapper.confirmedImportPlan(
+            financialDocument: financialDocument,
+            importSession: importSession,
+            validation: validation,
+            fingerprintSet: fingerprintSet,
+            providerGeneration: providerGeneration,
+            advisoryIdentity: .noMatch,
+            accountChoice: confirmedAccountChoice,
+            selectedAccountId: selectedAccountID,
+            cardInstrumentChoice: instrumentChoice,
+            cardAssociationAuthority: authority,
+            cardRelationshipKind: relationshipKind,
+            relatedInstrumentId: relatedInstrumentID
         )
         try validate(confirmedPlan: plan)
         return plan
@@ -893,6 +1022,34 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             case 1: return .matchedExisting(accountId: candidates[0])
             default: return .choiceRequired(eligibleAccountIds: candidates)
             }
+        }
+        if let evidence = financialDocument.cardStatementEvidence {
+            let snapshot = try provider.cardRepo.snapshot(workspaceId: mapper.workspaceId)
+            guard let accountObservation = evidence.accountSourceIdentityObservations.first,
+                  let instrumentObservation = evidence.instrumentSections.first?.sourceIdentityObservations.first else {
+                return .unavailable
+            }
+            let accountIDs = Set(snapshot.sourceObservations.filter {
+                $0.subjectKind == CardSourceIdentitySubject.liabilityAccount.rawValue &&
+                $0.observationKind == accountObservation.kind.rawValue &&
+                $0.sourceValue == accountObservation.value
+            }.map(\.subjectId))
+            let exactMappings = snapshot.instruments.filter { instrument in
+                accountIDs.contains(instrument.liabilityAccountId) &&
+                snapshot.sourceObservations.contains {
+                    $0.subjectKind == CardSourceIdentitySubject.instrument.rawValue &&
+                    $0.subjectId == instrument.id &&
+                    $0.observationKind == instrumentObservation.kind.rawValue &&
+                    $0.sourceValue == instrumentObservation.value
+                }
+            }
+            if exactMappings.count == 1 {
+                return .matchedExisting(accountId: exactMappings[0].liabilityAccountId)
+            }
+            let eligible = try provider.accountRepo.accounts(workspaceId: mapper.workspaceId)
+                .filter { $0.accountType == "credit_card" && $0.nativeCurrency == evidence.nativeCurrency.code }
+                .map(\.id).sorted()
+            return .cardChoiceRequired(eligibleLiabilityAccountIds: eligible)
         }
         let workspaceId = mapper.workspaceId
         let resolution = try resolver(accountRepo: provider.accountRepo).resolve(

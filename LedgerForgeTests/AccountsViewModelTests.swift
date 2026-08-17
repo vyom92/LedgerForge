@@ -241,6 +241,7 @@ private func makeViewModel(
         transactionStore: stores.transactions,
         importSessionStore: stores.importSessions,
         metadataCoordinator: coordinator,
+        cardStore: CardStore(),
         acknowledgementGate: acknowledgementGate ?? .shared
     )
 }

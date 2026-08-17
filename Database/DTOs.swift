@@ -247,6 +247,117 @@ public struct AccountIdentifierDTO: nonisolated Equatable {
     }
 }
 
+public struct CardInstrumentDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let workspaceId: String
+    public let liabilityAccountId: String
+    public let lifecycleStateCode: String
+    public let createdAtISO: String
+
+    public init(id: String, workspaceId: String, liabilityAccountId: String, lifecycleStateCode: String, createdAtISO: String) {
+        self.id = id
+        self.workspaceId = workspaceId
+        self.liabilityAccountId = liabilityAccountId
+        self.lifecycleStateCode = lifecycleStateCode
+        self.createdAtISO = createdAtISO
+    }
+}
+
+public struct CardInstrumentIdentifierDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let instrumentId: String
+    public let workspaceId: String
+    public let scheme: String
+    public let identifier: String
+    public let parserProvenanceCode: String
+    public let createdAtISO: String
+}
+
+public struct CardSourceIdentityObservationDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let workspaceId: String
+    public let documentId: String
+    public let importSessionId: String
+    public let normalizedDocumentId: String
+    public let parserProfileId: String
+    public let parserProfileVersion: String
+    public let subjectKind: String
+    public let subjectId: String
+    public let observationKind: String
+    public let sourceValue: String
+    public let associationAuthority: String
+    public let createdAtISO: String
+}
+
+public struct CardInstrumentRelationshipDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let workspaceId: String
+    public let liabilityAccountId: String
+    public let predecessorInstrumentId: String
+    public let successorInstrumentId: String
+    public let relationshipKind: String
+    public let authority: String
+    public let effectiveDateISO: String?
+    public let createdAtISO: String
+}
+
+public struct CardStatementDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let workspaceId: String
+    public let liabilityAccountId: String
+    public let documentId: String
+    public let importSessionId: String
+    public let normalizedDocumentId: String
+    public let parserProfileId: String
+    public let parserProfileVersion: String
+    public let statementDateISO: String
+    public let statementStartDateISO: String
+    public let statementEndDateISO: String
+    public let statementCurrency: String
+    public let sourceRowCount: Int
+    public let reconciliationRuleCode: String
+    public let createdAtISO: String
+}
+
+public struct CardStatementSummaryComponentDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let cardStatementId: String
+    public let componentCode: String
+    public let moneyCurrency: String?
+    public let moneyMinor: Int64?
+    public let moneyDecimal: String?
+    public let dateISO: String?
+}
+
+public struct CardTransactionEvidenceDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let cardStatementId: String
+    public let transactionId: String
+    public let rowScopeCode: String
+    public let instrumentId: String?
+    public let liabilityEffectCode: String
+    public let sourceTransactionDateISO: String
+    public let documentScopedSectionId: String?
+    public let originalCurrency: String?
+    public let originalAmountMinor: Int64?
+    public let originalAmountDecimal: String?
+}
+
+public struct CardRepositorySnapshotDTO: nonisolated Equatable, Sendable {
+    public let instruments: [CardInstrumentDTO]
+    public let instrumentIdentifiers: [CardInstrumentIdentifierDTO]
+    public let sourceObservations: [CardSourceIdentityObservationDTO]
+    public let relationships: [CardInstrumentRelationshipDTO]
+    public let statements: [CardStatementDTO]
+    public let summaryComponents: [CardStatementSummaryComponentDTO]
+    public let transactionEvidence: [CardTransactionEvidenceDTO]
+
+    public static let empty = CardRepositorySnapshotDTO(
+        instruments: [], instrumentIdentifiers: [], sourceObservations: [], relationships: [],
+        statements: [], summaryComponents: [], transactionEvidence: []
+    )
+}
+
 public struct ImportSessionDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let workspaceId: String

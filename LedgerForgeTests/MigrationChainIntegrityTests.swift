@@ -37,16 +37,16 @@ struct MigrationChainIntegrityTests {
         }
     }
 
-    @Test func currentV1ThroughV11RegistrationIsValidAndDeterministic() throws {
+    @Test func currentV1ThroughV12RegistrationIsValidAndDeterministic() throws {
         try MigrationChainValidator.validateRegistered(allMigrations)
 
-        #expect(allMigrations.map(\.version) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+        #expect(allMigrations.map(\.version) == Array(1...12))
         #expect(allMigrations.map(\.checksum).allSatisfy { $0.count == 64 })
         #expect(allMigrations.map(\.checksum) == allMigrations.map(\.checksum))
     }
 
-    @Test func cleanInstallContainsCompleteV11SchemaAndReopens() throws {
-        try withTemporaryDatabase(named: "V11CleanInstall") { path in
+    @Test func cleanInstallContainsCompleteV12SchemaAndReopens() throws {
+        try withTemporaryDatabase(named: "V12CleanInstall") { path in
             let provider = try SQLiteRepositoryProvider(path: path)
             let objects = try provider.database.query(
                 sql: "SELECT type, name FROM sqlite_master WHERE name IN ('partial_import_summaries', 'incoming_row_dispositions', 'validate_incoming_row_disposition', 'validate_partial_import_summary') ORDER BY name;",
@@ -97,7 +97,7 @@ struct MigrationChainIntegrityTests {
 
             let reopened = try SQLiteRepositoryProvider(path: path)
             defer { reopened.database.close() }
-            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM schema_migrations;") == 11)
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM schema_migrations;") == 12)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('categories', 'transaction_category_assignments');") == 2)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('statement_financial_projections', 'statement_financial_projection_events', 'statement_equivalence_groups', 'statement_equivalence_members');") == 4)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM statement_financial_projections;") == 0)
@@ -108,22 +108,28 @@ struct MigrationChainIntegrityTests {
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM cbq_source_identity_observations;") == 0)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM statement_source_observations;") == 0)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM transaction_source_observations;") == 0)
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('card_instruments', 'card_instrument_identifiers', 'card_source_identity_observations', 'card_instrument_relationships', 'card_statements', 'card_statement_summary_components', 'card_transaction_evidence');") == 7)
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM card_instruments;") == 0)
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM card_statements;") == 0)
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM card_transaction_evidence;") == 0)
         }
     }
 
-    @Test func cleanV9UpgradesToV11WithoutInventingEquivalenceOrCBQEvidence() throws {
-        try withTemporaryDatabase(named: "V9ToV11") { path in
+    @Test func cleanV9UpgradesToV12WithoutInventingEquivalenceCBQOrCardEvidence() throws {
+        try withTemporaryDatabase(named: "V9ToV12") { path in
             let database = SQLiteDatabase(path: path)
             try database.runMigrations(Array(allMigrations.prefix(9)))
             #expect(try database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 9)
             try database.runMigrations(allMigrations)
-            #expect(try database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 11)
+            #expect(try database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 12)
             #expect(try database.queryInt("SELECT COUNT(*) FROM statement_financial_projections;") == 0)
             #expect(try database.queryInt("SELECT COUNT(*) FROM statement_financial_projection_events;") == 0)
             #expect(try database.queryInt("SELECT COUNT(*) FROM statement_equivalence_groups;") == 0)
             #expect(try database.queryInt("SELECT COUNT(*) FROM statement_equivalence_members;") == 0)
             #expect(try database.queryInt("SELECT COUNT(*) FROM statement_source_observations;") == 0)
             #expect(try database.queryInt("SELECT COUNT(*) FROM transaction_source_observations;") == 0)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_instruments;") == 0)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_statements;") == 0)
             try database.checkpointAndClose()
 
             let reopened = try SQLiteRepositoryProvider(path: path)
@@ -133,7 +139,7 @@ struct MigrationChainIntegrityTests {
     }
 
     @Test func populatedV6FullImportUpgradesToCurrentWithoutInventingPartialOrCategoryTruth() throws {
-        try withTemporaryDatabase(named: "V6ToV11") { path in
+        try withTemporaryDatabase(named: "V6ToV12") { path in
             let database = SQLiteDatabase(path: path)
             try database.runMigrations(Array(allMigrations.prefix(6)))
             try database.execute(sql: """
@@ -253,9 +259,9 @@ struct MigrationChainIntegrityTests {
     }
 
     @Test func persistedHistoryRejectsUnsupportedFutureVersion() {
-        let future = PersistedMigrationRecord(version: 12, name: "future", checksum: String(repeating: "f", count: 64), appliedAt: "2026-07-20T00:00:00Z")
+        let future = PersistedMigrationRecord(version: 13, name: "future", checksum: String(repeating: "f", count: 64), appliedAt: "2026-07-20T00:00:00Z")
 
-        #expect(throws: MigrationIntegrityError.unsupportedFutureVersion(12)) {
+        #expect(throws: MigrationIntegrityError.unsupportedFutureVersion(13)) {
             try MigrationChainValidator.validatePersisted(allMigrations.map(record(for:)) + [future], against: allMigrations, requiresCompleteChain: false)
         }
     }
@@ -281,7 +287,7 @@ struct MigrationChainIntegrityTests {
         )
     }
 
-    @Test func freshDatabaseCreatesOneExactV1ThroughV11History() throws {
+    @Test func freshDatabaseCreatesOneExactV1ThroughV12History() throws {
         try withTemporaryDatabase(named: "Fresh") { path in
             let provider = try SQLiteRepositoryProvider(path: path)
             defer { provider.database.close() }
@@ -290,7 +296,7 @@ struct MigrationChainIntegrityTests {
         }
     }
 
-    @Test(arguments: Array(1...10))
+    @Test(arguments: Array(1...11))
     func everyRegisteredHistoricalPrefixIsExactBeforeOrdinaryReopenToCurrent(
         _ priorVersion: Int
     ) throws {
@@ -308,7 +314,7 @@ struct MigrationChainIntegrityTests {
 
             let provider = try SQLiteRepositoryProvider(path: path)
             try expectCurrentHistory(in: provider.database)
-            #expect(try provider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 11)
+            #expect(try provider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 12)
             try provider.database.checkpointAndClose()
         }
     }
@@ -386,10 +392,10 @@ struct MigrationChainIntegrityTests {
         try withTamperedCurrentDatabase(named: "Future") { database in
             try database.executePrepared(
                 sql: "INSERT INTO schema_migrations(version, name, applied_at, checksum) VALUES(?, ?, ?, ?);",
-                params: [12, "future", "2026-07-20T00:00:00Z", String(repeating: "f", count: 64)]
+                params: [13, "future", "2026-07-20T00:00:00Z", String(repeating: "f", count: 64)]
             )
         } assertReopen: {
-            MigrationIntegrityError.unsupportedFutureVersion(12)
+            MigrationIntegrityError.unsupportedFutureVersion(13)
         }
     }
 

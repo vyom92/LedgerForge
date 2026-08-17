@@ -220,7 +220,14 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             if let currentOwner {
                 guard currentOwner == accountID else { return .identifierOwnershipConflict }
             } else if try count("SELECT COUNT(*) FROM account_identifiers WHERE account_id = ? AND workspace_id = ?;", [accountID, plan.workspace.id]) > 0 {
-                guard isCBQObservationPlan(plan), try cbqAccountIsCompatible(plan, accountID: accountID) else {
+                let cbqCompatible: Bool
+                if isCBQObservationPlan(plan) {
+                    cbqCompatible = try cbqAccountIsCompatible(plan, accountID: accountID)
+                } else {
+                    cbqCompatible = false
+                }
+                let cardCompatible = plan.cardImportPlan != nil && cardAccountIsCompatible(account: existing, plan: plan)
+                guard cbqCompatible || cardCompatible else {
                     return .selectedAccountIneligible
                 }
             }
@@ -298,8 +305,194 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             workspaceID: plan.workspace.id,
             accountID: account.id
         )
+        if let cardPlan = plan.cardImportPlan {
+            guard !isSupportingSource else { return .repositoryIntegrityConflict }
+            if let result = try insertCardGraph(
+                cardPlan,
+                plan: plan,
+                account: account,
+                transactions: transactions
+            ) { return result }
+        }
         let receipt = ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id)
         return isSupportingSource ? .equivalentSourceRecorded(receipt) : .committed(receipt)
+    }
+
+    private func cardAccountIsCompatible(account: AccountDTO, plan: ConfirmedImportPlanDTO) -> Bool {
+        account.workspaceId == plan.workspace.id && account.accountType == "credit_card" &&
+        account.nativeCurrency == "QAR" && account.institutionId == "American Express"
+    }
+
+    private func insertCardGraph(
+        _ card: ConfirmedCardImportPlanDTO,
+        plan: ConfirmedImportPlanDTO,
+        account: AccountDTO,
+        transactions: [TransactionDTO]
+    ) throws -> ConfirmedImportRepositoryResult? {
+        let history = plan.historyTemplate
+        guard card.liabilityAccountId == account.id,
+              cardAccountIsCompatible(account: account, plan: plan),
+              card.statement.workspaceId == plan.workspace.id,
+              card.statement.liabilityAccountId == account.id,
+              card.statement.documentId == history.document.id,
+              card.statement.importSessionId == history.importSession.id,
+              card.statement.normalizedDocumentId == history.normalizedDocument?.id,
+              card.statement.parserProfileId == "amex.credit-card.pdf",
+              card.statement.parserProfileVersion == "1",
+              card.statement.statementCurrency == "QAR",
+              card.statement.reconciliationRuleCode == "amex.qar.previous-minus-credits-plus-debits.v1",
+              card.statement.sourceRowCount == transactions.count else { return .repositoryIntegrityConflict }
+
+        let selectedInstrumentID: String
+        switch card.instrumentChoice {
+        case .unspecified:
+            return .explicitAccountChoiceRequired
+        case .createProposedInstrument:
+            guard card.proposedInstrument.workspaceId == plan.workspace.id,
+                  card.proposedInstrument.liabilityAccountId == account.id,
+                  card.proposedInstrument.lifecycleStateCode == "unknown",
+                  try count("SELECT COUNT(*) FROM card_instruments WHERE id = ?;", [card.proposedInstrument.id]) == 0 else {
+                return .repositoryIntegrityConflict
+            }
+            try db.executePrepared(
+                sql: "INSERT INTO card_instruments (id, workspace_id, liability_account_id, lifecycle_state, created_at) VALUES (?,?,?,?,?);",
+                params: [card.proposedInstrument.id, card.proposedInstrument.workspaceId, card.proposedInstrument.liabilityAccountId, card.proposedInstrument.lifecycleStateCode, card.proposedInstrument.createdAtISO]
+            )
+            selectedInstrumentID = card.proposedInstrument.id
+        case .useExistingInstrument(let instrumentID):
+            guard try count("SELECT COUNT(*) FROM card_instruments WHERE id = ? AND workspace_id = ? AND liability_account_id = ?;", [instrumentID, plan.workspace.id, account.id]) == 1 else {
+                return .selectedAccountIneligible
+            }
+            selectedInstrumentID = instrumentID
+        }
+
+        guard Set(card.instrumentIdentifiers.map(\.id)).count == card.instrumentIdentifiers.count,
+              Set(card.instrumentIdentifiers.map { "\($0.workspaceId)|\($0.scheme)|\($0.identifier)" }).count == card.instrumentIdentifiers.count else {
+            return .repositoryIntegrityConflict
+        }
+        for identifier in card.instrumentIdentifiers {
+            guard identifier.instrumentId == selectedInstrumentID,
+                  identifier.workspaceId == plan.workspace.id,
+                  !identifier.scheme.isEmpty,
+                  !identifier.identifier.isEmpty,
+                  !identifier.parserProvenanceCode.isEmpty else {
+                return .repositoryIntegrityConflict
+            }
+            let owners = try db.query(
+                sql: "SELECT instrument_id FROM card_instrument_identifiers WHERE workspace_id = ? AND scheme = ? AND identifier = ?;",
+                params: [identifier.workspaceId, identifier.scheme, identifier.identifier]
+            ) { $0.string(at: 0) ?? "" }
+            guard owners.allSatisfy({ $0 == selectedInstrumentID }) else { return .identifierOwnershipConflict }
+            if owners.isEmpty {
+                try db.executePrepared(
+                    sql: "INSERT INTO card_instrument_identifiers (id, instrument_id, workspace_id, scheme, identifier, parser_provenance, created_at) VALUES (?,?,?,?,?,?,?);",
+                    params: [identifier.id, identifier.instrumentId, identifier.workspaceId, identifier.scheme, identifier.identifier, identifier.parserProvenanceCode, identifier.createdAtISO]
+                )
+            }
+        }
+
+        let allowedAuthorities = Set(["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"])
+        guard card.sourceObservations.count == 2,
+              Set(card.sourceObservations.map(\.id)).count == card.sourceObservations.count else { return .repositoryIntegrityConflict }
+        for observation in card.sourceObservations {
+            let subjectValid = (observation.subjectKind == "liability_account" && observation.subjectId == account.id) ||
+                (observation.subjectKind == "instrument" && observation.subjectId == selectedInstrumentID)
+            guard observation.workspaceId == plan.workspace.id,
+                  observation.documentId == history.document.id,
+                  observation.importSessionId == history.importSession.id,
+                  observation.normalizedDocumentId == history.normalizedDocument?.id,
+                  observation.parserProfileId == card.statement.parserProfileId,
+                  observation.parserProfileVersion == card.statement.parserProfileVersion,
+                  subjectValid, allowedAuthorities.contains(observation.associationAuthority),
+                  !observation.sourceValue.isEmpty else { return .repositoryIntegrityConflict }
+            if observation.associationAuthority == "prior_user_confirmed_mapping" {
+                guard try count(
+                    "SELECT COUNT(*) FROM card_source_identity_observations WHERE workspace_id = ? AND subject_kind = ? AND subject_id = ? AND observation_kind = ? AND source_value = ? AND association_authority = 'user_confirmed';",
+                    [observation.workspaceId, observation.subjectKind, observation.subjectId, observation.observationKind, observation.sourceValue]
+                ) > 0 else { return .staleIdentityDecision }
+            }
+            try db.executePrepared(
+                sql: "INSERT INTO card_source_identity_observations (id, workspace_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, subject_kind, subject_id, observation_kind, source_value, association_authority, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: [observation.id, observation.workspaceId, observation.documentId, observation.importSessionId, observation.normalizedDocumentId, observation.parserProfileId, observation.parserProfileVersion, observation.subjectKind, observation.subjectId, observation.observationKind, observation.sourceValue, observation.associationAuthority, observation.createdAtISO]
+            )
+        }
+
+        for relationship in card.relationships {
+            guard relationship.workspaceId == plan.workspace.id,
+                  relationship.liabilityAccountId == account.id,
+                  relationship.successorInstrumentId == selectedInstrumentID,
+                  relationship.predecessorInstrumentId != relationship.successorInstrumentId,
+                  relationship.authority == "user_confirmed",
+                  ["additional_concurrent", "replacement", "renewal", "upgrade", "unspecified"].contains(relationship.relationshipKind),
+                  try count("SELECT COUNT(*) FROM card_instruments WHERE id = ? AND liability_account_id = ?;", [relationship.predecessorInstrumentId, account.id]) == 1 else {
+                return .repositoryIntegrityConflict
+            }
+            try db.executePrepared(
+                sql: "INSERT INTO card_instrument_relationships (id, workspace_id, liability_account_id, predecessor_instrument_id, successor_instrument_id, relationship_kind, authority, effective_date, created_at) VALUES (?,?,?,?,?,?,?,?,?);",
+                params: [relationship.id, relationship.workspaceId, relationship.liabilityAccountId, relationship.predecessorInstrumentId, relationship.successorInstrumentId, relationship.relationshipKind, relationship.authority, relationship.effectiveDateISO ?? NSNull(), relationship.createdAtISO]
+            )
+        }
+
+        let requiredComponents = Set(["previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"])
+        guard Set(card.summaryComponents.map(\.componentCode)) == requiredComponents,
+              card.summaryComponents.allSatisfy({ $0.cardStatementId == card.statement.id }) else { return .repositoryIntegrityConflict }
+        let byCode = Dictionary(uniqueKeysWithValues: card.summaryComponents.map { ($0.componentCode, $0) })
+        guard let previous = byCode["previous_balance"]?.moneyMinor,
+              let credits = byCode["new_credits"]?.moneyMinor,
+              let debits = byCode["new_debits"]?.moneyMinor,
+              let balance = byCode["new_balance"]?.moneyMinor,
+              let instrumentTotal = byCode["instrument_net_total"]?.moneyMinor,
+              previous - credits + debits == balance,
+              byCode["due_date"]?.dateISO != nil else { return .repositoryIntegrityConflict }
+
+        let transactionsByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
+        guard card.transactionEvidence.count == transactions.count,
+              Set(card.transactionEvidence.map(\.transactionId)) == Set(transactions.map(\.id)),
+              Set(card.transactionEvidence.map(\.id)).count == card.transactionEvidence.count else { return .repositoryIntegrityConflict }
+        var increaseTotal: Int64 = 0
+        var decreaseTotal: Int64 = 0
+        var instrumentNet: Int64 = 0
+        for evidence in card.transactionEvidence {
+            guard evidence.cardStatementId == card.statement.id,
+                  let transaction = transactionsByID[evidence.transactionId],
+                  transaction.direction == evidence.liabilityEffectCode else { return .repositoryIntegrityConflict }
+            switch evidence.liabilityEffectCode {
+            case CardLiabilityEffect.increasesAmountOwed.rawValue:
+                increaseTotal += transaction.amountMinor
+                if evidence.instrumentId != nil { instrumentNet += transaction.amountMinor }
+            case CardLiabilityEffect.decreasesAmountOwed.rawValue:
+                decreaseTotal += -transaction.amountMinor
+                if evidence.instrumentId != nil { instrumentNet += transaction.amountMinor }
+            default: return .repositoryIntegrityConflict
+            }
+            if evidence.rowScopeCode == "account_level" {
+                guard evidence.instrumentId == nil && evidence.documentScopedSectionId == nil else { return .repositoryIntegrityConflict }
+            } else {
+                guard evidence.rowScopeCode == "instrument_level", evidence.instrumentId == selectedInstrumentID,
+                      evidence.documentScopedSectionId != nil else { return .repositoryIntegrityConflict }
+            }
+        }
+        guard increaseTotal == debits, decreaseTotal == credits, instrumentNet == instrumentTotal else {
+            return .repositoryIntegrityConflict
+        }
+
+        try db.executePrepared(
+            sql: "INSERT INTO card_statements (id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, statement_currency, source_row_count, reconciliation_rule_code, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+            params: [card.statement.id, card.statement.workspaceId, card.statement.liabilityAccountId, card.statement.documentId, card.statement.importSessionId, card.statement.normalizedDocumentId, card.statement.parserProfileId, card.statement.parserProfileVersion, card.statement.statementDateISO, card.statement.statementStartDateISO, card.statement.statementEndDateISO, card.statement.statementCurrency, card.statement.sourceRowCount, card.statement.reconciliationRuleCode, card.statement.createdAtISO]
+        )
+        for component in card.summaryComponents {
+            try db.executePrepared(
+                sql: "INSERT INTO card_statement_summary_components (id, card_statement_id, component_code, money_currency, money_minor, money_decimal, date_value) VALUES (?,?,?,?,?,?,?);",
+                params: [component.id, component.cardStatementId, component.componentCode, component.moneyCurrency ?? NSNull(), component.moneyMinor ?? NSNull(), component.moneyDecimal ?? NSNull(), component.dateISO ?? NSNull()]
+            )
+        }
+        for evidence in card.transactionEvidence {
+            try db.executePrepared(
+                sql: "INSERT INTO card_transaction_evidence (id, card_statement_id, transaction_id, row_scope, instrument_id, liability_effect, source_transaction_date, document_scoped_section_id, original_currency, original_amount_minor, original_amount_decimal) VALUES (?,?,?,?,?,?,?,?,?,?,?);",
+                params: [evidence.id, evidence.cardStatementId, evidence.transactionId, evidence.rowScopeCode, evidence.instrumentId ?? NSNull(), evidence.liabilityEffectCode, evidence.sourceTransactionDateISO, evidence.documentScopedSectionId ?? NSNull(), evidence.originalCurrency ?? NSNull(), evidence.originalAmountMinor ?? NSNull(), evidence.originalAmountDecimal ?? NSNull()]
+            )
+        }
+        return nil
     }
 
     private func reviewCBQSourceOverlapInsideTransaction(_ plan: ConfirmedImportPlanDTO, planID: String) throws -> CBQSourceOverlapReviewResult {

@@ -329,6 +329,7 @@ struct AxisSharedBankAccountProfileTests {
                 transactionRepo: provider.transactionRepo,
                 categoryRepo: provider.categoryRepo,
                 accountRepo: provider.accountRepo,
+                cardRepo: provider.cardRepo,
                 importSessionRepo: provider.importSessionRepo,
                 confirmedImportRepo: provider.confirmedImportRepo,
                 generationToken: provider.generationToken,

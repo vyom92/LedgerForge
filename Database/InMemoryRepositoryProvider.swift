@@ -8,6 +8,7 @@ public final class InMemoryRepositoryProvider {
     public let transactionRepo: TransactionRepository
     public let categoryRepo: CategoryRepository
     public let accountRepo: AccountRepository
+    public let cardRepo: CardRepository
     public let importSessionRepo: ImportSessionRepository
     public let generationToken: ProviderGenerationToken
     public let confirmedImportRepo: ConfirmedImportRepository
@@ -21,6 +22,7 @@ public final class InMemoryRepositoryProvider {
         self.transactionRepo = InMemoryTransactionRepo(state: state)
         self.categoryRepo = InMemoryCategoryRepo(state: state)
         self.accountRepo = InMemoryAccountRepo(state: state)
+        self.cardRepo = InMemoryCardRepo(state: state)
         self.importSessionRepo = InMemoryImportSessionRepo(state: state)
         self.confirmedImportRepo = InMemoryConfirmedImportRepo(state: state, generationToken: generationToken)
     }
@@ -97,8 +99,37 @@ private final class InMemoryRepositoryState {
     var cbqSourceIdentityRecords: [String: CBQSourceIdentityRecordDTO] = [:]
     var cbqReviewedSourcePlans: [String: ReviewedCBQSourceOverlapPlanDTO] = [:]
     var cbqTransactionSourceReferenceDigests: [String: Set<String>] = [:]
+    var cardInstruments: [String: CardInstrumentDTO] = [:]
+    var cardInstrumentIdentifiers: [String: CardInstrumentIdentifierDTO] = [:]
+    var cardSourceObservations: [String: CardSourceIdentityObservationDTO] = [:]
+    var cardRelationships: [String: CardInstrumentRelationshipDTO] = [:]
+    var cardStatements: [String: CardStatementDTO] = [:]
+    var cardSummaryComponents: [String: CardStatementSummaryComponentDTO] = [:]
+    var cardTransactionEvidence: [String: CardTransactionEvidenceDTO] = [:]
     var confirmedImportFailureInjection: ConfirmedImportFailureInjectionPoint?
     var supportingSourceFailureInjection: SupportingSourceFailureInjectionPoint?
+}
+
+private final class InMemoryCardRepo: CardRepository {
+    private let state: InMemoryRepositoryState
+    init(state: InMemoryRepositoryState) { self.state = state }
+
+    func snapshot(workspaceId: String) throws -> CardRepositorySnapshotDTO {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        let instruments = state.cardInstruments.values.filter { $0.workspaceId == workspaceId }.sorted { $0.id < $1.id }
+        let instrumentIDs = Set(instruments.map(\.id))
+        let statements = state.cardStatements.values.filter { $0.workspaceId == workspaceId }.sorted { ($0.statementEndDateISO, $0.id) < ($1.statementEndDateISO, $1.id) }
+        let statementIDs = Set(statements.map(\.id))
+        return CardRepositorySnapshotDTO(
+            instruments: instruments,
+            instrumentIdentifiers: state.cardInstrumentIdentifiers.values.filter { instrumentIDs.contains($0.instrumentId) }.sorted { $0.id < $1.id },
+            sourceObservations: state.cardSourceObservations.values.filter { $0.workspaceId == workspaceId }.sorted { ($0.createdAtISO, $0.id) < ($1.createdAtISO, $1.id) },
+            relationships: state.cardRelationships.values.filter { $0.workspaceId == workspaceId }.sorted { ($0.createdAtISO, $0.id) < ($1.createdAtISO, $1.id) },
+            statements: statements,
+            summaryComponents: state.cardSummaryComponents.values.filter { statementIDs.contains($0.cardStatementId) }.sorted { ($0.cardStatementId, $0.componentCode) < ($1.cardStatementId, $1.componentCode) },
+            transactionEvidence: state.cardTransactionEvidence.values.filter { statementIDs.contains($0.cardStatementId) }.sorted { ($0.cardStatementId, $0.id) < ($1.cardStatementId, $1.id) }
+        )
+    }
 }
 
 private final class InMemoryCategoryRepo: CategoryRepository {
@@ -1073,6 +1104,13 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         var statementProjections = state.statementFinancialProjections
         var equivalenceGroups = state.statementEquivalenceGroups
         var equivalenceMembers = state.statementEquivalenceMembers
+        var cardInstruments = state.cardInstruments
+        var cardInstrumentIdentifiers = state.cardInstrumentIdentifiers
+        var cardSourceObservations = state.cardSourceObservations
+        var cardRelationships = state.cardRelationships
+        var cardStatements = state.cardStatements
+        var cardSummaryComponents = state.cardSummaryComponents
+        var cardTransactionEvidence = state.cardTransactionEvidence
         let injectedFailure = state.confirmedImportFailureInjection
         let supportingFailure = state.supportingSourceFailureInjection
 
@@ -1119,7 +1157,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             if let currentOwner {
                 guard currentOwner == accountID else { return .identifierOwnershipConflict }
             } else if identifiers.values.contains(where: { $0.accountId == accountID && $0.workspaceId == plan.workspace.id }) {
-                guard isCBQObservationPlan(plan), cbqAccountIsCompatible(plan, accountID: accountID) else {
+                guard (isCBQObservationPlan(plan) && cbqAccountIsCompatible(plan, accountID: accountID)) ||
+                        (plan.cardImportPlan != nil && cardAccountIsCompatible(account: existing, plan: plan)) else {
                     return .selectedAccountIneligible
                 }
             }
@@ -1371,6 +1410,24 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         if injectedFailure == .sessionCompletion { return .repositoryIntegrityConflict }
         if isSupportingSource, supportingFailure == .completion { return .repositoryIntegrityConflict }
 
+        if let cardPlan = plan.cardImportPlan {
+            guard !isSupportingSource else { return .repositoryIntegrityConflict }
+            let cardResult = stageCardGraph(
+                cardPlan,
+                plan: plan,
+                account: account,
+                finalTransactions: finalTransactions,
+                instruments: &cardInstruments,
+                instrumentIdentifiers: &cardInstrumentIdentifiers,
+                sourceObservations: &cardSourceObservations,
+                relationships: &cardRelationships,
+                statements: &cardStatements,
+                summaryComponents: &cardSummaryComponents,
+                transactionEvidence: &cardTransactionEvidence
+            )
+            if let cardResult { return cardResult }
+        }
+
         state.workspaces = workspaces; state.accounts = accounts; state.accountIdentifiers = identifiers
         state.identifierObservations = observations; state.documents = documents; state.documentFingerprints = fingerprints
         state.importSessions = sessions; state.normalizedDocuments = normalizedDocuments; state.normalizedRows = normalizedRows
@@ -1379,8 +1436,176 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         state.statementFinancialProjections = statementProjections
         state.statementEquivalenceGroups = equivalenceGroups
         state.statementEquivalenceMembers = equivalenceMembers
+        state.cardInstruments = cardInstruments
+        state.cardInstrumentIdentifiers = cardInstrumentIdentifiers
+        state.cardSourceObservations = cardSourceObservations
+        state.cardRelationships = cardRelationships
+        state.cardStatements = cardStatements
+        state.cardSummaryComponents = cardSummaryComponents
+        state.cardTransactionEvidence = cardTransactionEvidence
         let receipt = ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id)
         return isSupportingSource ? .equivalentSourceRecorded(receipt) : .committed(receipt)
+    }
+
+    private func cardAccountIsCompatible(account: AccountDTO, plan: ConfirmedImportPlanDTO) -> Bool {
+        account.workspaceId == plan.workspace.id &&
+        account.accountType == "credit_card" &&
+        account.nativeCurrency == "QAR" &&
+        account.institutionId == "American Express"
+    }
+
+    private func stageCardGraph(
+        _ card: ConfirmedCardImportPlanDTO,
+        plan: ConfirmedImportPlanDTO,
+        account: AccountDTO,
+        finalTransactions: [TransactionDTO],
+        instruments: inout [String: CardInstrumentDTO],
+        instrumentIdentifiers: inout [String: CardInstrumentIdentifierDTO],
+        sourceObservations: inout [String: CardSourceIdentityObservationDTO],
+        relationships: inout [String: CardInstrumentRelationshipDTO],
+        statements: inout [String: CardStatementDTO],
+        summaryComponents: inout [String: CardStatementSummaryComponentDTO],
+        transactionEvidence: inout [String: CardTransactionEvidenceDTO]
+    ) -> ConfirmedImportRepositoryResult? {
+        let history = plan.historyTemplate
+        guard card.liabilityAccountId == account.id,
+              cardAccountIsCompatible(account: account, plan: plan),
+              card.statement.workspaceId == plan.workspace.id,
+              card.statement.liabilityAccountId == account.id,
+              card.statement.documentId == history.document.id,
+              card.statement.importSessionId == history.importSession.id,
+              card.statement.normalizedDocumentId == history.normalizedDocument?.id,
+              card.statement.parserProfileId == "amex.credit-card.pdf",
+              card.statement.parserProfileVersion == "1",
+              card.statement.statementCurrency == "QAR",
+              card.statement.reconciliationRuleCode == "amex.qar.previous-minus-credits-plus-debits.v1",
+              card.statement.sourceRowCount == finalTransactions.count,
+              statements[card.statement.id] == nil else { return .repositoryIntegrityConflict }
+
+        let selectedInstrument: CardInstrumentDTO
+        switch card.instrumentChoice {
+        case .unspecified:
+            return .explicitAccountChoiceRequired
+        case .createProposedInstrument:
+            guard card.proposedInstrument.workspaceId == plan.workspace.id,
+                  card.proposedInstrument.liabilityAccountId == account.id,
+                  card.proposedInstrument.lifecycleStateCode == "unknown",
+                  instruments[card.proposedInstrument.id] == nil else { return .repositoryIntegrityConflict }
+            instruments[card.proposedInstrument.id] = card.proposedInstrument
+            selectedInstrument = card.proposedInstrument
+        case .useExistingInstrument(let instrumentID):
+            guard let existing = instruments[instrumentID],
+                  existing.workspaceId == plan.workspace.id,
+                  existing.liabilityAccountId == account.id else { return .selectedAccountIneligible }
+            selectedInstrument = existing
+        }
+
+        guard Set(card.instrumentIdentifiers.map(\.id)).count == card.instrumentIdentifiers.count,
+              Set(card.instrumentIdentifiers.map { "\($0.workspaceId)|\($0.scheme)|\($0.identifier)" }).count == card.instrumentIdentifiers.count else {
+            return .repositoryIntegrityConflict
+        }
+        for identifier in card.instrumentIdentifiers {
+            guard identifier.instrumentId == selectedInstrument.id,
+                  identifier.workspaceId == plan.workspace.id,
+                  !identifier.scheme.isEmpty,
+                  !identifier.identifier.isEmpty,
+                  !identifier.parserProvenanceCode.isEmpty,
+                  !instrumentIdentifiers.values.contains(where: {
+                      $0.workspaceId == identifier.workspaceId && $0.scheme == identifier.scheme &&
+                      $0.identifier == identifier.identifier && $0.instrumentId != selectedInstrument.id
+                  }) else { return .identifierOwnershipConflict }
+            instrumentIdentifiers[identifier.id] = identifier
+        }
+
+        let allowedAuthorities = Set(["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"])
+        guard card.sourceObservations.count == 2,
+              Set(card.sourceObservations.map(\.id)).count == card.sourceObservations.count else { return .repositoryIntegrityConflict }
+        for observation in card.sourceObservations {
+            let subjectValid = (observation.subjectKind == "liability_account" && observation.subjectId == account.id) ||
+                (observation.subjectKind == "instrument" && observation.subjectId == selectedInstrument.id)
+            guard observation.workspaceId == plan.workspace.id,
+                  observation.documentId == history.document.id,
+                  observation.importSessionId == history.importSession.id,
+                  observation.normalizedDocumentId == history.normalizedDocument?.id,
+                  observation.parserProfileId == card.statement.parserProfileId,
+                  observation.parserProfileVersion == card.statement.parserProfileVersion,
+                  subjectValid,
+                  allowedAuthorities.contains(observation.associationAuthority),
+                  !observation.sourceValue.isEmpty,
+                  sourceObservations[observation.id] == nil else { return .repositoryIntegrityConflict }
+            if observation.associationAuthority == "prior_user_confirmed_mapping" {
+                guard sourceObservations.values.contains(where: {
+                    $0.workspaceId == observation.workspaceId && $0.subjectKind == observation.subjectKind &&
+                    $0.subjectId == observation.subjectId && $0.observationKind == observation.observationKind &&
+                    $0.sourceValue == observation.sourceValue && $0.associationAuthority == "user_confirmed"
+                }) else { return .staleIdentityDecision }
+            }
+            sourceObservations[observation.id] = observation
+        }
+
+        for relationship in card.relationships {
+            guard relationships[relationship.id] == nil,
+                  relationship.workspaceId == plan.workspace.id,
+                  relationship.liabilityAccountId == account.id,
+                  relationship.successorInstrumentId == selectedInstrument.id,
+                  relationship.predecessorInstrumentId != relationship.successorInstrumentId,
+                  relationship.authority == "user_confirmed",
+                  ["additional_concurrent", "replacement", "renewal", "upgrade", "unspecified"].contains(relationship.relationshipKind),
+                  let predecessor = instruments[relationship.predecessorInstrumentId],
+                  predecessor.liabilityAccountId == account.id else { return .repositoryIntegrityConflict }
+            relationships[relationship.id] = relationship
+        }
+
+        let requiredComponents = Set(["previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"])
+        guard Set(card.summaryComponents.map(\.componentCode)) == requiredComponents,
+              card.summaryComponents.allSatisfy({ $0.cardStatementId == card.statement.id && summaryComponents[$0.id] == nil }) else {
+            return .repositoryIntegrityConflict
+        }
+        let byCode = Dictionary(uniqueKeysWithValues: card.summaryComponents.map { ($0.componentCode, $0) })
+        guard let previous = byCode["previous_balance"]?.moneyMinor,
+              let credits = byCode["new_credits"]?.moneyMinor,
+              let debits = byCode["new_debits"]?.moneyMinor,
+              let balance = byCode["new_balance"]?.moneyMinor,
+              let instrumentTotal = byCode["instrument_net_total"]?.moneyMinor,
+              previous - credits + debits == balance,
+              byCode["due_date"]?.dateISO != nil else { return .repositoryIntegrityConflict }
+
+        let transactionsByID = Dictionary(uniqueKeysWithValues: finalTransactions.map { ($0.id, $0) })
+        guard card.transactionEvidence.count == finalTransactions.count,
+              Set(card.transactionEvidence.map(\.transactionId)) == Set(finalTransactions.map(\.id)),
+              Set(card.transactionEvidence.map(\.id)).count == card.transactionEvidence.count else { return .repositoryIntegrityConflict }
+        var increaseTotal: Int64 = 0
+        var decreaseTotal: Int64 = 0
+        var instrumentNet: Int64 = 0
+        for evidence in card.transactionEvidence {
+            guard evidence.cardStatementId == card.statement.id,
+                  transactionEvidence[evidence.id] == nil,
+                  let transaction = transactionsByID[evidence.transactionId],
+                  transaction.direction == evidence.liabilityEffectCode else { return .repositoryIntegrityConflict }
+            switch evidence.liabilityEffectCode {
+            case CardLiabilityEffect.increasesAmountOwed.rawValue:
+                increaseTotal += transaction.amountMinor
+                if evidence.instrumentId != nil { instrumentNet += transaction.amountMinor }
+            case CardLiabilityEffect.decreasesAmountOwed.rawValue:
+                decreaseTotal += -transaction.amountMinor
+                if evidence.instrumentId != nil { instrumentNet += transaction.amountMinor }
+            default:
+                return .repositoryIntegrityConflict
+            }
+            if evidence.rowScopeCode == "account_level" {
+                guard evidence.instrumentId == nil && evidence.documentScopedSectionId == nil else { return .repositoryIntegrityConflict }
+            } else {
+                guard evidence.rowScopeCode == "instrument_level", evidence.instrumentId == selectedInstrument.id,
+                      evidence.documentScopedSectionId != nil else { return .repositoryIntegrityConflict }
+            }
+            transactionEvidence[evidence.id] = evidence
+        }
+        guard increaseTotal == debits, decreaseTotal == credits, instrumentNet == instrumentTotal else {
+            return .repositoryIntegrityConflict
+        }
+        statements[card.statement.id] = card.statement
+        card.summaryComponents.forEach { summaryComponents[$0.id] = $0 }
+        return nil
     }
 
     private func reviewCBQSourceOverlapWithoutLock(_ plan: ConfirmedImportPlanDTO, planID: String) -> CBQSourceOverlapReviewResult {

@@ -157,6 +157,13 @@ struct AxisUPITransactionEventEvidence: Equatable, Sendable {
     let subtype: LedgerSubtype
 }
 
+/// Credit-card liability movement. This is intentionally separate from the
+/// debit/credit vocabulary used by bank accounts.
+enum CardLiabilityEffect: String, CaseIterable, Equatable, Sendable, Codable {
+    case increasesAmountOwed = "card_increase_owed"
+    case decreasesAmountOwed = "card_decrease_owed"
+}
+
 struct Transaction: Identifiable {
 
     /// Runtime identity is stable for persisted transactions. New parser output
@@ -177,6 +184,7 @@ struct Transaction: Identifiable {
     let creditMoney: Money?
     let money: Money
     let runningBalanceMoney: Money?
+    let cardLiabilityEffect: CardLiabilityEffect?
 
     /// Transitional presentation accessors. Money remains the sole authority.
     var debit: Decimal? { debitMoney?.amount }
@@ -185,7 +193,10 @@ struct Transaction: Identifiable {
     var balance: Decimal? { runningBalanceMoney?.amount }
     var currency: String { money.currency.code }
     var signedAmountDisplay: String {
-        MoneyFormatting.signedDisplay(money, isCredit: creditMoney != nil)
+        MoneyFormatting.signedDisplay(
+            money,
+            isCredit: cardLiabilityEffect == .decreasesAmountOwed || creditMoney != nil
+        )
     }
 
     /// Source sequence is meaningful only within one durable normalized document.
@@ -224,6 +235,7 @@ struct Transaction: Identifiable {
         creditMoney: Money?,
         money: Money,
         runningBalanceMoney: Money?,
+        cardLiabilityEffect: CardLiabilityEffect? = nil,
         account: String,
         sourceBank: String,
         sourceFile: String,
@@ -255,6 +267,7 @@ struct Transaction: Identifiable {
         self.creditMoney = creditMoney
         self.money = money
         self.runningBalanceMoney = runningBalanceMoney
+        self.cardLiabilityEffect = cardLiabilityEffect
         self.account = account
         self.sourceBank = sourceBank
         self.sourceFile = sourceFile
@@ -303,6 +316,7 @@ struct Transaction: Identifiable {
             creditMoney: try! credit.map { try Money(amount: $0, currency: currency) },
             money: postedMoney,
             runningBalanceMoney: try! balance.map { try Money(amount: $0, currency: currency) },
+            cardLiabilityEffect: nil,
             account: account,
             sourceBank: sourceBank,
             sourceFile: sourceFile,

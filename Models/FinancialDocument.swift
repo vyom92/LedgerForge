@@ -98,6 +98,170 @@ struct DeclaredStatementPeriod: Equatable, Sendable {
     }
 }
 
+enum CardSourceIdentityObservationKind: String, CaseIterable, Equatable, Sendable, Codable {
+    case liabilityMembershipNumber = "amex_membership_number"
+    case instrumentCardAccountNumber = "amex_card_account_number"
+}
+
+enum CardSourceIdentitySubject: String, CaseIterable, Equatable, Sendable, Codable {
+    case liabilityAccount = "liability_account"
+    case instrument
+}
+
+/// Exact parser-produced source observation. A masked value remains weak
+/// evidence and is never promoted to a `FinancialIdentifier`.
+struct CardSourceIdentityObservation: Equatable, Sendable {
+    let kind: CardSourceIdentityObservationKind
+    let subject: CardSourceIdentitySubject
+    let value: String
+
+    init(kind: CardSourceIdentityObservationKind, subject: CardSourceIdentitySubject, value: String) throws {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let expectedSubject: CardSourceIdentitySubject = kind == .liabilityMembershipNumber
+            ? .liabilityAccount
+            : .instrument
+        guard subject == expectedSubject,
+              !trimmed.isEmpty,
+              trimmed.range(of: #"^[0-9X-]+$"#, options: .regularExpression) != nil,
+              trimmed.contains("X") else {
+            throw CardStatementEvidenceError.malformedIdentityObservation
+        }
+        self.kind = kind
+        self.subject = subject
+        self.value = trimmed
+    }
+}
+
+enum CardTransactionScope: Equatable, Sendable {
+    case accountLevel
+    case instrument(documentScopedSectionID: String)
+
+    var persistenceCode: String {
+        switch self {
+        case .accountLevel: return "account_level"
+        case .instrument: return "instrument_level"
+        }
+    }
+}
+
+struct CardInstrumentSectionEvidence: Equatable, Sendable {
+    let documentScopedSectionID: String
+    let sourceIdentityObservations: [CardSourceIdentityObservation]
+}
+
+struct CardTransactionAnnotation: Equatable, Sendable {
+    let parserTransactionID: UUID
+    let rowScope: CardTransactionScope
+    let liabilityEffect: CardLiabilityEffect
+    let sourceTransactionDate: StatementDate
+    let originalMerchantMoney: Money?
+}
+
+enum CardStatementSummaryComponent: Equatable, Sendable {
+    case previousBalance(Money)
+    case newCredits(Money)
+    case newDebits(Money)
+    case newBalance(Money)
+    case dueDate(StatementDate)
+    case instrumentNetTotal(Money)
+
+    var persistenceCode: String {
+        switch self {
+        case .previousBalance: return "previous_balance"
+        case .newCredits: return "new_credits"
+        case .newDebits: return "new_debits"
+        case .newBalance: return "new_balance"
+        case .dueDate: return "due_date"
+        case .instrumentNetTotal: return "instrument_net_total"
+        }
+    }
+
+    var money: Money? {
+        switch self {
+        case .previousBalance(let value), .newCredits(let value), .newDebits(let value),
+                .newBalance(let value), .instrumentNetTotal(let value): return value
+        case .dueDate: return nil
+        }
+    }
+
+    var date: StatementDate? {
+        guard case .dueDate(let value) = self else { return nil }
+        return value
+    }
+}
+
+enum CardStatementEvidenceError: Error, Equatable, LocalizedError {
+    case malformedIdentityObservation
+    case duplicateTransactionAnnotation
+    case duplicateSummaryComponent
+    case invalidInstrumentSection
+
+    var errorDescription: String? {
+        switch self {
+        case .malformedIdentityObservation: return "Card source identity evidence is malformed."
+        case .duplicateTransactionAnnotation: return "Card transaction evidence is duplicated."
+        case .duplicateSummaryComponent: return "Card statement summary evidence is duplicated."
+        case .invalidInstrumentSection: return "Card instrument-section evidence is malformed."
+        }
+    }
+}
+
+struct CardStatementEvidence: Equatable, Sendable {
+    static let amexQARReconciliationRule = "amex.qar.previous-minus-credits-plus-debits.v1"
+
+    let statementDate: StatementDate
+    let declaredStatementPeriod: DeclaredStatementPeriod
+    let nativeCurrency: CurrencyCode
+    let accountSourceIdentityObservations: [CardSourceIdentityObservation]
+    let instrumentSections: [CardInstrumentSectionEvidence]
+    let transactionAnnotations: [CardTransactionAnnotation]
+    let summaryComponents: [CardStatementSummaryComponent]
+    let reconciliationRuleIdentifier: String
+
+    init(
+        statementDate: StatementDate,
+        declaredStatementPeriod: DeclaredStatementPeriod,
+        nativeCurrency: CurrencyCode,
+        accountSourceIdentityObservations: [CardSourceIdentityObservation],
+        instrumentSections: [CardInstrumentSectionEvidence],
+        transactionAnnotations: [CardTransactionAnnotation],
+        summaryComponents: [CardStatementSummaryComponent],
+        reconciliationRuleIdentifier: String
+    ) throws {
+        guard Set(transactionAnnotations.map(\.parserTransactionID)).count == transactionAnnotations.count else {
+            throw CardStatementEvidenceError.duplicateTransactionAnnotation
+        }
+        guard Set(summaryComponents.map(\.persistenceCode)).count == summaryComponents.count else {
+            throw CardStatementEvidenceError.duplicateSummaryComponent
+        }
+        let sectionIDs = instrumentSections.map(\.documentScopedSectionID)
+        guard !sectionIDs.contains(where: \.isEmpty), Set(sectionIDs).count == sectionIDs.count,
+              instrumentSections.allSatisfy({ section in
+                  !section.sourceIdentityObservations.isEmpty && section.sourceIdentityObservations.allSatisfy {
+                      $0.subject == .instrument
+                  }
+              }) else {
+            throw CardStatementEvidenceError.invalidInstrumentSection
+        }
+        self.statementDate = statementDate
+        self.declaredStatementPeriod = declaredStatementPeriod
+        self.nativeCurrency = nativeCurrency
+        self.accountSourceIdentityObservations = accountSourceIdentityObservations
+        self.instrumentSections = instrumentSections
+        self.transactionAnnotations = transactionAnnotations
+        self.summaryComponents = summaryComponents
+        self.reconciliationRuleIdentifier = reconciliationRuleIdentifier
+    }
+
+    func annotation(for transaction: Transaction) -> CardTransactionAnnotation? {
+        transactionAnnotations.first { $0.parserTransactionID == transaction.id }
+    }
+
+    func summary(code: String) -> CardStatementSummaryComponent? {
+        summaryComponents.first { $0.persistenceCode == code }
+    }
+}
+
 struct FinancialDocument: Identifiable {
 
     let id: UUID
@@ -113,6 +277,7 @@ struct FinancialDocument: Identifiable {
     let financialIdentifiers: [FinancialIdentifier]
     let cbqSourceIdentityObservations: [CBQSourceIdentityObservation]
     let sourceStatementEvidence: SourceStatementEvidence?
+    let cardStatementEvidence: CardStatementEvidence?
     let selectionReasons: [String]
     let createdAt: Date
 
@@ -127,6 +292,7 @@ struct FinancialDocument: Identifiable {
         financialIdentifiers: [FinancialIdentifier] = [],
         cbqSourceIdentityObservations: [CBQSourceIdentityObservation] = [],
         sourceStatementEvidence: SourceStatementEvidence? = nil,
+        cardStatementEvidence: CardStatementEvidence? = nil,
         selectionReasons: [String] = [],
         createdAt: Date = Date()
     ) {
@@ -140,6 +306,7 @@ struct FinancialDocument: Identifiable {
         self.financialIdentifiers = financialIdentifiers
         self.cbqSourceIdentityObservations = cbqSourceIdentityObservations
         self.sourceStatementEvidence = sourceStatementEvidence
+        self.cardStatementEvidence = cardStatementEvidence
         self.selectionReasons = selectionReasons
         self.createdAt = createdAt
     }

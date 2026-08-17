@@ -271,6 +271,7 @@ struct PersistenceAvailabilityTests {
             transactionRepo: memory.transactionRepo,
             categoryRepo: memory.categoryRepo,
             accountRepo: memory.accountRepo,
+            cardRepo: memory.cardRepo,
             importSessionRepo: memory.importSessionRepo,
             confirmedImportRepo: confirmedRepository,
             generationToken: memory.generationToken,

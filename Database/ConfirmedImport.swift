@@ -111,6 +111,46 @@ public struct CBQStatementSourceEvidenceDTO: nonisolated Equatable, Sendable {
     }
 }
 
+public enum ConfirmedCardInstrumentChoiceDTO: nonisolated Equatable, Sendable {
+    case unspecified
+    case createProposedInstrument
+    case useExistingInstrument(instrumentId: String)
+}
+
+public struct ConfirmedCardImportPlanDTO: nonisolated Equatable, Sendable {
+    public let liabilityAccountId: String
+    public let instrumentChoice: ConfirmedCardInstrumentChoiceDTO
+    public let proposedInstrument: CardInstrumentDTO
+    public let instrumentIdentifiers: [CardInstrumentIdentifierDTO]
+    public let sourceObservations: [CardSourceIdentityObservationDTO]
+    public let relationships: [CardInstrumentRelationshipDTO]
+    public let statement: CardStatementDTO
+    public let summaryComponents: [CardStatementSummaryComponentDTO]
+    public let transactionEvidence: [CardTransactionEvidenceDTO]
+
+    public init(
+        liabilityAccountId: String,
+        instrumentChoice: ConfirmedCardInstrumentChoiceDTO,
+        proposedInstrument: CardInstrumentDTO,
+        instrumentIdentifiers: [CardInstrumentIdentifierDTO] = [],
+        sourceObservations: [CardSourceIdentityObservationDTO],
+        relationships: [CardInstrumentRelationshipDTO] = [],
+        statement: CardStatementDTO,
+        summaryComponents: [CardStatementSummaryComponentDTO],
+        transactionEvidence: [CardTransactionEvidenceDTO]
+    ) {
+        self.liabilityAccountId = liabilityAccountId
+        self.instrumentChoice = instrumentChoice
+        self.proposedInstrument = proposedInstrument
+        self.instrumentIdentifiers = instrumentIdentifiers
+        self.sourceObservations = sourceObservations
+        self.relationships = relationships
+        self.statement = statement
+        self.summaryComponents = summaryComponents
+        self.transactionEvidence = transactionEvidence
+    }
+}
+
 /// Parser-produced, transient evidence transported only until the confirmed
 /// provider has selected the final durable account. It is deliberately not a
 /// persistence DTO and must never be serialized into history or diagnostics.
@@ -592,8 +632,9 @@ public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
     public let cbqSourceIdentityPatterns: [CBQSourceIdentityPatternDTO]
     public let cbqSourceRows: [CBQSourceRowDTO]
     public let cbqStatementSourceEvidence: CBQStatementSourceEvidenceDTO?
+    public let cardImportPlan: ConfirmedCardImportPlanDTO?
 
-    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], historyTemplate: ConfirmedImportHistoryTemplateDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO], declaredStatementStartISO: String? = nil, declaredStatementEndISO: String? = nil, openingBalanceMinor: Int64? = nil, openingBalanceDecimal: String? = nil, closingBalanceMinor: Int64? = nil, closingBalanceDecimal: String? = nil, statementFinancialProjection: StatementFinancialProjectionDTO? = nil, cbqSourceIdentityPatterns: [CBQSourceIdentityPatternDTO] = [], cbqSourceRows: [CBQSourceRowDTO] = [], cbqStatementSourceEvidence: CBQStatementSourceEvidenceDTO? = nil) {
+    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], historyTemplate: ConfirmedImportHistoryTemplateDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO], declaredStatementStartISO: String? = nil, declaredStatementEndISO: String? = nil, openingBalanceMinor: Int64? = nil, openingBalanceDecimal: String? = nil, closingBalanceMinor: Int64? = nil, closingBalanceDecimal: String? = nil, statementFinancialProjection: StatementFinancialProjectionDTO? = nil, cbqSourceIdentityPatterns: [CBQSourceIdentityPatternDTO] = [], cbqSourceRows: [CBQSourceRowDTO] = [], cbqStatementSourceEvidence: CBQStatementSourceEvidenceDTO? = nil, cardImportPlan: ConfirmedCardImportPlanDTO? = nil) {
         self.providerGeneration = providerGeneration
         self.workspace = workspace
         self.proposedAccount = proposedAccount
@@ -612,6 +653,7 @@ public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
         self.cbqSourceIdentityPatterns = cbqSourceIdentityPatterns
         self.cbqSourceRows = cbqSourceRows.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
         self.cbqStatementSourceEvidence = cbqStatementSourceEvidence
+        self.cardImportPlan = cardImportPlan
     }
 }
 

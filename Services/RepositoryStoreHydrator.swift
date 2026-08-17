@@ -82,6 +82,7 @@ struct RepositoryRuntimeSnapshot {
     let importSessions: [RepositoryImportSession]
     let importAttempts: [RepositoryImportAttempt]
     let categorySnapshot: CategorySnapshot
+    let cardSnapshot: CardStoreSnapshot
     let hydrationResult: RepositoryStoreHydrationResult
     let providerGeneration: ProviderGenerationToken?
 
@@ -91,6 +92,7 @@ struct RepositoryRuntimeSnapshot {
         importSessions: [RepositoryImportSession],
         importAttempts: [RepositoryImportAttempt],
         categorySnapshot: CategorySnapshot,
+        cardSnapshot: CardStoreSnapshot,
         providerGeneration: ProviderGenerationToken?
     ) {
         self.accounts = accounts
@@ -98,6 +100,7 @@ struct RepositoryRuntimeSnapshot {
         self.importSessions = importSessions
         self.importAttempts = importAttempts
         self.categorySnapshot = categorySnapshot
+        self.cardSnapshot = cardSnapshot
         self.providerGeneration = providerGeneration
         self.hydrationResult = RepositoryStoreHydrationResult(
             didHydrate: true,
@@ -126,6 +129,7 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
     case invalidPartialImport(String)
     case invalidStatementEquivalence(String)
     case invalidCategoryState(String)
+    case invalidCardState(String)
 
     var errorDescription: String? {
         switch self {
@@ -157,6 +161,8 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
             return "Persisted statement-equivalence evidence is invalid. Runtime data was not replaced."
         case .invalidCategoryState:
             return "Persisted category metadata is invalid. Runtime data was not replaced."
+        case .invalidCardState:
+            return "Persisted credit-card evidence is invalid. Runtime data was not replaced."
         }
     }
 }
@@ -167,11 +173,13 @@ final class RepositoryStoreHydrator {
     private let importSessionRepo: ImportSessionRepository
     private let transactionRepo: TransactionRepository
     private let categoryRepo: CategoryRepository
+    private let cardRepo: CardRepository
     private let accountStore: AccountStore
     private let importSessionStore: ImportSessionStore
     private let importAttemptStore: ImportAttemptStore
     private let transactionStore: TransactionStore
     private let categoryStore: CategoryStore
+    private let cardStore: CardStore
     private let workspaceId: String
     private let persistenceState: PersistenceState
     private let providerGeneration: ProviderGenerationToken?
@@ -197,9 +205,11 @@ final class RepositoryStoreHydrator {
             importSessionRepo: databaseProvider.importSessionRepo,
             transactionRepo: databaseProvider.transactionRepo,
             categoryRepo: databaseProvider.categoryRepo,
+            cardRepo: databaseProvider.cardRepo,
             accountStore: accountStore,
             transactionStore: transactionStore,
             categoryStore: categoryStore,
+            cardStore: .shared,
             importSessionStore: importSessionStore,
             importAttemptStore: importAttemptStore,
             workspaceId: workspaceId,
@@ -215,9 +225,11 @@ final class RepositoryStoreHydrator {
         importSessionRepo: ImportSessionRepository,
         transactionRepo: TransactionRepository,
         categoryRepo: CategoryRepository = EmptyCategoryRepo(),
+        cardRepo: CardRepository = EmptyCardRepo(),
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
         categoryStore: CategoryStore = .shared,
+        cardStore: CardStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace",
@@ -230,9 +242,11 @@ final class RepositoryStoreHydrator {
         self.importSessionRepo = importSessionRepo
         self.transactionRepo = transactionRepo
         self.categoryRepo = categoryRepo
+        self.cardRepo = cardRepo
         self.accountStore = accountStore
         self.transactionStore = transactionStore
         self.categoryStore = categoryStore
+        self.cardStore = cardStore
         self.importSessionStore = importSessionStore
         self.importAttemptStore = importAttemptStore
         self.workspaceId = workspaceId
@@ -285,6 +299,7 @@ final class RepositoryStoreHydrator {
         let accountDTOs = try accountRepo.accounts(workspaceId: workspaceId)
         let categoryDTOs = try categoryRepo.categories(workspaceId: workspaceId)
         let categoryAssignmentDTOs = try categoryRepo.assignments(workspaceId: workspaceId)
+        let cardDTOs = try cardRepo.snapshot(workspaceId: workspaceId)
         let identitiesByAccountID = Dictionary(
             uniqueKeysWithValues: try accountDTOs.map { accountDTO in
                 (accountDTO.id, try Self.identitySummaries(from: accountRepo.identifiers(accountId: accountDTO.id, workspaceId: workspaceId)))
@@ -318,19 +333,28 @@ final class RepositoryStoreHydrator {
             transactions: transactionDTOs,
             attempts: importAttempts
         )
+        let cardEvidenceByTransactionID = Dictionary(uniqueKeysWithValues: cardDTOs.transactionEvidence.map { ($0.transactionId, $0) })
         let transactions = try transactionDTOs.map {
             try Self.transaction(
                 from: $0,
                 accounts: accountDTOs,
                 importedDocumentsByID: importedDocumentsByID,
                 preferredSource: preferredSourcesByTransactionID[$0.id],
-                workspaceID: workspaceId
+                workspaceID: workspaceId,
+                cardEvidence: cardEvidenceByTransactionID[$0.id]
             )
         }
+        let cardSnapshot = try Self.cardSnapshot(
+            from: cardDTOs,
+            accounts: accountDTOs,
+            transactions: transactionDTOs,
+            workspaceID: workspaceId
+        )
         let accounts = try Self.accounts(
             from: accountDTOs,
             transactions: transactions,
-            identitiesByAccountID: identitiesByAccountID
+            identitiesByAccountID: identitiesByAccountID,
+            cardSnapshot: cardSnapshot
         )
         let categorySnapshot = try Self.categorySnapshot(
             categories: categoryDTOs,
@@ -345,6 +369,7 @@ final class RepositoryStoreHydrator {
             importSessions: importSessions,
             importAttempts: importAttempts,
             categorySnapshot: categorySnapshot,
+            cardSnapshot: cardSnapshot,
             providerGeneration: providerGeneration
         )
     }
@@ -369,6 +394,7 @@ final class RepositoryStoreHydrator {
         importSessionStore.installImportSessionsWithoutObservation(snapshot.importSessions)
         importAttemptStore.installAttemptsWithoutObservation(snapshot.importAttempts)
         categoryStore.installSnapshotWithoutObservation(snapshot.categorySnapshot)
+        cardStore.installSnapshotWithoutObservation(snapshot.cardSnapshot)
         if let providerGeneration = snapshot.providerGeneration {
             categoryReconciliationGate?.clearAfterCanonicalHydration(for: providerGeneration)
         }
@@ -386,6 +412,7 @@ final class RepositoryStoreHydrator {
         importSessionStore.notifyImportSessionsOfInstalledValue()
         importAttemptStore.notifyAttemptsOfInstalledValue()
         categoryStore.notifySnapshotOfInstalledValue()
+        cardStore.notifySnapshotOfInstalledValue()
     }
 
     private static func categorySnapshot(
@@ -713,17 +740,271 @@ final class RepositoryStoreHydrator {
         )
     }
 
+    private static func cardSnapshot(
+        from snapshot: CardRepositorySnapshotDTO,
+        accounts: [AccountDTO],
+        transactions: [TransactionDTO],
+        workspaceID: String
+    ) throws -> CardStoreSnapshot {
+        let accountByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+        let transactionByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
+        guard Set(snapshot.instruments.map(\.id)).count == snapshot.instruments.count,
+              Set(snapshot.sourceObservations.map(\.id)).count == snapshot.sourceObservations.count,
+              Set(snapshot.relationships.map(\.id)).count == snapshot.relationships.count,
+              Set(snapshot.statements.map(\.id)).count == snapshot.statements.count,
+              Set(snapshot.summaryComponents.map(\.id)).count == snapshot.summaryComponents.count,
+              Set(snapshot.transactionEvidence.map(\.id)).count == snapshot.transactionEvidence.count,
+              Set(snapshot.transactionEvidence.map(\.transactionId)).count == snapshot.transactionEvidence.count else {
+            throw RepositoryStoreHydrationError.invalidCardState("duplicate durable identity")
+        }
+
+        let instrumentByID = Dictionary(uniqueKeysWithValues: snapshot.instruments.map { ($0.id, $0) })
+        let statementByID = Dictionary(uniqueKeysWithValues: snapshot.statements.map { ($0.id, $0) })
+        let instrumentIDs = Set(snapshot.instruments.map(\.id))
+        guard snapshot.instrumentIdentifiers.allSatisfy({
+            $0.workspaceId == workspaceID && instrumentIDs.contains($0.instrumentId)
+        }), Set(snapshot.instrumentIdentifiers.map { "\($0.workspaceId)|\($0.scheme)|\($0.identifier)" }).count == snapshot.instrumentIdentifiers.count else {
+            throw RepositoryStoreHydrationError.invalidCardState("instrument identifier ownership")
+        }
+
+        let runtimeInstruments = try snapshot.instruments.map { instrument -> CardInstrument in
+            guard instrument.workspaceId == workspaceID,
+                  let account = accountByID[instrument.liabilityAccountId],
+                  account.workspaceId == workspaceID,
+                  account.accountType == "credit_card", account.nativeCurrency == "QAR",
+                  account.institutionId == Institution.amex.rawValue,
+                  let lifecycle = CardInstrumentLifecycleState(rawValue: instrument.lifecycleStateCode) else {
+                throw RepositoryStoreHydrationError.invalidCardState("instrument account relationship")
+            }
+            let observations = try snapshot.sourceObservations.filter {
+                $0.subjectKind == CardSourceIdentitySubject.instrument.rawValue && $0.subjectId == instrument.id
+            }.map { observation -> CardSourceIdentityObservation in
+                guard observation.workspaceId == workspaceID,
+                      let kind = CardSourceIdentityObservationKind(rawValue: observation.observationKind),
+                      observation.parserProfileId == AmericanExpressCreditCardPDFParser.profileID,
+                      observation.parserProfileVersion == AmericanExpressCreditCardPDFParser.profileVersion else {
+                    throw RepositoryStoreHydrationError.invalidCardState("instrument source observation")
+                }
+                return try CardSourceIdentityObservation(kind: kind, subject: .instrument, value: observation.sourceValue)
+            }
+            return CardInstrument(
+                id: instrument.id,
+                workspaceID: instrument.workspaceId,
+                liabilityAccountID: instrument.liabilityAccountId,
+                lifecycleState: lifecycle,
+                createdAtISO: instrument.createdAtISO,
+                sourceObservations: observations
+            )
+        }.sorted { $0.id < $1.id }
+
+        let runtimeRelationships = try snapshot.relationships.map { relationship -> CardInstrumentRelationship in
+            guard relationship.workspaceId == workspaceID,
+                  relationship.predecessorInstrumentId != relationship.successorInstrumentId,
+                  instrumentByID[relationship.predecessorInstrumentId]?.liabilityAccountId == relationship.liabilityAccountId,
+                  instrumentByID[relationship.successorInstrumentId]?.liabilityAccountId == relationship.liabilityAccountId,
+                  let kind = CardInstrumentRelationshipKind(rawValue: relationship.relationshipKind),
+                  ["user_confirmed", "source_proven"].contains(relationship.authority) else {
+                throw RepositoryStoreHydrationError.invalidCardState("instrument relationship")
+            }
+            let effectiveDate: StatementDate?
+            if let value = relationship.effectiveDateISO {
+                effectiveDate = try StatementDate(canonical: value)
+            } else {
+                effectiveDate = nil
+            }
+            return CardInstrumentRelationship(
+                id: relationship.id,
+                liabilityAccountID: relationship.liabilityAccountId,
+                predecessorInstrumentID: relationship.predecessorInstrumentId,
+                successorInstrumentID: relationship.successorInstrumentId,
+                kind: kind,
+                authority: relationship.authority,
+                effectiveDate: effectiveDate,
+                createdAtISO: relationship.createdAtISO
+            )
+        }
+
+        var runtimeStatements = [CardStatement]()
+        var runtimeEvidence = [DurableCardTransactionEvidence]()
+        for statement in snapshot.statements {
+            guard statement.workspaceId == workspaceID,
+                  accountByID[statement.liabilityAccountId]?.accountType == "credit_card",
+                  statement.parserProfileId == AmericanExpressCreditCardPDFParser.profileID,
+                  statement.parserProfileVersion == AmericanExpressCreditCardPDFParser.profileVersion,
+                  statement.statementCurrency == "QAR",
+                  statement.reconciliationRuleCode == CardStatementEvidence.amexQARReconciliationRule,
+                  statement.sourceRowCount > 0 else {
+                throw RepositoryStoreHydrationError.invalidCardState("statement relationship")
+            }
+            let statementComponents = snapshot.summaryComponents.filter { $0.cardStatementId == statement.id }
+            let requiredCodes = Set(["previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"])
+            guard Set(statementComponents.map(\.componentCode)) == requiredCodes else {
+                throw RepositoryStoreHydrationError.invalidCardState("statement summary coverage")
+            }
+            let components: [CardStatementSummaryComponent] = try statementComponents.map { component in
+                if component.componentCode == "due_date" {
+                    guard let dateISO = component.dateISO, component.moneyCurrency == nil,
+                          component.moneyMinor == nil, component.moneyDecimal == nil else {
+                        throw RepositoryStoreHydrationError.invalidCardState("due-date component")
+                    }
+                    return .dueDate(try StatementDate(canonical: dateISO))
+                }
+                guard component.dateISO == nil, let currency = component.moneyCurrency,
+                      let minor = component.moneyMinor, let decimal = component.moneyDecimal,
+                      let decimalMoney = try? Money(canonicalDecimal: decimal, currency: currency),
+                      let minorMoney = try? Money.fromMinorUnits(minor, currency: currency),
+                      decimalMoney == minorMoney, currency == statement.statementCurrency else {
+                    throw RepositoryStoreHydrationError.invalidCardState("money summary component")
+                }
+                switch component.componentCode {
+                case "previous_balance": return .previousBalance(decimalMoney)
+                case "new_credits": return .newCredits(decimalMoney)
+                case "new_debits": return .newDebits(decimalMoney)
+                case "new_balance": return .newBalance(decimalMoney)
+                case "instrument_net_total": return .instrumentNetTotal(decimalMoney)
+                default: throw RepositoryStoreHydrationError.invalidCardState("unknown summary component")
+                }
+            }
+            let componentByCode = Dictionary(uniqueKeysWithValues: components.map { ($0.persistenceCode, $0) })
+            guard let previous = componentByCode["previous_balance"]?.money,
+                  let credits = componentByCode["new_credits"]?.money,
+                  let debits = componentByCode["new_debits"]?.money,
+                  let balance = componentByCode["new_balance"]?.money,
+                  previous.amount - credits.amount + debits.amount == balance.amount else {
+                throw RepositoryStoreHydrationError.invalidCardState("summary reconciliation")
+            }
+            let evidenceRows = snapshot.transactionEvidence.filter { $0.cardStatementId == statement.id }
+            guard evidenceRows.count == statement.sourceRowCount else {
+                throw RepositoryStoreHydrationError.invalidCardState("statement row count")
+            }
+            var increase: Int64 = 0
+            var decrease: Int64 = 0
+            var instrumentNet: Int64 = 0
+            for evidence in evidenceRows {
+                guard let transaction = transactionByID[evidence.transactionId],
+                      transaction.accountId == statement.liabilityAccountId,
+                      transaction.documentId == statement.documentId,
+                      transaction.importSessionId == statement.importSessionId,
+                      transaction.direction == evidence.liabilityEffectCode,
+                      let effect = CardLiabilityEffect(rawValue: evidence.liabilityEffectCode),
+                      let transactionDate = try? StatementDate(canonical: evidence.sourceTransactionDateISO) else {
+                    throw RepositoryStoreHydrationError.invalidCardState("transaction relationship")
+                }
+                let scope: CardTransactionScope
+                if evidence.rowScopeCode == CardTransactionScope.accountLevel.persistenceCode {
+                    guard evidence.instrumentId == nil, evidence.documentScopedSectionId == nil else {
+                        throw RepositoryStoreHydrationError.invalidCardState("account-level scope")
+                    }
+                    scope = .accountLevel
+                } else {
+                    guard evidence.rowScopeCode == "instrument_level", let instrumentID = evidence.instrumentId,
+                          instrumentByID[instrumentID]?.liabilityAccountId == statement.liabilityAccountId,
+                          let sectionID = evidence.documentScopedSectionId, !sectionID.isEmpty else {
+                        throw RepositoryStoreHydrationError.invalidCardState("instrument scope")
+                    }
+                    scope = .instrument(documentScopedSectionID: sectionID)
+                    instrumentNet += transaction.amountMinor
+                }
+                switch effect {
+                case .increasesAmountOwed: increase += transaction.amountMinor
+                case .decreasesAmountOwed: decrease += -transaction.amountMinor
+                }
+                let originalMoney: Money?
+                if let currency = evidence.originalCurrency, let minor = evidence.originalAmountMinor,
+                   let decimal = evidence.originalAmountDecimal,
+                   let byDecimal = try? Money(canonicalDecimal: decimal, currency: currency),
+                   let byMinor = try? Money.fromMinorUnits(minor, currency: currency), byDecimal == byMinor {
+                    originalMoney = byDecimal
+                } else if evidence.originalCurrency == nil && evidence.originalAmountMinor == nil && evidence.originalAmountDecimal == nil {
+                    originalMoney = nil
+                } else {
+                    throw RepositoryStoreHydrationError.invalidCardState("original merchant money")
+                }
+                runtimeEvidence.append(DurableCardTransactionEvidence(
+                    statementID: statement.id, transactionID: evidence.transactionId, rowScope: scope,
+                    instrumentID: evidence.instrumentId, liabilityEffect: effect,
+                    sourceTransactionDate: transactionDate, originalMerchantMoney: originalMoney
+                ))
+            }
+            guard let debitsMinor = statementComponents.first(where: { $0.componentCode == "new_debits" })?.moneyMinor,
+                  let creditsMinor = statementComponents.first(where: { $0.componentCode == "new_credits" })?.moneyMinor,
+                  let instrumentMinor = statementComponents.first(where: { $0.componentCode == "instrument_net_total" })?.moneyMinor,
+                  increase == debitsMinor, decrease == creditsMinor, instrumentNet == instrumentMinor else {
+                throw RepositoryStoreHydrationError.invalidCardState("transaction totals")
+            }
+            let start = try StatementDate(canonical: statement.statementStartDateISO)
+            let end = try StatementDate(canonical: statement.statementEndDateISO)
+            let statementDate = try StatementDate(canonical: statement.statementDateISO)
+            guard start <= end else { throw RepositoryStoreHydrationError.invalidCardState("statement period") }
+            let usedInstrumentIDs = Array(Set(evidenceRows.compactMap(\.instrumentId))).sorted()
+            runtimeStatements.append(CardStatement(
+                id: statement.id, liabilityAccountID: statement.liabilityAccountId,
+                instrumentIDs: usedInstrumentIDs, sourceDocumentID: statement.documentId,
+                importSessionID: statement.importSessionId, parserProfileID: statement.parserProfileId,
+                parserProfileVersion: statement.parserProfileVersion, statementDate: statementDate,
+                period: try DeclaredStatementPeriod(start: start, end: end),
+                currency: try CurrencyCode(statement.statementCurrency), sourceRowCount: statement.sourceRowCount,
+                reconciliationRuleCode: statement.reconciliationRuleCode, summaryComponents: components
+            ))
+        }
+        guard Set(snapshot.summaryComponents.map(\.cardStatementId)).isSubset(of: Set(statementByID.keys)),
+              Set(snapshot.transactionEvidence.map(\.cardStatementId)).isSubset(of: Set(statementByID.keys)) else {
+            throw RepositoryStoreHydrationError.invalidCardState("orphan statement evidence")
+        }
+        for observation in snapshot.sourceObservations {
+            guard observation.workspaceId == workspaceID,
+                  statementByID.values.contains(where: {
+                      $0.documentId == observation.documentId && $0.importSessionId == observation.importSessionId &&
+                      $0.normalizedDocumentId == observation.normalizedDocumentId &&
+                      $0.parserProfileId == observation.parserProfileId && $0.parserProfileVersion == observation.parserProfileVersion
+                  }) else { throw RepositoryStoreHydrationError.invalidCardState("observation source graph") }
+            if observation.subjectKind == CardSourceIdentitySubject.liabilityAccount.rawValue {
+                guard accountByID[observation.subjectId]?.accountType == "credit_card" else {
+                    throw RepositoryStoreHydrationError.invalidCardState("observation account subject")
+                }
+            } else if observation.subjectKind == CardSourceIdentitySubject.instrument.rawValue {
+                guard instrumentByID[observation.subjectId] != nil else {
+                    throw RepositoryStoreHydrationError.invalidCardState("observation instrument subject")
+                }
+            } else { throw RepositoryStoreHydrationError.invalidCardState("observation subject kind") }
+        }
+        let evidencedTransactionIDs = Set(snapshot.transactionEvidence.map(\.transactionId))
+        guard transactions.allSatisfy({ transaction in
+            let isCardDirection = CardLiabilityEffect(rawValue: transaction.direction) != nil
+            return isCardDirection == evidencedTransactionIDs.contains(transaction.id)
+        }) else { throw RepositoryStoreHydrationError.invalidCardState("transaction evidence coverage") }
+        return CardStoreSnapshot(
+            instruments: runtimeInstruments,
+            relationships: runtimeRelationships.sorted { $0.id < $1.id },
+            statements: runtimeStatements.sorted { ($0.period.end, $0.id) < ($1.period.end, $1.id) },
+            transactionEvidence: runtimeEvidence.sorted { ($0.statementID, $0.transactionID) < ($1.statementID, $1.transactionID) }
+        )
+    }
+
     private static func accounts(
         from accountDTOs: [AccountDTO],
         transactions: [Transaction],
-        identitiesByAccountID: [String: [AccountIdentitySummary]]
+        identitiesByAccountID: [String: [AccountIdentitySummary]],
+        cardSnapshot: CardStoreSnapshot
     ) throws -> [Account] {
         try accountDTOs.map { accountDTO in
             let accountTransactions = transactions.filter { $0.repositoryAccountId == accountDTO.id }
-            let latestBalance = try latestRunningBalance(
-                from: accountTransactions,
-                currency: accountDTO.nativeCurrency
-            )
+            let latestBalance: Money?
+            if accountDTO.accountType == "credit_card" {
+                let latestStatement = cardSnapshot.statements
+                    .filter { $0.liabilityAccountID == accountDTO.id }
+                    .max { ($0.period.end, $0.statementDate, $0.id) < ($1.period.end, $1.statementDate, $1.id) }
+                if let newBalance = latestStatement?.newBalance {
+                    guard newBalance.currency.code == accountDTO.nativeCurrency else {
+                        throw RepositoryStoreHydrationError.accountCurrencyMismatch
+                    }
+                    latestBalance = try Money(amount: -newBalance.amount, currency: newBalance.currency)
+                } else {
+                    latestBalance = nil
+                }
+            } else {
+                latestBalance = try latestRunningBalance(from: accountTransactions, currency: accountDTO.nativeCurrency)
+            }
 
             return Account(
                 repositoryAccountId: accountDTO.id,
@@ -778,7 +1059,8 @@ final class RepositoryStoreHydrator {
         accounts: [AccountDTO],
         importedDocumentsByID: [String: ImportedDocumentDTO],
         preferredSource: PreferredTransactionSourceDTO?,
-        workspaceID: String
+        workspaceID: String,
+        cardEvidence: CardTransactionEvidenceDTO?
     ) throws -> Transaction {
         guard let postedDate = try? StatementDate(canonical: dto.postedDateISO) else {
             throw RepositoryStoreHydrationError.invalidPostedDate(dto.postedDateISO)
@@ -876,6 +1158,13 @@ final class RepositoryStoreHydrator {
             preferredSourceTransactionDate = nil
         }
 
+        let cardEffect = cardEvidence.flatMap { CardLiabilityEffect(rawValue: $0.liabilityEffectCode) }
+        if cardEvidence != nil, cardEffect == nil {
+            throw RepositoryStoreHydrationError.invalidCardState("invalid transaction effect")
+        }
+        if cardEvidence == nil, !["debit", "credit"].contains(dto.direction) {
+            throw RepositoryStoreHydrationError.invalidCardState("card direction without evidence")
+        }
         return Transaction(
             statementDate: postedDate,
             valueDate: valueDate,
@@ -885,6 +1174,7 @@ final class RepositoryStoreHydrator {
             creditMoney: dto.direction == "credit" ? absoluteAmount : nil,
             money: decimalMoney,
             runningBalanceMoney: runningBalanceMoney,
+            cardLiabilityEffect: cardEffect,
             account: accountDTO.name,
             sourceBank: accountDTO.institutionId ?? "",
             sourceFile: dto.importSessionId ?? "",

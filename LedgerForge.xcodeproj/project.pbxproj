@@ -104,6 +104,10 @@
 		740000023074000000000001 /* CBQCurrentAccountXLSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 740000123074000000000001 /* CBQCurrentAccountXLSParser.swift */; };
 		750000013075000000000001 /* CBQCurrentAccountPDFNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750000113075000000000001 /* CBQCurrentAccountPDFNormalizer.swift */; };
 		750000023075000000000001 /* CBQCurrentAccountPDFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750000123075000000000001 /* CBQCurrentAccountPDFParser.swift */; };
+		760000013076000000000001 /* AmericanExpressCreditCardPDFNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 760000113076000000000001 /* AmericanExpressCreditCardPDFNormalizer.swift */; };
+		760000023076000000000001 /* AmericanExpressCreditCardPDFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 760000123076000000000001 /* AmericanExpressCreditCardPDFParser.swift */; };
+		760000033076000000000001 /* Card.swift in Sources */ = {isa = PBXBuildFile; fileRef = 760000133076000000000001 /* Card.swift */; };
+		760000043076000000000001 /* CardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 760000143076000000000001 /* CardStore.swift */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
@@ -287,6 +291,10 @@
 		740000123074000000000001 /* CBQCurrentAccountXLSParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBQCurrentAccountXLSParser.swift; sourceTree = "<group>"; };
 		750000113075000000000001 /* CBQCurrentAccountPDFNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBQCurrentAccountPDFNormalizer.swift; sourceTree = "<group>"; };
 		750000123075000000000001 /* CBQCurrentAccountPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBQCurrentAccountPDFParser.swift; sourceTree = "<group>"; };
+		760000113076000000000001 /* AmericanExpressCreditCardPDFNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmericanExpressCreditCardPDFNormalizer.swift; sourceTree = "<group>"; };
+		760000123076000000000001 /* AmericanExpressCreditCardPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AmericanExpressCreditCardPDFParser.swift; sourceTree = "<group>"; };
+		760000133076000000000001 /* Card.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Card.swift; sourceTree = "<group>"; };
+		760000143076000000000001 /* CardStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStore.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
 		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
@@ -505,6 +513,7 @@
 		288EB0D72FF7995800F09BC9 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				760000133076000000000001 /* Card.swift */,
 				D57000013057000000000001 /* Category.swift */,
 				3A4400013004000000000001 /* Money.swift */,
 				28B87B3C2FFBBFC8009BEE8C /* Account.swift */,
@@ -523,6 +532,7 @@
 		288EB0DD2FF7A3D000F09BC9 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				760000143076000000000001 /* CardStore.swift */,
 				D57000023057000000000001 /* CategoryStore.swift */,
 				28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */,
 				37A100002FFDA6CB00C12A68 /* ImportSessionStore.swift */,
@@ -557,6 +567,7 @@
 		288EB0DF2FF7A3D200F09BC9 /* Parsers */ = {
 			isa = PBXGroup;
 			children = (
+				760000123076000000000001 /* AmericanExpressCreditCardPDFParser.swift */,
 				750000123075000000000001 /* CBQCurrentAccountPDFParser.swift */,
 				740000123074000000000001 /* CBQCurrentAccountXLSParser.swift */,
 				720000133072000000000001 /* HDFCBankAccountXLSParser.swift */,
@@ -663,6 +674,7 @@
 		288EB12E2FF7E10200F09BC9 /* Normalizers */ = {
 			isa = PBXGroup;
 			children = (
+				760000113076000000000001 /* AmericanExpressCreditCardPDFNormalizer.swift */,
 				750000113075000000000001 /* CBQCurrentAccountPDFNormalizer.swift */,
 				740000113074000000000001 /* CBQCurrentAccountXLSNormalizer.swift */,
 				720000123072000000000001 /* HDFCBankAccountXLSNormalizer.swift */,
@@ -917,6 +929,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				760000033076000000000001 /* Card.swift in Sources */,
+				760000043076000000000001 /* CardStore.swift in Sources */,
+				760000013076000000000001 /* AmericanExpressCreditCardPDFNormalizer.swift in Sources */,
+				760000023076000000000001 /* AmericanExpressCreditCardPDFParser.swift in Sources */,
 				710000013071000000000001 /* LegacyXLSDocumentReader.swift in Sources */,
 				750000013075000000000001 /* CBQCurrentAccountPDFNormalizer.swift in Sources */,
 				750000023075000000000001 /* CBQCurrentAccountPDFParser.swift in Sources */,

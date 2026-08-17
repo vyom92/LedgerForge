@@ -3,20 +3,20 @@
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current repository implementation baseline:** Sprint 75 exact CBQ current-account PDF variants and multi-source lineage; the implementation commit is recorded by Git history
-- **Documentation alignment:** Reconciled for the Sprint 75 implementation and acceptance boundary
+- **Current repository implementation baseline:** Sprint 76 shared credit-card domain and exact American Express PDF support; the implementation commit is recorded by Git history
+- **Documentation alignment:** Reconciled for the Sprint 76 implementation and acceptance boundary
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration and Sprint 65's clean-room PDF fixture replacement are included in the accepted baseline; no historical financial data was altered
-- **Latest chronologically accepted production implementation:** Sprint 75 exact CBQ current-account PDF variants and multi-source lineage
+- **Latest chronologically accepted production implementation:** Sprint 76 shared credit-card domain and exact American Express PDF support
 - **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed numbered increment:** Sprint 75 — CBQ Current-Account PDF Variants and Exact Multi-Source Lineage
+- **Latest verified completed numbered increment:** Sprint 76 — Shared Credit-Card Domain and Exact American Express PDF Support
 - **Accepted Sprint 63 implementation ref:** `7e1345e3817d3c3e91c24f881b962a48279fd73b`
-- **Latest accepted ADR:** ADR-043 — Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts
-- **Current migration:** V11
+- **Latest accepted ADR:** ADR-044 — Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence
+- **Current migration:** V12
 - **DBP-01 classification:** Accepted DEBUG-only developer tooling and development-database lifecycle implementation; it is not a production financial capability, production database-profile feature, numbered sprint, Sprint 65, schema migration or personal-v1 adoption
 - **Sprint 55A:** Axis Bank Source-Truth Restoration, ending at `f3154dbd13a340714179da7f972a6accdd3aca54`; parallel shared-runtime-store isolation remains Sprint 55 acceptance/test infrastructure
 - **Sprint 57A:** Category Reconciliation Closure, complete at `251a547cb44712a789a9ad7b23a4eabca742900b`; no migration was added
@@ -56,6 +56,13 @@
 - **Sprint 75 private-source acceptance:** Four direct-URL source-order campaigns were verified with both SQLite and In-Memory. History-first campaigns imported 60 then 0, 0 and 0 new transactions; monthly-first campaigns imported 9, 8, 43 and 0. Every campaign ended with one account, 60 canonical transactions, four durable attempts and 60 preferred-source mappings; SQLite reopen preserved the same graph. Independent history PDF/XLS comparison covered 60 exact rows with zero ordered or event-set mismatches, and the two monthly sources contributed 9 and 8 exact subset rows. Only aggregate counts are recorded; no private value, path, filename, identifier, narration, reference or digest entered Git.
 - **Sprint 75 focused acceptance:** The new PDF/lineage suite passed 8 tests; the final diagnostic correction passed 35 tests across the four affected legacy suites. The detector now selects exact institution rules by source extension so a broad PDF signature cannot admit a damaged XLS near-match.
 - **Sprint 75 cycle-close acceptance:** After the material detector correction, the authoritative replacement cycle-close passed a fresh Debug build, fresh optimized Release build and the complete TestPlan with 691 tests across 85 suites and zero failures. The earlier pre-correction cycle ran the same 691 tests and failed five tests with six reported issues; it is not acceptance evidence.
+- **Sprint 76 profile and source semantics:** Added exact native selectable-text `amex.credit-card.pdf@1` for the approved American Express Middle East Platinum QAR statement family. Posting Date remains the canonical transaction date; source Transaction Date is preserved separately. Charges increase amount owed, payments/refunds decrease amount owed, and bank debit/credit fields remain unused. Account-level payments, instrument rows, original merchant Money, multiline narration, references, statement summaries and physical source order are preserved. Rewards and final informational pages remain non-financial only under exact family signatures.
+- **Sprint 76 shared card domain:** ADR-044 reuses the durable credit-card `Account` as the liability account and adds immutable application-owned `CardInstrument` identity, source observations, explicit instrument relationships, bounded lifecycle state, card-specific transaction effects, typed statement evidence and a dedicated runtime `CardStore`. Masked Membership Number and Card Account Number observations never become strong identifiers. Exact durable user-confirmed mappings may be reused; changed weak evidence requires explicit account/instrument authority, and lifecycle or replacement is never inferred from chronology.
+- **Sprint 76 persistence and hydration:** Additive Migration V12 adds seven restrictive card tables with no historical backfill. Provider-owned confirmed import atomically writes and revalidates the account/instrument/statement/transaction graph with SQLite/In-Memory parity. Canonical hydration reconstructs and validates that graph after close/reopen. Current liability balance is selected by newest source statement date, not import time, and published with net-worth sign; charges/payments do not enter ordinary bank income/expense totals.
+- **Sprint 76 private-source acceptance:** The two approved originals were verified directly by SHA-256 and independent PDFKit row extraction. The earlier statement contained 61 rows and the later statement 34 rows. Ordered production-versus-independent comparisons produced zero row mismatches and zero summary mismatches for both statements; closing-to-opening continuity matched exactly. Chronological and reverse campaigns with both providers ended with one liability account, one instrument, 95 transactions, two statements and a runtime balance of negative QAR 7,761.88. Exact-byte duplicate handling, SQLite checkpoint/close/reopen and canonical hydration preserved the same graph. No private source path, filename, transaction list, identifier, narration or source-derived fixture entered Git.
+- **Sprint 76 lifecycle falsification:** Exact previously confirmed observations reuse one instrument; changed weak evidence rejects without accepted residue until an explicit separate-account or additional/replacement/renewal/upgrade decision is supplied. No relationship changes lifecycle from `unknown`; stale provider generation and conflicting strong instrument ownership reject atomically in SQLite and In-Memory. Importing the older statement after the newer statement does not change current balance authority.
+- **Sprint 76 focused acceptance:** The frozen Amex/migration/lifecycle boundary passed 61 tests across five suites. The adjacent CBQ, HDFC, Axis, bank-validation, categories, accounts and dashboard regression boundary passed 104 tests across 12 suites. The cycle-discovered V12 metadata correction passed 12 tests across two suites.
+- **Sprint 76 cycle-close acceptance:** The authoritative replacement cycle-close passed a fresh Debug build, fresh optimized Release build and the complete TestPlan with 701 tests across 86 suites and zero failures. The first cycle-close completed both builds but found four stale V11 test expectations; after the named V12-only correction, the replacement run is acceptance evidence.
 - **Sprint 72 source semantics:** `Date` is the authoritative transaction date, `Value Dt` is retained separately, `Withdrawal Amt.` is debit/outflow, `Deposit Amt.` is credit/inflow, and source physical row order plus source ordinals are preserved. Printed period, opening/closing balances, debit/credit counts and totals reconcile independently for each statement.
 - **Sprint 72 identity and fail-closed boundary:** Only the parser-produced verified full account number is emitted through the strong institution-account identifier contract. Shared customer identity and product metadata are excluded from account resolution. Missing, malformed, duplicate, reordered, near-match or ambiguous grammar, amount, date, identifier and summary evidence fails closed with zero accepted financial residue.
 - **Sprint 72 private-source acceptance:** Four private-original XLS/PDF source families were verified locally through an independent paired-PDF oracle: 62, 16, 76 and 7 ordered rows, 161 total. Requested row-field mismatches, printed-summary mismatches and two annual-to-recent continuity mismatches were all zero. No private source value, path, filename, identifier, narration or reference entered Git or repository documentation; task-owned source-derived artifacts and private-test result bundles were removed after verification.
@@ -273,7 +280,7 @@ Production publishes a SQLite repository only after:
 - pending migrations execute successfully;
 - the final migration chain revalidates.
 
-The active chain ends at V11. Migration V7 adds explicit partial-attempt counts, durable partial-import summaries and one typed incoming-row disposition per normalized source row for ADR-040. Additive Migration V8 adds workspace-owned categories and a separate restrictive current transaction-category assignment relationship without changing imported financial rows or provenance. Migration V9 adds versioned document-fingerprint authority and the source-byte fingerprint relationship without storing source bytes. Additive Migration V10 adds exact statement projections, ordered projection events, equivalence groups and authoritative/supporting members without backfilling existing history. Additive Migration V11 adds typed CBQ masked source-identity observations, statement-source observations and one transaction-source observation for every accepted CBQ financial row, also without backfill.
+The active chain ends at V12. Migration V7 adds explicit partial-attempt counts, durable partial-import summaries and one typed incoming-row disposition per normalized source row for ADR-040. Additive Migration V8 adds workspace-owned categories and a separate restrictive current transaction-category assignment relationship without changing imported financial rows or provenance. Migration V9 adds versioned document-fingerprint authority and the source-byte fingerprint relationship without storing source bytes. Additive Migration V10 adds exact statement projections, ordered projection events, equivalence groups and authoritative/supporting members without backfilling existing history. Additive Migration V11 adds typed CBQ masked source-identity observations, statement-source observations and one transaction-source observation for every accepted CBQ financial row. Additive Migration V12 adds durable card instruments, strong instrument identifiers, source observations, explicit instrument relationships, statements, typed summaries and one-to-one card transaction evidence. V11 and V12 perform no historical backfill.
 
 Open, initialization, migration-integrity or migration-execution failure installs centrally rejecting unavailable repositories rather than silently substituting an in-memory repository.
 
@@ -508,24 +515,26 @@ Shared Xcode configuration remains distinct from personal IDE state.
 - General Axis NRO coverage and additional Axis layouts remain unsupported.
 - Other Axis PDF layouts, OCR, password-protected PDFs and generic PDF statement support remain unsupported.
 - XLSX, TXT and OCR are not production-supported. XLS is supported only for the exact documented Axis, HDFC and CBQ profiles.
-- HDFC and CBQ bank-account support is limited to their exact documented profiles. American Express and all card-statement production parsing remain unsupported.
+- HDFC and CBQ bank-account support is limited to their exact documented profiles. Card support is limited separately to exact `amex.credit-card.pdf@1`; no other American Express layout or issuer card family is supported.
 - No production password-entry or Keychain workflow exists.
-- QAR production import exists only for the exact three-profile CBQ current-account family under ADR-043.
+- QAR production import exists only for the exact three-profile CBQ current-account family under ADR-043 and exact `amex.credit-card.pdf@1` under ADR-044.
 
 ### Card limits
 
-ADR-034 accepts a document-scoped card-statement evidence boundary subordinate to ADR-033.
+ADR-034's document-scoped evidence boundary is implemented and refined by
+ADR-044 for the shared Sprint 76 foundation and exact
+`amex.credit-card.pdf@1` profile. Durable liability accounts, card instruments,
+source observations, explicit relationships, statements, summaries,
+transaction evidence, Migration V12, SQLite/In-Memory parity, hydration and
+bounded presentation are operational for that profile.
 
-The following remain unimplemented:
-
-- concrete card validation;
-- durable card persistence;
-- card hydration;
-- card migration;
-- production card parsing;
-- institution-specific card support.
-
-Fixture integration, statement classification, schema capacity or parser candidates do not establish production card support.
+The following remain unimplemented: CBQ and Axis card parsers; additional Amex
+layouts; generic card profiles or masked identity; rewards persistence or
+valuation; payment allocation; bank-card payment matching; refund/reversal
+matching; installments/loans; calculated FX; invented fees, markup or tax;
+manual merge/split; historical repair/backfill; OCR and password workflows.
+Fixture integration, statement classification or schema capacity does not
+establish support beyond the exact accepted profile.
 
 ### Currency limits
 
@@ -1191,7 +1200,7 @@ The active repository also includes:
 - Sprint 47 fail-closed startup and migration-chain verification;
 - Sprint 48 truthful Settings cleanup;
 - the completed `FW-P0-23` financial-presentation and provenance repair boundary;
-- ADR-034 card-statement evidence architecture.
+- ADR-044 durable card-liability/instrument architecture and exact Amex PDF support.
 
 Detailed implementation history remains in Git and accepted ADRs.
 
@@ -1199,22 +1208,22 @@ Detailed implementation history remains in Git and accepted ADRs.
 
 ## Current Planning State
 
-- The current planning alignment is based on completed Sprints 50–75, including the Sprint 68B test-only correction, the DBP-01 maintenance correction, the Sprint 69 local validation closure, the bounded Sprint 71, Sprint 72 and Sprint 74 XLS increments, Sprint 73 exact HDFC PDF/XLS equivalence and Sprint 75 exact CBQ PDF/multi-source lineage, together with Migration V11 and accepted ADR-043.
+- The current planning alignment is based on completed Sprints 50–76, including the Sprint 68B test-only correction, the DBP-01 maintenance correction, the Sprint 69 local validation closure, the bounded Sprint 71, Sprint 72 and Sprint 74 XLS increments, Sprint 73 exact HDFC PDF/XLS equivalence, Sprint 75 exact CBQ PDF/multi-source lineage and Sprint 76 exact Amex PDF/shared card foundation, together with Migration V12 and accepted ADR-044.
 - DBP-01 is complete and no DBP-01 implementation remains pending. It is a separate post-Sprint-64 Debug tooling increment, not a numbered sprint or Sprint 65; no sprint renumbering occurred.
 - Sprint 63 implementation of the ADR-041 source-snapshot and source-byte foundation is complete; no source-snapshot implementation remains in the unscheduled queue.
 - `FW-P1-10 — Production PDF Statement Support` is completed and removed from the unscheduled queue by Sprint 65 for the selected exact account-neutral Axis bank-account grammar. Other Axis PDF layouts, OCR, password workflow, generic Axis PDF support and cross-format equivalence remain unsupported.
 - `FW-P1-14 — XLS and XLSX Support` is partially completed for the exact Axis NRO, shared HDFC NRE/NRO and CBQ current-account history XLS v1 profiles. XLSX, generic spreadsheets, other institutions and other layouts remain unscheduled.
-- `FW-P1-16` is partially completed for the exact HDFC PDF/XLS v1 pair under ADR-042 and for the separate exact three-profile CBQ current-account observation/overlap boundary under ADR-043. Axis PDF/CSV/XLS, cards, same-format semantic duplicates, generic partial overlap and every other relationship remain future work.
+- `FW-P1-16` is partially completed for the exact HDFC PDF/XLS v1 pair under ADR-042 and for the separate exact three-profile CBQ current-account observation/overlap boundary under ADR-043. Axis PDF/CSV/XLS, card cross-format equivalence, same-format semantic duplicates, generic partial overlap and every other relationship remain future work.
 - `FW-P1-40 — Deterministic Approved-Fixture Launcher` was completed by Sprint 58 and is removed from the unscheduled queue.
 - `FW-P1-37` retains only broader structured diagnostics work not completed by Sprint 58; its bounded privacy-safe preparation-failure summary and Developer Console fixture-workflow slice is complete.
 - `FW-P1-28 — Confirmed-Persistence Recovery and Unsupported Retry` is complete in Sprint 66 and removed from the unscheduled queue.
 - `FW-P1-29 — Better Validation Guidance` retains only broader validation education outside the typed immediate-result and recovery guidance completed by Sprint 66.
-- The exact retained HDFC PDF v1 slice and the exact CBQ current-account XLS/history-PDF/monthly-PDF lineage slice are complete. HDFC card, CBQ card and other card families remain eligible for targeted discovery but are not production support.
+- The exact retained HDFC PDF v1 slice, exact CBQ current-account XLS/history-PDF/monthly-PDF lineage slice and exact Amex QAR native-text card PDF slice are complete. HDFC card, CBQ card, Axis card, other Amex layouts and other card families remain eligible for targeted discovery but are not production support.
 - `FW-P2-20 — Category Model and Management` is complete in Sprint 57 and removed from the unscheduled queue.
 - `FW-P2-21 — Deterministic Categorization Rules` is now eligible for bounded discovery; no rule behavior is implemented or authorized.
 - Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
 - `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.
-- Sprint 75 is the highest-numbered completed increment. The selected Axis PDF, exact Axis NRO XLS, exact shared HDFC NRE/NRO PDF/XLS and exact CBQ current-account XLS/history-PDF/monthly-PDF boundaries are accepted. Broader PDF/XLS layouts, XLSX, OCR, password workflow, generic spreadsheet support, cards and cross-format behavior beyond ADR-042/ADR-043 remain unscheduled or blocked.
+- Sprint 76 is the highest-numbered completed increment. The selected Axis PDF, exact Axis NRO XLS, exact shared HDFC NRE/NRO PDF/XLS, exact CBQ current-account XLS/history-PDF/monthly-PDF and exact Amex credit-card PDF boundaries are accepted. Broader PDF/XLS layouts, XLSX, OCR, password workflow, generic spreadsheet/card support and cross-format behavior beyond ADR-042/ADR-043 remain unscheduled or blocked.
 
 ---
 

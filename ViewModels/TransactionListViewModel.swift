@@ -148,7 +148,11 @@ final class TransactionListViewModel: ObservableObject {
             ? unavailable
             : Self.dateRoleTitle(transaction.financialDateRole)
         let direction: String
-        if transaction.creditMoney != nil, transaction.debitMoney == nil {
+        if transaction.cardLiabilityEffect == .increasesAmountOwed {
+            direction = "Charge / increase owed"
+        } else if transaction.cardLiabilityEffect == .decreasesAmountOwed {
+            direction = "Payment or credit / decrease owed"
+        } else if transaction.creditMoney != nil, transaction.debitMoney == nil {
             direction = "Credit"
         } else if transaction.debitMoney != nil, transaction.creditMoney == nil {
             direction = "Debit"

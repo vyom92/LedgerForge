@@ -9,7 +9,7 @@ import Foundation
 struct StatementClassificationDetector: ImportFramework.StatementClassifier {
     private let rules: [StatementClassificationRule]
 
-    init(rules: [StatementClassificationRule] = [.bankStatement, .creditCardStatement]) {
+    init(rules: [StatementClassificationRule] = [.creditCardStatement, .bankStatement]) {
         self.rules = rules
     }
 
@@ -103,12 +103,15 @@ struct StatementClassificationRule: Equatable, Sendable {
         confidence: 0.90,
         requiredMatchCount: 2,
         signatures: [
+            StatementClassificationSignature(token: "THE PLATINUM CARD (QAR)", reason: "Matched the exact Amex card product."),
+            StatementClassificationSignature(token: "CARD ACCOUNT NUMBER:", reason: "Matched a card-instrument section."),
+            StatementClassificationSignature(token: "NEW CREDITS", reason: "Matched card liability summary evidence."),
             StatementClassificationSignature(token: "CREDIT CARD", reason: "Matched credit card statement phrase."),
             StatementClassificationSignature(token: "MINIMUM AMOUNT DUE", reason: "Matched minimum amount due label."),
             StatementClassificationSignature(token: "PAYMENT DUE DATE", reason: "Matched payment due date label."),
             StatementClassificationSignature(token: "TOTAL AMOUNT DUE", reason: "Matched total amount due label.")
         ],
-        supportingInstitutionCodes: []
+        supportingInstitutionCodes: [Institution.amex.rawValue]
     )
 }
 

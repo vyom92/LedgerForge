@@ -221,6 +221,10 @@ public protocol AccountRepository {
     func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO]
 }
 
+public protocol CardRepository {
+    func snapshot(workspaceId: String) throws -> CardRepositorySnapshotDTO
+}
+
 public extension AccountRepository {
     func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO] { [] }
 }
@@ -294,6 +298,7 @@ public final class DatabaseProvider {
     public let transactionRepo: TransactionRepository
     public let categoryRepo: CategoryRepository
     public let accountRepo: AccountRepository
+    public let cardRepo: CardRepository
     public let importSessionRepo: ImportSessionRepository
     /// Captured by a prepared import and compared only at confirmation. It is
     /// never presented or logged.
@@ -306,6 +311,7 @@ public final class DatabaseProvider {
         transactionRepo: TransactionRepository,
         categoryRepo: CategoryRepository? = nil,
         accountRepo: AccountRepository,
+        cardRepo: CardRepository = PlaceholderCardRepo(),
         importSessionRepo: ImportSessionRepository,
         confirmedImportRepo: ConfirmedImportRepository = PlaceholderConfirmedImportRepo(),
         generationToken: ProviderGenerationToken = ProviderGenerationToken(),
@@ -322,6 +328,7 @@ public final class DatabaseProvider {
             self.transactionRepo = GenerationCheckedTransactionRepository(base: transactionRepo, validity: validity)
             self.categoryRepo = GenerationCheckedCategoryRepository(base: resolvedCategoryRepo, validity: validity)
             self.accountRepo = GenerationCheckedAccountRepository(base: accountRepo, validity: validity)
+            self.cardRepo = GenerationCheckedCardRepository(base: cardRepo, validity: validity)
             self.importSessionRepo = GenerationCheckedImportSessionRepository(base: importSessionRepo, validity: validity)
             self.confirmedImportRepo = GenerationCheckedConfirmedImportRepository(base: confirmedImportRepo, validity: validity)
             return
@@ -331,6 +338,7 @@ public final class DatabaseProvider {
         self.transactionRepo = transactionRepo
         self.categoryRepo = resolvedCategoryRepo
         self.accountRepo = accountRepo
+        self.cardRepo = cardRepo
         self.importSessionRepo = importSessionRepo
         self.confirmedImportRepo = confirmedImportRepo
     }
@@ -344,6 +352,7 @@ public final class DatabaseProvider {
             transactionRepo: provider.transactionRepo,
             categoryRepo: provider.categoryRepo,
             accountRepo: provider.accountRepo,
+            cardRepo: provider.cardRepo,
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
             generationToken: provider.generationToken,
@@ -358,6 +367,7 @@ public final class DatabaseProvider {
             transactionRepo: PlaceholderTransactionRepo(),
             categoryRepo: PlaceholderCategoryRepo(),
             accountRepo: PlaceholderAccountRepo(),
+            cardRepo: PlaceholderCardRepo(),
             importSessionRepo: PlaceholderImportSessionRepo(),
             confirmedImportRepo: PlaceholderConfirmedImportRepo(),
             persistenceState: .unavailable(reason)
@@ -371,6 +381,7 @@ public final class DatabaseProvider {
             transactionRepo: provider.transactionRepo,
             categoryRepo: provider.categoryRepo,
             accountRepo: provider.accountRepo,
+            cardRepo: provider.cardRepo,
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
             generationToken: provider.generationToken,
@@ -385,6 +396,7 @@ public final class DatabaseProvider {
             transactionRepo: provider.transactionRepo,
             categoryRepo: provider.categoryRepo,
             accountRepo: provider.accountRepo,
+            cardRepo: provider.cardRepo,
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
             generationToken: provider.generationToken,
@@ -444,6 +456,15 @@ private struct GenerationCheckedAccountRepository: AccountRepository {
     func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO] { try validity.check(); return try base.identifiers(accountId: accountId, workspaceId: workspaceId) }
     func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String] { try validity.check(); return try base.accountIds(workspaceId: workspaceId, scheme: scheme, identifier: identifier) }
     func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO] { try validity.check(); return try base.cbqSourceIdentityRecords(workspaceId: workspaceId) }
+}
+
+private struct GenerationCheckedCardRepository: CardRepository {
+    let base: CardRepository
+    let validity: ProviderGenerationValidity
+    func snapshot(workspaceId: String) throws -> CardRepositorySnapshotDTO {
+        try validity.check()
+        return try base.snapshot(workspaceId: workspaceId)
+    }
 }
 
 private struct GenerationCheckedImportSessionRepository: ImportSessionRepository {
@@ -597,6 +618,18 @@ struct PlaceholderAccountRepo: AccountRepository {
         throw RepositoryError.persistenceUnavailable
     }
     func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO] { throw RepositoryError.persistenceUnavailable }
+}
+
+public struct PlaceholderCardRepo: CardRepository {
+    public init() {}
+
+    public func snapshot(workspaceId: String) throws -> CardRepositorySnapshotDTO {
+        throw RepositoryError.persistenceUnavailable
+    }
+}
+
+struct EmptyCardRepo: CardRepository {
+    func snapshot(workspaceId: String) throws -> CardRepositorySnapshotDTO { .empty }
 }
 
 struct PlaceholderImportSessionRepo: ImportSessionRepository {

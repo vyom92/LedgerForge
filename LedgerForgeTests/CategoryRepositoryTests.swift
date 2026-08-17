@@ -193,6 +193,7 @@ struct CategoryRepositoryTests {
             transactionRepo: concrete.transactionRepo,
             categoryRepo: concrete.categoryRepo,
             accountRepo: concrete.accountRepo,
+            cardRepo: concrete.cardRepo,
             importSessionRepo: concrete.importSessionRepo,
             confirmedImportRepo: concrete.confirmedImportRepo,
             generationToken: concrete.generationToken
@@ -215,6 +216,7 @@ struct CategoryRepositoryTests {
             transactionRepo: concrete.transactionRepo,
             categoryRepo: concrete.categoryRepo,
             accountRepo: concrete.accountRepo,
+            cardRepo: concrete.cardRepo,
             importSessionRepo: concrete.importSessionRepo,
             confirmedImportRepo: concrete.confirmedImportRepo,
             generationToken: concrete.generationToken
@@ -296,6 +298,7 @@ struct CategoryRepositoryTests {
             transactionRepo: base.transactionRepo,
             categoryRepo: countingRepository,
             accountRepo: base.accountRepo,
+            cardRepo: base.cardRepo,
             importSessionRepo: base.importSessionRepo,
             confirmedImportRepo: base.confirmedImportRepo,
             generationToken: base.generationToken

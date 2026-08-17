@@ -126,6 +126,10 @@ enum FixtureLocator {
         americanExpressCardStatementRoot.appendingPathComponent("Manifests").appendingPathComponent(fileName)
     }
 
+    static func americanExpressSyntheticPDF(_ fileName: String) -> URL {
+        fixturesRoot.appendingPathComponent("AmericanExpress").appendingPathComponent("Synthetic").appendingPathComponent(fileName)
+    }
+
     static func fileExists(at url: URL) -> Bool {
         FileManager.default.fileExists(atPath: url.path)
     }

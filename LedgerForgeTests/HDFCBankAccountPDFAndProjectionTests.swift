@@ -662,6 +662,7 @@ struct HDFCBankAccountPDFAndProjectionTests {
             transactionRepo: sqlite.transactionRepo,
             categoryRepo: sqlite.categoryRepo,
             accountRepo: sqlite.accountRepo,
+            cardRepo: sqlite.cardRepo,
             importSessionRepo: sqlite.importSessionRepo,
             confirmedImportRepo: sqlite.confirmedImportRepo,
             generationToken: sqlite.generationToken,

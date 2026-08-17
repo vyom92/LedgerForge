@@ -308,7 +308,11 @@ struct ImportPersistenceMapper {
         providerGeneration: ProviderGenerationToken,
         advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO,
         accountChoice: ConfirmedImportAccountChoiceDTO,
-        selectedAccountId: String
+        selectedAccountId: String,
+        cardInstrumentChoice: ConfirmedCardInstrumentChoiceDTO = .unspecified,
+        cardAssociationAuthority: String = "user_confirmed",
+        cardRelationshipKind: CardInstrumentRelationshipKind? = nil,
+        relatedInstrumentId: String? = nil
     ) throws -> ConfirmedImportPlanDTO {
         try confirmedImportPlan(
             financialDocument: financialDocument,
@@ -325,7 +329,11 @@ struct ImportPersistenceMapper {
             providerGeneration: providerGeneration,
             advisoryIdentity: advisoryIdentity,
             accountChoice: accountChoice,
-            selectedAccountId: selectedAccountId
+            selectedAccountId: selectedAccountId,
+            cardInstrumentChoice: cardInstrumentChoice,
+            cardAssociationAuthority: cardAssociationAuthority,
+            cardRelationshipKind: cardRelationshipKind,
+            relatedInstrumentId: relatedInstrumentId
         )
     }
 
@@ -337,7 +345,11 @@ struct ImportPersistenceMapper {
         providerGeneration: ProviderGenerationToken,
         advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO,
         accountChoice: ConfirmedImportAccountChoiceDTO,
-        selectedAccountId: String
+        selectedAccountId: String,
+        cardInstrumentChoice: ConfirmedCardInstrumentChoiceDTO = .unspecified,
+        cardAssociationAuthority: String = "user_confirmed",
+        cardRelationshipKind: CardInstrumentRelationshipKind? = nil,
+        relatedInstrumentId: String? = nil
     ) throws -> ConfirmedImportPlanDTO {
         let payload = try payload(
             financialDocument: financialDocument,
@@ -437,6 +449,15 @@ struct ImportPersistenceMapper {
             cbqRows = []
             cbqStatementEvidence = nil
         }
+        let cardPlan = try cardImportPlan(
+            financialDocument: financialDocument,
+            payload: payload,
+            selectedAccountId: selectedAccountId,
+            instrumentChoice: cardInstrumentChoice,
+            associationAuthority: cardAssociationAuthority,
+            relationshipKind: cardRelationshipKind,
+            relatedInstrumentId: relatedInstrumentId
+        )
         return ConfirmedImportPlanDTO(
             providerGeneration: providerGeneration,
             workspace: payload.workspace,
@@ -465,7 +486,166 @@ struct ImportPersistenceMapper {
                 CBQSourceIdentityPatternDTO(kind: $0.kind.rawValue, pattern: $0.pattern)
             },
             cbqSourceRows: cbqRows,
-            cbqStatementSourceEvidence: cbqStatementEvidence
+            cbqStatementSourceEvidence: cbqStatementEvidence,
+            cardImportPlan: cardPlan
+        )
+    }
+
+    private func cardImportPlan(
+        financialDocument: FinancialDocument,
+        payload: ImportPersistencePayload,
+        selectedAccountId: String,
+        instrumentChoice: ConfirmedCardInstrumentChoiceDTO,
+        associationAuthority: String,
+        relationshipKind: CardInstrumentRelationshipKind?,
+        relatedInstrumentId: String?
+    ) throws -> ConfirmedCardImportPlanDTO? {
+        guard let evidence = financialDocument.cardStatementEvidence else { return nil }
+        guard financialDocument.metadata.institution == .amex,
+              financialDocument.metadata.documentType == .creditCard,
+              financialDocument.metadata.fileFormat == .pdf,
+              payload.normalizedDocument.profileId == AmericanExpressCreditCardPDFParser.profileID,
+              payload.normalizedDocument.profileVersion == AmericanExpressCreditCardPDFParser.profileVersion,
+              evidence.instrumentSections.count == 1,
+              payload.transactions.count == financialDocument.transactions.count,
+              payload.transactions.count == evidence.transactionAnnotations.count,
+              ["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"].contains(associationAuthority) else {
+            throw ImportPersistenceError.conflictingTransactionProvenance
+        }
+        let proposedInstrumentID = "card-instrument-\(payload.importSession.id.lowercased())"
+        let selectedInstrumentID: String
+        switch instrumentChoice {
+        case .unspecified:
+            selectedInstrumentID = proposedInstrumentID
+        case .createProposedInstrument:
+            selectedInstrumentID = proposedInstrumentID
+        case .useExistingInstrument(let instrumentId):
+            selectedInstrumentID = instrumentId
+        }
+        let proposed = CardInstrumentDTO(
+            id: proposedInstrumentID,
+            workspaceId: workspaceId,
+            liabilityAccountId: selectedAccountId,
+            lifecycleStateCode: CardInstrumentLifecycleState.unknown.rawValue,
+            createdAtISO: payload.completedAtISO
+        )
+        let accountObservations = evidence.accountSourceIdentityObservations.map { observation in
+            CardSourceIdentityObservationDTO(
+                id: "card-observation-\(payload.importSession.id.lowercased())-account-\(observation.kind.rawValue)",
+                workspaceId: workspaceId,
+                documentId: payload.document.id,
+                importSessionId: payload.importSession.id,
+                normalizedDocumentId: payload.normalizedDocument.id,
+                parserProfileId: payload.normalizedDocument.profileId,
+                parserProfileVersion: payload.normalizedDocument.profileVersion,
+                subjectKind: observation.subject.rawValue,
+                subjectId: selectedAccountId,
+                observationKind: observation.kind.rawValue,
+                sourceValue: observation.value,
+                associationAuthority: associationAuthority,
+                createdAtISO: payload.completedAtISO
+            )
+        }
+        let instrumentObservations = evidence.instrumentSections[0].sourceIdentityObservations.map { observation in
+            CardSourceIdentityObservationDTO(
+                id: "card-observation-\(payload.importSession.id.lowercased())-instrument-\(observation.kind.rawValue)",
+                workspaceId: workspaceId,
+                documentId: payload.document.id,
+                importSessionId: payload.importSession.id,
+                normalizedDocumentId: payload.normalizedDocument.id,
+                parserProfileId: payload.normalizedDocument.profileId,
+                parserProfileVersion: payload.normalizedDocument.profileVersion,
+                subjectKind: observation.subject.rawValue,
+                subjectId: selectedInstrumentID,
+                observationKind: observation.kind.rawValue,
+                sourceValue: observation.value,
+                associationAuthority: associationAuthority,
+                createdAtISO: payload.completedAtISO
+            )
+        }
+        let statementID = "card-statement-\(payload.importSession.id.lowercased())"
+        let statement = CardStatementDTO(
+            id: statementID,
+            workspaceId: workspaceId,
+            liabilityAccountId: selectedAccountId,
+            documentId: payload.document.id,
+            importSessionId: payload.importSession.id,
+            normalizedDocumentId: payload.normalizedDocument.id,
+            parserProfileId: payload.normalizedDocument.profileId,
+            parserProfileVersion: payload.normalizedDocument.profileVersion,
+            statementDateISO: evidence.statementDate.canonical,
+            statementStartDateISO: evidence.declaredStatementPeriod.start.canonical,
+            statementEndDateISO: evidence.declaredStatementPeriod.end.canonical,
+            statementCurrency: evidence.nativeCurrency.code,
+            sourceRowCount: payload.transactions.count,
+            reconciliationRuleCode: evidence.reconciliationRuleIdentifier,
+            createdAtISO: payload.completedAtISO
+        )
+        let summary = try evidence.summaryComponents.map { component in
+            CardStatementSummaryComponentDTO(
+                id: "\(statementID)-summary-\(component.persistenceCode)",
+                cardStatementId: statementID,
+                componentCode: component.persistenceCode,
+                moneyCurrency: component.money?.currency.code,
+                moneyMinor: try component.money.map { try $0.minorUnits() },
+                moneyDecimal: try component.money.map { try $0.canonicalDecimalString() },
+                dateISO: component.date?.canonical
+            )
+        }
+        let annotations = Dictionary(uniqueKeysWithValues: evidence.transactionAnnotations.map { ($0.parserTransactionID, $0) })
+        let transactionEvidence = try zip(financialDocument.transactions, payload.transactions).map { source, transaction in
+            guard let annotation = annotations[source.id] else {
+                throw ImportPersistenceError.missingTransactionProvenance
+            }
+            let sectionID: String?
+            let instrumentID: String?
+            switch annotation.rowScope {
+            case .accountLevel:
+                sectionID = nil
+                instrumentID = nil
+            case .instrument(let value):
+                sectionID = value
+                instrumentID = selectedInstrumentID
+            }
+            return CardTransactionEvidenceDTO(
+                id: "card-transaction-evidence-\(transaction.id.lowercased())",
+                cardStatementId: statementID,
+                transactionId: transaction.id,
+                rowScopeCode: annotation.rowScope.persistenceCode,
+                instrumentId: instrumentID,
+                liabilityEffectCode: annotation.liabilityEffect.rawValue,
+                sourceTransactionDateISO: annotation.sourceTransactionDate.canonical,
+                documentScopedSectionId: sectionID,
+                originalCurrency: annotation.originalMerchantMoney?.currency.code,
+                originalAmountMinor: try annotation.originalMerchantMoney.map { try $0.minorUnits() },
+                originalAmountDecimal: try annotation.originalMerchantMoney.map { try $0.canonicalDecimalString() }
+            )
+        }
+        let relationships: [CardInstrumentRelationshipDTO]
+        if case .createProposedInstrument = instrumentChoice, let relationshipKind, let relatedInstrumentId {
+            relationships = [CardInstrumentRelationshipDTO(
+                id: "card-relationship-\(payload.importSession.id.lowercased())",
+                workspaceId: workspaceId,
+                liabilityAccountId: selectedAccountId,
+                predecessorInstrumentId: relatedInstrumentId,
+                successorInstrumentId: proposedInstrumentID,
+                relationshipKind: relationshipKind.rawValue,
+                authority: "user_confirmed",
+                effectiveDateISO: nil,
+                createdAtISO: payload.completedAtISO
+            )]
+        } else {
+            relationships = []
+        }
+        return ConfirmedCardImportPlanDTO(
+            liabilityAccountId: selectedAccountId,
+            instrumentChoice: instrumentChoice,
+            proposedInstrument: proposed,
+            sourceObservations: accountObservations + instrumentObservations,
+            relationships: relationships,
+            statement: statement,
+            summaryComponents: summary,
+            transactionEvidence: transactionEvidence
         )
     }
 
@@ -619,7 +799,10 @@ struct ImportPersistenceMapper {
         guard !transaction.sourceProvenance.isEmpty else { throw ImportPersistenceError.missingTransactionProvenance }
 
         let direction: String
-        if transaction.debitMoney != nil {
+        if let cardEffect = transaction.cardLiabilityEffect,
+           transaction.debitMoney == nil, transaction.creditMoney == nil {
+            direction = cardEffect.rawValue
+        } else if transaction.debitMoney != nil {
             direction = "debit"
         } else if transaction.creditMoney != nil {
             direction = "credit"

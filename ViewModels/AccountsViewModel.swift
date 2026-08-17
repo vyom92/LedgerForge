@@ -31,6 +31,10 @@ struct AccountsAccountPresentation: Identifiable, Equatable {
     let currencyCode: String
     let currentBalance: Decimal
     let identitySummaries: [AccountIdentitySummary]
+    let currentBalanceLabel: String
+    let latestStatementPeriod: String?
+    let dueDate: String?
+    let cardInstrumentCount: Int?
 }
 
 struct NativeAccountBalanceSummary: Identifiable, Equatable {
@@ -119,6 +123,7 @@ final class AccountsViewModel: ObservableObject {
     private let accountStore: AccountStore
     private let transactionStore: TransactionStore
     private let importSessionStore: ImportSessionStore
+    private let cardStore: CardStore
     private let metadataCoordinator: AccountMetadataCoordinating
 #if DEBUG
     private let acknowledgementGate: DevelopmentProfileAcknowledgementGate
@@ -131,7 +136,8 @@ final class AccountsViewModel: ObservableObject {
             accountStore: .shared,
             transactionStore: .shared,
             importSessionStore: .shared,
-            metadataCoordinator: AccountMetadataCoordinator()
+            metadataCoordinator: AccountMetadataCoordinator(),
+            cardStore: .shared
         )
     }
 
@@ -141,12 +147,14 @@ final class AccountsViewModel: ObservableObject {
         transactionStore: TransactionStore,
         importSessionStore: ImportSessionStore,
         metadataCoordinator: AccountMetadataCoordinating,
+        cardStore: CardStore,
         acknowledgementGate: DevelopmentProfileAcknowledgementGate? = nil
     ) {
         self.accountStore = accountStore
         self.transactionStore = transactionStore
         self.importSessionStore = importSessionStore
         self.metadataCoordinator = metadataCoordinator
+        self.cardStore = cardStore
         self.acknowledgementGate = acknowledgementGate ?? .shared
 
         accountStore.$accounts
@@ -161,6 +169,7 @@ final class AccountsViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshPresentation() }
             .store(in: &cancellables)
+        cardStore.$snapshot.receive(on: RunLoop.main).sink { [weak self] _ in self?.refreshPresentation() }.store(in: &cancellables)
 
         refreshPresentation()
     }
@@ -169,12 +178,14 @@ final class AccountsViewModel: ObservableObject {
         accountStore: AccountStore,
         transactionStore: TransactionStore,
         importSessionStore: ImportSessionStore,
-        metadataCoordinator: AccountMetadataCoordinating
+        metadataCoordinator: AccountMetadataCoordinating,
+        cardStore: CardStore
     ) {
         self.accountStore = accountStore
         self.transactionStore = transactionStore
         self.importSessionStore = importSessionStore
         self.metadataCoordinator = metadataCoordinator
+        self.cardStore = cardStore
 
         accountStore.$accounts
             .receive(on: RunLoop.main)
@@ -188,6 +199,7 @@ final class AccountsViewModel: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshPresentation() }
             .store(in: &cancellables)
+        cardStore.$snapshot.receive(on: RunLoop.main).sink { [weak self] _ in self?.refreshPresentation() }.store(in: &cancellables)
 
         refreshPresentation()
     }
@@ -361,14 +373,26 @@ final class AccountsViewModel: ObservableObject {
             }
 
         accounts = runtimeAccounts.map { account, repositoryAccountID in
-            AccountsAccountPresentation(
+            let latestCardStatement = cardStore.snapshot.statements
+                .filter { $0.liabilityAccountID == repositoryAccountID }
+                .sorted { lhs, rhs in
+                    if lhs.period.end != rhs.period.end { return lhs.period.end > rhs.period.end }
+                    if lhs.statementDate != rhs.statementDate { return lhs.statementDate > rhs.statementDate }
+                    return lhs.id > rhs.id
+                }.first
+            let instrumentCount = cardStore.snapshot.instruments.filter { $0.liabilityAccountID == repositoryAccountID }.count
+            return AccountsAccountPresentation(
                 id: repositoryAccountID,
                 displayName: account.nickname ?? account.name,
                 institution: account.institution,
                 accountTypeLabel: Self.accountTypeLabel(account.type),
                 currencyCode: account.currencyCode,
                 currentBalance: account.currentBalance,
-                identitySummaries: account.identitySummaries
+                identitySummaries: account.identitySummaries,
+                currentBalanceLabel: account.type == .creditCard ? "Current Liability" : "Current Balance",
+                latestStatementPeriod: latestCardStatement.map { "\($0.period.start.presentation) – \($0.period.end.presentation)" },
+                dueDate: latestCardStatement?.dueDate?.presentation,
+                cardInstrumentCount: account.type == .creditCard ? instrumentCount : nil
             )
         }
 

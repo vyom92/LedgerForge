@@ -329,6 +329,7 @@ public final class SQLiteRepositoryProvider {
     public let transactionRepo: TransactionRepository
     public let categoryRepo: CategoryRepository
     public let accountRepo: AccountRepository
+    public let cardRepo: CardRepository
     public let importSessionRepo: ImportSessionRepository
     public let generationToken: ProviderGenerationToken
     public let confirmedImportRepo: ConfirmedImportRepository
@@ -377,6 +378,10 @@ public final class SQLiteRepositoryProvider {
             sql: "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'account_identifier_observations';",
             params: []
         ) { _ in true }.isEmpty == false) ?? false
+        let supportsCards = (try? database.query(
+            sql: "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'card_instruments';",
+            params: []
+        ) { _ in true }.isEmpty == false) ?? false
         self.database = database
         self.generationToken = generationToken
 
@@ -384,6 +389,7 @@ public final class SQLiteRepositoryProvider {
         self.transactionRepo = SQLiteTransactionRepo(db: database)
         self.categoryRepo = SQLiteCategoryRepo(db: database)
         self.accountRepo = SQLiteAccountRepo(db: database)
+        self.cardRepo = supportsCards ? SQLiteCardRepo(db: database) : EmptyCardRepo()
         self.importSessionRepo = SQLiteImportSessionRepo(db: database)
         self.confirmedImportRepo = supportsConfirmedImport
             ? SQLiteConfirmedImportRepository(db: database, generationToken: generationToken)
@@ -417,6 +423,58 @@ public final class SQLiteRepositoryProvider {
         }
         return "ledgerforge.sqlite"
 #endif
+    }
+}
+
+private final class SQLiteCardRepo: CardRepository {
+    private let db: SQLiteDatabase
+    init(db: SQLiteDatabase) { self.db = db }
+
+    func snapshot(workspaceId: String) throws -> CardRepositorySnapshotDTO {
+        let instruments = try db.query(
+            sql: "SELECT id, workspace_id, liability_account_id, lifecycle_state, created_at FROM card_instruments WHERE workspace_id = ? ORDER BY id;",
+            params: [workspaceId]
+        ) { row in
+            CardInstrumentDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", liabilityAccountId: row.string(at: 2) ?? "", lifecycleStateCode: row.string(at: 3) ?? "", createdAtISO: row.string(at: 4) ?? "")
+        }
+        let identifiers = try db.query(
+            sql: "SELECT id, instrument_id, workspace_id, scheme, identifier, parser_provenance, created_at FROM card_instrument_identifiers WHERE workspace_id = ? ORDER BY id;",
+            params: [workspaceId]
+        ) { row in
+            CardInstrumentIdentifierDTO(id: row.string(at: 0) ?? "", instrumentId: row.string(at: 1) ?? "", workspaceId: row.string(at: 2) ?? "", scheme: row.string(at: 3) ?? "", identifier: row.string(at: 4) ?? "", parserProvenanceCode: row.string(at: 5) ?? "", createdAtISO: row.string(at: 6) ?? "")
+        }
+        let observations = try db.query(
+            sql: "SELECT id, workspace_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, subject_kind, subject_id, observation_kind, source_value, association_authority, created_at FROM card_source_identity_observations WHERE workspace_id = ? ORDER BY created_at, id;",
+            params: [workspaceId]
+        ) { row in
+            CardSourceIdentityObservationDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", documentId: row.string(at: 2) ?? "", importSessionId: row.string(at: 3) ?? "", normalizedDocumentId: row.string(at: 4) ?? "", parserProfileId: row.string(at: 5) ?? "", parserProfileVersion: row.string(at: 6) ?? "", subjectKind: row.string(at: 7) ?? "", subjectId: row.string(at: 8) ?? "", observationKind: row.string(at: 9) ?? "", sourceValue: row.string(at: 10) ?? "", associationAuthority: row.string(at: 11) ?? "", createdAtISO: row.string(at: 12) ?? "")
+        }
+        let relationships = try db.query(
+            sql: "SELECT id, workspace_id, liability_account_id, predecessor_instrument_id, successor_instrument_id, relationship_kind, authority, effective_date, created_at FROM card_instrument_relationships WHERE workspace_id = ? ORDER BY created_at, id;",
+            params: [workspaceId]
+        ) { row in
+            CardInstrumentRelationshipDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", liabilityAccountId: row.string(at: 2) ?? "", predecessorInstrumentId: row.string(at: 3) ?? "", successorInstrumentId: row.string(at: 4) ?? "", relationshipKind: row.string(at: 5) ?? "", authority: row.string(at: 6) ?? "", effectiveDateISO: row.string(at: 7), createdAtISO: row.string(at: 8) ?? "")
+        }
+        let statements = try db.query(
+            sql: "SELECT id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, statement_currency, source_row_count, reconciliation_rule_code, created_at FROM card_statements WHERE workspace_id = ? ORDER BY statement_end_date, id;",
+            params: [workspaceId]
+        ) { row in
+            CardStatementDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", liabilityAccountId: row.string(at: 2) ?? "", documentId: row.string(at: 3) ?? "", importSessionId: row.string(at: 4) ?? "", normalizedDocumentId: row.string(at: 5) ?? "", parserProfileId: row.string(at: 6) ?? "", parserProfileVersion: row.string(at: 7) ?? "", statementDateISO: row.string(at: 8) ?? "", statementStartDateISO: row.string(at: 9) ?? "", statementEndDateISO: row.string(at: 10) ?? "", statementCurrency: row.string(at: 11) ?? "", sourceRowCount: Int(row.int64(at: 12) ?? 0), reconciliationRuleCode: row.string(at: 13) ?? "", createdAtISO: row.string(at: 14) ?? "")
+        }
+        let statementIDs = Set(statements.map(\.id))
+        let summaries = try db.query(
+            sql: "SELECT c.id, c.card_statement_id, c.component_code, c.money_currency, c.money_minor, c.money_decimal, c.date_value FROM card_statement_summary_components c JOIN card_statements s ON s.id = c.card_statement_id WHERE s.workspace_id = ? ORDER BY c.card_statement_id, c.component_code;",
+            params: [workspaceId]
+        ) { row in
+            CardStatementSummaryComponentDTO(id: row.string(at: 0) ?? "", cardStatementId: row.string(at: 1) ?? "", componentCode: row.string(at: 2) ?? "", moneyCurrency: row.string(at: 3), moneyMinor: row.int64(at: 4), moneyDecimal: row.string(at: 5), dateISO: row.string(at: 6))
+        }.filter { statementIDs.contains($0.cardStatementId) }
+        let evidence = try db.query(
+            sql: "SELECT e.id, e.card_statement_id, e.transaction_id, e.row_scope, e.instrument_id, e.liability_effect, e.source_transaction_date, e.document_scoped_section_id, e.original_currency, e.original_amount_minor, e.original_amount_decimal FROM card_transaction_evidence e JOIN card_statements s ON s.id = e.card_statement_id WHERE s.workspace_id = ? ORDER BY e.card_statement_id, e.id;",
+            params: [workspaceId]
+        ) { row in
+            CardTransactionEvidenceDTO(id: row.string(at: 0) ?? "", cardStatementId: row.string(at: 1) ?? "", transactionId: row.string(at: 2) ?? "", rowScopeCode: row.string(at: 3) ?? "", instrumentId: row.string(at: 4), liabilityEffectCode: row.string(at: 5) ?? "", sourceTransactionDateISO: row.string(at: 6) ?? "", documentScopedSectionId: row.string(at: 7), originalCurrency: row.string(at: 8), originalAmountMinor: row.int64(at: 9), originalAmountDecimal: row.string(at: 10))
+        }
+        return CardRepositorySnapshotDTO(instruments: instruments, instrumentIdentifiers: identifiers, sourceObservations: observations, relationships: relationships, statements: statements, summaryComponents: summaries, transactionEvidence: evidence)
     }
 }
 
@@ -1271,6 +1329,7 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             transactionRepo: provider.transactionRepo,
             categoryRepo: provider.categoryRepo,
             accountRepo: provider.accountRepo,
+            cardRepo: provider.cardRepo,
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
             generationToken: provider.generationToken,

@@ -613,6 +613,12 @@ struct ImportIdentityReviewUIProjection: Equatable {
             tone = .warning
             matchedAccountID = nil
             self.eligibleAccountIDs = eligibleAccountIDs
+        case .cardChoiceRequired(let eligibleLiabilityAccountIDs):
+            presentation = ImportAccountOutcomePresentationMapper.presentation(for: .choiceRequired)
+            iconName = "creditcard.badge.questionmark"
+            tone = .warning
+            matchedAccountID = nil
+            self.eligibleAccountIDs = eligibleLiabilityAccountIDs
         case .ambiguous:
             presentation = ImportAccountOutcomePresentationMapper.presentation(for: .identityAmbiguous)
             iconName = "person.crop.circle.badge.questionmark"
@@ -645,7 +651,11 @@ enum ImportAccountConfirmationPolicy {
             return eligibleAccountIDs.contains(accountID)
         case (.choiceRequired, .some(.createNewAccount)):
             return true
-        case (.choiceRequired, nil), (.ambiguous, _), (.conflict, _):
+        case let (.cardChoiceRequired(eligibleAccountIDs), .some(.useExistingCardLiabilityAccount(accountID, _))):
+            return eligibleAccountIDs.contains(accountID)
+        case (.cardChoiceRequired, .some(.createNewCardLiabilityAccountAndInstrument)):
+            return true
+        case (.choiceRequired, _), (.cardChoiceRequired, _), (.ambiguous, _), (.conflict, _):
             return false
         }
     }
@@ -1295,6 +1305,7 @@ struct ContentView: View {
     @StateObject private var accountsViewModel = AccountsViewModel()
     @StateObject private var importHistoryViewModel = ImportHistoryViewModel()
     @ObservedObject private var importAttemptStore: ImportAttemptStore = .shared
+    @ObservedObject private var cardStore: CardStore = .shared
     @State private var selectedSection: AppShellSection = .dashboard
     @State private var didStartRepositoryHydration = false
 #if DEBUG
@@ -1950,7 +1961,7 @@ struct ContentView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Current Balance")
+                        Text(account.currentBalanceLabel)
                             .font(.caption)
                             .foregroundStyle(LFTheme.textSecondary)
                         Text(formatCurrency(account.currentBalance, currencyCode: account.currencyCode))
@@ -1963,6 +1974,15 @@ struct ContentView: View {
                     LFInfoRow(title: "Account Type", value: account.accountTypeLabel)
                     LFInfoRow(title: "Currency", value: account.currencyCode)
                     LFInfoRow(title: "Transactions", value: "\(accountsViewModel.transactionCount)")
+                    if let period = account.latestStatementPeriod {
+                        LFInfoRow(title: "Latest Statement", value: period)
+                    }
+                    if let dueDate = account.dueDate {
+                        LFInfoRow(title: "Due Date", value: dueDate)
+                    }
+                    if let count = account.cardInstrumentCount {
+                        LFInfoRow(title: "Card Instruments", value: "\(count)")
+                    }
 
                     Divider().overlay(LFTheme.divider)
 
@@ -1975,10 +1995,10 @@ struct ContentView: View {
 
                     ForEach(accountsViewModel.recentActivity) { transaction in
                         HStack {
-                            Image(systemName: transaction.credit != nil ? "arrow.down" : "arrow.up")
-                                .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
+                            Image(systemName: transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? "arrow.down" : "arrow.up")
+                                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? LFTheme.success : LFTheme.danger)
                                 .frame(width: 28, height: 28)
-                                .background((transaction.credit != nil ? LFTheme.success : LFTheme.danger).opacity(0.12))
+                                .background((transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? LFTheme.success : LFTheme.danger).opacity(0.12))
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             Text(transaction.description)
                                 .lineLimit(1)
@@ -2770,10 +2790,80 @@ struct ContentView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(LFTheme.text)
                 }
+                if case .cardChoiceRequired = importIdentityReview {
+                    ForEach(accountsViewModel.accounts.filter { projection.eligibleAccountIDs.contains($0.id) }) { account in
+                        let instruments = cardStore.snapshot.instruments.filter { $0.liabilityAccountID == account.id }
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(account.displayName).font(.subheadline.weight(.semibold))
+                            ForEach(instruments) { instrument in
+                                cardChoiceButton(
+                                    title: "Reuse confirmed instrument \(instrument.id.suffix(8))",
+                                    choice: .useExistingCardLiabilityAccount(
+                                        accountId: account.id,
+                                        instrumentChoice: .reuseExistingInstrument(instrumentId: instrument.id)
+                                    ), preparedImport: preparedImport
+                                )
+                                ForEach(CardInstrumentRelationshipKind.allCases, id: \.rawValue) { relationship in
+                                    cardChoiceButton(
+                                        title: "New instrument · \(cardRelationshipTitle(relationship))",
+                                        choice: .useExistingCardLiabilityAccount(
+                                            accountId: account.id,
+                                            instrumentChoice: .createNewInstrument(
+                                                relationship: relationship,
+                                                relatedInstrumentId: instrument.id
+                                            )
+                                        ), preparedImport: preparedImport
+                                    )
+                                }
+                            }
+                            cardChoiceButton(
+                                title: instruments.isEmpty ? "Create first instrument" : "Create new instrument · no relationship asserted",
+                                choice: .useExistingCardLiabilityAccount(
+                                    accountId: account.id,
+                                    instrumentChoice: .createNewInstrument()
+                                ), preparedImport: preparedImport
+                            )
+                        }
+                        .padding(10)
+                        .background(LFTheme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    cardChoiceButton(
+                        title: "Create separate liability account and instrument",
+                        choice: .createNewCardLiabilityAccountAndInstrument,
+                        preparedImport: preparedImport
+                    )
+                }
             }
             .padding(12)
             .background(LFTheme.primary.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    private func cardChoiceButton(title: String, choice: ImportAccountChoice, preparedImport: PreparedImport) -> some View {
+        Button {
+            importAccountChoice = choice
+            refreshPartialImportReview(preparedImport)
+        } label: {
+            HStack {
+                Text(title)
+                Spacer()
+                Image(systemName: importAccountChoice == choice ? "checkmark.circle.fill" : "circle")
+            }
+            .padding(8)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(LFTheme.text)
+    }
+
+    private func cardRelationshipTitle(_ relationship: CardInstrumentRelationshipKind) -> String {
+        switch relationship {
+        case .additionalConcurrent: return "additional/concurrent"
+        case .replacement: return "replacement"
+        case .renewal: return "renewal"
+        case .upgrade: return "upgrade"
+        case .unspecified: return "unspecified relationship"
         }
     }
 
@@ -2917,11 +3007,11 @@ struct ContentView: View {
             Text(transaction.currency)
                 .foregroundStyle(LFTheme.textSecondary)
                 .frame(width: 92, alignment: .leading)
-            Text(transaction.credit != nil ? "Credit" : "Debit")
-                .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
+            Text(transaction.cardLiabilityEffect == .increasesAmountOwed ? "Charge" : transaction.cardLiabilityEffect == .decreasesAmountOwed ? "Payment/Credit" : transaction.credit != nil ? "Credit" : "Debit")
+                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? LFTheme.success : LFTheme.danger)
                 .frame(width: 68, alignment: .leading)
             Text(transaction.signedAmountDisplay)
-                .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
+                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? LFTheme.success : LFTheme.danger)
                 .monospacedDigit()
                 .frame(width: 112, alignment: .trailing)
             Text(balanceText(transaction.balance, currency: transaction.currency))

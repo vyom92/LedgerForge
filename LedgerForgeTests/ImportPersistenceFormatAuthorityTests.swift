@@ -665,6 +665,7 @@ struct ImportPersistenceFormatAuthorityCoordinatorTests {
             transactionRepo: backend.transactionRepo,
             categoryRepo: backend.categoryRepo,
             accountRepo: backend.accountRepo,
+            cardRepo: backend.cardRepo,
             importSessionRepo: backend.importSessionRepo,
             confirmedImportRepo: recordingRepository,
             generationToken: backend.generationToken

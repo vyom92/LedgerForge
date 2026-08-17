@@ -24,6 +24,7 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
 
     init(
         rules: [InstitutionDetectionRule] = [
+            .americanExpressPlatinumQARPDF,
             .hdfcBankAccountPDF,
             .hdfcBankAccountXLS,
             .cbqCurrentAccountMonthlyPDF,
@@ -128,6 +129,20 @@ struct InstitutionDetectionRule: Equatable, Sendable {
             InstitutionSignature(token: "AXIS BANK", reason: "Matched Axis Bank name."),
             InstitutionSignature(token: "UTIB", reason: "Matched Axis Bank IFSC prefix."),
             InstitutionSignature(token: "STATEMENT OF AXIS ACCOUNT", reason: "Matched Axis account statement title.")
+        ]
+    )
+
+    static let americanExpressPlatinumQARPDF = InstitutionDetectionRule(
+        institution: .amex,
+        documentType: .creditCard,
+        confidence: 0.99,
+        requiredMatchCount: 5,
+        signatures: [
+            InstitutionSignature(token: "THE PLATINUM CARD (QAR)", reason: "Matched the exact Amex Platinum QAR product."),
+            InstitutionSignature(token: "STATEMENT OF ACCOUNT", reason: "Matched the Amex statement title."),
+            InstitutionSignature(token: "AMEX (MIDDLE EAST) B.S.C. (C)", reason: "Matched the exact Amex Middle East issuer."),
+            InstitutionSignature(token: "TRANSACTION DATE POSTING DATE DETAILS NON QAR SPENDING AMOUNT IN QAR", reason: "Matched the exact Amex financial header."),
+            InstitutionSignature(token: "CARD ACCOUNT NUMBER:", reason: "Matched the Amex instrument-section identity label.")
         ]
     )
 

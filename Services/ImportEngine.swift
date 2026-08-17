@@ -551,6 +551,18 @@ final class ImportEngine {
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
                 sourceContext = normalization.sourceContext
+            case Institution.amex.rawValue:
+                let normalization = try snapshot.withBytes {
+                    try AmericanExpressCreditCardPDFNormalizer().normalize(
+                        text: contents,
+                        sourceBytes: $0,
+                        fileURL: url
+                    )
+                }
+                document = normalization.document
+                normalizedRows = normalization.rows
+                normalizedHeader = normalization.header
+                sourceContext = normalization.sourceContext
             default:
                 throw ImportError.invalidDocument(message: "No suitable PDF normalizer found.")
             }

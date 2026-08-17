@@ -62,7 +62,7 @@ A work item becomes executable only when Chat supplies one complete approved pro
 **Candidate entries reviewed:** 155  
 **Fresh build/test/runtime evidence:** Sprint 65 focused, complete-TestPlan, build, Release-containment and signed-app private-pair evidence is recorded in `PROJECT_STATE.md`.
 
-**Current alignment — 2026-08-17:** The 2026-08-01 155-candidate audit above is retained as historical and was not rerun. Sprint 75 is the current production implementation in this commit; the exact ref is recorded by Git history. Sprint 73A was test-only; ADR-043 and Migration V11 are current. Current implementation truth belongs to `PROJECT_STATE.md`.
+**Current alignment — 2026-08-17:** The 2026-08-01 155-candidate audit above is retained as historical and was not rerun. Sprint 76 is the current production implementation in this commit; the exact ref is recorded by Git history. Sprint 73A was test-only; ADR-044 and Migration V12 are current. Current implementation truth belongs to `PROJECT_STATE.md`.
 
 **Current alignment — Axis source-truth restoration:** the Git-authoritative repository state is newer than this audit baseline. `PROJECT_STATE.md` records the active `axis.bank-account.csv@2` conventional direction contract and the suspension of provenance-less mixed partial overlap.
 
@@ -624,11 +624,12 @@ profiles and ADR-043 boundary above.
 
 **Status:** Ready for discovery  
 **Fixture state:** Clean-room American Express, CBQ and Axis card fixture families are integrated.  
-**Implementation blockers:** One selected concrete issuer/layout, a production-supported source format, and approved validation, persistence, hydration and migration contracts under `FW-P1-09`.
+**Completed boundary:** Sprint 76 accepts only exact native-text `amex.credit-card.pdf@1` under ADR-044, including card-aware validation, Migration V12, provider parity, hydration/relaunch and bounded presentation.
+**Remaining boundary:** CBQ card, Axis card, other American Express layouts and every other issuer/layout require separate source truth, exact profile, parser and acceptance authority. The shared Sprint 76 domain does not make them production-supported.
 
-American Express remains the priority independent issuer candidate, but discovery must compare the strongest fixture-backed options rather than select by label alone.
+Future discovery should compare the strongest remaining fixture/source-backed options rather than select by issuer label alone.
 
-Each family requires:
+Each remaining family requires:
 
 - one approved source format and reader path;
 - independent posted-amount, currency, order, statement-summary and identity evidence;
@@ -638,7 +639,8 @@ Each family requires:
 - provider parity, migration and relaunch acceptance;
 - explicit exclusion of unsupported universal card assumptions.
 
-No parser family may claim production support from fixtures, classification or shared semantic discovery alone.
+No additional parser family may claim production support from fixtures,
+classification, the V12 schema or the shared Sprint 76 domain alone.
 
 ---
 
@@ -737,32 +739,39 @@ The original source structure and every user-approved mapping must remain inspec
 
 ## FW-P1-09 — Credit-Card Financial Semantics Foundation
 
-**Status:** Ready for discovery  
+**Status:** Partially completed by Sprint 76; remaining semantics are future work
 **Discovery:** Shared cross-family semantic discovery is complete.  
-**Architecture:** ADR-034 accepted.  
-**Depends on:** Selection of one concrete fixture-backed card family and source format for family-specific validation, persistence, hydration and migration planning.
+**Architecture:** ADR-034 is implemented/refined by accepted ADR-044 for the completed boundary.
+**Completed boundary:** Shared liability-account/card-instrument separation, card-specific liability effects, masked source observations without strong-identity promotion, explicit instrument relationships/lifecycle authority, Migration V12, provider-owned atomic commit, SQLite/In-Memory parity, hydration/relaunch, newest-source-date balance authority and bounded presentation are implemented for exact `amex.credit-card.pdf@1`.
 
-Define the smallest document-scoped evidence contract required before production card parsing.
-
-The American Express, CBQ and Axis card fixture integrations and final cross-family evidence review are complete. ADR-034 accepts a future boundary in which `FinancialDocument` may carry parser-owned card-statement evidence preserving only source-supported values such as:
+The initial production card foundation is complete for the exact Sprint 76
+profile. It preserves:
 
 - authoritative posted statement amount and currency;
-- optional source-proven effect on amount owed;
+- source-proven effect on amount owed without bank debit/credit reuse;
 - account-level versus instrument-level row scope;
 - document-scoped instrument-section identity;
 - optional original merchant amount and currency;
-- independently optional printed FX-rate, fee, markup and tax evidence;
+- exact account/instrument source observations and durable user-confirmed mappings;
 - source-specific statement-summary and reconciliation components.
 
-Targeted discovery must now select one concrete family and define its exact vocabulary, validation, durable schema, migration, provider parity, hydration, relaunch and presentation contracts.
+Remaining future semantics include rewards persistence/valuation, payment
+allocation, bank-card payment matching, refund/reversal matching, installments
+or loans, calculated FX, fee/markup/tax contracts, manual merge/split,
+historical repair/backfill and any generic card profile or masked-identity
+framework. Each requires its own approved authority; absence is not inferred.
 
 Sprint 75's completed CBQ current-account source-lineage work remains separate
 from card semantics and does not generalize ADR-043 to CBQ cards. Sprint 73's
 exact whole-statement HDFC contract also does not authorize card overlap.
 
-Card-liability effects remain separate from bank-account debit/credit semantics. Missing rates, fees, taxes, aggregates or other evidence must not be invented. Payment allocation, rewards accounting, reversal matching and universal card taxonomy remain excluded.
+Card-liability effects remain separate from bank-account debit/credit semantics.
+Missing rates, fees, taxes, aggregates or other evidence must not be invented.
+Payment allocation, rewards accounting, reversal matching and universal card
+taxonomy remain excluded from the completed boundary.
 
-Do not claim production card support from fixture integration, schema capacity, classification or parser candidates.
+Do not claim card support beyond exact `amex.credit-card.pdf@1` from fixture
+integration, schema capacity, classification or parser candidates.
 
 ---
 
