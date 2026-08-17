@@ -75,4 +75,41 @@ struct ImportAccountChoiceTests {
             choice: nil
         ))
     }
+
+    @Test func cardChoiceRequiresEligibleLiabilityAccountAndCompletedSectionDecisions() {
+        let review = ImportIdentityReview.cardChoiceRequired(
+            eligibleLiabilityAccountIds: ["eligible-card-account"]
+        )
+        let completeChoices: [String: ImportCardInstrumentChoice] = [
+            "instrument-section-1": .reuseExistingInstrument(instrumentId: "instrument-a"),
+            "instrument-section-2": .createNewInstrument()
+        ]
+
+        #expect(!ImportAccountConfirmationPolicy.allowsConfirmation(review: review, choice: nil))
+        #expect(!ImportAccountConfirmationPolicy.allowsConfirmation(
+            review: review,
+            choice: .useExistingCardLiabilityAccountSections(
+                accountId: "eligible-card-account",
+                sectionChoices: [:]
+            )
+        ))
+        #expect(!ImportAccountConfirmationPolicy.allowsConfirmation(
+            review: review,
+            choice: .useExistingCardLiabilityAccountSections(
+                accountId: "ineligible-card-account",
+                sectionChoices: completeChoices
+            )
+        ))
+        #expect(ImportAccountConfirmationPolicy.allowsConfirmation(
+            review: review,
+            choice: .useExistingCardLiabilityAccountSections(
+                accountId: "eligible-card-account",
+                sectionChoices: completeChoices
+            )
+        ))
+        #expect(ImportAccountConfirmationPolicy.allowsConfirmation(
+            review: review,
+            choice: .createNewCardLiabilityAccountAndInstrument
+        ))
+    }
 }

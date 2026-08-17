@@ -62,7 +62,7 @@ A work item becomes executable only when Chat supplies one complete approved pro
 **Candidate entries reviewed:** 155  
 **Fresh build/test/runtime evidence:** Sprint 65 focused, complete-TestPlan, build, Release-containment and signed-app private-pair evidence is recorded in `PROJECT_STATE.md`.
 
-**Current alignment — 2026-08-17:** The 2026-08-01 155-candidate audit above is retained as historical and was not rerun. Sprint 76 is the current production implementation in this commit; the exact ref is recorded by Git history. Sprint 73A was test-only; ADR-044 and Migration V12 are current. Current implementation truth belongs to `PROJECT_STATE.md`.
+**Current alignment — 2026-08-17:** The 2026-08-01 155-candidate audit above is retained as historical and was not rerun. Sprint 76A is the current production implementation in this commit; the exact ref is recorded by Git history. Sprint 73A was test-only; amended ADR-044 and Migration V13 are current. Current implementation truth belongs to `PROJECT_STATE.md`.
 
 **Current alignment — Axis source-truth restoration:** the Git-authoritative repository state is newer than this audit baseline. `PROJECT_STATE.md` records the active `axis.bank-account.csv@2` conventional direction contract and the suspension of provenance-less mixed partial overlap.
 
@@ -624,7 +624,7 @@ profiles and ADR-043 boundary above.
 
 **Status:** Ready for discovery  
 **Fixture state:** Clean-room American Express, CBQ and Axis card fixture families are integrated.  
-**Completed boundary:** Sprint 76 accepts only exact native-text `amex.credit-card.pdf@1` under ADR-044, including card-aware validation, Migration V12, provider parity, hydration/relaunch and bounded presentation.
+**Completed boundary:** Sprint 76A accepts only exact native-text `amex.credit-card.pdf@1` under ADR-044, including ordered multi-instrument sections, encrypted-source unlock and institution-scoped Keychain reuse, exact byte-distinct semantic-source grouping, card-aware validation, Migration V13, provider parity, hydration/relaunch and bounded presentation.
 **Remaining boundary:** CBQ card, Axis card, other American Express layouts and every other issuer/layout require separate source truth, exact profile, parser and acceptance authority. The shared Sprint 76 domain does not make them production-supported.
 
 Future discovery should compare the strongest remaining fixture/source-backed options rather than select by issuer label alone.
@@ -640,7 +640,7 @@ Each remaining family requires:
 - explicit exclusion of unsupported universal card assumptions.
 
 No additional parser family may claim production support from fixtures,
-classification, the V12 schema or the shared Sprint 76 domain alone.
+classification, the V13 schema or the shared Sprint 76A domain alone.
 
 ---
 
@@ -739,12 +739,12 @@ The original source structure and every user-approved mapping must remain inspec
 
 ## FW-P1-09 — Credit-Card Financial Semantics Foundation
 
-**Status:** Partially completed by Sprint 76; remaining semantics are future work
+**Status:** Partially completed by Sprint 76A; remaining semantics are future work
 **Discovery:** Shared cross-family semantic discovery is complete.  
 **Architecture:** ADR-034 is implemented/refined by accepted ADR-044 for the completed boundary.
-**Completed boundary:** Shared liability-account/card-instrument separation, card-specific liability effects, masked source observations without strong-identity promotion, explicit instrument relationships/lifecycle authority, Migration V12, provider-owned atomic commit, SQLite/In-Memory parity, hydration/relaunch, newest-source-date balance authority and bounded presentation are implemented for exact `amex.credit-card.pdf@1`.
+**Completed boundary:** Shared liability-account/card-instrument separation, ordered document-scoped instrument sections, card-specific liability effects, masked source observations without strong-identity promotion, explicit instrument relationships/lifecycle authority, exact Amex semantic-source grouping, Migration V13, provider-owned atomic commit, SQLite/In-Memory parity, hydration/relaunch, newest-source-date balance authority and bounded presentation are implemented for exact `amex.credit-card.pdf@1`.
 
-The initial production card foundation is complete for the exact Sprint 76
+The initial production card foundation is complete for the exact Sprint 76A
 profile. It preserves:
 
 - authoritative posted statement amount and currency;
@@ -791,10 +791,9 @@ Retain future work for other Axis PDF layouts, OCR, password-protected PDFs, gen
 
 ## FW-P1-11 — Password-Protected PDF Support
 
-**Status:** Blocked
-**Depends on:** `FW-P1-10` and an approved password workflow
-
-Support encrypted PDF statements through the existing password-provider boundary.
+**Status:** Partially completed by Sprint 76A for exact encrypted `amex.credit-card.pdf@1`
+**Completed boundary:** The shared coordinator retries bounded remembered candidates and secure user input against the same immutable source snapshot. The PDF reader owns only unlock/native-text extraction and hands exact page boundaries to Amex normalization in memory without creating decrypted PDF files or reconstructed source bytes.
+**Remaining boundary:** Other institutions, other Amex layouts, arbitrary encrypted PDFs, owner-password/permissions variants, OCR and generic encrypted-document support require separate exact source and acceptance authority.
 
 Readers must not access UI prompts, Keychain or institution-specific password policy directly.
 
@@ -802,12 +801,13 @@ Readers must not access UI prompts, Keychain or institution-specific password po
 
 ## FW-P1-12 — Secure Institution Password Storage
 
-**Status:** Blocked
-**Depends on:** `FW-P1-11` and a security review
+**Status:** Completed by Sprint 76A for the accepted personal-v1 institution credential boundary
+**Completed boundary:** A namespaced macOS generic-password item stores one current statement password per proven institution. Persistence occurs only after successful unlock and authoritative institution detection. Production passwords do not enter SQLite, source evidence or diagnostics; deterministic tests use an in-memory store and the bounded real-Keychain smoke test removes its unique synthetic item.
+**Remaining boundary:** Generic credential profiles, cloud synchronization, password-pattern derivation and broader encrypted-document support are not authorized.
 
 Store institution-specific credentials using macOS Keychain.
 
-Requirements include:
+The completed boundary preserves:
 
 - offline-first operation;
 - no passwords in SQLite;
@@ -820,12 +820,11 @@ Requirements include:
 
 ## FW-P1-13 — Per-File Password Override and Entry
 
-**Status:** Blocked
-**Depends on:** `FW-P1-11`
+**Status:** Partially completed by Sprint 76A
+**Completed boundary:** When no remembered candidate unlocks an exact supported PDF, the existing-style secure challenge accepts a replacement credential. The replacement overwrites the institution item only after successful unlock and authoritative institution detection; cancellation and failed candidates are discarded.
+**Remaining boundary:** A separate use-once preference, arbitrary per-file credential profiles and generic override policy are not implemented. The accepted personal-v1 product decision remembers the successfully proven institution password without a preference maze.
 
-Allow manual password entry when no stored credential succeeds.
-
-The user must control whether the password is used once, stored, replaced or discarded.
+Readers and institution parsers remain unaware of the UI and storage policy.
 
 ---
 

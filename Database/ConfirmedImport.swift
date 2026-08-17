@@ -117,6 +117,205 @@ public enum ConfirmedCardInstrumentChoiceDTO: nonisolated Equatable, Sendable {
     case useExistingInstrument(instrumentId: String)
 }
 
+public struct ConfirmedCardSectionDecisionDTO: nonisolated Equatable, Sendable {
+    public let instrumentChoice: ConfirmedCardInstrumentChoiceDTO
+    public let proposedInstrument: CardInstrumentDTO
+    public let instrumentIdentifiers: [CardInstrumentIdentifierDTO]
+    public let section: CardStatementSectionDTO
+    public let sourceObservations: [CardStatementSectionObservationDTO]
+    public let relationships: [CardInstrumentRelationshipDTO]
+
+    public init(
+        instrumentChoice: ConfirmedCardInstrumentChoiceDTO,
+        proposedInstrument: CardInstrumentDTO,
+        instrumentIdentifiers: [CardInstrumentIdentifierDTO] = [],
+        section: CardStatementSectionDTO,
+        sourceObservations: [CardStatementSectionObservationDTO],
+        relationships: [CardInstrumentRelationshipDTO] = []
+    ) {
+        self.instrumentChoice = instrumentChoice
+        self.proposedInstrument = proposedInstrument
+        self.instrumentIdentifiers = instrumentIdentifiers
+        self.section = section
+        self.sourceObservations = sourceObservations
+        self.relationships = relationships
+    }
+}
+
+public struct CardStatementSemanticProjectionEventPlanDTO: nonisolated Equatable, Sendable {
+    public let incomingTransactionId: String
+    public let normalizedRowId: String
+    public let sourceOrdinal: Int
+    public let postingDateISO: String
+    public let sourceTransactionDateISO: String
+    public let liabilityEffectCode: String
+    public let postedCurrency: String
+    public let postedAmountMinor: Int64
+    public let postedAmountDecimal: String
+    public let originalCurrency: String?
+    public let originalAmountMinor: Int64?
+    public let originalAmountDecimal: String?
+    public let sourceReference: String?
+    public let rowScopeCode: String
+    public let documentScopedSectionId: String?
+    public let documentSectionOrdinal: Int?
+}
+
+public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendable {
+    public static let algorithm = "ledgerforge.amex-card-statement-semantic.sha256.v1"
+
+    public let id: String
+    public let algorithmIdentifier: String
+    public let digest: String
+    public let institutionCode: String
+    public let statementFamilyCode: String
+    public let parserProfileId: String
+    public let parserProfileVersion: String
+    public let statementDateISO: String
+    public let statementStartDateISO: String
+    public let statementEndDateISO: String
+    public let nativeCurrency: String
+    public let reconciliationRuleCode: String
+    public let summaryComponents: [CardStatementSummaryComponentDTO]
+    public let sections: [CardStatementSemanticProjectionSectionDTO]
+    public let events: [CardStatementSemanticProjectionEventPlanDTO]
+
+    public func calculatedDigest() -> String {
+        var fields = [
+            algorithmIdentifier, institutionCode, statementFamilyCode, parserProfileId,
+            parserProfileVersion, statementDateISO, statementStartDateISO, statementEndDateISO,
+            nativeCurrency, reconciliationRuleCode, String(events.count), String(sections.count)
+        ]
+        for component in summaryComponents.sorted(by: { $0.componentCode < $1.componentCode }) {
+            fields += [
+                component.componentCode, component.moneyCurrency ?? "", component.moneyDecimal ?? "",
+                component.dateISO ?? ""
+            ]
+        }
+        for section in sections.sorted(by: { $0.sourceOrdinal < $1.sourceOrdinal }) {
+            fields += [
+                String(section.sourceOrdinal), section.documentScopedSectionId,
+                section.signedTotalCurrency, section.signedTotalDecimal,
+                section.reconciliationRuleCode
+            ]
+        }
+        for event in events.sorted(by: { $0.sourceOrdinal < $1.sourceOrdinal }) {
+            fields += [
+                String(event.sourceOrdinal), event.postingDateISO, event.sourceTransactionDateISO,
+                event.liabilityEffectCode, event.postedCurrency, event.postedAmountDecimal,
+                event.originalCurrency == nil ? "0" : "1", event.originalCurrency ?? "",
+                event.originalAmountDecimal ?? "", event.sourceReference == nil ? "0" : "1",
+                event.sourceReference ?? "", event.rowScopeCode,
+                event.documentScopedSectionId ?? "", event.documentSectionOrdinal.map(String.init) ?? ""
+            ]
+        }
+        let payload = fields.map { "\($0.utf8.count):\($0)" }.joined()
+        return SHA256.hash(data: Data(payload.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    public func isValid() -> Bool {
+        let hex = CharacterSet(charactersIn: "0123456789abcdef")
+        guard algorithmIdentifier == Self.algorithm,
+              digest.count == 64, digest.unicodeScalars.allSatisfy(hex.contains),
+              institutionCode == "American Express",
+              statementFamilyCode == "amex.credit-card.pdf@1",
+              parserProfileId == "amex.credit-card.pdf", parserProfileVersion == "1",
+              (try? StatementDate(canonical: statementDateISO)) != nil,
+              (try? StatementDate(canonical: statementStartDateISO)) != nil,
+              (try? StatementDate(canonical: statementEndDateISO)) != nil,
+              statementStartDateISO <= statementEndDateISO,
+              (try? CurrencyCode(nativeCurrency)) != nil,
+              !events.isEmpty, !sections.isEmpty,
+              events.map(\.sourceOrdinal) == events.indices.map({ $0 + 1 }),
+              sections.map(\.sourceOrdinal).sorted() == Array(1...sections.count),
+              Set(sections.map(\.documentScopedSectionId)).count == sections.count,
+              Set(summaryComponents.map(\.componentCode)) == Set([
+                "previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"
+              ]) else {
+            return false
+        }
+        let sectionOrdinals = Dictionary(uniqueKeysWithValues: sections.map {
+            ($0.documentScopedSectionId, $0.sourceOrdinal)
+        })
+        guard sections.allSatisfy({ section in
+            guard section.projectionId == id,
+                  section.signedTotalCurrency == nativeCurrency,
+                  let money = try? Money(
+                    canonicalDecimal: section.signedTotalDecimal,
+                    currency: section.signedTotalCurrency
+                  ), let minor = try? money.minorUnits() else { return false }
+            return minor == section.signedTotalMinor && !section.reconciliationRuleCode.isEmpty
+        }), summaryComponents.allSatisfy({ component in
+            guard let currency = component.moneyCurrency,
+                  let decimal = component.moneyDecimal,
+                  let expectedMinor = component.moneyMinor else {
+                return component.componentCode == "due_date" && component.dateISO != nil
+            }
+            guard currency == nativeCurrency,
+                  let money = try? Money(canonicalDecimal: decimal, currency: currency),
+                  let minor = try? money.minorUnits() else { return false }
+            return minor == expectedMinor
+        }) else { return false }
+        guard events.allSatisfy({ event in
+            guard event.postedCurrency == nativeCurrency,
+                  let posted = try? Money(canonicalDecimal: event.postedAmountDecimal, currency: event.postedCurrency),
+                  let postedMinor = try? posted.minorUnits(),
+                  postedMinor == event.postedAmountMinor,
+                  event.postedAmountMinor != 0,
+                  (try? StatementDate(canonical: event.postingDateISO)) != nil,
+                  (try? StatementDate(canonical: event.sourceTransactionDateISO)) != nil,
+                  event.postingDateISO >= statementStartDateISO,
+                  event.postingDateISO <= statementEndDateISO,
+                  event.sourceReference?.isEmpty == false,
+                  [CardLiabilityEffect.increasesAmountOwed.rawValue, CardLiabilityEffect.decreasesAmountOwed.rawValue]
+                    .contains(event.liabilityEffectCode) else { return false }
+            guard (event.liabilityEffectCode == CardLiabilityEffect.increasesAmountOwed.rawValue && event.postedAmountMinor > 0) ||
+                    (event.liabilityEffectCode == CardLiabilityEffect.decreasesAmountOwed.rawValue && event.postedAmountMinor < 0) else {
+                return false
+            }
+            if let originalCurrency = event.originalCurrency,
+               let originalAmountMinor = event.originalAmountMinor,
+               let originalAmountDecimal = event.originalAmountDecimal {
+                guard let original = try? Money(canonicalDecimal: originalAmountDecimal, currency: originalCurrency),
+                      let originalMinor = try? original.minorUnits(),
+                      originalMinor == originalAmountMinor,
+                      originalCurrency != nativeCurrency,
+                      (event.liabilityEffectCode == CardLiabilityEffect.increasesAmountOwed.rawValue && originalMinor > 0) ||
+                        (event.liabilityEffectCode == CardLiabilityEffect.decreasesAmountOwed.rawValue && originalMinor < 0) else {
+                    return false
+                }
+            } else if event.originalCurrency != nil || event.originalAmountMinor != nil || event.originalAmountDecimal != nil {
+                return false
+            }
+            if event.rowScopeCode == "account_level" {
+                return event.documentScopedSectionId == nil && event.documentSectionOrdinal == nil
+            }
+            guard event.rowScopeCode == "instrument_level",
+                  let sectionID = event.documentScopedSectionId,
+                  let ordinal = event.documentSectionOrdinal else { return false }
+            return sectionOrdinals[sectionID] == ordinal
+        }) else { return false }
+        let summaryByCode = Dictionary(uniqueKeysWithValues: summaryComponents.map { ($0.componentCode, $0) })
+        guard let previous = summaryByCode["previous_balance"]?.moneyMinor,
+              let credits = summaryByCode["new_credits"]?.moneyMinor,
+              let debits = summaryByCode["new_debits"]?.moneyMinor,
+              let balance = summaryByCode["new_balance"]?.moneyMinor,
+              let instrumentNet = summaryByCode["instrument_net_total"]?.moneyMinor,
+              previous - credits + debits == balance,
+              events.filter({ $0.liabilityEffectCode == CardLiabilityEffect.increasesAmountOwed.rawValue })
+                .reduce(Int64(0), { $0 + $1.postedAmountMinor }) == debits,
+              -events.filter({ $0.liabilityEffectCode == CardLiabilityEffect.decreasesAmountOwed.rawValue })
+                .reduce(Int64(0), { $0 + $1.postedAmountMinor }) == credits,
+              sections.reduce(Int64(0), { $0 + $1.signedTotalMinor }) == instrumentNet,
+              sections.allSatisfy({ section in
+                  let sectionEvents = events.filter({ $0.documentScopedSectionId == section.documentScopedSectionId })
+                  return !sectionEvents.isEmpty &&
+                    sectionEvents.reduce(Int64(0), { $0 + $1.postedAmountMinor }) == section.signedTotalMinor
+              }) else { return false }
+        return digest == calculatedDigest()
+    }
+}
+
 public struct ConfirmedCardImportPlanDTO: nonisolated Equatable, Sendable {
     public let liabilityAccountId: String
     public let instrumentChoice: ConfirmedCardInstrumentChoiceDTO
@@ -127,6 +326,8 @@ public struct ConfirmedCardImportPlanDTO: nonisolated Equatable, Sendable {
     public let statement: CardStatementDTO
     public let summaryComponents: [CardStatementSummaryComponentDTO]
     public let transactionEvidence: [CardTransactionEvidenceDTO]
+    public let sectionDecisions: [ConfirmedCardSectionDecisionDTO]
+    public let semanticProjection: CardStatementSemanticProjectionDTO?
 
     public init(
         liabilityAccountId: String,
@@ -137,7 +338,9 @@ public struct ConfirmedCardImportPlanDTO: nonisolated Equatable, Sendable {
         relationships: [CardInstrumentRelationshipDTO] = [],
         statement: CardStatementDTO,
         summaryComponents: [CardStatementSummaryComponentDTO],
-        transactionEvidence: [CardTransactionEvidenceDTO]
+        transactionEvidence: [CardTransactionEvidenceDTO],
+        sectionDecisions: [ConfirmedCardSectionDecisionDTO] = [],
+        semanticProjection: CardStatementSemanticProjectionDTO? = nil
     ) {
         self.liabilityAccountId = liabilityAccountId
         self.instrumentChoice = instrumentChoice
@@ -148,6 +351,8 @@ public struct ConfirmedCardImportPlanDTO: nonisolated Equatable, Sendable {
         self.statement = statement
         self.summaryComponents = summaryComponents
         self.transactionEvidence = transactionEvidence
+        self.sectionDecisions = sectionDecisions
+        self.semanticProjection = semanticProjection
     }
 }
 

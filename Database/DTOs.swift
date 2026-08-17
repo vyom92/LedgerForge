@@ -343,6 +343,114 @@ public struct CardTransactionEvidenceDTO: nonisolated Equatable, Sendable {
     public let originalAmountDecimal: String?
 }
 
+public struct CardStatementSectionDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let cardStatementId: String
+    public let documentScopedSectionId: String
+    public let sourceOrdinal: Int
+    public let instrumentId: String
+    public let holderLabel: String?
+    public let signedTotalCurrency: String
+    public let signedTotalMinor: Int64
+    public let signedTotalDecimal: String
+    public let reconciliationRuleCode: String
+}
+
+public struct CardStatementSectionObservationDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let cardStatementSectionId: String
+    public let workspaceId: String
+    public let documentId: String
+    public let importSessionId: String
+    public let normalizedDocumentId: String
+    public let parserProfileId: String
+    public let parserProfileVersion: String
+    public let observationKind: String
+    public let sourceValue: String
+    public let associationAuthority: String
+    public let createdAtISO: String
+}
+
+public struct CardStatementSemanticProjectionSectionDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let projectionId: String
+    public let sourceOrdinal: Int
+    public let documentScopedSectionId: String
+    public let signedTotalCurrency: String
+    public let signedTotalMinor: Int64
+    public let signedTotalDecimal: String
+    public let reconciliationRuleCode: String
+}
+
+public struct CardStatementSemanticProjectionEventDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let projectionId: String
+    public let canonicalTransactionId: String
+    public let normalizedRowId: String
+    public let sourceOrdinal: Int
+    public let postingDateISO: String
+    public let sourceTransactionDateISO: String
+    public let liabilityEffectCode: String
+    public let postedCurrency: String
+    public let postedAmountMinor: Int64
+    public let postedAmountDecimal: String
+    public let originalCurrency: String?
+    public let originalAmountMinor: Int64?
+    public let originalAmountDecimal: String?
+    public let sourceReference: String?
+    public let rowScopeCode: String
+    public let documentScopedSectionId: String?
+    public let documentSectionOrdinal: Int?
+}
+
+public struct CardStatementSemanticProjectionRecordDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let workspaceId: String
+    public let liabilityAccountId: String
+    public let cardStatementId: String
+    public let documentId: String
+    public let importSessionId: String
+    public let algorithm: String
+    public let digest: String
+    public let institutionCode: String
+    public let statementFamilyCode: String
+    public let parserProfileId: String
+    public let parserProfileVersion: String
+    public let statementDateISO: String
+    public let statementStartDateISO: String
+    public let statementEndDateISO: String
+    public let nativeCurrency: String
+    public let eventCount: Int
+    public let sectionCount: Int
+    public let reconciliationRuleCode: String
+    public let createdAtISO: String
+    public let sections: [CardStatementSemanticProjectionSectionDTO]
+    public let events: [CardStatementSemanticProjectionEventDTO]
+}
+
+public struct CardStatementSemanticGroupDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let workspaceId: String
+    public let liabilityAccountId: String
+    public let institutionCode: String
+    public let statementFamilyCode: String
+    public let statementStartDateISO: String
+    public let statementEndDateISO: String
+    public let nativeCurrency: String
+    public let projectionAlgorithm: String
+    public let projectionDigest: String
+    public let authoritativeProjectionId: String
+    public let createdAtISO: String
+}
+
+public struct CardStatementSemanticMemberDTO: nonisolated Equatable, Sendable {
+    public let id: String
+    public let groupId: String
+    public let projectionId: String
+    public let role: StatementEquivalenceMemberRole
+    public let createdAtISO: String
+}
+
 public struct CardRepositorySnapshotDTO: nonisolated Equatable, Sendable {
     public let instruments: [CardInstrumentDTO]
     public let instrumentIdentifiers: [CardInstrumentIdentifierDTO]
@@ -351,11 +459,45 @@ public struct CardRepositorySnapshotDTO: nonisolated Equatable, Sendable {
     public let statements: [CardStatementDTO]
     public let summaryComponents: [CardStatementSummaryComponentDTO]
     public let transactionEvidence: [CardTransactionEvidenceDTO]
+    public let sections: [CardStatementSectionDTO]
+    public let sectionObservations: [CardStatementSectionObservationDTO]
+    public let semanticProjections: [CardStatementSemanticProjectionRecordDTO]
+    public let semanticGroups: [CardStatementSemanticGroupDTO]
+    public let semanticMembers: [CardStatementSemanticMemberDTO]
 
     public static let empty = CardRepositorySnapshotDTO(
         instruments: [], instrumentIdentifiers: [], sourceObservations: [], relationships: [],
-        statements: [], summaryComponents: [], transactionEvidence: []
+        statements: [], summaryComponents: [], transactionEvidence: [], sections: [],
+        sectionObservations: [], semanticProjections: [], semanticGroups: [], semanticMembers: []
     )
+
+    public init(
+        instruments: [CardInstrumentDTO],
+        instrumentIdentifiers: [CardInstrumentIdentifierDTO],
+        sourceObservations: [CardSourceIdentityObservationDTO],
+        relationships: [CardInstrumentRelationshipDTO],
+        statements: [CardStatementDTO],
+        summaryComponents: [CardStatementSummaryComponentDTO],
+        transactionEvidence: [CardTransactionEvidenceDTO],
+        sections: [CardStatementSectionDTO] = [],
+        sectionObservations: [CardStatementSectionObservationDTO] = [],
+        semanticProjections: [CardStatementSemanticProjectionRecordDTO] = [],
+        semanticGroups: [CardStatementSemanticGroupDTO] = [],
+        semanticMembers: [CardStatementSemanticMemberDTO] = []
+    ) {
+        self.instruments = instruments
+        self.instrumentIdentifiers = instrumentIdentifiers
+        self.sourceObservations = sourceObservations
+        self.relationships = relationships
+        self.statements = statements
+        self.summaryComponents = summaryComponents
+        self.transactionEvidence = transactionEvidence
+        self.sections = sections
+        self.sectionObservations = sectionObservations
+        self.semanticProjections = semanticProjections
+        self.semanticGroups = semanticGroups
+        self.semanticMembers = semanticMembers
+    }
 }
 
 public struct ImportSessionDTO: nonisolated Equatable, Sendable {

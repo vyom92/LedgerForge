@@ -32,6 +32,98 @@ struct MoneyTests {
         #expect(try CurrencyCatalog.shared.definition(for: "KWD").fractionDigits == 3)
     }
 
+    @Test func catalogIsVersionedAtV2() {
+        #expect(CurrencyCatalog.version == "ledgerforge.currency-catalog.v2")
+    }
+
+    @Test func catalogContainsExactly155DeterministicSortedUniqueDefinitions() {
+        let definitions = CurrencyCatalog.shared.definitions
+        let codes = definitions.map { $0.code.code }
+
+        #expect(definitions.count == 155)
+        #expect(codes == codes.sorted())
+        #expect(Set(codes).count == definitions.count)
+        #expect(definitions == definitions.sorted { $0.code < $1.code })
+    }
+
+    @Test func catalogIncludesRequiredOrdinaryCurrenciesAndScales() throws {
+        let expectedScales = [
+            "KRW": 0,
+            "QAR": 2,
+            "BHD": 3,
+            "KWD": 3,
+            "AUD": 2,
+            "CHF": 2,
+            "EUR": 2,
+            "GBP": 2,
+            "ZAR": 2,
+            "XAF": 0,
+            "XCD": 2,
+            "XCG": 2,
+            "XOF": 0,
+            "XPF": 0
+        ]
+
+        for (code, scale) in expectedScales {
+            #expect(try CurrencyCatalog.shared.definition(for: code).fractionDigits == scale)
+        }
+    }
+
+    @Test func catalogRejectsNonCurrencyAndFundCodesWithTypedErrors() {
+        let excludedCodes = [
+            // ISO 4217 List One entries whose minor unit is N.A.
+            "XAU", "XAG", "XPD", "XPT", "XBA", "XBB", "XBC", "XBD",
+            "XDR", "XSU", "XUA", "XTS", "XXX",
+            // Current ISO 4217 List Two fund codes.
+            "XAD", "BOV", "CLF", "COU", "MXV", "CHW", "CHE", "USN", "UYI", "UYW",
+            "ZZZ"
+        ]
+
+        for code in excludedCodes {
+            do {
+                _ = try CurrencyCatalog.shared.definition(for: code)
+                Issue.record("Expected \(code) to be unsupported")
+            } catch let error as MoneyError {
+                #expect(error == .unsupportedCurrency(code))
+            } catch {
+                Issue.record("Expected typed unsupported-currency error for \(code), got \(error)")
+            }
+        }
+    }
+
+    @Test func exactScaleRejectsFractionalKRWFourthDecimalBHDAndThirdDecimalTwoScale() {
+        let cases = [("1.1", "KRW"), ("1.2345", "BHD"), ("1.001", "EUR")]
+
+        for (amount, currency) in cases {
+            do {
+                _ = try Money(amount: Decimal(string: amount)!, currency: currency)
+                Issue.record("Expected \(currency) amount \(amount) to fail without rounding")
+            } catch let error as MoneyError {
+                #expect(error == .excessPrecision(currency: currency))
+            } catch {
+                Issue.record("Expected excess-precision error for \(currency), got \(error)")
+            }
+        }
+    }
+
+    @Test func canonicalScaleRoundTripsForZeroTwoAndThreeDecimalCurrencies() throws {
+        let values = [
+            ("0", "KRW", "0", Int64(0)),
+            ("12.34", "QAR", "12.34", Int64(1_234)),
+            ("-1.234", "BHD", "-1.234", Int64(-1_234))
+        ]
+
+        for (amount, currency, canonical, minorUnits) in values {
+            let money = try Money(amount: Decimal(string: amount)!, currency: currency)
+            #expect(try money.canonicalDecimalString() == canonical)
+            #expect(try money.minorUnits() == minorUnits)
+
+            let decoded = try Money(canonicalDecimal: canonical, currency: currency)
+            #expect(decoded == money)
+            #expect(try Money.fromMinorUnits(minorUnits, currency: currency) == money)
+        }
+    }
+
     @Test func excessPrecisionFailsWithoutRounding() {
         do {
             _ = try Money(amount: Decimal(string: "1.001")!, currency: "INR")

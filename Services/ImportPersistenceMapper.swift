@@ -312,7 +312,10 @@ struct ImportPersistenceMapper {
         cardInstrumentChoice: ConfirmedCardInstrumentChoiceDTO = .unspecified,
         cardAssociationAuthority: String = "user_confirmed",
         cardRelationshipKind: CardInstrumentRelationshipKind? = nil,
-        relatedInstrumentId: String? = nil
+        relatedInstrumentId: String? = nil,
+        cardSectionChoices: [String: ConfirmedCardInstrumentChoiceDTO] = [:],
+        cardSectionAuthorities: [String: String] = [:],
+        cardSectionRelationships: [String: (kind: CardInstrumentRelationshipKind, relatedInstrumentId: String)] = [:]
     ) throws -> ConfirmedImportPlanDTO {
         try confirmedImportPlan(
             financialDocument: financialDocument,
@@ -333,7 +336,10 @@ struct ImportPersistenceMapper {
             cardInstrumentChoice: cardInstrumentChoice,
             cardAssociationAuthority: cardAssociationAuthority,
             cardRelationshipKind: cardRelationshipKind,
-            relatedInstrumentId: relatedInstrumentId
+            relatedInstrumentId: relatedInstrumentId,
+            cardSectionChoices: cardSectionChoices,
+            cardSectionAuthorities: cardSectionAuthorities,
+            cardSectionRelationships: cardSectionRelationships
         )
     }
 
@@ -349,7 +355,10 @@ struct ImportPersistenceMapper {
         cardInstrumentChoice: ConfirmedCardInstrumentChoiceDTO = .unspecified,
         cardAssociationAuthority: String = "user_confirmed",
         cardRelationshipKind: CardInstrumentRelationshipKind? = nil,
-        relatedInstrumentId: String? = nil
+        relatedInstrumentId: String? = nil,
+        cardSectionChoices: [String: ConfirmedCardInstrumentChoiceDTO] = [:],
+        cardSectionAuthorities: [String: String] = [:],
+        cardSectionRelationships: [String: (kind: CardInstrumentRelationshipKind, relatedInstrumentId: String)] = [:]
     ) throws -> ConfirmedImportPlanDTO {
         let payload = try payload(
             financialDocument: financialDocument,
@@ -456,7 +465,10 @@ struct ImportPersistenceMapper {
             instrumentChoice: cardInstrumentChoice,
             associationAuthority: cardAssociationAuthority,
             relationshipKind: cardRelationshipKind,
-            relatedInstrumentId: relatedInstrumentId
+            relatedInstrumentId: relatedInstrumentId,
+            sectionChoices: cardSectionChoices,
+            sectionAuthorities: cardSectionAuthorities,
+            sectionRelationships: cardSectionRelationships
         )
         return ConfirmedImportPlanDTO(
             providerGeneration: providerGeneration,
@@ -498,7 +510,10 @@ struct ImportPersistenceMapper {
         instrumentChoice: ConfirmedCardInstrumentChoiceDTO,
         associationAuthority: String,
         relationshipKind: CardInstrumentRelationshipKind?,
-        relatedInstrumentId: String?
+        relatedInstrumentId: String?,
+        sectionChoices: [String: ConfirmedCardInstrumentChoiceDTO],
+        sectionAuthorities: [String: String],
+        sectionRelationships: [String: (kind: CardInstrumentRelationshipKind, relatedInstrumentId: String)]
     ) throws -> ConfirmedCardImportPlanDTO? {
         guard let evidence = financialDocument.cardStatementEvidence else { return nil }
         guard financialDocument.metadata.institution == .amex,
@@ -506,29 +521,97 @@ struct ImportPersistenceMapper {
               financialDocument.metadata.fileFormat == .pdf,
               payload.normalizedDocument.profileId == AmericanExpressCreditCardPDFParser.profileID,
               payload.normalizedDocument.profileVersion == AmericanExpressCreditCardPDFParser.profileVersion,
-              evidence.instrumentSections.count == 1,
               payload.transactions.count == financialDocument.transactions.count,
               payload.transactions.count == evidence.transactionAnnotations.count,
               ["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"].contains(associationAuthority) else {
             throw ImportPersistenceError.conflictingTransactionProvenance
         }
-        let proposedInstrumentID = "card-instrument-\(payload.importSession.id.lowercased())"
-        let selectedInstrumentID: String
-        switch instrumentChoice {
-        case .unspecified:
-            selectedInstrumentID = proposedInstrumentID
-        case .createProposedInstrument:
-            selectedInstrumentID = proposedInstrumentID
-        case .useExistingInstrument(let instrumentId):
-            selectedInstrumentID = instrumentId
+        let statementID = "card-statement-\(payload.importSession.id.lowercased())"
+        let sectionCount = evidence.instrumentSections.count
+        var selectedInstrumentIDs = [String: String]()
+        var sectionDecisions = [ConfirmedCardSectionDecisionDTO]()
+        for section in evidence.instrumentSections {
+            let sectionID = section.documentScopedSectionID
+            let choice = sectionChoices[sectionID] ?? (sectionCount == 1 ? instrumentChoice : .unspecified)
+            let authority = sectionAuthorities[sectionID] ?? associationAuthority
+            guard ["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"].contains(authority) else {
+                throw ImportPersistenceError.conflictingTransactionProvenance
+            }
+            let proposedInstrumentID = sectionCount == 1
+                ? "card-instrument-\(payload.importSession.id.lowercased())"
+                : "card-instrument-\(payload.importSession.id.lowercased())-\(section.sourceOrdinal)"
+            let selectedInstrumentID: String
+            switch choice {
+            case .unspecified, .createProposedInstrument:
+                selectedInstrumentID = proposedInstrumentID
+            case .useExistingInstrument(let instrumentId):
+                selectedInstrumentID = instrumentId
+            }
+            selectedInstrumentIDs[sectionID] = selectedInstrumentID
+            let proposed = CardInstrumentDTO(
+                id: proposedInstrumentID,
+                workspaceId: workspaceId,
+                liabilityAccountId: selectedAccountId,
+                lifecycleStateCode: CardInstrumentLifecycleState.unknown.rawValue,
+                createdAtISO: payload.completedAtISO
+            )
+            let durableSectionID = "card-section-\(payload.importSession.id.lowercased())-\(section.sourceOrdinal)"
+            let sectionDTO = CardStatementSectionDTO(
+                id: durableSectionID,
+                cardStatementId: statementID,
+                documentScopedSectionId: sectionID,
+                sourceOrdinal: section.sourceOrdinal,
+                instrumentId: selectedInstrumentID,
+                holderLabel: section.holderLabel,
+                signedTotalCurrency: section.signedNetTotal.currency.code,
+                signedTotalMinor: try section.signedNetTotal.minorUnits(),
+                signedTotalDecimal: try section.signedNetTotal.canonicalDecimalString(),
+                reconciliationRuleCode: section.reconciliationRuleIdentifier
+            )
+            let observations = section.sourceIdentityObservations.map { observation in
+                CardStatementSectionObservationDTO(
+                    id: "card-section-observation-\(payload.importSession.id.lowercased())-\(section.sourceOrdinal)-\(observation.kind.rawValue)",
+                    cardStatementSectionId: durableSectionID,
+                    workspaceId: workspaceId,
+                    documentId: payload.document.id,
+                    importSessionId: payload.importSession.id,
+                    normalizedDocumentId: payload.normalizedDocument.id,
+                    parserProfileId: payload.normalizedDocument.profileId,
+                    parserProfileVersion: payload.normalizedDocument.profileVersion,
+                    observationKind: observation.kind.rawValue,
+                    sourceValue: observation.value,
+                    associationAuthority: authority,
+                    createdAtISO: payload.completedAtISO
+                )
+            }
+            let requestedRelationship = sectionRelationships[sectionID] ?? {
+                guard sectionCount == 1, let relationshipKind, let relatedInstrumentId else { return nil }
+                return (relationshipKind, relatedInstrumentId)
+            }()
+            let relationships: [CardInstrumentRelationshipDTO]
+            if case .createProposedInstrument = choice, let requestedRelationship {
+                relationships = [CardInstrumentRelationshipDTO(
+                    id: "card-relationship-\(payload.importSession.id.lowercased())-\(section.sourceOrdinal)",
+                    workspaceId: workspaceId,
+                    liabilityAccountId: selectedAccountId,
+                    predecessorInstrumentId: requestedRelationship.relatedInstrumentId,
+                    successorInstrumentId: proposedInstrumentID,
+                    relationshipKind: requestedRelationship.kind.rawValue,
+                    authority: "user_confirmed",
+                    effectiveDateISO: nil,
+                    createdAtISO: payload.completedAtISO
+                )]
+            } else {
+                relationships = []
+            }
+            sectionDecisions.append(ConfirmedCardSectionDecisionDTO(
+                instrumentChoice: choice,
+                proposedInstrument: proposed,
+                section: sectionDTO,
+                sourceObservations: observations,
+                relationships: relationships
+            ))
         }
-        let proposed = CardInstrumentDTO(
-            id: proposedInstrumentID,
-            workspaceId: workspaceId,
-            liabilityAccountId: selectedAccountId,
-            lifecycleStateCode: CardInstrumentLifecycleState.unknown.rawValue,
-            createdAtISO: payload.completedAtISO
-        )
         let accountObservations = evidence.accountSourceIdentityObservations.map { observation in
             CardSourceIdentityObservationDTO(
                 id: "card-observation-\(payload.importSession.id.lowercased())-account-\(observation.kind.rawValue)",
@@ -546,24 +629,6 @@ struct ImportPersistenceMapper {
                 createdAtISO: payload.completedAtISO
             )
         }
-        let instrumentObservations = evidence.instrumentSections[0].sourceIdentityObservations.map { observation in
-            CardSourceIdentityObservationDTO(
-                id: "card-observation-\(payload.importSession.id.lowercased())-instrument-\(observation.kind.rawValue)",
-                workspaceId: workspaceId,
-                documentId: payload.document.id,
-                importSessionId: payload.importSession.id,
-                normalizedDocumentId: payload.normalizedDocument.id,
-                parserProfileId: payload.normalizedDocument.profileId,
-                parserProfileVersion: payload.normalizedDocument.profileVersion,
-                subjectKind: observation.subject.rawValue,
-                subjectId: selectedInstrumentID,
-                observationKind: observation.kind.rawValue,
-                sourceValue: observation.value,
-                associationAuthority: associationAuthority,
-                createdAtISO: payload.completedAtISO
-            )
-        }
-        let statementID = "card-statement-\(payload.importSession.id.lowercased())"
         let statement = CardStatementDTO(
             id: statementID,
             workspaceId: workspaceId,
@@ -605,7 +670,10 @@ struct ImportPersistenceMapper {
                 instrumentID = nil
             case .instrument(let value):
                 sectionID = value
-                instrumentID = selectedInstrumentID
+                guard let selected = selectedInstrumentIDs[value] else {
+                    throw ImportPersistenceError.conflictingTransactionProvenance
+                }
+                instrumentID = selected
             }
             return CardTransactionEvidenceDTO(
                 id: "card-transaction-evidence-\(transaction.id.lowercased())",
@@ -621,31 +689,125 @@ struct ImportPersistenceMapper {
                 originalAmountDecimal: try annotation.originalMerchantMoney.map { try $0.canonicalDecimalString() }
             )
         }
-        let relationships: [CardInstrumentRelationshipDTO]
-        if case .createProposedInstrument = instrumentChoice, let relationshipKind, let relatedInstrumentId {
-            relationships = [CardInstrumentRelationshipDTO(
-                id: "card-relationship-\(payload.importSession.id.lowercased())",
-                workspaceId: workspaceId,
-                liabilityAccountId: selectedAccountId,
-                predecessorInstrumentId: relatedInstrumentId,
-                successorInstrumentId: proposedInstrumentID,
-                relationshipKind: relationshipKind.rawValue,
-                authority: "user_confirmed",
-                effectiveDateISO: nil,
-                createdAtISO: payload.completedAtISO
-            )]
+        let projectionID = "card-semantic-projection-\(payload.importSession.id.lowercased())"
+        let projectionSections = sectionDecisions.map { decision in
+            CardStatementSemanticProjectionSectionDTO(
+                id: "\(projectionID)-section-\(decision.section.sourceOrdinal)",
+                projectionId: projectionID,
+                sourceOrdinal: decision.section.sourceOrdinal,
+                documentScopedSectionId: decision.section.documentScopedSectionId,
+                signedTotalCurrency: decision.section.signedTotalCurrency,
+                signedTotalMinor: decision.section.signedTotalMinor,
+                signedTotalDecimal: decision.section.signedTotalDecimal,
+                reconciliationRuleCode: decision.section.reconciliationRuleCode
+            )
+        }
+        let sectionOrdinals = Dictionary(uniqueKeysWithValues: projectionSections.map {
+            ($0.documentScopedSectionId, $0.sourceOrdinal)
+        })
+        let projectionEvents = try zip(financialDocument.transactions, zip(payload.transactions, transactionEvidence)).map {
+            source, pair -> CardStatementSemanticProjectionEventPlanDTO in
+            let (transaction, persistedEvidence) = pair
+            guard let provenance = source.sourceProvenance.first,
+                  source.sourceProvenance.count == 1,
+                  let normalizedRow = transaction.rawRows.first,
+                  transaction.rawRows.count == 1,
+                  normalizedRow.sourceOrdinal == provenance.sourceOrdinal,
+                  let postingDate = source.statementDate else {
+                throw ImportPersistenceError.missingTransactionProvenance
+            }
+            return CardStatementSemanticProjectionEventPlanDTO(
+                incomingTransactionId: transaction.id,
+                normalizedRowId: normalizedRow.normalizedRowId,
+                sourceOrdinal: provenance.sourceOrdinal,
+                postingDateISO: postingDate.canonical,
+                sourceTransactionDateISO: persistedEvidence.sourceTransactionDateISO,
+                liabilityEffectCode: persistedEvidence.liabilityEffectCode,
+                postedCurrency: source.money.currency.code,
+                postedAmountMinor: try source.money.minorUnits(),
+                postedAmountDecimal: try source.money.canonicalDecimalString(),
+                originalCurrency: persistedEvidence.originalCurrency,
+                originalAmountMinor: persistedEvidence.originalAmountMinor,
+                originalAmountDecimal: persistedEvidence.originalAmountDecimal,
+                sourceReference: source.reference,
+                rowScopeCode: persistedEvidence.rowScopeCode,
+                documentScopedSectionId: persistedEvidence.documentScopedSectionId,
+                documentSectionOrdinal: persistedEvidence.documentScopedSectionId.flatMap { sectionOrdinals[$0] }
+            )
+        }.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
+        let provisionalProjection = CardStatementSemanticProjectionDTO(
+            id: projectionID,
+            algorithmIdentifier: CardStatementSemanticProjectionDTO.algorithm,
+            digest: String(repeating: "0", count: 64),
+            institutionCode: Institution.amex.rawValue,
+            statementFamilyCode: "amex.credit-card.pdf@1",
+            parserProfileId: payload.normalizedDocument.profileId,
+            parserProfileVersion: payload.normalizedDocument.profileVersion,
+            statementDateISO: statement.statementDateISO,
+            statementStartDateISO: statement.statementStartDateISO,
+            statementEndDateISO: statement.statementEndDateISO,
+            nativeCurrency: statement.statementCurrency,
+            reconciliationRuleCode: statement.reconciliationRuleCode,
+            summaryComponents: summary,
+            sections: projectionSections,
+            events: projectionEvents
+        )
+        let semanticProjection = CardStatementSemanticProjectionDTO(
+            id: provisionalProjection.id,
+            algorithmIdentifier: provisionalProjection.algorithmIdentifier,
+            digest: provisionalProjection.calculatedDigest(),
+            institutionCode: provisionalProjection.institutionCode,
+            statementFamilyCode: provisionalProjection.statementFamilyCode,
+            parserProfileId: provisionalProjection.parserProfileId,
+            parserProfileVersion: provisionalProjection.parserProfileVersion,
+            statementDateISO: provisionalProjection.statementDateISO,
+            statementStartDateISO: provisionalProjection.statementStartDateISO,
+            statementEndDateISO: provisionalProjection.statementEndDateISO,
+            nativeCurrency: provisionalProjection.nativeCurrency,
+            reconciliationRuleCode: provisionalProjection.reconciliationRuleCode,
+            summaryComponents: provisionalProjection.summaryComponents,
+            sections: provisionalProjection.sections,
+            events: provisionalProjection.events
+        )
+        guard semanticProjection.isValid(), let firstDecision = sectionDecisions.first else {
+            throw ImportPersistenceError.conflictingTransactionProvenance
+        }
+        let legacyInstrumentObservations: [CardSourceIdentityObservationDTO]
+        if sectionCount == 1 {
+            legacyInstrumentObservations = zip(
+                evidence.instrumentSections[0].sourceIdentityObservations,
+                firstDecision.sourceObservations
+            ).map { observation, sectionObservation in
+                CardSourceIdentityObservationDTO(
+                    id: "card-observation-\(payload.importSession.id.lowercased())-instrument-\(observation.kind.rawValue)",
+                    workspaceId: sectionObservation.workspaceId,
+                    documentId: sectionObservation.documentId,
+                    importSessionId: sectionObservation.importSessionId,
+                    normalizedDocumentId: sectionObservation.normalizedDocumentId,
+                    parserProfileId: sectionObservation.parserProfileId,
+                    parserProfileVersion: sectionObservation.parserProfileVersion,
+                    subjectKind: observation.subject.rawValue,
+                    subjectId: firstDecision.section.instrumentId,
+                    observationKind: observation.kind.rawValue,
+                    sourceValue: observation.value,
+                    associationAuthority: sectionObservation.associationAuthority,
+                    createdAtISO: sectionObservation.createdAtISO
+                )
+            }
         } else {
-            relationships = []
+            legacyInstrumentObservations = []
         }
         return ConfirmedCardImportPlanDTO(
             liabilityAccountId: selectedAccountId,
-            instrumentChoice: instrumentChoice,
-            proposedInstrument: proposed,
-            sourceObservations: accountObservations + instrumentObservations,
-            relationships: relationships,
+            instrumentChoice: firstDecision.instrumentChoice,
+            proposedInstrument: firstDecision.proposedInstrument,
+            sourceObservations: accountObservations + legacyInstrumentObservations,
+            relationships: sectionDecisions.flatMap(\.relationships),
             statement: statement,
             summaryComponents: summary,
-            transactionEvidence: transactionEvidence
+            transactionEvidence: transactionEvidence,
+            sectionDecisions: sectionDecisions,
+            semanticProjection: semanticProjection
         )
     }
 

@@ -6,6 +6,8 @@ enum AmericanExpressCreditCardPDFParserError: Error, Equatable, LocalizedError {
     case changedHeader
     case malformedSourceEvidence
     case malformedRow(sourceOrdinal: Int)
+    case unsupportedCurrency(String)
+    case excessCurrencyPrecision(String)
 
     var errorDescription: String? {
         switch self {
@@ -13,6 +15,8 @@ enum AmericanExpressCreditCardPDFParserError: Error, Equatable, LocalizedError {
         case .changedHeader: return "The normalized Amex columns changed."
         case .malformedSourceEvidence: return "Amex card statement evidence is malformed."
         case .malformedRow(let ordinal): return "Amex row \(ordinal) is malformed."
+        case .unsupportedCurrency: return "Amex original Money uses an unsupported currency."
+        case .excessCurrencyPrecision: return "Amex original Money exceeds the currency scale."
         }
     }
 }
@@ -35,11 +39,20 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
               !document.rows.isEmpty else {
             throw AmericanExpressCreditCardPDFParserError.changedHeader
         }
-        let fragments = Dictionary(uniqueKeysWithValues: document.sourceContext.preTransactionFragments.compactMap { fragment -> (String, String)? in
+        let parsedFragments = document.sourceContext.preTransactionFragments.compactMap { fragment -> [String]? in
             let fields = fragment.text.split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false)
             guard fields.count == 2 else { return nil }
-            return (String(fields[0]), String(fields[1]))
-        })
+            return [String(fields[0]), String(fields[1])]
+        }
+        let commonPairs = parsedFragments.filter { $0[0] != "INSTRUMENT_SECTION" }.map { ($0[0], $0[1]) }
+        guard Set(commonPairs.map(\.0)).count == commonPairs.count else {
+            throw AmericanExpressCreditCardPDFParserError.malformedSourceEvidence
+        }
+        let fragments = Dictionary(uniqueKeysWithValues: commonPairs)
+        let sectionFragments = document.sourceContext.preTransactionFragments.compactMap { fragment -> [String]? in
+            let fields = fragment.text.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+            return fields.first == "INSTRUMENT_SECTION" ? fields : nil
+        }
         guard let membership = fragments["MEMBERSHIP_NUMBER"],
               let statementDateText = fragments["STATEMENT_DATE"],
               let periodText = fragments["PERIOD"],
@@ -48,8 +61,7 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
               let debitsText = fragments["NEW_DEBITS"],
               let newBalanceText = fragments["NEW_BALANCE"],
               let dueDateText = fragments["DUE_DATE"],
-              let cardAccount = fragments["CARD_ACCOUNT_NUMBER"],
-              let instrumentTotalText = fragments["INSTRUMENT_TOTAL"] else {
+              !sectionFragments.isEmpty else {
             throw AmericanExpressCreditCardPDFParserError.malformedSourceEvidence
         }
         do {
@@ -63,11 +75,31 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
                 subject: .liabilityAccount,
                 value: membership
             )
-            let instrumentObservation = try CardSourceIdentityObservation(
-                kind: .instrumentCardAccountNumber,
-                subject: .instrument,
-                value: cardAccount
-            )
+            let instrumentSections = try sectionFragments.enumerated().map { index, fields -> CardInstrumentSectionEvidence in
+                guard fields.count == 6,
+                      fields[1] == AmericanExpressCreditCardPDFNormalizer.instrumentSectionID(ordinal: index + 1),
+                      fields[5].isEmpty || fields[5] == "CR" else {
+                    throw AmericanExpressCreditCardPDFParserError.malformedSourceEvidence
+                }
+                let observation = try CardSourceIdentityObservation(
+                    kind: .instrumentCardAccountNumber,
+                    subject: .instrument,
+                    value: fields[2]
+                )
+                let magnitude = try Self.money(fields[4], currency: currency)
+                let signedTotal = try Money(
+                    amount: fields[5] == "CR" ? -magnitude.amount : magnitude.amount,
+                    currency: currency
+                )
+                return CardInstrumentSectionEvidence(
+                    documentScopedSectionID: fields[1],
+                    sourceOrdinal: index + 1,
+                    holderLabel: fields[3],
+                    sourceIdentityObservations: [observation],
+                    signedNetTotal: signedTotal
+                )
+            }
+            let sectionIDs = Set(instrumentSections.map(\.documentScopedSectionID))
             var transactions: [Transaction] = []
             var annotations: [CardTransactionAnnotation] = []
             for row in document.rows {
@@ -102,7 +134,7 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
                 let scope: CardTransactionScope
                 if row.values[8] == "account_level" && row.values[9].isEmpty {
                     scope = .accountLevel
-                } else if row.values[8] == "instrument_level" && row.values[9] == AmericanExpressCreditCardPDFNormalizer.instrumentSectionID {
+                } else if row.values[8] == "instrument_level" && sectionIDs.contains(row.values[9]) {
                     scope = .instrument(documentScopedSectionID: row.values[9])
                 } else {
                     throw AmericanExpressCreditCardPDFParserError.malformedRow(sourceOrdinal: row.rowNumber)
@@ -146,10 +178,7 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
                 declaredStatementPeriod: period,
                 nativeCurrency: currency,
                 accountSourceIdentityObservations: [accountObservation],
-                instrumentSections: [CardInstrumentSectionEvidence(
-                    documentScopedSectionID: AmericanExpressCreditCardPDFNormalizer.instrumentSectionID,
-                    sourceIdentityObservations: [instrumentObservation]
-                )],
+                instrumentSections: instrumentSections,
                 transactionAnnotations: annotations,
                 summaryComponents: [
                     .previousBalance(try Self.money(previousText, currency: currency)),
@@ -157,7 +186,7 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
                     .newDebits(try Self.money(debitsText, currency: currency)),
                     .newBalance(try Self.money(newBalanceText, currency: currency)),
                     .dueDate(try Self.shortDate(dueDateText)),
-                    .instrumentNetTotal(try Self.money(instrumentTotalText, currency: currency))
+                    .instrumentNetTotal(try Money.aggregate(instrumentSections.map(\.signedNetTotal)))
                 ],
                 reconciliationRuleIdentifier: CardStatementEvidence.amexQARReconciliationRule
             )
@@ -174,6 +203,10 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
             )
         } catch let error as AmericanExpressCreditCardPDFParserError {
             throw error
+        } catch MoneyError.unsupportedCurrency(let currency) {
+            throw AmericanExpressCreditCardPDFParserError.unsupportedCurrency(currency)
+        } catch MoneyError.excessPrecision(let currency) {
+            throw AmericanExpressCreditCardPDFParserError.excessCurrencyPrecision(currency)
         } catch {
             throw AmericanExpressCreditCardPDFParserError.malformedSourceEvidence
         }

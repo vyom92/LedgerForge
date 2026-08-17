@@ -40,11 +40,11 @@ final class AmericanExpressCreditCardPDFNormalizer {
     ]
     static let profileID = "amex.credit-card.pdf"
     static let profileVersion = "1"
-    static let instrumentSectionID = "instrument-section-1"
+    static func instrumentSectionID(ordinal: Int) -> String { "instrument-section-\(ordinal)" }
 
     private static let rowStartPattern = #"^(\d{2}-[A-Za-z]{3}-\d{4}) (\d{2}-[A-Za-z]{3}-\d{4}) (.+)$"#
     private static let postedMoney = #"[0-9]+(?:,[0-9]{3})*\.\d{2}"#
-    private static let originalMoney = #"[0-9]+(?:,[0-9]{3})*(?:\.\d{2})?"#
+    private static let originalMoney = #"[0-9]+(?:,[0-9]{3})*(?:\.\d+)?"#
 
     private let now: () -> Date
 
@@ -62,6 +62,14 @@ final class AmericanExpressCreditCardPDFNormalizer {
                 throw AmericanExpressCreditCardPDFNormalizationError.unsupportedNativeText
             }
             return value
+        }
+        return try normalize(text: text, pageTexts: pages, fileURL: fileURL)
+    }
+
+    func normalize(text: String, pageTexts pages: [String], fileURL: URL) throws -> AmericanExpressCreditCardPDFNormalizationResult {
+        guard pages.count >= 3,
+              pages.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+            throw AmericanExpressCreditCardPDFNormalizationError.unsupportedNativeText
         }
         let joined = pages.joined(separator: "\n")
         guard joined == text || Self.boundedWhitespace(joined) == Self.boundedWhitespace(text) else {
@@ -81,25 +89,40 @@ final class AmericanExpressCreditCardPDFNormalizer {
         let membership = try Self.uniqueCapture(#"Membership Number\s+Statement date\s+Statement Period\s+([0-9X-]+)\s+\d{2}/\d{2}/\d{2}\s+\d{2}/\d{2}/\d{2} to \d{2}/\d{2}/\d{2}"#, in: joined)
         let statementDate = try Self.uniqueCapture(#"Membership Number\s+Statement date\s+Statement Period\s+[0-9X-]+\s+(\d{2}/\d{2}/\d{2})\s+\d{2}/\d{2}/\d{2} to \d{2}/\d{2}/\d{2}"#, in: joined)
         let period = try Self.uniqueCapture(#"Membership Number\s+Statement date\s+Statement Period\s+[0-9X-]+\s+\d{2}/\d{2}/\d{2}\s+(\d{2}/\d{2}/\d{2} to \d{2}/\d{2}/\d{2})"#, in: joined)
-        let summaryPattern = #"Previous Balance\s+New Credits\s+New Debits\s+New Balance\s+Due Date\s+- \(QAR\) \+ \(QAR\) = \(QAR\) ([0-9,.]+)\s+([0-9,.]+)\s+([0-9,.]+)\s+([0-9,.]+)\s+(\d{2}/\d{2}/\d{2})"#
+        let summaryPattern = #"Previous Balance\s+New Credits\s+New Debits\s+New Balance\s+Due Date\s+- \(QAR\) \+ \(QAR\) = \(QAR\)\s+(?:\(QAR\)\s+)?([0-9,.]+)\s+([0-9,.]+)\s+([0-9,.]+)\s+([0-9,.]+)\s+(\d{2}/\d{2}/\d{2})"#
         guard let summary = Self.captures(summaryPattern, in: pages[0]), summary.count == 5 else {
             throw AmericanExpressCreditCardPDFNormalizationError.malformedSummary
         }
-        let sectionMatches = Self.allCaptures(#"New Transactions For .+ Card Account Number: ([0-9X-]+)"#, in: joined)
-        let totalMatches = Self.allCaptures(#"Total of New Transactions For .+ ([0-9]+(?:,[0-9]{3})*\.\d{2})"#, in: joined)
-        guard sectionMatches.count == 1, totalMatches.count == 1 else {
+        let sectionPattern = #"^New Transactions For (.+?) Card Account Number: ([0-9X-]+)$"#
+        let totalPattern = #"^Total of New Transactions For (.+?) ([0-9]+(?:,[0-9]{3})*\.\d{2})(?: ?(CR|DR))?$"#
+        let sectionMatches = Self.allCaptures(sectionPattern, in: joined)
+        let totalMatches = Self.allCaptures(totalPattern, in: joined)
+        guard !sectionMatches.isEmpty, !totalMatches.isEmpty,
+              sectionMatches.count >= totalMatches.count else {
             throw AmericanExpressCreditCardPDFNormalizationError.malformedInstrumentSection
         }
 
-        var scope = "account_level"
+        struct ParsedSection {
+            let id: String
+            let holder: String
+            let account: String
+            let total: String
+            let isCredit: Bool
+        }
+
+        var currentSectionID: String?
+        var currentSectionHolder: String?
+        var currentSectionAccount: String?
+        var parsedSections: [ParsedSection] = []
         var rows: [NormalizedRow] = []
-        var sectionOpened = false
-        var sectionClosed = false
         var sawRewards = false
         var sawInformation = false
         for (pageIndex, page) in pages.enumerated() {
             let hasFinancialRow = page.range(of: Self.rowStartPattern, options: [.regularExpression, .anchored], range: nil, locale: nil) != nil ||
                 page.range(of: #"(?m)^\d{2}-[A-Za-z]{3}-\d{4} \d{2}-[A-Za-z]{3}-\d{4} "#, options: .regularExpression) != nil
+            let hasFinancialStructure = hasFinancialRow ||
+                page.contains("Transaction Date Posting Date Details Non QAR Spending Amount in QAR") ||
+                page.contains("New Transactions For ") || page.contains("Total of New Transactions For ")
             if page.contains("Membership Rewards Period") {
                 guard !hasFinancialRow,
                       page.contains("Membership Rewards Account Number"),
@@ -111,7 +134,7 @@ final class AmericanExpressCreditCardPDFNormalizer {
                 sawRewards = true
                 continue
             }
-            if !hasFinancialRow && !page.contains("Transaction Date Posting Date Details Non QAR Spending Amount in QAR") {
+            if !hasFinancialStructure {
                 guard pageIndex == pages.count - 1,
                       page.contains("This Card is issued by AMEX (Middle East) B.S.C. (c)"),
                       !page.contains("New Transactions For"),
@@ -128,20 +151,37 @@ final class AmericanExpressCreditCardPDFNormalizer {
             var index = 0
             while index < lines.count {
                 let line = lines[index].trimmingCharacters(in: .whitespacesAndNewlines)
-                if line.hasPrefix("New Transactions For ") {
-                    guard !sectionOpened, !sectionClosed else {
-                        throw AmericanExpressCreditCardPDFNormalizationError.malformedInstrumentSection
+                if let opening = Self.captures(sectionPattern, in: line), opening.count == 2 {
+                    if currentSectionID != nil {
+                        guard currentSectionHolder == opening[0],
+                              currentSectionAccount == opening[1] else {
+                            throw AmericanExpressCreditCardPDFNormalizationError.malformedInstrumentSection
+                        }
+                    } else {
+                        currentSectionID = Self.instrumentSectionID(ordinal: parsedSections.count + 1)
+                        currentSectionHolder = opening[0]
+                        currentSectionAccount = opening[1]
                     }
-                    sectionOpened = true
-                    scope = "instrument_level"
                     index += 1
                     continue
                 }
-                if line.hasPrefix("Total of New Transactions For ") {
-                    guard sectionOpened, !sectionClosed else {
+                if let total = Self.captures(totalPattern, in: line), total.count == 3 {
+                    guard let sectionID = currentSectionID,
+                          let holder = currentSectionHolder,
+                          let account = currentSectionAccount,
+                          total[0] == holder else {
                         throw AmericanExpressCreditCardPDFNormalizationError.malformedInstrumentSection
                     }
-                    sectionClosed = true
+                    parsedSections.append(ParsedSection(
+                        id: sectionID,
+                        holder: holder,
+                        account: account,
+                        total: total[1],
+                        isCredit: total[2] == "CR"
+                    ))
+                    currentSectionID = nil
+                    currentSectionHolder = nil
+                    currentSectionAccount = nil
                     index += 1
                     continue
                 }
@@ -168,13 +208,18 @@ final class AmericanExpressCreditCardPDFNormalizer {
                     transactionDate: start[0],
                     postingDate: start[1],
                     block: block,
-                    scope: scope
+                    sectionID: currentSectionID
                 ))
             }
         }
-        guard !rows.isEmpty, sectionOpened, sectionClosed, sawRewards, sawInformation,
+        guard !rows.isEmpty, currentSectionID == nil, sawRewards, sawInformation,
               rows.first?.values[8] == "account_level",
-              rows.dropFirst().allSatisfy({ $0.values[8] == "instrument_level" }) else {
+              rows.dropFirst().allSatisfy({ $0.values[8] == "instrument_level" || $0.values[8] == "account_level" }),
+              parsedSections.count == totalMatches.count,
+              zip(parsedSections, totalMatches).allSatisfy({ section, capture in
+                  capture.count == 3 && section.holder == capture[0] && section.total == capture[1] &&
+                  section.isCredit == (capture[2] == "CR")
+              }) else {
             throw AmericanExpressCreditCardPDFNormalizationError.malformedInstrumentSection
         }
 
@@ -184,7 +229,7 @@ final class AmericanExpressCreditCardPDFNormalizer {
         document.firstTransactionRow = rows.first?.rowNumber
         document.columnCount = Self.logicalHeader.count
         document.encoding = "UTF-8"
-        let fragments: [NormalizedDocument.SourceFragment] = [
+        var fragments: [NormalizedDocument.SourceFragment] = [
             .init(sourceOrdinal: 1, text: "MEMBERSHIP_NUMBER\t\(membership)"),
             .init(sourceOrdinal: 2, text: "STATEMENT_DATE\t\(statementDate)"),
             .init(sourceOrdinal: 3, text: "PERIOD\t\(period)"),
@@ -192,10 +237,14 @@ final class AmericanExpressCreditCardPDFNormalizer {
             .init(sourceOrdinal: 5, text: "NEW_CREDITS\t\(summary[1])"),
             .init(sourceOrdinal: 6, text: "NEW_DEBITS\t\(summary[2])"),
             .init(sourceOrdinal: 7, text: "NEW_BALANCE\t\(summary[3])"),
-            .init(sourceOrdinal: 8, text: "DUE_DATE\t\(summary[4])"),
-            .init(sourceOrdinal: 9, text: "CARD_ACCOUNT_NUMBER\t\(sectionMatches[0][0])"),
-            .init(sourceOrdinal: 10, text: "INSTRUMENT_TOTAL\t\(totalMatches[0][0])")
+            .init(sourceOrdinal: 8, text: "DUE_DATE\t\(summary[4])")
         ]
+        for (index, section) in parsedSections.enumerated() {
+            fragments.append(.init(
+                sourceOrdinal: 9 + index,
+                text: "INSTRUMENT_SECTION\t\(section.id)\t\(section.account)\t\(section.holder)\t\(section.total)\t\(section.isCredit ? "CR" : "")"
+            ))
+        }
         return AmericanExpressCreditCardPDFNormalizationResult(
             document: document,
             rows: rows,
@@ -204,7 +253,7 @@ final class AmericanExpressCreditCardPDFNormalizer {
         )
     }
 
-    private static func normalizedRow(sourceOrdinal: Int, transactionDate: String, postingDate: String, block: [String], scope: String) throws -> NormalizedRow {
+    private static func normalizedRow(sourceOrdinal: Int, transactionDate: String, postingDate: String, block: [String], sectionID: String?) throws -> NormalizedRow {
         let amountOnly = #"^(\#(postedMoney))(?: (CR))?$"#
         let foreign = #"^(\#(originalMoney)) ([A-Z]{3})(?: (CR))? (\#(postedMoney))(?: (CR))?$"#
         var amountMatch: (original: String, currency: String, posted: String, credit: Bool)?
@@ -234,10 +283,11 @@ final class AmericanExpressCreditCardPDFNormalizer {
             throw AmericanExpressCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: sourceOrdinal)
         }
         let effect = amountMatch.credit ? CardLiabilityEffect.decreasesAmountOwed.rawValue : CardLiabilityEffect.increasesAmountOwed.rawValue
+        let scope = sectionID == nil ? "account_level" : "instrument_level"
         return NormalizedRow(rowNumber: sourceOrdinal, values: [
             transactionDate, postingDate, details.joined(separator: "\n"), reference,
             amountMatch.original, amountMatch.currency, amountMatch.posted, effect,
-            scope, scope == "instrument_level" ? instrumentSectionID : ""
+            scope, sectionID ?? ""
         ])
     }
 

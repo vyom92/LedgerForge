@@ -186,6 +186,10 @@ enum ImportAccountChoice: Equatable {
         accountId: String,
         instrumentChoice: ImportCardInstrumentChoice
     )
+    case useExistingCardLiabilityAccountSections(
+        accountId: String,
+        sectionChoices: [String: ImportCardInstrumentChoice]
+    )
 }
 
 enum ImportIdentityReview: Equatable, Sendable {
@@ -757,7 +761,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                     confirmedChoice = .createProposedAccount
                     selectedAccountId = proposedID
                 case .createNewCardLiabilityAccountAndInstrument,
-                     .useExistingCardLiabilityAccount:
+                     .useExistingCardLiabilityAccount,
+                     .useExistingCardLiabilityAccountSections:
                     confirmedChoice = .unspecified
                     selectedAccountId = proposedID
                 case nil:
@@ -814,7 +819,8 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                     confirmedChoice = .createProposedAccount
                     selectedAccountId = proposedID
                 case .createNewCardLiabilityAccountAndInstrument,
-                     .useExistingCardLiabilityAccount:
+                     .useExistingCardLiabilityAccount,
+                     .useExistingCardLiabilityAccountSections:
                     confirmedChoice = .unspecified
                     selectedAccountId = proposedID
                 case nil:
@@ -859,66 +865,132 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
     ) throws -> ConfirmedImportPlanDTO {
         guard let evidence = financialDocument.cardStatementEvidence,
               evidence.accountSourceIdentityObservations.count == 1,
-              evidence.instrumentSections.count == 1,
-              evidence.instrumentSections[0].sourceIdentityObservations.count == 1 else {
+              !evidence.instrumentSections.isEmpty,
+              evidence.instrumentSections.allSatisfy({ $0.sourceIdentityObservations.count == 1 }) else {
             throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
         }
         let snapshot = try provider.cardRepo.snapshot(workspaceId: mapper.workspaceId)
         let accountObservation = evidence.accountSourceIdentityObservations[0]
-        let instrumentObservation = evidence.instrumentSections[0].sourceIdentityObservations[0]
         let accountCandidates = Set(snapshot.sourceObservations.filter {
             $0.subjectKind == CardSourceIdentitySubject.liabilityAccount.rawValue &&
             $0.observationKind == accountObservation.kind.rawValue &&
             $0.sourceValue == accountObservation.value
         }.map(\.subjectId))
-        var mappings: [(accountID: String, instrumentID: String)] = []
+        var mappingsByAccount = [String: [String: [String]]]()
         for accountID in accountCandidates.sorted() {
-            let instruments = Set(snapshot.sourceObservations.filter { observation in
-                observation.subjectKind == CardSourceIdentitySubject.instrument.rawValue &&
-                observation.observationKind == instrumentObservation.kind.rawValue &&
-                observation.sourceValue == instrumentObservation.value &&
-                snapshot.instruments.contains(where: { instrument in
-                    instrument.id == observation.subjectId && instrument.liabilityAccountId == accountID
-                })
-            }.map(\.subjectId))
-            mappings.append(contentsOf: instruments.sorted().map { (accountID, $0) })
+            for section in evidence.instrumentSections {
+                let incoming = section.sourceIdentityObservations[0]
+                let instruments = Set(snapshot.sectionObservations.compactMap { observation -> String? in
+                    guard observation.observationKind == incoming.kind.rawValue,
+                          observation.sourceValue == incoming.value,
+                          let durableSection = snapshot.sections.first(where: {
+                              $0.id == observation.cardStatementSectionId
+                          }),
+                          snapshot.instruments.contains(where: {
+                              $0.id == durableSection.instrumentId && $0.liabilityAccountId == accountID
+                          }) else { return nil }
+                    return durableSection.instrumentId
+                }).sorted()
+                mappingsByAccount[accountID, default: [:]][section.documentScopedSectionID] = instruments
+            }
         }
 
         let proposedAccountID = "account-\(importSession.id.uuidString.lowercased())"
         let selectedAccountID: String
         let confirmedAccountChoice: ConfirmedImportAccountChoiceDTO
-        let instrumentChoice: ConfirmedCardInstrumentChoiceDTO
-        let authority: String
-        var relationshipKind: CardInstrumentRelationshipKind?
-        var relatedInstrumentID: String?
+        var accountAssociationAuthority = "user_confirmed"
+        var sectionChoices = [String: ConfirmedCardInstrumentChoiceDTO]()
+        var sectionAuthorities = [String: String]()
+        var sectionRelationships = [String: (kind: CardInstrumentRelationshipKind, relatedInstrumentId: String)]()
         switch accountChoice {
         case .createNewCardLiabilityAccountAndInstrument:
             selectedAccountID = proposedAccountID
             confirmedAccountChoice = .createProposedAccount
-            instrumentChoice = .createProposedInstrument
-            authority = "user_confirmed"
+            for section in evidence.instrumentSections {
+                sectionChoices[section.documentScopedSectionID] = .createProposedInstrument
+                sectionAuthorities[section.documentScopedSectionID] = "user_confirmed"
+            }
         case .useExistingCardLiabilityAccount(let accountID, let choice):
+            guard evidence.instrumentSections.count == 1 else {
+                throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+            }
             selectedAccountID = accountID
             confirmedAccountChoice = .useExistingAccount(accountId: accountID)
-            authority = "user_confirmed"
+            let sectionID = evidence.instrumentSections[0].documentScopedSectionID
+            sectionAuthorities[sectionID] = "user_confirmed"
             switch choice {
             case .reuseExistingInstrument(let instrumentID):
-                instrumentChoice = .useExistingInstrument(instrumentId: instrumentID)
+                sectionChoices[sectionID] = .useExistingInstrument(instrumentId: instrumentID)
             case .createNewInstrument(let relationship, let related):
-                instrumentChoice = .createProposedInstrument
-                relationshipKind = relationship
-                relatedInstrumentID = related
+                sectionChoices[sectionID] = .createProposedInstrument
+                if let relationship, let related {
+                    sectionRelationships[sectionID] = (relationship, related)
+                }
             }
-        case nil where mappings.count == 1:
-            selectedAccountID = mappings[0].accountID
-            confirmedAccountChoice = .useExistingAccount(accountId: mappings[0].accountID)
-            instrumentChoice = .useExistingInstrument(instrumentId: mappings[0].instrumentID)
-            authority = "prior_user_confirmed_mapping"
+        case .useExistingCardLiabilityAccountSections(let accountID, let choices):
+            guard Set(choices.keys) == Set(evidence.instrumentSections.map(\.documentScopedSectionID)) else {
+                throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+            }
+            selectedAccountID = accountID
+            confirmedAccountChoice = .useExistingAccount(accountId: accountID)
+            for section in evidence.instrumentSections {
+                let sectionID = section.documentScopedSectionID
+                guard let choice = choices[sectionID] else {
+                    throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+                }
+                sectionAuthorities[sectionID] = "user_confirmed"
+                switch choice {
+                case .reuseExistingInstrument(let instrumentID):
+                    sectionChoices[sectionID] = .useExistingInstrument(instrumentId: instrumentID)
+                case .createNewInstrument(let relationship, let related):
+                    sectionChoices[sectionID] = .createProposedInstrument
+                    if let relationship, let related {
+                        sectionRelationships[sectionID] = (relationship, related)
+                    }
+                }
+            }
+        case nil where mappingsByAccount.filter({ _, mapping in
+            let resolved = evidence.instrumentSections.compactMap {
+                mapping[$0.documentScopedSectionID]?.count == 1
+                    ? mapping[$0.documentScopedSectionID]?.first
+                    : nil
+            }
+            return resolved.count == evidence.instrumentSections.count &&
+                Set(resolved).count == evidence.instrumentSections.count
+        }).count == 1:
+            guard let resolved = mappingsByAccount.first(where: { _, mapping in
+                let instruments = evidence.instrumentSections.compactMap {
+                    mapping[$0.documentScopedSectionID]?.count == 1
+                        ? mapping[$0.documentScopedSectionID]?.first
+                        : nil
+                }
+                return instruments.count == evidence.instrumentSections.count &&
+                    Set(instruments).count == evidence.instrumentSections.count
+            }) else {
+                throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+            }
+            selectedAccountID = resolved.key
+            confirmedAccountChoice = .useExistingAccount(accountId: resolved.key)
+            accountAssociationAuthority = "prior_user_confirmed_mapping"
+            for section in evidence.instrumentSections {
+                let sectionID = section.documentScopedSectionID
+                guard let resolvedInstrumentIDs = resolved.value[sectionID],
+                      resolvedInstrumentIDs.count == 1,
+                      let resolvedInstrumentID = resolvedInstrumentIDs.first else {
+                    throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+                }
+                sectionChoices[sectionID] = .useExistingInstrument(
+                    instrumentId: resolvedInstrumentID
+                )
+                sectionAuthorities[sectionID] = "prior_user_confirmed_mapping"
+            }
         default:
             selectedAccountID = proposedAccountID
             confirmedAccountChoice = .unspecified
-            instrumentChoice = .unspecified
-            authority = "user_confirmed"
+            for section in evidence.instrumentSections {
+                sectionChoices[section.documentScopedSectionID] = .unspecified
+                sectionAuthorities[section.documentScopedSectionID] = "user_confirmed"
+            }
         }
         let plan = try mapper.confirmedImportPlan(
             financialDocument: financialDocument,
@@ -929,10 +1001,10 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             advisoryIdentity: .noMatch,
             accountChoice: confirmedAccountChoice,
             selectedAccountId: selectedAccountID,
-            cardInstrumentChoice: instrumentChoice,
-            cardAssociationAuthority: authority,
-            cardRelationshipKind: relationshipKind,
-            relatedInstrumentId: relatedInstrumentID
+            cardAssociationAuthority: accountAssociationAuthority,
+            cardSectionChoices: sectionChoices,
+            cardSectionAuthorities: sectionAuthorities,
+            cardSectionRelationships: sectionRelationships
         )
         try validate(confirmedPlan: plan)
         return plan
@@ -1026,7 +1098,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         if let evidence = financialDocument.cardStatementEvidence {
             let snapshot = try provider.cardRepo.snapshot(workspaceId: mapper.workspaceId)
             guard let accountObservation = evidence.accountSourceIdentityObservations.first,
-                  let instrumentObservation = evidence.instrumentSections.first?.sourceIdentityObservations.first else {
+                  evidence.instrumentSections.allSatisfy({ $0.sourceIdentityObservations.count == 1 }) else {
                 return .unavailable
             }
             let accountIDs = Set(snapshot.sourceObservations.filter {
@@ -1034,17 +1106,27 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
                 $0.observationKind == accountObservation.kind.rawValue &&
                 $0.sourceValue == accountObservation.value
             }.map(\.subjectId))
-            let exactMappings = snapshot.instruments.filter { instrument in
-                accountIDs.contains(instrument.liabilityAccountId) &&
-                snapshot.sourceObservations.contains {
-                    $0.subjectKind == CardSourceIdentitySubject.instrument.rawValue &&
-                    $0.subjectId == instrument.id &&
-                    $0.observationKind == instrumentObservation.kind.rawValue &&
-                    $0.sourceValue == instrumentObservation.value
+            let exactlyMappedAccounts = accountIDs.filter { accountID in
+                let resolvedInstruments = evidence.instrumentSections.compactMap { incomingSection -> String? in
+                    let incoming = incomingSection.sourceIdentityObservations[0]
+                    let mapped = Set(snapshot.sectionObservations.compactMap { observation -> String? in
+                        guard observation.observationKind == incoming.kind.rawValue,
+                              observation.sourceValue == incoming.value,
+                              let section = snapshot.sections.first(where: {
+                                  $0.id == observation.cardStatementSectionId
+                              }),
+                              snapshot.instruments.contains(where: {
+                                  $0.id == section.instrumentId && $0.liabilityAccountId == accountID
+                              }) else { return nil }
+                        return section.instrumentId
+                    })
+                    return mapped.count == 1 ? mapped.first : nil
                 }
+                return resolvedInstruments.count == evidence.instrumentSections.count &&
+                    Set(resolvedInstruments).count == evidence.instrumentSections.count
             }
-            if exactMappings.count == 1 {
-                return .matchedExisting(accountId: exactMappings[0].liabilityAccountId)
+            if exactlyMappedAccounts.count == 1, let accountID = exactlyMappedAccounts.first {
+                return .matchedExisting(accountId: accountID)
             }
             let eligible = try provider.accountRepo.accounts(workspaceId: mapper.workspaceId)
                 .filter { $0.accountType == "credit_card" && $0.nativeCurrency == evidence.nativeCurrency.code }

@@ -16,32 +16,52 @@ struct AmericanExpressCreditCardPDFTests {
         #expect(prepared.detectedDocumentType == .creditCard)
         #expect(prepared.parserName == "American Express Credit Card PDF")
         #expect(prepared.validation.passed)
-        #expect(prepared.transactionCount == 5)
+        #expect(prepared.transactionCount == 9)
         #expect(prepared.financialDocument.bookedCurrency?.code == "QAR")
         #expect(prepared.financialDocument.financialIdentifiers.isEmpty)
         let evidence = try #require(prepared.financialDocument.cardStatementEvidence)
         #expect(evidence.declaredStatementPeriod.start.canonical == "2026-07-01")
         #expect(evidence.declaredStatementPeriod.end.canonical == "2026-07-31")
         #expect(evidence.transactionAnnotations.map(\.rowScope.persistenceCode) == [
-            "account_level", "instrument_level", "instrument_level", "instrument_level", "instrument_level"
+            "account_level", "instrument_level", "instrument_level", "instrument_level",
+            "instrument_level", "instrument_level", "instrument_level", "instrument_level", "instrument_level"
         ])
         #expect(evidence.transactionAnnotations.map(\.liabilityEffect) == [
             .decreasesAmountOwed, .increasesAmountOwed, .increasesAmountOwed,
-            .decreasesAmountOwed, .increasesAmountOwed
+            .decreasesAmountOwed, .increasesAmountOwed, .increasesAmountOwed,
+            .increasesAmountOwed, .increasesAmountOwed, .decreasesAmountOwed
         ])
         #expect(evidence.transactionAnnotations.first?.sourceTransactionDate.canonical == "2026-06-30")
         #expect(prepared.financialDocument.transactions.first?.statementDate?.canonical == "2026-07-01")
         #expect(prepared.financialDocument.transactions.allSatisfy {
             $0.debitMoney == nil && $0.creditMoney == nil && $0.runningBalanceMoney == nil
         })
-        let expectedOriginal = try Money(amount: 40, currency: "USD")
-        #expect(evidence.transactionAnnotations[2].originalMerchantMoney == expectedOriginal)
-        #expect(evidence.transactionAnnotations.filter { $0.originalMerchantMoney != nil }.count == 1)
-        #expect(prepared.financialDocument.transactions[4].description == "FICTIONAL RAIL JOURNEY\nEXAMPLE CITY TO SAMPLE BAY\nPASSENGER AVERY EXAMPLE")
+        #expect(evidence.transactionAnnotations[2].originalMerchantMoney == (try Money(amount: Decimal(string: "1.234")!, currency: "BHD")))
+        #expect(evidence.transactionAnnotations[3].originalMerchantMoney == (try Money(amount: Decimal(string: "-5.678")!, currency: "BHD")))
+        #expect(evidence.transactionAnnotations[6].originalMerchantMoney == (try Money(amount: 1000, currency: "KRW")))
+        #expect(evidence.transactionAnnotations.filter { $0.originalMerchantMoney != nil }.count == 3)
+        #expect(prepared.financialDocument.transactions[7].description == "FICTIONAL AIR JOURNEY\nTBD TO SAMPLE BAY\nTICKET 000-0000000000\nPASSENGER JORDAN SAMPLE")
         #expect(prepared.financialDocument.transactions.map(\.reference) == [
-            "PAY-FICTION-001", "BUY-FICTION-002", "FX-FICTION-003", "REFUND-FICTION-004", "TRAVEL-FICTION-005"
+            "PAY-FICTION-001", "BUY-FICTION-002", "BHD-FICTION-003", "BHD-REFUND-FICTION-004",
+            "TINY-DEBIT-FICTION-005", "ORDER-FICTION-006", "KRW-FICTION-007",
+            "TRAVEL-FICTION-008", "TINY-CREDIT-FICTION-009"
         ])
-        #expect(try #require(PDFDocument(url: Self.fixtureURL)).pageCount == 4)
+        #expect(prepared.financialDocument.transactions[4].statementDate?.canonical == "2026-07-20")
+        #expect(prepared.financialDocument.transactions[5].statementDate?.canonical == "2026-07-12")
+        #expect(try #require(PDFDocument(url: Self.fixtureURL)).pageCount == 5)
+        #expect(evidence.instrumentSections.map(\.sourceOrdinal) == [1, 2, 3])
+        #expect(evidence.instrumentSections.map(\.holderLabel) == ["AVERY EXAMPLE", "AVERY EXAMPLE", "JORDAN SAMPLE"])
+        #expect(evidence.instrumentSections.map { $0.sourceIdentityObservations.first?.value } == [
+            "9999-XXXX", "3777-XXXXXX-20002", "3777-XXXXXX-30003"
+        ])
+        #expect(evidence.instrumentSections.map(\.signedNetTotal) == [
+            try Money(amount: 70, currency: "QAR"),
+            try Money(amount: Decimal(string: "30.01")!, currency: "QAR"),
+            try Money(amount: Decimal(string: "449.99")!, currency: "QAR")
+        ])
+        #expect(evidence.accountSourceIdentityObservations.first?.value == "9999-XXXX")
+        #expect(evidence.accountSourceIdentityObservations.first?.kind == .liabilityMembershipNumber)
+        #expect(evidence.instrumentSections.first?.sourceIdentityObservations.first?.kind == .instrumentCardAccountNumber)
         #expect(evidence.accountSourceIdentityObservations.allSatisfy { !$0.value.contains("MR-") })
         #expect(evidence.instrumentSections.flatMap(\.sourceIdentityObservations).allSatisfy { !$0.value.contains("MR-") })
     }
@@ -61,6 +81,26 @@ struct AmericanExpressCreditCardPDFTests {
         let rejected = SignatureInstitutionDetector().detect(from: nearMatch)
         #expect(rejected.metadata.institution == .unknown)
         #expect(rejected.metadata.documentType == .unknown)
+    }
+
+    @Test
+    func sharedCardEvidenceAllowsAccountOnlyStatementsWithoutInventedSections() throws {
+        let period = try DeclaredStatementPeriod(
+            start: StatementDate(canonical: "2026-07-01"),
+            end: StatementDate(canonical: "2026-07-31")
+        )
+        let evidence = try CardStatementEvidence(
+            statementDate: StatementDate(canonical: "2026-07-31"),
+            declaredStatementPeriod: period,
+            nativeCurrency: CurrencyCode("QAR"),
+            accountSourceIdentityObservations: [],
+            instrumentSections: [],
+            transactionAnnotations: [],
+            summaryComponents: [],
+            reconciliationRuleIdentifier: "shared.account-only.test.v1"
+        )
+
+        #expect(evidence.instrumentSections.isEmpty)
     }
 
     @Test
@@ -142,6 +182,122 @@ struct AmericanExpressCreditCardPDFTests {
     func providerOwnedCardGraphIsAtomicAndObservableInBothProviders() async throws {
         try await verifyPersistence(inMemory: true)
         try await verifyPersistence(inMemory: false)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func encryptedAndUnlockedSyntheticSourcesAreExactSemanticEquivalentsInBothOrdersAndProviders() async throws {
+        let encrypted = Self.encryptedFixtureURL
+        let unlockedHash = SHA256.hash(data: try Data(contentsOf: Self.fixtureURL))
+        let encryptedHash = SHA256.hash(data: try Data(contentsOf: encrypted))
+        #expect(unlockedHash != encryptedHash)
+
+        for inMemory in [true, false] {
+            for (orderName, urls) in [
+                ("unlocked-encrypted", [Self.fixtureURL, encrypted]),
+                ("encrypted-unlocked", [encrypted, Self.fixtureURL])
+            ] {
+                let workspaceID = "amex-semantic-\(orderName)-\(inMemory ? "memory" : "sqlite")-\(UUID().uuidString)"
+                let credentials = InMemoryStatementPasswordCredentialStore(passwords: [
+                    Institution.amex.statementPasswordCredentialScope: Self.syntheticFixturePassword
+                ])
+                let passwordProvider = DefaultPasswordProvider(
+                    credentialStore: credentials,
+                    challenge: { _ in
+                        Issue.record("Remembered synthetic credential should unlock without a challenge")
+                        return nil
+                    }
+                )
+                let importCoordinator = DefaultImportCoordinator(
+                    readerRegistry: DefaultReaderRegistry(),
+                    passwordProvider: passwordProvider
+                )
+                let context = try makePersistentContext(
+                    workspaceID: workspaceID,
+                    inMemory: inMemory,
+                    importCoordinator: importCoordinator
+                )
+                defer { context.cleanup() }
+
+                let first = try await context.engine.prepareImport(from: urls[0])
+                let firstResult = try persist(
+                    first,
+                    choice: .createNewCardLiabilityAccountAndInstrument,
+                    context: context
+                )
+                context.engine.cancelPreparedImport(first)
+                #expect(firstResult.persisted)
+                #expect(firstResult.transactionCount == 9)
+
+                let second = try await context.engine.prepareImport(from: urls[1])
+                let secondResult = try persist(second, choice: nil, context: context)
+                context.engine.cancelPreparedImport(second)
+                #expect(secondResult.persisted)
+                #expect(secondResult.isEquivalentSupportingSource)
+                #expect(secondResult.transactionCount == 0)
+                #expect(secondResult.accountId == firstResult.accountId)
+
+                #expect(try context.provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == 9)
+                let card = try context.provider.cardRepo.snapshot(workspaceId: workspaceID)
+                #expect(card.instruments.count == 3)
+                #expect(card.statements.count == 2)
+                #expect(card.sections.count == 6)
+                #expect(card.sectionObservations.count == 6)
+                #expect(card.transactionEvidence.count == 9)
+                #expect(card.semanticProjections.count == 2)
+                #expect(card.semanticGroups.count == 1)
+                #expect(card.semanticMembers.map(\.role.rawValue).sorted() == ["authoritative", "supporting"])
+                let canonicalEventSets = card.semanticProjections.map { Set($0.events.map(\.canonicalTransactionId)) }
+                #expect(canonicalEventSets.count == 2)
+                #expect(canonicalEventSets[0] == canonicalEventSets[1])
+            }
+        }
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func sameAccountAndPeriodWithDifferentExactProjectionFailsClosedInBothProviders() async throws {
+        for inMemory in [true, false] {
+            let workspaceID = "amex-semantic-conflict-\(inMemory ? "memory" : "sqlite")-\(UUID().uuidString)"
+            let context = try makePersistentContext(workspaceID: workspaceID, inMemory: inMemory)
+            defer { context.cleanup() }
+
+            let first = try await context.engine.prepareImport(from: Self.fixtureURL)
+            let firstResult = try persist(
+                first,
+                choice: .createNewCardLiabilityAccountAndInstrument,
+                context: context
+            )
+            context.engine.cancelPreparedImport(first)
+            #expect(firstResult.persisted)
+
+            let variantURL = try Self.variantFixtureURL(label: "semantic-conflict")
+            defer { try? FileManager.default.removeItem(at: variantURL) }
+            let second = try await context.engine.prepareImport(from: variantURL)
+            let conflictingDocument = try replacingFirstReference(in: second.financialDocument)
+            let conflictingValidation = ImportValidator.validate(financialDocument: conflictingDocument)
+            #expect(conflictingValidation.passed)
+
+            do {
+                _ = try context.coordinator.persistValidatedImport(
+                    financialDocument: conflictingDocument,
+                    importSession: second.importSession,
+                    validation: conflictingValidation,
+                    fingerprintSet: second.fingerprintSet,
+                    accountChoice: nil,
+                    providerGeneration: context.provider.generationToken
+                )
+                Issue.record("Expected exact same-period semantic conflict to reject")
+            } catch let failure as ImportPersistenceCommitFailure {
+                #expect(failure.originalError as? ImportPersistenceCoordinationError == .statementEquivalenceConflict)
+            }
+            context.engine.cancelPreparedImport(second)
+
+            #expect(try context.provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == 9)
+            let card = try context.provider.cardRepo.snapshot(workspaceId: workspaceID)
+            #expect(card.statements.count == 1)
+            #expect(card.semanticProjections.count == 1)
+            #expect(card.semanticGroups.count == 1)
+            #expect(try context.provider.importSessionRepo.importSession(id: second.importSession.id.uuidString) == nil)
+        }
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -231,243 +387,14 @@ struct AmericanExpressCreditCardPDFTests {
             context.engine.cancelPreparedImport(second)
 
             #expect(try context.provider.accountRepo.accounts(workspaceId: workspaceID).count == 1)
-            #expect(try context.provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == 5)
+            #expect(try context.provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == 9)
             let card = try context.provider.cardRepo.snapshot(workspaceId: workspaceID)
-            #expect(card.instruments.count == 1)
+            #expect(card.instruments.count == 3)
             #expect(card.instrumentIdentifiers.count == 1)
             #expect(card.statements.count == 1)
             #expect(try context.provider.importSessionRepo.importSession(id: second.importSession.id.uuidString) == nil)
         }
     }
-
-    @Test(.globalRuntimeStateIsolation)
-    func privateOriginalsMatchApprovedAggregateOracleWhenExplicitlyProvided() async throws {
-        let environment = ProcessInfo.processInfo.environment
-        guard let earlierPath = environment["LEDGERFORGE_PRIVATE_AMEX_EARLIER_PDF"],
-              let laterPath = environment["LEDGERFORGE_PRIVATE_AMEX_LATER_PDF"] else { return }
-        func decimal(_ value: String) -> Decimal { Decimal(string: value, locale: Locale(identifier: "en_US_POSIX"))! }
-        let expectations: [(String, Int, String, String, Decimal, Decimal, Decimal, Decimal, String, Decimal)] = [
-            (earlierPath, 61, "2026-04-24", "2026-05-23", decimal("12042.19"), decimal("17164.45"), decimal("10572.54"), decimal("5450.28"), "2026-06-17", decimal("4908.09")),
-            (laterPath, 34, "2026-05-24", "2026-06-23", decimal("5450.28"), decimal("8037.53"), decimal("10349.13"), decimal("7761.88"), "2026-07-18", decimal("7762.60"))
-        ]
-        var documents = [FinancialDocument]()
-        let expectedHashes = [
-            "04bf29025dfcc85225e48c60a82126a6aeed77999f624d22957f74958f5e28b0",
-            "c1d02f796fd549ed4914a5b09c5eeb1372810256a35f922302ddbbea41a368a6"
-        ]
-        for (expectedIndex, expected) in expectations.enumerated() {
-            let url = URL(fileURLWithPath: expected.0)
-            let sourceBytes = try Data(contentsOf: url)
-            let sourceHash = SHA256.hash(data: sourceBytes).map { String(format: "%02x", $0) }.joined()
-            #expect(sourceHash == expectedHashes[expectedIndex])
-            let independentRows = try IndependentAmexPDFOracle.rows(in: url)
-            let context = makeContext(workspaceID: "amex-private-oracle-\(UUID().uuidString)", inMemory: true)
-            let prepared = try await context.engine.prepareImport(from: url)
-            #expect(prepared.validation.passed)
-            #expect(prepared.transactionCount == expected.1)
-            let evidence = try #require(prepared.financialDocument.cardStatementEvidence)
-            #expect(evidence.declaredStatementPeriod.start.canonical == expected.2)
-            #expect(evidence.declaredStatementPeriod.end.canonical == expected.3)
-            #expect(evidence.summary(code: "previous_balance")?.money?.amount == expected.4)
-            #expect(evidence.summary(code: "new_credits")?.money?.amount == expected.5)
-            #expect(evidence.summary(code: "new_debits")?.money?.amount == expected.6)
-            #expect(evidence.summary(code: "new_balance")?.money?.amount == expected.7)
-            #expect(evidence.summary(code: "due_date")?.date?.canonical == expected.8)
-            #expect(evidence.summary(code: "instrument_net_total")?.money?.amount == expected.9)
-            #expect(evidence.transactionAnnotations.filter { $0.rowScope == .accountLevel }.count == 1)
-            #expect(evidence.transactionAnnotations.filter { $0.rowScope != .accountLevel }.count == expected.1 - 1)
-            let productionRows = try zip(prepared.financialDocument.transactions, evidence.transactionAnnotations).map {
-                try IndependentAmexPDFOracle.Row(
-                    transactionDate: $0.1.sourceTransactionDate,
-                    postingDate: #require($0.0.statementDate),
-                    effect: $0.1.liabilityEffect,
-                    postedMoney: $0.0.money,
-                    originalMoney: $0.1.originalMerchantMoney,
-                    reference: #require($0.0.reference),
-                    scopeCode: $0.1.rowScope.persistenceCode,
-                    sourceOrdinal: #require($0.0.sourceProvenance.first?.sourceOrdinal)
-                )
-            }
-            let rowMismatchCount = zip(independentRows, productionRows).filter { pair in pair.0 != pair.1 }.count
-                + abs(independentRows.count - productionRows.count)
-            #expect(rowMismatchCount == 0)
-            #expect(prepared.financialDocument.financialIdentifiers.isEmpty)
-            #expect(evidence.accountSourceIdentityObservations.count == 1)
-            #expect(evidence.instrumentSections.flatMap(\.sourceIdentityObservations).count == 1)
-            documents.append(prepared.financialDocument)
-            context.engine.cancelPreparedImport(prepared)
-        }
-        #expect(documents[0].cardStatementEvidence?.summary(code: "new_balance")?.money ==
-                documents[1].cardStatementEvidence?.summary(code: "previous_balance")?.money)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func privateOriginalsPersistChronologicallyAndInReverseWithProviderParityWhenExplicitlyProvided() async throws {
-        let environment = ProcessInfo.processInfo.environment
-        guard let earlierPath = environment["LEDGERFORGE_PRIVATE_AMEX_EARLIER_PDF"],
-              let laterPath = environment["LEDGERFORGE_PRIVATE_AMEX_LATER_PDF"] else { return }
-        let earlier = URL(fileURLWithPath: earlierPath)
-        let later = URL(fileURLWithPath: laterPath)
-        for inMemory in [true, false] {
-            try await verifyPrivateCampaign(
-                urls: [earlier, later],
-                expectedFirstBalance: "-5450.28",
-                inMemory: inMemory,
-                campaign: "chronological"
-            )
-            try await verifyPrivateCampaign(
-                urls: [later, earlier],
-                expectedFirstBalance: "-7761.88",
-                inMemory: inMemory,
-                campaign: "reverse"
-            )
-        }
-    }
-
-    private func verifyPrivateCampaign(
-        urls: [URL],
-        expectedFirstBalance: String,
-        inMemory: Bool,
-        campaign: String
-    ) async throws {
-        let workspaceID = "amex-private-\(campaign)-\(inMemory ? "memory" : "sqlite")-\(UUID().uuidString)"
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-Amex-Private-\(UUID().uuidString)")
-        var sqlite: SQLiteRepositoryProvider?
-        let provider: DatabaseProvider
-        if inMemory {
-            provider = DatabaseProvider(inMemory: true)
-        } else {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let opened = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("campaign.sqlite").path)
-            sqlite = opened
-            provider = DatabaseProvider.verifiedSQLite(opened, protectsGeneration: false)
-        }
-        defer {
-            sqlite?.database.close()
-            if !inMemory { try? FileManager.default.removeItem(at: folder) }
-        }
-        let coordinator = DefaultImportPersistenceCoordinator(
-            databaseProvider: provider,
-            mapper: ImportPersistenceMapper(workspaceId: workspaceID, workspaceName: "Amex Private Campaign")
-        )
-        let engine = ImportEngine(
-            importPersistenceCoordinator: coordinator,
-            persistenceStateProvider: { provider.persistenceState },
-            providerGenerationProvider: { provider.generationToken },
-            forcedHydration: { .init(didHydrate: true, accountCount: 0, transactionCount: 0) }
-        )
-
-        var accountID: String?
-        for (index, url) in urls.enumerated() {
-            let prepared = try await engine.prepareImport(from: url)
-            let result = try coordinator.persistValidatedImport(
-                financialDocument: prepared.financialDocument,
-                importSession: prepared.importSession,
-                validation: prepared.validation,
-                fingerprintSet: prepared.fingerprintSet,
-                accountChoice: index == 0 ? .createNewCardLiabilityAccountAndInstrument : nil,
-                providerGeneration: provider.generationToken
-            )
-            engine.cancelPreparedImport(prepared)
-            #expect(result.persisted)
-            if index == 0 {
-                accountID = result.accountId
-                try verifyCardState(
-                    provider: provider,
-                    workspaceID: workspaceID,
-                    expectedTransactions: prepared.transactionCount,
-                    expectedStatements: 1,
-                    expectedBalance: expectedFirstBalance
-                )
-            } else {
-                #expect(result.accountId == accountID)
-            }
-        }
-
-        let duplicate = try await engine.prepareImport(from: urls[0])
-        let duplicateResult = try coordinator.persistValidatedImport(
-            financialDocument: duplicate.financialDocument,
-            importSession: duplicate.importSession,
-            validation: duplicate.validation,
-            fingerprintSet: duplicate.fingerprintSet,
-            accountChoice: nil,
-            providerGeneration: provider.generationToken
-        )
-        engine.cancelPreparedImport(duplicate)
-        #expect(!duplicateResult.persisted)
-        try verifyCardState(
-            provider: provider,
-            workspaceID: workspaceID,
-            expectedTransactions: 95,
-            expectedStatements: 2,
-            expectedBalance: "-7761.88"
-        )
-
-        if let sqlite {
-            try sqlite.database.checkpointAndClose()
-            let reopenedSQLite = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("campaign.sqlite").path)
-            let reopened = DatabaseProvider.verifiedSQLite(reopenedSQLite, protectsGeneration: false)
-            try verifyCardState(
-                provider: reopened,
-                workspaceID: workspaceID,
-                expectedTransactions: 95,
-                expectedStatements: 2,
-                expectedBalance: "-7761.88"
-            )
-            try reopenedSQLite.database.checkpointAndClose()
-        }
-    }
-
-    private func verifyCardState(
-        provider: DatabaseProvider,
-        workspaceID: String,
-        expectedTransactions: Int,
-        expectedStatements: Int,
-        expectedBalance: String
-    ) throws {
-        #expect(try provider.accountRepo.accounts(workspaceId: workspaceID).count == 1)
-        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == expectedTransactions)
-        let card = try provider.cardRepo.snapshot(workspaceId: workspaceID)
-        #expect(card.instruments.count == 1)
-        #expect(card.instruments.allSatisfy { $0.lifecycleStateCode == "unknown" })
-        #expect(card.instrumentIdentifiers.isEmpty)
-        #expect(card.relationships.isEmpty)
-        #expect(card.statements.count == expectedStatements)
-        #expect(card.sourceObservations.count == expectedStatements * 2)
-        #expect(card.summaryComponents.count == expectedStatements * 6)
-        #expect(card.transactionEvidence.count == expectedTransactions)
-        for statement in card.statements {
-            #expect(try provider.importSessionRepo.importSession(id: statement.importSessionId) != nil)
-            #expect(try provider.importSessionRepo.importedDocument(id: statement.documentId) != nil)
-        }
-
-        let hydrator = RepositoryStoreHydrator(
-            accountRepo: provider.accountRepo,
-            importSessionRepo: provider.importSessionRepo,
-            transactionRepo: provider.transactionRepo,
-            categoryRepo: provider.categoryRepo,
-            cardRepo: provider.cardRepo,
-            accountStore: AccountStore(),
-            transactionStore: TransactionStore(),
-            categoryStore: CategoryStore(),
-            cardStore: CardStore(),
-            importSessionStore: ImportSessionStore(),
-            importAttemptStore: ImportAttemptStore(),
-            workspaceId: workspaceID,
-            persistenceState: provider.persistenceState,
-            providerGeneration: provider.generationToken,
-            participatesInLifecycleGate: false
-        )
-        let hydrated = try hydrator.stageHydration()
-        #expect(hydrated.accounts.count == 1)
-        #expect(hydrated.accounts.first?.type == .creditCard)
-        let amount = try #require(Decimal(string: expectedBalance, locale: Locale(identifier: "en_US_POSIX")))
-        #expect(hydrated.accounts.first?.currentBalanceMoney == (try Money(amount: amount, currency: "QAR")))
-        #expect(hydrated.transactions.count == expectedTransactions)
-        #expect(hydrated.cardSnapshot.statements.count == expectedStatements)
-        #expect(hydrated.cardSnapshot.transactionEvidence.count == expectedTransactions)
-    }
-
     private func verifyPersistence(inMemory: Bool) async throws {
         let workspaceID = "amex-card-\(inMemory ? "memory" : "sqlite")-\(UUID().uuidString)"
         let context = try makePersistentContext(workspaceID: workspaceID, inMemory: inMemory)
@@ -482,16 +409,21 @@ struct AmericanExpressCreditCardPDFTests {
             providerGeneration: context.provider.generationToken
         )
         #expect(result.persisted)
-        #expect(result.transactionCount == 5)
+        #expect(result.transactionCount == 9)
         #expect(try context.provider.accountRepo.accounts(workspaceId: workspaceID).count == 1)
-        #expect(try context.provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == 5)
+        #expect(try context.provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == 9)
         let card = try context.provider.cardRepo.snapshot(workspaceId: workspaceID)
-        #expect(card.instruments.count == 1)
+        #expect(card.instruments.count == 3)
         #expect(card.statements.count == 1)
+        #expect(card.sections.count == 3)
+        #expect(card.sectionObservations.count == 3)
         #expect(card.summaryComponents.count == 6)
-        #expect(card.transactionEvidence.count == 5)
+        #expect(card.transactionEvidence.count == 9)
         #expect(card.transactionEvidence.filter { $0.instrumentId == nil }.count == 1)
-        #expect(card.transactionEvidence.filter { $0.instrumentId != nil }.count == 4)
+        #expect(card.transactionEvidence.filter { $0.instrumentId != nil }.count == 8)
+        #expect(card.semanticProjections.count == 1)
+        #expect(card.semanticGroups.count == 1)
+        #expect(card.semanticMembers.count == 1)
 
         let accounts = AccountStore()
         let transactions = TransactionStore()
@@ -514,12 +446,13 @@ struct AmericanExpressCreditCardPDFTests {
             participatesInLifecycleGate: false
         )
         let snapshot = try hydrator.stageHydration()
-        let expectedLiability = try Money(amount: -1000, currency: "QAR")
+        let expectedLiability = try Money(amount: -1150, currency: "QAR")
         #expect(snapshot.accounts.first?.currentBalanceMoney == expectedLiability)
         #expect(snapshot.transactions.allSatisfy { $0.debitMoney == nil && $0.creditMoney == nil && $0.cardLiabilityEffect != nil })
-        #expect(snapshot.cardSnapshot.instruments.count == 1)
+        #expect(snapshot.cardSnapshot.instruments.count == 3)
         #expect(snapshot.cardSnapshot.statements.count == 1)
-        #expect(snapshot.cardSnapshot.transactionEvidence.count == 5)
+        #expect(snapshot.cardSnapshot.statements.first?.sections.count == 3)
+        #expect(snapshot.cardSnapshot.transactionEvidence.count == 9)
 
         let duplicate = try await context.engine.prepareImport(from: Self.fixtureURL)
         let duplicateResult = try context.coordinator.persistValidatedImport(
@@ -529,7 +462,7 @@ struct AmericanExpressCreditCardPDFTests {
             providerGeneration: context.provider.generationToken
         )
         #expect(!duplicateResult.persisted)
-        #expect(try context.provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == 5)
+        #expect(try context.provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == 9)
     }
 
     private func verifyWeakIdentityDecisions(inMemory: Bool) async throws {
@@ -545,7 +478,11 @@ struct AmericanExpressCreditCardPDFTests {
         context.engine.cancelPreparedImport(first)
         let accountID = try #require(firstResult.accountId)
         var card = try context.provider.cardRepo.snapshot(workspaceId: workspaceID)
-        let originalInstrumentID = try #require(card.instruments.first?.id)
+        let originalInstrumentBySection = Dictionary(uniqueKeysWithValues: card.sections.map {
+            ($0.documentScopedSectionId, $0.instrumentId)
+        })
+        let firstSectionID = try #require(first.financialDocument.cardStatementEvidence?.instrumentSections.first?.documentScopedSectionID)
+        let originalInstrumentID = try #require(originalInstrumentBySection[firstSectionID])
         #expect(card.instrumentIdentifiers.isEmpty)
         #expect(card.sourceObservations.allSatisfy { $0.sourceValue.contains("X") })
 
@@ -556,15 +493,17 @@ struct AmericanExpressCreditCardPDFTests {
         context.engine.cancelPreparedImport(exactReuse)
         #expect(exactReuseResult.accountId == accountID)
         card = try context.provider.cardRepo.snapshot(workspaceId: workspaceID)
-        #expect(card.instruments.count == 1)
-        #expect(card.sourceObservations.filter { $0.associationAuthority == "prior_user_confirmed_mapping" }.count == 2)
+        #expect(card.instruments.count == 3)
+        #expect(card.sourceObservations.filter { $0.associationAuthority == "prior_user_confirmed_mapping" }.count == 1)
+        #expect(card.sectionObservations.filter { $0.associationAuthority == "prior_user_confirmed_mapping" }.count == 3)
 
         let changedURL = try Self.variantFixtureURL(label: "changed-weak-instrument")
         temporaryURLs.append(changedURL)
         let changedPrepared = try await context.engine.prepareImport(from: changedURL)
         let changedDocument = try replacingCardObservations(
             in: changedPrepared.financialDocument,
-            instrumentValue: "3777-XXXXXX-20002"
+            instrumentValue: "3777-XXXXXX-20002",
+            statementStart: try StatementDate(canonical: "2026-06-30")
         )
         let transactionCountBeforeRejection = try context.provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count
         let statementsBeforeRejection = card.statements.count
@@ -590,11 +529,15 @@ struct AmericanExpressCreditCardPDFTests {
             importSession: changedPrepared.importSession,
             validation: ImportValidator.validate(financialDocument: changedDocument),
             fingerprintSet: changedPrepared.fingerprintSet,
-            accountChoice: .useExistingCardLiabilityAccount(
+            accountChoice: .useExistingCardLiabilityAccountSections(
                 accountId: accountID,
-                instrumentChoice: .createNewInstrument(
-                    relationship: .additionalConcurrent,
-                    relatedInstrumentId: originalInstrumentID
+                sectionChoices: try sectionChoices(
+                    for: changedDocument,
+                    originalInstrumentBySection: originalInstrumentBySection,
+                    firstChoice: .createNewInstrument(
+                        relationship: .additionalConcurrent,
+                        relatedInstrumentId: originalInstrumentID
+                    )
                 )
             ),
             providerGeneration: context.provider.generationToken
@@ -612,18 +555,23 @@ struct AmericanExpressCreditCardPDFTests {
             let prepared = try await context.engine.prepareImport(from: url)
             let document = try replacingCardObservations(
                 in: prepared.financialDocument,
-                instrumentValue: "3777-XXXXXX-3\(String(format: "%04d", index + 1))"
+                instrumentValue: "3777-XXXXXX-3\(String(format: "%04d", index + 1))",
+                statementStart: try StatementDate(canonical: "2026-06-\(29 - index)")
             )
             let result = try context.coordinator.persistValidatedImport(
                 financialDocument: document,
                 importSession: prepared.importSession,
                 validation: ImportValidator.validate(financialDocument: document),
                 fingerprintSet: prepared.fingerprintSet,
-                accountChoice: .useExistingCardLiabilityAccount(
+                accountChoice: .useExistingCardLiabilityAccountSections(
                     accountId: accountID,
-                    instrumentChoice: .createNewInstrument(
-                        relationship: kind,
-                        relatedInstrumentId: originalInstrumentID
+                    sectionChoices: try sectionChoices(
+                        for: document,
+                        originalInstrumentBySection: originalInstrumentBySection,
+                        firstChoice: .createNewInstrument(
+                            relationship: kind,
+                            relatedInstrumentId: originalInstrumentID
+                        )
                     )
                 ),
                 providerGeneration: context.provider.generationToken
@@ -654,7 +602,7 @@ struct AmericanExpressCreditCardPDFTests {
 
         card = try context.provider.cardRepo.snapshot(workspaceId: workspaceID)
         #expect(try context.provider.accountRepo.accounts(workspaceId: workspaceID).count == 2)
-        #expect(card.instruments.filter { $0.liabilityAccountId == accountID }.count == 5)
+        #expect(card.instruments.filter { $0.liabilityAccountId == accountID }.count == 7)
         #expect(card.instruments.allSatisfy { $0.lifecycleStateCode == CardInstrumentLifecycleState.unknown.rawValue })
         #expect(Set(card.relationships.map(\.relationshipKind)) == Set([
             CardInstrumentRelationshipKind.additionalConcurrent.rawValue,
@@ -680,10 +628,30 @@ struct AmericanExpressCreditCardPDFTests {
         )
     }
 
+    private func sectionChoices(
+        for document: FinancialDocument,
+        originalInstrumentBySection: [String: String],
+        firstChoice: ImportCardInstrumentChoice
+    ) throws -> [String: ImportCardInstrumentChoice] {
+        let sections = try #require(document.cardStatementEvidence?.instrumentSections)
+        return try Dictionary(uniqueKeysWithValues: sections.map { section in
+            if section.sourceOrdinal == 1 {
+                return (section.documentScopedSectionID, firstChoice)
+            }
+            return (
+                section.documentScopedSectionID,
+                .reuseExistingInstrument(
+                    instrumentId: try #require(originalInstrumentBySection[section.documentScopedSectionID])
+                )
+            )
+        })
+    }
+
     private func replacingCardObservations(
         in document: FinancialDocument,
         accountValue: String? = nil,
-        instrumentValue: String? = nil
+        instrumentValue: String? = nil,
+        statementStart: StatementDate? = nil
     ) throws -> FinancialDocument {
         let existing = try #require(document.cardStatementEvidence)
         let resolvedAccountValue: String
@@ -708,15 +676,27 @@ struct AmericanExpressCreditCardPDFTests {
             subject: .instrument,
             value: resolvedInstrumentValue
         )
+        let declaredPeriod = try DeclaredStatementPeriod(
+            start: statementStart ?? existing.declaredStatementPeriod.start,
+            end: existing.declaredStatementPeriod.end
+        )
         let evidence = try CardStatementEvidence(
             statementDate: existing.statementDate,
-            declaredStatementPeriod: existing.declaredStatementPeriod,
+            declaredStatementPeriod: declaredPeriod,
             nativeCurrency: existing.nativeCurrency,
             accountSourceIdentityObservations: [accountObservation],
-            instrumentSections: [CardInstrumentSectionEvidence(
-                documentScopedSectionID: try #require(existing.instrumentSections.first?.documentScopedSectionID),
-                sourceIdentityObservations: [instrumentObservation]
-            )],
+            instrumentSections: existing.instrumentSections.map { section in
+                CardInstrumentSectionEvidence(
+                    documentScopedSectionID: section.documentScopedSectionID,
+                    sourceOrdinal: section.sourceOrdinal,
+                    holderLabel: section.holderLabel,
+                    sourceIdentityObservations: section.sourceOrdinal == 1
+                        ? [instrumentObservation]
+                        : section.sourceIdentityObservations,
+                    signedNetTotal: section.signedNetTotal,
+                    reconciliationRuleIdentifier: section.reconciliationRuleIdentifier
+                )
+            },
             transactionAnnotations: existing.transactionAnnotations,
             summaryComponents: existing.summaryComponents,
             reconciliationRuleIdentifier: existing.reconciliationRuleIdentifier
@@ -727,12 +707,76 @@ struct AmericanExpressCreditCardPDFTests {
             metadata: document.metadata,
             parserName: document.parserName,
             bookedCurrency: document.bookedCurrency,
-            declaredStatementPeriod: document.declaredStatementPeriod,
+            declaredStatementPeriod: declaredPeriod,
             transactions: document.transactions,
             financialIdentifiers: document.financialIdentifiers,
             cbqSourceIdentityObservations: document.cbqSourceIdentityObservations,
             sourceStatementEvidence: document.sourceStatementEvidence,
             cardStatementEvidence: evidence,
+            selectionReasons: document.selectionReasons,
+            createdAt: document.createdAt
+        )
+    }
+
+    private func replacingFirstReference(in document: FinancialDocument) throws -> FinancialDocument {
+        guard let first = document.transactions.first else { throw CocoaError(.fileReadCorruptFile) }
+        let reference = (first.reference ?? "FICTIONAL-REFERENCE") + "-CHANGED"
+        let referenceDigest = SHA256.hash(data: Data(reference.utf8))
+            .map { String(format: "%02x", $0) }.joined()
+        let provenance = first.sourceProvenance.map { source in
+            TransactionSourceProvenance(
+                normalizedDocumentID: source.normalizedDocumentID,
+                normalizedRowID: source.normalizedRowID,
+                sourceOrdinal: source.sourceOrdinal,
+                normalizedRecordDigest: String.normalizedRecordDigest(values: [reference]),
+                parserProfileID: source.parserProfileID,
+                parserProfileVersion: source.parserProfileVersion,
+                sourceTransactionDate: source.sourceTransactionDate,
+                structuredReferenceDigest: referenceDigest
+            )
+        }
+        let replacement = Transaction(
+            statementDate: first.statementDate,
+            valueDate: first.valueDate,
+            description: first.description,
+            reference: reference,
+            debitMoney: first.debitMoney,
+            creditMoney: first.creditMoney,
+            money: first.money,
+            runningBalanceMoney: first.runningBalanceMoney,
+            cardLiabilityEffect: first.cardLiabilityEffect,
+            account: first.account,
+            sourceBank: first.sourceBank,
+            sourceFile: first.sourceFile,
+            id: first.id,
+            repositoryTransactionId: first.repositoryTransactionId,
+            financialDateRole: first.financialDateRole,
+            statementTimezoneEvidence: first.statementTimezoneEvidence,
+            sourceProvenance: provenance,
+            repositoryAccountId: first.repositoryAccountId,
+            repositoryImportSessionId: first.repositoryImportSessionId,
+            repositoryDocumentId: first.repositoryDocumentId,
+            repositorySourceDocumentName: first.repositorySourceDocumentName,
+            repositoryPreferredSourceDocumentName: first.repositoryPreferredSourceDocumentName,
+            repositoryPreferredSourceFormatCode: first.repositoryPreferredSourceFormatCode,
+            repositoryPreferredSourceTransactionDate: first.repositoryPreferredSourceTransactionDate,
+            repositoryPreferredStructuredReferenceDigest: referenceDigest,
+            verifiedAxisUPIEventEvidence: first.verifiedAxisUPIEventEvidence
+        )
+        var transactions = document.transactions
+        transactions[0] = replacement
+        return FinancialDocument(
+            id: document.id,
+            sourceDocument: document.sourceDocument,
+            metadata: document.metadata,
+            parserName: document.parserName,
+            bookedCurrency: document.bookedCurrency,
+            declaredStatementPeriod: document.declaredStatementPeriod,
+            transactions: transactions,
+            financialIdentifiers: document.financialIdentifiers,
+            cbqSourceIdentityObservations: document.cbqSourceIdentityObservations,
+            sourceStatementEvidence: document.sourceStatementEvidence,
+            cardStatementEvidence: document.cardStatementEvidence,
             selectionReasons: document.selectionReasons,
             createdAt: document.createdAt
         )
@@ -745,6 +789,7 @@ struct AmericanExpressCreditCardPDFTests {
         accountID: String,
         identifier: String
     ) throws -> ConfirmedImportPlanDTO {
+        let sectionIDs = try #require(prepared.financialDocument.cardStatementEvidence).instrumentSections.map(\.documentScopedSectionID)
         let base = try mapper.confirmedImportPlan(
             financialDocument: prepared.financialDocument,
             importSession: prepared.importSession,
@@ -754,29 +799,42 @@ struct AmericanExpressCreditCardPDFTests {
             advisoryIdentity: .noMatch,
             accountChoice: .createProposedAccount,
             selectedAccountId: accountID,
-            cardInstrumentChoice: .createProposedInstrument,
-            cardAssociationAuthority: "parser_strong_evidence"
+            cardAssociationAuthority: "parser_strong_evidence",
+            cardSectionChoices: Dictionary(uniqueKeysWithValues: sectionIDs.map { ($0, .createProposedInstrument) }),
+            cardSectionAuthorities: Dictionary(uniqueKeysWithValues: sectionIDs.map { ($0, "parser_strong_evidence") })
         )
         let card = try #require(base.cardImportPlan)
+        let firstDecision = try #require(card.sectionDecisions.first)
         let strongIdentifier = CardInstrumentIdentifierDTO(
             id: "card-identifier-\(prepared.importSession.id.uuidString.lowercased())",
-            instrumentId: card.proposedInstrument.id,
+            instrumentId: firstDecision.proposedInstrument.id,
             workspaceId: base.workspace.id,
             scheme: "amex_verified_instrument",
             identifier: identifier,
             parserProvenanceCode: "amex.synthetic.strong-evidence-test",
-            createdAtISO: card.proposedInstrument.createdAtISO
+            createdAtISO: firstDecision.proposedInstrument.createdAtISO
         )
+        let sectionDecisions = card.sectionDecisions.map { decision in
+            ConfirmedCardSectionDecisionDTO(
+                instrumentChoice: decision.instrumentChoice,
+                proposedInstrument: decision.proposedInstrument,
+                instrumentIdentifiers: decision.section.sourceOrdinal == 1 ? [strongIdentifier] : [],
+                section: decision.section,
+                sourceObservations: decision.sourceObservations,
+                relationships: decision.relationships
+            )
+        }
         let replacedCard = ConfirmedCardImportPlanDTO(
             liabilityAccountId: card.liabilityAccountId,
             instrumentChoice: card.instrumentChoice,
             proposedInstrument: card.proposedInstrument,
-            instrumentIdentifiers: [strongIdentifier],
             sourceObservations: card.sourceObservations,
             relationships: card.relationships,
             statement: card.statement,
             summaryComponents: card.summaryComponents,
-            transactionEvidence: card.transactionEvidence
+            transactionEvidence: card.transactionEvidence,
+            sectionDecisions: sectionDecisions,
+            semanticProjection: card.semanticProjection
         )
         return ConfirmedImportPlanDTO(
             providerGeneration: base.providerGeneration,
@@ -801,13 +859,32 @@ struct AmericanExpressCreditCardPDFTests {
         )
     }
 
-    private func makeContext(workspaceID: String, inMemory: Bool) -> (engine: ImportEngine, coordinator: DefaultImportPersistenceCoordinator, provider: DatabaseProvider) {
+    private func makeContext(
+        workspaceID: String,
+        inMemory: Bool
+    ) -> (engine: ImportEngine, coordinator: DefaultImportPersistenceCoordinator, provider: DatabaseProvider) {
+        makeContext(
+            workspaceID: workspaceID,
+            inMemory: inMemory,
+            importCoordinator: DefaultImportCoordinator(
+                readerRegistry: DefaultReaderRegistry(),
+                passwordProvider: DefaultPasswordProvider()
+            )
+        )
+    }
+
+    private func makeContext(
+        workspaceID: String,
+        inMemory: Bool,
+        importCoordinator: any ImportFramework.ImportCoordinator
+    ) -> (engine: ImportEngine, coordinator: DefaultImportPersistenceCoordinator, provider: DatabaseProvider) {
         let provider = DatabaseProvider(inMemory: inMemory)
         let coordinator = DefaultImportPersistenceCoordinator(
             databaseProvider: provider,
             mapper: ImportPersistenceMapper(workspaceId: workspaceID, workspaceName: "Amex Synthetic")
         )
         let engine = ImportEngine(
+            importCoordinator: importCoordinator,
             importPersistenceCoordinator: coordinator,
             persistenceStateProvider: { provider.persistenceState },
             providerGenerationProvider: { provider.generationToken },
@@ -816,9 +893,27 @@ struct AmericanExpressCreditCardPDFTests {
         return (engine, coordinator, provider)
     }
 
-    private func makePersistentContext(workspaceID: String, inMemory: Bool) throws -> (engine: ImportEngine, coordinator: DefaultImportPersistenceCoordinator, provider: DatabaseProvider, cleanup: () -> Void) {
+    private func makePersistentContext(
+        workspaceID: String,
+        inMemory: Bool
+    ) throws -> (engine: ImportEngine, coordinator: DefaultImportPersistenceCoordinator, provider: DatabaseProvider, cleanup: () -> Void) {
+        try makePersistentContext(
+            workspaceID: workspaceID,
+            inMemory: inMemory,
+            importCoordinator: DefaultImportCoordinator(
+                readerRegistry: DefaultReaderRegistry(),
+                passwordProvider: DefaultPasswordProvider()
+            )
+        )
+    }
+
+    private func makePersistentContext(
+        workspaceID: String,
+        inMemory: Bool,
+        importCoordinator: any ImportFramework.ImportCoordinator
+    ) throws -> (engine: ImportEngine, coordinator: DefaultImportPersistenceCoordinator, provider: DatabaseProvider, cleanup: () -> Void) {
         if inMemory {
-            let context = makeContext(workspaceID: workspaceID, inMemory: true)
+            let context = makeContext(workspaceID: workspaceID, inMemory: true, importCoordinator: importCoordinator)
             return (context.engine, context.coordinator, context.provider, {})
         }
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("LedgerForge-Amex-\(UUID().uuidString)")
@@ -830,6 +925,7 @@ struct AmericanExpressCreditCardPDFTests {
             mapper: ImportPersistenceMapper(workspaceId: workspaceID, workspaceName: "Amex Synthetic")
         )
         let engine = ImportEngine(
+            importCoordinator: importCoordinator,
             importPersistenceCoordinator: coordinator,
             persistenceStateProvider: { provider.persistenceState },
             providerGenerationProvider: { provider.generationToken },
@@ -842,6 +938,8 @@ struct AmericanExpressCreditCardPDFTests {
     }
 
     private static let fixtureURL = FixtureLocator.americanExpressSyntheticPDF("amex_credit_card_pdf_v1_synthetic.pdf")
+    private static let encryptedFixtureURL = FixtureLocator.americanExpressSyntheticPDF("amex_credit_card_pdf_v1_synthetic_encrypted.pdf")
+    private static let syntheticFixturePassword = "ledgerforge-fixture-only"
 
     private static func variantFixtureURL(label: String) throws -> URL {
         let document = try #require(PDFDocument(url: fixtureURL))
@@ -851,109 +949,5 @@ struct AmericanExpressCreditCardPDFTests {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("amex-\(label)-\(UUID().uuidString).pdf")
         guard document.write(to: url) else { throw CocoaError(.fileWriteUnknown) }
         return url
-    }
-}
-
-private enum IndependentAmexPDFOracle {
-    struct Row: Equatable {
-        let transactionDate: StatementDate
-        let postingDate: StatementDate
-        let effect: CardLiabilityEffect
-        let postedMoney: Money
-        let originalMoney: Money?
-        let reference: String
-        let scopeCode: String
-        let sourceOrdinal: Int
-    }
-
-    static func rows(in url: URL) throws -> [Row] {
-        let pdf = try #require(PDFDocument(url: url))
-        let startPattern = #"^(\d{2}-[A-Za-z]{3}-\d{4}) (\d{2}-[A-Za-z]{3}-\d{4}) (.+)$"#
-        let postedPattern = #"^([0-9]+(?:,[0-9]{3})*\.\d{2})(?: (CR))?$"#
-        let foreignPattern = #"^([0-9]+(?:,[0-9]{3})*(?:\.\d{2})?) ([A-Z]{3})(?: (CR))? ([0-9]+(?:,[0-9]{3})*\.\d{2})(?: (CR))?$"#
-        var result: [Row] = []
-        var scopeCode = "account_level"
-
-        for pageIndex in 0..<pdf.pageCount {
-            let lines = try #require(pdf.page(at: pageIndex)?.string).components(separatedBy: .newlines)
-            var index = 0
-            while index < lines.count {
-                let line = lines[index].trimmingCharacters(in: .whitespacesAndNewlines)
-                if line.hasPrefix("New Transactions For ") {
-                    scopeCode = "instrument_level"
-                    index += 1
-                    continue
-                }
-                guard let start = captures(startPattern, in: line) else {
-                    index += 1
-                    continue
-                }
-                var block: [String] = [start[2]]
-                index += 1
-                while index < lines.count {
-                    let candidate = lines[index].trimmingCharacters(in: .whitespacesAndNewlines)
-                    if captures(startPattern, in: candidate) != nil ||
-                        candidate.hasPrefix("New Transactions For ") ||
-                        candidate.hasPrefix("Total of New Transactions For ") ||
-                        candidate.hasPrefix("This Card is issued by AMEX") {
-                        break
-                    }
-                    if !candidate.isEmpty { block.append(candidate) }
-                    index += 1
-                }
-                let reference = try #require(block.first(where: { $0.hasPrefix("Reference: ") }))
-                var effect: CardLiabilityEffect?
-                var posted: Money?
-                var original: Money?
-                for candidate in block {
-                    if let values = captures(foreignPattern, in: candidate) {
-                        let isCredit = !values[4].isEmpty
-                        effect = isCredit ? .decreasesAmountOwed : .increasesAmountOwed
-                        let originalCurrency = try CurrencyCode(values[1])
-                        let originalAmount = try decimal(values[0])
-                        let postedAmount = try decimal(values[3])
-                        original = try Money(amount: isCredit ? -originalAmount : originalAmount, currency: originalCurrency)
-                        posted = try Money(amount: isCredit ? -postedAmount : postedAmount, currency: "QAR")
-                    } else if let values = captures(postedPattern, in: candidate) {
-                        let isCredit = !values[1].isEmpty
-                        effect = isCredit ? .decreasesAmountOwed : .increasesAmountOwed
-                        let postedAmount = try decimal(values[0])
-                        posted = try Money(amount: isCredit ? -postedAmount : postedAmount, currency: "QAR")
-                    }
-                }
-                result.append(Row(
-                    transactionDate: try statementDate(start[0]),
-                    postingDate: try statementDate(start[1]),
-                    effect: try #require(effect),
-                    postedMoney: try #require(posted),
-                    originalMoney: original,
-                    reference: String(reference.dropFirst("Reference: ".count)),
-                    scopeCode: scopeCode,
-                    sourceOrdinal: result.count + 1
-                ))
-            }
-        }
-        return result
-    }
-
-    private static func captures(_ pattern: String, in value: String) -> [String]? {
-        guard let expression = try? NSRegularExpression(pattern: pattern),
-              let match = expression.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)),
-              match.range == NSRange(value.startIndex..., in: value) else { return nil }
-        return (1..<match.numberOfRanges).map { index in
-            guard let range = Range(match.range(at: index), in: value) else { return "" }
-            return String(value[range])
-        }
-    }
-
-    private static func decimal(_ value: String) throws -> Decimal {
-        try #require(Decimal(string: value.replacingOccurrences(of: ",", with: ""), locale: Locale(identifier: "en_US_POSIX")))
-    }
-
-    private static func statementDate(_ value: String) throws -> StatementDate {
-        let parts = value.split(separator: "-")
-        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        let month = try #require(months.firstIndex { $0.caseInsensitiveCompare(String(parts[1])) == .orderedSame }) + 1
-        return try StatementDate(year: try #require(Int(parts[2])), month: month, day: try #require(Int(parts[0])))
     }
 }

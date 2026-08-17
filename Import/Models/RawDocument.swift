@@ -9,14 +9,19 @@ public struct RawDocument: Equatable, Sendable {
     public let fileName: String
     public let fileExtension: String
     public let content: RawDocumentContent
+    /// Reader-owned, in-memory-only native PDF text preserving page boundaries.
+    /// Source identity and persistence continue to use the immutable original
+    /// snapshot bytes; decrypted or reconstructed PDF bytes are never emitted.
+    public let pdfPageTexts: [String]?
     public let extractedAt: Date
 
-    public init(id: UUID = UUID(), sourceURL: URL, fileName: String, fileExtension: String, content: RawDocumentContent, extractedAt: Date = Date()) {
+    public init(id: UUID = UUID(), sourceURL: URL, fileName: String, fileExtension: String, content: RawDocumentContent, pdfPageTexts: [String]? = nil, extractedAt: Date = Date()) {
         self.id = id
         self.sourceURL = sourceURL
         self.fileName = fileName
         self.fileExtension = fileExtension.lowercased()
         self.content = content
+        self.pdfPageTexts = pdfPageTexts
         self.extractedAt = extractedAt
     }
 }

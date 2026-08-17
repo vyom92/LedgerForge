@@ -521,10 +521,10 @@ struct ImportRepositoryIntegrationTests {
 
     @Test func unsupportedCurrencyCannotReachPersistenceConstruction() async throws {
         do {
-            _ = try Money(amount: 1, currency: "JPY")
+            _ = try Money(amount: 1, currency: "XTS")
             Issue.record("Expected unsupported currency construction to fail before persistence.")
         } catch let error as MoneyError {
-            #expect(error == .unsupportedCurrency("JPY"))
+            #expect(error == .unsupportedCurrency("XTS"))
         }
     }
 

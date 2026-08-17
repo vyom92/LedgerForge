@@ -467,7 +467,17 @@ final class ImportEngine {
             if !transfersSnapshot { snapshot.invalidate() }
         }
         try Task.checkCancellation()
-        let rawDocument = try await readDocument(from: url, snapshot: snapshot)
+        let (rawDocument, passwordRequest) = try await readDocument(
+            from: url,
+            snapshot: snapshot,
+            requestID: requestId
+        )
+        let coordinatorForCredentialCleanup = importCoordinator
+        defer {
+            Task {
+                await coordinatorForCredentialCleanup.discardStagedPassword(for: passwordRequest)
+            }
+        }
         try Task.checkCancellation()
         let contents = rawDocument.searchableText
         let sourceFormat = try Self.preparedSourceFormat(fileType: rawDocument.fileExtension)
@@ -500,6 +510,10 @@ final class ImportEngine {
             document: rawDocument,
             institution: institutionCandidate
         )
+        try await importCoordinator.confirmSuccessfulPassword(
+            for: passwordRequest,
+            institutionCode: detection.metadata.institution.statementPasswordCredentialScope
+        )
 
         let document: Document
         let normalizedRows: [NormalizedRow]
@@ -529,11 +543,7 @@ final class ImportEngine {
                 sourceContext = normalization.sourceContext
             case Institution.hdfc.rawValue:
                 let normalization = try snapshot.withBytes {
-                    try HDFCBankAccountPDFNormalizer().normalize(
-                        text: contents,
-                        sourceBytes: $0,
-                        fileURL: url
-                    )
+                    try HDFCBankAccountPDFNormalizer().normalize(text: contents, sourceBytes: $0, fileURL: url)
                 }
                 document = normalization.document
                 normalizedRows = normalization.rows
@@ -541,24 +551,22 @@ final class ImportEngine {
                 sourceContext = normalization.sourceContext
             case Institution.cbq.rawValue:
                 let normalization = try snapshot.withBytes {
-                    try CBQCurrentAccountPDFNormalizer().normalize(
-                        text: contents,
-                        sourceBytes: $0,
-                        fileURL: url
-                    )
+                    try CBQCurrentAccountPDFNormalizer().normalize(text: contents, sourceBytes: $0, fileURL: url)
                 }
                 document = normalization.document
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
                 sourceContext = normalization.sourceContext
             case Institution.amex.rawValue:
-                let normalization = try snapshot.withBytes {
+                let normalization = try (rawDocument.pdfPageTexts.map {
                     try AmericanExpressCreditCardPDFNormalizer().normalize(
                         text: contents,
-                        sourceBytes: $0,
+                        pageTexts: $0,
                         fileURL: url
                     )
-                }
+                } ?? snapshot.withBytes {
+                    try AmericanExpressCreditCardPDFNormalizer().normalize(text: contents, sourceBytes: $0, fileURL: url)
+                })
                 document = normalization.document
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
@@ -632,7 +640,6 @@ final class ImportEngine {
             developerConsole.warning(.`import`, "No suitable parser found.")
             throw ImportError.invalidDocument(message: "No suitable parser found.")
         }
-
         let normalizedDocument = NormalizedDocument(
             document: document,
             metadata: metadata,
@@ -1268,10 +1275,11 @@ final class ImportEngine {
 
     private func readDocument(
         from url: URL,
-        snapshot: SourceContentSnapshot
-    ) async throws -> RawDocument {
+        snapshot: SourceContentSnapshot,
+        requestID: UUID
+    ) async throws -> (RawDocument, ImportRequest) {
         try Task.checkCancellation()
-        let request = ImportRequest(fileURL: url)
+        let request = ImportRequest(id: requestID, fileURL: url)
         let result = await importCoordinator.importDocument(request, snapshot: snapshot)
         try Task.checkCancellation()
 
@@ -1288,7 +1296,7 @@ final class ImportEngine {
             throw ImportError.invalidDocument(message: "Import expected extractable text document content.")
         }
 
-        return rawDocument
+        return (rawDocument, request)
     }
 
     /// The extension routes into one format-specific reader, but it is not

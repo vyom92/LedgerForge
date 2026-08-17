@@ -1108,7 +1108,308 @@ END;
 """
 )
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12]
+public let migrationV13 = Migration(
+    version: 13,
+    name: "multi-section card statements and exact semantic sources",
+    sql: """
+CREATE TABLE card_statement_sections (
+  id TEXT PRIMARY KEY,
+  card_statement_id TEXT NOT NULL,
+  document_scoped_section_id TEXT NOT NULL CHECK(length(document_scoped_section_id) > 0),
+  source_ordinal INTEGER NOT NULL CHECK(source_ordinal > 0),
+  instrument_id TEXT NOT NULL,
+  holder_label TEXT,
+  signed_total_currency TEXT NOT NULL,
+  signed_total_minor INTEGER NOT NULL,
+  signed_total_decimal TEXT NOT NULL,
+  reconciliation_rule_code TEXT NOT NULL CHECK(length(reconciliation_rule_code) > 0),
+  UNIQUE(card_statement_id, document_scoped_section_id),
+  UNIQUE(card_statement_id, source_ordinal),
+  FOREIGN KEY(card_statement_id) REFERENCES card_statements(id) ON DELETE RESTRICT,
+  FOREIGN KEY(instrument_id) REFERENCES card_instruments(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_card_statement_section_instrument
+  ON card_statement_sections(instrument_id, card_statement_id, source_ordinal);
+
+CREATE TABLE card_statement_section_observations (
+  id TEXT PRIMARY KEY,
+  card_statement_section_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  import_session_id TEXT NOT NULL,
+  normalized_document_id TEXT NOT NULL,
+  parser_profile_id TEXT NOT NULL,
+  parser_profile_version TEXT NOT NULL,
+  observation_kind TEXT NOT NULL CHECK(observation_kind = 'amex_card_account_number'),
+  source_value TEXT NOT NULL CHECK(length(source_value) > 0),
+  association_authority TEXT NOT NULL CHECK(association_authority IN ('user_confirmed', 'prior_user_confirmed_mapping', 'parser_strong_evidence')),
+  created_at DATETIME NOT NULL,
+  UNIQUE(card_statement_section_id, observation_kind, source_value),
+  FOREIGN KEY(card_statement_section_id) REFERENCES card_statement_sections(id) ON DELETE RESTRICT,
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_card_section_observation_lookup
+  ON card_statement_section_observations(workspace_id, observation_kind, source_value, card_statement_section_id);
+
+CREATE TABLE card_statement_semantic_projections (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  liability_account_id TEXT NOT NULL,
+  card_statement_id TEXT NOT NULL UNIQUE,
+  document_id TEXT NOT NULL UNIQUE,
+  import_session_id TEXT NOT NULL UNIQUE,
+  algorithm TEXT NOT NULL,
+  digest TEXT NOT NULL CHECK(length(digest) = 64),
+  institution_code TEXT NOT NULL,
+  statement_family_code TEXT NOT NULL,
+  parser_profile_id TEXT NOT NULL,
+  parser_profile_version TEXT NOT NULL,
+  statement_date DATE NOT NULL,
+  statement_start_date DATE NOT NULL,
+  statement_end_date DATE NOT NULL,
+  native_currency TEXT NOT NULL,
+  event_count INTEGER NOT NULL CHECK(event_count > 0),
+  section_count INTEGER NOT NULL CHECK(section_count > 0),
+  reconciliation_rule_code TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  CHECK(statement_start_date <= statement_end_date),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(liability_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(card_statement_id) REFERENCES card_statements(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_card_semantic_projection_period
+  ON card_statement_semantic_projections(workspace_id, liability_account_id, statement_start_date, statement_end_date);
+
+CREATE TABLE card_statement_semantic_projection_sections (
+  id TEXT PRIMARY KEY,
+  projection_id TEXT NOT NULL,
+  source_ordinal INTEGER NOT NULL CHECK(source_ordinal > 0),
+  document_scoped_section_id TEXT NOT NULL,
+  signed_total_currency TEXT NOT NULL,
+  signed_total_minor INTEGER NOT NULL,
+  signed_total_decimal TEXT NOT NULL,
+  reconciliation_rule_code TEXT NOT NULL,
+  UNIQUE(projection_id, source_ordinal),
+  UNIQUE(projection_id, document_scoped_section_id),
+  FOREIGN KEY(projection_id) REFERENCES card_statement_semantic_projections(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE card_statement_semantic_projection_events (
+  id TEXT PRIMARY KEY,
+  projection_id TEXT NOT NULL,
+  canonical_transaction_id TEXT NOT NULL,
+  normalized_row_id TEXT NOT NULL,
+  source_ordinal INTEGER NOT NULL CHECK(source_ordinal > 0),
+  posting_date DATE NOT NULL,
+  source_transaction_date DATE NOT NULL,
+  liability_effect TEXT NOT NULL CHECK(liability_effect IN ('card_increase_owed', 'card_decrease_owed')),
+  posted_currency TEXT NOT NULL,
+  posted_amount_minor INTEGER NOT NULL,
+  posted_amount_decimal TEXT NOT NULL,
+  original_currency TEXT,
+  original_amount_minor INTEGER,
+  original_amount_decimal TEXT,
+  source_reference TEXT,
+  row_scope TEXT NOT NULL CHECK(row_scope IN ('account_level', 'instrument_level')),
+  document_scoped_section_id TEXT,
+  document_section_ordinal INTEGER,
+  UNIQUE(projection_id, source_ordinal),
+  CHECK((row_scope = 'account_level' AND document_scoped_section_id IS NULL AND document_section_ordinal IS NULL) OR
+        (row_scope = 'instrument_level' AND document_scoped_section_id IS NOT NULL AND document_section_ordinal IS NOT NULL)),
+  CHECK((original_currency IS NULL AND original_amount_minor IS NULL AND original_amount_decimal IS NULL) OR
+        (original_currency IS NOT NULL AND original_amount_minor IS NOT NULL AND original_amount_decimal IS NOT NULL)),
+  FOREIGN KEY(projection_id) REFERENCES card_statement_semantic_projections(id) ON DELETE RESTRICT,
+  FOREIGN KEY(canonical_transaction_id) REFERENCES transactions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_row_id) REFERENCES normalized_rows(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_card_semantic_event_transaction
+  ON card_statement_semantic_projection_events(canonical_transaction_id, projection_id, source_ordinal);
+
+CREATE TABLE card_statement_semantic_groups (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  liability_account_id TEXT NOT NULL,
+  institution_code TEXT NOT NULL,
+  statement_family_code TEXT NOT NULL,
+  statement_start_date DATE NOT NULL,
+  statement_end_date DATE NOT NULL,
+  native_currency TEXT NOT NULL,
+  projection_algorithm TEXT NOT NULL,
+  projection_digest TEXT NOT NULL CHECK(length(projection_digest) = 64),
+  authoritative_projection_id TEXT NOT NULL UNIQUE,
+  created_at DATETIME NOT NULL,
+  UNIQUE(workspace_id, liability_account_id, institution_code, statement_family_code, statement_start_date, statement_end_date, native_currency),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(liability_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(authoritative_projection_id) REFERENCES card_statement_semantic_projections(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE card_statement_semantic_members (
+  id TEXT PRIMARY KEY,
+  group_id TEXT NOT NULL,
+  projection_id TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL CHECK(role IN ('authoritative', 'supporting')),
+  created_at DATETIME NOT NULL,
+  FOREIGN KEY(group_id) REFERENCES card_statement_semantic_groups(id) ON DELETE RESTRICT,
+  FOREIGN KEY(projection_id) REFERENCES card_statement_semantic_projections(id) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX idx_card_semantic_authoritative_member
+  ON card_statement_semantic_members(group_id) WHERE role = 'authoritative';
+
+CREATE TRIGGER validate_card_statement_section
+BEFORE INSERT ON card_statement_sections
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statements s JOIN card_instruments i ON i.id = NEW.instrument_id
+    WHERE s.id = NEW.card_statement_id
+      AND i.workspace_id = s.workspace_id
+      AND i.liability_account_id = s.liability_account_id
+      AND NEW.signed_total_currency = s.statement_currency
+  ) THEN RAISE(ABORT, 'card statement section relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_card_statement_section_observation
+BEFORE INSERT ON card_statement_section_observations
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statement_sections cs
+    JOIN card_statements s ON s.id = cs.card_statement_id
+    JOIN normalized_documents n ON n.id = NEW.normalized_document_id
+    WHERE cs.id = NEW.card_statement_section_id
+      AND s.workspace_id = NEW.workspace_id
+      AND s.document_id = NEW.document_id
+      AND s.import_session_id = NEW.import_session_id
+      AND s.normalized_document_id = NEW.normalized_document_id
+      AND s.parser_profile_id = NEW.parser_profile_id
+      AND s.parser_profile_version = NEW.parser_profile_version
+      AND n.document_id = NEW.document_id
+      AND n.import_session_id = NEW.import_session_id
+  ) THEN RAISE(ABORT, 'card section observation relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_v13_card_transaction_section
+BEFORE INSERT ON card_transaction_evidence
+WHEN NEW.row_scope = 'instrument_level'
+ AND EXISTS (
+   SELECT 1 FROM card_statement_sections
+   WHERE card_statement_id = NEW.card_statement_id
+ )
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statement_sections cs
+    WHERE cs.card_statement_id = NEW.card_statement_id
+      AND cs.document_scoped_section_id = NEW.document_scoped_section_id
+      AND cs.instrument_id = NEW.instrument_id
+  ) THEN RAISE(ABORT, 'card transaction section relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_card_semantic_projection
+BEFORE INSERT ON card_statement_semantic_projections
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statements s
+    WHERE s.id = NEW.card_statement_id
+      AND s.workspace_id = NEW.workspace_id
+      AND s.liability_account_id = NEW.liability_account_id
+      AND s.document_id = NEW.document_id
+      AND s.import_session_id = NEW.import_session_id
+      AND s.statement_date = NEW.statement_date
+      AND s.statement_start_date = NEW.statement_start_date
+      AND s.statement_end_date = NEW.statement_end_date
+      AND s.statement_currency = NEW.native_currency
+      AND s.parser_profile_id = NEW.parser_profile_id
+      AND s.parser_profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'card semantic projection relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_card_semantic_projection_event
+BEFORE INSERT ON card_statement_semantic_projection_events
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statement_semantic_projections p
+    JOIN normalized_rows r ON r.id = NEW.normalized_row_id
+    JOIN normalized_documents n ON n.id = r.normalized_document_id
+    JOIN transactions t ON t.id = NEW.canonical_transaction_id
+    WHERE p.id = NEW.projection_id
+      AND n.document_id = p.document_id
+      AND n.import_session_id = p.import_session_id
+      AND t.account_id = p.liability_account_id
+  ) THEN RAISE(ABORT, 'card semantic event relationship invalid') END;
+END;
+
+-- V12 compatibility backfill. Only the exact singular V12 Amex shape is
+-- migrated: one known parser-owned section ID, one durable instrument, one
+-- instrument observation and the already persisted signed aggregate total.
+INSERT INTO card_statement_sections (
+  id, card_statement_id, document_scoped_section_id, source_ordinal, instrument_id,
+  holder_label, signed_total_currency, signed_total_minor, signed_total_decimal,
+  reconciliation_rule_code
+)
+SELECT
+  'card-section-' || s.id,
+  s.id,
+  'instrument-section-1',
+  1,
+  e.instrument_id,
+  NULL,
+  c.money_currency,
+  c.money_minor,
+  c.money_decimal,
+  'amex.section.signed-increases-minus-decreases.v1'
+FROM card_statements s
+JOIN card_statement_summary_components c
+  ON c.card_statement_id = s.id AND c.component_code = 'instrument_net_total'
+JOIN (
+  SELECT card_statement_id, MIN(instrument_id) AS instrument_id
+  FROM card_transaction_evidence
+  WHERE row_scope = 'instrument_level'
+    AND document_scoped_section_id = 'instrument-section-1'
+  GROUP BY card_statement_id
+  HAVING COUNT(DISTINCT instrument_id) = 1
+     AND COUNT(DISTINCT document_scoped_section_id) = 1
+) e ON e.card_statement_id = s.id
+WHERE s.parser_profile_id = 'amex.credit-card.pdf'
+  AND s.parser_profile_version = '1'
+  AND (SELECT COUNT(*) FROM card_source_identity_observations o
+        WHERE o.document_id = s.document_id
+          AND o.subject_kind = 'instrument'
+          AND o.subject_id = e.instrument_id
+          AND o.observation_kind = 'amex_card_account_number') = 1;
+
+INSERT INTO card_statement_section_observations (
+  id, card_statement_section_id, workspace_id, document_id, import_session_id,
+  normalized_document_id, parser_profile_id, parser_profile_version,
+  observation_kind, source_value, association_authority, created_at
+)
+SELECT
+  'card-section-observation-' || o.id,
+  cs.id,
+  o.workspace_id,
+  o.document_id,
+  o.import_session_id,
+  o.normalized_document_id,
+  o.parser_profile_id,
+  o.parser_profile_version,
+  o.observation_kind,
+  o.source_value,
+  o.association_authority,
+  o.created_at
+FROM card_statement_sections cs
+JOIN card_statements s ON s.id = cs.card_statement_id
+JOIN card_source_identity_observations o
+  ON o.document_id = s.document_id
+ AND o.subject_kind = 'instrument'
+ AND o.subject_id = cs.instrument_id
+ AND o.observation_kind = 'amex_card_account_number';
+"""
+)
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

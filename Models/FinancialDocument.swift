@@ -146,7 +146,30 @@ enum CardTransactionScope: Equatable, Sendable {
 
 struct CardInstrumentSectionEvidence: Equatable, Sendable {
     let documentScopedSectionID: String
+    let sourceOrdinal: Int
+    let holderLabel: String?
     let sourceIdentityObservations: [CardSourceIdentityObservation]
+    let signedNetTotal: Money
+    let reconciliationRuleIdentifier: String
+
+    static let amexSignedNetRule = "amex.section.signed-increases-minus-decreases.v1"
+
+    init(
+        documentScopedSectionID: String,
+        sourceOrdinal: Int,
+        holderLabel: String?,
+        sourceIdentityObservations: [CardSourceIdentityObservation],
+        signedNetTotal: Money,
+        reconciliationRuleIdentifier: String = Self.amexSignedNetRule
+    ) {
+        self.documentScopedSectionID = documentScopedSectionID
+        self.sourceOrdinal = sourceOrdinal
+        let trimmedHolderLabel = holderLabel?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.holderLabel = trimmedHolderLabel?.isEmpty == false ? trimmedHolderLabel : nil
+        self.sourceIdentityObservations = sourceIdentityObservations
+        self.signedNetTotal = signedNetTotal
+        self.reconciliationRuleIdentifier = reconciliationRuleIdentifier
+    }
 }
 
 struct CardTransactionAnnotation: Equatable, Sendable {
@@ -235,10 +258,23 @@ struct CardStatementEvidence: Equatable, Sendable {
             throw CardStatementEvidenceError.duplicateSummaryComponent
         }
         let sectionIDs = instrumentSections.map(\.documentScopedSectionID)
-        guard !sectionIDs.contains(where: \.isEmpty), Set(sectionIDs).count == sectionIDs.count,
+        let sectionIDSet = Set(sectionIDs)
+        let sectionOrdinals = instrumentSections.map(\.sourceOrdinal)
+        guard !sectionIDs.contains(where: \.isEmpty), sectionIDSet.count == sectionIDs.count,
+              sectionOrdinals == instrumentSections.indices.map { $0 + 1 },
+              instrumentSections.allSatisfy({
+                  $0.signedNetTotal.currency == nativeCurrency &&
+                  !$0.reconciliationRuleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              }),
               instrumentSections.allSatisfy({ section in
                   !section.sourceIdentityObservations.isEmpty && section.sourceIdentityObservations.allSatisfy {
                       $0.subject == .instrument
+                  }
+              }),
+              transactionAnnotations.allSatisfy({ annotation in
+                  switch annotation.rowScope {
+                  case .accountLevel: return true
+                  case .instrument(let sectionID): return sectionIDSet.contains(sectionID)
                   }
               }) else {
             throw CardStatementEvidenceError.invalidInstrumentSection

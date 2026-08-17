@@ -21,12 +21,14 @@ public final class DefaultImportCoordinator: ImportFramework.ImportCoordinator {
         }
 
         do {
-            let password = try await passwordProvider?.password(for: request)
-            let rawDocument = try await reader.read(
-                request: request,
-                snapshot: snapshot,
-                password: password
-            )
+            let rawDocument: RawDocument
+            if request.fileExtension == "pdf" {
+                rawDocument = try await readPasswordProtectedPDF(request: request) { password in
+                    try await reader.read(request: request, snapshot: snapshot, password: password)
+                }
+            } else {
+                rawDocument = try await reader.read(request: request, snapshot: snapshot, password: nil)
+            }
             return .success(request: request, rawDocument: rawDocument)
         } catch let error as ImportError {
             return .failure(request: request, error: error)
@@ -43,13 +45,59 @@ public final class DefaultImportCoordinator: ImportFramework.ImportCoordinator {
         }
 
         do {
-            let password = try await passwordProvider?.password(for: request)
-            let rawDocument = try await reader.read(request: request, password: password)
+            let rawDocument: RawDocument
+            if request.fileExtension == "pdf" {
+                rawDocument = try await readPasswordProtectedPDF(request: request) { password in
+                    try await reader.read(request: request, password: password)
+                }
+            } else {
+                rawDocument = try await reader.read(request: request, password: nil)
+            }
             return .success(request: request, rawDocument: rawDocument)
         } catch let error as ImportError {
             return .failure(request: request, error: error)
         } catch {
             return .failure(request: request, error: .readerFailure(message: error.localizedDescription))
         }
+    }
+
+    public func confirmSuccessfulPassword(for request: ImportRequest, institutionCode: String) async throws {
+        try await passwordProvider?.confirmSuccessfulPassword(
+            for: request,
+            institutionCode: institutionCode
+        )
+    }
+
+    public func discardStagedPassword(for request: ImportRequest) async {
+        await passwordProvider?.discardStagedPassword(for: request)
+    }
+
+    private func readPasswordProtectedPDF(
+        request: ImportRequest,
+        read: @Sendable (String?) async throws -> RawDocument
+    ) async throws -> RawDocument {
+        do {
+            return try await read(nil)
+        } catch let error as ImportError where error == .passwordRequired || error == .incorrectPassword {
+            // The immutable source has proved that a credential is required.
+        }
+
+        guard let passwordProvider else { throw ImportError.passwordRequired }
+        for candidate in try await passwordProvider.rememberedPasswords(for: request) {
+            do {
+                let document = try await read(candidate)
+                await passwordProvider.stageSuccessfulPassword(candidate, for: request)
+                return document
+            } catch let error as ImportError where error == .incorrectPassword || error == .passwordRequired {
+                continue
+            }
+        }
+
+        guard let supplied = try await passwordProvider.password(for: request), !supplied.isEmpty else {
+            throw ImportError.passwordRequired
+        }
+        let document = try await read(supplied)
+        await passwordProvider.stageSuccessfulPassword(supplied, for: request)
+        return document
     }
 }

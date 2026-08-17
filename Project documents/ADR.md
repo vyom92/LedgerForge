@@ -446,11 +446,11 @@ Every supported institution provides financial documents in one or more formats.
 
 # ADR-015 — Automatic Password Management
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-08-17
 
-- **Decision standing:** Accepted product and architecture direction; production workflow not implemented.
-- **Implementation:** PasswordProvider and locked-reader protocol foundations exist.
-- **Current qualification:** No production password-entry, credential-profile or Keychain workflow currently exists. Readers still must not own credential storage or prompting.
+- **Decision standing:** Accepted and implemented for the exact Sprint 76A encrypted American Express PDF boundary.
+- **Implementation:** Import coordination tries bounded remembered candidates, the secure challenge accepts replacement input, and a namespaced generic-password Keychain item is written only after the same immutable source unlocks and authoritative institution detection succeeds. Readers receive only an optional candidate and never access Keychain, UI prompting or institution password policy.
+- **Current qualification:** The workflow is proven for exact `amex.credit-card.pdf@1`; it does not claim arbitrary encrypted PDFs, filename-based institution inference or generic credential profiles. Production credentials never enter SQLite, source evidence or diagnostics. Deterministic tests use an in-memory store; the real-Keychain smoke boundary uses a unique synthetic item and removes it during cleanup.
 
 
 ## Status
@@ -2162,10 +2162,10 @@ Users gain durable, privacy-safe explanation of supported import outcomes withou
 
 # ADR-033 — Deterministic Money and Native-Currency Integrity
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-08-17
 
 - **Decision standing:** Accepted and implemented in Sprint 44.
-- **Implementation:** Money, compiled catalog authority, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation are operational.
+- **Implementation:** Money, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation remain operational. Sprint 76A advances the offline authority to `ledgerforge.currency-catalog.v2`: 155 active ordinary ISO 4217 List One currencies with numeric minor units, compiled from the SIX 2026-01-01 publication after excluding current List Two fund codes and List One `N.A.`-scale entries.
 - **Current qualification:** Sprint 44 introduced no migration. Production non-INR import, FX storage, conversion and reporting-currency totals remain unsupported.
 
 
@@ -5312,7 +5312,7 @@ Git.
 
 ## Status
 
-Accepted and implemented in Sprint 76
+Accepted and implemented in Sprint 76; amended and implemented by Sprint 76A
 
 ## Context
 
@@ -5321,6 +5321,12 @@ boundary but intentionally deferred durable account, instrument, persistence,
 hydration and production-profile decisions. Sprint 76 supplied the missing
 concrete contract and independent source evidence for one exact American
 Express Middle East Platinum QAR native-text PDF family.
+
+Sprint 76A preserves that architecture while correcting its singular document-
+instrument assumption. The expanded exact source corpus proves that one card
+statement contains zero or more ordered instrument sections, and that two
+byte-distinct sources can represent one exact semantic card statement without
+authorizing generic card equivalence.
 
 A card statement records activity against a liability account and may separate
 account-level rows from activity belonging to individual physical or virtual
@@ -5336,7 +5342,10 @@ they are not strong ownership identifiers.
 The existing durable `Account` remains the liability account and uses the
 credit-card account type. No parallel `CardAccount` is created. One liability
 account owns zero or more immutable application-identified `CardInstrument`
-records and accepted card statements.
+records and accepted card statements. Each accepted statement owns zero or
+more ordered document-scoped instrument sections. A section records its own
+source identity observations, confirmed durable instrument, holder-label
+presentation evidence, financial rows and signed section total.
 
 A card instrument is distinct from the liability account, parser profile,
 statement document, product label and masked suffix. It may carry:
@@ -5348,10 +5357,13 @@ statement document, product label and masked suffix. It may carry:
 
 Masked observations never become strong identifiers. For the exact Amex
 profile, Membership Number is a liability-account observation and Card Account
-Number is an instrument observation. The first accepted statement requires
-explicit creation or selection. A later exact observation family/value may
-reuse the durable user-confirmed mapping unless stronger evidence conflicts.
-Changed weak evidence requires an explicit account and instrument decision.
+Number is an instrument observation. The first accepted statement requires an
+explicit liability-account decision and one explicit decision for every
+printed instrument section. A later exact observation family/value may reuse
+the durable user-confirmed section mapping unless stronger evidence conflicts.
+Changed weak evidence requires an explicit account and per-section instrument
+decision. Same holder text never merges sections, and section absence or
+reappearance never changes lifecycle.
 
 Instrument relationships are stored separately as `additional/concurrent`,
 `replacement`, `renewal` or `upgrade`. They are created only by explicit user
@@ -5391,18 +5403,22 @@ Previous Balance - New Credits + New Debits = New Balance
 ```
 
 Increase/decrease row totals must equal New Debits/New Credits respectively.
-The instrument net total excludes account-level payments. Transaction-level
-running balances are not required, and cross-statement continuity is not a
-standalone-statement prerequisite.
+Each instrument section reconciles independently to its printed signed total;
+account-level payments are excluded from section totals. A section total may
+be a credit/decrease in amount owed. Transaction-level running balances are
+not required, and cross-statement continuity is not a standalone-statement
+prerequisite.
 
-### Atomic persistence and Migration V12
+### Atomic persistence and Migration V13
 
-The confirmed-import plan carries one bounded card plan. The provider owns one
-atomic write containing the account decision, instrument decision, strong
-identifiers where available, source observations, explicit relationships,
-statement, summaries, canonical transactions, card transaction evidence and
-the existing document/fingerprint/session/history graph. There is no
-post-commit card persistence phase.
+The confirmed-import plan carries one bounded card plan containing one
+liability-account decision plus an ordered decision for every document-scoped
+instrument section. The provider owns one atomic write containing those
+decisions, strong identifiers where available, source observations, explicit
+relationships, statement sections and signed totals, summaries, canonical
+transactions, card transaction evidence, semantic-source evidence and the
+existing document/fingerprint/session/history graph. There is no post-commit
+card persistence phase.
 
 Immediately before commit, both providers revalidate source fingerprint,
 provider generation, account and instrument choices, current strong ownership,
@@ -5427,6 +5443,26 @@ account-level row has no instrument while an instrument-level row belongs to
 an instrument owned by the same liability account. V12 performs no historical
 backfill.
 
+Additive Migration V13 leaves V1–V12 SQL immutable and adds durable ordered
+statement sections, section-owned observations, exact semantic projections,
+projection sections/events, semantic groups and authoritative/supporting
+membership. It deterministically migrates readable V12 single-instrument card
+graphs into the new shape and performs no speculative financial or lifecycle
+inference. SQLite and In-Memory apply the same validation and zero-residue
+failure rules.
+
+### Exact semantic duplicate boundary
+
+Exact source bytes remain the duplicate authority for a document. Separately,
+`amex.credit-card.pdf@1` may group byte-distinct sources only when the complete
+ordered semantic projection matches: institution/family/profile version,
+statement period/date/currency, every ordered account- or instrument-level
+event, Posting Date, source Transaction Date, liability effect, posted and
+optional original Money, reference, section assignment, every signed section
+total and the statement reconciliation contract. The first accepted projection
+is authoritative; an exact later projection is retained as supporting source
+evidence with zero duplicate canonical transactions. Any mismatch fails closed.
+
 ### Hydration, balance and presentation
 
 `RepositoryStoreHydrator` reads and validates the card graph with accounts,
@@ -5448,15 +5484,19 @@ net-worth-signed card balance.
 
 ### Exact production profile
 
-Sprint 76 accepts only `amex.credit-card.pdf@1`: the exact American Express
+Sprint 76A accepts only `amex.credit-card.pdf@1`: the exact American Express
 Middle East Platinum QAR native selectable-text statement family exercised by
-the approved source evidence. The normalizer/parser preserves physical order,
-multiline narration and references, treats the pre-instrument payment as
-account-level, preserves optional original merchant Money, supports exact
-financial continuation pages and excludes rewards/final informational pages
-only after exact family-specific signatures. Changed headers, malformed rows or
-summaries, hostile financial content after a non-financial boundary and
-unsupported near matches fail closed.
+the expanded approved source evidence. The normalizer/parser preserves physical
+order, multiline narration and references, supports multiple repeated or
+distinct instrument sections and signed per-section totals, treats account-
+level payments independently, preserves optional original merchant Money,
+supports exact continuation-page mechanics and excludes rewards/final
+informational pages only after exact family-specific signatures. Encrypted
+sources are unlocked through ADR-015 and hand off native text with page
+boundaries in memory; original immutable bytes remain document identity.
+Changed headers, malformed rows or summaries, contradictory credit markers,
+hostile financial content after a non-financial boundary and unsupported near
+matches fail closed.
 
 ## Consequences
 
@@ -5477,5 +5517,7 @@ generic card parser/profile framework, generic masked account identity,
 rewards valuation or persistence, payment allocation, bank-card payment
 matching, refund/reversal matching, installments, loans, calculated FX,
 invented fees/markup/tax, account merge/split, historical repair/backfill,
-cloud or multi-user architecture, OCR, password workflows or generic card
-support. ADR-043 CBQ bank overlap does not generalize to cards.
+cloud or multi-user architecture, OCR, arbitrary encrypted PDFs or generic
+card support. ADR-043 CBQ bank overlap does not generalize to cards, and the
+Sprint 76A exact semantic projection does not authorize generic card
+equivalence.

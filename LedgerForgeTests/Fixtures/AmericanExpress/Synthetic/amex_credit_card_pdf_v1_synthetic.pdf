@@ -12,7 +12,7 @@ endobj
 endobj
 3 0 obj
 <<
-/Contents 10 0 R /MediaBox [ 0 0 595.2756 841.8898 ] /Parent 9 0 R /Resources <<
+/Contents 11 0 R /MediaBox [ 0 0 595.2756 841.8898 ] /Parent 10 0 R /Resources <<
 /Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
 >> /Rotate 0 /Trans <<
 
@@ -22,7 +22,7 @@ endobj
 endobj
 4 0 obj
 <<
-/Contents 11 0 R /MediaBox [ 0 0 595.2756 841.8898 ] /Parent 9 0 R /Resources <<
+/Contents 12 0 R /MediaBox [ 0 0 595.2756 841.8898 ] /Parent 10 0 R /Resources <<
 /Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
 >> /Rotate 0 /Trans <<
 
@@ -32,7 +32,7 @@ endobj
 endobj
 5 0 obj
 <<
-/Contents 12 0 R /MediaBox [ 0 0 595.2756 841.8898 ] /Parent 9 0 R /Resources <<
+/Contents 13 0 R /MediaBox [ 0 0 595.2756 841.8898 ] /Parent 10 0 R /Resources <<
 /Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
 >> /Rotate 0 /Trans <<
 
@@ -42,7 +42,7 @@ endobj
 endobj
 6 0 obj
 <<
-/Contents 13 0 R /MediaBox [ 0 0 595.2756 841.8898 ] /Parent 9 0 R /Resources <<
+/Contents 14 0 R /MediaBox [ 0 0 595.2756 841.8898 ] /Parent 10 0 R /Resources <<
 /Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
 >> /Rotate 0 /Trans <<
 
@@ -52,51 +52,71 @@ endobj
 endobj
 7 0 obj
 <<
-/PageMode /UseNone /Pages 9 0 R /Type /Catalog
+/Contents 15 0 R /MediaBox [ 0 0 595.2756 841.8898 ] /Parent 10 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
 >>
 endobj
 8 0 obj
+<<
+/PageMode /UseNone /Pages 10 0 R /Type /Catalog
+>>
+endobj
+9 0 obj
 <<
 /Author (LedgerForge test fixture generator) /CreationDate (D:20000101000000+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20000101000000+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
   /Subject (unspecified) /Title (Fictional Amex Credit Card Mechanics Fixture) /Trapped /False
 >>
 endobj
-9 0 obj
-<<
-/Count 4 /Kids [ 3 0 R 4 0 R 5 0 R 6 0 R ] /Type /Pages
->>
-endobj
 10 0 obj
 <<
-/Length 1069
+/Count 5 /Kids [ 3 0 R 4 0 R 5 0 R 6 0 R 7 0 R ] /Type /Pages
 >>
-stream
-1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
-BT 1 0 0 1 42 787.8898 Tm /F1 9 Tf 10.8 TL 12 TL (The Platinum Card \(QAR\)) Tj T* (Statement of Account) Tj T* (AMEX \(MIDDLE EAST\) B.S.C. \(C\)) Tj T* (Membership Number) Tj T* (Statement date) Tj T* (Statement Period) Tj T* (9999-XXXX) Tj T* (31/07/26) Tj T* (01/07/26 to 31/07/26) Tj T* (Previous Balance) Tj T* (New Credits) Tj T* (New Debits) Tj T* (New Balance) Tj T* (Due Date) Tj T* (- \(QAR\) + \(QAR\) = \(QAR\) 1,000.00 450.00 450.00 1,000.00 20/08/26) Tj T* (Transaction Date Posting Date Details Non QAR Spending Amount in QAR) Tj T* (30-Jun-2026 01-Jul-2026 FICTIONAL ACCOUNT PAYMENT) Tj T* (Reference: PAY-FICTION-001) Tj T* (400.00 CR) Tj T* (New Transactions For AVERY EXAMPLE Card Account Number: 3777-XXXXXX-10001) Tj T* (02-Jul-2026 02-Jul-2026 FICTIONAL BOOKSHOP) Tj T* (Reference: BUY-FICTION-002) Tj T* (100.00) Tj T* (04-Jul-2026 05-Jul-2026 FICTIONAL FOREIGN MARKET) Tj T* (Reference: FX-FICTION-003) Tj T* (40.00 USD 150.00) Tj T* (This Card is issued by AMEX \(Middle East\) B.S.C. \(c\)) Tj T* ET
- 
-endstream
 endobj
 11 0 obj
 <<
-/Length 749
+/Length 1198
 >>
 stream
 1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
-BT 1 0 0 1 42 787.8898 Tm /F1 9 Tf 10.8 TL 12 TL (The Platinum Card \(QAR\)) Tj T* (Statement of Account) Tj T* (AMEX \(MIDDLE EAST\) B.S.C. \(C\)) Tj T* (Membership Number) Tj T* (Statement date) Tj T* (Statement Period) Tj T* (9999-XXXX) Tj T* (31/07/26) Tj T* (01/07/26 to 31/07/26) Tj T* (08-Jul-2026 08-Jul-2026 FICTIONAL MERCHANT REFUND) Tj T* (Reference: REFUND-FICTION-004) Tj T* (50.00 CR) Tj T* (11-Jul-2026 12-Jul-2026 FICTIONAL RAIL JOURNEY) Tj T* (EXAMPLE CITY TO SAMPLE BAY) Tj T* (PASSENGER AVERY EXAMPLE) Tj T* (Reference: TRAVEL-FICTION-005) Tj T* (200.00) Tj T* (Total of New Transactions For AVERY EXAMPLE 400.00) Tj T* (This Card is issued by AMEX \(Middle East\) B.S.C. \(c\)) Tj T* ET
+BT 1 0 0 1 42 787.8898 Tm /F1 9 Tf 10.8 TL 12 TL (The Platinum Card \(QAR\)) Tj T* (Statement of Account) Tj T* (AMEX \(MIDDLE EAST\) B.S.C. \(C\)) Tj T* (Membership Number) Tj T* (Statement date) Tj T* (Statement Period) Tj T* (9999-XXXX) Tj T* (31/07/26) Tj T* (01/07/26 to 31/07/26) Tj T* (Previous Balance) Tj T* (New Credits) Tj T* (New Debits) Tj T* (New Balance) Tj T* (Due Date) Tj T* (- \(QAR\) + \(QAR\) = \(QAR\) \(QAR\) 1,000.00 450.01 600.01 1,150.00 20/08/26) Tj T* (Transaction Date Posting Date Details Non QAR Spending Amount in QAR) Tj T* (30-Jun-2026 01-Jul-2026 FICTIONAL ACCOUNT PAYMENT) Tj T* (Reference: PAY-FICTION-001) Tj T* (400.00 CR) Tj T* (New Transactions For AVERY EXAMPLE Card Account Number: 9999-XXXX) Tj T* (02-Jul-2026 02-Jul-2026 FICTIONAL BOOKSHOP) Tj T* (Reference: BUY-FICTION-002) Tj T* (100.00) Tj T* (04-Jul-2026 05-Jul-2026 FICTIONAL BAHRAIN MARKET) Tj T* (Reference: BHD-FICTION-003) Tj T* (1.234 BHD 20.00) Tj T* (06-Jul-2026 08-Jul-2026 FICTIONAL FOREIGN REFUND) Tj T* (Reference: BHD-REFUND-FICTION-004) Tj T* (5.678 BHD CR 50.00 CR) Tj T* (This Card is issued by AMEX \(Middle East\) B.S.C. \(c\)) Tj T* ET
  
 endstream
 endobj
 12 0 obj
 <<
-/Length 703
+/Length 826
 >>
 stream
 1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
-BT 1 0 0 1 42 787.8898 Tm /F1 9 Tf 10.8 TL 12 TL (The Platinum Card \(QAR\)) Tj T* (Statement of Account) Tj T* (AMEX \(MIDDLE EAST\) B.S.C. \(C\)) Tj T* (Membership Number) Tj T* (Statement date) Tj T* (Statement Period) Tj T* (9999-XXXX) Tj T* (31/07/26) Tj T* (01/07/26 to 31/07/26) Tj T* (Membership Rewards Period) Tj T* (01/07/26 to 31/07/26) Tj T* (Membership Rewards Account Number) Tj T* (MR-XXXX-7000) Tj T* (New Points Card Type Account Number No. of Points) Tj T* (The Platinum Card 3777-XXXXXX-10001 125) Tj T* (Total New Paid Points 125) Tj T* (Total Adjustments 0) Tj T* (Rewards information is non-financial in this fictional fixture.) Tj T* ET
+BT 1 0 0 1 42 787.8898 Tm /F1 9 Tf 10.8 TL 12 TL (The Platinum Card \(QAR\)) Tj T* (Statement of Account) Tj T* (AMEX \(MIDDLE EAST\) B.S.C. \(C\)) Tj T* (Membership Number) Tj T* (Statement date) Tj T* (Statement Period) Tj T* (9999-XXXX) Tj T* (31/07/26) Tj T* (01/07/26 to 31/07/26) Tj T* (Total of New Transactions For AVERY EXAMPLE 70.00) Tj T* (New Transactions For AVERY EXAMPLE Card Account Number: 3777-XXXXXX-20002) Tj T* (19-Jul-2026 20-Jul-2026 FICTIONAL TINY PURCHASE) Tj T* (Reference: TINY-DEBIT-FICTION-005) Tj T* (0.01) Tj T* (10-Jul-2026 12-Jul-2026 FICTIONAL NONMONOTONIC PURCHASE) Tj T* (Reference: ORDER-FICTION-006) Tj T* (30.00) Tj T* (Total of New Transactions For AVERY EXAMPLE 30.01) Tj T* (This Card is issued by AMEX \(Middle East\) B.S.C. \(c\)) Tj T* ET
  
 endstream
 endobj
 13 0 obj
+<<
+/Length 965
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT 1 0 0 1 42 787.8898 Tm /F1 9 Tf 10.8 TL 12 TL (The Platinum Card \(QAR\)) Tj T* (Statement of Account) Tj T* (AMEX \(MIDDLE EAST\) B.S.C. \(C\)) Tj T* (Membership Number) Tj T* (Statement date) Tj T* (Statement Period) Tj T* (9999-XXXX) Tj T* (31/07/26) Tj T* (01/07/26 to 31/07/26) Tj T* (New Transactions For JORDAN SAMPLE Card Account Number: 3777-XXXXXX-30003) Tj T* (21-Jul-2026 22-Jul-2026 FICTIONAL SEOUL MARKET) Tj T* (Reference: KRW-FICTION-007) Tj T* (1000 KRW 250.00) Tj T* (15-Jul-2026 18-Jul-2026 FICTIONAL AIR JOURNEY) Tj T* (TBD TO SAMPLE BAY) Tj T* (TICKET 000-0000000000) Tj T* (PASSENGER JORDAN SAMPLE) Tj T* (Reference: TRAVEL-FICTION-008) Tj T* (200.00) Tj T* (24-Jul-2026 25-Jul-2026 FICTIONAL TINY CREDIT) Tj T* (Reference: TINY-CREDIT-FICTION-009) Tj T* (0.01 CR) Tj T* (Total of New Transactions For JORDAN SAMPLE 449.99) Tj T* (This Card is issued by AMEX \(Middle East\) B.S.C. \(c\)) Tj T* ET
+ 
+endstream
+endobj
+14 0 obj
+<<
+/Length 703
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT 1 0 0 1 42 787.8898 Tm /F1 9 Tf 10.8 TL 12 TL (The Platinum Card \(QAR\)) Tj T* (Statement of Account) Tj T* (AMEX \(MIDDLE EAST\) B.S.C. \(C\)) Tj T* (Membership Number) Tj T* (Statement date) Tj T* (Statement Period) Tj T* (9999-XXXX) Tj T* (31/07/26) Tj T* (01/07/26 to 31/07/26) Tj T* (Membership Rewards Period) Tj T* (01/07/26 to 31/07/26) Tj T* (Membership Rewards Account Number) Tj T* (MR-XXXX-7000) Tj T* (New Points Card Type Account Number No. of Points) Tj T* (The Platinum Card 3777-XXXXXX-30003 125) Tj T* (Total New Paid Points 125) Tj T* (Total Adjustments 0) Tj T* (Rewards information is non-financial in this fictional fixture.) Tj T* ET
+ 
+endstream
+endobj
+15 0 obj
 <<
 /Length 512
 >>
@@ -107,31 +127,33 @@ BT 1 0 0 1 42 787.8898 Tm /F1 9 Tf 10.8 TL 12 TL (The Platinum Card \(QAR\)) Tj 
 endstream
 endobj
 xref
-0 14
+0 16
 0000000000 65535 f 
 0000000061 00000 n 
 0000000092 00000 n 
 0000000199 00000 n 
-0000000403 00000 n 
-0000000607 00000 n 
-0000000811 00000 n 
-0000001015 00000 n 
-0000001083 00000 n 
-0000001405 00000 n 
-0000001482 00000 n 
-0000002603 00000 n 
-0000003403 00000 n 
-0000004157 00000 n 
+0000000404 00000 n 
+0000000609 00000 n 
+0000000814 00000 n 
+0000001019 00000 n 
+0000001224 00000 n 
+0000001293 00000 n 
+0000001615 00000 n 
+0000001699 00000 n 
+0000002949 00000 n 
+0000003826 00000 n 
+0000004842 00000 n 
+0000005596 00000 n 
 trailer
 <<
 /ID 
 [<390f568d0dafce1fa674bffcc5838f0f><390f568d0dafce1fa674bffcc5838f0f>]
 % ReportLab generated PDF document -- digest (opensource)
 
-/Info 8 0 R
-/Root 7 0 R
-/Size 14
+/Info 9 0 R
+/Root 8 0 R
+/Size 16
 >>
 startxref
-4720
+6159
 %%EOF

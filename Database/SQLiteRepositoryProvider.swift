@@ -474,7 +474,111 @@ private final class SQLiteCardRepo: CardRepository {
         ) { row in
             CardTransactionEvidenceDTO(id: row.string(at: 0) ?? "", cardStatementId: row.string(at: 1) ?? "", transactionId: row.string(at: 2) ?? "", rowScopeCode: row.string(at: 3) ?? "", instrumentId: row.string(at: 4), liabilityEffectCode: row.string(at: 5) ?? "", sourceTransactionDateISO: row.string(at: 6) ?? "", documentScopedSectionId: row.string(at: 7), originalCurrency: row.string(at: 8), originalAmountMinor: row.int64(at: 9), originalAmountDecimal: row.string(at: 10))
         }
-        return CardRepositorySnapshotDTO(instruments: instruments, instrumentIdentifiers: identifiers, sourceObservations: observations, relationships: relationships, statements: statements, summaryComponents: summaries, transactionEvidence: evidence)
+        let sections = try db.query(
+            sql: "SELECT cs.id, cs.card_statement_id, cs.document_scoped_section_id, cs.source_ordinal, cs.instrument_id, cs.holder_label, cs.signed_total_currency, cs.signed_total_minor, cs.signed_total_decimal, cs.reconciliation_rule_code FROM card_statement_sections cs JOIN card_statements s ON s.id = cs.card_statement_id WHERE s.workspace_id = ? ORDER BY cs.card_statement_id, cs.source_ordinal;",
+            params: [workspaceId]
+        ) { row in
+            CardStatementSectionDTO(
+                id: row.string(at: 0) ?? "", cardStatementId: row.string(at: 1) ?? "",
+                documentScopedSectionId: row.string(at: 2) ?? "", sourceOrdinal: Int(row.int64(at: 3) ?? 0),
+                instrumentId: row.string(at: 4) ?? "", holderLabel: row.string(at: 5),
+                signedTotalCurrency: row.string(at: 6) ?? "", signedTotalMinor: row.int64(at: 7) ?? 0,
+                signedTotalDecimal: row.string(at: 8) ?? "", reconciliationRuleCode: row.string(at: 9) ?? ""
+            )
+        }
+        let sectionObservations = try db.query(
+            sql: "SELECT id, card_statement_section_id, workspace_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, observation_kind, source_value, association_authority, created_at FROM card_statement_section_observations WHERE workspace_id = ? ORDER BY created_at, id;",
+            params: [workspaceId]
+        ) { row in
+            CardStatementSectionObservationDTO(
+                id: row.string(at: 0) ?? "", cardStatementSectionId: row.string(at: 1) ?? "",
+                workspaceId: row.string(at: 2) ?? "", documentId: row.string(at: 3) ?? "",
+                importSessionId: row.string(at: 4) ?? "", normalizedDocumentId: row.string(at: 5) ?? "",
+                parserProfileId: row.string(at: 6) ?? "", parserProfileVersion: row.string(at: 7) ?? "",
+                observationKind: row.string(at: 8) ?? "", sourceValue: row.string(at: 9) ?? "",
+                associationAuthority: row.string(at: 10) ?? "", createdAtISO: row.string(at: 11) ?? ""
+            )
+        }
+        let projectionSections = try db.query(
+            sql: "SELECT ps.id, ps.projection_id, ps.source_ordinal, ps.document_scoped_section_id, ps.signed_total_currency, ps.signed_total_minor, ps.signed_total_decimal, ps.reconciliation_rule_code FROM card_statement_semantic_projection_sections ps JOIN card_statement_semantic_projections p ON p.id = ps.projection_id WHERE p.workspace_id = ? ORDER BY ps.projection_id, ps.source_ordinal;",
+            params: [workspaceId]
+        ) { row in
+            CardStatementSemanticProjectionSectionDTO(
+                id: row.string(at: 0) ?? "", projectionId: row.string(at: 1) ?? "",
+                sourceOrdinal: Int(row.int64(at: 2) ?? 0), documentScopedSectionId: row.string(at: 3) ?? "",
+                signedTotalCurrency: row.string(at: 4) ?? "", signedTotalMinor: row.int64(at: 5) ?? 0,
+                signedTotalDecimal: row.string(at: 6) ?? "", reconciliationRuleCode: row.string(at: 7) ?? ""
+            )
+        }
+        let projectionEvents = try db.query(
+            sql: "SELECT pe.id, pe.projection_id, pe.canonical_transaction_id, pe.normalized_row_id, pe.source_ordinal, pe.posting_date, pe.source_transaction_date, pe.liability_effect, pe.posted_currency, pe.posted_amount_minor, pe.posted_amount_decimal, pe.original_currency, pe.original_amount_minor, pe.original_amount_decimal, pe.source_reference, pe.row_scope, pe.document_scoped_section_id, pe.document_section_ordinal FROM card_statement_semantic_projection_events pe JOIN card_statement_semantic_projections p ON p.id = pe.projection_id WHERE p.workspace_id = ? ORDER BY pe.projection_id, pe.source_ordinal;",
+            params: [workspaceId]
+        ) { row in
+            CardStatementSemanticProjectionEventDTO(
+                id: row.string(at: 0) ?? "", projectionId: row.string(at: 1) ?? "",
+                canonicalTransactionId: row.string(at: 2) ?? "", normalizedRowId: row.string(at: 3) ?? "",
+                sourceOrdinal: Int(row.int64(at: 4) ?? 0), postingDateISO: row.string(at: 5) ?? "",
+                sourceTransactionDateISO: row.string(at: 6) ?? "", liabilityEffectCode: row.string(at: 7) ?? "",
+                postedCurrency: row.string(at: 8) ?? "", postedAmountMinor: row.int64(at: 9) ?? 0,
+                postedAmountDecimal: row.string(at: 10) ?? "", originalCurrency: row.string(at: 11),
+                originalAmountMinor: row.int64(at: 12), originalAmountDecimal: row.string(at: 13),
+                sourceReference: row.string(at: 14), rowScopeCode: row.string(at: 15) ?? "",
+                documentScopedSectionId: row.string(at: 16), documentSectionOrdinal: row.int64(at: 17).map(Int.init)
+            )
+        }
+        let semanticProjections = try db.query(
+            sql: "SELECT id, workspace_id, liability_account_id, card_statement_id, document_id, import_session_id, algorithm, digest, institution_code, statement_family_code, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, native_currency, event_count, section_count, reconciliation_rule_code, created_at FROM card_statement_semantic_projections WHERE workspace_id = ? ORDER BY statement_end_date, id;",
+            params: [workspaceId]
+        ) { row in
+            let projectionID = row.string(at: 0) ?? ""
+            return CardStatementSemanticProjectionRecordDTO(
+                id: projectionID, workspaceId: row.string(at: 1) ?? "", liabilityAccountId: row.string(at: 2) ?? "",
+                cardStatementId: row.string(at: 3) ?? "", documentId: row.string(at: 4) ?? "",
+                importSessionId: row.string(at: 5) ?? "", algorithm: row.string(at: 6) ?? "",
+                digest: row.string(at: 7) ?? "", institutionCode: row.string(at: 8) ?? "",
+                statementFamilyCode: row.string(at: 9) ?? "", parserProfileId: row.string(at: 10) ?? "",
+                parserProfileVersion: row.string(at: 11) ?? "", statementDateISO: row.string(at: 12) ?? "",
+                statementStartDateISO: row.string(at: 13) ?? "", statementEndDateISO: row.string(at: 14) ?? "",
+                nativeCurrency: row.string(at: 15) ?? "", eventCount: Int(row.int64(at: 16) ?? 0),
+                sectionCount: Int(row.int64(at: 17) ?? 0), reconciliationRuleCode: row.string(at: 18) ?? "",
+                createdAtISO: row.string(at: 19) ?? "",
+                sections: projectionSections.filter { $0.projectionId == projectionID },
+                events: projectionEvents.filter { $0.projectionId == projectionID }
+            )
+        }
+        let semanticGroups = try db.query(
+            sql: "SELECT id, workspace_id, liability_account_id, institution_code, statement_family_code, statement_start_date, statement_end_date, native_currency, projection_algorithm, projection_digest, authoritative_projection_id, created_at FROM card_statement_semantic_groups WHERE workspace_id = ? ORDER BY statement_end_date, id;",
+            params: [workspaceId]
+        ) { row in
+            CardStatementSemanticGroupDTO(
+                id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "",
+                liabilityAccountId: row.string(at: 2) ?? "", institutionCode: row.string(at: 3) ?? "",
+                statementFamilyCode: row.string(at: 4) ?? "", statementStartDateISO: row.string(at: 5) ?? "",
+                statementEndDateISO: row.string(at: 6) ?? "", nativeCurrency: row.string(at: 7) ?? "",
+                projectionAlgorithm: row.string(at: 8) ?? "", projectionDigest: row.string(at: 9) ?? "",
+                authoritativeProjectionId: row.string(at: 10) ?? "", createdAtISO: row.string(at: 11) ?? ""
+            )
+        }
+        let semanticMembers = try db.query(
+            sql: "SELECT m.id, m.group_id, m.projection_id, m.role, m.created_at FROM card_statement_semantic_members m JOIN card_statement_semantic_groups g ON g.id = m.group_id WHERE g.workspace_id = ? ORDER BY m.id;",
+            params: [workspaceId]
+        ) { row in
+            guard let role = StatementEquivalenceMemberRole(rawValue: row.string(at: 3) ?? "") else {
+                throw RepositoryError.relationshipViolation("Card semantic member role is invalid.")
+            }
+            return CardStatementSemanticMemberDTO(
+                id: row.string(at: 0) ?? "", groupId: row.string(at: 1) ?? "",
+                projectionId: row.string(at: 2) ?? "",
+                role: role,
+                createdAtISO: row.string(at: 4) ?? ""
+            )
+        }
+        return CardRepositorySnapshotDTO(
+            instruments: instruments, instrumentIdentifiers: identifiers, sourceObservations: observations,
+            relationships: relationships, statements: statements, summaryComponents: summaries,
+            transactionEvidence: evidence, sections: sections, sectionObservations: sectionObservations,
+            semanticProjections: semanticProjections, semanticGroups: semanticGroups, semanticMembers: semanticMembers
+        )
     }
 }
 

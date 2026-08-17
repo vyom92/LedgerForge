@@ -62,6 +62,7 @@ final class ImportValidator {
         var decreaseValues: [Money] = []
         var instrumentIncreaseValues: [Money] = []
         var instrumentDecreaseValues: [Money] = []
+        var sectionValues = Dictionary(uniqueKeysWithValues: sectionIDs.map { ($0, [Money]()) })
 
         for (index, transaction) in transactions.enumerated() {
             let row = transaction.sourceProvenance.first?.sourceOrdinal ?? index + 1
@@ -109,6 +110,8 @@ final class ImportValidator {
             case .instrument(let sectionID):
                 if !sectionIDs.contains(sectionID) {
                     issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Card instrument row references an unknown document section."))
+                } else {
+                    sectionValues[sectionID, default: []].append(transaction.money)
                 }
                 if annotation.liabilityEffect == .increasesAmountOwed {
                     instrumentIncreaseValues.append(transaction.money)
@@ -152,6 +155,14 @@ final class ImportValidator {
            let calculated = try? instrumentIncreaseTotal - instrumentDecreaseTotal,
            calculated != instrumentTotal {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card instrument rows do not equal the printed instrument total."))
+        }
+        for section in evidence.instrumentSections {
+            guard let values = sectionValues[section.documentScopedSectionID], !values.isEmpty,
+                  let calculated = try? moneySum(values, currency: currency),
+                  calculated == section.signedNetTotal else {
+                issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card instrument section does not equal its printed signed total."))
+                continue
+            }
         }
 
         return ImportValidationResult(

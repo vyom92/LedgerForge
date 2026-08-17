@@ -1,6 +1,7 @@
 // LedgerForgeTests/PDFDocumentReaderTests.swift
 
 import Foundation
+import PDFKit
 import Testing
 @testable import LedgerForge
 
@@ -129,6 +130,39 @@ struct PDFDocumentReaderTests {
         } catch {
             Issue.record("Expected ImportError.incorrectPassword, got \(error).")
         }
+    }
+
+    @Test func amexSyntheticEncryptedFixtureRequiresIncorrectAndCorrectPasswords() async throws {
+        let fixtureURL = FixtureLocator.americanExpressSyntheticPDF(
+            "amex_credit_card_pdf_v1_synthetic_encrypted.pdf"
+        )
+        try #require(FixtureLocator.fileExists(at: fixtureURL))
+
+        let sourceBytes = try Data(contentsOf: fixtureURL)
+        let snapshot = SourceContentSnapshot(bytes: sourceBytes)
+        let request = ImportRequest(fileURL: fixtureURL)
+        let reader = PDFDocumentReader()
+
+        await #expect(throws: ImportError.passwordRequired) {
+            try await reader.read(request: request, snapshot: snapshot, password: nil)
+        }
+        await #expect(throws: ImportError.incorrectPassword) {
+            try await reader.read(request: request, snapshot: snapshot, password: "fictional-wrong-password")
+        }
+
+        let unlocked = try await reader.read(
+            request: request,
+            snapshot: snapshot,
+            password: "ledgerforge-fixture-only"
+        )
+        guard case .text(let text) = unlocked.content else {
+            Issue.record("Expected the unlocked synthetic Amex PDF to produce text.")
+            return
+        }
+        #expect(text.localizedCaseInsensitiveContains("Statement of Account"))
+        let pageTexts = try #require(unlocked.pdfPageTexts)
+        #expect(pageTexts.count == 5)
+        #expect(pageTexts.joined(separator: "\n") == text)
     }
 
     private func approvedAxisPDFFixtureURL() -> URL {

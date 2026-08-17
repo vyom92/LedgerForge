@@ -653,6 +653,8 @@ enum ImportAccountConfirmationPolicy {
             return true
         case let (.cardChoiceRequired(eligibleAccountIDs), .some(.useExistingCardLiabilityAccount(accountID, _))):
             return eligibleAccountIDs.contains(accountID)
+        case let (.cardChoiceRequired(eligibleAccountIDs), .some(.useExistingCardLiabilityAccountSections(accountID, sectionChoices))):
+            return eligibleAccountIDs.contains(accountID) && !sectionChoices.isEmpty
         case (.cardChoiceRequired, .some(.createNewCardLiabilityAccountAndInstrument)):
             return true
         case (.choiceRequired, _), (.cardChoiceRequired, _), (.ambiguous, _), (.conflict, _):
@@ -1293,9 +1295,13 @@ struct ContentView: View {
     @State private var showingImporter = false
     @State private var selectedFile = "No statement imported"
     @State private var importState: ImportPresentationState = .idle
+    @State private var statementPassword = ""
+    @StateObject private var statementPasswordChallenges = StatementPasswordChallengeController.shared
     @State private var preparationOwner = ImportPreparationTaskOwner()
     @State private var importIdentityReview: ImportIdentityReview = .unavailable
     @State private var importAccountChoice: ImportAccountChoice?
+    @State private var cardSectionDraftAccountID: String?
+    @State private var cardSectionDraftChoices: [String: ImportCardInstrumentChoice] = [:]
     @State private var partialImportReview: PartialImportReviewResult = .ordinaryFullImport
     @State private var selectedImportSourceURL: URL?
     @State private var confirmedImportRecoveryContext: ConfirmedImportRecoveryContext?
@@ -2380,6 +2386,35 @@ struct ContentView: View {
                     Text("Preparing a read-only preview. You can cancel before confirmation.")
                         .font(.caption)
                         .foregroundStyle(LFTheme.textSecondary)
+                    if let challenge = statementPasswordChallenges.challenge {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Password required")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Enter the statement password to unlock this PDF. It will be remembered in macOS Keychain only after the institution is verified.")
+                                .font(.caption)
+                                .foregroundStyle(LFTheme.textSecondary)
+                            SecureField("Statement password", text: $statementPassword)
+                                .textFieldStyle(.roundedBorder)
+                                .onSubmit {
+                                    submitStatementPassword(challenge)
+                                }
+                            HStack {
+                                Button("Cancel") {
+                                    statementPassword = ""
+                                    statementPasswordChallenges.cancel(challengeID: challenge.id)
+                                }
+                                Spacer()
+                                Button("Unlock") {
+                                    submitStatementPassword(challenge)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(statementPassword.isEmpty)
+                            }
+                        }
+                        .padding(12)
+                        .background(LFTheme.surface.opacity(0.7))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
                 }
             case .previewReady(let preparedImport), .validationFailed(let preparedImport), .committing(let preparedImport):
                 VStack(alignment: .leading, spacing: 10) {
@@ -2722,7 +2757,10 @@ struct ContentView: View {
                     .font(.subheadline.weight(.semibold))
                 tableHeader(["Date", "Description", "Currency", "Type", "Amount", "Balance"])
                 ForEach(preparedImport.financialDocument.transactions.prefix(12)) { transaction in
-                    previewTransactionRow(transaction)
+                    previewTransactionRow(
+                        transaction,
+                        cardEvidence: preparedImport.financialDocument.cardStatementEvidence
+                    )
                 }
             }
             .padding(12)
@@ -2791,38 +2829,51 @@ struct ContentView: View {
                     .foregroundStyle(LFTheme.text)
                 }
                 if case .cardChoiceRequired = importIdentityReview {
+                    let statementSections = preparedImport.financialDocument.cardStatementEvidence?.instrumentSections ?? []
                     ForEach(accountsViewModel.accounts.filter { projection.eligibleAccountIDs.contains($0.id) }) { account in
                         let instruments = cardStore.snapshot.instruments.filter { $0.liabilityAccountID == account.id }
                         VStack(alignment: .leading, spacing: 8) {
                             Text(account.displayName).font(.subheadline.weight(.semibold))
-                            ForEach(instruments) { instrument in
-                                cardChoiceButton(
-                                    title: "Reuse confirmed instrument \(instrument.id.suffix(8))",
-                                    choice: .useExistingCardLiabilityAccount(
-                                        accountId: account.id,
-                                        instrumentChoice: .reuseExistingInstrument(instrumentId: instrument.id)
-                                    ), preparedImport: preparedImport
-                                )
-                                ForEach(CardInstrumentRelationshipKind.allCases, id: \.rawValue) { relationship in
-                                    cardChoiceButton(
-                                        title: "New instrument · \(cardRelationshipTitle(relationship))",
-                                        choice: .useExistingCardLiabilityAccount(
-                                            accountId: account.id,
-                                            instrumentChoice: .createNewInstrument(
-                                                relationship: relationship,
-                                                relatedInstrumentId: instrument.id
-                                            )
-                                        ), preparedImport: preparedImport
+                            if statementSections.count > 1 {
+                                ForEach(statementSections, id: \.documentScopedSectionID) { section in
+                                    multiInstrumentSectionChoices(
+                                        section: section,
+                                        allSectionIDs: statementSections.map(\.documentScopedSectionID),
+                                        accountID: account.id,
+                                        instruments: instruments,
+                                        preparedImport: preparedImport
                                     )
                                 }
+                            } else {
+                                ForEach(instruments) { instrument in
+                                    cardChoiceButton(
+                                        title: "Reuse confirmed instrument \(instrument.id.suffix(8))",
+                                        choice: .useExistingCardLiabilityAccount(
+                                            accountId: account.id,
+                                            instrumentChoice: .reuseExistingInstrument(instrumentId: instrument.id)
+                                        ), preparedImport: preparedImport
+                                    )
+                                    ForEach(CardInstrumentRelationshipKind.allCases, id: \.rawValue) { relationship in
+                                        cardChoiceButton(
+                                            title: "New instrument · \(cardRelationshipTitle(relationship))",
+                                            choice: .useExistingCardLiabilityAccount(
+                                                accountId: account.id,
+                                                instrumentChoice: .createNewInstrument(
+                                                    relationship: relationship,
+                                                    relatedInstrumentId: instrument.id
+                                                )
+                                            ), preparedImport: preparedImport
+                                        )
+                                    }
+                                }
+                                cardChoiceButton(
+                                    title: instruments.isEmpty ? "Create first instrument" : "Create new instrument · no relationship asserted",
+                                    choice: .useExistingCardLiabilityAccount(
+                                        accountId: account.id,
+                                        instrumentChoice: .createNewInstrument()
+                                    ), preparedImport: preparedImport
+                                )
                             }
-                            cardChoiceButton(
-                                title: instruments.isEmpty ? "Create first instrument" : "Create new instrument · no relationship asserted",
-                                choice: .useExistingCardLiabilityAccount(
-                                    accountId: account.id,
-                                    instrumentChoice: .createNewInstrument()
-                                ), preparedImport: preparedImport
-                            )
                         }
                         .padding(10)
                         .background(LFTheme.surface)
@@ -2843,6 +2894,10 @@ struct ContentView: View {
 
     private func cardChoiceButton(title: String, choice: ImportAccountChoice, preparedImport: PreparedImport) -> some View {
         Button {
+            if case .createNewCardLiabilityAccountAndInstrument = choice {
+                cardSectionDraftAccountID = nil
+                cardSectionDraftChoices = [:]
+            }
             importAccountChoice = choice
             refreshPartialImportReview(preparedImport)
         } label: {
@@ -2850,6 +2905,98 @@ struct ContentView: View {
                 Text(title)
                 Spacer()
                 Image(systemName: importAccountChoice == choice ? "checkmark.circle.fill" : "circle")
+            }
+            .padding(8)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(LFTheme.text)
+    }
+
+    private func multiInstrumentSectionChoices(
+        section: CardInstrumentSectionEvidence,
+        allSectionIDs: [String],
+        accountID: String,
+        instruments: [CardInstrument],
+        preparedImport: PreparedImport
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(section.holderLabel ?? "Card section \(section.sourceOrdinal)")
+                .font(.caption.weight(.semibold))
+            if let observed = section.sourceIdentityObservations.first?.value {
+                Text(observed)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(LFTheme.textSecondary)
+            }
+            Text("Signed section total: \(formatCurrency(section.signedNetTotal.amount, currencyCode: section.signedNetTotal.currency.code))")
+                .font(.caption2)
+                .foregroundStyle(section.signedNetTotal.amount < .zero ? LFTheme.success : LFTheme.textSecondary)
+            ForEach(instruments) { instrument in
+                cardSectionChoiceButton(
+                    title: "Reuse confirmed instrument \(instrument.id.suffix(8))",
+                    accountID: accountID,
+                    sectionID: section.documentScopedSectionID,
+                    choice: .reuseExistingInstrument(instrumentId: instrument.id),
+                    requiredSectionIDs: allSectionIDs,
+                    preparedImport: preparedImport
+                )
+                ForEach(CardInstrumentRelationshipKind.allCases, id: \.rawValue) { relationship in
+                    cardSectionChoiceButton(
+                        title: "New instrument · \(cardRelationshipTitle(relationship))",
+                        accountID: accountID,
+                        sectionID: section.documentScopedSectionID,
+                        choice: .createNewInstrument(
+                            relationship: relationship,
+                            relatedInstrumentId: instrument.id
+                        ),
+                        requiredSectionIDs: allSectionIDs,
+                        preparedImport: preparedImport
+                    )
+                }
+            }
+            cardSectionChoiceButton(
+                title: instruments.isEmpty ? "Create first instrument" : "Create new instrument · no relationship asserted",
+                accountID: accountID,
+                sectionID: section.documentScopedSectionID,
+                choice: .createNewInstrument(),
+                requiredSectionIDs: allSectionIDs,
+                preparedImport: preparedImport
+            )
+        }
+        .padding(8)
+        .background(LFTheme.background.opacity(0.65))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func cardSectionChoiceButton(
+        title: String,
+        accountID: String,
+        sectionID: String,
+        choice: ImportCardInstrumentChoice,
+        requiredSectionIDs: [String],
+        preparedImport: PreparedImport
+    ) -> some View {
+        Button {
+            if cardSectionDraftAccountID != accountID {
+                cardSectionDraftAccountID = accountID
+                cardSectionDraftChoices = [:]
+            }
+            cardSectionDraftChoices[sectionID] = choice
+            if Set(cardSectionDraftChoices.keys) == Set(requiredSectionIDs) {
+                importAccountChoice = .useExistingCardLiabilityAccountSections(
+                    accountId: accountID,
+                    sectionChoices: cardSectionDraftChoices
+                )
+            } else {
+                importAccountChoice = nil
+            }
+            refreshPartialImportReview(preparedImport)
+        } label: {
+            HStack {
+                Text(title)
+                Spacer()
+                let selected = cardSectionDraftAccountID == accountID &&
+                    cardSectionDraftChoices[sectionID] == choice
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
             }
             .padding(8)
         }
@@ -2997,12 +3144,22 @@ struct ContentView: View {
         .accessibilityLabel("Reviewed partial import. \(plan.recognizedCount) already represented. \(plan.importedCount) will import. Zero blocked.")
     }
 
-    private func previewTransactionRow(_ transaction: Transaction) -> some View {
+    private func previewTransactionRow(
+        _ transaction: Transaction,
+        cardEvidence: CardStatementEvidence? = nil
+    ) -> some View {
         HStack(spacing: 14) {
             Text(formatDate(transaction.statementDate))
                 .frame(width: 84, alignment: .leading)
-            Text(transaction.description)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(transaction.description)
+                    .lineLimit(1)
+                if let scope = cardTransactionScopeLabel(transaction, evidence: cardEvidence) {
+                    Text(scope)
+                        .font(.caption2)
+                        .foregroundStyle(LFTheme.textSecondary)
+                }
+            }
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(transaction.currency)
                 .foregroundStyle(LFTheme.textSecondary)
@@ -3021,6 +3178,22 @@ struct ContentView: View {
         }
         .font(.caption)
         .padding(.vertical, 8)
+    }
+
+    private func cardTransactionScopeLabel(
+        _ transaction: Transaction,
+        evidence: CardStatementEvidence?
+    ) -> String? {
+        guard let annotation = evidence?.annotation(for: transaction) else { return nil }
+        switch annotation.rowScope {
+        case .accountLevel:
+            return "Liability-account activity"
+        case .instrument(let sectionID):
+            let ordinal = evidence?.instrumentSections.first(where: {
+                $0.documentScopedSectionID == sectionID
+            })?.sourceOrdinal
+            return ordinal.map { "Card section \($0) activity" } ?? "Card-instrument activity"
+        }
     }
 
     private var importFooterAction: some View {
@@ -3659,6 +3832,8 @@ struct ContentView: View {
             }
             importIdentityReview = identityReview
             importAccountChoice = ImportAccountConfirmationPolicy.initialChoice(for: identityReview)
+            cardSectionDraftAccountID = nil
+            cardSectionDraftChoices = [:]
             partialImportReview = preparedPartialReview
             guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
                 ImportEngine.shared.cancelPreparedImport(preparedImport)
@@ -3692,13 +3867,14 @@ struct ContentView: View {
                 message: summary.displayText,
                 retrySourceURL: isRetryablePreparationFailure(error) ? retrySourceURL : nil
             )
+            let diagnosticMetadata = [
+                "stage": summary.stage.rawValue,
+                "family": summary.family.rawValue
+            ]
             DeveloperConsole.shared.error(
                 .import,
                 "Import preparation failed",
-                metadata: [
-                    "stage": summary.stage.rawValue,
-                    "family": summary.family.rawValue
-                ]
+                metadata: diagnosticMetadata
             )
             releasePreparationOperation(operationID)
         }
@@ -3744,6 +3920,8 @@ struct ContentView: View {
         switch importState {
         case .preparing(let currentFileName, _):
             fileName = currentFileName
+            statementPassword = ""
+            statementPasswordChallenges.cancel()
             preparationOwner.cancel()
         case .previewReady(let preparedImport), .validationFailed(let preparedImport):
             fileName = preparedImport.fileName
@@ -3758,6 +3936,13 @@ struct ContentView: View {
         confirmedImportRecoveryContext = nil
         selectedFile = fileName
         importState = .cancelled(fileName: fileName)
+    }
+
+    private func submitStatementPassword(_ challenge: StatementPasswordChallenge) {
+        guard !statementPassword.isEmpty else { return }
+        let password = statementPassword
+        statementPassword = ""
+        statementPasswordChallenges.submit(password, challengeID: challenge.id)
     }
 
     @MainActor

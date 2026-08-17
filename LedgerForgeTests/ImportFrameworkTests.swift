@@ -30,7 +30,7 @@ struct ImportFrameworkTests {
     }
 
     @Test func importCoordinatorWiresRegistryPasswordProviderAndReader() async throws {
-        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/statement.csv"))
+        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/statement.pdf"))
         let rawDocument = RawDocument(
             sourceURL: request.fileURL,
             fileName: request.fileName,
@@ -84,11 +84,14 @@ private struct StaticPasswordProvider: ImportFramework.PasswordProvider {
 }
 
 private struct PasswordCheckingReader: ImportFramework.DocumentReader {
-    let supportedFileExtensions: Set<String> = ["csv"]
+    let supportedFileExtensions: Set<String> = ["pdf"]
     let expectedPassword: String
     let rawDocument: RawDocument
 
     func read(request: ImportRequest, password: String?) async throws -> RawDocument {
+        guard password != nil else {
+            throw ImportError.passwordRequired
+        }
         guard password == expectedPassword else {
             throw ImportError.incorrectPassword
         }

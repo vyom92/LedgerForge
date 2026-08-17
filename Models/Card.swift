@@ -49,9 +49,21 @@ struct CardStatement: Identifiable, Equatable, Sendable {
     let sourceRowCount: Int
     let reconciliationRuleCode: String
     let summaryComponents: [CardStatementSummaryComponent]
+    let sections: [CardStatementSection]
 
     var newBalance: Money? { summaryComponents.first { $0.persistenceCode == "new_balance" }?.money }
     var dueDate: StatementDate? { summaryComponents.first { $0.persistenceCode == "due_date" }?.date }
+}
+
+struct CardStatementSection: Identifiable, Equatable, Sendable {
+    let id: String
+    let documentScopedSectionID: String
+    let sourceOrdinal: Int
+    let instrumentID: String
+    let holderLabel: String?
+    let signedTotal: Money
+    let reconciliationRuleCode: String
+    let sourceObservations: [CardSourceIdentityObservation]
 }
 
 struct DurableCardTransactionEvidence: Equatable, Sendable {

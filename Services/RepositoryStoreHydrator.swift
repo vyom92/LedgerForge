@@ -754,12 +754,20 @@ final class RepositoryStoreHydrator {
               Set(snapshot.statements.map(\.id)).count == snapshot.statements.count,
               Set(snapshot.summaryComponents.map(\.id)).count == snapshot.summaryComponents.count,
               Set(snapshot.transactionEvidence.map(\.id)).count == snapshot.transactionEvidence.count,
-              Set(snapshot.transactionEvidence.map(\.transactionId)).count == snapshot.transactionEvidence.count else {
+              Set(snapshot.transactionEvidence.map(\.transactionId)).count == snapshot.transactionEvidence.count,
+              Set(snapshot.sections.map(\.id)).count == snapshot.sections.count,
+              Set(snapshot.sectionObservations.map(\.id)).count == snapshot.sectionObservations.count,
+              Set(snapshot.semanticProjections.map(\.id)).count == snapshot.semanticProjections.count,
+              Set(snapshot.semanticGroups.map(\.id)).count == snapshot.semanticGroups.count,
+              Set(snapshot.semanticMembers.map(\.id)).count == snapshot.semanticMembers.count else {
             throw RepositoryStoreHydrationError.invalidCardState("duplicate durable identity")
         }
 
         let instrumentByID = Dictionary(uniqueKeysWithValues: snapshot.instruments.map { ($0.id, $0) })
         let statementByID = Dictionary(uniqueKeysWithValues: snapshot.statements.map { ($0.id, $0) })
+        let sectionByID = Dictionary(uniqueKeysWithValues: snapshot.sections.map { ($0.id, $0) })
+        let projectionByID = Dictionary(uniqueKeysWithValues: snapshot.semanticProjections.map { ($0.id, $0) })
+        let groupByID = Dictionary(uniqueKeysWithValues: snapshot.semanticGroups.map { ($0.id, $0) })
         let instrumentIDs = Set(snapshot.instruments.map(\.id))
         guard snapshot.instrumentIdentifiers.allSatisfy({
             $0.workspaceId == workspaceID && instrumentIDs.contains($0.instrumentId)
@@ -776,7 +784,7 @@ final class RepositoryStoreHydrator {
                   let lifecycle = CardInstrumentLifecycleState(rawValue: instrument.lifecycleStateCode) else {
                 throw RepositoryStoreHydrationError.invalidCardState("instrument account relationship")
             }
-            let observations = try snapshot.sourceObservations.filter {
+            let legacyObservations = try snapshot.sourceObservations.filter {
                 $0.subjectKind == CardSourceIdentitySubject.instrument.rawValue && $0.subjectId == instrument.id
             }.map { observation -> CardSourceIdentityObservation in
                 guard observation.workspaceId == workspaceID,
@@ -787,13 +795,28 @@ final class RepositoryStoreHydrator {
                 }
                 return try CardSourceIdentityObservation(kind: kind, subject: .instrument, value: observation.sourceValue)
             }
+            let sectionScopedObservations = try snapshot.sectionObservations.filter {
+                sectionByID[$0.cardStatementSectionId]?.instrumentId == instrument.id
+            }.map { observation -> CardSourceIdentityObservation in
+                guard observation.workspaceId == workspaceID,
+                      observation.observationKind == CardSourceIdentityObservationKind.instrumentCardAccountNumber.rawValue,
+                      observation.parserProfileId == AmericanExpressCreditCardPDFParser.profileID,
+                      observation.parserProfileVersion == AmericanExpressCreditCardPDFParser.profileVersion else {
+                    throw RepositoryStoreHydrationError.invalidCardState("section source observation")
+                }
+                return try CardSourceIdentityObservation(
+                    kind: .instrumentCardAccountNumber,
+                    subject: .instrument,
+                    value: observation.sourceValue
+                )
+            }
             return CardInstrument(
                 id: instrument.id,
                 workspaceID: instrument.workspaceId,
                 liabilityAccountID: instrument.liabilityAccountId,
                 lifecycleState: lifecycle,
                 createdAtISO: instrument.createdAtISO,
-                sourceObservations: observations
+                sourceObservations: legacyObservations + sectionScopedObservations
             )
         }.sorted { $0.id < $1.id }
 
@@ -873,13 +896,96 @@ final class RepositoryStoreHydrator {
                   previous.amount - credits.amount + debits.amount == balance.amount else {
                 throw RepositoryStoreHydrationError.invalidCardState("summary reconciliation")
             }
+            let durableSections = snapshot.sections.filter { $0.cardStatementId == statement.id }
+                .sorted { $0.sourceOrdinal < $1.sourceOrdinal }
+            guard !durableSections.isEmpty,
+                  durableSections.map(\.sourceOrdinal) == Array(1...durableSections.count),
+                  Set(durableSections.map(\.documentScopedSectionId)).count == durableSections.count else {
+                throw RepositoryStoreHydrationError.invalidCardState("statement section coverage")
+            }
+            let runtimeSections: [CardStatementSection] = try durableSections.map { section in
+                guard let instrument = instrumentByID[section.instrumentId],
+                      instrument.liabilityAccountId == statement.liabilityAccountId,
+                      section.signedTotalCurrency == statement.statementCurrency,
+                      section.reconciliationRuleCode == CardInstrumentSectionEvidence.amexSignedNetRule,
+                      let byDecimal = try? Money(
+                        canonicalDecimal: section.signedTotalDecimal,
+                        currency: section.signedTotalCurrency
+                      ), let byMinor = try? Money.fromMinorUnits(
+                        section.signedTotalMinor,
+                        currency: section.signedTotalCurrency
+                      ), byDecimal == byMinor else {
+                    throw RepositoryStoreHydrationError.invalidCardState("statement section relationship")
+                }
+                let observations = try snapshot.sectionObservations.filter {
+                    $0.cardStatementSectionId == section.id
+                }.map { observation -> CardSourceIdentityObservation in
+                    guard observation.workspaceId == workspaceID,
+                          observation.documentId == statement.documentId,
+                          observation.importSessionId == statement.importSessionId,
+                          observation.normalizedDocumentId == statement.normalizedDocumentId,
+                          observation.parserProfileId == statement.parserProfileId,
+                          observation.parserProfileVersion == statement.parserProfileVersion,
+                          observation.observationKind == CardSourceIdentityObservationKind.instrumentCardAccountNumber.rawValue,
+                          ["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"]
+                            .contains(observation.associationAuthority) else {
+                        throw RepositoryStoreHydrationError.invalidCardState("section observation graph")
+                    }
+                    return try CardSourceIdentityObservation(
+                        kind: .instrumentCardAccountNumber,
+                        subject: .instrument,
+                        value: observation.sourceValue
+                    )
+                }
+                guard !observations.isEmpty else {
+                    throw RepositoryStoreHydrationError.invalidCardState("section observation coverage")
+                }
+                return CardStatementSection(
+                    id: section.id,
+                    documentScopedSectionID: section.documentScopedSectionId,
+                    sourceOrdinal: section.sourceOrdinal,
+                    instrumentID: section.instrumentId,
+                    holderLabel: section.holderLabel,
+                    signedTotal: byDecimal,
+                    reconciliationRuleCode: section.reconciliationRuleCode,
+                    sourceObservations: observations
+                )
+            }
+
+            let semanticProjection = snapshot.semanticProjections.first { $0.cardStatementId == statement.id }
+            let semanticMember = semanticProjection.flatMap { projection in
+                snapshot.semanticMembers.first { $0.projectionId == projection.id }
+            }
+            let isSupportingSource: Bool
+            if let projection = semanticProjection, let member = semanticMember,
+               let group = groupByID[member.groupId] {
+                guard try validCardSemanticProjection(
+                    projection,
+                    statement: statement,
+                    summaryComponents: statementComponents,
+                    durableSections: durableSections,
+                    transactionsByID: transactionByID,
+                    member: member,
+                    group: group
+                ) else {
+                    throw RepositoryStoreHydrationError.invalidCardState("semantic projection graph")
+                }
+                isSupportingSource = member.role == .supporting
+            } else if semanticProjection == nil && semanticMember == nil {
+                isSupportingSource = false
+            } else {
+                throw RepositoryStoreHydrationError.invalidCardState("semantic membership coverage")
+            }
             let evidenceRows = snapshot.transactionEvidence.filter { $0.cardStatementId == statement.id }
-            guard evidenceRows.count == statement.sourceRowCount else {
+            guard evidenceRows.count == (isSupportingSource ? 0 : statement.sourceRowCount) else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement row count")
             }
             var increase: Int64 = 0
             var decrease: Int64 = 0
             var instrumentNet: Int64 = 0
+            var sectionNetByID = Dictionary(uniqueKeysWithValues: durableSections.map {
+                ($0.documentScopedSectionId, Int64(0))
+            })
             for evidence in evidenceRows {
                 guard let transaction = transactionByID[evidence.transactionId],
                       transaction.accountId == statement.liabilityAccountId,
@@ -904,6 +1010,7 @@ final class RepositoryStoreHydrator {
                     }
                     scope = .instrument(documentScopedSectionID: sectionID)
                     instrumentNet += transaction.amountMinor
+                    sectionNetByID[sectionID, default: 0] += transaction.amountMinor
                 }
                 switch effect {
                 case .increasesAmountOwed: increase += transaction.amountMinor
@@ -926,17 +1033,35 @@ final class RepositoryStoreHydrator {
                     sourceTransactionDate: transactionDate, originalMerchantMoney: originalMoney
                 ))
             }
+            if isSupportingSource, let semanticProjection {
+                for event in semanticProjection.events {
+                    switch CardLiabilityEffect(rawValue: event.liabilityEffectCode) {
+                    case .increasesAmountOwed: increase += event.postedAmountMinor
+                    case .decreasesAmountOwed: decrease += -event.postedAmountMinor
+                    case nil: throw RepositoryStoreHydrationError.invalidCardState("semantic event effect")
+                    }
+                    if let sectionID = event.documentScopedSectionId {
+                        instrumentNet += event.postedAmountMinor
+                        sectionNetByID[sectionID, default: 0] += event.postedAmountMinor
+                    }
+                }
+            }
             guard let debitsMinor = statementComponents.first(where: { $0.componentCode == "new_debits" })?.moneyMinor,
                   let creditsMinor = statementComponents.first(where: { $0.componentCode == "new_credits" })?.moneyMinor,
                   let instrumentMinor = statementComponents.first(where: { $0.componentCode == "instrument_net_total" })?.moneyMinor,
-                  increase == debitsMinor, decrease == creditsMinor, instrumentNet == instrumentMinor else {
+                  increase == debitsMinor,
+                  decrease == creditsMinor,
+                  instrumentNet == instrumentMinor,
+                  durableSections.allSatisfy({
+                      sectionNetByID[$0.documentScopedSectionId] == $0.signedTotalMinor
+                  }) else {
                 throw RepositoryStoreHydrationError.invalidCardState("transaction totals")
             }
             let start = try StatementDate(canonical: statement.statementStartDateISO)
             let end = try StatementDate(canonical: statement.statementEndDateISO)
             let statementDate = try StatementDate(canonical: statement.statementDateISO)
             guard start <= end else { throw RepositoryStoreHydrationError.invalidCardState("statement period") }
-            let usedInstrumentIDs = Array(Set(evidenceRows.compactMap(\.instrumentId))).sorted()
+            let usedInstrumentIDs = durableSections.map(\.instrumentId)
             runtimeStatements.append(CardStatement(
                 id: statement.id, liabilityAccountID: statement.liabilityAccountId,
                 instrumentIDs: usedInstrumentIDs, sourceDocumentID: statement.documentId,
@@ -944,11 +1069,19 @@ final class RepositoryStoreHydrator {
                 parserProfileVersion: statement.parserProfileVersion, statementDate: statementDate,
                 period: try DeclaredStatementPeriod(start: start, end: end),
                 currency: try CurrencyCode(statement.statementCurrency), sourceRowCount: statement.sourceRowCount,
-                reconciliationRuleCode: statement.reconciliationRuleCode, summaryComponents: components
+                reconciliationRuleCode: statement.reconciliationRuleCode,
+                summaryComponents: components,
+                sections: runtimeSections
             ))
         }
         guard Set(snapshot.summaryComponents.map(\.cardStatementId)).isSubset(of: Set(statementByID.keys)),
-              Set(snapshot.transactionEvidence.map(\.cardStatementId)).isSubset(of: Set(statementByID.keys)) else {
+              Set(snapshot.transactionEvidence.map(\.cardStatementId)).isSubset(of: Set(statementByID.keys)),
+              Set(snapshot.sections.map(\.cardStatementId)).isSubset(of: Set(statementByID.keys)),
+              snapshot.sectionObservations.allSatisfy({ sectionByID[$0.cardStatementSectionId] != nil }),
+              snapshot.semanticProjections.allSatisfy({ statementByID[$0.cardStatementId] != nil }),
+              snapshot.semanticMembers.allSatisfy({
+                  projectionByID[$0.projectionId] != nil && groupByID[$0.groupId] != nil
+              }) else {
             throw RepositoryStoreHydrationError.invalidCardState("orphan statement evidence")
         }
         for observation in snapshot.sourceObservations {
@@ -979,6 +1112,123 @@ final class RepositoryStoreHydrator {
             statements: runtimeStatements.sorted { ($0.period.end, $0.id) < ($1.period.end, $1.id) },
             transactionEvidence: runtimeEvidence.sorted { ($0.statementID, $0.transactionID) < ($1.statementID, $1.transactionID) }
         )
+    }
+
+    private static func validCardSemanticProjection(
+        _ persisted: CardStatementSemanticProjectionRecordDTO,
+        statement: CardStatementDTO,
+        summaryComponents: [CardStatementSummaryComponentDTO],
+        durableSections: [CardStatementSectionDTO],
+        transactionsByID: [String: TransactionDTO],
+        member: CardStatementSemanticMemberDTO,
+        group: CardStatementSemanticGroupDTO
+    ) throws -> Bool {
+        guard persisted.workspaceId == statement.workspaceId,
+              persisted.liabilityAccountId == statement.liabilityAccountId,
+              persisted.cardStatementId == statement.id,
+              persisted.documentId == statement.documentId,
+              persisted.importSessionId == statement.importSessionId,
+              persisted.parserProfileId == statement.parserProfileId,
+              persisted.parserProfileVersion == statement.parserProfileVersion,
+              persisted.statementDateISO == statement.statementDateISO,
+              persisted.statementStartDateISO == statement.statementStartDateISO,
+              persisted.statementEndDateISO == statement.statementEndDateISO,
+              persisted.nativeCurrency == statement.statementCurrency,
+              persisted.reconciliationRuleCode == statement.reconciliationRuleCode,
+              persisted.eventCount == persisted.events.count,
+              persisted.sectionCount == persisted.sections.count,
+              persisted.eventCount == statement.sourceRowCount,
+              persisted.sectionCount == durableSections.count,
+              member.projectionId == persisted.id,
+              group.id == member.groupId,
+              group.workspaceId == persisted.workspaceId,
+              group.liabilityAccountId == persisted.liabilityAccountId,
+              group.institutionCode == persisted.institutionCode,
+              group.statementFamilyCode == persisted.statementFamilyCode,
+              group.statementStartDateISO == persisted.statementStartDateISO,
+              group.statementEndDateISO == persisted.statementEndDateISO,
+              group.nativeCurrency == persisted.nativeCurrency,
+              group.projectionAlgorithm == persisted.algorithm,
+              group.projectionDigest == persisted.digest else { return false }
+        switch member.role {
+        case .authoritative:
+            guard group.authoritativeProjectionId == persisted.id else { return false }
+        case .supporting:
+            guard group.authoritativeProjectionId != persisted.id else { return false }
+        }
+
+        let durableSectionsByOrdinal = Dictionary(uniqueKeysWithValues: durableSections.map {
+            ($0.sourceOrdinal, $0)
+        })
+        guard persisted.sections.allSatisfy({ projected in
+            guard projected.projectionId == persisted.id,
+                  let durable = durableSectionsByOrdinal[projected.sourceOrdinal] else { return false }
+            return projected.documentScopedSectionId == durable.documentScopedSectionId &&
+                projected.signedTotalCurrency == durable.signedTotalCurrency &&
+                projected.signedTotalMinor == durable.signedTotalMinor &&
+                projected.signedTotalDecimal == durable.signedTotalDecimal &&
+                projected.reconciliationRuleCode == durable.reconciliationRuleCode
+        }) else { return false }
+
+        let eventPlans = persisted.events.map { event in
+            CardStatementSemanticProjectionEventPlanDTO(
+                incomingTransactionId: event.canonicalTransactionId,
+                normalizedRowId: event.normalizedRowId,
+                sourceOrdinal: event.sourceOrdinal,
+                postingDateISO: event.postingDateISO,
+                sourceTransactionDateISO: event.sourceTransactionDateISO,
+                liabilityEffectCode: event.liabilityEffectCode,
+                postedCurrency: event.postedCurrency,
+                postedAmountMinor: event.postedAmountMinor,
+                postedAmountDecimal: event.postedAmountDecimal,
+                originalCurrency: event.originalCurrency,
+                originalAmountMinor: event.originalAmountMinor,
+                originalAmountDecimal: event.originalAmountDecimal,
+                sourceReference: event.sourceReference,
+                rowScopeCode: event.rowScopeCode,
+                documentScopedSectionId: event.documentScopedSectionId,
+                documentSectionOrdinal: event.documentSectionOrdinal
+            )
+        }
+        guard persisted.events.allSatisfy({ event in
+            guard event.projectionId == persisted.id,
+                  !event.normalizedRowId.isEmpty,
+                  let transaction = transactionsByID[event.canonicalTransactionId],
+                  transaction.accountId == persisted.liabilityAccountId,
+                  transaction.postedDateISO == event.postingDateISO,
+                  transaction.direction == event.liabilityEffectCode,
+                  transaction.nativeCurrency == event.postedCurrency,
+                  transaction.amountMinor == event.postedAmountMinor,
+                  transaction.amountDecimal == event.postedAmountDecimal,
+                  transaction.reference == event.sourceReference else { return false }
+            if event.rowScopeCode == CardTransactionScope.accountLevel.persistenceCode {
+                return event.documentScopedSectionId == nil && event.documentSectionOrdinal == nil
+            }
+            guard event.rowScopeCode == "instrument_level",
+                  let sectionID = event.documentScopedSectionId,
+                  let ordinal = event.documentSectionOrdinal,
+                  let section = durableSectionsByOrdinal[ordinal] else { return false }
+            return section.documentScopedSectionId == sectionID
+        }) else { return false }
+
+        let projection = CardStatementSemanticProjectionDTO(
+            id: persisted.id,
+            algorithmIdentifier: persisted.algorithm,
+            digest: persisted.digest,
+            institutionCode: persisted.institutionCode,
+            statementFamilyCode: persisted.statementFamilyCode,
+            parserProfileId: persisted.parserProfileId,
+            parserProfileVersion: persisted.parserProfileVersion,
+            statementDateISO: persisted.statementDateISO,
+            statementStartDateISO: persisted.statementStartDateISO,
+            statementEndDateISO: persisted.statementEndDateISO,
+            nativeCurrency: persisted.nativeCurrency,
+            reconciliationRuleCode: persisted.reconciliationRuleCode,
+            summaryComponents: summaryComponents,
+            sections: persisted.sections.sorted { $0.sourceOrdinal < $1.sourceOrdinal },
+            events: eventPlans.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
+        )
+        return projection.isValid()
     }
 
     private static func accounts(

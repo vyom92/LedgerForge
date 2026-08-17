@@ -26,7 +26,7 @@ struct DevelopmentDatabaseLifecycleTests {
             return
         }
         #expect(persistentActivation.profile.kind == .persistentDebug)
-        #expect(persistentActivation.profile.verifiedCurrentSchemaVersion == 12)
+        #expect(persistentActivation.profile.verifiedCurrentSchemaVersion == 13)
         #expect(setup.coordinator.activeProfile == persistentActivation.profile)
         #expect(setup.coordinator.currentDatabaseURL == setup.identity.persistentDebugURL)
         #expect(DatabaseProvider.shared.generationToken != currentToken)
@@ -586,7 +586,7 @@ struct DevelopmentDatabaseLifecycleTests {
             return
         }
         #expect(first.profile.migrationSourceVersion == 3)
-        #expect(first.profile.verifiedCurrentSchemaVersion == 12)
+        #expect(first.profile.verifiedCurrentSchemaVersion == 13)
 
         guard case .activated(let replacement) = setup.coordinator.resetActiveProfile(),
               let replacementURL = setup.coordinator.currentDatabaseURL else {
@@ -594,7 +594,7 @@ struct DevelopmentDatabaseLifecycleTests {
             return
         }
         #expect(replacement.profile.migrationSourceVersion == 3)
-        #expect(replacement.profile.verifiedCurrentSchemaVersion == 12)
+        #expect(replacement.profile.verifiedCurrentSchemaVersion == 13)
         #expect(replacementURL != firstURL)
         for member in setup.identity.databaseSet(at: firstURL) {
             #expect(!FileManager.default.fileExists(atPath: member.path))
@@ -602,7 +602,7 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(try DatabaseProvider.shared.accountRepo.accounts(workspaceId: "default-workspace").isEmpty)
     }
 
-    @Test(.globalRuntimeStateIsolation, arguments: Array(1...11))
+    @Test(.globalRuntimeStateIsolation, arguments: Array(1...12))
     func migrationSandboxVerifiesExactHistoricalPrefixBeforeOpeningCurrentRuntime(
         _ sourceVersion: Int
     ) throws {
@@ -637,18 +637,18 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(observedPrefix == Array(1...sourceVersion))
         #expect(globalTokenDuringPrefix == installedCurrentToken)
         #expect(activation.profile.migrationSourceVersion == sourceVersion)
-        #expect(activation.profile.verifiedCurrentSchemaVersion == 12)
+        #expect(activation.profile.verifiedCurrentSchemaVersion == 13)
         #expect(try DatabaseProvider.shared.accountRepo.accounts(workspaceId: "default-workspace").isEmpty)
         guard let sandboxURL = coordinator.currentDatabaseURL else {
             Issue.record("Missing active sandbox URL")
             return
         }
         let inspection = try SQLiteRepositoryProvider(path: sandboxURL.path)
-        #expect(try inspection.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 12)
+        #expect(try inspection.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 13)
         #expect(try inspection.database.validatedMigrationHistory(
             against: allMigrations,
             requiresCompleteChain: true
-        ).compactMap(\.version) == Array(1...12))
+        ).compactMap(\.version) == Array(1...13))
         try inspection.database.checkpointAndClose()
     }
 
@@ -903,8 +903,8 @@ struct DevelopmentDatabaseLifecycleTests {
             committedProfileKind: profileKind,
             migrationSourceVersion: nil,
             committedMigrationSourceVersion: nil,
-            verifiedCurrentSchemaVersion: 12,
-            committedVerifiedCurrentSchemaVersion: 12,
+            verifiedCurrentSchemaVersion: 13,
+            committedVerifiedCurrentSchemaVersion: 13,
             accountIDs: ["account-\(suffix)"],
             transactionIDs: [transactionID],
             importSessionIDs: ["session-\(suffix)"],

@@ -37,16 +37,17 @@ struct MigrationChainIntegrityTests {
         }
     }
 
-    @Test func currentV1ThroughV12RegistrationIsValidAndDeterministic() throws {
+    @Test func currentV1ThroughV13RegistrationIsValidAndDeterministic() throws {
         try MigrationChainValidator.validateRegistered(allMigrations)
 
-        #expect(allMigrations.map(\.version) == Array(1...12))
+        #expect(allMigrations.map(\.version) == Array(1...13))
         #expect(allMigrations.map(\.checksum).allSatisfy { $0.count == 64 })
         #expect(allMigrations.map(\.checksum) == allMigrations.map(\.checksum))
+        #expect(migrationV13.name == "multi-section card statements and exact semantic sources")
     }
 
-    @Test func cleanInstallContainsCompleteV12SchemaAndReopens() throws {
-        try withTemporaryDatabase(named: "V12CleanInstall") { path in
+    @Test func cleanInstallContainsCompleteV13SchemaAndReopens() throws {
+        try withTemporaryDatabase(named: "V13CleanInstall") { path in
             let provider = try SQLiteRepositoryProvider(path: path)
             let objects = try provider.database.query(
                 sql: "SELECT type, name FROM sqlite_master WHERE name IN ('partial_import_summaries', 'incoming_row_dispositions', 'validate_incoming_row_disposition', 'validate_partial_import_summary') ORDER BY name;",
@@ -97,7 +98,7 @@ struct MigrationChainIntegrityTests {
 
             let reopened = try SQLiteRepositoryProvider(path: path)
             defer { reopened.database.close() }
-            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM schema_migrations;") == 12)
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM schema_migrations;") == 13)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('categories', 'transaction_category_assignments');") == 2)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('statement_financial_projections', 'statement_financial_projection_events', 'statement_equivalence_groups', 'statement_equivalence_members');") == 4)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM statement_financial_projections;") == 0)
@@ -109,19 +110,22 @@ struct MigrationChainIntegrityTests {
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM statement_source_observations;") == 0)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM transaction_source_observations;") == 0)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('card_instruments', 'card_instrument_identifiers', 'card_source_identity_observations', 'card_instrument_relationships', 'card_statements', 'card_statement_summary_components', 'card_transaction_evidence');") == 7)
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('card_statement_sections', 'card_statement_section_observations', 'card_statement_semantic_projections', 'card_statement_semantic_projection_sections', 'card_statement_semantic_projection_events', 'card_statement_semantic_groups', 'card_statement_semantic_members');") == 7)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM card_instruments;") == 0)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM card_statements;") == 0)
             #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM card_transaction_evidence;") == 0)
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM card_statement_sections;") == 0)
+            #expect(try reopened.database.queryInt("SELECT COUNT(*) FROM card_statement_semantic_projections;") == 0)
         }
     }
 
-    @Test func cleanV9UpgradesToV12WithoutInventingEquivalenceCBQOrCardEvidence() throws {
-        try withTemporaryDatabase(named: "V9ToV12") { path in
+    @Test func cleanV9UpgradesToV13WithoutInventingEquivalenceCBQOrCardEvidence() throws {
+        try withTemporaryDatabase(named: "V9ToV13") { path in
             let database = SQLiteDatabase(path: path)
             try database.runMigrations(Array(allMigrations.prefix(9)))
             #expect(try database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 9)
             try database.runMigrations(allMigrations)
-            #expect(try database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 12)
+            #expect(try database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 13)
             #expect(try database.queryInt("SELECT COUNT(*) FROM statement_financial_projections;") == 0)
             #expect(try database.queryInt("SELECT COUNT(*) FROM statement_financial_projection_events;") == 0)
             #expect(try database.queryInt("SELECT COUNT(*) FROM statement_equivalence_groups;") == 0)
@@ -130,6 +134,8 @@ struct MigrationChainIntegrityTests {
             #expect(try database.queryInt("SELECT COUNT(*) FROM transaction_source_observations;") == 0)
             #expect(try database.queryInt("SELECT COUNT(*) FROM card_instruments;") == 0)
             #expect(try database.queryInt("SELECT COUNT(*) FROM card_statements;") == 0)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_statement_sections;") == 0)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_statement_semantic_projections;") == 0)
             try database.checkpointAndClose()
 
             let reopened = try SQLiteRepositoryProvider(path: path)
@@ -139,7 +145,7 @@ struct MigrationChainIntegrityTests {
     }
 
     @Test func populatedV6FullImportUpgradesToCurrentWithoutInventingPartialOrCategoryTruth() throws {
-        try withTemporaryDatabase(named: "V6ToV12") { path in
+        try withTemporaryDatabase(named: "V6ToV13") { path in
             let database = SQLiteDatabase(path: path)
             try database.runMigrations(Array(allMigrations.prefix(6)))
             try database.execute(sql: """
@@ -259,9 +265,9 @@ struct MigrationChainIntegrityTests {
     }
 
     @Test func persistedHistoryRejectsUnsupportedFutureVersion() {
-        let future = PersistedMigrationRecord(version: 13, name: "future", checksum: String(repeating: "f", count: 64), appliedAt: "2026-07-20T00:00:00Z")
+        let future = PersistedMigrationRecord(version: 14, name: "future", checksum: String(repeating: "f", count: 64), appliedAt: "2026-07-20T00:00:00Z")
 
-        #expect(throws: MigrationIntegrityError.unsupportedFutureVersion(13)) {
+        #expect(throws: MigrationIntegrityError.unsupportedFutureVersion(14)) {
             try MigrationChainValidator.validatePersisted(allMigrations.map(record(for:)) + [future], against: allMigrations, requiresCompleteChain: false)
         }
     }
@@ -287,7 +293,7 @@ struct MigrationChainIntegrityTests {
         )
     }
 
-    @Test func freshDatabaseCreatesOneExactV1ThroughV12History() throws {
+    @Test func freshDatabaseCreatesOneExactV1ThroughV13History() throws {
         try withTemporaryDatabase(named: "Fresh") { path in
             let provider = try SQLiteRepositoryProvider(path: path)
             defer { provider.database.close() }
@@ -296,7 +302,7 @@ struct MigrationChainIntegrityTests {
         }
     }
 
-    @Test(arguments: Array(1...11))
+    @Test(arguments: Array(1...12))
     func everyRegisteredHistoricalPrefixIsExactBeforeOrdinaryReopenToCurrent(
         _ priorVersion: Int
     ) throws {
@@ -314,8 +320,114 @@ struct MigrationChainIntegrityTests {
 
             let provider = try SQLiteRepositoryProvider(path: path)
             try expectCurrentHistory(in: provider.database)
-            #expect(try provider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 12)
+            #expect(try provider.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 13)
             try provider.database.checkpointAndClose()
+        }
+    }
+
+    @Test func v12ToV13BackfillsOnlyUniquelyProvenSingularAmexEvidence() throws {
+        try withTemporaryDatabase(named: "V12ToV13AmexBackfill") { path in
+            let database = SQLiteDatabase(path: path)
+            try database.runMigrations(Array(allMigrations.prefix(12)))
+            try seedV12AmexCard(in: database)
+
+            try database.runMigrations(allMigrations)
+
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_statement_sections;") == 1)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_statement_section_observations;") == 1)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_statement_semantic_projections;") == 0)
+            let sections = try database.query(
+                sql: "SELECT document_scoped_section_id, source_ordinal, instrument_id, holder_label, signed_total_currency, signed_total_minor, signed_total_decimal FROM card_statement_sections;",
+                params: []
+            ) { row in
+                (row.string(at: 0), row.int64(at: 1), row.string(at: 2), row.string(at: 3), row.string(at: 4), row.int64(at: 5), row.string(at: 6))
+            }
+            #expect(sections.count == 1)
+            #expect(sections.first?.0 == "instrument-section-1")
+            #expect(sections.first?.1 == 1)
+            #expect(sections.first?.2 == "i1")
+            #expect(sections.first?.3 == nil)
+            #expect(sections.first?.4 == "USD")
+            #expect(sections.first?.5 == 12345)
+            #expect(sections.first?.6 == "123.45")
+            database.close()
+        }
+    }
+
+    @Test func v12ToV13DoesNotFabricateSectionForIncompleteAmexEvidence() throws {
+        try withTemporaryDatabase(named: "V12ToV13AmexIncomplete") { path in
+            let database = SQLiteDatabase(path: path)
+            try database.runMigrations(Array(allMigrations.prefix(12)))
+            try seedV12AmexCard(in: database, includeInstrumentObservation: false)
+
+            try database.runMigrations(allMigrations)
+
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_statement_sections;") == 0)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_statement_section_observations;") == 0)
+            database.close()
+        }
+    }
+
+    @Test func v12ToV13DoesNotFabricateSectionForAmbiguousAmexEvidence() throws {
+        try withTemporaryDatabase(named: "V12ToV13AmexAmbiguous") { path in
+            let database = SQLiteDatabase(path: path)
+            try database.runMigrations(Array(allMigrations.prefix(12)))
+            try seedV12AmexCard(in: database)
+            try database.execute(sql: """
+            INSERT INTO card_instruments(id,workspace_id,liability_account_id,lifecycle_state,created_at)
+              VALUES('i2','w','a','active','2026-07-20T00:00:00Z');
+            INSERT INTO transactions(id,workspace_id,account_id,import_session_id,document_id,posted_date,native_currency,amount_minor,amount_decimal,direction,created_at)
+              VALUES('t2','w','a','s','d','2026-07-20','USD',2345,'23.45','card_increase_owed','2026-07-20T00:00:00Z');
+            INSERT INTO card_transaction_evidence(id,card_statement_id,transaction_id,row_scope,instrument_id,liability_effect,source_transaction_date,document_scoped_section_id)
+              VALUES('evidence-2','cs','t2','instrument_level','i2','card_increase_owed','2026-07-20','instrument-section-1');
+            """)
+
+            try database.runMigrations(allMigrations)
+
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_statement_sections;") == 0)
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_statement_section_observations;") == 0)
+            database.close()
+        }
+    }
+
+    @Test func v13AllowsSameObservationKindAcrossSectionsButRejectsDuplicatesAndMismatchedSources() throws {
+        try withTemporaryDatabase(named: "V13SectionObservations") { path in
+            let database = SQLiteDatabase(path: path)
+            try database.runMigrations(Array(allMigrations.prefix(12)))
+            try seedV12AmexCard(in: database, includeInstrumentObservation: false)
+            try database.runMigrations(allMigrations)
+            try database.execute(sql: """
+            INSERT INTO card_instruments(id,workspace_id,liability_account_id,lifecycle_state,created_at)
+              VALUES('i2','w','a','active','2026-07-20T00:00:00Z');
+            INSERT INTO card_statement_sections(id,card_statement_id,document_scoped_section_id,source_ordinal,instrument_id,holder_label,signed_total_currency,signed_total_minor,signed_total_decimal,reconciliation_rule_code)
+              VALUES('section-1','cs','amex-instrument-section-1',1,'i1',NULL,'USD',12345,'123.45','amex.section.signed-increases-minus-decreases.v1');
+            INSERT INTO card_statement_sections(id,card_statement_id,document_scoped_section_id,source_ordinal,instrument_id,holder_label,signed_total_currency,signed_total_minor,signed_total_decimal,reconciliation_rule_code)
+              VALUES('section-2','cs','amex-instrument-section-2',2,'i2',NULL,'USD',2345,'23.45','amex.section.signed-increases-minus-decreases.v1');
+            """)
+
+            try database.executePrepared(
+                sql: "INSERT INTO card_statement_section_observations(id,card_statement_section_id,workspace_id,document_id,import_session_id,normalized_document_id,parser_profile_id,parser_profile_version,observation_kind,source_value,association_authority,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: ["section-observation-1", "section-1", "w", "d", "s", "nd", "amex.credit-card.pdf", "1", "amex_card_account_number", "card-1111", "parser_strong_evidence", "2026-07-20T00:00:00Z"]
+            )
+            try database.executePrepared(
+                sql: "INSERT INTO card_statement_section_observations(id,card_statement_section_id,workspace_id,document_id,import_session_id,normalized_document_id,parser_profile_id,parser_profile_version,observation_kind,source_value,association_authority,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: ["section-observation-2", "section-2", "w", "d", "s", "nd", "amex.credit-card.pdf", "1", "amex_card_account_number", "card-2222", "parser_strong_evidence", "2026-07-20T00:00:00Z"]
+            )
+            #expect(try database.queryInt("SELECT COUNT(*) FROM card_statement_section_observations;") == 2)
+
+            #expect(throws: Error.self) {
+                try database.executePrepared(
+                    sql: "INSERT INTO card_statement_section_observations(id,card_statement_section_id,workspace_id,document_id,import_session_id,normalized_document_id,parser_profile_id,parser_profile_version,observation_kind,source_value,association_authority,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?);",
+                    params: ["section-observation-duplicate", "section-2", "w", "d", "s", "nd", "amex.credit-card.pdf", "1", "amex_card_account_number", "card-2222", "parser_strong_evidence", "2026-07-20T00:00:00Z"]
+                )
+            }
+            #expect(throws: Error.self) {
+                try database.executePrepared(
+                    sql: "INSERT INTO card_statement_section_observations(id,card_statement_section_id,workspace_id,document_id,import_session_id,normalized_document_id,parser_profile_id,parser_profile_version,observation_kind,source_value,association_authority,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?);",
+                    params: ["section-observation-invalid", "section-2", "w", "d", "s", "nd", "wrong.profile", "1", "amex_card_account_number", "card-3333", "parser_strong_evidence", "2026-07-20T00:00:00Z"]
+                )
+            }
+            database.close()
         }
     }
 
@@ -392,10 +504,10 @@ struct MigrationChainIntegrityTests {
         try withTamperedCurrentDatabase(named: "Future") { database in
             try database.executePrepared(
                 sql: "INSERT INTO schema_migrations(version, name, applied_at, checksum) VALUES(?, ?, ?, ?);",
-                params: [13, "future", "2026-07-20T00:00:00Z", String(repeating: "f", count: 64)]
+                params: [14, "future", "2026-07-20T00:00:00Z", String(repeating: "f", count: 64)]
             )
         } assertReopen: {
-            MigrationIntegrityError.unsupportedFutureVersion(13)
+            MigrationIntegrityError.unsupportedFutureVersion(14)
         }
     }
 
@@ -411,6 +523,41 @@ struct MigrationChainIntegrityTests {
                 defer { reopened.close() }
                 try reopened.runMigrations(allMigrations)
             }
+        }
+    }
+
+    private func seedV12AmexCard(
+        in database: SQLiteDatabase,
+        includeInstrumentObservation: Bool = true
+    ) throws {
+        try database.execute(sql: """
+        INSERT INTO workspaces(id,name,created_at) VALUES('w','Workspace','2026-07-20T00:00:00Z');
+        INSERT INTO accounts(id,workspace_id,name,account_type,native_currency,created_at)
+          VALUES('a','w','American Express','credit_card','USD','2026-07-20T00:00:00Z');
+        INSERT INTO import_sessions(id,workspace_id,user_visible_name,started_at,completed_at,validation_status,created_at,parser_version)
+          VALUES('s','w','Sanitized Amex statement','2026-07-20T00:00:00Z','2026-07-20T00:00:01Z','passed','2026-07-20T00:00:00Z','AmericanExpressCreditCardPDFParser');
+        INSERT INTO documents(id,workspace_id,import_session_id,filename,mime_type,size_bytes,sha256,created_at)
+          VALUES('d','w','s','sanitized.pdf','application/pdf',1,'v12-amex-sha','2026-07-20T00:00:00Z');
+        INSERT INTO normalized_documents(id,import_session_id,document_id,normalized_json,created_at,profile_id,profile_version)
+          VALUES('nd','s','d','{}','2026-07-20T00:00:00Z','amex.credit-card.pdf','1');
+        INSERT INTO normalized_rows(id,normalized_document_id,row_index,row_original,created_at)
+          VALUES('nr','nd',1,'sanitized','2026-07-20T00:00:00Z');
+        INSERT INTO card_instruments(id,workspace_id,liability_account_id,lifecycle_state,created_at)
+          VALUES('i1','w','a','active','2026-07-20T00:00:00Z');
+        INSERT INTO card_statements(id,workspace_id,liability_account_id,document_id,import_session_id,normalized_document_id,parser_profile_id,parser_profile_version,statement_date,statement_start_date,statement_end_date,statement_currency,source_row_count,reconciliation_rule_code,created_at)
+          VALUES('cs','w','a','d','s','nd','amex.credit-card.pdf','1','2026-07-20','2026-06-24','2026-07-23','USD',1,'amex.statement.summary.v1','2026-07-20T00:00:00Z');
+        INSERT INTO card_statement_summary_components(id,card_statement_id,component_code,money_currency,money_minor,money_decimal)
+          VALUES('summary-total','cs','instrument_net_total','USD',12345,'123.45');
+        INSERT INTO transactions(id,workspace_id,account_id,import_session_id,document_id,posted_date,native_currency,amount_minor,amount_decimal,direction,created_at)
+          VALUES('t1','w','a','s','d','2026-07-20','USD',12345,'123.45','card_increase_owed','2026-07-20T00:00:00Z');
+        INSERT INTO card_transaction_evidence(id,card_statement_id,transaction_id,row_scope,instrument_id,liability_effect,source_transaction_date,document_scoped_section_id)
+          VALUES('evidence-1','cs','t1','instrument_level','i1','card_increase_owed','2026-07-20','instrument-section-1');
+        """)
+        if includeInstrumentObservation {
+            try database.execute(sql: """
+            INSERT INTO card_source_identity_observations(id,workspace_id,document_id,import_session_id,normalized_document_id,parser_profile_id,parser_profile_version,subject_kind,subject_id,observation_kind,source_value,association_authority,created_at)
+              VALUES('observation-i1','w','d','s','nd','amex.credit-card.pdf','1','instrument','i1','amex_card_account_number','card-1111','parser_strong_evidence','2026-07-20T00:00:00Z');
+            """)
         }
     }
 

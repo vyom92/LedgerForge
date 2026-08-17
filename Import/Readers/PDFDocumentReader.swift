@@ -13,7 +13,7 @@ final class PDFDocumentReader: ImportFramework.DocumentReader {
             throw ImportError.unsupportedFile(extension: request.fileExtension)
         }
 
-        let text = try snapshot.withBytes { bytes in
+        let extracted = try snapshot.withBytes { bytes -> (text: String, pages: [String]) in
             guard let document = PDFDocument(data: bytes) else {
                 throw ImportError.invalidDocument(message: "Unable to open PDF document.")
             }
@@ -32,14 +32,22 @@ final class PDFDocumentReader: ImportFramework.DocumentReader {
                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw ImportError.invalidDocument(message: "PDF document contains no extractable text.")
             }
-            return text
+            let pages = try (0..<document.pageCount).map { pageIndex -> String in
+                guard let pageText = document.page(at: pageIndex)?.string,
+                      !pageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw ImportError.invalidDocument(message: "PDF page contains no extractable text.")
+                }
+                return pageText
+            }
+            return (text, pages)
         }
 
         return RawDocument(
             sourceURL: request.fileURL,
             fileName: request.fileName,
             fileExtension: request.fileExtension,
-            content: .text(text)
+            content: .text(extracted.text),
+            pdfPageTexts: extracted.pages
         )
     }
 }
