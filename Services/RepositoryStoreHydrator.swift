@@ -780,17 +780,24 @@ final class RepositoryStoreHydrator {
                   let account = accountByID[instrument.liabilityAccountId],
                   account.workspaceId == workspaceID,
                   account.accountType == "credit_card", account.nativeCurrency == "QAR",
-                  account.institutionId == Institution.amex.rawValue,
+                  [Institution.amex.rawValue, Institution.cbq.rawValue].contains(account.institutionId),
                   let lifecycle = CardInstrumentLifecycleState(rawValue: instrument.lifecycleStateCode) else {
                 throw RepositoryStoreHydrationError.invalidCardState("instrument account relationship")
             }
+            let expectedProfileID = account.institutionId == Institution.amex.rawValue
+                ? CardStatementProfileContract.amex.profileID
+                : CardStatementProfileContract.cbqV1.profileID
+            let expectedObservationKind = account.institutionId == Institution.amex.rawValue
+                ? CardSourceIdentityObservationKind.instrumentCardAccountNumber
+                : CardSourceIdentityObservationKind.cbqInstrumentMaskedCardNumber
             let legacyObservations = try snapshot.sourceObservations.filter {
                 $0.subjectKind == CardSourceIdentitySubject.instrument.rawValue && $0.subjectId == instrument.id
             }.map { observation -> CardSourceIdentityObservation in
                 guard observation.workspaceId == workspaceID,
                       let kind = CardSourceIdentityObservationKind(rawValue: observation.observationKind),
-                      observation.parserProfileId == AmericanExpressCreditCardPDFParser.profileID,
-                      observation.parserProfileVersion == AmericanExpressCreditCardPDFParser.profileVersion else {
+                      kind == expectedObservationKind,
+                      observation.parserProfileId == expectedProfileID,
+                      observation.parserProfileVersion == CardStatementProfileContract.amex.profileVersion else {
                     throw RepositoryStoreHydrationError.invalidCardState("instrument source observation")
                 }
                 return try CardSourceIdentityObservation(kind: kind, subject: .instrument, value: observation.sourceValue)
@@ -799,13 +806,13 @@ final class RepositoryStoreHydrator {
                 sectionByID[$0.cardStatementSectionId]?.instrumentId == instrument.id
             }.map { observation -> CardSourceIdentityObservation in
                 guard observation.workspaceId == workspaceID,
-                      observation.observationKind == CardSourceIdentityObservationKind.instrumentCardAccountNumber.rawValue,
-                      observation.parserProfileId == AmericanExpressCreditCardPDFParser.profileID,
-                      observation.parserProfileVersion == AmericanExpressCreditCardPDFParser.profileVersion else {
+                      observation.observationKind == expectedObservationKind.rawValue,
+                      observation.parserProfileId == expectedProfileID,
+                      observation.parserProfileVersion == CardStatementProfileContract.amex.profileVersion else {
                     throw RepositoryStoreHydrationError.invalidCardState("section source observation")
                 }
                 return try CardSourceIdentityObservation(
-                    kind: .instrumentCardAccountNumber,
+                    kind: expectedObservationKind,
                     subject: .instrument,
                     value: observation.sourceValue
                 )
@@ -850,18 +857,21 @@ final class RepositoryStoreHydrator {
         var runtimeStatements = [CardStatement]()
         var runtimeEvidence = [DurableCardTransactionEvidence]()
         for statement in snapshot.statements {
-            guard statement.workspaceId == workspaceID,
-                  accountByID[statement.liabilityAccountId]?.accountType == "credit_card",
-                  statement.parserProfileId == AmericanExpressCreditCardPDFParser.profileID,
-                  statement.parserProfileVersion == AmericanExpressCreditCardPDFParser.profileVersion,
+            guard let contract = CardStatementProfileContract(
+                    reconciliationRuleIdentifier: statement.reconciliationRuleCode
+                  ),
+                  statement.workspaceId == workspaceID,
+                  let statementAccount = accountByID[statement.liabilityAccountId],
+                  statementAccount.accountType == "credit_card",
+                  statementAccount.institutionId == contract.institutionCode,
+                  statement.parserProfileId == contract.profileID,
+                  statement.parserProfileVersion == contract.profileVersion,
                   statement.statementCurrency == "QAR",
-                  statement.reconciliationRuleCode == CardStatementEvidence.amexQARReconciliationRule,
                   statement.sourceRowCount > 0 else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement relationship")
             }
             let statementComponents = snapshot.summaryComponents.filter { $0.cardStatementId == statement.id }
-            let requiredCodes = Set(["previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"])
-            guard Set(statementComponents.map(\.componentCode)) == requiredCodes else {
+            guard Set(statementComponents.map(\.componentCode)) == contract.requiredSummaryCodes else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement summary coverage")
             }
             let components: [CardStatementSummaryComponent] = try statementComponents.map { component in
@@ -883,18 +893,23 @@ final class RepositoryStoreHydrator {
                 case "previous_balance": return .previousBalance(decimalMoney)
                 case "new_credits": return .newCredits(decimalMoney)
                 case "new_debits": return .newDebits(decimalMoney)
+                case "amount_billed": return .amountBilled(decimalMoney)
+                case "payment_received": return .paymentReceived(decimalMoney)
+                case "total_payment": return .totalPayment(decimalMoney)
+                case "credit_reversal": return .creditReversal(decimalMoney)
+                case "purchases": return .purchases(decimalMoney)
+                case "billed_installment": return .billedInstallment(decimalMoney)
+                case "fees_charges": return .feesCharges(decimalMoney)
                 case "new_balance": return .newBalance(decimalMoney)
                 case "instrument_net_total": return .instrumentNetTotal(decimalMoney)
+                case "source_section_net_total": return .sourceSectionNetTotal(decimalMoney)
                 default: throw RepositoryStoreHydrationError.invalidCardState("unknown summary component")
                 }
             }
             let componentByCode = Dictionary(uniqueKeysWithValues: components.map { ($0.persistenceCode, $0) })
             guard let previous = componentByCode["previous_balance"]?.money,
-                  let credits = componentByCode["new_credits"]?.money,
-                  let debits = componentByCode["new_debits"]?.money,
-                  let balance = componentByCode["new_balance"]?.money,
-                  previous.amount - credits.amount + debits.amount == balance.amount else {
-                throw RepositoryStoreHydrationError.invalidCardState("summary reconciliation")
+                  let balance = componentByCode["new_balance"]?.money else {
+                throw RepositoryStoreHydrationError.invalidCardState("summary balance coverage")
             }
             let durableSections = snapshot.sections.filter { $0.cardStatementId == statement.id }
                 .sorted { $0.sourceOrdinal < $1.sourceOrdinal }
@@ -907,7 +922,7 @@ final class RepositoryStoreHydrator {
                 guard let instrument = instrumentByID[section.instrumentId],
                       instrument.liabilityAccountId == statement.liabilityAccountId,
                       section.signedTotalCurrency == statement.statementCurrency,
-                      section.reconciliationRuleCode == CardInstrumentSectionEvidence.amexSignedNetRule,
+                      section.reconciliationRuleCode == contract.sectionRule,
                       let byDecimal = try? Money(
                         canonicalDecimal: section.signedTotalDecimal,
                         currency: section.signedTotalCurrency
@@ -926,13 +941,18 @@ final class RepositoryStoreHydrator {
                           observation.normalizedDocumentId == statement.normalizedDocumentId,
                           observation.parserProfileId == statement.parserProfileId,
                           observation.parserProfileVersion == statement.parserProfileVersion,
-                          observation.observationKind == CardSourceIdentityObservationKind.instrumentCardAccountNumber.rawValue,
+                          observation.observationKind == contract.instrumentObservationKindCode,
                           ["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"]
                             .contains(observation.associationAuthority) else {
                         throw RepositoryStoreHydrationError.invalidCardState("section observation graph")
                     }
+                    guard let observationKind = CardSourceIdentityObservationKind(
+                        rawValue: contract.instrumentObservationKindCode
+                    ) else {
+                        throw RepositoryStoreHydrationError.invalidCardState("section observation kind")
+                    }
                     return try CardSourceIdentityObservation(
-                        kind: .instrumentCardAccountNumber,
+                        kind: observationKind,
                         subject: .instrument,
                         value: observation.sourceValue
                     )
@@ -959,7 +979,8 @@ final class RepositoryStoreHydrator {
             let isSupportingSource: Bool
             if let projection = semanticProjection, let member = semanticMember,
                let group = groupByID[member.groupId] {
-                guard try validCardSemanticProjection(
+                guard contract.supportsSemanticSourceGrouping,
+                      try validCardSemanticProjection(
                     projection,
                     statement: statement,
                     summaryComponents: statementComponents,
@@ -972,6 +993,9 @@ final class RepositoryStoreHydrator {
                 }
                 isSupportingSource = member.role == .supporting
             } else if semanticProjection == nil && semanticMember == nil {
+                // Historical V13 Amex rows may predate a semantic projection;
+                // source-byte CBQ statements never create one. In either case,
+                // the authoritative statement graph remains hydratable.
                 isSupportingSource = false
             } else {
                 throw RepositoryStoreHydrationError.invalidCardState("semantic membership coverage")
@@ -983,6 +1007,8 @@ final class RepositoryStoreHydrator {
             var increase: Int64 = 0
             var decrease: Int64 = 0
             var instrumentNet: Int64 = 0
+            var allRowsNet: Int64 = 0
+            var membershipTotals: [CardTransactionSummaryMembership: Int64] = [:]
             var sectionNetByID = Dictionary(uniqueKeysWithValues: durableSections.map {
                 ($0.documentScopedSectionId, Int64(0))
             })
@@ -998,7 +1024,8 @@ final class RepositoryStoreHydrator {
                 }
                 let scope: CardTransactionScope
                 if evidence.rowScopeCode == CardTransactionScope.accountLevel.persistenceCode {
-                    guard evidence.instrumentId == nil, evidence.documentScopedSectionId == nil else {
+                    guard evidence.instrumentId == nil,
+                          evidence.documentScopedSectionId.map(sectionNetByID.keys.contains) ?? true else {
                         throw RepositoryStoreHydrationError.invalidCardState("account-level scope")
                     }
                     scope = .accountLevel
@@ -1008,10 +1035,35 @@ final class RepositoryStoreHydrator {
                           let sectionID = evidence.documentScopedSectionId, !sectionID.isEmpty else {
                         throw RepositoryStoreHydrationError.invalidCardState("instrument scope")
                     }
-                    scope = .instrument(documentScopedSectionID: sectionID)
+                    scope = .instrument
                     instrumentNet += transaction.amountMinor
-                    sectionNetByID[sectionID, default: 0] += transaction.amountMinor
                 }
+                let membership: CardTransactionSummaryMembership?
+                if let code = evidence.summaryMembershipCode {
+                    guard let decoded = CardTransactionSummaryMembership(rawValue: code) else {
+                        throw RepositoryStoreHydrationError.invalidCardState("summary membership")
+                    }
+                    membership = decoded
+                } else {
+                    membership = nil
+                }
+                if contract.requiresCBQSummaryMembership {
+                    let allowed = scope == .accountLevel
+                        ? contract.accountLevelMemberships
+                        : contract.instrumentMemberships
+                    guard membership.map(allowed.contains) == true else {
+                        throw RepositoryStoreHydrationError.invalidCardState("summary membership scope")
+                    }
+                } else if membership != nil {
+                    throw RepositoryStoreHydrationError.invalidCardState("unexpected summary membership")
+                }
+                if let sectionID = evidence.documentScopedSectionId {
+                    sectionNetByID[sectionID, default: 0] += transaction.amountMinor
+                } else if contract != .amex {
+                    throw RepositoryStoreHydrationError.invalidCardState("CBQ structural section coverage")
+                }
+                allRowsNet += transaction.amountMinor
+                if let membership { membershipTotals[membership, default: 0] += transaction.amountMinor }
                 switch effect {
                 case .increasesAmountOwed: increase += transaction.amountMinor
                 case .decreasesAmountOwed: decrease += -transaction.amountMinor
@@ -1028,9 +1080,11 @@ final class RepositoryStoreHydrator {
                     throw RepositoryStoreHydrationError.invalidCardState("original merchant money")
                 }
                 runtimeEvidence.append(DurableCardTransactionEvidence(
-                    statementID: statement.id, transactionID: evidence.transactionId, rowScope: scope,
+                    statementID: statement.id, transactionID: evidence.transactionId,
+                    financialScope: scope, documentScopedSectionID: evidence.documentScopedSectionId,
                     instrumentID: evidence.instrumentId, liabilityEffect: effect,
-                    sourceTransactionDate: transactionDate, originalMerchantMoney: originalMoney
+                    sourceTransactionDate: transactionDate, originalMerchantMoney: originalMoney,
+                    summaryMembership: membership
                 ))
             }
             if isSupportingSource, let semanticProjection {
@@ -1046,13 +1100,48 @@ final class RepositoryStoreHydrator {
                     }
                 }
             }
-            guard let debitsMinor = statementComponents.first(where: { $0.componentCode == "new_debits" })?.moneyMinor,
-                  let creditsMinor = statementComponents.first(where: { $0.componentCode == "new_credits" })?.moneyMinor,
-                  let instrumentMinor = statementComponents.first(where: { $0.componentCode == "instrument_net_total" })?.moneyMinor,
-                  increase == debitsMinor,
-                  decrease == creditsMinor,
-                  instrumentNet == instrumentMinor,
-                  durableSections.allSatisfy({
+            let previousMinor = try previous.minorUnits()
+            let balanceMinor = try balance.minorUnits()
+            let sectionNet = durableSections.reduce(Int64(0)) { $0 + $1.signedTotalMinor }
+            let summaryValid: Bool
+            switch contract {
+            case .amex:
+                summaryValid = componentByCode["new_debits"]?.money.flatMap { try? $0.minorUnits() } == increase &&
+                    componentByCode["new_credits"]?.money.flatMap { try? $0.minorUnits() } == decrease &&
+                    componentByCode["instrument_net_total"]?.money.flatMap { try? $0.minorUnits() } == instrumentNet &&
+                    previousMinor - decrease + increase == balanceMinor && sectionNet == instrumentNet
+            case .cbqV1:
+                let billed = componentByCode["amount_billed"]?.money.flatMap { try? $0.minorUnits() }
+                let payment = componentByCode["payment_received"]?.money.flatMap { try? $0.minorUnits() }
+                summaryValid = billed == membershipTotals[.cbqV1AmountBilled, default: 0] &&
+                    payment == -membershipTotals[.cbqV1PaymentReceived, default: 0] &&
+                    componentByCode["source_section_net_total"]?.money.flatMap { try? $0.minorUnits() } == allRowsNet &&
+                    billed.flatMap { billed in payment.map { previousMinor + billed - $0 == balanceMinor } } == true &&
+                    sectionNet == allRowsNet
+            case .cbqV2:
+                let payment = componentByCode["total_payment"]?.money.flatMap { try? $0.minorUnits() }
+                let credit = componentByCode["credit_reversal"]?.money.flatMap { try? $0.minorUnits() }
+                let purchases = componentByCode["purchases"]?.money.flatMap { try? $0.minorUnits() }
+                let installment = componentByCode["billed_installment"]?.money.flatMap { try? $0.minorUnits() }
+                let fees = componentByCode["fees_charges"]?.money.flatMap { try? $0.minorUnits() }
+                let equationValid = payment.flatMap { paid in
+                    credit.flatMap { credited in
+                        purchases.flatMap { bought in
+                            installment.flatMap { billed in
+                                fees.map { previousMinor - paid - credited + bought + billed + $0 == balanceMinor }
+                            }
+                        }
+                    }
+                } ?? false
+                summaryValid = payment == -membershipTotals[.cbqV2TotalPayment, default: 0] &&
+                    credit == -membershipTotals[.cbqV2CreditReversal, default: 0] &&
+                    purchases == membershipTotals[.cbqV2Purchases, default: 0] &&
+                    installment == membershipTotals[.cbqV2BilledInstallment, default: 0] &&
+                    fees == membershipTotals[.cbqV2FeesCharges, default: 0] &&
+                    componentByCode["source_section_net_total"]?.money.flatMap { try? $0.minorUnits() } == allRowsNet &&
+                    equationValid && sectionNet == allRowsNet
+            }
+            guard summaryValid, durableSections.allSatisfy({
                       sectionNetByID[$0.documentScopedSectionId] == $0.signedTotalMinor
                   }) else {
                 throw RepositoryStoreHydrationError.invalidCardState("transaction totals")
@@ -1086,17 +1175,31 @@ final class RepositoryStoreHydrator {
         }
         for observation in snapshot.sourceObservations {
             guard observation.workspaceId == workspaceID,
-                  statementByID.values.contains(where: {
+                  let sourceStatement = statementByID.values.first(where: {
                       $0.documentId == observation.documentId && $0.importSessionId == observation.importSessionId &&
                       $0.normalizedDocumentId == observation.normalizedDocumentId &&
                       $0.parserProfileId == observation.parserProfileId && $0.parserProfileVersion == observation.parserProfileVersion
-                  }) else { throw RepositoryStoreHydrationError.invalidCardState("observation source graph") }
+                  }),
+                  let contract = CardStatementProfileContract(
+                    reconciliationRuleIdentifier: sourceStatement.reconciliationRuleCode
+                  ),
+                  let observationKind = CardSourceIdentityObservationKind(rawValue: observation.observationKind) else {
+                throw RepositoryStoreHydrationError.invalidCardState("observation source graph")
+            }
             if observation.subjectKind == CardSourceIdentitySubject.liabilityAccount.rawValue {
-                guard accountByID[observation.subjectId]?.accountType == "credit_card" else {
+                guard accountByID[observation.subjectId]?.accountType == "credit_card",
+                      observationKind.rawValue == contract.accountObservationKindCode,
+                      (try? CardSourceIdentityObservation(
+                        kind: observationKind, subject: .liabilityAccount, value: observation.sourceValue
+                      )) != nil else {
                     throw RepositoryStoreHydrationError.invalidCardState("observation account subject")
                 }
             } else if observation.subjectKind == CardSourceIdentitySubject.instrument.rawValue {
-                guard instrumentByID[observation.subjectId] != nil else {
+                guard instrumentByID[observation.subjectId] != nil,
+                      observationKind.rawValue == contract.instrumentObservationKindCode,
+                      (try? CardSourceIdentityObservation(
+                        kind: observationKind, subject: .instrument, value: observation.sourceValue
+                      )) != nil else {
                     throw RepositoryStoreHydrationError.invalidCardState("observation instrument subject")
                 }
             } else { throw RepositoryStoreHydrationError.invalidCardState("observation subject kind") }
@@ -1243,7 +1346,7 @@ final class RepositoryStoreHydrator {
             if accountDTO.accountType == "credit_card" {
                 let latestStatement = cardSnapshot.statements
                     .filter { $0.liabilityAccountID == accountDTO.id }
-                    .max { ($0.period.end, $0.statementDate, $0.id) < ($1.period.end, $1.statementDate, $1.id) }
+                    .max { ($0.statementDate, $0.period.end, $0.id) < ($1.statementDate, $1.period.end, $1.id) }
                 if let newBalance = latestStatement?.newBalance {
                     guard newBalance.currency.code == accountDTO.nativeCurrency else {
                         throw RepositoryStoreHydrationError.accountCurrencyMismatch

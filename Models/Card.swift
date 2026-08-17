@@ -69,11 +69,13 @@ struct CardStatementSection: Identifiable, Equatable, Sendable {
 struct DurableCardTransactionEvidence: Equatable, Sendable {
     let statementID: String
     let transactionID: String
-    let rowScope: CardTransactionScope
+    let financialScope: CardTransactionScope
+    let documentScopedSectionID: String?
     let instrumentID: String?
     let liabilityEffect: CardLiabilityEffect
     let sourceTransactionDate: StatementDate
     let originalMerchantMoney: Money?
+    let summaryMembership: CardTransactionSummaryMembership?
 }
 
 struct CardStoreSnapshot: Equatable, Sendable {

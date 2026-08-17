@@ -1409,7 +1409,197 @@ JOIN card_source_identity_observations o
 """
 )
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13]
+public let migrationV14 = Migration(
+    version: 14,
+    name: "generalized card reconciliation and structural section evidence",
+    sql: """
+DROP TRIGGER validate_card_source_identity;
+DROP TRIGGER validate_card_statement_section_observation;
+DROP TRIGGER validate_card_transaction_evidence;
+DROP TRIGGER validate_v13_card_transaction_section;
+
+ALTER TABLE card_source_identity_observations RENAME TO card_source_identity_observations_v13;
+ALTER TABLE card_statement_section_observations RENAME TO card_statement_section_observations_v13;
+ALTER TABLE card_statement_summary_components RENAME TO card_statement_summary_components_v13;
+ALTER TABLE card_transaction_evidence RENAME TO card_transaction_evidence_v13;
+
+CREATE TABLE card_source_identity_observations (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  import_session_id TEXT NOT NULL,
+  normalized_document_id TEXT NOT NULL,
+  parser_profile_id TEXT NOT NULL,
+  parser_profile_version TEXT NOT NULL,
+  subject_kind TEXT NOT NULL CHECK(subject_kind IN ('liability_account', 'instrument')),
+  subject_id TEXT NOT NULL,
+  observation_kind TEXT NOT NULL CHECK(observation_kind IN (
+    'amex_membership_number', 'amex_card_account_number',
+    'cbq_card_account_reference', 'cbq_masked_card_number'
+  )),
+  source_value TEXT NOT NULL CHECK(length(source_value) > 0),
+  association_authority TEXT NOT NULL CHECK(association_authority IN ('user_confirmed', 'prior_user_confirmed_mapping', 'parser_strong_evidence')),
+  created_at DATETIME NOT NULL,
+  UNIQUE(document_id, subject_kind, observation_kind),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+INSERT INTO card_source_identity_observations
+SELECT * FROM card_source_identity_observations_v13;
+DROP TABLE card_source_identity_observations_v13;
+CREATE INDEX idx_card_source_identity_subject ON card_source_identity_observations(workspace_id, subject_kind, subject_id, observation_kind, source_value);
+
+CREATE TABLE card_statement_section_observations (
+  id TEXT PRIMARY KEY,
+  card_statement_section_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  import_session_id TEXT NOT NULL,
+  normalized_document_id TEXT NOT NULL,
+  parser_profile_id TEXT NOT NULL,
+  parser_profile_version TEXT NOT NULL,
+  observation_kind TEXT NOT NULL CHECK(observation_kind IN ('amex_card_account_number', 'cbq_masked_card_number')),
+  source_value TEXT NOT NULL CHECK(length(source_value) > 0),
+  association_authority TEXT NOT NULL CHECK(association_authority IN ('user_confirmed', 'prior_user_confirmed_mapping', 'parser_strong_evidence')),
+  created_at DATETIME NOT NULL,
+  UNIQUE(card_statement_section_id, observation_kind, source_value),
+  FOREIGN KEY(card_statement_section_id) REFERENCES card_statement_sections(id) ON DELETE RESTRICT,
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+INSERT INTO card_statement_section_observations
+SELECT * FROM card_statement_section_observations_v13;
+DROP TABLE card_statement_section_observations_v13;
+CREATE INDEX idx_card_section_observation_lookup ON card_statement_section_observations(workspace_id, observation_kind, source_value, card_statement_section_id);
+
+CREATE TABLE card_statement_summary_components (
+  id TEXT PRIMARY KEY,
+  card_statement_id TEXT NOT NULL,
+  component_code TEXT NOT NULL CHECK(component_code IN (
+    'previous_balance', 'new_credits', 'new_debits', 'amount_billed', 'payment_received',
+    'total_payment', 'credit_reversal', 'purchases', 'billed_installment', 'fees_charges',
+    'new_balance', 'due_date', 'instrument_net_total', 'source_section_net_total'
+  )),
+  money_currency TEXT,
+  money_minor INTEGER,
+  money_decimal TEXT,
+  date_value DATE,
+  UNIQUE(card_statement_id, component_code),
+  CHECK((component_code = 'due_date' AND date_value IS NOT NULL AND money_currency IS NULL AND money_minor IS NULL AND money_decimal IS NULL) OR
+        (component_code != 'due_date' AND date_value IS NULL AND money_currency IS NOT NULL AND money_minor IS NOT NULL AND money_decimal IS NOT NULL)),
+  FOREIGN KEY(card_statement_id) REFERENCES card_statements(id) ON DELETE RESTRICT
+);
+INSERT INTO card_statement_summary_components
+SELECT * FROM card_statement_summary_components_v13;
+DROP TABLE card_statement_summary_components_v13;
+
+CREATE TABLE card_transaction_evidence (
+  id TEXT PRIMARY KEY,
+  card_statement_id TEXT NOT NULL,
+  transaction_id TEXT NOT NULL UNIQUE,
+  row_scope TEXT NOT NULL CHECK(row_scope IN ('account_level', 'instrument_level')),
+  instrument_id TEXT,
+  liability_effect TEXT NOT NULL CHECK(liability_effect IN ('card_increase_owed', 'card_decrease_owed')),
+  source_transaction_date DATE NOT NULL,
+  document_scoped_section_id TEXT,
+  original_currency TEXT,
+  original_amount_minor INTEGER,
+  original_amount_decimal TEXT,
+  summary_membership_code TEXT CHECK(summary_membership_code IS NULL OR summary_membership_code IN (
+    'cbq_v1_amount_billed', 'cbq_v1_payment_received', 'cbq_v2_total_payment',
+    'cbq_v2_credit_reversal', 'cbq_v2_purchases', 'cbq_v2_billed_installment', 'cbq_v2_fees_charges'
+  )),
+  CHECK((row_scope = 'account_level' AND instrument_id IS NULL) OR
+        (row_scope = 'instrument_level' AND instrument_id IS NOT NULL AND document_scoped_section_id IS NOT NULL)),
+  CHECK((original_currency IS NULL AND original_amount_minor IS NULL AND original_amount_decimal IS NULL) OR
+        (original_currency IS NOT NULL AND original_amount_minor IS NOT NULL AND original_amount_decimal IS NOT NULL)),
+  FOREIGN KEY(card_statement_id) REFERENCES card_statements(id) ON DELETE RESTRICT,
+  FOREIGN KEY(transaction_id) REFERENCES transactions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(instrument_id) REFERENCES card_instruments(id) ON DELETE RESTRICT
+);
+INSERT INTO card_transaction_evidence (
+  id, card_statement_id, transaction_id, row_scope, instrument_id, liability_effect,
+  source_transaction_date, document_scoped_section_id, original_currency,
+  original_amount_minor, original_amount_decimal, summary_membership_code
+)
+SELECT id, card_statement_id, transaction_id, row_scope, instrument_id, liability_effect,
+  source_transaction_date, document_scoped_section_id, original_currency,
+  original_amount_minor, original_amount_decimal, NULL
+FROM card_transaction_evidence_v13;
+DROP TABLE card_transaction_evidence_v13;
+
+CREATE TRIGGER validate_card_source_identity
+BEFORE INSERT ON card_source_identity_observations
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d JOIN import_sessions s ON s.id = d.import_session_id
+    JOIN normalized_documents n ON n.document_id = d.id AND n.import_session_id = s.id
+    WHERE d.id = NEW.document_id AND s.id = NEW.import_session_id
+      AND n.id = NEW.normalized_document_id AND d.workspace_id = NEW.workspace_id
+      AND n.profile_id = NEW.parser_profile_id AND n.profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'card observation source relationship invalid') END;
+  SELECT CASE WHEN NEW.subject_kind = 'liability_account' AND NOT EXISTS (
+    SELECT 1 FROM accounts a WHERE a.id = NEW.subject_id AND a.workspace_id = NEW.workspace_id AND a.account_type = 'credit_card'
+  ) THEN RAISE(ABORT, 'card observation liability account invalid') END;
+  SELECT CASE WHEN NEW.subject_kind = 'instrument' AND NOT EXISTS (
+    SELECT 1 FROM card_instruments i WHERE i.id = NEW.subject_id AND i.workspace_id = NEW.workspace_id
+  ) THEN RAISE(ABORT, 'card observation instrument invalid') END;
+END;
+
+CREATE TRIGGER validate_card_statement_section_observation
+BEFORE INSERT ON card_statement_section_observations
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statement_sections cs
+    JOIN card_statements s ON s.id = cs.card_statement_id
+    JOIN normalized_documents n ON n.id = NEW.normalized_document_id
+    WHERE cs.id = NEW.card_statement_section_id
+      AND s.workspace_id = NEW.workspace_id
+      AND s.document_id = NEW.document_id
+      AND s.import_session_id = NEW.import_session_id
+      AND s.normalized_document_id = NEW.normalized_document_id
+      AND s.parser_profile_id = NEW.parser_profile_id
+      AND s.parser_profile_version = NEW.parser_profile_version
+      AND n.document_id = NEW.document_id
+      AND n.import_session_id = NEW.import_session_id
+  ) THEN RAISE(ABORT, 'card section observation relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_card_transaction_evidence
+BEFORE INSERT ON card_transaction_evidence
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM transactions t JOIN card_statements s ON s.id = NEW.card_statement_id
+    WHERE t.id = NEW.transaction_id AND t.account_id = s.liability_account_id
+      AND t.document_id = s.document_id AND t.import_session_id = s.import_session_id
+      AND t.direction = NEW.liability_effect
+  ) THEN RAISE(ABORT, 'card transaction relationship invalid') END;
+  SELECT CASE WHEN NEW.instrument_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM card_instruments i JOIN card_statements s ON s.id = NEW.card_statement_id
+    WHERE i.id = NEW.instrument_id AND i.liability_account_id = s.liability_account_id
+  ) THEN RAISE(ABORT, 'card transaction instrument invalid') END;
+END;
+
+CREATE TRIGGER validate_v14_card_transaction_section
+BEFORE INSERT ON card_transaction_evidence
+WHEN NEW.document_scoped_section_id IS NOT NULL
+ AND EXISTS (SELECT 1 FROM card_statement_sections WHERE card_statement_id = NEW.card_statement_id)
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statement_sections cs
+    WHERE cs.card_statement_id = NEW.card_statement_id
+      AND cs.document_scoped_section_id = NEW.document_scoped_section_id
+      AND (NEW.row_scope = 'account_level' OR cs.instrument_id = NEW.instrument_id)
+  ) THEN RAISE(ABORT, 'card transaction section relationship invalid') END;
+END;
+"""
+)
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

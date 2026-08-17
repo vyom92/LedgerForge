@@ -22,7 +22,7 @@ struct AmericanExpressCreditCardPDFTests {
         let evidence = try #require(prepared.financialDocument.cardStatementEvidence)
         #expect(evidence.declaredStatementPeriod.start.canonical == "2026-07-01")
         #expect(evidence.declaredStatementPeriod.end.canonical == "2026-07-31")
-        #expect(evidence.transactionAnnotations.map(\.rowScope.persistenceCode) == [
+        #expect(evidence.transactionAnnotations.map(\.financialScope.persistenceCode) == [
             "account_level", "instrument_level", "instrument_level", "instrument_level",
             "instrument_level", "instrument_level", "instrument_level", "instrument_level", "instrument_level"
         ])

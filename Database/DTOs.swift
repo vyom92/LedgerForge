@@ -3,6 +3,76 @@
 
 import Foundation
 
+enum CardTransactionSummaryMembership: String, CaseIterable, Equatable, Sendable, Codable {
+    case cbqV1AmountBilled = "cbq_v1_amount_billed"
+    case cbqV1PaymentReceived = "cbq_v1_payment_received"
+    case cbqV2TotalPayment = "cbq_v2_total_payment"
+    case cbqV2CreditReversal = "cbq_v2_credit_reversal"
+    case cbqV2Purchases = "cbq_v2_purchases"
+    case cbqV2BilledInstallment = "cbq_v2_billed_installment"
+    case cbqV2FeesCharges = "cbq_v2_fees_charges"
+}
+
+/// Persistence-safe exact contract descriptor shared by the main app and the
+/// subprocess probe. It deliberately uses durable codes instead of depending
+/// on parser or UI model types.
+enum CardStatementProfileContract: Equatable, Sendable {
+    case amex
+    case cbqV1
+    case cbqV2
+
+    init?(reconciliationRuleIdentifier rule: String) {
+        switch rule {
+        case "amex.qar.previous-minus-credits-plus-debits.v1": self = .amex
+        case "cbq.qar.v1.previous-plus-billed-minus-payment.v1": self = .cbqV1
+        case "cbq.qar.v2.previous-minus-payment-minus-credit-plus-components.v1": self = .cbqV2
+        default: return nil
+        }
+    }
+
+    var institutionCode: String { self == .amex ? "American Express" : "Commercial Bank of Qatar" }
+    var profileID: String { self == .amex ? "amex.credit-card.pdf" : "cbq.credit-card.pdf" }
+    var profileVersion: String { "1" }
+    var statementFamilyCode: String { "\(profileID)@\(profileVersion)" }
+    var supportsSemanticSourceGrouping: Bool { self == .amex }
+    var requiresCBQSummaryMembership: Bool { self != .amex }
+    var accountObservationKindCode: String {
+        self == .amex ? "amex_membership_number" : "cbq_card_account_reference"
+    }
+    var instrumentObservationKindCode: String {
+        self == .amex ? "amex_card_account_number" : "cbq_masked_card_number"
+    }
+    var sectionRule: String {
+        self == .amex
+            ? "amex.section.signed-increases-minus-decreases.v1"
+            : "cbq.section.signed-source-membership.v1"
+    }
+    var requiredSummaryCodes: Set<String> {
+        switch self {
+        case .amex:
+            return ["previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"]
+        case .cbqV1:
+            return ["previous_balance", "amount_billed", "payment_received", "new_balance", "due_date", "source_section_net_total"]
+        case .cbqV2:
+            return ["previous_balance", "total_payment", "credit_reversal", "purchases", "billed_installment", "fees_charges", "new_balance", "due_date", "source_section_net_total"]
+        }
+    }
+    var accountLevelMemberships: Set<CardTransactionSummaryMembership> {
+        switch self {
+        case .amex: return []
+        case .cbqV1: return [.cbqV1PaymentReceived]
+        case .cbqV2: return [.cbqV2TotalPayment]
+        }
+    }
+    var instrumentMemberships: Set<CardTransactionSummaryMembership> {
+        switch self {
+        case .amex: return []
+        case .cbqV1: return [.cbqV1AmountBilled]
+        case .cbqV2: return [.cbqV2CreditReversal, .cbqV2Purchases, .cbqV2BilledInstallment, .cbqV2FeesCharges]
+        }
+    }
+}
+
 nonisolated enum ImportAttemptOutcome: String, CaseIterable { case successfulImport = "successful_import", equivalentSourceRecorded = "equivalent_source_recorded", cbqSourceOverlapCommitted = "cbq_source_overlap_committed", statementEquivalenceConflict = "statement_equivalence_conflict", statementEquivalenceEvidenceUnavailable = "statement_equivalence_evidence_unavailable", equivalentFormatAlreadyRecorded = "equivalent_format_already_recorded", partialImportCommitted = "partial_import_committed", reviewedPartialPlanStale = "reviewed_partial_plan_stale", partialImportUnsupportedEvidence = "partial_import_unsupported_evidence", validationFailure = "validation_failure", persistenceFailure = "persistence_failure", exactStatementDuplicate = "exact_statement_duplicate", existingEligibleAxisUPIEvent = "existing_eligible_axis_upi_event", repeatedEligibleIncomingEvidence = "repeated_eligible_incoming_evidence", transactionEventOwnershipConflict = "transaction_event_ownership_conflict", repositoryIntegrityConflict = "repository_integrity_conflict", accountChoiceRequired = "account_choice_required", identifierOwnershipConflict = "identifier_ownership_conflict", identityAmbiguity = "identity_ambiguity", identityConflict = "identity_conflict", staleAccountChoice = "stale_account_choice", staleProviderGeneration = "stale_provider_generation", sqliteContention = "sqlite_contention", sourceSnapshotAcquisitionFailed = "source_snapshot_acquisition_failed", sourceSnapshotIntegrityFailed = "source_snapshot_integrity_failed" }
 nonisolated enum ImportAttemptCoverage: String, CaseIterable { case evaluatedSupportedOnly = "evaluated_supported_only", allRowsSupportedAxisUPIReviewed = "all_rows_supported_axis_upi_reviewed", unsupportedOrUnevaluated = "unsupported_or_unevaluated" }
 nonisolated enum ImportAttemptAccountDecision: String, CaseIterable { case matchedExisting = "matched_existing", userSelectedExisting = "user_selected_existing", createdNew = "created_new", resolvedOrCreated = "resolved_or_created", selectedExisting = "selected_existing", noFinancialMutation = "no_financial_mutation", sideEffectsMayExist = "side_effects_may_exist" }
@@ -341,6 +411,7 @@ public struct CardTransactionEvidenceDTO: nonisolated Equatable, Sendable {
     public let originalCurrency: String?
     public let originalAmountMinor: Int64?
     public let originalAmountDecimal: String?
+    public let summaryMembershipCode: String?
 }
 
 public struct CardStatementSectionDTO: nonisolated Equatable, Sendable {

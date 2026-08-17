@@ -123,6 +123,42 @@ struct StatementClassificationTests {
         #expect(csvClassification.documentType == .bankStatement)
     }
 
+    @Test func exactCBQCardAndCurrentAccountFamiliesRemainSeparated() async throws {
+        let bankURL = FixtureLocator.cbqBankAccountPDF("cbq_current_account_statement_baseline.pdf")
+        let reader = PDFDocumentReader()
+        let card = RawDocument(
+            sourceURL: URL(fileURLWithPath: "/tmp/fictional-cbq-card.pdf"),
+            fileName: "fictional-cbq-card.pdf",
+            fileExtension: "pdf",
+            content: .text("""
+            Card Account Reference
+            Card Number Card Holder Name Product Card Limit
+            Post Date Purchase Date Description & Referance Foreign Currency Amount in QAR
+            1234XXXXXXXX5678 FICTIONAL HOLDER Diners Club FICTIONAL PRODUCT 5000.00
+            4321XXXXXXXX8765 FICTIONAL HOLDER Mastercard Platinum FICTIONAL PRODUCT 7000.00
+            """)
+        )
+        let bank = try await reader.read(request: ImportRequest(fileURL: bankURL), password: nil)
+        let detector = SignatureInstitutionDetector()
+        let classifier = StatementClassificationDetector()
+
+        let cardInstitution = try await detector.detectInstitution(in: card)
+        let bankInstitution = try await detector.detectInstitution(in: bank)
+        let cardClassification = try await classifier.classify(document: card, institution: cardInstitution)
+        let bankClassification = try await classifier.classify(document: bank, institution: bankInstitution)
+
+        #expect(cardInstitution.institutionCode == Institution.cbq.rawValue)
+        #expect(bankInstitution.institutionCode == Institution.cbq.rawValue)
+        #expect(cardClassification.documentType == .creditCardStatement)
+        #expect(bankClassification.documentType == .bankStatement)
+
+        let cardText = try rawText(from: card)
+        let nearMatch = cardText.replacingOccurrences(of: "Description & Referance", with: "Description & Reference")
+        let rejected = detector.detect(from: nearMatch)
+        #expect(rejected.metadata.documentType != .creditCard)
+        #expect(rejected.metadata.documentType != .bankAccount)
+    }
+
     @Test func frameworkDocumentTypesMapToLegacyDocumentTypes() async throws {
         #expect(StatementDocumentType.bankStatement.legacyDocumentType == .bankAccount)
         #expect(StatementDocumentType.creditCardStatement.legacyDocumentType == .creditCard)

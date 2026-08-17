@@ -3185,10 +3185,11 @@ struct ContentView: View {
         evidence: CardStatementEvidence?
     ) -> String? {
         guard let annotation = evidence?.annotation(for: transaction) else { return nil }
-        switch annotation.rowScope {
+        switch annotation.financialScope {
         case .accountLevel:
             return "Liability-account activity"
-        case .instrument(let sectionID):
+        case .instrument:
+            let sectionID = annotation.documentScopedSectionID
             let ordinal = evidence?.instrumentSections.first(where: {
                 $0.documentScopedSectionID == sectionID
             })?.sourceOrdinal

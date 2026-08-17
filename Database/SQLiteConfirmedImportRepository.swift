@@ -331,8 +331,20 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     }
 
     private func cardAccountIsCompatible(account: AccountDTO, plan: ConfirmedImportPlanDTO) -> Bool {
+        guard let rule = plan.cardImportPlan?.statement.reconciliationRuleCode,
+              let contract = CardStatementProfileContract(reconciliationRuleIdentifier: rule) else {
+            return false
+        }
+        return cardAccountIsCompatible(account: account, plan: plan, contract: contract)
+    }
+
+    private func cardAccountIsCompatible(
+        account: AccountDTO,
+        plan: ConfirmedImportPlanDTO,
+        contract: CardStatementProfileContract
+    ) -> Bool {
         account.workspaceId == plan.workspace.id && account.accountType == "credit_card" &&
-        account.nativeCurrency == "QAR" && account.institutionId == "American Express"
+        account.nativeCurrency == "QAR" && account.institutionId == contract.institutionCode
     }
 
     private func insertCardGraph(
@@ -348,7 +360,19 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         if card.sectionDecisions.isEmpty {
             guard !isSupportingSource else { return .repositoryIntegrityConflict }
         } else {
-            return try insertV13CardGraph(card, plan: plan, account: account, transactions: transactions, isSupportingSource: isSupportingSource)
+            guard let contract = CardStatementProfileContract(
+                reconciliationRuleIdentifier: card.statement.reconciliationRuleCode
+            ) else { return .repositoryIntegrityConflict }
+            if contract.supportsSemanticSourceGrouping {
+                return try insertV13CardGraph(
+                    card, plan: plan, account: account, transactions: transactions,
+                    isSupportingSource: isSupportingSource
+                )
+            }
+            return try insertSourceByteCardGraph(
+                card, plan: plan, account: account, transactions: transactions,
+                isSupportingSource: isSupportingSource, contract: contract
+            )
         }
         let history = plan.historyTemplate
         guard card.liabilityAccountId == account.id,
@@ -511,6 +535,328 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             try db.executePrepared(
                 sql: "INSERT INTO card_transaction_evidence (id, card_statement_id, transaction_id, row_scope, instrument_id, liability_effect, source_transaction_date, document_scoped_section_id, original_currency, original_amount_minor, original_amount_decimal) VALUES (?,?,?,?,?,?,?,?,?,?,?);",
                 params: [evidence.id, evidence.cardStatementId, evidence.transactionId, evidence.rowScopeCode, evidence.instrumentId ?? NSNull(), evidence.liabilityEffectCode, evidence.sourceTransactionDateISO, evidence.documentScopedSectionId ?? NSNull(), evidence.originalCurrency ?? NSNull(), evidence.originalAmountMinor ?? NSNull(), evidence.originalAmountDecimal ?? NSNull()]
+            )
+        }
+        return nil
+    }
+
+    /// Persists exact card families that intentionally use ordinary source-byte
+    /// duplicate authority. The graph remains in the shared card tables, but it
+    /// does not create any Amex semantic-equivalence projection or membership.
+    private func insertSourceByteCardGraph(
+        _ card: ConfirmedCardImportPlanDTO,
+        plan: ConfirmedImportPlanDTO,
+        account: AccountDTO,
+        transactions: [TransactionDTO],
+        isSupportingSource: Bool,
+        contract: CardStatementProfileContract
+    ) throws -> ConfirmedImportRepositoryResult? {
+        let history = plan.historyTemplate
+        let incomingByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
+        guard !contract.supportsSemanticSourceGrouping,
+              card.semanticProjection == nil,
+              !isSupportingSource,
+              card.liabilityAccountId == account.id,
+              cardAccountIsCompatible(account: account, plan: plan, contract: contract),
+              card.statement.workspaceId == plan.workspace.id,
+              card.statement.liabilityAccountId == account.id,
+              card.statement.documentId == history.document.id,
+              card.statement.importSessionId == history.importSession.id,
+              card.statement.normalizedDocumentId == history.normalizedDocument?.id,
+              card.statement.parserProfileId == contract.profileID,
+              card.statement.parserProfileVersion == contract.profileVersion,
+              card.statement.statementCurrency == "QAR",
+              card.statement.sourceRowCount == transactions.count,
+              try count("SELECT COUNT(*) FROM card_statements WHERE id = ?;", [card.statement.id]) == 0,
+              !card.sectionDecisions.isEmpty,
+              card.sectionDecisions.map(\.section.sourceOrdinal).sorted() == Array(1...card.sectionDecisions.count),
+              Set(card.sectionDecisions.map(\.section.id)).count == card.sectionDecisions.count,
+              Set(card.sectionDecisions.map(\.section.documentScopedSectionId)).count == card.sectionDecisions.count,
+              Set(card.sectionDecisions.map(\.section.instrumentId)).count == card.sectionDecisions.count else {
+            return .repositoryIntegrityConflict
+        }
+
+        let allowedAuthorities = Set(["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"])
+        let allowedRelationships = Set(["additional_concurrent", "replacement", "renewal", "upgrade", "unspecified"])
+        let decisions = card.sectionDecisions.sorted { $0.section.sourceOrdinal < $1.section.sourceOrdinal }
+        var selectedInstrumentIDs = Set<String>()
+        var selectedBySectionID = [String: String]()
+
+        for decision in decisions {
+            let section = decision.section
+            guard section.cardStatementId == card.statement.id,
+                  section.signedTotalCurrency == card.statement.statementCurrency,
+                  section.reconciliationRuleCode == contract.sectionRule,
+                  (try? Money(canonicalDecimal: section.signedTotalDecimal, currency: section.signedTotalCurrency).minorUnits()) == section.signedTotalMinor else {
+                return .repositoryIntegrityConflict
+            }
+            let selectedID: String
+            switch decision.instrumentChoice {
+            case .unspecified:
+                return .explicitAccountChoiceRequired
+            case .createProposedInstrument:
+                guard decision.proposedInstrument.id == section.instrumentId,
+                      decision.proposedInstrument.workspaceId == plan.workspace.id,
+                      decision.proposedInstrument.liabilityAccountId == account.id,
+                      decision.proposedInstrument.lifecycleStateCode == "unknown",
+                      try count("SELECT COUNT(*) FROM card_instruments WHERE id = ?;", [decision.proposedInstrument.id]) == 0 else {
+                    return .repositoryIntegrityConflict
+                }
+                try db.executePrepared(
+                    sql: "INSERT INTO card_instruments (id, workspace_id, liability_account_id, lifecycle_state, created_at) VALUES (?,?,?,?,?);",
+                    params: [decision.proposedInstrument.id, decision.proposedInstrument.workspaceId, decision.proposedInstrument.liabilityAccountId, decision.proposedInstrument.lifecycleStateCode, decision.proposedInstrument.createdAtISO]
+                )
+                selectedID = decision.proposedInstrument.id
+            case .useExistingInstrument(let instrumentID):
+                guard section.instrumentId == instrumentID,
+                      try count(
+                        "SELECT COUNT(*) FROM card_instruments WHERE id = ? AND workspace_id = ? AND liability_account_id = ?;",
+                        [instrumentID, plan.workspace.id, account.id]
+                      ) == 1 else { return .selectedAccountIneligible }
+                selectedID = instrumentID
+            }
+            guard selectedInstrumentIDs.insert(selectedID).inserted else {
+                return .repositoryIntegrityConflict
+            }
+            selectedBySectionID[section.documentScopedSectionId] = selectedID
+
+            guard decision.instrumentIdentifiers.isEmpty,
+                  !decision.sourceObservations.isEmpty,
+                  Set(decision.sourceObservations.map(\.id)).count == decision.sourceObservations.count else {
+                return .repositoryIntegrityConflict
+            }
+            for observation in decision.sourceObservations {
+                guard observation.cardStatementSectionId == section.id,
+                      observation.workspaceId == plan.workspace.id,
+                      observation.documentId == history.document.id,
+                      observation.importSessionId == history.importSession.id,
+                      observation.normalizedDocumentId == history.normalizedDocument?.id,
+                      observation.parserProfileId == contract.profileID,
+                      observation.parserProfileVersion == contract.profileVersion,
+                      observation.observationKind == contract.instrumentObservationKindCode,
+                      !observation.sourceValue.isEmpty,
+                      allowedAuthorities.contains(observation.associationAuthority) else {
+                    return .repositoryIntegrityConflict
+                }
+                guard observation.sourceValue.range(
+                    of: #"^[0-9X]+$"#, options: .regularExpression
+                ) != nil, observation.sourceValue.contains("X"),
+                    observation.sourceValue.contains(where: \.isNumber) else {
+                    return .repositoryIntegrityConflict
+                }
+                if observation.associationAuthority == "prior_user_confirmed_mapping" {
+                    guard try count(
+                        "SELECT COUNT(*) FROM card_statement_section_observations o JOIN card_statement_sections s ON s.id = o.card_statement_section_id WHERE o.workspace_id = ? AND o.observation_kind = ? AND o.source_value = ? AND o.association_authority = 'user_confirmed' AND s.instrument_id = ?;",
+                        [observation.workspaceId, observation.observationKind, observation.sourceValue, selectedID]
+                    ) > 0 else { return .staleIdentityDecision }
+                }
+            }
+
+            for relationship in decision.relationships {
+                guard relationship.workspaceId == plan.workspace.id,
+                      relationship.liabilityAccountId == account.id,
+                      relationship.successorInstrumentId == selectedID,
+                      relationship.predecessorInstrumentId != selectedID,
+                      relationship.authority == "user_confirmed",
+                      allowedRelationships.contains(relationship.relationshipKind),
+                      try count(
+                        "SELECT COUNT(*) FROM card_instruments WHERE id = ? AND liability_account_id = ?;",
+                        [relationship.predecessorInstrumentId, account.id]
+                      ) == 1 else { return .repositoryIntegrityConflict }
+            }
+        }
+
+        guard card.instrumentIdentifiers.isEmpty,
+              Set(card.relationships.map(\.id)) == Set(decisions.flatMap(\.relationships).map(\.id)),
+              card.sourceObservations.count == 1,
+              Set(card.sourceObservations.map(\.id)).count == card.sourceObservations.count else {
+            return .repositoryIntegrityConflict
+        }
+        for observation in card.sourceObservations {
+            guard observation.workspaceId == plan.workspace.id,
+                  observation.documentId == history.document.id,
+                  observation.importSessionId == history.importSession.id,
+                  observation.normalizedDocumentId == history.normalizedDocument?.id,
+                  observation.parserProfileId == contract.profileID,
+                  observation.parserProfileVersion == contract.profileVersion,
+                  observation.subjectKind == "liability_account",
+                  observation.subjectId == account.id,
+                  observation.observationKind == contract.accountObservationKindCode,
+                  !observation.sourceValue.isEmpty,
+                  allowedAuthorities.contains(observation.associationAuthority),
+                  observation.sourceValue.range(of: #"^[0-9]+$"#, options: .regularExpression) != nil else {
+                return .repositoryIntegrityConflict
+            }
+            if observation.associationAuthority == "prior_user_confirmed_mapping" {
+                guard try count(
+                    "SELECT COUNT(*) FROM card_source_identity_observations WHERE workspace_id = ? AND subject_kind = ? AND subject_id = ? AND observation_kind = ? AND source_value = ? AND association_authority = 'user_confirmed';",
+                    [observation.workspaceId, observation.subjectKind, observation.subjectId, observation.observationKind, observation.sourceValue]
+                ) > 0 else { return .staleIdentityDecision }
+            }
+        }
+
+        guard Set(card.summaryComponents.map(\.componentCode)) == contract.requiredSummaryCodes,
+              card.summaryComponents.allSatisfy({ $0.cardStatementId == card.statement.id }) else {
+            return .repositoryIntegrityConflict
+        }
+        let byCode = Dictionary(uniqueKeysWithValues: card.summaryComponents.map { ($0.componentCode, $0) })
+        guard let previous = byCode["previous_balance"]?.moneyMinor,
+              let balance = byCode["new_balance"]?.moneyMinor,
+              byCode["due_date"]?.dateISO != nil,
+              card.summaryComponents.allSatisfy({ component in
+                  if component.componentCode == "due_date" {
+                      return component.dateISO != nil && component.moneyCurrency == nil &&
+                          component.moneyMinor == nil && component.moneyDecimal == nil
+                  }
+                  guard component.dateISO == nil,
+                        component.moneyCurrency == card.statement.statementCurrency,
+                        let currency = component.moneyCurrency,
+                        let minor = component.moneyMinor,
+                        let decimal = component.moneyDecimal else { return false }
+                  return (try? Money(canonicalDecimal: decimal, currency: currency).minorUnits()) == minor
+              }) else { return .repositoryIntegrityConflict }
+
+        guard card.transactionEvidence.count == transactions.count,
+              Set(card.transactionEvidence.map(\.transactionId)) == Set(transactions.map(\.id)),
+              Set(card.transactionEvidence.map(\.id)).count == card.transactionEvidence.count else {
+            return .repositoryIntegrityConflict
+        }
+        var allRowsNet: Int64 = 0
+        var membershipTotals: [CardTransactionSummaryMembership: Int64] = [:]
+        var sectionTotals = Dictionary(uniqueKeysWithValues: decisions.map {
+            ($0.section.documentScopedSectionId, Int64(0))
+        })
+        for evidence in card.transactionEvidence {
+            guard evidence.cardStatementId == card.statement.id,
+                  let transaction = incomingByID[evidence.transactionId],
+                  transaction.direction == evidence.liabilityEffectCode,
+                  (evidence.liabilityEffectCode == CardLiabilityEffect.increasesAmountOwed.rawValue && transaction.amountMinor > 0) ||
+                    (evidence.liabilityEffectCode == CardLiabilityEffect.decreasesAmountOwed.rawValue && transaction.amountMinor < 0),
+                  let membershipCode = evidence.summaryMembershipCode,
+                  let membership = CardTransactionSummaryMembership(rawValue: membershipCode) else {
+                return .repositoryIntegrityConflict
+            }
+            if evidence.rowScopeCode == "account_level" {
+                guard evidence.instrumentId == nil,
+                      contract.accountLevelMemberships.contains(membership) else {
+                    return .repositoryIntegrityConflict
+                }
+            } else {
+                guard evidence.rowScopeCode == "instrument_level",
+                      let sectionID = evidence.documentScopedSectionId,
+                      let expectedInstrumentID = selectedBySectionID[sectionID],
+                      evidence.instrumentId == expectedInstrumentID,
+                      contract.instrumentMemberships.contains(membership) else {
+                    return .repositoryIntegrityConflict
+                }
+            }
+            guard let sectionID = evidence.documentScopedSectionId,
+                  selectedBySectionID[sectionID] != nil else {
+                return .repositoryIntegrityConflict
+            }
+            if let currency = evidence.originalCurrency,
+               let minor = evidence.originalAmountMinor,
+               let decimal = evidence.originalAmountDecimal {
+                let originalSignMatchesEffect =
+                    (evidence.liabilityEffectCode == CardLiabilityEffect.increasesAmountOwed.rawValue && minor > 0) ||
+                    (evidence.liabilityEffectCode == CardLiabilityEffect.decreasesAmountOwed.rawValue && minor < 0)
+                guard originalSignMatchesEffect,
+                      (try? Money(canonicalDecimal: decimal, currency: currency).minorUnits()) == minor else {
+                    return .repositoryIntegrityConflict
+                }
+            } else if evidence.originalCurrency != nil || evidence.originalAmountMinor != nil || evidence.originalAmountDecimal != nil {
+                return .repositoryIntegrityConflict
+            }
+            allRowsNet += transaction.amountMinor
+            membershipTotals[membership, default: 0] += transaction.amountMinor
+            sectionTotals[sectionID, default: 0] += transaction.amountMinor
+        }
+
+        let sectionNet = decisions.reduce(Int64(0)) { $0 + $1.section.signedTotalMinor }
+        let summaryValid: Bool
+        switch contract {
+        case .amex:
+            summaryValid = false
+        case .cbqV1:
+            let billed = byCode["amount_billed"]?.moneyMinor
+            let payment = byCode["payment_received"]?.moneyMinor
+            summaryValid = billed == membershipTotals[.cbqV1AmountBilled, default: 0] &&
+                payment == -membershipTotals[.cbqV1PaymentReceived, default: 0] &&
+                byCode["source_section_net_total"]?.moneyMinor == allRowsNet &&
+                billed.flatMap { amount in payment.map { previous + amount - $0 == balance } } == true &&
+                sectionNet == allRowsNet
+        case .cbqV2:
+            let payment = byCode["total_payment"]?.moneyMinor
+            let credit = byCode["credit_reversal"]?.moneyMinor
+            let purchases = byCode["purchases"]?.moneyMinor
+            let installment = byCode["billed_installment"]?.moneyMinor
+            let fees = byCode["fees_charges"]?.moneyMinor
+            let equationValid = payment.flatMap { paid in
+                credit.flatMap { credited in
+                    purchases.flatMap { bought in
+                        installment.flatMap { billed in
+                            fees.map { previous - paid - credited + bought + billed + $0 == balance }
+                        }
+                    }
+                }
+            } ?? false
+            summaryValid = payment == -membershipTotals[.cbqV2TotalPayment, default: 0] &&
+                credit == -membershipTotals[.cbqV2CreditReversal, default: 0] &&
+                purchases == membershipTotals[.cbqV2Purchases, default: 0] &&
+                installment == membershipTotals[.cbqV2BilledInstallment, default: 0] &&
+                fees == membershipTotals[.cbqV2FeesCharges, default: 0] &&
+                byCode["source_section_net_total"]?.moneyMinor == allRowsNet &&
+                equationValid && sectionNet == allRowsNet
+        }
+        guard summaryValid,
+              decisions.allSatisfy({
+                  sectionTotals[$0.section.documentScopedSectionId] == $0.section.signedTotalMinor
+              }) else { return .repositoryIntegrityConflict }
+
+        for decision in decisions {
+            for relationship in decision.relationships {
+                try db.executePrepared(
+                    sql: "INSERT INTO card_instrument_relationships (id, workspace_id, liability_account_id, predecessor_instrument_id, successor_instrument_id, relationship_kind, authority, effective_date, created_at) VALUES (?,?,?,?,?,?,?,?,?);",
+                    params: [relationship.id, relationship.workspaceId, relationship.liabilityAccountId, relationship.predecessorInstrumentId, relationship.successorInstrumentId, relationship.relationshipKind, relationship.authority, relationship.effectiveDateISO ?? NSNull(), relationship.createdAtISO]
+                )
+            }
+        }
+        for observation in card.sourceObservations {
+            try db.executePrepared(
+                sql: "INSERT INTO card_source_identity_observations (id, workspace_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, subject_kind, subject_id, observation_kind, source_value, association_authority, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: [observation.id, observation.workspaceId, observation.documentId, observation.importSessionId, observation.normalizedDocumentId, observation.parserProfileId, observation.parserProfileVersion, observation.subjectKind, observation.subjectId, observation.observationKind, observation.sourceValue, observation.associationAuthority, observation.createdAtISO]
+            )
+        }
+        try db.executePrepared(
+            sql: "INSERT INTO card_statements (id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, statement_currency, source_row_count, reconciliation_rule_code, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+            params: [card.statement.id, card.statement.workspaceId, card.statement.liabilityAccountId, card.statement.documentId, card.statement.importSessionId, card.statement.normalizedDocumentId, card.statement.parserProfileId, card.statement.parserProfileVersion, card.statement.statementDateISO, card.statement.statementStartDateISO, card.statement.statementEndDateISO, card.statement.statementCurrency, card.statement.sourceRowCount, card.statement.reconciliationRuleCode, card.statement.createdAtISO]
+        )
+        for component in card.summaryComponents {
+            try db.executePrepared(
+                sql: "INSERT INTO card_statement_summary_components (id, card_statement_id, component_code, money_currency, money_minor, money_decimal, date_value) VALUES (?,?,?,?,?,?,?);",
+                params: [component.id, component.cardStatementId, component.componentCode, component.moneyCurrency ?? NSNull(), component.moneyMinor ?? NSNull(), component.moneyDecimal ?? NSNull(), component.dateISO ?? NSNull()]
+            )
+        }
+        for decision in decisions {
+            let section = decision.section
+            try db.executePrepared(
+                sql: "INSERT INTO card_statement_sections (id, card_statement_id, document_scoped_section_id, source_ordinal, instrument_id, holder_label, signed_total_currency, signed_total_minor, signed_total_decimal, reconciliation_rule_code) VALUES (?,?,?,?,?,?,?,?,?,?);",
+                params: [section.id, section.cardStatementId, section.documentScopedSectionId, section.sourceOrdinal, section.instrumentId, section.holderLabel ?? NSNull(), section.signedTotalCurrency, section.signedTotalMinor, section.signedTotalDecimal, section.reconciliationRuleCode]
+            )
+            for observation in decision.sourceObservations {
+                try db.executePrepared(
+                    sql: "INSERT INTO card_statement_section_observations (id, card_statement_section_id, workspace_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, observation_kind, source_value, association_authority, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);",
+                    params: [observation.id, observation.cardStatementSectionId, observation.workspaceId, observation.documentId, observation.importSessionId, observation.normalizedDocumentId, observation.parserProfileId, observation.parserProfileVersion, observation.observationKind, observation.sourceValue, observation.associationAuthority, observation.createdAtISO]
+                )
+            }
+        }
+        for evidence in card.transactionEvidence {
+            guard incomingByID[evidence.transactionId]?.accountId == account.id else {
+                return .repositoryIntegrityConflict
+            }
+            try db.executePrepared(
+                sql: "INSERT INTO card_transaction_evidence (id, card_statement_id, transaction_id, row_scope, instrument_id, liability_effect, source_transaction_date, document_scoped_section_id, original_currency, original_amount_minor, original_amount_decimal, summary_membership_code) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: [evidence.id, evidence.cardStatementId, evidence.transactionId, evidence.rowScopeCode, evidence.instrumentId ?? NSNull(), evidence.liabilityEffectCode, evidence.sourceTransactionDateISO, evidence.documentScopedSectionId ?? NSNull(), evidence.originalCurrency ?? NSNull(), evidence.originalAmountMinor ?? NSNull(), evidence.originalAmountDecimal ?? NSNull(), evidence.summaryMembershipCode ?? NSNull()]
             )
         }
         return nil

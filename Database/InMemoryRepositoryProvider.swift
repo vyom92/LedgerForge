@@ -1482,11 +1482,19 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         return isSupportingSource ? .equivalentSourceRecorded(receipt) : .committed(receipt)
     }
 
-    private func cardAccountIsCompatible(account: AccountDTO, plan: ConfirmedImportPlanDTO) -> Bool {
+    private func cardAccountIsCompatible(account: AccountDTO, plan: ConfirmedImportPlanDTO, contract: CardStatementProfileContract) -> Bool {
         account.workspaceId == plan.workspace.id &&
         account.accountType == "credit_card" &&
         account.nativeCurrency == "QAR" &&
-        account.institutionId == "American Express"
+        account.institutionId == contract.institutionCode
+    }
+
+    private func cardAccountIsCompatible(account: AccountDTO, plan: ConfirmedImportPlanDTO) -> Bool {
+        guard let rule = plan.cardImportPlan?.statement.reconciliationRuleCode,
+              let contract = CardStatementProfileContract(reconciliationRuleIdentifier: rule) else {
+            return false
+        }
+        return cardAccountIsCompatible(account: account, plan: plan, contract: contract)
     }
 
     private func stageCardGraph(
@@ -1508,17 +1516,17 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         let history = plan.historyTemplate
         let incomingTransactions = plan.transactionTemplates.map(\.transaction)
         let incomingByID = Dictionary(uniqueKeysWithValues: incomingTransactions.map { ($0.id, $0) })
-        guard card.liabilityAccountId == account.id,
-              cardAccountIsCompatible(account: account, plan: plan),
+        guard let contract = CardStatementProfileContract(reconciliationRuleIdentifier: card.statement.reconciliationRuleCode),
+              card.liabilityAccountId == account.id,
+              cardAccountIsCompatible(account: account, plan: plan, contract: contract),
               card.statement.workspaceId == plan.workspace.id,
               card.statement.liabilityAccountId == account.id,
               card.statement.documentId == history.document.id,
               card.statement.importSessionId == history.importSession.id,
               card.statement.normalizedDocumentId == history.normalizedDocument?.id,
-              card.statement.parserProfileId == "amex.credit-card.pdf",
-              card.statement.parserProfileVersion == "1",
+              card.statement.parserProfileId == contract.profileID,
+              card.statement.parserProfileVersion == contract.profileVersion,
               card.statement.statementCurrency == "QAR",
-              card.statement.reconciliationRuleCode == "amex.qar.previous-minus-credits-plus-debits.v1",
               card.statement.sourceRowCount == incomingTransactions.count,
               statements[card.statement.id] == nil,
               !card.sectionDecisions.isEmpty,
@@ -1526,7 +1534,9 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               Set(card.sectionDecisions.map(\.section.id)).count == card.sectionDecisions.count,
               Set(card.sectionDecisions.map(\.section.documentScopedSectionId)).count == card.sectionDecisions.count,
               Set(card.sectionDecisions.map(\.section.instrumentId)).count == card.sectionDecisions.count,
-              card.semanticProjection?.sections.count == card.sectionDecisions.count,
+              (contract.supportsSemanticSourceGrouping
+                ? card.semanticProjection?.sections.count == card.sectionDecisions.count
+                : card.semanticProjection == nil),
               finalTransactions.count == (isSupportingSource ? 0 : incomingTransactions.count) else {
             return .repositoryIntegrityConflict
         }
@@ -1544,7 +1554,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             guard section.cardStatementId == card.statement.id,
                   section.sourceOrdinal > 0,
                   section.signedTotalCurrency == card.statement.statementCurrency,
-                  section.reconciliationRuleCode == "amex.section.signed-increases-minus-decreases.v1",
+                  section.reconciliationRuleCode == contract.sectionRule,
                   validCardMoney(currency: section.signedTotalCurrency, minor: section.signedTotalMinor, decimal: section.signedTotalDecimal),
                   sections[section.id] == nil else { return .repositoryIntegrityConflict }
 
@@ -1605,7 +1615,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                       observation.normalizedDocumentId == history.normalizedDocument?.id,
                       observation.parserProfileId == card.statement.parserProfileId,
                       observation.parserProfileVersion == card.statement.parserProfileVersion,
-                      observation.observationKind == "amex_card_account_number",
+                      observation.observationKind == contract.instrumentObservationKindCode,
                       !observation.sourceValue.isEmpty,
                       allowedAuthorities.contains(observation.associationAuthority),
                       sectionObservations[observation.id] == nil else { return .repositoryIntegrityConflict }
@@ -1643,6 +1653,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         for observation in card.sourceObservations {
             let subjectValid = (observation.subjectKind == "liability_account" && observation.subjectId == account.id) ||
                 (card.sectionDecisions.count == 1 && observation.subjectKind == "instrument" && selectedInstrumentIDs.contains(observation.subjectId))
+            let kindValid = (observation.subjectKind == "liability_account" && observation.observationKind == contract.accountObservationKindCode) ||
+                (observation.subjectKind == "instrument" && observation.observationKind == contract.instrumentObservationKindCode)
             guard observation.workspaceId == plan.workspace.id,
                   observation.documentId == history.document.id,
                   observation.importSessionId == history.importSession.id,
@@ -1650,6 +1662,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                   observation.parserProfileId == card.statement.parserProfileId,
                   observation.parserProfileVersion == card.statement.parserProfileVersion,
                   subjectValid,
+                  kindValid,
                   allowedAuthorities.contains(observation.associationAuthority),
                   !observation.sourceValue.isEmpty,
                   sourceObservations[observation.id] == nil else { return .repositoryIntegrityConflict }
@@ -1667,18 +1680,13 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             return .repositoryIntegrityConflict
         }
 
-        let requiredComponents = Set(["previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"])
-        guard Set(card.summaryComponents.map(\.componentCode)) == requiredComponents,
+        guard Set(card.summaryComponents.map(\.componentCode)) == contract.requiredSummaryCodes,
               card.summaryComponents.allSatisfy({ $0.cardStatementId == card.statement.id && summaryComponents[$0.id] == nil }) else {
             return .repositoryIntegrityConflict
         }
         let byCode = Dictionary(uniqueKeysWithValues: card.summaryComponents.map { ($0.componentCode, $0) })
         guard let previous = byCode["previous_balance"]?.moneyMinor,
-              let credits = byCode["new_credits"]?.moneyMinor,
-              let debits = byCode["new_debits"]?.moneyMinor,
               let balance = byCode["new_balance"]?.moneyMinor,
-              let instrumentTotal = byCode["instrument_net_total"]?.moneyMinor,
-              previous - credits + debits == balance,
               byCode["due_date"]?.dateISO != nil,
               card.summaryComponents.allSatisfy({ component in
                   guard let currency = component.moneyCurrency,
@@ -1696,6 +1704,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         var increaseTotal: Int64 = 0
         var decreaseTotal: Int64 = 0
         var instrumentNet: Int64 = 0
+        var allRowsNet: Int64 = 0
+        var membershipTotals: [CardTransactionSummaryMembership: Int64] = [:]
         var sectionTotals = Dictionary(uniqueKeysWithValues: card.sectionDecisions.map {
             ($0.section.documentScopedSectionId, Int64(0))
         })
@@ -1713,14 +1723,28 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             default:
                 return .repositoryIntegrityConflict
             }
+            allRowsNet += transaction.amountMinor
+            let membership = evidence.summaryMembershipCode.flatMap(CardTransactionSummaryMembership.init(rawValue:))
+            if let membership { membershipTotals[membership, default: 0] += transaction.amountMinor }
             if evidence.rowScopeCode == "account_level" {
-                guard evidence.instrumentId == nil && evidence.documentScopedSectionId == nil else { return .repositoryIntegrityConflict }
+                guard evidence.instrumentId == nil,
+                      (!contract.requiresCBQSummaryMembership || membership.map(contract.accountLevelMemberships.contains) == true) else {
+                    return .repositoryIntegrityConflict
+                }
             } else {
                 guard evidence.rowScopeCode == "instrument_level",
                       let sectionID = evidence.documentScopedSectionId,
                       let expectedInstrumentID = selectedBySectionID[sectionID],
-                      evidence.instrumentId == expectedInstrumentID else { return .repositoryIntegrityConflict }
+                      evidence.instrumentId == expectedInstrumentID,
+                      (!contract.requiresCBQSummaryMembership || membership.map(contract.instrumentMemberships.contains) == true) else {
+                    return .repositoryIntegrityConflict
+                }
+            }
+            if let sectionID = evidence.documentScopedSectionId {
+                guard selectedBySectionID[sectionID] != nil else { return .repositoryIntegrityConflict }
                 sectionTotals[sectionID, default: 0] += transaction.amountMinor
+            } else if contract != .amex {
+                return .repositoryIntegrityConflict
             }
             guard (evidence.originalCurrency == nil && evidence.originalAmountMinor == nil && evidence.originalAmountDecimal == nil) ||
                     (evidence.originalCurrency != nil && evidence.originalAmountMinor != nil && evidence.originalAmountDecimal != nil),
@@ -1732,10 +1756,40 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                 transactionEvidence[evidence.id] = evidence
             }
         }
-        guard increaseTotal == debits,
-              decreaseTotal == credits,
-              instrumentNet == instrumentTotal,
-              instrumentTotal == card.sectionDecisions.reduce(Int64(0), { $0 + $1.section.signedTotalMinor }),
+        let sectionNet = card.sectionDecisions.reduce(Int64(0), { $0 + $1.section.signedTotalMinor })
+        let summaryValid: Bool
+        switch contract {
+        case .amex:
+            summaryValid = byCode["new_debits"]?.moneyMinor == increaseTotal &&
+                byCode["new_credits"]?.moneyMinor == decreaseTotal &&
+                byCode["instrument_net_total"]?.moneyMinor == instrumentNet &&
+                previous - decreaseTotal + increaseTotal == balance && sectionNet == instrumentNet
+        case .cbqV1:
+            let billed = byCode["amount_billed"]?.moneyMinor
+            let payment = byCode["payment_received"]?.moneyMinor
+            let equationValid = billed.flatMap { amount in
+                payment.map { previous + amount - $0 == balance }
+            } ?? false
+            summaryValid = billed == membershipTotals[.cbqV1AmountBilled, default: 0] &&
+                payment == -membershipTotals[.cbqV1PaymentReceived, default: 0] &&
+                byCode["source_section_net_total"]?.moneyMinor == allRowsNet &&
+                equationValid && sectionNet == allRowsNet
+        case .cbqV2:
+            let payment = byCode["total_payment"]?.moneyMinor
+            let credit = byCode["credit_reversal"]?.moneyMinor
+            let purchases = byCode["purchases"]?.moneyMinor
+            let installment = byCode["billed_installment"]?.moneyMinor
+            let fees = byCode["fees_charges"]?.moneyMinor
+            summaryValid = payment == -membershipTotals[.cbqV2TotalPayment, default: 0] &&
+                credit == -membershipTotals[.cbqV2CreditReversal, default: 0] &&
+                purchases == membershipTotals[.cbqV2Purchases, default: 0] &&
+                installment == membershipTotals[.cbqV2BilledInstallment, default: 0] &&
+                fees == membershipTotals[.cbqV2FeesCharges, default: 0] &&
+                byCode["source_section_net_total"]?.moneyMinor == allRowsNet &&
+                payment.flatMap { paid in credit.flatMap { credited in purchases.flatMap { bought in installment.flatMap { billed in fees.map { previous - paid - credited + bought + billed + $0 == balance } } } } } == true &&
+                sectionNet == allRowsNet
+        }
+        guard summaryValid,
               card.sectionDecisions.allSatisfy({ sectionTotals[$0.section.documentScopedSectionId] == $0.section.signedTotalMinor }) else {
             return .repositoryIntegrityConflict
         }
@@ -1755,6 +1809,9 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         groups: inout [String: CardStatementSemanticGroupDTO],
         members: inout [String: CardStatementSemanticMemberDTO]
     ) -> ConfirmedImportRepositoryResult? {
+        if card.semanticProjection == nil {
+            return isSupportingSource ? .repositoryIntegrityConflict : nil
+        }
         guard let projection = card.semanticProjection,
               projection.isValid(),
               projections[projection.id] == nil,

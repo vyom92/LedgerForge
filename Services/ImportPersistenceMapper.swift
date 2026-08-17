@@ -516,11 +516,18 @@ struct ImportPersistenceMapper {
         sectionRelationships: [String: (kind: CardInstrumentRelationshipKind, relatedInstrumentId: String)]
     ) throws -> ConfirmedCardImportPlanDTO? {
         guard let evidence = financialDocument.cardStatementEvidence else { return nil }
-        guard financialDocument.metadata.institution == .amex,
+        let isAmex = financialDocument.metadata.institution == .amex &&
+            evidence.reconciliationRuleIdentifier == CardStatementEvidence.amexQARReconciliationRule &&
+            payload.normalizedDocument.profileId == "amex.credit-card.pdf" &&
+            payload.normalizedDocument.profileVersion == "1"
+        let isCBQ = financialDocument.metadata.institution == .cbq &&
+            [CardStatementEvidence.cbqV1QARReconciliationRule, CardStatementEvidence.cbqV2QARReconciliationRule]
+                .contains(evidence.reconciliationRuleIdentifier) &&
+            payload.normalizedDocument.profileId == "cbq.credit-card.pdf" &&
+            payload.normalizedDocument.profileVersion == "1"
+        guard (isAmex || isCBQ),
               financialDocument.metadata.documentType == .creditCard,
               financialDocument.metadata.fileFormat == .pdf,
-              payload.normalizedDocument.profileId == AmericanExpressCreditCardPDFParser.profileID,
-              payload.normalizedDocument.profileVersion == AmericanExpressCreditCardPDFParser.profileVersion,
               payload.transactions.count == financialDocument.transactions.count,
               payload.transactions.count == evidence.transactionAnnotations.count,
               ["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"].contains(associationAuthority) else {
@@ -662,15 +669,13 @@ struct ImportPersistenceMapper {
             guard let annotation = annotations[source.id] else {
                 throw ImportPersistenceError.missingTransactionProvenance
             }
-            let sectionID: String?
+            let sectionID = annotation.documentScopedSectionID
             let instrumentID: String?
-            switch annotation.rowScope {
+            switch annotation.financialScope {
             case .accountLevel:
-                sectionID = nil
                 instrumentID = nil
-            case .instrument(let value):
-                sectionID = value
-                guard let selected = selectedInstrumentIDs[value] else {
+            case .instrument:
+                guard let sectionID, let selected = selectedInstrumentIDs[sectionID] else {
                     throw ImportPersistenceError.conflictingTransactionProvenance
                 }
                 instrumentID = selected
@@ -679,18 +684,21 @@ struct ImportPersistenceMapper {
                 id: "card-transaction-evidence-\(transaction.id.lowercased())",
                 cardStatementId: statementID,
                 transactionId: transaction.id,
-                rowScopeCode: annotation.rowScope.persistenceCode,
+                rowScopeCode: annotation.financialScope.persistenceCode,
                 instrumentId: instrumentID,
                 liabilityEffectCode: annotation.liabilityEffect.rawValue,
                 sourceTransactionDateISO: annotation.sourceTransactionDate.canonical,
                 documentScopedSectionId: sectionID,
                 originalCurrency: annotation.originalMerchantMoney?.currency.code,
                 originalAmountMinor: try annotation.originalMerchantMoney.map { try $0.minorUnits() },
-                originalAmountDecimal: try annotation.originalMerchantMoney.map { try $0.canonicalDecimalString() }
+                originalAmountDecimal: try annotation.originalMerchantMoney.map { try $0.canonicalDecimalString() },
+                summaryMembershipCode: annotation.summaryMembership?.rawValue
             )
         }
-        let projectionID = "card-semantic-projection-\(payload.importSession.id.lowercased())"
-        let projectionSections = sectionDecisions.map { decision in
+        let semanticProjection: CardStatementSemanticProjectionDTO?
+        if isAmex {
+            let projectionID = "card-semantic-projection-\(payload.importSession.id.lowercased())"
+            let projectionSections = sectionDecisions.map { decision in
             CardStatementSemanticProjectionSectionDTO(
                 id: "\(projectionID)-section-\(decision.section.sourceOrdinal)",
                 projectionId: projectionID,
@@ -702,10 +710,10 @@ struct ImportPersistenceMapper {
                 reconciliationRuleCode: decision.section.reconciliationRuleCode
             )
         }
-        let sectionOrdinals = Dictionary(uniqueKeysWithValues: projectionSections.map {
-            ($0.documentScopedSectionId, $0.sourceOrdinal)
-        })
-        let projectionEvents = try zip(financialDocument.transactions, zip(payload.transactions, transactionEvidence)).map {
+            let sectionOrdinals = Dictionary(uniqueKeysWithValues: projectionSections.map {
+                ($0.documentScopedSectionId, $0.sourceOrdinal)
+            })
+            let projectionEvents = try zip(financialDocument.transactions, zip(payload.transactions, transactionEvidence)).map {
             source, pair -> CardStatementSemanticProjectionEventPlanDTO in
             let (transaction, persistedEvidence) = pair
             guard let provenance = source.sourceProvenance.first,
@@ -734,8 +742,8 @@ struct ImportPersistenceMapper {
                 documentScopedSectionId: persistedEvidence.documentScopedSectionId,
                 documentSectionOrdinal: persistedEvidence.documentScopedSectionId.flatMap { sectionOrdinals[$0] }
             )
-        }.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
-        let provisionalProjection = CardStatementSemanticProjectionDTO(
+            }.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
+            let provisionalProjection = CardStatementSemanticProjectionDTO(
             id: projectionID,
             algorithmIdentifier: CardStatementSemanticProjectionDTO.algorithm,
             digest: String(repeating: "0", count: 64),
@@ -752,7 +760,7 @@ struct ImportPersistenceMapper {
             sections: projectionSections,
             events: projectionEvents
         )
-        let semanticProjection = CardStatementSemanticProjectionDTO(
+            let projection = CardStatementSemanticProjectionDTO(
             id: provisionalProjection.id,
             algorithmIdentifier: provisionalProjection.algorithmIdentifier,
             digest: provisionalProjection.calculatedDigest(),
@@ -768,8 +776,15 @@ struct ImportPersistenceMapper {
             summaryComponents: provisionalProjection.summaryComponents,
             sections: provisionalProjection.sections,
             events: provisionalProjection.events
-        )
-        guard semanticProjection.isValid(), let firstDecision = sectionDecisions.first else {
+            )
+            guard projection.isValid() else {
+                throw ImportPersistenceError.conflictingTransactionProvenance
+            }
+            semanticProjection = projection
+        } else {
+            semanticProjection = nil
+        }
+        guard let firstDecision = sectionDecisions.first else {
             throw ImportPersistenceError.conflictingTransactionProvenance
         }
         let legacyInstrumentObservations: [CardSourceIdentityObservationDTO]

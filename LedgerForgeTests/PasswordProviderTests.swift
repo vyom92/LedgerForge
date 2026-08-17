@@ -112,6 +112,55 @@ struct PasswordProviderTests {
         #expect(await store.password(institutionCode: "american-express") == "fictional-new-password")
     }
 
+    @Test func cbqCardCredentialUsesSharedInstitutionScopeForSaveReuseAndStaleReplacement() async throws {
+        let scope = Institution.cbq.statementPasswordCredentialScope
+        let store = InMemoryStatementPasswordCredentialStore()
+        let firstRequest = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/fictional-cbq-card.pdf"))
+        let provider = DefaultPasswordProvider(
+            credentialStore: store,
+            supportedInstitutionCodes: [scope],
+            challenge: { _ in "fictional-cbq-card-password" }
+        )
+
+        await provider.stageSuccessfulPassword("fictional-cbq-card-password", for: firstRequest)
+        #expect(await store.password(institutionCode: scope) == nil)
+        try await provider.confirmSuccessfulPassword(for: firstRequest, institutionCode: scope)
+        #expect(await store.password(institutionCode: scope) == "fictional-cbq-card-password")
+
+        let remembered = try await provider.rememberedPasswords(for: firstRequest)
+        #expect(remembered == ["fictional-cbq-card-password"])
+
+        let replacementRequest = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/fictional-cbq-card-replacement.pdf"))
+        await provider.stageSuccessfulPassword("fictional-cbq-card-replacement", for: replacementRequest)
+        #expect(await store.password(institutionCode: scope) == "fictional-cbq-card-password")
+        try await provider.confirmSuccessfulPassword(for: replacementRequest, institutionCode: scope)
+        #expect(await store.password(institutionCode: scope) == "fictional-cbq-card-replacement")
+    }
+
+    @Test func cbqInstitutionScopeUsesProductionKeychainStoreForFirstSaveReuseAndReplacement() async throws {
+        let service = "com.ledgerforge.tests.cbq-password-\(UUID().uuidString)"
+        let scope = Institution.cbq.statementPasswordCredentialScope
+        let store = KeychainStatementPasswordCredentialStore(service: service)
+        defer { Task { try? await store.delete(institutionCode: scope) } }
+        try await store.delete(institutionCode: scope)
+        let provider = DefaultPasswordProvider(
+            credentialStore: store,
+            supportedInstitutionCodes: [scope],
+            challenge: { _ in nil }
+        )
+
+        let first = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/fictional-cbq-first.pdf"))
+        await provider.stageSuccessfulPassword("fictional-cbq-keychain-first", for: first)
+        try await provider.confirmSuccessfulPassword(for: first, institutionCode: scope)
+        #expect(try await store.password(institutionCode: scope) == "fictional-cbq-keychain-first")
+        #expect(try await provider.rememberedPasswords(for: first) == ["fictional-cbq-keychain-first"])
+
+        let replacement = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/fictional-cbq-replacement.pdf"))
+        await provider.stageSuccessfulPassword("fictional-cbq-keychain-replacement", for: replacement)
+        try await provider.confirmSuccessfulPassword(for: replacement, institutionCode: scope)
+        #expect(try await store.password(institutionCode: scope) == "fictional-cbq-keychain-replacement")
+    }
+
     @Test func stagedPasswordIsDiscardedAfterRejectionOrCancellationAndNeverSaved() async throws {
         let store = InMemoryStatementPasswordCredentialStore(
             passwords: ["american-express": "fictional-existing-password"]

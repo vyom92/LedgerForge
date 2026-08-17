@@ -132,10 +132,13 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
                     )
                 }
                 let scope: CardTransactionScope
+                let sectionID: String?
                 if row.values[8] == "account_level" && row.values[9].isEmpty {
                     scope = .accountLevel
+                    sectionID = nil
                 } else if row.values[8] == "instrument_level" && sectionIDs.contains(row.values[9]) {
-                    scope = .instrument(documentScopedSectionID: row.values[9])
+                    scope = .instrument
+                    sectionID = row.values[9]
                 } else {
                     throw AmericanExpressCreditCardPDFParserError.malformedRow(sourceOrdinal: row.rowNumber)
                 }
@@ -167,7 +170,8 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
                 transactions.append(transaction)
                 annotations.append(CardTransactionAnnotation(
                     parserTransactionID: transaction.id,
-                    rowScope: scope,
+                    financialScope: scope,
+                    documentScopedSectionID: sectionID,
                     liabilityEffect: effect,
                     sourceTransactionDate: transactionDate,
                     originalMerchantMoney: originalMoney

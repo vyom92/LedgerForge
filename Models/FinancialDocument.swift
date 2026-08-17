@@ -101,6 +101,8 @@ struct DeclaredStatementPeriod: Equatable, Sendable {
 enum CardSourceIdentityObservationKind: String, CaseIterable, Equatable, Sendable, Codable {
     case liabilityMembershipNumber = "amex_membership_number"
     case instrumentCardAccountNumber = "amex_card_account_number"
+    case cbqLiabilityAccountReference = "cbq_card_account_reference"
+    case cbqInstrumentMaskedCardNumber = "cbq_masked_card_number"
 }
 
 enum CardSourceIdentitySubject: String, CaseIterable, Equatable, Sendable, Codable {
@@ -117,13 +119,24 @@ struct CardSourceIdentityObservation: Equatable, Sendable {
 
     init(kind: CardSourceIdentityObservationKind, subject: CardSourceIdentitySubject, value: String) throws {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        let expectedSubject: CardSourceIdentitySubject = kind == .liabilityMembershipNumber
-            ? .liabilityAccount
-            : .instrument
-        guard subject == expectedSubject,
-              !trimmed.isEmpty,
-              trimmed.range(of: #"^[0-9X-]+$"#, options: .regularExpression) != nil,
-              trimmed.contains("X") else {
+        let expectedSubject: CardSourceIdentitySubject
+        let isValidValue: Bool
+        switch kind {
+        case .liabilityMembershipNumber:
+            expectedSubject = .liabilityAccount
+            isValidValue = trimmed.range(of: #"^[0-9X-]+$"#, options: .regularExpression) != nil && trimmed.contains("X")
+        case .instrumentCardAccountNumber:
+            expectedSubject = .instrument
+            isValidValue = trimmed.range(of: #"^[0-9X-]+$"#, options: .regularExpression) != nil && trimmed.contains("X")
+        case .cbqLiabilityAccountReference:
+            expectedSubject = .liabilityAccount
+            isValidValue = trimmed.range(of: #"^[0-9]+$"#, options: .regularExpression) != nil
+        case .cbqInstrumentMaskedCardNumber:
+            expectedSubject = .instrument
+            isValidValue = trimmed.range(of: #"^[0-9X]+$"#, options: .regularExpression) != nil &&
+                trimmed.contains("X") && trimmed.contains(where: \.isNumber)
+        }
+        guard subject == expectedSubject, !trimmed.isEmpty, isValidValue else {
             throw CardStatementEvidenceError.malformedIdentityObservation
         }
         self.kind = kind
@@ -134,7 +147,7 @@ struct CardSourceIdentityObservation: Equatable, Sendable {
 
 enum CardTransactionScope: Equatable, Sendable {
     case accountLevel
-    case instrument(documentScopedSectionID: String)
+    case instrument
 
     var persistenceCode: String {
         switch self {
@@ -153,6 +166,7 @@ struct CardInstrumentSectionEvidence: Equatable, Sendable {
     let reconciliationRuleIdentifier: String
 
     static let amexSignedNetRule = "amex.section.signed-increases-minus-decreases.v1"
+    static let cbqSignedSourceMembershipRule = "cbq.section.signed-source-membership.v1"
 
     init(
         documentScopedSectionID: String,
@@ -174,35 +188,74 @@ struct CardInstrumentSectionEvidence: Equatable, Sendable {
 
 struct CardTransactionAnnotation: Equatable, Sendable {
     let parserTransactionID: UUID
-    let rowScope: CardTransactionScope
+    let financialScope: CardTransactionScope
+    let documentScopedSectionID: String?
     let liabilityEffect: CardLiabilityEffect
     let sourceTransactionDate: StatementDate
     let originalMerchantMoney: Money?
+    let summaryMembership: CardTransactionSummaryMembership?
+
+    init(
+        parserTransactionID: UUID,
+        financialScope: CardTransactionScope,
+        documentScopedSectionID: String?,
+        liabilityEffect: CardLiabilityEffect,
+        sourceTransactionDate: StatementDate,
+        originalMerchantMoney: Money?,
+        summaryMembership: CardTransactionSummaryMembership? = nil
+    ) {
+        self.parserTransactionID = parserTransactionID
+        self.financialScope = financialScope
+        self.documentScopedSectionID = documentScopedSectionID
+        self.liabilityEffect = liabilityEffect
+        self.sourceTransactionDate = sourceTransactionDate
+        self.originalMerchantMoney = originalMerchantMoney
+        self.summaryMembership = summaryMembership
+    }
 }
 
 enum CardStatementSummaryComponent: Equatable, Sendable {
     case previousBalance(Money)
     case newCredits(Money)
     case newDebits(Money)
+    case amountBilled(Money)
+    case paymentReceived(Money)
+    case totalPayment(Money)
+    case creditReversal(Money)
+    case purchases(Money)
+    case billedInstallment(Money)
+    case feesCharges(Money)
     case newBalance(Money)
     case dueDate(StatementDate)
     case instrumentNetTotal(Money)
+    case sourceSectionNetTotal(Money)
 
     var persistenceCode: String {
         switch self {
         case .previousBalance: return "previous_balance"
         case .newCredits: return "new_credits"
         case .newDebits: return "new_debits"
+        case .amountBilled: return "amount_billed"
+        case .paymentReceived: return "payment_received"
+        case .totalPayment: return "total_payment"
+        case .creditReversal: return "credit_reversal"
+        case .purchases: return "purchases"
+        case .billedInstallment: return "billed_installment"
+        case .feesCharges: return "fees_charges"
         case .newBalance: return "new_balance"
         case .dueDate: return "due_date"
         case .instrumentNetTotal: return "instrument_net_total"
+        case .sourceSectionNetTotal: return "source_section_net_total"
         }
     }
 
     var money: Money? {
         switch self {
         case .previousBalance(let value), .newCredits(let value), .newDebits(let value),
-                .newBalance(let value), .instrumentNetTotal(let value): return value
+                .amountBilled(let value), .paymentReceived(let value), .totalPayment(let value),
+                .creditReversal(let value), .purchases(let value), .billedInstallment(let value),
+                .feesCharges(let value), .newBalance(let value), .instrumentNetTotal(let value),
+                .sourceSectionNetTotal(let value): return value
         case .dueDate: return nil
         }
     }
@@ -231,6 +284,8 @@ enum CardStatementEvidenceError: Error, Equatable, LocalizedError {
 
 struct CardStatementEvidence: Equatable, Sendable {
     static let amexQARReconciliationRule = "amex.qar.previous-minus-credits-plus-debits.v1"
+    static let cbqV1QARReconciliationRule = "cbq.qar.v1.previous-plus-billed-minus-payment.v1"
+    static let cbqV2QARReconciliationRule = "cbq.qar.v2.previous-minus-payment-minus-credit-plus-components.v1"
 
     let statementDate: StatementDate
     let declaredStatementPeriod: DeclaredStatementPeriod
@@ -261,7 +316,7 @@ struct CardStatementEvidence: Equatable, Sendable {
         let sectionIDSet = Set(sectionIDs)
         let sectionOrdinals = instrumentSections.map(\.sourceOrdinal)
         guard !sectionIDs.contains(where: \.isEmpty), sectionIDSet.count == sectionIDs.count,
-              sectionOrdinals == instrumentSections.indices.map { $0 + 1 },
+              sectionOrdinals == instrumentSections.indices.map({ $0 + 1 }),
               instrumentSections.allSatisfy({
                   $0.signedNetTotal.currency == nativeCurrency &&
                   !$0.reconciliationRuleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -272,9 +327,11 @@ struct CardStatementEvidence: Equatable, Sendable {
                   }
               }),
               transactionAnnotations.allSatisfy({ annotation in
-                  switch annotation.rowScope {
-                  case .accountLevel: return true
-                  case .instrument(let sectionID): return sectionIDSet.contains(sectionID)
+                  switch annotation.financialScope {
+                  case .accountLevel:
+                      return annotation.documentScopedSectionID.map(sectionIDSet.contains) ?? true
+                  case .instrument:
+                      return annotation.documentScopedSectionID.map(sectionIDSet.contains) == true
                   }
               }) else {
             throw CardStatementEvidenceError.invalidInstrumentSection

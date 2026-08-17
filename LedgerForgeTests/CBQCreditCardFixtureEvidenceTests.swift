@@ -82,11 +82,11 @@ struct CBQCreditCardFixtureEvidenceTests {
         for expected in evidence {
             let identity = expected.identityRelationships
             #expect(identity.customerContinuous && identity.accountContinuous && identity.instrumentsContinuous)
-            #expect(identity.primaryAndSupplementaryDistinct && identity.instrumentsDistinctFromAccount)
+            #expect(identity.companionInstrumentsDistinct && identity.instrumentsDistinctFromAccount)
             #expect(identity.continuityAcrossLayoutTransition)
-            #expect(identity.accountID != identity.primaryInstrumentID)
-            #expect(identity.accountID != identity.supplementaryInstrumentID)
-            #expect(Set(expected.instruments.map(\.relationship)) == ["primary", "supplementary"])
+            #expect(identity.accountID != identity.companionInstrument1ID)
+            #expect(identity.accountID != identity.companionInstrument2ID)
+            #expect(Set(expected.instruments.map(\.relationship)) == ["companion"])
             #expect(expected.instrumentRelationships.accountID == expected.account.accountID)
             #expect(expected.instrumentRelationships.instruments.allSatisfy { $0.accountRelationship == "belongs_to_fictional_account" })
             #expect(expected.transactions.allSatisfy { transaction in
@@ -262,9 +262,9 @@ private struct InstrumentRelationships: Decodable { let accountID: String; let i
 private struct InstrumentRelationship: Decodable { let instrumentID: String; let role: String; let accountRelationship: String; enum CodingKeys: String, CodingKey { case instrumentID = "instrument_id", role, accountRelationship = "account_relationship" } }
 
 private struct IdentityRelationships: Decodable {
-    let accountID: String; let primaryInstrumentID: String; let supplementaryInstrumentID: String
-    let customerContinuous: Bool; let accountContinuous: Bool; let instrumentsContinuous: Bool; let primaryAndSupplementaryDistinct: Bool; let instrumentsDistinctFromAccount: Bool; let continuityAcrossLayoutTransition: Bool
-    enum CodingKeys: String, CodingKey { case accountID = "account_id", primaryInstrumentID = "primary_instrument_id", supplementaryInstrumentID = "supplementary_instrument_id", customerContinuous = "customer_continuous_across_all_fixtures", accountContinuous = "account_continuous_across_all_fixtures", instrumentsContinuous = "instrument_identities_continuous_across_all_fixtures", primaryAndSupplementaryDistinct = "primary_and_supplementary_distinct", instrumentsDistinctFromAccount = "instruments_distinct_from_account", continuityAcrossLayoutTransition = "continuity_preserved_across_v1_to_v2_transition" }
+    let accountID: String; let companionInstrument1ID: String; let companionInstrument2ID: String
+    let customerContinuous: Bool; let accountContinuous: Bool; let instrumentsContinuous: Bool; let companionInstrumentsDistinct: Bool; let instrumentsDistinctFromAccount: Bool; let continuityAcrossLayoutTransition: Bool
+    enum CodingKeys: String, CodingKey { case accountID = "account_id", companionInstrument1ID = "companion_instrument_1_id", companionInstrument2ID = "companion_instrument_2_id", customerContinuous = "customer_continuous_across_all_fixtures", accountContinuous = "account_continuous_across_all_fixtures", instrumentsContinuous = "instrument_identities_continuous_across_all_fixtures", companionInstrumentsDistinct = "companion_instruments_distinct", instrumentsDistinctFromAccount = "instruments_distinct_from_account", continuityAcrossLayoutTransition = "continuity_preserved_across_v1_to_v2_transition" }
 }
 
 private struct PeriodRelationships: Decodable {

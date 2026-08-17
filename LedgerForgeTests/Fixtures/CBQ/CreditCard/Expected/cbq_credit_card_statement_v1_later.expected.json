@@ -349,11 +349,11 @@
   "fictional_instrument_identities": [
     {
       "instrument_id": "TEST-CBQ-CARD-A",
-      "relationship": "primary"
+      "relationship": "companion"
     },
     {
       "instrument_id": "TEST-CBQ-CARD-B",
-      "relationship": "supplementary"
+      "relationship": "companion"
     }
   ],
   "source_text_boundary": "private source text replaced; exact financial and structural evidence preserved",
@@ -374,12 +374,12 @@
   "fictional_identity_relationships": {
     "customer_id": "TEST-CBQ-CUSTOMER-0001",
     "account_id": "TEST-CBQ-ACCOUNT-0001",
-    "primary_instrument_id": "TEST-CBQ-CARD-A",
-    "supplementary_instrument_id": "TEST-CBQ-CARD-B",
+    "companion_instrument_1_id": "TEST-CBQ-CARD-A",
+    "companion_instrument_2_id": "TEST-CBQ-CARD-B",
     "customer_continuous_across_all_fixtures": true,
     "account_continuous_across_all_fixtures": true,
     "instrument_identities_continuous_across_all_fixtures": true,
-    "primary_and_supplementary_distinct": true,
+    "companion_instruments_distinct": true,
     "instruments_distinct_from_account": true,
     "continuity_preserved_across_v1_to_v2_transition": true,
     "identity_source": "deterministic_fictional_mapping_not_derived_from_filename_display_label_or_masked_value"
@@ -389,12 +389,12 @@
     "instruments": [
       {
         "instrument_id": "TEST-CBQ-CARD-A",
-        "role": "primary",
+        "role": "companion",
         "account_relationship": "belongs_to_fictional_account"
       },
       {
         "instrument_id": "TEST-CBQ-CARD-B",
-        "role": "supplementary",
+        "role": "companion",
         "account_relationship": "belongs_to_fictional_account"
       }
     ]

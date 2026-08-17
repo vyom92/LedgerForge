@@ -510,11 +510,6 @@ final class ImportEngine {
             document: rawDocument,
             institution: institutionCandidate
         )
-        try await importCoordinator.confirmSuccessfulPassword(
-            for: passwordRequest,
-            institutionCode: detection.metadata.institution.statementPasswordCredentialScope
-        )
-
         let document: Document
         let normalizedRows: [NormalizedRow]
         let normalizedHeader: NormalizedRow?
@@ -550,8 +545,25 @@ final class ImportEngine {
                 normalizedHeader = normalization.header
                 sourceContext = normalization.sourceContext
             case Institution.cbq.rawValue:
-                let normalization = try snapshot.withBytes {
-                    try CBQCurrentAccountPDFNormalizer().normalize(text: contents, sourceBytes: $0, fileURL: url)
+                let normalization: (document: Document, rows: [NormalizedRow], header: NormalizedRow?, sourceContext: NormalizedDocument.SourceContext)
+                if classification.documentType == .creditCardStatement {
+                    let card = try (rawDocument.pdfPageTexts.map {
+                        try CBQCreditCardPDFNormalizer().normalize(
+                            text: contents, pageTexts: $0, fileURL: url
+                        )
+                    } ?? snapshot.withBytes {
+                        try CBQCreditCardPDFNormalizer().normalize(
+                            text: contents, sourceBytes: $0, fileURL: url
+                        )
+                    })
+                    normalization = (card.document, card.rows, card.header, card.sourceContext)
+                } else {
+                    let bank = try snapshot.withBytes {
+                        try CBQCurrentAccountPDFNormalizer().normalize(
+                            text: contents, sourceBytes: $0, fileURL: url
+                        )
+                    }
+                    normalization = (bank.document, bank.rows, bank.header, bank.sourceContext)
                 }
                 document = normalization.document
                 normalizedRows = normalization.rows
@@ -661,6 +673,12 @@ final class ImportEngine {
         )
         try Task.checkCancellation()
         developerConsole.info(.validation, "Validation completed", metadata: ["passed": validation.passed ? "true" : "false", "issues": "\(validation.issues.count)"])
+        if validation.passed {
+            try await importCoordinator.confirmSuccessfulPassword(
+                for: passwordRequest,
+                institutionCode: detection.metadata.institution.statementPasswordCredentialScope
+            )
+        }
 
         let importSession = ImportSession(
             fileName: document.filename,

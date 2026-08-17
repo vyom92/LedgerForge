@@ -23,6 +23,7 @@ final class StatementParserRegistry {
             HDFCBankAccountXLSParser(),
             CBQCurrentAccountPDFParser(),
             CBQCurrentAccountXLSParser(),
+            CBQCreditCardPDFParser(),
             AmericanExpressCreditCardPDFParser()
 
         ]

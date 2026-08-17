@@ -522,11 +522,11 @@ struct AmericanExpressPrivateAcceptanceTests {
                 throw PrivateAcceptanceError.productionMismatch
             }
             let sectionOrdinal: Int?
-            switch annotation.rowScope {
+            switch annotation.financialScope {
             case .accountLevel:
-                sectionOrdinal = nil
-            case .instrument(let sectionID):
-                sectionOrdinal = ordinalBySectionID[sectionID]
+                sectionOrdinal = annotation.documentScopedSectionID.flatMap { ordinalBySectionID[$0] }
+            case .instrument:
+                sectionOrdinal = annotation.documentScopedSectionID.flatMap { ordinalBySectionID[$0] }
             }
             return OracleRow(
                 sourceOrdinal: sourceOrdinal,

@@ -43,14 +43,30 @@ final class ImportValidator {
         let transactions = financialDocument.transactions
         var issues: [ValidationIssue] = []
         let currency = evidence.nativeCurrency
+        guard let contract = CardStatementProfileContract(reconciliationRuleIdentifier: evidence.reconciliationRuleIdentifier) else {
+            return ImportValidationResult(
+                rowsRead: transactions.count,
+                transactionsParsed: transactions.count,
+                statementCurrency: currency,
+                debitTotalMoney: nil,
+                creditTotalMoney: nil,
+                openingBalanceMoney: nil,
+                closingBalanceMoney: nil,
+                passed: false,
+                issues: [ValidationIssue(severity: .error, rowNumber: nil, message: "Card reconciliation contract is unsupported.")]
+            )
+        }
         let sectionIDs = Set(evidence.instrumentSections.map(\.documentScopedSectionID))
         let annotationsByID = Dictionary(
             uniqueKeysWithValues: evidence.transactionAnnotations.map { ($0.parserTransactionID, $0) }
         )
 
-        if financialDocument.metadata.documentType != .creditCard ||
+        if financialDocument.metadata.institution.rawValue != contract.institutionCode ||
+            financialDocument.metadata.documentType != .creditCard ||
+            financialDocument.metadata.fileFormat != .pdf ||
             financialDocument.bookedCurrency != currency ||
-            financialDocument.declaredStatementPeriod != evidence.declaredStatementPeriod {
+            financialDocument.declaredStatementPeriod != evidence.declaredStatementPeriod ||
+            evidence.statementDate != evidence.declaredStatementPeriod.end {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card statement metadata conflicts with parser evidence."))
         }
         if transactions.isEmpty || annotationsByID.count != transactions.count ||
@@ -60,8 +76,9 @@ final class ImportValidator {
 
         var increaseValues: [Money] = []
         var decreaseValues: [Money] = []
-        var instrumentIncreaseValues: [Money] = []
-        var instrumentDecreaseValues: [Money] = []
+        var instrumentValues: [Money] = []
+        var allValues: [Money] = []
+        var membershipValues: [CardTransactionSummaryMembership: [Money]] = [:]
         var sectionValues = Dictionary(uniqueKeysWithValues: sectionIDs.map { ($0, [Money]()) })
 
         for (index, transaction) in transactions.enumerated() {
@@ -81,13 +98,16 @@ final class ImportValidator {
                 transaction.cardLiabilityEffect != annotation.liabilityEffect ||
                 transaction.sourceProvenance.count != 1 ||
                 transaction.sourceProvenance[0].sourceTransactionDate != annotation.sourceTransactionDate ||
-                transaction.sourceProvenance[0].parserProfileID != AmericanExpressCreditCardPDFParser.profileID ||
-                transaction.sourceProvenance[0].parserProfileVersion != AmericanExpressCreditCardPDFParser.profileVersion {
+                transaction.sourceProvenance[0].sourceOrdinal != index + 1 ||
+                transaction.sourceProvenance[0].parserProfileID != contract.profileID ||
+                transaction.sourceProvenance[0].parserProfileVersion != contract.profileVersion {
                 issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Card row semantics or provenance are incomplete."))
             }
             if let original = annotation.originalMerchantMoney,
-               original.currency == currency {
-                issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Original merchant Money must represent non-statement currency."))
+               original.currency == currency ||
+                (annotation.liabilityEffect == .increasesAmountOwed && original.amount <= 0) ||
+                (annotation.liabilityEffect == .decreasesAmountOwed && original.amount >= 0) {
+                issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Original merchant Money is invalid for the card liability effect."))
             }
             let minor = try? transaction.money.minorUnits()
             switch annotation.liabilityEffect {
@@ -104,58 +124,73 @@ final class ImportValidator {
                     decreaseValues.append(positive)
                 }
             }
-            switch annotation.rowScope {
-            case .accountLevel:
-                break
-            case .instrument(let sectionID):
+            allValues.append(transaction.money)
+            if let membership = annotation.summaryMembership {
+                membershipValues[membership, default: []].append(transaction.money)
+            }
+            if let sectionID = annotation.documentScopedSectionID {
                 if !sectionIDs.contains(sectionID) {
-                    issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Card instrument row references an unknown document section."))
+                    issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Card row references an unknown structural source section."))
                 } else {
                     sectionValues[sectionID, default: []].append(transaction.money)
                 }
-                if annotation.liabilityEffect == .increasesAmountOwed {
-                    instrumentIncreaseValues.append(transaction.money)
-                } else if let positive = try? Money(amount: -transaction.money.amount, currency: currency) {
-                    instrumentDecreaseValues.append(positive)
+            }
+            switch annotation.financialScope {
+            case .accountLevel:
+                if contract.requiresCBQSummaryMembership,
+                   annotation.summaryMembership.map(contract.accountLevelMemberships.contains) != true {
+                    issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "CBQ account-level activity has invalid summary membership."))
+                }
+            case .instrument:
+                guard annotation.documentScopedSectionID != nil else {
+                    issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Card instrument activity is missing structural source membership."))
+                    continue
+                }
+                instrumentValues.append(transaction.money)
+                if contract.requiresCBQSummaryMembership,
+                   annotation.summaryMembership.map(contract.instrumentMemberships.contains) != true {
+                    issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "CBQ instrument activity has invalid summary membership."))
                 }
             }
         }
 
         let previous = evidence.summary(code: "previous_balance")?.money
-        let credits = evidence.summary(code: "new_credits")?.money
-        let debits = evidence.summary(code: "new_debits")?.money
         let newBalance = evidence.summary(code: "new_balance")?.money
         let dueDate = evidence.summary(code: "due_date")?.date
-        let instrumentTotal = evidence.summary(code: "instrument_net_total")?.money
-        let summaryMoney = [previous, credits, debits, newBalance, instrumentTotal]
-        if dueDate == nil || summaryMoney.contains(where: { $0 == nil }) ||
-            summaryMoney.compactMap({ $0 }).contains(where: { $0.currency != currency }) ||
-            evidence.reconciliationRuleIdentifier != CardStatementEvidence.amexQARReconciliationRule {
-            issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Amex summary components are incomplete or contradictory."))
+        if dueDate == nil || previous == nil || newBalance == nil ||
+            evidence.summaryComponents.compactMap(\.money).contains(where: { $0.currency != currency }) ||
+            Set(evidence.summaryComponents.map(\.persistenceCode)) != contract.requiredSummaryCodes {
+            issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card summary components are incomplete or contradictory."))
+        }
+        if evidence.accountSourceIdentityObservations.count != 1 ||
+            evidence.accountSourceIdentityObservations.first?.kind.rawValue != contract.accountObservationKindCode ||
+            evidence.accountSourceIdentityObservations.first?.subject != .liabilityAccount ||
+            evidence.instrumentSections.contains(where: { section in
+                section.reconciliationRuleIdentifier != contract.sectionRule ||
+                    section.sourceIdentityObservations.count != 1 ||
+                    section.sourceIdentityObservations.first?.kind.rawValue != contract.instrumentObservationKindCode ||
+                    section.sourceIdentityObservations.first?.subject != .instrument
+            }) {
+            issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card source identity or section evidence is incompatible with its exact profile."))
         }
 
         let increaseTotal = try? moneySum(increaseValues, currency: currency)
         let decreaseTotal = try? moneySum(decreaseValues, currency: currency)
-        let instrumentIncreaseTotal = try? moneySum(instrumentIncreaseValues, currency: currency)
-        let instrumentDecreaseTotal = try? moneySum(instrumentDecreaseValues, currency: currency)
-        if let previous, let credits, let debits, let newBalance,
-           let expected = try? (try previous - credits) + debits,
-           expected != newBalance {
-            issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Amex statement summary does not reconcile."))
-        }
-        if let debits, increaseTotal != debits {
-            issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card increases do not equal printed New Debits."))
-        }
-        if let credits, decreaseTotal != credits {
-            issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card decreases do not equal printed New Credits."))
-        }
-        if let instrumentTotal,
-           let instrumentIncreaseTotal,
-           let instrumentDecreaseTotal,
-           let calculated = try? instrumentIncreaseTotal - instrumentDecreaseTotal,
-           calculated != instrumentTotal {
-            issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card instrument rows do not equal the printed instrument total."))
-        }
+        let instrumentTotal = try? moneySum(instrumentValues, currency: currency)
+        let allRowsTotal = try? moneySum(allValues, currency: currency)
+        validateSummary(
+            contract: contract,
+            evidence: evidence,
+            previous: previous,
+            newBalance: newBalance,
+            increaseTotal: increaseTotal,
+            decreaseTotal: decreaseTotal,
+            instrumentTotal: instrumentTotal,
+            allRowsTotal: allRowsTotal,
+            membershipValues: membershipValues,
+            currency: currency,
+            issues: &issues
+        )
         for section in evidence.instrumentSections {
             guard let values = sectionValues[section.documentScopedSectionID], !values.isEmpty,
                   let calculated = try? moneySum(values, currency: currency),
@@ -163,6 +198,11 @@ final class ImportValidator {
                 issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card instrument section does not equal its printed signed total."))
                 continue
             }
+        }
+        let sectionsTotal = try? moneySum(evidence.instrumentSections.map(\.signedNetTotal), currency: currency)
+        let expectedSectionCoverage = contract == .amex ? instrumentTotal : allRowsTotal
+        if sectionsTotal != expectedSectionCoverage {
+            issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card structural sections do not cover the exact source financial rows."))
         }
 
         return ImportValidationResult(
@@ -176,6 +216,73 @@ final class ImportValidator {
             passed: issues.isEmpty,
             issues: issues
         )
+    }
+
+    private static func validateSummary(
+        contract: CardStatementProfileContract,
+        evidence: CardStatementEvidence,
+        previous: Money?,
+        newBalance: Money?,
+        increaseTotal: Money?,
+        decreaseTotal: Money?,
+        instrumentTotal: Money?,
+        allRowsTotal: Money?,
+        membershipValues: [CardTransactionSummaryMembership: [Money]],
+        currency: CurrencyCode,
+        issues: inout [ValidationIssue]
+    ) {
+        func component(_ code: String) -> Money? { evidence.summary(code: code)?.money }
+        func total(_ membership: CardTransactionSummaryMembership, magnitude: Bool = false) -> Money? {
+            let values = membershipValues[membership, default: []]
+            let normalized = magnitude ? values.compactMap { try? Money(amount: abs($0.amount), currency: currency) } : values
+            return try? moneySum(normalized, currency: currency)
+        }
+        let mismatch: Bool
+        switch contract {
+        case .amex:
+            let credits = component("new_credits")
+            let debits = component("new_debits")
+            let printedInstrument = component("instrument_net_total")
+            let expected: Money?
+            if let previous, let credits, let debits {
+                expected = try? (try previous - credits) + debits
+            } else {
+                expected = nil
+            }
+            mismatch = expected != newBalance || increaseTotal != debits || decreaseTotal != credits || instrumentTotal != printedInstrument
+        case .cbqV1:
+            let billed = component("amount_billed")
+            let payment = component("payment_received")
+            let sectionNet = component("source_section_net_total")
+            let expected: Money?
+            if let previous, let billed, let payment {
+                expected = try? (try previous + billed) - payment
+            } else {
+                expected = nil
+            }
+            mismatch = expected != newBalance || total(.cbqV1AmountBilled) != billed ||
+                total(.cbqV1PaymentReceived, magnitude: true) != payment || allRowsTotal != sectionNet
+        case .cbqV2:
+            let payment = component("total_payment")
+            let credit = component("credit_reversal")
+            let purchases = component("purchases")
+            let installment = component("billed_installment")
+            let fees = component("fees_charges")
+            let sectionNet = component("source_section_net_total")
+            let expected: Money?
+            if let previous, let payment, let credit, let purchases, let installment, let fees {
+                expected = try? (try (try (try (try previous - payment) - credit) + purchases) + installment) + fees
+            } else {
+                expected = nil
+            }
+            mismatch = expected != newBalance || total(.cbqV2TotalPayment, magnitude: true) != payment ||
+                total(.cbqV2CreditReversal, magnitude: true) != credit || total(.cbqV2Purchases) != purchases ||
+                total(.cbqV2BilledInstallment) != installment || total(.cbqV2FeesCharges) != fees ||
+                allRowsTotal != sectionNet
+        }
+        if mismatch {
+            issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card statement summary does not reconcile under its exact profile contract."))
+        }
     }
 
     static func validate(transactions: [Transaction]) -> ImportValidationResult {

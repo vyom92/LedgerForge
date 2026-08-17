@@ -27,6 +27,7 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
             .americanExpressPlatinumQARPDF,
             .hdfcBankAccountPDF,
             .hdfcBankAccountXLS,
+            .cbqCreditCardPDF,
             .cbqCurrentAccountMonthlyPDF,
             .cbqCurrentAccountHistoryPDF,
             .cbqCurrentAccountXLS,
@@ -206,6 +207,29 @@ struct InstitutionDetectionRule: Equatable, Sendable {
                 token: "DATE DETAILS AMOUNT BALANCE",
                 reason: "Matched the exact CBQ current-account transaction header."
             )
+        ]
+    )
+
+    static let cbqCreditCardPDF = InstitutionDetectionRule(
+        institution: .cbq,
+        documentType: .creditCard,
+        confidence: 0.99,
+        requiredMatchCount: 5,
+        signatures: [
+            InstitutionSignature(
+                token: "CARD ACCOUNT REFERENCE",
+                reason: "Matched the exact CBQ card-account reference label."
+            ),
+            InstitutionSignature(
+                token: "CARD NUMBER CARD HOLDER NAME PRODUCT CARD LIMIT",
+                reason: "Matched the exact CBQ companion-card header."
+            ),
+            InstitutionSignature(
+                token: "POST DATE PURCHASE DATE DESCRIPTION & REFERANCE FOREIGN CURRENCY AMOUNT IN QAR",
+                reason: "Matched the exact CBQ card transaction header."
+            ),
+            InstitutionSignature(token: "DINERS CLUB", reason: "Matched the Diners companion section."),
+            InstitutionSignature(token: "MASTERCARD PLATINUM", reason: "Matched the Mastercard companion section.")
         ]
     )
 

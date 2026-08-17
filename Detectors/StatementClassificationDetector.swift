@@ -109,9 +109,12 @@ struct StatementClassificationRule: Equatable, Sendable {
             StatementClassificationSignature(token: "CREDIT CARD", reason: "Matched credit card statement phrase."),
             StatementClassificationSignature(token: "MINIMUM AMOUNT DUE", reason: "Matched minimum amount due label."),
             StatementClassificationSignature(token: "PAYMENT DUE DATE", reason: "Matched payment due date label."),
-            StatementClassificationSignature(token: "TOTAL AMOUNT DUE", reason: "Matched total amount due label.")
+            StatementClassificationSignature(token: "TOTAL AMOUNT DUE", reason: "Matched total amount due label."),
+            StatementClassificationSignature(token: "CARD ACCOUNT REFERENCE", reason: "Matched the CBQ card-account reference label."),
+            StatementClassificationSignature(token: "CARD NUMBER CARD HOLDER NAME PRODUCT CARD LIMIT", reason: "Matched the CBQ companion-card header."),
+            StatementClassificationSignature(token: "POST DATE PURCHASE DATE DESCRIPTION & REFERANCE FOREIGN CURRENCY AMOUNT IN QAR", reason: "Matched the CBQ card transaction header.")
         ],
-        supportingInstitutionCodes: [Institution.amex.rawValue]
+        supportingInstitutionCodes: [Institution.amex.rawValue, Institution.cbq.rawValue]
     )
 }
 

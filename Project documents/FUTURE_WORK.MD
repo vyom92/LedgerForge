@@ -62,7 +62,7 @@ A work item becomes executable only when Chat supplies one complete approved pro
 **Candidate entries reviewed:** 155  
 **Fresh build/test/runtime evidence:** Sprint 65 focused, complete-TestPlan, build, Release-containment and signed-app private-pair evidence is recorded in `PROJECT_STATE.md`.
 
-**Current alignment — 2026-08-17:** The 2026-08-01 155-candidate audit above is retained as historical and was not rerun. Sprint 76A is the current production implementation in this commit; the exact ref is recorded by Git history. Sprint 73A was test-only; amended ADR-044 and Migration V13 are current. Current implementation truth belongs to `PROJECT_STATE.md`.
+**Current alignment — 2026-08-17:** The 2026-08-01 155-candidate audit above is retained as historical and was not rerun. Sprint 77 is the current production implementation in this commit; the exact ref is recorded by Git history. Sprint 73A was test-only; amended ADR-044 and Migration V14 are current. Current implementation truth belongs to `PROJECT_STATE.md`.
 
 **Current alignment — Axis source-truth restoration:** the Git-authoritative repository state is newer than this audit baseline. `PROJECT_STATE.md` records the active `axis.bank-account.csv@2` conventional direction contract and the suspension of provenance-less mixed partial overlap.
 
@@ -594,10 +594,10 @@ original pairs remain the financial acceptance authority.
 
 ## FW-P1-03 — CBQ Parser Family
 
-**Status:** Current-account family completed for the exact three-profile boundary; card and broader-layout work remains
-**Fixture state:** Self-contained synthetic mechanics fixtures cover exact current-account history XLS, history PDF and monthly PDF profiles. Separate clean-room CBQ card evidence remains discovery-only.
-**Completed boundary:** Sprint 74 added `cbq.current-account.xls@1`. Sprint 75 adds `cbq.current-account.history.pdf@1` and `cbq.current-account.monthly.pdf@1` plus ADR-043 exact reviewed multi-source lineage, typed masked/full CBQ account compatibility, Migration V11 source observations, SQLite/In-Memory parity, hydration/relaunch and preferred source-evidence presentation. The three sources may arrive in any order without duplicating one real transaction.
-**Remaining boundary:** The CBQ card family remains separate and depends on the concrete card contract under `FW-P1-09`. Generic or changed CBQ layouts, XLSX, OCR, locked/image-only PDFs, generic masked identity, generic partial matching and any additional CBQ source family remain unsupported.
+**Status:** Exact three-profile current-account family and exact credit-card PDF v1/v2 family completed; broader-layout work remains
+**Fixture state:** Self-contained synthetic mechanics fixtures cover exact current-account history XLS, history PDF and monthly PDF profiles plus the exact CBQ card v1/v2 mechanics. Private originals remain the card financial authority.
+**Completed boundary:** Sprint 74 added `cbq.current-account.xls@1`. Sprint 75 added `cbq.current-account.history.pdf@1` and `cbq.current-account.monthly.pdf@1` plus ADR-043 exact reviewed multi-source lineage. Sprint 77 separately adds `cbq.credit-card.pdf@1` with deterministic v1/v2 layout provenance, encrypted-source unlock, typed card observations, family reconciliation, Migration V14, shared-card provider parity and hydration. Bank and card families remain independent.
+**Remaining boundary:** Generic or changed CBQ bank/card layouts, XLSX, OCR, image-only PDFs, generic masked identity, generic partial matching, card semantic equivalence and any additional CBQ source family remain unsupported.
 
 Keep independent CBQ families:
 
@@ -614,18 +614,18 @@ Targeted discovery must not combine them merely because the institution is share
 - card-specific validation/persistence dependencies where applicable;
 - independent financial and source-provenance oracles.
 
-Fixture availability makes remaining families discoverable. Production
-current-account support remains limited to the exact three Sprint 74/75
-profiles and ADR-043 boundary above.
+Fixture availability makes remaining families discoverable. Production support
+remains limited to the exact three Sprint 74/75 current-account profiles under
+ADR-043 and the separate Sprint 77 card profile under ADR-044.
 
 ---
 
 ## FW-P1-04 — Additional Credit-Card Parser Families
 
-**Status:** Ready for discovery  
+**Status:** Partially completed; remaining families are ready for discovery
 **Fixture state:** Clean-room American Express, CBQ and Axis card fixture families are integrated.  
-**Completed boundary:** Sprint 76A accepts only exact native-text `amex.credit-card.pdf@1` under ADR-044, including ordered multi-instrument sections, encrypted-source unlock and institution-scoped Keychain reuse, exact byte-distinct semantic-source grouping, card-aware validation, Migration V13, provider parity, hydration/relaunch and bounded presentation.
-**Remaining boundary:** CBQ card, Axis card, other American Express layouts and every other issuer/layout require separate source truth, exact profile, parser and acceptance authority. The shared Sprint 76 domain does not make them production-supported.
+**Completed boundary:** Sprint 76A accepts exact native-text `amex.credit-card.pdf@1` under ADR-044, including ordered multi-instrument sections, encrypted-source unlock and institution-scoped Keychain reuse, exact byte-distinct semantic-source grouping, card-aware validation, Migration V13, provider parity, hydration/relaunch and bounded presentation. Sprint 77 adds exact encrypted `cbq.credit-card.pdf@1` v1/v2 through the same shared card domain with Migration V14 and source-byte duplicate authority.
+**Remaining boundary:** Axis card, HDFC card, other American Express/CBQ layouts and every other issuer/layout require separate source truth, exact profile, parser and acceptance authority. The shared domain does not make them production-supported.
 
 Future discovery should compare the strongest remaining fixture/source-backed options rather than select by issuer label alone.
 
@@ -640,7 +640,7 @@ Each remaining family requires:
 - explicit exclusion of unsupported universal card assumptions.
 
 No additional parser family may claim production support from fixtures,
-classification, the V13 schema or the shared Sprint 76A domain alone.
+classification, the V14 schema or the shared card domain alone.
 
 ---
 
@@ -739,18 +739,18 @@ The original source structure and every user-approved mapping must remain inspec
 
 ## FW-P1-09 — Credit-Card Financial Semantics Foundation
 
-**Status:** Partially completed by Sprint 76A; remaining semantics are future work
+**Status:** Partially completed through Sprint 77; remaining semantics are future work
 **Discovery:** Shared cross-family semantic discovery is complete.  
 **Architecture:** ADR-034 is implemented/refined by accepted ADR-044 for the completed boundary.
-**Completed boundary:** Shared liability-account/card-instrument separation, ordered document-scoped instrument sections, card-specific liability effects, masked source observations without strong-identity promotion, explicit instrument relationships/lifecycle authority, exact Amex semantic-source grouping, Migration V13, provider-owned atomic commit, SQLite/In-Memory parity, hydration/relaunch, newest-source-date balance authority and bounded presentation are implemented for exact `amex.credit-card.pdf@1`.
+**Completed boundary:** Shared liability-account/card-instrument separation, independent financial scope and physical source-section membership, card-specific liability effects, typed source observations without weak-evidence promotion, explicit instrument relationships/lifecycle authority, exact family reconciliation, Migration V14, provider-owned atomic commit, SQLite/In-Memory parity, hydration/relaunch, newest-source-date balance authority and bounded presentation are implemented for exact `amex.credit-card.pdf@1` and `cbq.credit-card.pdf@1`. Exact semantic-source grouping remains Amex-only.
 
-The initial production card foundation is complete for the exact Sprint 76A
-profile. It preserves:
+The production card foundation is complete for the exact Sprint 76A Amex and
+Sprint 77 CBQ profiles. It preserves:
 
 - authoritative posted statement amount and currency;
 - source-proven effect on amount owed without bank debit/credit reuse;
-- account-level versus instrument-level row scope;
-- document-scoped instrument-section identity;
+- account-level versus instrument-level financial scope;
+- independent document-scoped physical section membership;
 - optional original merchant amount and currency;
 - exact account/instrument source observations and durable user-confirmed mappings;
 - source-specific statement-summary and reconciliation components.
@@ -762,7 +762,7 @@ historical repair/backfill and any generic card profile or masked-identity
 framework. Each requires its own approved authority; absence is not inferred.
 
 Sprint 75's completed CBQ current-account source-lineage work remains separate
-from card semantics and does not generalize ADR-043 to CBQ cards. Sprint 73's
+from Sprint 77 card semantics and does not generalize ADR-043 to CBQ cards. Sprint 73's
 exact whole-statement HDFC contract also does not authorize card overlap.
 
 Card-liability effects remain separate from bank-account debit/credit semantics.
@@ -770,8 +770,9 @@ Missing rates, fees, taxes, aggregates or other evidence must not be invented.
 Payment allocation, rewards accounting, reversal matching and universal card
 taxonomy remain excluded from the completed boundary.
 
-Do not claim card support beyond exact `amex.credit-card.pdf@1` from fixture
-integration, schema capacity, classification or parser candidates.
+Do not claim card support beyond exact `amex.credit-card.pdf@1` and
+`cbq.credit-card.pdf@1` from fixture integration, schema capacity,
+classification or parser candidates.
 
 ---
 
@@ -791,9 +792,9 @@ Retain future work for other Axis PDF layouts, OCR, password-protected PDFs, gen
 
 ## FW-P1-11 — Password-Protected PDF Support
 
-**Status:** Partially completed by Sprint 76A for exact encrypted `amex.credit-card.pdf@1`
-**Completed boundary:** The shared coordinator retries bounded remembered candidates and secure user input against the same immutable source snapshot. The PDF reader owns only unlock/native-text extraction and hands exact page boundaries to Amex normalization in memory without creating decrypted PDF files or reconstructed source bytes.
-**Remaining boundary:** Other institutions, other Amex layouts, arbitrary encrypted PDFs, owner-password/permissions variants, OCR and generic encrypted-document support require separate exact source and acceptance authority.
+**Status:** Partially completed through Sprint 77 for exact encrypted Amex and CBQ credit-card profiles
+**Completed boundary:** The shared coordinator retries bounded remembered candidates and secure user input against the same immutable source snapshot. The PDF reader owns only unlock/native-text extraction and hands exact page boundaries to approved Amex/CBQ normalization in memory without creating decrypted PDF files or reconstructed source bytes.
+**Remaining boundary:** Other institutions, other Amex/CBQ layouts, Axis/HDFC/CBQ-bank and investment password proof, arbitrary encrypted PDFs, owner-password/permissions variants, OCR and generic encrypted-document support require separate exact source and acceptance authority.
 
 Readers must not access UI prompts, Keychain or institution-specific password policy directly.
 
@@ -801,8 +802,8 @@ Readers must not access UI prompts, Keychain or institution-specific password po
 
 ## FW-P1-12 — Secure Institution Password Storage
 
-**Status:** Completed by Sprint 76A for the accepted personal-v1 institution credential boundary
-**Completed boundary:** A namespaced macOS generic-password item stores one current statement password per proven institution. Persistence occurs only after successful unlock and authoritative institution detection. Production passwords do not enter SQLite, source evidence or diagnostics; deterministic tests use an in-memory store and the bounded real-Keychain smoke test removes its unique synthetic item.
+**Status:** Completed through Sprint 77 for the accepted personal-v1 institution credential boundary
+**Completed boundary:** A namespaced macOS generic-password item stores one current statement password per proven institution. Exact Amex and CBQ card profiles are proven production consumers. Persistence occurs only after successful unlock and authoritative supported-profile parsing/validation. Production passwords do not enter SQLite, source evidence or diagnostics; deterministic tests use injected/in-memory stores and bounded real-Keychain smoke tests remove their unique fictional items.
 **Remaining boundary:** Generic credential profiles, cloud synchronization, password-pattern derivation and broader encrypted-document support are not authorized.
 
 Store institution-specific credentials using macOS Keychain.
@@ -820,8 +821,8 @@ The completed boundary preserves:
 
 ## FW-P1-13 — Per-File Password Override and Entry
 
-**Status:** Partially completed by Sprint 76A
-**Completed boundary:** When no remembered candidate unlocks an exact supported PDF, the existing-style secure challenge accepts a replacement credential. The replacement overwrites the institution item only after successful unlock and authoritative institution detection; cancellation and failed candidates are discarded.
+**Status:** Partially completed through Sprint 77
+**Completed boundary:** When no remembered candidate unlocks an exact supported PDF, the existing-style secure challenge accepts a replacement credential. The replacement overwrites the institution item only after successful unlock and authoritative supported-profile parsing/validation; cancellation, failed candidates and unsupported unlocked content are discarded. Exact Amex and CBQ card profiles are proven consumers.
 **Remaining boundary:** A separate use-once preference, arbitrary per-file credential profiles and generic override policy are not implemented. The accepted personal-v1 product decision remembers the successfully proven institution password without a preference maze.
 
 Readers and institution parsers remain unaware of the UI and storage policy.
@@ -1681,11 +1682,11 @@ Profiling output must remain separate from financial truth and must not retain s
 ## FW-P2-61 — Institution, Layout and Format Regression Matrix
 
 **Status:** Ready for discovery
-**Dependency now satisfied by:** Exact Axis CSV/PDF/XLS, exact HDFC PDF/XLS and exact CBQ current-account XLS/history-PDF/monthly-PDF production families.
+**Dependency now satisfied by:** Exact Axis CSV/PDF/XLS, exact HDFC PDF/XLS, exact CBQ current-account XLS/history-PDF/monthly-PDF and exact Amex/CBQ card PDF production families.
 
 Create a systematic regression matrix across the current exact supported institution, layout and format families.
 
-The integrated HDFC card, CBQ card and other card fixtures may inform future discovery, but fixture presence alone does not establish card production support. Sprint 73 HDFC and Sprint 75 CBQ mechanics fixtures are regression evidence only; private-original acceptance remains the source authority.
+The integrated HDFC, Axis and other unsupported card fixtures may inform future discovery, but fixture presence alone does not establish card production support. Exact Amex and CBQ card production boundaries remain limited to their approved private-source authority.
 
 INR and QAR now provide two exact production currency paths. Include their
 native-currency regression boundary in this matrix; do not create a separate
