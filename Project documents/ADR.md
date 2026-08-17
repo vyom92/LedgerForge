@@ -26,12 +26,12 @@ When reading this file:
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
 **Status alignment date:** 2026-08-17
-**Repository implementation ref reviewed:** `main` — Sprint 76 implementation in this commit; the exact ref is recorded by Git history
-**Latest verified production implementation:** Sprint 76 — Shared Credit-Card Domain and Exact American Express PDF Support
+**Repository implementation ref reviewed:** `main` — Sprint 76A implementation in this commit; the exact ref is recorded by Git history
+**Latest verified production implementation:** Sprint 76A — Multi-Instrument Amex, Encrypted PDF, Currency and Semantic-Duplicate Hardening
 **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`
-**Latest completed numbered outcome:** Sprint 76
+**Latest completed numbered outcome:** Sprint 76A
 **Latest accepted ADR:** ADR-044
-**Current migration:** V12
+**Current migration:** V13
 
 No alignment note authorizes implementation.
 
@@ -53,7 +53,7 @@ No alignment note authorizes implementation.
 | ADR-012 | Separation of Readers and Parsers | Accepted and implemented. | Readers own extraction; parsers own financial interpretation. |
 | ADR-013 | Store Ownership | Accepted, refined by ADR-024. | Dedicated stores own runtime domain state. |
 | ADR-014 | Document-First Architecture | Accepted product direction. | Document-oriented extraction and classification foundations exist. |
-| ADR-015 | Automatic Password Management | Accepted product and architecture direction; production workflow not implemented. | PasswordProvider and locked-reader protocol foundations exist. |
+| ADR-015 | Automatic Password Management | Accepted and implemented for the exact Sprint 76A encrypted American Express PDF boundary. | Bounded remembered credentials, secure replacement input and institution-scoped Keychain persistence are operational; broader encrypted-document support remains outside the accepted boundary. |
 | ADR-016 | Universal Import Pipeline | Accepted, superseded in part by ADR-030, ADR-031, ADR-032, ADR-038 and ADR-039. | The unified pipeline remains authoritative, but its current ordering and persistence boundary have changed. |
 | ADR-017 | Deterministic Before Intelligent | Accepted foundational principle. | Deterministic processing remains mandatory at trusted boundaries. |
 | ADR-018 | Unified Import Framework Operational | Accepted and implemented in Sprint 11C. | CSV entered the unified framework. |
@@ -71,7 +71,7 @@ No alignment note authorizes implementation.
 | ADR-030 | Versioned Exact-Content Fingerprints and Atomic Import-History Commit | Accepted and implemented in Sprint 39; persistence/concurrency limitations superseded in part by ADR-038 implementation. | ledgerforge.raw-text.sha256.v1 remains the exact reader-text authority. |
 | ADR-031 | Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking | Accepted and implemented in Sprint 41; concurrency boundary extended by ADR-038 implementation. | ledgerforge.transaction-event.axis-upi-reference.v1 remains limited to approved account-scoped Axis UPI evidence. |
 | ADR-032 | Durable Import Attempt History and Rejected-Outcome Semantics | Accepted and implemented in Sprint 42; atomicity limitation superseded by ADR-038 implementation. | Durable attempts remain distinct from accepted import sessions. |
-| ADR-033 | Deterministic Money and Native-Currency Integrity | Accepted and implemented in Sprint 44. | Money, compiled catalog authority, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation are operational. |
+| ADR-033 | Deterministic Money and Native-Currency Integrity | Accepted and implemented in Sprint 44; the catalog authority was extended in Sprint 76A. | Money, `ledgerforge.currency-catalog.v2` with 155 active ordinary ISO-backed currencies, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation are operational. |
 | ADR-034 | Document-Scoped Card Statement Evidence | Accepted and implemented for the exact Sprint 76 American Express profile; refined by ADR-044. | The document-scoped evidence boundary is operational for `amex.credit-card.pdf@1`; no generic card-family support follows. |
 | ADR-035 | Development Database Lifecycle and Recoverable Reset | Accepted and implemented in Sprint 45 Phase A; expanded by DBP-01 on 2026-07-29. | Four DEBUG-only profiles, lifecycle-owned observer-atomic switching and reset, non-current warnings and generation-scoped protected-action acknowledgement are operational; all profile machinery is absent from Release. |
 | ADR-036 | Category Identity, Assignment, and Mutable Transaction Metadata | Accepted and implemented in Sprint 57; reconciliation closure aligned 2026-07-26. | Flat durable categories, current assignments, canonical hydration and category-specific reconciliation blocking/retry are operational; hierarchy and parent selection remain deferred. |
@@ -82,7 +82,7 @@ No alignment note authorizes implementation.
 | ADR-041 | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority | Accepted and implemented in Sprint 63. | Immutable source snapshots and exact source-byte fingerprint authority are operational for supported CSV, PDF and XLS imports. |
 | ADR-042 | Exact Cross-Format Statement Equivalence and Supporting-Source Persistence | Accepted and implemented in Sprint 73. | Exact whole-statement equivalence is operational only for the independently approved HDFC bank-account PDF/XLS v1 pair. |
 | ADR-043 | Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts | Accepted and implemented in Sprint 75. | Exact CBQ history XLS, history PDF and monthly PDF sources coexist through bounded masked/full account resolution and one canonical transaction with durable per-source observations. |
-| ADR-044 | Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence | Accepted and implemented in Sprint 76. | A shared provider-owned card domain, Migration V12 and exact `amex.credit-card.pdf@1` support preserve liability effects, account/instrument identity, statement evidence and newest-source-date balance authority. |
+| ADR-044 | Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence | Accepted and implemented in Sprint 76; amended and implemented in Sprint 76A. | The shared provider-owned card domain, Migration V13, ordered multi-section evidence and exact Amex semantic-source grouping preserve liability effects, account/instrument identity, statement evidence and newest-source-date balance authority. |
 
 ## Alignment Policy
 
