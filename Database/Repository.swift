@@ -218,6 +218,11 @@ public protocol AccountRepository {
     func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String
     func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO]
     func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String]
+    func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO]
+}
+
+public extension AccountRepository {
+    func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO] { [] }
 }
 
 public protocol ImportSessionRepository {
@@ -234,6 +239,8 @@ public protocol ImportSessionRepository {
     func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO]
     func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO]
     func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO]
+    func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO]
+    func cbqSourceObservationSummaries(workspaceId: String) throws -> [CBQSourceObservationSummaryDTO]
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult
 }
 
@@ -243,6 +250,8 @@ public extension ImportSessionRepository {
     func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO] { [] }
     func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO] { [] }
     func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] { [] }
+    func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO] { [] }
+    func cbqSourceObservationSummaries(workspaceId: String) throws -> [CBQSourceObservationSummaryDTO] { [] }
 }
 
 /// This deliberately does not expose a generic transaction closure. Providers
@@ -252,12 +261,17 @@ public protocol ConfirmedImportRepository {
     func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult
     func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult
     func commitReviewedPartialImport(_ plan: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult
+    func reviewCBQSourceOverlap(_ plan: ConfirmedImportPlanDTO) -> CBQSourceOverlapReviewResult
+    func commitReviewedCBQSourceOverlap(_ plan: ReviewedCBQSourceOverlapPlanDTO) -> ConfirmedImportRepositoryResult
 }
 
 public extension ConfirmedImportRepository {
     func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult {
         .notApplicable
     }
+
+    func reviewCBQSourceOverlap(_ plan: ConfirmedImportPlanDTO) -> CBQSourceOverlapReviewResult { .notApplicable }
+    func commitReviewedCBQSourceOverlap(_ plan: ReviewedCBQSourceOverlapPlanDTO) -> ConfirmedImportRepositoryResult { .persistenceUnavailable }
 }
 
 public struct PartialImportSessionUpdate {
@@ -429,6 +443,7 @@ private struct GenerationCheckedAccountRepository: AccountRepository {
     func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String { try validity.check(); return try base.attachIdentifier(identifier) }
     func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO] { try validity.check(); return try base.identifiers(accountId: accountId, workspaceId: workspaceId) }
     func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String] { try validity.check(); return try base.accountIds(workspaceId: workspaceId, scheme: scheme, identifier: identifier) }
+    func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO] { try validity.check(); return try base.cbqSourceIdentityRecords(workspaceId: workspaceId) }
 }
 
 private struct GenerationCheckedImportSessionRepository: ImportSessionRepository {
@@ -447,6 +462,8 @@ private struct GenerationCheckedImportSessionRepository: ImportSessionRepository
     func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO] { try validity.check(); return try base.statementFinancialProjections(workspaceId: workspaceId) }
     func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO] { try validity.check(); return try base.statementEquivalenceGroups(workspaceId: workspaceId) }
     func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] { try validity.check(); return try base.statementEquivalenceMembers(workspaceId: workspaceId) }
+    func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO] { try validity.check(); return try base.preferredTransactionSources(workspaceId: workspaceId) }
+    func cbqSourceObservationSummaries(workspaceId: String) throws -> [CBQSourceObservationSummaryDTO] { try validity.check(); return try base.cbqSourceObservationSummaries(workspaceId: workspaceId) }
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult { try validity.check(); return try base.commitImportHistory(payload) }
 }
 
@@ -490,6 +507,17 @@ private struct GenerationCheckedConfirmedImportRepository: ConfirmedImportReposi
         } catch {
             return .staleProviderGeneration
         }
+    }
+
+
+    func reviewCBQSourceOverlap(_ plan: ConfirmedImportPlanDTO) -> CBQSourceOverlapReviewResult {
+        do { try validity.check(); return base.reviewCBQSourceOverlap(plan) }
+        catch { return .repositoryIntegrityConflict }
+    }
+
+    func commitReviewedCBQSourceOverlap(_ plan: ReviewedCBQSourceOverlapPlanDTO) -> ConfirmedImportRepositoryResult {
+        do { try validity.check(); return base.commitReviewedCBQSourceOverlap(plan) }
+        catch { return .staleProviderGeneration }
     }
 }
 
@@ -568,6 +596,7 @@ struct PlaceholderAccountRepo: AccountRepository {
     func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String] {
         throw RepositoryError.persistenceUnavailable
     }
+    func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO] { throw RepositoryError.persistenceUnavailable }
 }
 
 struct PlaceholderImportSessionRepo: ImportSessionRepository {
@@ -614,4 +643,7 @@ public struct PlaceholderConfirmedImportRepo: ConfirmedImportRepository {
     public func commitReviewedPartialImport(_ plan: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult {
         .persistenceUnavailable
     }
+
+    public func reviewCBQSourceOverlap(_ plan: ConfirmedImportPlanDTO) -> CBQSourceOverlapReviewResult { .repositoryIntegrityConflict }
+    public func commitReviewedCBQSourceOverlap(_ plan: ReviewedCBQSourceOverlapPlanDTO) -> ConfirmedImportRepositoryResult { .persistenceUnavailable }
 }

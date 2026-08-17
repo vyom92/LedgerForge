@@ -26,12 +26,12 @@ When reading this file:
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
 **Status alignment date:** 2026-08-17
-**Repository implementation ref reviewed:** main@31d493e421869d6a825aa2db576f82c2be3bdb68 — Sprint 73 accepted implementation
-**Latest verified production implementation:** Sprint 73 — Exact HDFC PDF v1 and Whole-Statement Cross-Format Equivalence
+**Repository implementation ref reviewed:** `main` — Sprint 75 implementation in this commit; the exact ref is recorded by Git history
+**Latest verified production implementation:** Sprint 75 — Exact CBQ Current-Account PDF Variants and Multi-Source Lineage
 **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`
-**Latest completed numbered outcome:** Sprint 73
-**Latest accepted ADR:** ADR-042
-**Current migration:** V10
+**Latest completed numbered outcome:** Sprint 75
+**Latest accepted ADR:** ADR-043
+**Current migration:** V11
 
 No alignment note authorizes implementation.
 
@@ -49,7 +49,7 @@ No alignment note authorizes implementation.
 | ADR-008 | Multi-Currency Domain Model | Accepted and extended by ADR-033. | The Money/native-currency foundation was implemented in Sprint 44 without a migration. |
 | ADR-009 | Reactive Store Architecture | Accepted, refined by ADR-024. | Stores own observable runtime state. |
 | ADR-010 | Validation Before Persistence | Accepted, refined by ADR-032, ADR-038 and ADR-039. | Validation remains mandatory before accepted persistence. |
-| ADR-011 | Unified FinancialDocument Pipeline | Accepted architectural direction. | Current production support remains limited to the approved shared Axis bank-account CSV grammar. |
+| ADR-011 | Unified FinancialDocument Pipeline | Accepted architectural direction. | Exact supported Axis, HDFC and CBQ bank-account profiles use the shared pipeline; no generic institution or layout support is implied. |
 | ADR-012 | Separation of Readers and Parsers | Accepted and implemented. | Readers own extraction; parsers own financial interpretation. |
 | ADR-013 | Store Ownership | Accepted, refined by ADR-024. | Dedicated stores own runtime domain state. |
 | ADR-014 | Document-First Architecture | Accepted product direction. | Document-oriented extraction and classification foundations exist. |
@@ -63,7 +63,7 @@ No alignment note authorizes implementation.
 | ADR-022 | Preview Compatibility During Test Builds | Accepted and implemented as a toolchain-compatibility decision. | Historical Sprint 18 build compatibility evidence remains valid for that toolchain. |
 | ADR-023 | Frozen UI/UX Architecture | Accepted and implemented. | The frozen UI/UX hierarchy remains authoritative. |
 | ADR-024 | Repository Hydration Boundary | Accepted and implemented. | RepositoryStoreHydrator is the sole persistence-to-runtime boundary. |
-| ADR-025 | Stable Financial Entity Identity | Accepted and implemented, then extended by ADR-027, ADR-029, ADR-038 and ADR-039. | Stable account identity, parser-owned identifiers, deterministic resolution, durable ownership and accepted-import observations are operational for the approved Axis path. |
+| ADR-025 | Stable Financial Entity Identity | Accepted and implemented, then extended by ADR-027, ADR-029, ADR-038, ADR-039 and ADR-043. | Strong parser-owned identifiers remain ownership authority; ADR-043 adds bounded CBQ masked source observations without treating unknown characters as owned identifiers. |
 | ADR-026 | Structured Developer Diagnostics | Accepted and implemented in Sprint 31. | Structured diagnostics remain in-memory, bounded and privacy-safe. |
 | ADR-027 | Parser-Owned Financial Identifier Extraction | Accepted and implemented through Sprints 33, 35 and 36. | Verified financial identifiers originate exclusively in approved StatementParser implementations. |
 | ADR-028 | Bounded Parser Source Evidence | Accepted and implemented in Sprint 34. | Bounded transient pre-transaction source context supports parser-owned interpretation. |
@@ -79,8 +79,9 @@ No alignment note authorizes implementation.
 | ADR-038 | Atomic Confirmed Import and Durable Identifier Ownership | Accepted and implemented in Sprint 50. | Migration V5, provider-owned atomic confirmed import, durable identifier ownership/observations, provider parity and subprocess contention acceptance are operational. |
 | ADR-039 | Trusted Statement Dates and Durable Source Provenance | Accepted and implemented in Sprint 52, with Sprint 52A corrective closure. | Migration V6, StatementDate, date-role/timezone evidence, parser-profile provenance, source ordinal/digest relationships and strict hydration are operational. |
 | ADR-040 | Explicit Reviewed Partial-Overlap Import | Accepted; architecture and V7 compatibility structures remain readable and validated, but the former Axis production partial-overlap family is suspended. | Mixed supported overlap currently fails closed pending new immutable source evidence and an independently derived direction/event oracle. |
-| ADR-041 | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority | Accepted and implemented in Sprint 63. | Immutable source snapshots and exact source-byte fingerprint authority are operational for new CSV preparation, confirmation and persistence; production PDF support remains unsupported. |
+| ADR-041 | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority | Accepted and implemented in Sprint 63. | Immutable source snapshots and exact source-byte fingerprint authority are operational for supported CSV, PDF and XLS imports. |
 | ADR-042 | Exact Cross-Format Statement Equivalence and Supporting-Source Persistence | Accepted and implemented in Sprint 73. | Exact whole-statement equivalence is operational only for the independently approved HDFC bank-account PDF/XLS v1 pair. |
+| ADR-043 | Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts | Accepted and implemented in Sprint 75. | Exact CBQ history XLS, history PDF and monthly PDF sources coexist through bounded masked/full account resolution and one canonical transaction with durable per-source observations. |
 
 ## Alignment Policy
 
@@ -5095,3 +5096,211 @@ duplicate acceptance, user override, source replacement, authority switching,
 transaction provenance reassignment, historical repair or backfill, account
 merge, OCR, password workflows, generic PDF/spreadsheet parsing, document-byte
 storage or generic mutation infrastructure.
+
+---
+
+# ADR-043 — Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts
+
+**Status:** Accepted and implemented in Sprint 75
+**Date:** 2026-08-17
+**Decision owners:** LedgerForge architecture and financial correctness
+**Migration:** Additive V11
+
+## Context
+
+The exact supported CBQ current-account history XLS, history PDF and monthly
+PDF representations can contain the same financial events without sharing the
+same container bytes, source order, summary fields or identity completeness.
+History sources print a full account identifier. Monthly sources print masked
+account and masked IBAN evidence. Treating every source as a new import would
+duplicate transactions; discarding later sources would lose truthful source
+evidence; reconstructing masked characters would invent account ownership.
+
+ADR-042 remains the HDFC-only exact whole-statement equivalence decision.
+ADR-040 and Migration V7 remain historical, readable and suspended for new
+partial imports. This decision creates a separate, bounded CBQ observation and
+review contract.
+
+## Authorized profiles
+
+This ADR authorizes only:
+
+- `cbq.current-account.xls@1`;
+- `cbq.current-account.history.pdf@1`;
+- `cbq.current-account.monthly.pdf@1`.
+
+It does not authorize another institution, CBQ cards, a changed CBQ layout or
+generic partial matching.
+
+## Canonical transaction and source observations
+
+One real financial event has one canonical durable transaction. The first
+accepted source that introduces an event creates that transaction. Every new
+or already represented financial row from every accepted source creates one
+durable transaction-source observation associated with the canonical
+transaction.
+
+Every accepted representation retains its own document, exact source-byte
+fingerprint, import session, normalized document and rows, statement-source
+observation and transaction-source observations. A later preferred source does
+not rewrite the canonical transaction's `document_id` or `import_session_id`.
+The original durable provenance remains truthful.
+
+For source-evidence presentation only, preference is:
+
+1. monthly PDF;
+2. history PDF;
+3. history XLS.
+
+This ranking may select richer displayed source evidence. It does not change
+financial fields, transfer transaction provenance or delete earlier evidence.
+
+## Exact transaction-lineage authority
+
+Candidate lineage requires the same resolved durable CBQ current account and
+an exact tuple of:
+
+- posting date;
+- signed QAR Money;
+- row-associated running balance.
+
+When that tuple has more than one candidate, an exact parser-extracted
+structured bank-reference digest may disambiguate it. Raw private references
+need not be retained for matching. Zero candidates mean a new event; exactly
+one candidate means a represented event; multiple unresolved candidates fail
+closed.
+
+Lineage may not use fuzzy description or merchant matching, amount or balance
+tolerance, date windows, row proximity or position, narration similarity or
+filename inference.
+
+## Masked CBQ source identity
+
+The exact monthly parser may emit typed source observations for a masked CBQ
+account number and masked CBQ IBAN. They are verified source evidence about an
+account, not complete `FinancialIdentifier` values and not ownership rows in
+`account_identifiers`. Unknown characters are never reconstructed.
+
+Compatibility is deterministic and positional:
+
+1. normalize only the exact grammar's permitted spaces, hyphens and case;
+2. require the exact expected length;
+3. treat each mask character as one unknown character at that position;
+4. require every printed non-mask character to equal the candidate character
+   at the same position;
+5. require jointly printed account and IBAN masks to be mutually consistent;
+6. require CBQ, QAR and the exact current-account family.
+
+Suffix-only guessing, substring matching, edit distance, hidden-digit
+reconstruction, transaction overlap as account identity, narration similarity
+and filename inference are forbidden.
+
+Account identity and transaction lineage remain separate. Account identity is
+established by a complete strong identifier or this bounded exact CBQ
+masked/full compatibility. Only after the account is resolved may transaction
+lineage use the exact financial tuple.
+
+## Bounded account resolution
+
+- When a full-identifier account already exists, a compatible monthly mask
+  resolves it if unique. Multiple compatible accounts require explicit choice
+  among only those accounts. No compatible account permits explicit creation
+  of a new account carrying only the masked observations.
+- A later monthly source may resolve uniquely against durable masked
+  observations from a monthly-created account. Ambiguity requires explicit
+  compatible-account selection.
+- A later history source with a full identifier may resolve a uniquely
+  compatible monthly-created account. Confirmed atomic persistence then
+  attaches the parser-produced full identifier through the existing ownership
+  architecture. It must not create a second account.
+- A selected account with a conflicting full identifier rejects with zero
+  accepted financial writes.
+- A full-identifier history source arriving first continues to use normal
+  strong `FinancialIdentityResolver` behavior.
+
+The generic no-match rule is unchanged. An already identified account is
+eligible for explicit selection only through this typed CBQ compatibility
+path; no generic identity override exists.
+
+## Reviewed overlap and atomic commit
+
+The read-only reviewed plan classifies every incoming row as `new`,
+`represented-existing` or blocked/ambiguous. An eligible plan has zero blocked
+rows and is bound to the exact fingerprint, account decision, provider
+generation, parser profile/version, source document, complete ordered
+observations, expected existing transaction identifiers and a deterministic
+plan digest.
+
+The provider atomically revalidates immediately before write:
+
+- the exact source fingerprint and provider generation;
+- the account decision;
+- incoming masked observations;
+- current full identifiers and their ownership;
+- current masked observations and exact compatibility;
+- every expected canonical transaction and row classification.
+
+All-new, mixed-overlap and fully represented sources use the same reviewed
+contract. A fully represented source is valid with zero imported transactions,
+one or more represented transactions and zero blocked rows. It still persists
+its document, session, fingerprint and complete source observations. Stale,
+newly ambiguous or conflicting review state leaves zero accepted residue.
+SQLite and In-Memory expose the same outcomes.
+
+## Migration V11
+
+Additive Migration V11 introduces:
+
+- `cbq_source_identity_observations`, containing the durable account,
+  document/session, parser profile/version, typed masked pattern and timestamp;
+- `statement_source_observations`, containing the source format, QAR, source,
+  imported, represented and blocked counts plus only source-supported optional
+  statement boundary and opening/closing evidence;
+- `transaction_source_observations`, containing one row-to-canonical-
+  transaction relationship per accepted financial source row, with posting
+  date, optional source transaction date, exact signed Money, running balance,
+  optional structured-reference digest and provenance role.
+
+`UNIQUE(document_id, source_ordinal)` prevents one source row from disappearing
+or mapping twice. History sources preserve absence of statement period and
+opening/closing summary evidence. Monthly sources preserve their actual
+statement boundary, brought-forward opening and closing evidence. V11 performs
+no backfill and does not mutate historical V7 or V10 records.
+
+## PDF source semantics
+
+The history PDF profile requires the exact Transaction History/current-account
+and Date/Details/Amount/Balance family. It preserves posting date, signed QAR
+amount, row balance, details, source ordinal and full account identity. It does
+not invent transaction/value date, statement period, opening/closing summary or
+unavailable reference evidence.
+
+The monthly PDF profile requires the exact ACCOUNT STATEMENT, Current
+Account-Retail, QATARI RIYAL and Posting Date/Transaction Description/
+Transaction Date/Debit/Credit/Balance family. Posting date is the canonical
+event date. Source Transaction Date is a separate observation and is not value
+date. BROUGHT FORWARD is opening-balance evidence, not a transaction. The
+promotional page is excluded only after exact non-financial layout evidence.
+Printed statement boundary, opening and closing evidence are preserved.
+
+## Consequences
+
+- The three exact CBQ representations can be accepted in any order without
+  duplicating a real transaction.
+- Every accepted financial row remains durably explainable after SQLite reopen
+  and canonical hydration.
+- Monthly-created accounts can later acquire a verified full identifier
+  without invented digits or duplicate accounts.
+- Preferred source presentation can improve without rewriting canonical
+  provenance.
+- Exact-byte duplicate identity, HDFC equivalence and historical V7 partial
+  structures retain their separate meanings.
+
+## Exclusions
+
+ADR-043 does not authorize CBQ credit cards, generic partial import, fuzzy or
+tolerant matching, generic masked identity, HDFC or Axis overlap, source
+replacement, canonical provenance reassignment, account merge, historical
+repair or backfill, OCR, password workflows, image-only PDFs, generic PDF or
+spreadsheet parsing, XLSX, source-byte storage or private-source material in
+Git.

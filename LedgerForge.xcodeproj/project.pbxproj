@@ -102,6 +102,8 @@
 		730000023073000000000001 /* HDFCBankAccountPDFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 730000123073000000000001 /* HDFCBankAccountPDFParser.swift */; };
 		740000013074000000000001 /* CBQCurrentAccountXLSNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 740000113074000000000001 /* CBQCurrentAccountXLSNormalizer.swift */; };
 		740000023074000000000001 /* CBQCurrentAccountXLSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 740000123074000000000001 /* CBQCurrentAccountXLSParser.swift */; };
+		750000013075000000000001 /* CBQCurrentAccountPDFNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750000113075000000000001 /* CBQCurrentAccountPDFNormalizer.swift */; };
+		750000023075000000000001 /* CBQCurrentAccountPDFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 750000123075000000000001 /* CBQCurrentAccountPDFParser.swift */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
@@ -283,6 +285,8 @@
 		730000123073000000000001 /* HDFCBankAccountPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDFCBankAccountPDFParser.swift; sourceTree = "<group>"; };
 		740000113074000000000001 /* CBQCurrentAccountXLSNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBQCurrentAccountXLSNormalizer.swift; sourceTree = "<group>"; };
 		740000123074000000000001 /* CBQCurrentAccountXLSParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBQCurrentAccountXLSParser.swift; sourceTree = "<group>"; };
+		750000113075000000000001 /* CBQCurrentAccountPDFNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBQCurrentAccountPDFNormalizer.swift; sourceTree = "<group>"; };
+		750000123075000000000001 /* CBQCurrentAccountPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBQCurrentAccountPDFParser.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
 		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
@@ -553,6 +557,7 @@
 		288EB0DF2FF7A3D200F09BC9 /* Parsers */ = {
 			isa = PBXGroup;
 			children = (
+				750000123075000000000001 /* CBQCurrentAccountPDFParser.swift */,
 				740000123074000000000001 /* CBQCurrentAccountXLSParser.swift */,
 				720000133072000000000001 /* HDFCBankAccountXLSParser.swift */,
 				730000123073000000000001 /* HDFCBankAccountPDFParser.swift */,
@@ -658,6 +663,7 @@
 		288EB12E2FF7E10200F09BC9 /* Normalizers */ = {
 			isa = PBXGroup;
 			children = (
+				750000113075000000000001 /* CBQCurrentAccountPDFNormalizer.swift */,
 				740000113074000000000001 /* CBQCurrentAccountXLSNormalizer.swift */,
 				720000123072000000000001 /* HDFCBankAccountXLSNormalizer.swift */,
 				730000113073000000000001 /* HDFCBankAccountPDFNormalizer.swift */,
@@ -912,6 +918,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				710000013071000000000001 /* LegacyXLSDocumentReader.swift in Sources */,
+				750000013075000000000001 /* CBQCurrentAccountPDFNormalizer.swift in Sources */,
+				750000023075000000000001 /* CBQCurrentAccountPDFParser.swift in Sources */,
 				740000013074000000000001 /* CBQCurrentAccountXLSNormalizer.swift in Sources */,
 				740000023074000000000001 /* CBQCurrentAccountXLSParser.swift in Sources */,
 				720000023072000000000001 /* HDFCBankAccountXLSNormalizer.swift in Sources */,

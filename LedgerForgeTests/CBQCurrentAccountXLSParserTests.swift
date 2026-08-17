@@ -21,7 +21,7 @@ struct CBQCurrentAccountXLSParserTests {
         #expect(document.transactions.allSatisfy { $0.currency == "QAR" })
         #expect(document.transactions.allSatisfy { $0.valueDate == nil && $0.reference == nil })
         #expect(document.transactions.allSatisfy {
-            $0.financialDateRole == .transactionDate
+            $0.financialDateRole == .postingDate
                 && $0.statementTimezoneEvidence == .iana("Asia/Qatar")
                 && $0.sourceProvenance[0].parserProfileID == CBQCurrentAccountXLSParser.profileID
                 && $0.sourceProvenance[0].parserProfileVersion == CBQCurrentAccountXLSParser.profileVersion

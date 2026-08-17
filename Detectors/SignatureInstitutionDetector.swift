@@ -26,6 +26,8 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
         rules: [InstitutionDetectionRule] = [
             .hdfcBankAccountPDF,
             .hdfcBankAccountXLS,
+            .cbqCurrentAccountMonthlyPDF,
+            .cbqCurrentAccountHistoryPDF,
             .cbqCurrentAccountXLS,
             .axisBankAccount
         ]
@@ -55,7 +57,25 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
 
     func detectInstitution(in document: RawDocument) async throws -> ImportInstitutionCandidate {
         guard case .data = document.content else {
-            return detect(from: document.searchableText).importCandidate
+            let applicableRules: [InstitutionDetectionRule]
+            switch document.fileExtension {
+            case "xls", "xlsx":
+                applicableRules = rules.filter {
+                    $0 != .hdfcBankAccountPDF
+                        && $0 != .cbqCurrentAccountMonthlyPDF
+                        && $0 != .cbqCurrentAccountHistoryPDF
+                }
+            case "pdf":
+                applicableRules = rules.filter {
+                    $0 != .hdfcBankAccountXLS
+                        && $0 != .cbqCurrentAccountXLS
+                }
+            default:
+                applicableRules = rules
+            }
+            return SignatureInstitutionDetector(rules: applicableRules)
+                .detect(from: document.searchableText)
+                .importCandidate
         }
         return ImportInstitutionCandidate(
             institutionCode: nil,
@@ -171,6 +191,35 @@ struct InstitutionDetectionRule: Equatable, Sendable {
                 token: "DATE DETAILS AMOUNT BALANCE",
                 reason: "Matched the exact CBQ current-account transaction header."
             )
+        ]
+    )
+
+    static let cbqCurrentAccountHistoryPDF = InstitutionDetectionRule(
+        institution: .cbq,
+        documentType: .bankAccount,
+        confidence: 0.99,
+        requiredMatchCount: 2,
+        signatures: [
+            InstitutionSignature(
+                token: "TRANSACTION HISTORY",
+                reason: "Matched the exact CBQ PDF transaction-history title."
+            ),
+            InstitutionSignature(
+                token: "CURRENT ACCOUNT-RETAIL",
+                reason: "Matched the exact CBQ PDF current-account product evidence."
+            )
+        ]
+    )
+
+    static let cbqCurrentAccountMonthlyPDF = InstitutionDetectionRule(
+        institution: .cbq,
+        documentType: .bankAccount,
+        confidence: 0.99,
+        requiredMatchCount: 3,
+        signatures: [
+            InstitutionSignature(token: "ACCOUNT STATEMENT", reason: "Matched the exact CBQ monthly statement title."),
+            InstitutionSignature(token: "ACCOUNT TYPE: CURRENT ACCOUNT-RETAIL", reason: "Matched the exact CBQ current-account product evidence."),
+            InstitutionSignature(token: "POSTING DATE TRANSACTION DESCRIPTION TRANSACTION DATE DEBIT CREDIT BALANCE", reason: "Matched the exact CBQ monthly transaction header.")
         ]
     )
 }

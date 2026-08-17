@@ -253,6 +253,7 @@ struct ImportOutcomePresentationTests {
         let expected: [(ImportAttemptOutcome, String, String)] = [
             (.successfulImport, "Import completed", "Persisted 2 transaction(s)"),
             (.equivalentSourceRecorded, "Equivalent source recorded", "Recorded equivalent source evidence and persisted 0 additional transactions"),
+            (.cbqSourceOverlapCommitted, "CBQ source recorded", "Recorded exact CBQ source lineage and persisted 2 new transaction(s)"),
             (.statementEquivalenceConflict, "Statement equivalence conflict", "The same statement period differs financially across formats. No new financial history was written"),
             (.statementEquivalenceEvidenceUnavailable, "Equivalence evidence unavailable", "Existing overlapping history lacks exact projection evidence. No new financial history was written"),
             (.equivalentFormatAlreadyRecorded, "Format already recorded", "This source format is already represented for the statement period. No new financial history was written"),

@@ -700,6 +700,61 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         accountChoice: ImportAccountChoice?,
         providerGeneration: ProviderGenerationToken
     ) throws -> ConfirmedImportPlanDTO {
+        if isCBQSourceObservationImport(financialDocument) {
+            let candidates = try cbqCompatibleAccountIDs(provider: provider, financialDocument: financialDocument)
+            let proposedID = "account-\(importSession.id.uuidString.lowercased())"
+            let advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO
+            let confirmedChoice: ConfirmedImportAccountChoiceDTO
+            let selectedAccountId: String
+            switch candidates.count {
+            case 0:
+                advisoryIdentity = .noMatch
+                if case .useExistingAccount(let selected)? = accountChoice {
+                    confirmedChoice = .useExistingAccount(accountId: selected)
+                    selectedAccountId = selected
+                } else {
+                    confirmedChoice = .createProposedAccount
+                    selectedAccountId = proposedID
+                }
+            case 1:
+                advisoryIdentity = .noMatch
+                switch accountChoice {
+                case .useExistingAccount(let selected):
+                    confirmedChoice = .useExistingAccount(accountId: selected)
+                    selectedAccountId = selected
+                case .createNewAccount:
+                    confirmedChoice = .createProposedAccount
+                    selectedAccountId = proposedID
+                case nil:
+                    confirmedChoice = .useExistingAccount(accountId: candidates[0])
+                    selectedAccountId = candidates[0]
+                }
+            default:
+                advisoryIdentity = .ambiguous
+                if case .useExistingAccount(let selected)? = accountChoice {
+                    confirmedChoice = .useExistingAccount(accountId: selected)
+                    selectedAccountId = selected
+                } else if case .createNewAccount? = accountChoice {
+                    confirmedChoice = .createProposedAccount
+                    selectedAccountId = proposedID
+                } else {
+                    confirmedChoice = .unspecified
+                    selectedAccountId = proposedID
+                }
+            }
+            let plan = try mapper.confirmedImportPlan(
+                financialDocument: financialDocument,
+                importSession: importSession,
+                validation: validation,
+                fingerprintSet: fingerprintSet,
+                providerGeneration: providerGeneration,
+                advisoryIdentity: advisoryIdentity,
+                accountChoice: confirmedChoice,
+                selectedAccountId: selectedAccountId
+            )
+            try validate(confirmedPlan: plan)
+            return plan
+        }
         let resolution = try resolver(accountRepo: provider.accountRepo).resolve(
             workspaceId: mapper.workspaceId,
             identifiers: financialDocument.financialIdentifiers
@@ -754,6 +809,63 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         return plan
     }
 
+    private func isCBQSourceObservationImport(_ document: FinancialDocument) -> Bool {
+        guard document.metadata.institution == .cbq,
+              document.metadata.documentType == .bankAccount,
+              document.bookedCurrency?.code == "QAR",
+              let profile = document.transactions.first?.sourceProvenance.first?.parserProfileID else { return false }
+        return [CBQCurrentAccountXLSParser.profileID, CBQCurrentAccountPDFParser.historyProfileID, CBQCurrentAccountPDFParser.monthlyProfileID].contains(profile)
+    }
+
+    private func cbqCompatibleAccountIDs(provider: DatabaseProvider, financialDocument: FinancialDocument) throws -> [String] {
+        guard isCBQSourceObservationImport(financialDocument) else { return [] }
+        let incomingMasks = financialDocument.cbqSourceIdentityObservations
+        let incomingFull = FinancialIdentityResolver.strongVerifiedIdentifiers(from: financialDocument.financialIdentifiers)
+            .first(where: { $0.kind == .institutionAccountId && $0.normalizedValue.count == 13 })?.normalizedValue
+        guard (!incomingMasks.isEmpty && CBQSourceIdentityObservation.validatePair(incomingMasks)) || incomingFull != nil else { return [] }
+        let records = try provider.accountRepo.cbqSourceIdentityRecords(workspaceId: mapper.workspaceId)
+        let recordsByAccount = Dictionary(grouping: records, by: \.accountId)
+        var compatible = [String]()
+        for account in try provider.accountRepo.accounts(workspaceId: mapper.workspaceId) {
+            guard account.institutionId == Institution.cbq.rawValue,
+                  account.nativeCurrency == "QAR",
+                  account.accountType == "bank" else { continue }
+            let strongAccounts = try provider.accountRepo.identifiers(accountId: account.id, workspaceId: mapper.workspaceId)
+                .filter { $0.scheme == FinancialIdentifierKind.institutionAccountId.rawValue && $0.identifier.count == 13 }
+                .map(\.identifier)
+            let durableMasks = try (recordsByAccount[account.id] ?? []).map {
+                guard let kind = CBQSourceIdentityObservationKind(rawValue: $0.kind) else {
+                    throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+                }
+                return try CBQSourceIdentityObservation(
+                    kind: kind,
+                    rawPattern: $0.pattern
+                )
+            }
+            let matches: Bool
+            if !incomingMasks.isEmpty {
+                let fullMatch = strongAccounts.contains { candidate in incomingMasks.allSatisfy { $0.isCompatible(withFullAccountNumber: candidate) } }
+                let maskMatch = Self.maskSetsCompatible(incomingMasks, durableMasks)
+                matches = fullMatch || maskMatch
+            } else if let incomingFull {
+                let exactFull = strongAccounts.contains(incomingFull)
+                let maskedMatch = durableMasks.count >= 2 && durableMasks.allSatisfy { $0.isCompatible(withFullAccountNumber: incomingFull) }
+                matches = exactFull || maskedMatch
+            } else { matches = false }
+            if matches { compatible.append(account.id) }
+        }
+        return compatible.sorted()
+    }
+
+    private static func maskSetsCompatible(_ lhs: [CBQSourceIdentityObservation], _ rhs: [CBQSourceIdentityObservation]) -> Bool {
+        guard !rhs.isEmpty else { return false }
+        return lhs.allSatisfy { incoming in
+            rhs.filter { $0.kind == incoming.kind }.contains { durable in
+                zip(incoming.pattern, durable.pattern).allSatisfy { left, right in left == "X" || right == "X" || left == right }
+            }
+        }
+    }
+
     func persistValidatedImport(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
@@ -774,6 +886,14 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         guard validation.passed else { return .unavailable }
 
         let provider = databaseProviderProvider()
+        if isCBQSourceObservationImport(financialDocument) {
+            let candidates = try cbqCompatibleAccountIDs(provider: provider, financialDocument: financialDocument)
+            switch candidates.count {
+            case 0: return .unavailable
+            case 1: return .matchedExisting(accountId: candidates[0])
+            default: return .choiceRequired(eligibleAccountIds: candidates)
+            }
+        }
         let workspaceId = mapper.workspaceId
         let resolution = try resolver(accountRepo: provider.accountRepo).resolve(
             workspaceId: workspaceId,
@@ -935,7 +1055,23 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             accountChoice: accountChoice,
             providerGeneration: providerGeneration,
         )
-        let repositoryResult = provider.confirmedImportRepo.commitConfirmedImport(plan)
+        let repositoryResult: ConfirmedImportRepositoryResult
+        if !plan.cbqSourceRows.isEmpty {
+            switch provider.confirmedImportRepo.reviewCBQSourceOverlap(plan) {
+            case .eligible(let reviewed):
+                repositoryResult = provider.confirmedImportRepo.commitReviewedCBQSourceOverlap(reviewed)
+            case .accountChoiceRequired:
+                repositoryResult = .explicitAccountChoiceRequired
+            case .identityConflict:
+                repositoryResult = .identityConflict
+            case .staleProviderGeneration:
+                repositoryResult = .staleProviderGeneration
+            case .blockedOrAmbiguousRows, .repositoryIntegrityConflict, .notApplicable:
+                repositoryResult = .repositoryIntegrityConflict
+            }
+        } else {
+            repositoryResult = provider.confirmedImportRepo.commitConfirmedImport(plan)
+        }
         return try map(
             repositoryResult,
             provider: provider,
@@ -1153,6 +1289,20 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             )
             developerConsole?.info(.database, "Provider-owned confirmed import committed", metadata: ["transactions": "\(count)"])
             return ImportPersistenceResult(persisted: true, workspaceId: receipt.workspaceId, accountId: receipt.accountId, importSessionId: receipt.importSessionId, transactionCount: count, importAttemptId: plan.historyTemplate.successfulAttempt.id, accountOutcome: accountOutcome)
+        case .sourceOverlapCommitted(let receipt, let newTransactionCount):
+            let accountOutcome = ImportAccountOutcome.confirmed(
+                advisoryIdentity: plan.advisoryIdentity,
+                accountChoice: plan.accountChoice,
+                eligibleIdentifierCount: plan.identifiers.count
+            )
+            return ImportPersistenceResult(
+                persisted: true, workspaceId: receipt.workspaceId, accountId: receipt.accountId,
+                importSessionId: receipt.importSessionId, transactionCount: newTransactionCount,
+                importAttemptId: plan.historyTemplate.successfulAttempt.id,
+                sourceRowCount: plan.cbqSourceRows.count,
+                recognizedExistingRowCount: plan.cbqSourceRows.count - newTransactionCount,
+                accountOutcome: accountOutcome
+            )
         case .equivalentSourceRecorded(let receipt):
             developerConsole?.info(.database, "Equivalent supporting statement source recorded", metadata: ["transactions": "0"])
             return ImportPersistenceResult(
@@ -1194,7 +1344,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
 
     private func coordinationError(for result: ConfirmedImportRepositoryResult) -> ImportPersistenceCoordinationError {
         switch result {
-        case .committed, .equivalentSourceRecorded, .partialCommitted, .exactDuplicate:
+        case .committed, .equivalentSourceRecorded, .partialCommitted, .sourceOverlapCommitted, .exactDuplicate:
             return .unclassified
         case .repeatedIncomingEventEvidence, .existingEventDuplicate, .eventOwnershipConflict:
             return .transactionEventBlock

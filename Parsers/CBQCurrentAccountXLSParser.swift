@@ -157,7 +157,7 @@ final class CBQCurrentAccountXLSParser: StatementParser {
                         account: document.metadata.institution.rawValue,
                         sourceBank: document.metadata.institution.rawValue,
                         sourceFile: document.document.filename,
-                        financialDateRole: .transactionDate,
+                        financialDateRole: .postingDate,
                         statementTimezoneEvidence: .iana("Asia/Qatar"),
                         sourceProvenance: [
                             TransactionSourceProvenance(
@@ -187,7 +187,14 @@ final class CBQCurrentAccountXLSParser: StatementParser {
             bookedCurrency: currency,
             declaredStatementPeriod: nil,
             transactions: transactions,
-            financialIdentifiers: [identifier]
+            financialIdentifiers: [identifier],
+            sourceStatementEvidence: SourceStatementEvidence(
+                sourceFormatCode: "history-xls",
+                statementBoundaryDate: nil,
+                period: nil,
+                openingBalance: nil,
+                closingBalance: nil
+            )
         )
     }
 

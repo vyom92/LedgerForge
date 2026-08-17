@@ -388,6 +388,55 @@ struct ImportPersistenceMapper {
             normalizedDocument: payload.normalizedDocument,
             importSessionID: payload.importSession.id
         )
+        let cbqRows: [CBQSourceRowDTO]
+        let cbqStatementEvidence: CBQStatementSourceEvidenceDTO?
+        let isCBQCurrentAccount = financialDocument.metadata.institution == .cbq &&
+            financialDocument.metadata.documentType == .bankAccount &&
+            [CBQCurrentAccountXLSParser.profileID, CBQCurrentAccountPDFParser.historyProfileID, CBQCurrentAccountPDFParser.monthlyProfileID]
+                .contains(payload.normalizedDocument.profileId)
+        if isCBQCurrentAccount {
+            cbqRows = try financialDocument.transactions.enumerated().map { index, source in
+                guard source.sourceProvenance.count == 1,
+                      index < payload.transactions.count,
+                      index < payload.normalizedRows.count,
+                      let date = source.statementDate,
+                      let balance = source.runningBalanceMoney else {
+                    throw ImportPersistenceError.missingTransactionProvenance
+                }
+                let provenance = source.sourceProvenance[0]
+                return CBQSourceRowDTO(
+                    incomingTransactionId: payload.transactions[index].id,
+                    normalizedRowId: payload.normalizedRows[index].id,
+                    sourceOrdinal: provenance.sourceOrdinal,
+                    normalizedRecordDigest: provenance.normalizedRecordDigest,
+                    postingDateISO: date.canonical,
+                    sourceTransactionDateISO: provenance.sourceTransactionDate?.canonical,
+                    nativeCurrency: source.money.currency.code,
+                    signedAmountMinor: try source.money.minorUnits(),
+                    signedAmountDecimal: try source.money.canonicalDecimalString(),
+                    direction: source.debitMoney == nil ? "credit" : "debit",
+                    runningBalanceMinor: try balance.minorUnits(),
+                    runningBalanceDecimal: try balance.canonicalDecimalString(),
+                    structuredReferenceDigest: provenance.structuredReferenceDigest
+                )
+            }
+            guard let evidence = financialDocument.sourceStatementEvidence else {
+                throw ImportPersistenceError.missingTransactionProvenance
+            }
+            cbqStatementEvidence = CBQStatementSourceEvidenceDTO(
+                sourceFormatCode: evidence.sourceFormatCode,
+                statementBoundaryDateISO: evidence.statementBoundaryDate?.canonical,
+                statementStartDateISO: evidence.period?.start.canonical,
+                statementEndDateISO: evidence.period?.end.canonical,
+                openingBalanceMinor: try evidence.openingBalance.map { try $0.minorUnits() },
+                openingBalanceDecimal: try evidence.openingBalance.map { try $0.canonicalDecimalString() },
+                closingBalanceMinor: try evidence.closingBalance.map { try $0.minorUnits() },
+                closingBalanceDecimal: try evidence.closingBalance.map { try $0.canonicalDecimalString() }
+            )
+        } else {
+            cbqRows = []
+            cbqStatementEvidence = nil
+        }
         return ConfirmedImportPlanDTO(
             providerGeneration: providerGeneration,
             workspace: payload.workspace,
@@ -411,7 +460,12 @@ struct ImportPersistenceMapper {
             openingBalanceDecimal: try validation.openingBalanceMoney.map { try $0.canonicalDecimalString() },
             closingBalanceMinor: try validation.closingBalanceMoney.map { try $0.minorUnits() },
             closingBalanceDecimal: try validation.closingBalanceMoney.map { try $0.canonicalDecimalString() },
-            statementFinancialProjection: statementProjection
+            statementFinancialProjection: statementProjection,
+            cbqSourceIdentityPatterns: financialDocument.cbqSourceIdentityObservations.map {
+                CBQSourceIdentityPatternDTO(kind: $0.kind.rawValue, pattern: $0.pattern)
+            },
+            cbqSourceRows: cbqRows,
+            cbqStatementSourceEvidence: cbqStatementEvidence
         )
     }
 

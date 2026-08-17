@@ -5,6 +5,84 @@
 import CryptoKit
 import Foundation
 
+enum CBQSourceIdentityObservationKind: String, CaseIterable, Equatable, Sendable {
+    case maskedAccountNumber = "cbq_masked_account_number"
+    case maskedIBAN = "cbq_masked_iban"
+}
+
+/// Typed, partial identity printed by an approved CBQ monthly statement. It is
+/// source evidence only: callers must never promote its pattern to a strong
+/// `FinancialIdentifier` or persist it in `account_identifiers`.
+struct CBQSourceIdentityObservation: Equatable, Sendable {
+    enum ValidationError: Error, Equatable {
+        case unsupportedKind
+        case malformedPattern
+        case noUnknownPosition
+    }
+
+    let kind: CBQSourceIdentityObservationKind
+    let pattern: String
+
+    init(kind: CBQSourceIdentityObservationKind, rawPattern: String) throws {
+        let normalized = Self.normalize(rawPattern)
+        let expectedLength = kind == .maskedAccountNumber ? 13 : 29
+        let validCharacters = kind == .maskedAccountNumber
+            ? normalized.allSatisfy({ $0.isASCII && ($0.isNumber || $0 == "X") })
+            : normalized.allSatisfy({ $0.isASCII && ($0.isNumber || $0.isLetter) })
+        guard normalized.count == expectedLength, validCharacters else {
+            throw ValidationError.malformedPattern
+        }
+        guard normalized.contains("X") else { throw ValidationError.noUnknownPosition }
+        if kind == .maskedIBAN {
+            guard normalized.hasPrefix("QA"),
+                  normalized.dropFirst(2).prefix(2).allSatisfy(\.isNumber),
+                  normalized.dropFirst(4).prefix(4) == "CBQA" else {
+                throw ValidationError.malformedPattern
+            }
+        }
+        self.kind = kind
+        self.pattern = normalized
+    }
+
+    static func validatePair(_ observations: [CBQSourceIdentityObservation]) -> Bool {
+        let accounts = observations.filter { $0.kind == .maskedAccountNumber }
+        let ibans = observations.filter { $0.kind == .maskedIBAN }
+        guard accounts.count == 1, ibans.count == 1 else { return false }
+        return String(ibans[0].pattern.suffix(13)) == accounts[0].pattern
+    }
+
+    func isCompatible(withFullAccountNumber candidate: String) -> Bool {
+        let full = Self.normalize(candidate)
+        let comparedPattern: String
+        switch kind {
+        case .maskedAccountNumber:
+            guard full.count == 13, full.allSatisfy({ $0.isASCII && $0.isNumber }) else { return false }
+            comparedPattern = pattern
+        case .maskedIBAN:
+            guard full.count == 13, full.allSatisfy({ $0.isASCII && $0.isNumber }) else { return false }
+            comparedPattern = String(pattern.suffix(13))
+        }
+        return zip(comparedPattern, full).allSatisfy { mask, digit in
+            mask == "X" || mask == digit
+        }
+    }
+
+    private static func normalize(_ value: String) -> String {
+        value.uppercased().filter { character in
+            if character == "X" || character == "*" { return true }
+            return character.isNumber || character.isLetter
+        }.map { $0 == "*" ? "X" : $0 }.reduce(into: "") { $0.append($1) }
+    }
+}
+
+struct SourceStatementEvidence: Equatable, Sendable {
+    let sourceFormatCode: String
+    let statementBoundaryDate: StatementDate?
+    let period: DeclaredStatementPeriod?
+    let openingBalance: Money?
+    let closingBalance: Money?
+}
+
 struct DeclaredStatementPeriod: Equatable, Sendable {
     let start: StatementDate
     let end: StatementDate
@@ -33,6 +111,8 @@ struct FinancialDocument: Identifiable {
     let declaredStatementPeriod: DeclaredStatementPeriod?
     let transactions: [Transaction]
     let financialIdentifiers: [FinancialIdentifier]
+    let cbqSourceIdentityObservations: [CBQSourceIdentityObservation]
+    let sourceStatementEvidence: SourceStatementEvidence?
     let selectionReasons: [String]
     let createdAt: Date
 
@@ -45,6 +125,8 @@ struct FinancialDocument: Identifiable {
         declaredStatementPeriod: DeclaredStatementPeriod? = nil,
         transactions: [Transaction],
         financialIdentifiers: [FinancialIdentifier] = [],
+        cbqSourceIdentityObservations: [CBQSourceIdentityObservation] = [],
+        sourceStatementEvidence: SourceStatementEvidence? = nil,
         selectionReasons: [String] = [],
         createdAt: Date = Date()
     ) {
@@ -56,6 +138,8 @@ struct FinancialDocument: Identifiable {
         self.declaredStatementPeriod = declaredStatementPeriod
         self.transactions = transactions
         self.financialIdentifiers = financialIdentifiers
+        self.cbqSourceIdentityObservations = cbqSourceIdentityObservations
+        self.sourceStatementEvidence = sourceStatementEvidence
         self.selectionReasons = selectionReasons
         self.createdAt = createdAt
     }

@@ -14,13 +14,13 @@ final class ImportValidator {
         let usesRowAssociatedBalancesWithoutSourceOrderRecurrence =
             financialDocument.metadata.institution == .cbq
                 && financialDocument.metadata.documentType == .bankAccount
-                && financialDocument.metadata.fileFormat == .xls
                 && !financialDocument.transactions.isEmpty
                 && financialDocument.transactions.allSatisfy { transaction in
                     !transaction.sourceProvenance.isEmpty
                         && transaction.sourceProvenance.allSatisfy {
-                            $0.parserProfileID == CBQCurrentAccountXLSParser.profileID
-                                && $0.parserProfileVersion == CBQCurrentAccountXLSParser.profileVersion
+                            [CBQCurrentAccountXLSParser.profileID, CBQCurrentAccountPDFParser.historyProfileID]
+                                .contains($0.parserProfileID)
+                                && $0.parserProfileVersion == "1"
                         }
                 }
         return validate(

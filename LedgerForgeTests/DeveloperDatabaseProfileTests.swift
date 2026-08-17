@@ -95,7 +95,7 @@ struct DeveloperDatabaseProfileTests {
         #expect(!identity.authorizesCleanup(of: temporary))
     }
 
-    @Test(arguments: [0, 10, Int.max])
+    @Test(arguments: [0, 11, Int.max])
     func migrationSandboxRejectsNonHistoricalSourceVersions(_ version: Int) {
         #expect(throws: DevelopmentDatabaseProfileDomainError.invalidMigrationSourceVersion) {
             _ = try DevelopmentDatabaseProfile.resolve(.migrationSandbox(sourceVersion: version))
@@ -111,7 +111,7 @@ struct DeveloperDatabaseProfileTests {
         )
 
         #expect(descriptor.displayName == "Migration Sandbox")
-        #expect(descriptor.migrationSourceVersion == 9)
+        #expect(descriptor.migrationSourceVersion == 10)
         #expect(!String(describing: DevelopmentDatabaseProfileActivationResult.activityBlocked).contains("/"))
         #expect(!String(describing: DevelopmentDatabaseProfileActivationResult.migrationFailed).contains("sqlite"))
     }
@@ -148,11 +148,11 @@ struct DeveloperDatabaseProfileTests {
         }
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set("temporary-invalid-location", forKey: DevelopmentDatabaseProfilePreferences.rememberedProfileKey)
-        defaults.set(9, forKey: DevelopmentDatabaseProfilePreferences.rememberedMigrationSourceVersionKey)
+        defaults.set(11, forKey: DevelopmentDatabaseProfilePreferences.rememberedMigrationSourceVersionKey)
 
         let preferences = DevelopmentDatabaseProfilePreferences(defaults: defaults)
         #expect(preferences.rememberedDevelopmentProfile == .persistentDebug)
-        #expect(preferences.rememberedMigrationSourceVersion == 9)
+        #expect(preferences.rememberedMigrationSourceVersion == 10)
     }
 
     @Test(.globalRuntimeStateIsolation)

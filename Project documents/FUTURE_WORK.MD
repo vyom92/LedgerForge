@@ -62,7 +62,7 @@ A work item becomes executable only when Chat supplies one complete approved pro
 **Candidate entries reviewed:** 155  
 **Fresh build/test/runtime evidence:** Sprint 65 focused, complete-TestPlan, build, Release-containment and signed-app private-pair evidence is recorded in `PROJECT_STATE.md`.
 
-**Current alignment — 2026-08-17:** The 2026-08-01 155-candidate audit above is retained as historical and was not rerun. `main@31d493e421869d6a825aa2db576f82c2be3bdb68` is the accepted Sprint 73 production implementation; `main@9ea2a043ebf842e3ead6574bc29d59fe2ac45180` is a later documentation-only commit; Sprint 73A was test-only; ADR-042 and Migration V10 are current. Current implementation truth belongs to `PROJECT_STATE.md`.
+**Current alignment — 2026-08-17:** The 2026-08-01 155-candidate audit above is retained as historical and was not rerun. Sprint 75 is the current production implementation in this commit; the exact ref is recorded by Git history. Sprint 73A was test-only; ADR-043 and Migration V11 are current. Current implementation truth belongs to `PROJECT_STATE.md`.
 
 **Current alignment — Axis source-truth restoration:** the Git-authoritative repository state is newer than this audit baseline. `PROJECT_STATE.md` records the active `axis.bank-account.csv@2` conventional direction contract and the suspension of provenance-less mixed partial overlap.
 
@@ -507,8 +507,9 @@ No schema change is authorized until workspace identity, isolation and migration
 
 ## FW-P0-19 — Cross-Format Statement Duplicate Identity
 
-**Status:** Blocked
-**Depends on:** Successful completion and approval of Sprint 40, `FW-P1-16` and production support for at least two equivalent source formats
+**Status:** Partially completed through exact bounded HDFC and CBQ decisions
+**Completed boundary:** ADR-042 distinguishes exact source bytes from exact whole-statement HDFC PDF/XLS equivalence. ADR-043 separately retains exact CBQ source identity while mapping exact reviewed history-XLS, history-PDF and monthly-PDF rows to one canonical transaction set with complete per-source observations.
+**Remaining boundary:** Generic duplicate/equivalence identity, Axis relationships, cards, same-format byte-distinct semantic identity, source replacement and every unapproved institution/profile relationship remain blocked on their own source truth and architecture.
 
 Determine when equivalent CSV, PDF, XLS, XLSX or TXT representations describe the same statement even though their exact source bytes differ.
 
@@ -593,10 +594,10 @@ original pairs remain the financial acceptance authority.
 
 ## FW-P1-03 — CBQ Parser Family
 
-**Status:** Partially completed through the exact current-account transaction-history XLS v1 slice
-**Fixture state:** Clean-room CBQ current-account and credit-card evidence is integrated with separate expected baselines.  
-**Completed boundary:** Sprint 74 supports only the retained CBQ current-account transaction-history OLE2/BIFF8 grammar as `cbq.current-account.xls@1`, with signed QAR amounts, physical source order, printed row-associated balances, exact-byte duplicate authority and one strong printed account identifier through the ordinary import, provider and hydration path.
-**Remaining boundary:** CBQ monthly-statement PDF and transaction-history PDF remain open. Sprint 75 overlap/equivalence work remains open and must not be inferred from the XLS support. The CBQ card family remains separate and depends on the concrete card contract under `FW-P1-09`. Generic, changed, XLSX and other CBQ layouts remain unsupported.
+**Status:** Current-account family completed for the exact three-profile boundary; card and broader-layout work remains
+**Fixture state:** Self-contained synthetic mechanics fixtures cover exact current-account history XLS, history PDF and monthly PDF profiles. Separate clean-room CBQ card evidence remains discovery-only.
+**Completed boundary:** Sprint 74 added `cbq.current-account.xls@1`. Sprint 75 adds `cbq.current-account.history.pdf@1` and `cbq.current-account.monthly.pdf@1` plus ADR-043 exact reviewed multi-source lineage, typed masked/full CBQ account compatibility, Migration V11 source observations, SQLite/In-Memory parity, hydration/relaunch and preferred source-evidence presentation. The three sources may arrive in any order without duplicating one real transaction.
+**Remaining boundary:** The CBQ card family remains separate and depends on the concrete card contract under `FW-P1-09`. Generic or changed CBQ layouts, XLSX, OCR, locked/image-only PDFs, generic masked identity, generic partial matching and any additional CBQ source family remain unsupported.
 
 Keep independent CBQ families:
 
@@ -613,9 +614,9 @@ Targeted discovery must not combine them merely because the institution is share
 - card-specific validation/persistence dependencies where applicable;
 - independent financial and source-provenance oracles.
 
-Fixture availability makes the remaining families discoverable. Only the exact
-Sprint 74 current-account transaction-history XLS v1 slice is
-production-supported.
+Fixture availability makes remaining families discoverable. Production
+current-account support remains limited to the exact three Sprint 74/75
+profiles and ADR-043 boundary above.
 
 ---
 
@@ -755,9 +756,9 @@ The American Express, CBQ and Axis card fixture integrations and final cross-fam
 
 Targeted discovery must now select one concrete family and define its exact vocabulary, validation, durable schema, migration, provider parity, hydration, relaunch and presentation contracts.
 
-The separately planned CBQ partial-overlap work for Sprints 74–75 remains
-future work and is not generalized or implemented by the Sprint 73 exact
-whole-statement HDFC contract.
+Sprint 75's completed CBQ current-account source-lineage work remains separate
+from card semantics and does not generalize ADR-043 to CBQ cards. Sprint 73's
+exact whole-statement HDFC contract also does not authorize card overlap.
 
 Card-liability effects remain separate from bank-account debit/credit semantics. Missing rates, fees, taxes, aggregates or other evidence must not be invented. Payment allocation, rewards accounting, reversal matching and universal card taxonomy remain excluded.
 
@@ -821,11 +822,11 @@ The user must control whether the password is used once, stored, replaced or dis
 
 ## FW-P1-14 — XLS and XLSX Support
 
-**Status:** Partially completed by Sprints 71 and 72 for two exact XLS profiles
-**Completed boundary:** The native static OLE2/BIFF8 reader supports the exact `axis.bank-account.xls@1` Axis NRO grammar and the exact shared `hdfc.bank-account.xls@1` HDFC NRE/NRO grammar through the ordinary import pipeline. Exact source bytes are duplicate authority. Unsupported encryption, multiple or hidden worksheets, formulas, boolean/error cells, malformed values and non-exact layouts fail closed before accepted writes.
-**Remaining boundary:** XLSX/OOXML, generic spreadsheet mapping, other HDFC XLS layouts, other institution/layout support, formula-result handling, macros, password workflow, multi-sheet/hidden-sheet support, user-authored mappings and cross-format equivalence beyond the exact Sprint 73 HDFC PDF/XLS pair remain unsupported and require separate approved discovery or implementation increments.
+**Status:** Partially completed by Sprints 71, 72 and 74 for three exact XLS profiles
+**Completed boundary:** The native static OLE2/BIFF8 reader supports the exact `axis.bank-account.xls@1` Axis NRO grammar, exact shared `hdfc.bank-account.xls@1` HDFC NRE/NRO grammar and exact `cbq.current-account.xls@1` CBQ transaction-history grammar through the ordinary import pipeline. Exact source bytes are duplicate authority. Unsupported encryption, multiple or hidden worksheets, formulas, boolean/error cells, malformed values and non-exact layouts fail closed before accepted writes.
+**Remaining boundary:** XLSX/OOXML, generic spreadsheet mapping, other HDFC/CBQ XLS layouts, other institution/layout support, formula-result handling, macros, password workflow, multi-sheet/hidden-sheet support, user-authored mappings and cross-format behavior beyond exact ADR-042 HDFC equivalence and ADR-043 CBQ source lineage remain unsupported and require separate approved discovery or implementation increments.
 
-The accepted libxls reader authority is limited to version 1.6.3 at commit `c199d132494833da696b58aa4acf3fc5a36d930b`, statically vendored under its BSD 2-clause license and linked only to system `iconv`. It does not authorize a generic XLS support claim or any XLSX reader. Spreadsheet readers continue to feed the universal import pipeline. Fixture availability outside the exact completed Axis NRO and HDFC NRE/NRO grammars authorizes discovery, not production support.
+The accepted libxls reader authority is limited to version 1.6.3 at commit `c199d132494833da696b58aa4acf3fc5a36d930b`, statically vendored under its BSD 2-clause license and linked only to system `iconv`. It does not authorize a generic XLS support claim or any XLSX reader. Spreadsheet readers continue to feed the universal import pipeline. Fixture availability outside the exact completed Axis NRO, HDFC NRE/NRO and CBQ current-account transaction-history grammars authorizes discovery, not production support.
 
 ---
 
@@ -840,9 +841,9 @@ Support deterministic text statements through the existing pipeline.
 
 ## FW-P1-16 — Cross-Format Financial Equivalence
 
-**Status:** Partially completed for one exact HDFC bank-account pair
-**Completed boundary:** Sprint 73 implements exact ordered whole-statement equivalence only between `hdfc.bank-account.pdf@1` and `hdfc.bank-account.xls@1` under ADR-042.
-**Remaining boundary:** Axis PDF/CSV/XLS, CBQ, cards, same-format equivalence, partial overlap and every other institution or format pair require separate source approval and bounded implementation.
+**Status:** Partially completed for exact HDFC equivalence and a separate exact CBQ lineage family
+**Completed boundary:** Sprint 73 implements exact ordered whole-statement equivalence only between `hdfc.bank-account.pdf@1` and `hdfc.bank-account.xls@1` under ADR-042. Sprint 75 separately implements exact reviewed transaction-level lineage among `cbq.current-account.xls@1`, `cbq.current-account.history.pdf@1` and `cbq.current-account.monthly.pdf@1` under ADR-043; this is not generic whole-statement equivalence.
+**Remaining boundary:** Axis PDF/CSV/XLS, cards, same-format equivalence, generic partial overlap, other CBQ/HDFC profiles and every other institution or format relationship require separate source approval and bounded implementation.
 
 Verify equivalent statements produce equivalent:
 
@@ -854,8 +855,8 @@ Verify equivalent statements produce equivalent:
 - balances;
 - validation outcomes.
 
-Extraction differences must not change financial truth. The completed HDFC
-slice does not authorize fuzzy matching, generic equivalence, historical
+Extraction differences must not change financial truth. The completed HDFC and
+CBQ slices do not authorize fuzzy matching, generic equivalence, historical
 backfill, source replacement or authoritative-source switching.
 
 ---
@@ -1672,21 +1673,23 @@ Profiling output must remain separate from financial truth and must not retain s
 ## FW-P2-61 — Institution, Layout and Format Regression Matrix
 
 **Status:** Ready for discovery
-**Dependency now satisfied by:** Exact Axis CSV/PDF/XLS and exact HDFC PDF/XLS production families.
+**Dependency now satisfied by:** Exact Axis CSV/PDF/XLS, exact HDFC PDF/XLS and exact CBQ current-account XLS/history-PDF/monthly-PDF production families.
 
 Create a systematic regression matrix across the current exact supported institution, layout and format families.
 
-The integrated CBQ, HDFC card and other card fixtures may inform future discovery, but fixture presence alone does not establish additional production support. Sprint 73's HDFC PDF mechanics fixtures are regression evidence only; private-original acceptance remains the source authority.
+The integrated HDFC card, CBQ card and other card fixtures may inform future discovery, but fixture presence alone does not establish card production support. Sprint 73 HDFC and Sprint 75 CBQ mechanics fixtures are regression evidence only; private-original acceptance remains the source authority.
 
-Expand currency regression coverage once a second production currency exists; do not create a separate mixed-currency regression candidate.
+INR and QAR now provide two exact production currency paths. Include their
+native-currency regression boundary in this matrix; do not create a separate
+mixed-currency regression candidate or infer converted/consolidated totals.
 
 ---
 
 ## FW-P2-63 — Cross-Format Fixture-Parity Tests
 
-**Status:** Partially completed for exact HDFC PDF/XLS v1
-**Completed boundary:** Exact format-neutral projection and parity coverage for the approved HDFC bank-account PDF/XLS pair.
-**Remaining boundary:** Axis and card cross-format parity, additional HDFC formats, CBQ, same-format equivalence and partial-overlap behavior remain future work.
+**Status:** Partially completed for exact HDFC PDF/XLS v1 and exact CBQ three-source lineage
+**Completed boundary:** Exact format-neutral projection and parity coverage exists for the approved HDFC bank-account PDF/XLS pair. Exact account/posting-date/signed-QAR/balance lineage, all-new/mixed/fully-represented provider parity and source-summary coverage exist for the approved CBQ current-account XLS/history-PDF/monthly-PDF family.
+**Remaining boundary:** Axis and card cross-format parity, additional HDFC/CBQ formats, same-format equivalence and generic partial-overlap behavior remain future work.
 
 ---
 

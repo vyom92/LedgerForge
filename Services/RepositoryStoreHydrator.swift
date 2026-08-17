@@ -290,7 +290,14 @@ final class RepositoryStoreHydrator {
                 (accountDTO.id, try Self.identitySummaries(from: accountRepo.identifiers(accountId: accountDTO.id, workspaceId: workspaceId)))
             }
         )
-        let importedDocumentsByID = try referencedImportedDocuments(from: transactionDTOs)
+        let preferredSources = try importSessionRepo.preferredTransactionSources(workspaceId: workspaceId)
+        let preferredSourcesByTransactionID = Dictionary(uniqueKeysWithValues: preferredSources.map { ($0.transactionId, $0) })
+        var importedDocumentsByID = try referencedImportedDocuments(from: transactionDTOs)
+        for documentID in Set(preferredSources.map(\.documentId)) where importedDocumentsByID[documentID] == nil {
+            if let document = try importSessionRepo.importedDocument(id: documentID) {
+                importedDocumentsByID[documentID] = document
+            }
+        }
         let importAttempts = try importSessionRepo.importAttempts(workspaceId: workspaceId).map(RepositoryImportAttempt.init)
         let statementProjections = try importSessionRepo.statementFinancialProjections(workspaceId: workspaceId)
         let statementGroups = try importSessionRepo.statementEquivalenceGroups(workspaceId: workspaceId)
@@ -316,6 +323,7 @@ final class RepositoryStoreHydrator {
                 from: $0,
                 accounts: accountDTOs,
                 importedDocumentsByID: importedDocumentsByID,
+                preferredSource: preferredSourcesByTransactionID[$0.id],
                 workspaceID: workspaceId
             )
         }
@@ -769,6 +777,7 @@ final class RepositoryStoreHydrator {
         from dto: TransactionDTO,
         accounts: [AccountDTO],
         importedDocumentsByID: [String: ImportedDocumentDTO],
+        preferredSource: PreferredTransactionSourceDTO?,
         workspaceID: String
     ) throws -> Transaction {
         guard let postedDate = try? StatementDate(canonical: dto.postedDateISO) else {
@@ -853,6 +862,19 @@ final class RepositoryStoreHydrator {
         } else {
             repositorySourceDocumentName = nil
         }
+        let preferredSourceDocumentName: String? = preferredSource.flatMap { source in
+            guard let document = importedDocumentsByID[source.documentId],
+                  document.workspaceId == workspaceID,
+                  document.importSessionId == source.importSessionId else { return nil }
+            let value = document.filename.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? nil : value
+        }
+        let preferredSourceTransactionDate: StatementDate?
+        if let sourceTransactionDateISO = preferredSource?.sourceTransactionDateISO {
+            preferredSourceTransactionDate = try StatementDate(canonical: sourceTransactionDateISO)
+        } else {
+            preferredSourceTransactionDate = nil
+        }
 
         return Transaction(
             statementDate: postedDate,
@@ -874,7 +896,11 @@ final class RepositoryStoreHydrator {
             repositoryAccountId: dto.accountId,
             repositoryImportSessionId: dto.importSessionId,
             repositoryDocumentId: dto.documentId,
-            repositorySourceDocumentName: repositorySourceDocumentName
+            repositorySourceDocumentName: repositorySourceDocumentName,
+            repositoryPreferredSourceDocumentName: preferredSourceDocumentName,
+            repositoryPreferredSourceFormatCode: preferredSource?.sourceFormatCode,
+            repositoryPreferredSourceTransactionDate: preferredSourceTransactionDate,
+            repositoryPreferredStructuredReferenceDigest: preferredSource?.structuredReferenceDigest
         )
     }
 

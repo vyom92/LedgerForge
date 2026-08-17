@@ -106,6 +106,32 @@ struct TransactionSourceProvenance: Equatable, Sendable {
     let normalizedRecordDigest: String
     let parserProfileID: String
     let parserProfileVersion: String
+    /// A second date printed for the same source row. This remains source
+    /// evidence and never replaces the parser-owned canonical statement date.
+    let sourceTransactionDate: StatementDate?
+    /// Privacy-safe digest of a parser-recognized structured reference. Raw
+    /// narrations and references are deliberately excluded from V11 lineage.
+    let structuredReferenceDigest: String?
+
+    init(
+        normalizedDocumentID: String,
+        normalizedRowID: String,
+        sourceOrdinal: Int,
+        normalizedRecordDigest: String,
+        parserProfileID: String,
+        parserProfileVersion: String,
+        sourceTransactionDate: StatementDate? = nil,
+        structuredReferenceDigest: String? = nil
+    ) {
+        self.normalizedDocumentID = normalizedDocumentID
+        self.normalizedRowID = normalizedRowID
+        self.sourceOrdinal = sourceOrdinal
+        self.normalizedRecordDigest = normalizedRecordDigest
+        self.parserProfileID = parserProfileID
+        self.parserProfileVersion = parserProfileVersion
+        self.sourceTransactionDate = sourceTransactionDate
+        self.structuredReferenceDigest = structuredReferenceDigest
+    }
 }
 
 extension String {
@@ -183,6 +209,10 @@ struct Transaction: Identifiable {
     var repositoryImportSessionId: String? = nil
     let repositoryDocumentId: String?
     let repositorySourceDocumentName: String?
+    let repositoryPreferredSourceDocumentName: String?
+    let repositoryPreferredSourceFormatCode: String?
+    let repositoryPreferredSourceTransactionDate: StatementDate?
+    let repositoryPreferredStructuredReferenceDigest: String?
     var verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
 
     init(
@@ -206,6 +236,10 @@ struct Transaction: Identifiable {
         repositoryImportSessionId: String? = nil,
         repositoryDocumentId: String? = nil,
         repositorySourceDocumentName: String? = nil,
+        repositoryPreferredSourceDocumentName: String? = nil,
+        repositoryPreferredSourceFormatCode: String? = nil,
+        repositoryPreferredSourceTransactionDate: StatementDate? = nil,
+        repositoryPreferredStructuredReferenceDigest: String? = nil,
         verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence? = nil
     ) {
         self.id = id
@@ -228,6 +262,10 @@ struct Transaction: Identifiable {
         self.repositoryImportSessionId = repositoryImportSessionId
         self.repositoryDocumentId = repositoryDocumentId
         self.repositorySourceDocumentName = repositorySourceDocumentName
+        self.repositoryPreferredSourceDocumentName = repositoryPreferredSourceDocumentName
+        self.repositoryPreferredSourceFormatCode = repositoryPreferredSourceFormatCode
+        self.repositoryPreferredSourceTransactionDate = repositoryPreferredSourceTransactionDate
+        self.repositoryPreferredStructuredReferenceDigest = repositoryPreferredStructuredReferenceDigest
         self.verifiedAxisUPIEventEvidence = verifiedAxisUPIEventEvidence
     }
 

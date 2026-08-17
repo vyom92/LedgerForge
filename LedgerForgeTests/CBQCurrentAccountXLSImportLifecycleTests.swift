@@ -61,7 +61,7 @@ struct CBQCurrentAccountXLSImportLifecycleTests {
         #expect(memory.accountCount == 1)
         #expect(memory.identifierCount == 1)
         #expect(memory.transactionCount == 4)
-        #expect(memory.successfulAttemptCount == 1)
+        #expect(memory.committedAttemptCount == 1)
         #expect(memory.valueDateCount == 0)
         #expect(memory.projectionCount == 0)
         #expect(memory.currencyCodes == ["QAR"])
@@ -200,8 +200,8 @@ struct CBQCurrentAccountXLSImportLifecycleTests {
         let transactions = try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID)
         return CBQGraphSnapshot(
             financial: financial,
-            successfulAttemptCount: attempts.filter {
-                $0.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue
+            committedAttemptCount: attempts.filter {
+                $0.outcomeCode == ImportAttemptOutcome.cbqSourceOverlapCommitted.rawValue
             }.count,
             valueDateCount: transactions.compactMap(\.valueDateISO).count,
             projectionCount: try provider.importSessionRepo
@@ -292,7 +292,7 @@ private struct CBQFinancialGraphSnapshot: Equatable {
 
 private struct CBQGraphSnapshot: Equatable {
     let financial: CBQFinancialGraphSnapshot
-    let successfulAttemptCount: Int
+    let committedAttemptCount: Int
     let valueDateCount: Int
     let projectionCount: Int
     let currencyCodes: Set<String>
@@ -302,7 +302,7 @@ private struct CBQGraphSnapshot: Equatable {
     var identifierCount: Int { financial.identifierCount }
     var transactionCount: Int { financial.transactionCount }
     var isEmpty: Bool {
-        financial.isEmpty && successfulAttemptCount == 0 && projectionCount == 0
+        financial.isEmpty && committedAttemptCount == 0 && projectionCount == 0
     }
 }
 

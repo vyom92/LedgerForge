@@ -35,6 +35,82 @@ public struct ConfirmedImportIdentifierCandidateDTO: nonisolated Equatable, Send
     }
 }
 
+public struct CBQSourceIdentityPatternDTO: nonisolated Equatable, Sendable {
+    public let kind: String
+    public let pattern: String
+
+    public init(kind: String, pattern: String) {
+        self.kind = kind
+        self.pattern = pattern
+    }
+}
+
+public struct CBQSourceIdentityRecordDTO: nonisolated Equatable, Sendable {
+    public let accountId: String
+    public let kind: String
+    public let pattern: String
+
+    public init(accountId: String, kind: String, pattern: String) {
+        self.accountId = accountId
+        self.kind = kind
+        self.pattern = pattern
+    }
+}
+
+public struct CBQSourceRowDTO: nonisolated Equatable, Sendable {
+    public let incomingTransactionId: String
+    public let normalizedRowId: String
+    public let sourceOrdinal: Int
+    public let normalizedRecordDigest: String
+    public let postingDateISO: String
+    public let sourceTransactionDateISO: String?
+    public let nativeCurrency: String
+    public let signedAmountMinor: Int64
+    public let signedAmountDecimal: String
+    public let direction: String
+    public let runningBalanceMinor: Int64
+    public let runningBalanceDecimal: String
+    public let structuredReferenceDigest: String?
+
+    public init(incomingTransactionId: String, normalizedRowId: String, sourceOrdinal: Int, normalizedRecordDigest: String, postingDateISO: String, sourceTransactionDateISO: String?, nativeCurrency: String, signedAmountMinor: Int64, signedAmountDecimal: String, direction: String, runningBalanceMinor: Int64, runningBalanceDecimal: String, structuredReferenceDigest: String?) {
+        self.incomingTransactionId = incomingTransactionId
+        self.normalizedRowId = normalizedRowId
+        self.sourceOrdinal = sourceOrdinal
+        self.normalizedRecordDigest = normalizedRecordDigest
+        self.postingDateISO = postingDateISO
+        self.sourceTransactionDateISO = sourceTransactionDateISO
+        self.nativeCurrency = nativeCurrency
+        self.signedAmountMinor = signedAmountMinor
+        self.signedAmountDecimal = signedAmountDecimal
+        self.direction = direction
+        self.runningBalanceMinor = runningBalanceMinor
+        self.runningBalanceDecimal = runningBalanceDecimal
+        self.structuredReferenceDigest = structuredReferenceDigest
+    }
+}
+
+public struct CBQStatementSourceEvidenceDTO: nonisolated Equatable, Sendable {
+    public let sourceFormatCode: String
+    public let statementBoundaryDateISO: String?
+    public let statementStartDateISO: String?
+    public let statementEndDateISO: String?
+    public let openingBalanceMinor: Int64?
+    public let openingBalanceDecimal: String?
+    public let closingBalanceMinor: Int64?
+    public let closingBalanceDecimal: String?
+
+    public init(sourceFormatCode: String, statementBoundaryDateISO: String? = nil, statementStartDateISO: String? = nil, statementEndDateISO: String? = nil, openingBalanceMinor: Int64? = nil, openingBalanceDecimal: String? = nil, closingBalanceMinor: Int64? = nil, closingBalanceDecimal: String? = nil) {
+        self.sourceFormatCode = sourceFormatCode
+        self.statementBoundaryDateISO = statementBoundaryDateISO
+        self.statementStartDateISO = statementStartDateISO
+        self.statementEndDateISO = statementEndDateISO
+        self.openingBalanceMinor = openingBalanceMinor
+        self.openingBalanceDecimal = openingBalanceDecimal
+        self.closingBalanceMinor = closingBalanceMinor
+        self.closingBalanceDecimal = closingBalanceDecimal
+    }
+}
+
 /// Parser-produced, transient evidence transported only until the confirmed
 /// provider has selected the final durable account. It is deliberately not a
 /// persistence DTO and must never be serialized into history or diagnostics.
@@ -513,8 +589,11 @@ public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
     public let closingBalanceMinor: Int64?
     public let closingBalanceDecimal: String?
     public let statementFinancialProjection: StatementFinancialProjectionDTO?
+    public let cbqSourceIdentityPatterns: [CBQSourceIdentityPatternDTO]
+    public let cbqSourceRows: [CBQSourceRowDTO]
+    public let cbqStatementSourceEvidence: CBQStatementSourceEvidenceDTO?
 
-    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], historyTemplate: ConfirmedImportHistoryTemplateDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO], declaredStatementStartISO: String? = nil, declaredStatementEndISO: String? = nil, openingBalanceMinor: Int64? = nil, openingBalanceDecimal: String? = nil, closingBalanceMinor: Int64? = nil, closingBalanceDecimal: String? = nil, statementFinancialProjection: StatementFinancialProjectionDTO? = nil) {
+    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], historyTemplate: ConfirmedImportHistoryTemplateDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO], declaredStatementStartISO: String? = nil, declaredStatementEndISO: String? = nil, openingBalanceMinor: Int64? = nil, openingBalanceDecimal: String? = nil, closingBalanceMinor: Int64? = nil, closingBalanceDecimal: String? = nil, statementFinancialProjection: StatementFinancialProjectionDTO? = nil, cbqSourceIdentityPatterns: [CBQSourceIdentityPatternDTO] = [], cbqSourceRows: [CBQSourceRowDTO] = [], cbqStatementSourceEvidence: CBQStatementSourceEvidenceDTO? = nil) {
         self.providerGeneration = providerGeneration
         self.workspace = workspace
         self.proposedAccount = proposedAccount
@@ -530,7 +609,90 @@ public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
         self.closingBalanceMinor = closingBalanceMinor
         self.closingBalanceDecimal = closingBalanceDecimal
         self.statementFinancialProjection = statementFinancialProjection
+        self.cbqSourceIdentityPatterns = cbqSourceIdentityPatterns
+        self.cbqSourceRows = cbqSourceRows.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
+        self.cbqStatementSourceEvidence = cbqStatementSourceEvidence
     }
+}
+
+public enum CBQSourceOverlapDisposition: String, nonisolated Equatable, Sendable {
+    case new
+    case representedExisting = "represented-existing"
+}
+
+public struct ReviewedCBQSourceOverlapRowDTO: nonisolated Equatable, Sendable {
+    public let source: CBQSourceRowDTO
+    public let disposition: CBQSourceOverlapDisposition
+    public let expectedTransactionId: String?
+
+    public init(source: CBQSourceRowDTO, disposition: CBQSourceOverlapDisposition, expectedTransactionId: String? = nil) {
+        self.source = source
+        self.disposition = disposition
+        self.expectedTransactionId = expectedTransactionId
+    }
+}
+
+public struct ReviewedCBQSourceOverlapPlanDTO: nonisolated Equatable, Sendable {
+    public static let digestAlgorithm = "ledgerforge.cbq-source-overlap-plan.sha256.v1"
+    public let id: String
+    public let basePlan: ConfirmedImportPlanDTO
+    public let accountId: String
+    public let rows: [ReviewedCBQSourceOverlapRowDTO]
+    public let newCount: Int
+    public let representedCount: Int
+    public let blockedCount: Int
+    public let digest: String
+
+    public init(id: String = UUID().uuidString, basePlan: ConfirmedImportPlanDTO, accountId: String, rows: [ReviewedCBQSourceOverlapRowDTO], newCount: Int, representedCount: Int, blockedCount: Int, digest: String? = nil) {
+        self.id = id
+        self.basePlan = basePlan
+        self.accountId = accountId
+        self.rows = rows.sorted { $0.source.sourceOrdinal < $1.source.sourceOrdinal }
+        self.newCount = newCount
+        self.representedCount = representedCount
+        self.blockedCount = blockedCount
+        self.digest = digest ?? Self.makeDigest(id: id, basePlan: basePlan, accountId: accountId, rows: self.rows, newCount: newCount, representedCount: representedCount, blockedCount: blockedCount)
+    }
+
+    public func hasValidDigest() -> Bool {
+        digest == Self.makeDigest(id: id, basePlan: basePlan, accountId: accountId, rows: rows, newCount: newCount, representedCount: representedCount, blockedCount: blockedCount)
+    }
+
+    private static func makeDigest(id: String, basePlan: ConfirmedImportPlanDTO, accountId: String, rows: [ReviewedCBQSourceOverlapRowDTO], newCount: Int, representedCount: Int, blockedCount: Int) -> String {
+        let normalized = basePlan.historyTemplate.normalizedDocument
+        var values = [
+            digestAlgorithm, id, basePlan.providerGeneration.value.uuidString.lowercased(),
+            basePlan.workspace.id, accountId, normalized?.profileId ?? "", normalized?.profileVersion ?? "",
+            basePlan.historyTemplate.document.id, basePlan.historyTemplate.importSession.id,
+            String(newCount), String(representedCount), String(blockedCount)
+        ]
+        for fingerprint in basePlan.historyTemplate.fingerprints {
+            values += [fingerprint.algorithm, fingerprint.fingerprint, fingerprint.isDuplicateAuthority ? "1" : "0"]
+        }
+        for identity in basePlan.cbqSourceIdentityPatterns.sorted(by: { $0.kind < $1.kind }) {
+            values += [identity.kind, identity.pattern]
+        }
+        for row in rows {
+            let source = row.source
+            values += [source.incomingTransactionId, source.normalizedRowId, String(source.sourceOrdinal), source.normalizedRecordDigest,
+                       source.postingDateISO, source.sourceTransactionDateISO ?? "", source.nativeCurrency,
+                       String(source.signedAmountMinor), source.signedAmountDecimal, source.direction,
+                       String(source.runningBalanceMinor), source.runningBalanceDecimal,
+                       source.structuredReferenceDigest ?? "", row.disposition.rawValue, row.expectedTransactionId ?? ""]
+        }
+        let payload = values.map { "\($0.lengthOfBytes(using: .utf8)):\($0)" }.joined()
+        return SHA256.hash(data: Data(payload.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+public enum CBQSourceOverlapReviewResult: nonisolated Equatable, Sendable {
+    case notApplicable
+    case eligible(ReviewedCBQSourceOverlapPlanDTO)
+    case accountChoiceRequired(compatibleAccountIds: [String])
+    case identityConflict
+    case staleProviderGeneration
+    case blockedOrAmbiguousRows(count: Int)
+    case repositoryIntegrityConflict
 }
 
 public enum PartialImportRowDisposition: String, nonisolated Equatable, Sendable {
@@ -723,6 +885,7 @@ public enum ConfirmedImportRepositoryResult: nonisolated Equatable, Sendable, Cu
     case committed(ConfirmedImportReceiptDTO)
     case equivalentSourceRecorded(ConfirmedImportReceiptDTO)
     case partialCommitted(ConfirmedImportReceiptDTO)
+    case sourceOverlapCommitted(ConfirmedImportReceiptDTO, newTransactionCount: Int)
     case exactDuplicate
     case repeatedIncomingEventEvidence
     case existingEventDuplicate
@@ -749,6 +912,7 @@ public enum ConfirmedImportRepositoryResult: nonisolated Equatable, Sendable, Cu
         case .committed: return "Confirmed import committed."
         case .equivalentSourceRecorded: return "Equivalent supporting source recorded."
         case .partialCommitted: return "Reviewed partial import committed."
+        case .sourceOverlapCommitted: return "Reviewed CBQ source overlap committed."
         case .exactDuplicate: return "The statement was already imported."
         case .repeatedIncomingEventEvidence: return "Incoming transaction evidence conflicts within this import."
         case .existingEventDuplicate: return "A supported transaction event already exists."

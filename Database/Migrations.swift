@@ -765,7 +765,151 @@ END;
 """
 )
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10]
+public let migrationV11 = Migration(
+    version: 11,
+    name: "CBQ exact source observations and masked identity evidence",
+    sql: """
+CREATE TABLE cbq_source_identity_observations (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  import_session_id TEXT NOT NULL,
+  normalized_document_id TEXT NOT NULL,
+  parser_profile_id TEXT NOT NULL CHECK(parser_profile_id = 'cbq.current-account.monthly.pdf'),
+  parser_profile_version TEXT NOT NULL CHECK(parser_profile_version = '1'),
+  kind TEXT NOT NULL CHECK(kind IN ('cbq_masked_account_number', 'cbq_masked_iban')),
+  pattern TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  UNIQUE(document_id, kind),
+  CHECK((kind = 'cbq_masked_account_number' AND length(pattern) = 13) OR
+        (kind = 'cbq_masked_iban' AND length(pattern) = 29)),
+  CHECK(pattern NOT GLOB '*[^0-9A-Z]*' AND instr(pattern, 'X') > 0),
+  CHECK(kind != 'cbq_masked_account_number' OR pattern NOT GLOB '*[^0-9X]*'),
+  CHECK(kind != 'cbq_masked_iban' OR
+        (substr(pattern, 1, 2) = 'QA' AND
+         substr(pattern, 3, 2) NOT GLOB '*[^0-9]*' AND
+         substr(pattern, 5, 4) = 'CBQA')),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_cbq_source_identity_account
+  ON cbq_source_identity_observations(workspace_id, account_id, kind);
+
+CREATE TABLE statement_source_observations (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  import_session_id TEXT NOT NULL UNIQUE,
+  document_id TEXT NOT NULL UNIQUE,
+  normalized_document_id TEXT NOT NULL UNIQUE,
+  parser_profile_id TEXT NOT NULL CHECK(parser_profile_id IN ('cbq.current-account.xls', 'cbq.current-account.history.pdf', 'cbq.current-account.monthly.pdf')),
+  parser_profile_version TEXT NOT NULL CHECK(parser_profile_version = '1'),
+  source_format_code TEXT NOT NULL CHECK(source_format_code IN ('history-xls', 'history-pdf', 'monthly-pdf')),
+  native_currency TEXT NOT NULL CHECK(native_currency = 'QAR'),
+  source_row_count INTEGER NOT NULL CHECK(source_row_count > 0),
+  newly_imported_transaction_count INTEGER NOT NULL CHECK(newly_imported_transaction_count >= 0),
+  represented_transaction_count INTEGER NOT NULL CHECK(represented_transaction_count >= 0),
+  blocked_count INTEGER NOT NULL CHECK(blocked_count = 0),
+  statement_boundary_date DATE,
+  statement_start_date DATE,
+  statement_end_date DATE,
+  opening_balance_minor INTEGER,
+  opening_balance_decimal TEXT,
+  closing_balance_minor INTEGER,
+  closing_balance_decimal TEXT,
+  created_at DATETIME NOT NULL,
+  CHECK(source_row_count = newly_imported_transaction_count + represented_transaction_count),
+  CHECK((statement_start_date IS NULL AND statement_end_date IS NULL) OR
+        (statement_start_date IS NOT NULL AND statement_end_date IS NOT NULL AND statement_start_date <= statement_end_date)),
+  CHECK((opening_balance_minor IS NULL) = (opening_balance_decimal IS NULL)),
+  CHECK((closing_balance_minor IS NULL) = (closing_balance_decimal IS NULL)),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_statement_source_observation_account
+  ON statement_source_observations(workspace_id, account_id, created_at);
+
+CREATE TABLE transaction_source_observations (
+  id TEXT PRIMARY KEY,
+  canonical_transaction_id TEXT NOT NULL,
+  document_id TEXT NOT NULL,
+  import_session_id TEXT NOT NULL,
+  normalized_row_id TEXT NOT NULL UNIQUE,
+  source_ordinal INTEGER NOT NULL CHECK(source_ordinal > 0),
+  posting_date DATE NOT NULL,
+  source_transaction_date DATE,
+  native_currency TEXT NOT NULL CHECK(native_currency = 'QAR'),
+  signed_amount_minor INTEGER NOT NULL CHECK(signed_amount_minor != 0),
+  signed_amount_decimal TEXT NOT NULL CHECK(length(signed_amount_decimal) > 0),
+  running_balance_minor INTEGER NOT NULL,
+  running_balance_decimal TEXT NOT NULL CHECK(length(running_balance_decimal) > 0),
+  structured_reference_digest TEXT CHECK(structured_reference_digest IS NULL OR (length(structured_reference_digest) = 64 AND structured_reference_digest NOT GLOB '*[^0-9a-f]*')),
+  observation_role TEXT NOT NULL CHECK(observation_role IN ('introduced', 'represented-existing')),
+  created_at DATETIME NOT NULL,
+  UNIQUE(document_id, source_ordinal),
+  FOREIGN KEY(canonical_transaction_id) REFERENCES transactions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_row_id) REFERENCES normalized_rows(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_transaction_source_observation_canonical
+  ON transaction_source_observations(canonical_transaction_id, created_at);
+
+CREATE TRIGGER validate_cbq_source_identity_observation
+BEFORE INSERT ON cbq_source_identity_observations
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM accounts a WHERE a.id = NEW.account_id AND a.workspace_id = NEW.workspace_id
+  ) THEN RAISE(ABORT, 'cbq identity account relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d JOIN import_sessions s ON s.id = d.import_session_id
+    JOIN normalized_documents n ON n.document_id = d.id AND n.import_session_id = s.id
+    WHERE d.id = NEW.document_id AND s.id = NEW.import_session_id
+      AND n.id = NEW.normalized_document_id AND d.workspace_id = NEW.workspace_id
+      AND n.profile_id = NEW.parser_profile_id AND n.profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'cbq identity source relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_statement_source_observation
+BEFORE INSERT ON statement_source_observations
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM accounts a WHERE a.id = NEW.account_id AND a.workspace_id = NEW.workspace_id
+  ) THEN RAISE(ABORT, 'statement source account relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d JOIN import_sessions s ON s.id = d.import_session_id
+    JOIN normalized_documents n ON n.document_id = d.id AND n.import_session_id = s.id
+    WHERE d.id = NEW.document_id AND s.id = NEW.import_session_id
+      AND n.id = NEW.normalized_document_id AND d.workspace_id = NEW.workspace_id
+      AND n.profile_id = NEW.parser_profile_id AND n.profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'statement source relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_transaction_source_observation
+BEFORE INSERT ON transaction_source_observations
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM transactions t
+    JOIN documents d ON d.id = NEW.document_id
+    JOIN import_sessions s ON s.id = NEW.import_session_id
+    JOIN normalized_rows r ON r.id = NEW.normalized_row_id
+    JOIN normalized_documents n ON n.id = r.normalized_document_id
+    WHERE t.id = NEW.canonical_transaction_id
+      AND d.import_session_id = s.id
+      AND n.document_id = d.id AND n.import_session_id = s.id
+  ) THEN RAISE(ABORT, 'transaction source relationship invalid') END;
+END;
+"""
+)
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

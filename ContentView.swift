@@ -667,7 +667,7 @@ enum DurableImportAccountOutcomeSection {
     ) -> ImportAccountOutcomePresentation? {
         if let outcome = ImportAttemptOutcome(rawValue: outcomeCode) {
             switch outcome {
-            case .successfulImport, .partialImportCommitted, .accountChoiceRequired,
+            case .successfulImport, .cbqSourceOverlapCommitted, .partialImportCommitted, .accountChoiceRequired,
                     .identifierOwnershipConflict, .identityAmbiguity, .identityConflict,
                     .staleAccountChoice, .staleProviderGeneration:
                 return ImportAccountOutcomePresentationMapper.presentation(
@@ -748,6 +748,13 @@ struct DurableImportAttemptPresentation: Equatable {
             return DurableImportPresentationValue(
                 label: "Equivalent source recorded",
                 explanation: "Recorded equivalent source evidence and persisted 0 additional transactions",
+                iconName: "checkmark.seal.fill",
+                tone: .success
+            )
+        case .cbqSourceOverlapCommitted:
+            return DurableImportPresentationValue(
+                label: "CBQ source recorded",
+                explanation: "Recorded exact CBQ source lineage and persisted \(transactionCount) new transaction(s)",
                 iconName: "checkmark.seal.fill",
                 tone: .success
             )

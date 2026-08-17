@@ -1848,6 +1848,19 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
             .sorted()
     }
 
+    func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO] {
+        try db.query(
+            sql: "SELECT account_id, kind, pattern FROM cbq_source_identity_observations WHERE workspace_id = ? ORDER BY account_id, kind, pattern;",
+            params: [workspaceId]
+        ) { row in
+            CBQSourceIdentityRecordDTO(
+                accountId: row.string(at: 0) ?? "",
+                kind: row.string(at: 1) ?? "",
+                pattern: row.string(at: 2) ?? ""
+            )
+        }
+    }
+
     private func storedIdentifiers(workspaceId: String, scheme: String, identifier: String) throws -> [AccountIdentifierDTO] {
         let sql = """
         SELECT ai.id, ai.account_id, a.workspace_id, ai.scheme, ai.identifier, ai.provenance, ai.created_at
@@ -2117,6 +2130,41 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
                 id: row.string(at: 0) ?? "", groupID: row.string(at: 1) ?? "",
                 projectionID: row.string(at: 2) ?? "", role: role,
                 sourceFormatCode: row.string(at: 4) ?? "", createdAtISO: row.string(at: 5) ?? ""
+            )
+        }
+    }
+
+    func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO] {
+        let rows = try db.query(
+            sql: "SELECT o.canonical_transaction_id, o.document_id, o.import_session_id, s.source_format_code, o.source_transaction_date, o.structured_reference_digest FROM transaction_source_observations o JOIN statement_source_observations s ON s.document_id = o.document_id JOIN transactions t ON t.id = o.canonical_transaction_id WHERE t.workspace_id = ? ORDER BY o.canonical_transaction_id, CASE s.source_format_code WHEN 'monthly-pdf' THEN 3 WHEN 'history-pdf' THEN 2 ELSE 1 END DESC, o.created_at DESC, o.document_id;",
+            params: [workspaceId]
+        ) { row in
+            PreferredTransactionSourceDTO(
+                transactionId: row.string(at: 0) ?? "",
+                documentId: row.string(at: 1) ?? "",
+                importSessionId: row.string(at: 2) ?? "",
+                sourceFormatCode: row.string(at: 3) ?? "",
+                sourceTransactionDateISO: row.string(at: 4),
+                structuredReferenceDigest: row.string(at: 5)
+            )
+        }
+        var seen = Set<String>()
+        return rows.filter { seen.insert($0.transactionId).inserted }
+    }
+
+    func cbqSourceObservationSummaries(workspaceId: String) throws -> [CBQSourceObservationSummaryDTO] {
+        try db.query(
+            sql: "SELECT s.document_id, s.import_session_id, s.source_format_code, s.source_row_count, s.newly_imported_transaction_count, s.represented_transaction_count, COUNT(t.id) FROM statement_source_observations s LEFT JOIN transaction_source_observations t ON t.document_id = s.document_id WHERE s.workspace_id = ? GROUP BY s.document_id, s.import_session_id, s.source_format_code, s.source_row_count, s.newly_imported_transaction_count, s.represented_transaction_count ORDER BY s.document_id;",
+            params: [workspaceId]
+        ) { row in
+            CBQSourceObservationSummaryDTO(
+                documentId: row.string(at: 0) ?? "",
+                importSessionId: row.string(at: 1) ?? "",
+                sourceFormatCode: row.string(at: 2) ?? "",
+                sourceRowCount: Int(row.int64(at: 3) ?? 0),
+                importedTransactionCount: Int(row.int64(at: 4) ?? 0),
+                representedTransactionCount: Int(row.int64(at: 5) ?? 0),
+                transactionObservationCount: Int(row.int64(at: 6) ?? 0)
             )
         }
     }

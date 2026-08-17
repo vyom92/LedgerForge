@@ -16,6 +16,42 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         self.generationToken = generationToken
     }
 
+    func reviewCBQSourceOverlap(_ plan: ConfirmedImportPlanDTO) -> CBQSourceOverlapReviewResult {
+        guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+        do {
+            try plan.historyTemplate.validateFingerprints()
+            return try reviewCBQSourceOverlapInsideTransaction(plan, planID: UUID().uuidString)
+        } catch { return .repositoryIntegrityConflict }
+    }
+
+    func commitReviewedCBQSourceOverlap(_ reviewed: ReviewedCBQSourceOverlapPlanDTO) -> ConfirmedImportRepositoryResult {
+        guard consumePlan(reviewed.id), reviewed.basePlan.providerGeneration == generationToken,
+              reviewed.hasValidDigest(), reviewed.blockedCount == 0 else { return .reviewedPartialPlanStale }
+        do {
+            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+            let current = try reviewCBQSourceOverlapInsideTransaction(reviewed.basePlan, planID: reviewed.id)
+            guard case .eligible(let currentPlan) = current, currentPlan == reviewed else {
+                try db.execute(sql: "ROLLBACK;")
+                return .reviewedPartialPlanStale
+            }
+            let narrowed = try narrowedCBQPlan(reviewed)
+            let result = try commitInsideTransaction(narrowed)
+            guard case .committed(let receipt) = result else {
+                try db.execute(sql: "ROLLBACK;")
+                return result
+            }
+            try insertCBQSourceObservations(reviewed)
+            try db.execute(sql: "COMMIT;")
+            return .sourceOverlapCommitted(receipt, newTransactionCount: reviewed.newCount)
+        } catch let error as SQLiteExecutionError where error.isRetryableContention {
+            try? db.execute(sql: "ROLLBACK;"); return .retryableContention
+        } catch let SQLiteDatabaseError.execution(error) where error.isRetryableContention {
+            try? db.execute(sql: "ROLLBACK;"); return .retryableContention
+        } catch {
+            try? db.execute(sql: "ROLLBACK;"); return .repositoryIntegrityConflict
+        }
+    }
+
     func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult {
         guard plan.providerGeneration == generationToken else { return .evidenceUnavailable }
         do {
@@ -154,11 +190,14 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         switch plan.advisoryIdentity {
         case .resolved(let accountID) where currentOwner != accountID: return .staleIdentityDecision
         case .noMatch where currentOwner != nil:
+            if isCBQObservationPlan(plan), case .useExistingAccount(let selected) = plan.accountChoice, selected == currentOwner {
+                break
+            }
             if case .createProposedAccount = plan.accountChoice {
                 return .identifierOwnershipConflict
             }
             return .staleIdentityDecision
-        case .ambiguous: return .identityAmbiguous
+        case .ambiguous where !isCBQObservationPlan(plan): return .identityAmbiguous
         case .conflict: return .identityConflict
         default: break
         }
@@ -181,7 +220,9 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             if let currentOwner {
                 guard currentOwner == accountID else { return .identifierOwnershipConflict }
             } else if try count("SELECT COUNT(*) FROM account_identifiers WHERE account_id = ? AND workspace_id = ?;", [accountID, plan.workspace.id]) > 0 {
-                return .selectedAccountIneligible
+                guard isCBQObservationPlan(plan), try cbqAccountIsCompatible(plan, accountID: accountID) else {
+                    return .selectedAccountIneligible
+                }
             }
             account = existing
         }
@@ -259,6 +300,196 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         )
         let receipt = ConfirmedImportReceiptDTO(workspaceId: plan.workspace.id, accountId: account.id, importSessionId: history.importSession.id, documentId: history.document.id)
         return isSupportingSource ? .equivalentSourceRecorded(receipt) : .committed(receipt)
+    }
+
+    private func reviewCBQSourceOverlapInsideTransaction(_ plan: ConfirmedImportPlanDTO, planID: String) throws -> CBQSourceOverlapReviewResult {
+        guard isCBQObservationPlan(plan), let evidence = plan.cbqStatementSourceEvidence,
+              plan.cbqSourceRows.count == plan.historyTemplate.normalizedRows.count,
+              plan.cbqSourceRows.count == plan.transactionTemplates.count,
+              evidence.sourceFormatCode == expectedCBQSourceFormat(plan),
+              Set(plan.cbqSourceRows.map(\.sourceOrdinal)).count == plan.cbqSourceRows.count,
+              Set(plan.cbqSourceRows.map(\.normalizedRowId)).count == plan.cbqSourceRows.count else {
+            return .notApplicable
+        }
+        let compatible = try compatibleCBQAccountIDs(plan)
+        let accountID: String
+        switch plan.accountChoice {
+        case .createProposedAccount:
+            guard compatible.isEmpty else { return .accountChoiceRequired(compatibleAccountIds: compatible) }
+            accountID = plan.proposedAccount.id
+        case .useExistingAccount(let selected):
+            guard compatible.contains(selected) else { return .identityConflict }
+            accountID = selected
+        case .unspecified:
+            return compatible.isEmpty ? .identityConflict : .accountChoiceRequired(compatibleAccountIds: compatible)
+        }
+
+        var reviewedRows = [ReviewedCBQSourceOverlapRowDTO]()
+        var blocked = 0
+        var usedExisting = Set<String>()
+        for source in plan.cbqSourceRows.sorted(by: { $0.sourceOrdinal < $1.sourceOrdinal }) {
+            guard source.nativeCurrency == "QAR", source.signedAmountMinor != 0,
+                  source.runningBalanceDecimal.count > 0,
+                  plan.historyTemplate.normalizedRows.contains(where: {
+                      $0.id == source.normalizedRowId && $0.sourceOrdinal == source.sourceOrdinal && $0.digest == source.normalizedRecordDigest
+                  }) else {
+                return .repositoryIntegrityConflict
+            }
+            if case .createProposedAccount = plan.accountChoice {
+                reviewedRows.append(.init(source: source, disposition: .new))
+                continue
+            }
+            var candidates = try db.query(
+                sql: "SELECT id FROM transactions WHERE account_id = ? AND posted_date = ? AND native_currency = ? AND amount_minor = ? AND amount_decimal = ? AND direction = ? AND running_balance_minor = ? ORDER BY id;",
+                params: [accountID, source.postingDateISO, source.nativeCurrency, source.signedAmountMinor, source.signedAmountDecimal, source.direction, source.runningBalanceMinor]
+            ) { $0.string(at: 0) ?? "" }.filter { !$0.isEmpty }
+            if candidates.count > 1, let digest = source.structuredReferenceDigest {
+                let referenced = try db.query(
+                    sql: "SELECT DISTINCT canonical_transaction_id FROM transaction_source_observations WHERE structured_reference_digest = ? ORDER BY canonical_transaction_id;",
+                    params: [digest]
+                ) { $0.string(at: 0) ?? "" }
+                candidates = candidates.filter(Set(referenced).contains)
+            }
+            if candidates.isEmpty {
+                reviewedRows.append(.init(source: source, disposition: .new))
+            } else if candidates.count == 1, let transactionID = candidates.first, !usedExisting.contains(transactionID) {
+                usedExisting.insert(transactionID)
+                reviewedRows.append(.init(source: source, disposition: .representedExisting, expectedTransactionId: transactionID))
+            } else {
+                blocked += 1
+            }
+        }
+        guard blocked == 0, reviewedRows.count == plan.cbqSourceRows.count else {
+            return .blockedOrAmbiguousRows(count: blocked)
+        }
+        let newCount = reviewedRows.filter { $0.disposition == .new }.count
+        return .eligible(ReviewedCBQSourceOverlapPlanDTO(
+            id: planID, basePlan: plan, accountId: accountID, rows: reviewedRows,
+            newCount: newCount, representedCount: reviewedRows.count - newCount, blockedCount: 0
+        ))
+    }
+
+    private func narrowedCBQPlan(_ reviewed: ReviewedCBQSourceOverlapPlanDTO) throws -> ConfirmedImportPlanDTO {
+        let plan = reviewed.basePlan
+        let newIDs = Set(reviewed.rows.filter { $0.disposition == .new }.map(\.source.incomingTransactionId))
+        let originalAttempt = plan.historyTemplate.successfulAttempt
+        let attempt = ImportAttemptDTO(
+            id: originalAttempt.id, workspaceId: originalAttempt.workspaceId,
+            createdAtISO: originalAttempt.createdAtISO,
+            outcomeCode: ImportAttemptOutcome.cbqSourceOverlapCommitted.rawValue,
+            coverageCode: originalAttempt.coverageCode,
+            accountDecisionCode: originalAttempt.accountDecisionCode,
+            guidanceCode: originalAttempt.guidanceCode,
+            persistenceCode: originalAttempt.persistenceCode,
+            transactionCount: reviewed.newCount,
+            accountId: reviewed.accountId,
+            importSessionId: originalAttempt.importSessionId,
+            documentId: originalAttempt.documentId,
+            relatedImportSessionId: originalAttempt.relatedImportSessionId,
+            sourceRowCount: reviewed.rows.count,
+            importedTransactionCount: reviewed.newCount,
+            recognizedExistingRowCount: reviewed.representedCount,
+            blockedRowCount: 0
+        )
+        let history = ConfirmedImportHistoryTemplateDTO(
+            document: plan.historyTemplate.document, fingerprints: plan.historyTemplate.fingerprints,
+            importSession: plan.historyTemplate.importSession, completedAtISO: plan.historyTemplate.completedAtISO,
+            successfulAttempt: attempt, normalizedDocument: plan.historyTemplate.normalizedDocument,
+            normalizedRows: plan.historyTemplate.normalizedRows
+        )
+        return ConfirmedImportPlanDTO(
+            providerGeneration: plan.providerGeneration, workspace: plan.workspace, proposedAccount: plan.proposedAccount,
+            accountChoice: plan.accountChoice, advisoryIdentity: plan.advisoryIdentity, identifiers: plan.identifiers,
+            historyTemplate: history, transactionTemplates: plan.transactionTemplates.filter { newIDs.contains($0.transaction.id) },
+            declaredStatementStartISO: plan.declaredStatementStartISO, declaredStatementEndISO: plan.declaredStatementEndISO,
+            openingBalanceMinor: plan.openingBalanceMinor, openingBalanceDecimal: plan.openingBalanceDecimal,
+            closingBalanceMinor: plan.closingBalanceMinor, closingBalanceDecimal: plan.closingBalanceDecimal,
+            statementFinancialProjection: plan.statementFinancialProjection,
+            cbqSourceIdentityPatterns: plan.cbqSourceIdentityPatterns, cbqSourceRows: plan.cbqSourceRows,
+            cbqStatementSourceEvidence: plan.cbqStatementSourceEvidence
+        )
+    }
+
+    private func insertCBQSourceObservations(_ reviewed: ReviewedCBQSourceOverlapPlanDTO) throws {
+        let plan = reviewed.basePlan
+        guard let normalized = plan.historyTemplate.normalizedDocument,
+              let evidence = plan.cbqStatementSourceEvidence else {
+            throw RepositoryError.relationshipViolation("CBQ source evidence is unavailable.")
+        }
+        let history = plan.historyTemplate
+        for identity in plan.cbqSourceIdentityPatterns {
+            try db.executePrepared(
+                sql: "INSERT INTO cbq_source_identity_observations (id, workspace_id, account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, kind, pattern, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?);",
+                params: [UUID().uuidString, plan.workspace.id, reviewed.accountId, history.document.id, history.importSession.id, normalized.id, normalized.profileId, normalized.profileVersion, identity.kind, identity.pattern, history.completedAtISO]
+            )
+        }
+        try db.executePrepared(
+            sql: "INSERT INTO statement_source_observations (id, workspace_id, account_id, import_session_id, document_id, normalized_document_id, parser_profile_id, parser_profile_version, source_format_code, native_currency, source_row_count, newly_imported_transaction_count, represented_transaction_count, blocked_count, statement_boundary_date, statement_start_date, statement_end_date, opening_balance_minor, opening_balance_decimal, closing_balance_minor, closing_balance_decimal, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+            params: [UUID().uuidString, plan.workspace.id, reviewed.accountId, history.importSession.id, history.document.id, normalized.id, normalized.profileId, normalized.profileVersion, evidence.sourceFormatCode, "QAR", reviewed.rows.count, reviewed.newCount, reviewed.representedCount, 0, evidence.statementBoundaryDateISO ?? NSNull(), evidence.statementStartDateISO ?? NSNull(), evidence.statementEndDateISO ?? NSNull(), evidence.openingBalanceMinor ?? NSNull(), evidence.openingBalanceDecimal ?? NSNull(), evidence.closingBalanceMinor ?? NSNull(), evidence.closingBalanceDecimal ?? NSNull(), history.completedAtISO]
+        )
+        for row in reviewed.rows {
+            let canonicalID = row.disposition == .new ? row.source.incomingTransactionId : row.expectedTransactionId
+            guard let canonicalID else { throw RepositoryError.relationshipViolation("CBQ source row has no canonical transaction.") }
+            try db.executePrepared(
+                sql: "INSERT INTO transaction_source_observations (id, canonical_transaction_id, document_id, import_session_id, normalized_row_id, source_ordinal, posting_date, source_transaction_date, native_currency, signed_amount_minor, signed_amount_decimal, running_balance_minor, running_balance_decimal, structured_reference_digest, observation_role, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: [UUID().uuidString, canonicalID, history.document.id, history.importSession.id, row.source.normalizedRowId, row.source.sourceOrdinal, row.source.postingDateISO, row.source.sourceTransactionDateISO ?? NSNull(), row.source.nativeCurrency, row.source.signedAmountMinor, row.source.signedAmountDecimal, row.source.runningBalanceMinor, row.source.runningBalanceDecimal, row.source.structuredReferenceDigest ?? NSNull(), row.disposition == .new ? "introduced" : "represented-existing", history.completedAtISO]
+            )
+        }
+    }
+
+    private func expectedCBQSourceFormat(_ plan: ConfirmedImportPlanDTO) -> String? {
+        switch plan.historyTemplate.normalizedDocument?.profileId {
+        case "cbq.current-account.xls": return "history-xls"
+        case "cbq.current-account.history.pdf": return "history-pdf"
+        case "cbq.current-account.monthly.pdf": return "monthly-pdf"
+        default: return nil
+        }
+    }
+
+    private func isCBQObservationPlan(_ plan: ConfirmedImportPlanDTO) -> Bool {
+        expectedCBQSourceFormat(plan) != nil && !plan.cbqSourceRows.isEmpty && plan.cbqStatementSourceEvidence != nil
+    }
+
+    private func compatibleCBQAccountIDs(_ plan: ConfirmedImportPlanDTO) throws -> [String] {
+        let accountIDs = try db.query(
+            sql: "SELECT id FROM accounts WHERE workspace_id = ? AND institution_id = ? AND account_type = 'bank' AND native_currency = 'QAR' ORDER BY id;",
+            params: [plan.workspace.id, "Commercial Bank of Qatar"]
+        ) { $0.string(at: 0) ?? "" }
+        return try accountIDs.filter { try cbqAccountIsCompatible(plan, accountID: $0) }
+    }
+
+    private func cbqAccountIsCompatible(_ plan: ConfirmedImportPlanDTO, accountID: String) throws -> Bool {
+        let fullIncoming = plan.identifiers.first { $0.scheme == "institution_account_id" && $0.normalizedValue.count == 13 }?.normalizedValue
+        let strong = try db.query(
+            sql: "SELECT identifier FROM account_identifiers WHERE account_id = ? AND workspace_id = ? AND scheme = ? ORDER BY identifier;",
+            params: [accountID, plan.workspace.id, "institution_account_id"]
+        ) { $0.string(at: 0) ?? "" }.filter { $0.count == 13 }
+        let durableMasks = try db.query(
+            sql: "SELECT kind, pattern FROM cbq_source_identity_observations WHERE account_id = ? AND workspace_id = ? ORDER BY kind, pattern;",
+            params: [accountID, plan.workspace.id]
+        ) { (kind: $0.string(at: 0) ?? "", pattern: $0.string(at: 1) ?? "") }
+        if !plan.cbqSourceIdentityPatterns.isEmpty {
+            let fullMatch = strong.contains { candidate in plan.cbqSourceIdentityPatterns.allSatisfy { Self.mask($0.pattern, matches: candidate) } }
+            let maskMatch = plan.cbqSourceIdentityPatterns.allSatisfy { incoming in
+                durableMasks.filter { $0.kind == incoming.kind }.contains { Self.masksCompatible(incoming.pattern, $0.pattern) }
+            }
+            return fullMatch || maskMatch
+        }
+        if let fullIncoming {
+            return strong.contains(fullIncoming) || (!durableMasks.isEmpty && durableMasks.allSatisfy { Self.mask($0.pattern, matches: fullIncoming) })
+        }
+        return false
+    }
+
+    private static func mask(_ pattern: String, matches fullAccount: String) -> Bool {
+        let compared = pattern.count == 29 ? String(pattern.suffix(13)) : pattern
+        guard compared.count == 13, fullAccount.count == 13 else { return false }
+        return zip(compared, fullAccount).allSatisfy { $0 == "X" || $0 == $1 }
+    }
+
+    private static func masksCompatible(_ lhs: String, _ rhs: String) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        return zip(lhs, rhs).allSatisfy { $0 == "X" || $1 == "X" || $0 == $1 }
     }
 
     private func insert(
