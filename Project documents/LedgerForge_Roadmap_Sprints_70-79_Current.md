@@ -454,13 +454,13 @@ expected net QAR
 - the existing unified source snapshot/fingerprint/reader/import-history pipeline is reused, but salary receives a typed payload/persistence branch rather than fabricated `FinancialDocument.transactions`;
 - a dedicated `Salary` sidebar destination owns Salary History and This Month planning; Dashboard receives summary-only expected-this-month, planned-obligations/funding-position and available-for-investment values;
 - one current-month funding plan is editable user state; explicit rollover seeds the new month from the previous editable plan and every carried value remains editable at any time;
-- balance selection is account-driven and explicit: checked accounts contribute an editable planning balance, with provenance distinguishing carried, manual and explicitly refreshed account snapshots;
+- balance selection is account-driven and explicit: checked accounts contribute an editable planning balance, with provenance distinguishing carried, manual and explicitly refreshed account snapshots; a checked account with no balance makes affected outputs incomplete rather than zero, and the only eligible account is never auto-selected merely because it is unique;
 - current Qatar planning uses the selected QAR account set, presently CBQ; current India planning may select Axis NRE, Axis NRO, HDFC NRE and HDFC NRO independently;
 - current account balances are never silently treated as historical opening cash; refresh/capture is user-triggered and captured planning balances are not live-linked;
 - India funding shortfall is calculated only after checked INR liquidity is considered; commitments may optionally target a funding account for routing math without creating transfers or transactions;
 - salary-to-bank and card-to-bank matching remain explicit/manual only; no amount/date auto-match is authorized;
-- transfer fee is editable QAR planning input, initially QAR 25;
-- planning FX is a plan-local, explicit, dated, user-entered quote in `INR per 1 QAR`; Sprint 79 does not activate the dormant global `exchange_rates` domain;
+- transfer fee is editable QAR planning input, initially QAR 25; it contributes only when India funding shortfall is greater than zero, otherwise its effective contribution is QAR 0 while the configured value remains retained/editable;
+- planning FX is a plan-local, explicit, dated, user-entered positive quote in `INR per 1 QAR`; Sprint 79 does not activate the dormant global `exchange_rates` domain; when India funding is required, missing/invalid FX makes QAR funding and investment-capacity outputs incomplete rather than zero;
 - when INR commitments require QAR funding, the derived QAR principal rounds upward to the next QAR minor unit so the plan does not underfund the stated INR requirement;
 - available-for-investment is a derived result after checked Qatar liquidity, expected salary, Qatar obligations, India funding shortfall and transfer fee; planned investment remains a separate editable user input;
 - the manual Budget Analysis workflow is a product-behaviour reference only, not salary source truth or an acceptance oracle.

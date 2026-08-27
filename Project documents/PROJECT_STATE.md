@@ -35,10 +35,10 @@ The approved product boundary is:
 - fixed/variable are editable planning semantics only, never imported payroll classifications;
 - one dedicated `Salary` sidebar space owns Salary History plus This Month planning; Dashboard receives summary-only funding signals;
 - one editable current-month plan may roll forward prior values and account selections as editable defaults;
-- checked QAR/INR accounts contribute explicit planning balances with carried/manual/refreshed-snapshot provenance; current balance capture is always user-triggered and never live-linked;
+- checked QAR/INR accounts contribute explicit planning balances with carried/manual/refreshed-snapshot provenance; current balance capture is always user-triggered and never live-linked; missing checked-account balance evidence makes affected outputs incomplete rather than zero, and account inclusion is never auto-selected solely because one eligible account exists;
 - India funding uses selected INR liquidity before calculating the Qatar funding shortfall;
-- transfer fee starts at editable QAR 25;
-- plan-local user-entered FX is dated and oriented as INR per 1 QAR; the dormant global `exchange_rates` domain remains inactive;
+- transfer fee starts at editable QAR 25 and contributes only when India funding shortfall is greater than zero; otherwise its effective contribution is QAR 0 while the configured fee remains editable;
+- plan-local user-entered FX is positive, dated and oriented as INR per 1 QAR; the dormant global `exchange_rates` domain remains inactive; if India funding is required and FX is missing/invalid, QAR funding and investment-capacity outputs are incomplete rather than zero;
 - INR funding conversion rounds the required QAR principal upward to the next QAR minor unit;
 - available-for-investment and final buffer are derived planner outputs, while planned investment is editable user input;
 - no automatic salary-bank matching, card-payment matching, transfers, obligation inference or investment execution is authorized.

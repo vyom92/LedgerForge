@@ -5732,7 +5732,7 @@ A captured account balance becomes a planning snapshot and is not live-linked. L
 
 Current product requirements include the selectable QAR account set, presently CBQ, and the independently selectable India INR accounts Axis NRE, Axis NRO, HDFC NRE and HDFC NRO. Architecture remains account-ID driven so future eligible accounts do not require hardcoded schema columns.
 
-Only checked balances contribute to planner liquidity.
+Only checked balances contribute to planner liquidity. A checked account without a planning-balance value makes every affected liquidity/funding result incomplete; missing balance evidence is never treated as Money zero. LedgerForge does not auto-select an eligible account merely because it is the only eligible account.
 
 ### Commitments and funding flow
 
@@ -5775,9 +5775,9 @@ Where INR funding shortfall requires conversion to QAR principal:
 exact QAR requirement = INR shortfall / INR-per-QAR rate
 ```
 
-The payable/funding principal rounds **upward** to the next QAR minor unit. This explicit derived-planning rounding rule exists solely to avoid underfunding the stated INR requirement and does not weaken ADR-033's no-implicit-rounding rule for imported/persisted native Money.
+The payable/funding principal rounds **upward** to the next QAR minor unit. This explicit derived-planning rounding rule exists solely to avoid underfunding the stated INR requirement and does not weaken ADR-033's no-implicit-rounding rule for imported/persisted native Money. If India funding shortfall is greater than zero but a valid positive dated planning FX quote is absent, QAR funding principal, available-for-investment and final-buffer outputs are incomplete/unavailable; they are never substituted with zero.
 
-The editable transfer fee is native QAR Money and initially defaults to QAR 25.00.
+The editable transfer fee is native QAR Money and initially defaults to QAR 25.00. The configured fee contributes to the current plan only when India funding shortfall is greater than zero. When India funding shortfall is zero, effective transfer fee is QAR 0.00 while the configured fee remains retained, editable and eligible for rollover.
 
 ### Derived planner outputs
 
@@ -5791,7 +5791,7 @@ QAR before investment
 = expected QAR available
 - Qatar commitments
 - rounded QAR principal required for India
-- transfer fee
+- effective transfer fee when India funding is required
 
 available for investment
 = QAR before investment
