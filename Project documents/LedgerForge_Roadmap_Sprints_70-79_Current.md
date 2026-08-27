@@ -64,7 +64,7 @@ Classify material claims as verified, explicit user decision, reported only or i
 | 78 | Exact Axis credit-card PDF/XLSX support/equivalence | Failed |
 | 78A | First bounded Sprint-78 correction | Failed |
 | 78B | Bounded Sprint-78 correction that completed the outcome | **Accepted 2026-08-27** |
-| 79 | Qatar Airways salary + current-month funding planner | Unblocked for Chat planning; not authorized for execution |
+| 79 | Qatar Airways salary + current-month funding planner | Architecture approved; execution awaits complete Chat prompt |
 
 ---
 
