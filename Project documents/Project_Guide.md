@@ -1,536 +1,412 @@
 # LedgerForge Project Guide
 
-**Status:** Active repository routing guide  
-**Alignment reviewed:** 2026-07-25
+**Status:** Active task-routing authority
+
+## PG-00 — Machine Reading Contract
+
+This file is a routing guide, not a general project briefing.
+
+For every task:
+
+1. Read **PG-01 Task Index**.
+2. Classify the task as exactly one primary task type.
+3. Jump directly to that task's `PG-*` section.
+4. Read only that task section, authorities explicitly named by that section, and source/tests/evidence required by the task.
+5. Do not read other playbooks merely because they exist.
+6. If a task genuinely spans multiple types, the Coordinator must name the primary type and explicitly authorize any secondary playbook.
+7. Exit this guide at the `END PG-*` marker for the selected section.
+
+Do not load the whole document into working context by default.
+
+The complete Chat-approved execution prompt remains the execution contract. This guide routes work; it does not authorize implementation.
+
+---
+
+## PG-01 — Task Index
+
+| Task type | Jump to | Terminal state |
+|---|---|---|
+| Prepare roadmap / select next sprint | `PG-10` | `PLAN_READY` |
+| Targeted discovery / diagnosis | `PG-20` | `DISCOVERY_RESOLVED` |
+| Implement an approved sprint | `PG-30` | `IMPLEMENTATION_CANDIDATE` |
+| Corrective sprint / bounded repair | `PG-35` | `IMPLEMENTATION_CANDIDATE` |
+| Technical acceptance / report review | `PG-40` | `TECHNICALLY_ACCEPTED`, `REJECTED_WITH_BOUNDARY`, or `BLOCKED_BY_NAMED_EVIDENCE` |
+| Documentation sync | `PG-50` | `DOCS_RECONCILED` |
+| Architecture / ADR decision | `PG-60` | `ARCHITECTURE_DECIDED` |
+| Repository recovery / Git-state repair | `PG-70` | `RECOVERY_CLEAN` |
+| MCP infrastructure engineering | `PG-80` | `MCP_ACCEPTED` |
+| Simple pushed-repository question | `PG-90` | Verified answer |
+| Maintain this guide | `PG-99` | Guide-specific completion |
+
+If no row clearly matches, return to Chat for task classification. Do not invent a new workflow casually.
+
+---
+
+## PG-02 — Minimal Authority Map
+
+Read an authority only when the selected playbook requires it.
+
+| Need | Authority |
+|---|---|
+| Current accepted repository state | `PROJECT_STATE.md` |
+| Unscheduled work / canonical queue | `FUTURE_WORK.MD` |
+| Accepted architecture | `ADR.md` + relevant architecture document |
+| Persistence / migrations | `Database_v1_Architecture.md` + registered migrations |
+| Financial engineering invariants | `Engineering Standards.md` |
+| Build, Xcode, Git and validation mechanics | `BUILD_AND_PROJECT_CONVENTIONS.md` |
+| Approved UI | `UI_UX_v1.0_Frozen.md` + approved assets |
+| Actual pushed implementation | GitHub exact ref |
+| Actual local / unstaged implementation | MCP Executor / direct local evidence |
+| Execution authorization | Complete current Chat-approved prompt |
+
+Memory, old conversations, uploads and reports are context, not repository authority. Reports are claims until independently verified.
+
+---
+
+## PG-03 — Coordinator Execution-Topology Requirement
+
+Whenever the Coordinator prepares an execution prompt, the prompt MUST explicitly determine:
+
+- primary task type;
+- reasoning owner;
+- parent model;
+- reasoning level;
+- model justification;
+- subagent count, model, and reasoning;
+- read/write role;
+- parallelism;
+- write ownership;
+- MCP role;
+- escalation condition;
+- required terminal state.
+
+Required prompt block:
+
+```text
+EXECUTION TOPOLOGY
+
+Primary task type:
+<PG section>
+
+Reasoning owner:
+<Chat / execution model>
+
+Parent execution model:
+<model or none>
+
+Parent reasoning level:
+<low / medium / high / max>
+
+Why this model/reasoning level:
+<bounded justification>
+
+Subagents:
+<none / count + model + reasoning>
+
+Subagent mode:
+<read-only / writer / specialist>
+
+Parallelism:
+<none / parallel / sequential>
+
+Write ownership:
+<one writer / exact disjoint ownership>
+
+MCP role:
+<read evidence / mutation gate / validation / final verification / publish>
+
+Escalation condition:
+<exact condition requiring return to Chat>
+
+Required terminal state:
+<defined PG end state>
+```
+
+Use the least costly model/reasoning level that can safely complete the bounded work. Prefer Chat Sol High for sprint selection, architecture, financial-source-truth reasoning, acceptance, and cross-authority semantic reconciliation; Luna High for tightly bounded implementation, one-file edits, mechanical transformations, and focused evidence work; Luna Max for broad integration/orchestration and final cross-file consistency reasoning.
+
+Use subagents only when decomposition reduces context or increases independent verification. For production code prefer one writer plus read-only specialists. Multiple writers require explicit disjoint ownership. Documentation sync is the canonical one-file-per-writer exception. The execution model must not silently redesign its model/subagent topology unless the approved prompt delegates that decision.
+
+---
+
+# PG-10 — Prepare Roadmap / Select Next Sprint
 
 ## Purpose
+Choose the next bounded product outcome without authorizing implementation.
 
-This is the concise human-readable map for the LedgerForge repository.
+## Reasoning owner
+Chat / Coordinator. Default reasoning: **Sol High**.
 
-Begin with the repository-root `AGENTS.md`. It is the sole mandatory bootstrap entry point.
+## Read
+GitHub exact pushed ref; `PROJECT_STATE.md`; `FUTURE_WORK.MD`; relevant ADR/code/tests only for serious contenders; MCP only when local/unpushed evidence materially affects selection.
 
-This guide routes a task to the correct subject authorities. It does not duplicate their complete rules and does not authorize work.
+## Method
+1. Establish exact inspected ref.
+2. Read current state and canonical queue in P0 → P1 → P2 → P3 order.
+3. Separate priority from readiness.
+4. Classify serious higher-priority candidates as implementation-ready, ready for targeted discovery, blocked by named dependency, completed/no longer applicable, or explicitly deferred.
+5. Inspect only evidence needed to distinguish serious contenders.
+6. Decide combine/split boundary and select one outcome.
+7. Define included scope, exclusions, acceptance boundary, stop conditions, migration impact, and ADR impact.
+8. Prepare execution topology under `PG-03`.
 
-The complete Chat-approved prompt supplied directly in the current conversation is the sole execution contract.
+Default subagents: none. Read-only Luna High agents are allowed only for independent bounded evidence gaps. No writers.
 
-There is no repository-stored active work contract.
+## Required end state: `PLAN_READY`
+Planning is complete and implementation has not begun.
 
----
-
-## Authority Model
-
-Use the least broad authoritative source that can answer the question.
-
-| Question | Primary authority |
-|---|---|
-| What is verified in the current repository? | Exact repository evidence and `Project documents/PROJECT_STATE.md` |
-| What may be executed now? | The complete Chat-approved prompt in the current conversation |
-| What remains unscheduled? | `Project documents/FUTURE_WORK.MD` |
-| What architecture is accepted? | `Project documents/ADR.md` and `Project documents/Architecture_v1.0_Frozen.md` |
-| What is the database design? | `Project documents/Database_v1_Architecture.md`, accepted ADRs and registered migrations |
-| What is product direction? | `Project documents/Product Vision.md` |
-| What UI is approved? | `Project documents/UI_UX_v1.0_Frozen.md` and approved assets |
-| What engineering, privacy and verification standards apply? | `AGENTS.md` and `Project documents/Engineering Standards.md` |
-| What build, Xcode and Git mechanics apply? | `Project documents/BUILD_AND_PROJECT_CONVENTIONS.md` |
-| What happened historically? | Git history and historical ADR text |
-| What is true only in the local checkout? | Direct local evidence, normally through bounded Work investigation |
-
-When authorities conflict:
-
-1. identify the exact conflict;
-2. inspect the current exact ref;
-3. apply accepted ADRs over older frozen baseline text where they supersede it;
-4. do not choose the most convenient interpretation;
-5. stop and return the unresolved decision to Chat.
-
-Memory, uploaded copies and earlier conversations provide context only. They do not override current repository evidence.
+**END PG-10**
 
 ---
 
-## Repository Map
+# PG-20 — Targeted Discovery / Diagnosis
 
-| Path | Purpose |
-|---|---|
-| `AGENTS.md` | Mandatory bootstrap, role ownership, repository workflow and core invariants |
-| `Project documents/Project_Guide.md` | This routing map |
-| `Project documents/PROJECT_STATE.md` | Verified current repository reality |
-| `Project documents/FUTURE_WORK.MD` | Canonical unscheduled queue |
-| `Project documents/ADR.md` | Accepted architectural decisions and historical decision record |
-| `Project documents/Architecture_v1.0_Frozen.md` | Frozen system architecture and compatibility boundary |
-| `Project documents/Database_v1_Architecture.md` | Persistence, migration and database-design boundary |
-| `Project documents/Product Vision.md` | Long-term product direction |
-| `Project documents/UI_UX_v1.0_Frozen.md` | Frozen UI/UX authority |
-| `Project documents/UI Assets/Approved/` | Approved visual references |
-| `Project documents/Engineering Standards.md` | Financial correctness, privacy, evidence and verification policy |
-| `Project documents/BUILD_AND_PROJECT_CONVENTIONS.md` | Build, Xcode, validation and Git mechanics |
-| `LedgerForgeTests/` | Automated tests and approved fixture evidence |
-| Registered migrations | Exact executable schema authority |
-| Production source | Verified implementation behavior when documentation is insufficient |
+## Purpose
+Resolve one decision-critical unknown.
 
-Do not treat a document list as an instruction to read everything.
+## Reasoning owner
+Chat defines the question and decision boundary. Use Luna High for bounded diagnosis; Luna Max only when causal tracing spans several tightly coupled layers.
 
-Load only the authorities required by the task.
+## Tools
+Use the least invasive proving source: GitHub for pushed truth; MCP/direct local evidence for current local/unstaged truth; specialist macOS tooling for Xcode/SwiftUI/runtime questions; Browser only for current official external documentation.
+
+## Method
+1. State the exact unknown and why it affects a decision.
+2. Inspect the smallest plausible causal boundary; widen only when evidence requires it.
+3. Separate verified fact, reported fact, inference, and unresolved gap.
+4. Identify the first causal ownership layer.
+5. Return cause, evidence, affected scope, candidate repair boundary, and remaining uncertainty.
+
+Read-only parallel Luna High agents are allowed only for independent causal boundaries. No parallel writers.
+
+## Required end state: `DISCOVERY_RESOLVED`
+The unknown is resolved sufficiently for Chat to decide, or one named blocker and its required evidence are established. No opportunistic implementation.
+
+**END PG-20**
 
 ---
 
-## Current Import Architecture
+# PG-30 — Implement Approved Sprint
 
-The approved production flow is:
+## Purpose
+Implement exactly the Chat-approved sprint outcome.
+
+## Reasoning owner
+Chat owns scope, architecture, source truth, and acceptance boundary. Codex owns bounded implementation under the approved prompt.
+
+## Default topology
+Narrow work: Luna High parent, High reasoning, no subagents or bounded read-only specialists. Broad/cross-layer work: Luna Max parent, High reasoning, Luna High read-only specialists, normally one production writer.
+
+## Method
+1. Consume the approved execution contract and verify live-state evidence.
+2. Stop on material contradiction.
+3. Acquire mutation authority only immediately before mutation.
+4. Edit only approved scope.
+5. Run the smallest meaningful validation first, then widen only as acceptance/risk requires.
+6. Test falsification paths, not only success paths.
+7. Leave the candidate unstaged unless publication is explicitly included.
+8. Return exact MCP candidate-state evidence.
+
+## Required end state: `IMPLEMENTATION_CANDIDATE`
+A bounded local candidate appears to satisfy acceptance. It remains pending Chat acceptance.
+
+**END PG-30**
+
+---
+
+# PG-35 — Corrective Sprint / Bounded Repair
+
+## Purpose
+Repair a defect attributable to an existing sprint without silently widening scope.
+
+## Reasoning owner
+Chat determines attribution, corrective suffix, and minimum repair boundary.
+
+Use `PG-30` execution mechanics.
+
+## Method
+1. Establish the failed acceptance condition and attribution to Sprint N.
+2. Preserve the original intended outcome.
+3. Repair only the first causal boundary plus required consequences.
+4. Add regression/falsification evidence.
+5. Do not absorb unrelated work or renumber later planned sprints.
+
+## Required end state: `IMPLEMENTATION_CANDIDATE`
+The corrected original outcome is ready for Chat acceptance.
+
+**END PG-35**
+
+---
+
+# PG-40 — Technical Acceptance / Report Review
+
+## Purpose
+Determine whether a candidate actually satisfies the approved outcome.
+
+## Reasoning owner
+Chat / Coordinator. Default reasoning: **Sol High**.
+
+## Method
+Verify candidate identity, branch/worktree handling, changed files, scope/exclusions, architecture/migration impact, independent-oracle boundary, test boundary, source truth where relevant, provider parity where relevant, persistence/hydration/relaunch/presentation where relevant, privacy/residue, falsification evidence, and final local state.
+
+Treat execution reports as claims. Classify material claims as verified, reported only, contradicted, or missing.
+
+Optional Luna High subagents are read-only evidence audits. No writers.
+
+## Required end state
+Exactly one:
+- `TECHNICALLY_ACCEPTED`
+- `REJECTED_WITH_BOUNDARY`
+- `BLOCKED_BY_NAMED_EVIDENCE`
+
+Acceptance does not automatically imply publication.
+
+**END PG-40**
+
+---
+
+# PG-50 — Documentation Sync
+
+## Purpose
+Reconcile accepted implementation, architecture, roadmap, and workflow truth without creating another duplicated policy layer.
+
+## Reasoning owner
+**Chat / Coordinator performs semantic reasoning file-by-file.** Default reasoning: **Sol High**. The execution model implements already-settled semantic specifications.
+
+## Canonical topology
 
 ```text
-ImportCoordinator
-    ↓
-PasswordProvider
-    ↓
-ReaderRegistry
-    ↓
-Reader
-    ↓
-RawDocument
-    ↓
-Institution Detection
-    ↓
-Statement Classification
-    ↓
-Parser Selection
-    ↓
-Statement Parser
-    ↓
-FinancialDocument
-    ↓
-Validation
-    ↓
-Exact-Content and Supported Transaction-Event Evaluation
-    ↓
-Account / Identity Review
-    ↓
-Explicit User Confirmation
-    ↓
-DatabaseProvider Confirmed-Import Operation
-    ↓
-Provider-Owned Atomic Persistence
-    ↓
-RepositoryStoreHydrator
-    ↓
-Runtime Stores
-    ↓
-ViewModels
-    ↓
-Views
+Chat semantic reasoning
+→ MCP live unstaged evidence
+→ file-by-file specifications
+→ MCP mutation gate
+→ Luna Max coordinator
+→ one Luna High writer per file
+→ Luna Max read-only cross-file verification
+→ Chat rereads actual files via MCP
+→ semantic acceptance
+→ publication gate
 ```
 
-Key boundaries:
+## Rules
+1. Chat freezes accepted product truth before writers edit dependent facts.
+2. MCP provides live local/unstaged truth; GitHub is not used to infer local state.
+3. Chat specifies each target file independently: preserve, remove, add, move, structural requirements, and cross-file invariants.
+4. Each Luna High writer owns exactly one file and may not edit another.
+5. Cross-file problems are reported as `CROSS_FILE_NOTE`, not edited outside ownership.
+6. Luna Max coordinates writers, then performs read-only cross-file verification after subagents finish.
+7. Luna Max does not integration-edit after subagents finish.
+8. Chat rereads the actual resulting files through MCP and performs semantic acceptance.
+9. Documentation-only work does not trigger application-wide tests unless executable material changed.
+10. Private planning/harness material remains outside Git unless separately authorized.
 
-- readers understand source formats;
-- parsers own financial interpretation and verified financial identifiers;
-- validation precedes accepted persistence;
-- preparation and review are read-only;
-- advisory duplicate and identity results are not confirmation-time authority;
-- the provider revalidates the accepted plan inside one atomic operation;
-- rejected or losing accepted operations leave zero accepted financial residue;
-- `RepositoryStoreHydrator` is the sole persistence-to-runtime boundary;
-- runtime stores are projections, not durable truth.
+## Required end state: `DOCS_RECONCILED`
+Current authorities agree; obsolete current-state claims are removed or narrowed; historical claims remain historically accurate; policy has one durable home where practical; routing points to subject authorities instead of duplicating them; no private material leaked into Git; final diff is ready for publication review.
 
-The current production-support boundary belongs only in `PROJECT_STATE.md`.
-
-A reader, parser, protocol, fixture, schema table or visually similar layout does not establish support.
-
----
-
-## Role Ownership
-
-### Chat
-
-Chat owns:
-
-- sprint planning;
-- prioritization;
-- architecture discussion and decisions;
-- execution-prompt preparation;
-- review of Work and Codex reports;
-- final acceptance.
-
-Planning does not authorize implementation.
-
-### Work
-
-Work performs bounded, read-only investigation only when GitHub cannot efficiently establish a decision-critical fact.
-
-Before escalation, Chat states:
-
-1. the exact unknown;
-2. why it affects the decision;
-3. the bounded evidence Work must return.
-
-Work may investigate:
-
-- local or unpushed state;
-- linked worktrees;
-- filesystem or Xcode configuration;
-- build, test or runtime evidence;
-- broad cross-file tracing;
-- one unresolved architecture boundary.
-
-Work does not:
-
-- edit files;
-- select a sprint;
-- define architecture;
-- commit;
-- push;
-- create branches or pull requests.
-
-### Codex
-
-Codex performs only the edits, builds, tests, documentation updates and Git operations authorized by the complete Chat-approved prompt.
-
-Codex reports evidence and limitations directly in chat.
-
-### User edits
-
-The user may edit repository files directly.
-
-Legitimate compatible user work must be preserved and reconciled.
-
-Unrelated, ambiguous, private, incompatible or unsafe work is a stop condition, not permission to discard it.
+**END PG-50**
 
 ---
 
-## Tool Routing
+# PG-60 — Architecture / ADR Decision
 
-Use the least invasive authoritative tool.
+## Purpose
+Resolve an architectural question before implementation.
 
-| Need | Preferred route |
-|---|---|
-| Pushed files, refs, commits, issues, PRs or CI | GitHub |
-| Local branch, dirty worktree, stashes, linked worktrees or unpushed commits | Work or direct local evidence |
-| SwiftUI, AppKit, Xcode, signing, packaging or macOS runtime expertise | Build macOS Apps guidance, subordinate to accepted ADRs |
-| Current official external documentation | Browser |
-| Approved visual comparison | Figma and approved assets |
-| Explicitly relevant supporting material outside GitHub | Google Drive |
-| Artifact creation or conversion | Only when explicitly requested |
+## Reasoning owner
+Chat. Default: **Sol High**.
 
-Do not inspect GitHub through Browser or Computer Use when the GitHub connector can answer.
+## Method
+1. Define the architectural question and existing accepted constraints.
+2. Gather only decision-relevant ADR, architecture, source/test, local, and official external evidence.
+3. Compare serious alternatives against correctness, persistence, determinism, migration, privacy, and operability.
+4. Decide or name the blocker.
+5. Record an ADR only after the decision is accepted.
 
-Do not infer local state from pushed GitHub state.
+Read-only Luna High specialists may investigate independent alternatives/layers. They do not decide architecture.
 
----
+## Required end state: `ARCHITECTURE_DECIDED`
+An explicit architecture decision or named unresolved blocker exists. Implementation remains separately authorized.
 
-## Task Routing
-
-| Task | Read next |
-|---|---|
-| Sprint planning or backlog review | `PROJECT_STATE.md` → `FUTURE_WORK.MD` → relevant ADRs, architecture, code/tests and fixtures |
-| Report review | Exact starting/ending refs → changed files → relevant authorities → tests, oracles, documentation and Git residue |
-| Swift implementation | `PROJECT_STATE.md` → approved prompt → relevant ADRs/architecture → Engineering Standards → source/tests |
-| Database or migration work | Database Architecture → relevant ADRs → registered migrations → providers/DTOs/tests |
-| Import, reader or parser work | Architecture → relevant ADRs → Engineering Standards → approved fixtures and independent expected evidence |
-| Identity or duplicate work | ADR-027 through ADR-031 and ADR-038/039 as relevant → providers/tests/fixtures |
-| Money or currency work | ADR-033 → Engineering Standards → providers/hydration/presentation tests |
-| Category work | ADR-036 → current transaction identity and hydration → UI authority → migration/provider tests |
-| Financial mutation or repair | ADR-037 → one concrete family → provider/migration/hydration and audit boundary |
-| UI implementation | Frozen UI/UX → approved assets → Architecture → Engineering Standards → repository-backed state |
-| Build or Xcode project work | Build Conventions → `AGENTS.md` → exact project/scheme/TestPlan state |
-| Documentation alignment | Affected subject authorities → current exact ref → complete prompt → cross-document consistency |
-| Local repository recovery | `AGENTS.md` and Build Conventions → bounded local evidence before any edit |
-| External technical dependency | Current official documentation, then reconcile with accepted repository architecture |
-
-Use only the documents required by the task.
-
-Do not invent:
-
-- a sprint;
-- a production-support claim;
-- an architecture decision;
-- a migration;
-- a fixture baseline;
-- local repository state.
+**END PG-60**
 
 ---
 
-## Planning Route
+# PG-70 — Repository Recovery / Git-State Repair
 
-For sprint planning:
+## Purpose
+Make repository state understood and safe without losing unique work.
 
-1. identify the exact inspected ref;
-2. establish the verified baseline from `PROJECT_STATE.md`;
-3. review `FUTURE_WORK.MD` in P0, P1, P2, P3 order;
-4. distinguish priority from readiness;
-5. classify every serious higher-priority candidate;
-6. inspect focused code, tests and fixtures only where documentation is insufficient;
-7. compare the strongest plausible candidates;
-8. define included scope, exclusions, acceptance boundary and stop conditions;
-9. state migration and ADR impact;
-10. identify remaining evidence gaps;
-11. use Work only for a named bounded gap that GitHub cannot resolve.
+## Decision owner
+Chat.
 
-A lower-priority item is not selected merely because it is easier.
+## Primary tool
+MCP Executor / direct local repository evidence. Do not infer local state from GitHub.
 
-Candidates are combined only when they produce one outcome, share one architectural boundary and can be validated by one bounded acceptance plan.
+## Method
+Inventory primary worktree, branch/HEAD, main/origin-main relation, staged/unstaged/untracked paths, linked worktrees, local/remote branches, stashes, active operations, leases/processes, and unique commits. Classify every unexplained state; preserve all unique work; consolidate only proven compatible work; remove only proven redundant state with explicit authorization; verify final state.
 
-Sprint selection does not authorize implementation.
+Normally use no subagents. Repository destruction is never delegated to autonomous agents.
 
----
+## Required end state: `RECOVERY_CLEAN`
+One understood safe primary worktree, with no unique or unexplained work lost.
 
-## Execution Lifecycle
-
-The default lifecycle is:
-
-```text
-Verified repository state
-    ↓
-Approved scope and execution prompt
-    ↓
-Complete local repository preflight
-    ↓
-Recovery gate, if needed
-    ↓
-Full-repository reconciliation
-    ↓
-Authorized edit
-    ↓
-Focused build/test feedback
-    ↓
-Required regression, Release, analysis and runtime verification
-    ↓
-Authorized documentation reconciliation
-    ↓
-Complete diff, privacy and Git review
-    ↓
-Commit
-    ↓
-Push to origin/main
-    ↓
-Verify clean main == origin/main
-    ↓
-Direct evidence report
-```
-
-Default repository model:
-
-- one `main` branch;
-- one primary worktree;
-- one active repository task;
-- no pull request;
-- no feature branch;
-- no extra worktree.
-
-A branch, worktree or pull request requires explicit user approval, a repository-specific reason and an approved prompt requiring the exception.
+**END PG-70**
 
 ---
 
-## Local Repository Gate
+# PG-80 — MCP Infrastructure Engineering
 
-Before Codex execution, verify:
+## Purpose
+Develop or maintain LedgerForge MCP infrastructure without conflating it with LedgerForge product implementation.
 
-- current branch and HEAD;
-- `main`;
-- `origin/main`;
-- divergence;
-- staged changes;
-- unstaged changes;
-- untracked files;
-- linked worktrees;
-- local and remote branches;
-- stashes;
-- in-progress Git operations.
+## Ownership
+MCP Developer workflow. Product sprint Coordinator retains authority over product-repository impact.
 
-Never delete, reset, drop, prune, overwrite or force-push unique or unexplained work.
+## Method
+1. Define the MCP infrastructure change and baseline.
+2. Implement in the LedgerForge-MCP repository/scratch.
+3. Static/unit qualify; deploy/qualify the live executor as required; verify recovery/rollback.
+4. Perform only bounded product-repository compatibility checks unless product mutation is separately authorized.
+5. Report exact executor/tool/schema state.
 
-The required recovery target is:
+Coordinator chooses model/reasoning under `PG-03`. MCP infrastructure-admin authority never implies product-writing authority.
 
-- approved completed work consolidated onto `main`;
-- local and remote `main` synchronized;
-- only proven-safe redundant branches/worktrees removed;
-- one clean primary worktree;
-- no unexplained stash;
-- no unique unpushed commit elsewhere.
+## Required end state: `MCP_ACCEPTED`
+Qualified MCP infrastructure with product-repository isolation preserved.
 
-Stop on ambiguity.
+**END PG-80**
 
 ---
 
-## Financial Evidence Route
+# PG-90 — Simple Pushed-Repository Question
 
-For financial-correctness work:
+## Purpose
+Answer a bounded factual question about pushed repository state.
 
-- source semantics outrank parser-derived expected output;
-- production parser output cannot be its own sole oracle;
-- preserve native currency, scale, direction, date meaning, source order, balances, identifiers and provenance;
-- fail closed on malformed, ambiguous, conflicting or unsupported evidence;
-- verify zero accepted durable residue on rejection;
-- require SQLite/In-Memory parity where both matter;
-- verify persistence, hydration, provider reconstruction, relaunch and presentation;
-- do not infer support from structural similarity;
-- do not invent historical evidence;
-- keep sanitized fixtures in Git and private originals outside it.
+## Tools
+GitHub exact ref. Read only the smallest relevant file/code/test.
 
-Distinguish:
+## Method
+1. Identify exact ref.
+2. Inspect the smallest authoritative source.
+3. Answer and state uncertainty if the source cannot establish the claim.
 
-- source truth;
-- implementation behavior;
-- test evidence;
-- inference.
+Do not load roadmap, complete project state, recovery rules, unrelated ADRs, or local-state evidence.
 
-A green suite proves only the boundary and oracle it actually exercises.
+## Required end state
+Verified answer with exact pushed-repository evidence.
+
+**END PG-90**
 
 ---
 
-## Report Review Route
+## PG-99 — Guide Maintenance
 
-Treat Work and Codex reports as claims requiring verification.
+Change this guide only when task classifications, authority routing, model/tool ownership, execution-topology rules, or terminal-state definitions materially change.
 
-Classify material claims as:
+Do not add sprint history, support matrices, migration history, parser architecture detail, financial-rule detail, build commands, Git recipes, or duplicated subject-authority content.
 
-- verified;
-- reported only;
-- contradicted;
-- missing.
+When this guide conflicts with a subject authority, repair the guide. Keep section IDs stable so agents can jump directly to known `PG-*` sections.
 
-Verify at minimum:
-
-- starting and ending refs;
-- branch and worktree handling;
-- changed files;
-- included and excluded scope;
-- migration impact;
-- ADR impact;
-- fixture and oracle authority;
-- what tests actually exercise;
-- persistence, hydration and relaunch where relevant;
-- documentation changes;
-- staged, unstaged and untracked residue;
-- commit and push result;
-- final `main == origin/main`;
-- limitations;
-- falsification analysis.
-
-A green suite is not acceptance evidence until its boundary and oracle independence are checked.
-
----
-
-## Reference Fixtures
-
-Approved sanitized or clean-room fixtures and their independent expected evidence define only the claims covered by their tests and metadata.
-
-Fixture presence does not establish:
-
-- production reader support;
-- production parser support;
-- institution-wide support;
-- another source format;
-- durable persistence;
-- hydration;
-- UI support;
-- exact-content identity.
-
-Private statements, credentials and unrestricted source evidence never enter Git.
-
-Use OCR only when reliable native extraction is unavailable and the approved evidence boundary requires it.
-
----
-
-## Documentation Rules
-
-Verified durable facts belong only in their subject authorities.
-
-| Fact | Authority |
-|---|---|
-| Current implementation state | `PROJECT_STATE.md` |
-| Unscheduled work | `FUTURE_WORK.MD` |
-| Accepted architecture | `ADR.md` |
-| Frozen architecture alignment | Architecture documents |
-| Product direction | Product Vision |
-| Approved UI | Frozen UI/UX and assets |
-| Engineering policy | Engineering Standards |
-| Build and Git mechanics | Build Conventions |
-| Detailed implementation history | Git |
-
-Do not turn every document into a duplicate project-state ledger.
-
-When architecture changes, review:
-
-- ADR;
-- frozen Architecture;
-- Database Architecture where relevant;
-- Engineering Standards;
-- UI/UX where relevant;
-- `PROJECT_STATE.md`;
-- `FUTURE_WORK.MD` only when queue reconciliation is explicitly authorized.
-
----
-
-## Documentation-Only Cycles
-
-Documentation-only work may skip full executable validation only when all of the following remain unchanged:
-
-- Swift source;
-- tests;
-- schemas;
-- migrations;
-- fixtures;
-- Xcode project metadata;
-- schemes;
-- TestPlan;
-- build settings;
-- assets;
-- executable resources.
-
-Every documentation-only cycle still requires:
-
-- exact-ref verification;
-- authority review;
-- complete diff review;
-- conflict-marker scan;
-- link and path validation;
-- privacy review;
-- status-claim verification;
-- Git-state verification.
-
-A `project.pbxproj`, scheme, TestPlan or build-setting change is not documentation-only work.
-
----
-
-## Stop Conditions
-
-Stop rather than improvise when:
-
-- the repository baseline differs materially from the approved prompt;
-- local state is ambiguous;
-- unique work may be lost;
-- remote divergence is unresolved;
-- required architecture is absent or contradictory;
-- a migration requires guessing;
-- source truth is unavailable;
-- financial relationships cannot be preserved;
-- the independent oracle is missing;
-- privacy-sensitive material appears;
-- required validation fails;
-- the complete diff cannot be explained;
-- provider parity cannot be established;
-- zero-residue behavior cannot be proven;
-- requested work would overstate production support.
-
-Report the exact unknown and the bounded evidence required to continue.
-
----
-
-## Guide Maintenance
-
-This guide should remain concise.
-
-Update it only when:
-
-- a subject authority changes;
-- role ownership changes;
-- task routing changes;
-- the canonical pipeline changes;
-- the repository lifecycle changes.
-
-Do not copy detailed rules from Engineering Standards or Build Conventions into this guide unless the routing decision itself depends on them.
-
-When this guide conflicts with a subject authority, repair the guide rather than broadening its authority.
-
----
+**END PG-99**
 
 ## End of Project Guide

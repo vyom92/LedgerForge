@@ -5,7 +5,16 @@ import Combine
 import Foundation
 import Security
 
+struct StatementPasswordStoredCredential: Sendable, Equatable {
+    let value: String
+    let origin: ImportFramework.StatementPasswordCandidateOrigin
+}
+
 protocol StatementPasswordCredentialStore: Sendable {
+    /// Returns only explicitly known canonical accounts and registered legacy
+    /// compatibility labels for this institution. Implementations must never
+    /// perform an unbounded Keychain scan.
+    func credentials(institutionCode: String) async throws -> [StatementPasswordStoredCredential]
     func password(institutionCode: String) async throws -> String?
     func save(_ password: String, institutionCode: String) async throws
     func delete(institutionCode: String) async throws
@@ -26,18 +35,129 @@ enum StatementPasswordCredentialStoreError: Error, LocalizedError, Equatable {
 }
 
 final class KeychainStatementPasswordCredentialStore: StatementPasswordCredentialStore, @unchecked Sendable {
-    static let productionService = "com.ledgerforge.statement-password"
+    nonisolated static let productionService = "com.ledgerforge.statement-password"
+    nonisolated static let axisInstitutionScope = "axis-bank"
+    nonisolated static let axisAppPDFScope = "axis-bank.credit-card.app-pdf"
+    nonisolated static let axisTraditionalPDFScope = "axis-bank.credit-card.traditional-pdf"
+    nonisolated static let productionLegacyLabelsByInstitutionCode = [
+        axisInstitutionScope: ["com.ledgerforge.Axis CC statement"]
+    ]
 
     private let service: String
+    private let legacyLabelsByInstitutionCode: [String: [String]]
 
-    init(service: String = productionService) {
+    init(
+        service: String = productionService,
+        legacyLabelsByInstitutionCode: [String: [String]]? = nil
+    ) {
         self.service = service
+        self.legacyLabelsByInstitutionCode = legacyLabelsByInstitutionCode
+            ?? (service == Self.productionService ? Self.productionLegacyLabelsByInstitutionCode : [:])
+    }
+
+    func credentials(institutionCode: String) async throws -> [StatementPasswordStoredCredential] {
+        var credentials = [StatementPasswordStoredCredential]()
+        for scope in canonicalScopes(for: institutionCode) {
+            var query = baseQuery(institutionCode: scope)
+            query[kSecReturnData as String] = true
+            query[kSecMatchLimit as String] = kSecMatchLimitOne
+            guard let password = try password(matching: query) else { continue }
+            let origin: ImportFramework.StatementPasswordCandidateOrigin
+            if institutionCode == Self.axisInstitutionScope,
+               scope == Self.axisInstitutionScope {
+                origin = .compatibility(scope: scope)
+            } else {
+                origin = .canonical(scope: scope)
+            }
+            credentials.append(.init(value: password, origin: origin))
+        }
+
+        // Legacy lookup is intentionally label-bounded. Never enumerate all
+        // generic-password items, and never use a filename or source path.
+        if institutionCode == Self.axisInstitutionScope {
+            for label in legacyLabelsByInstitutionCode[institutionCode] ?? [] {
+                let legacyQuery: [String: Any] = [
+                    kSecClass as String: kSecClassGenericPassword,
+                    kSecAttrLabel as String: label,
+                    kSecReturnData as String: true,
+                    kSecMatchLimit as String: kSecMatchLimitAll
+                ]
+                if let password = try password(matching: legacyQuery, requireUniqueMatch: true) {
+                    credentials.append(.init(value: password, origin: .legacy(label: label)))
+                }
+            }
+        }
+        return credentials
     }
 
     func password(institutionCode: String) async throws -> String? {
         var query = baseQuery(institutionCode: institutionCode)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
+        if let password = try password(matching: query) {
+            return password
+        }
+        guard institutionCode == Self.axisInstitutionScope else { return nil }
+        for label in legacyLabelsByInstitutionCode[institutionCode] ?? [] {
+            let legacyQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrLabel as String: label,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitAll
+            ]
+            if let password = try password(matching: legacyQuery, requireUniqueMatch: true) {
+                return password
+            }
+        }
+        return nil
+    }
+
+    private func password(
+        matching query: [String: Any],
+        requireUniqueMatch: Bool = false
+    ) throws -> String? {
+        if requireUniqueMatch {
+            // A label-bounded `match-all + return-data` generic-password query
+            // is rejected by the signed macOS test host with errSecParam.
+            // Establish uniqueness from non-secret attributes first, then read
+            // data only when exactly one registered legacy item exists.
+            var uniquenessQuery = query
+            uniquenessQuery.removeValue(forKey: kSecReturnData as String)
+            uniquenessQuery[kSecReturnAttributes as String] = true
+            uniquenessQuery[kSecMatchLimit as String] = kSecMatchLimitAll
+
+            var uniquenessResult: CFTypeRef?
+            let uniquenessStatus = SecItemCopyMatching(
+                uniquenessQuery as CFDictionary,
+                &uniquenessResult
+            )
+            if uniquenessStatus == errSecItemNotFound { return nil }
+            guard uniquenessStatus == errSecSuccess else {
+                throw StatementPasswordCredentialStoreError.keychainFailure(uniquenessStatus)
+            }
+
+            let matches: [Any]
+            if let array = uniquenessResult as? [Any] {
+                matches = array
+            } else if let array = uniquenessResult as? NSArray {
+                matches = array.map { $0 }
+            } else if let uniquenessResult {
+                matches = [uniquenessResult]
+            } else {
+                return nil
+            }
+            // More than one item under a registered legacy label is
+            // ambiguous. Omit that compatibility candidate instead of
+            // silently choosing one Keychain item.
+            guard matches.count == 1 else { return nil }
+
+            var dataQuery = query
+            dataQuery.removeValue(forKey: kSecReturnAttributes as String)
+            dataQuery[kSecReturnData as String] = true
+            dataQuery[kSecMatchLimit as String] = kSecMatchLimitOne
+            return try password(matching: dataQuery)
+        }
+
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
@@ -79,6 +199,11 @@ final class KeychainStatementPasswordCredentialStore: StatementPasswordCredentia
         }
     }
 
+    private func canonicalScopes(for institutionCode: String) -> [String] {
+        guard institutionCode == Self.axisInstitutionScope else { return [institutionCode] }
+        return [Self.axisAppPDFScope, Self.axisTraditionalPDFScope, Self.axisInstitutionScope]
+    }
+
     private func baseQuery(institutionCode: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
@@ -96,17 +221,60 @@ actor InMemoryStatementPasswordCredentialStore: StatementPasswordCredentialStore
         self.passwords = passwords
     }
 
-    func password(institutionCode: String) -> String? {
-        passwords[institutionCode]
+    func credentials(institutionCode: String) async -> [StatementPasswordStoredCredential] {
+        let scopes: [String]
+        if institutionCode == KeychainStatementPasswordCredentialStore.axisInstitutionScope {
+            scopes = [
+                KeychainStatementPasswordCredentialStore.axisAppPDFScope,
+                KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope,
+                KeychainStatementPasswordCredentialStore.axisInstitutionScope
+            ]
+        } else {
+            scopes = [institutionCode]
+        }
+        var result = scopes.compactMap { scope -> StatementPasswordStoredCredential? in
+            guard let password = passwords[scope] else { return nil }
+            let origin: ImportFramework.StatementPasswordCandidateOrigin
+            if institutionCode == KeychainStatementPasswordCredentialStore.axisInstitutionScope,
+               scope == KeychainStatementPasswordCredentialStore.axisInstitutionScope {
+                origin = .compatibility(scope: scope)
+            } else {
+                origin = .canonical(scope: scope)
+            }
+            return .init(value: password, origin: origin)
+        }
+        // In-memory tests model registered legacy records using a stable
+        // sentinel key. This keeps the production order and provenance
+        // behavior testable without touching a user's Keychain.
+        if institutionCode == KeychainStatementPasswordCredentialStore.axisInstitutionScope,
+           let legacy = passwords[Self.legacyStorageKey] {
+            result.append(.init(
+                value: legacy,
+                origin: .legacy(label: Self.legacyStorageKey)
+            ))
+        }
+        return result
     }
 
-    func save(_ password: String, institutionCode: String) {
+    func password(institutionCode: String) async -> String? {
+        if let password = passwords[institutionCode] {
+            return password
+        }
+        if institutionCode == KeychainStatementPasswordCredentialStore.axisInstitutionScope {
+            return passwords[Self.legacyStorageKey]
+        }
+        return nil
+    }
+
+    func save(_ password: String, institutionCode: String) async {
         passwords[institutionCode] = password
     }
 
-    func delete(institutionCode: String) {
+    func delete(institutionCode: String) async {
         passwords.removeValue(forKey: institutionCode)
     }
+
+    nonisolated private static let legacyStorageKey = "__legacy_axis_statement_password__"
 }
 
 struct StatementPasswordChallenge: Identifiable, Equatable {
@@ -148,13 +316,13 @@ final class StatementPasswordChallengeController: ObservableObject {
 }
 
 private actor StatementPasswordSessionVault {
-    private var stagedByRequestID = [UUID: String]()
+    private var stagedByRequestID = [UUID: ImportFramework.StatementPasswordCandidate]()
 
-    func stage(_ password: String, requestID: UUID) {
-        stagedByRequestID[requestID] = password
+    func stage(_ candidate: ImportFramework.StatementPasswordCandidate, requestID: UUID) {
+        stagedByRequestID[requestID] = candidate
     }
 
-    func take(requestID: UUID) -> String? {
+    func take(requestID: UUID) -> ImportFramework.StatementPasswordCandidate? {
         stagedByRequestID.removeValue(forKey: requestID)
     }
 
@@ -190,28 +358,76 @@ struct DefaultPasswordProvider: ImportFramework.PasswordProvider {
         try await challenge(request)
     }
 
-    func rememberedPasswords(for request: ImportRequest) async throws -> [String] {
-        var seen = Set<String>()
-        var candidates = [String]()
+    func rememberedPasswordCandidates(
+        for request: ImportRequest
+    ) async throws -> [ImportFramework.StatementPasswordCandidate] {
+        var candidates = [ImportFramework.StatementPasswordCandidate]()
+        var candidateIndexByValue = [String: Int]()
         for code in supportedInstitutionCodes {
-            if let password = try await credentialStore.password(institutionCode: code),
-               !password.isEmpty,
-               seen.insert(password).inserted {
-                candidates.append(password)
+            for stored in try await credentialStore.credentials(institutionCode: code) {
+                guard !stored.value.isEmpty else { continue }
+                if let index = candidateIndexByValue[stored.value] {
+                    let existing = candidates[index]
+                    candidates[index] = .init(
+                        value: existing.value,
+                        origins: existing.origins + [stored.origin]
+                    )
+                } else {
+                    candidateIndexByValue[stored.value] = candidates.count
+                    candidates.append(.init(value: stored.value, origin: stored.origin))
+                }
             }
         }
         return candidates
     }
 
+    func rememberedPasswords(for request: ImportRequest) async throws -> [String] {
+        (try await rememberedPasswordCandidates(for: request)).map { $0.value }
+    }
+
+    func stageSuccessfulPassword(
+        _ candidate: ImportFramework.StatementPasswordCandidate,
+        for request: ImportRequest
+    ) async {
+        guard !candidate.value.isEmpty else { return }
+        await sessionVault.stage(candidate, requestID: request.id)
+    }
+
     func stageSuccessfulPassword(_ password: String, for request: ImportRequest) async {
         guard !password.isEmpty else { return }
-        await sessionVault.stage(password, requestID: request.id)
+        await stageSuccessfulPassword(
+            .init(value: password, origin: .challenge),
+            for: request
+        )
     }
 
     func confirmSuccessfulPassword(for request: ImportRequest, institutionCode: String) async throws {
-        guard supportedInstitutionCodes.contains(institutionCode),
-              let password = await sessionVault.take(requestID: request.id) else { return }
-        try await credentialStore.save(password, institutionCode: institutionCode)
+        try await confirmSuccessfulPassword(
+            for: request,
+            target: .init(institutionCode: institutionCode)
+        )
+    }
+
+    func confirmSuccessfulPassword(
+        for request: ImportRequest,
+        target: ImportFramework.StatementPasswordCredentialTarget
+    ) async throws {
+        guard supportedInstitutionCodes.contains(target.institutionCode)
+                || supportedInstitutionCodes.contains(target.scope),
+              let candidate = await sessionVault.take(requestID: request.id) else { return }
+
+        // A canonical candidate that exactly matches the validated target is
+        // already durable. Do not churn its Keychain item on every import.
+        let isExactCanonical = candidate.origins.contains { origin in
+            guard case .canonical(let scope) = origin else { return false }
+            return scope == target.scope
+        }
+        guard !isExactCanonical else { return }
+
+        // Compatibility and challenge credentials are written only to the
+        // exact post-validation family target. The old canonical/legacy item
+        // is never erased here.
+        try await credentialStore.save(candidate.value, institutionCode: target.scope)
     }
 
     func discardStagedPassword(for request: ImportRequest) async {

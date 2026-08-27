@@ -20,8 +20,9 @@ struct AmericanExpressCreditCardPDFTests {
         #expect(prepared.financialDocument.bookedCurrency?.code == "QAR")
         #expect(prepared.financialDocument.financialIdentifiers.isEmpty)
         let evidence = try #require(prepared.financialDocument.cardStatementEvidence)
-        #expect(evidence.declaredStatementPeriod.start.canonical == "2026-07-01")
-        #expect(evidence.declaredStatementPeriod.end.canonical == "2026-07-31")
+        let declaredPeriod = try #require(evidence.declaredStatementPeriod)
+        #expect(declaredPeriod.start.canonical == "2026-07-01")
+        #expect(declaredPeriod.end.canonical == "2026-07-31")
         #expect(evidence.transactionAnnotations.map(\.financialScope.persistenceCode) == [
             "account_level", "instrument_level", "instrument_level", "instrument_level",
             "instrument_level", "instrument_level", "instrument_level", "instrument_level", "instrument_level"
@@ -676,9 +677,10 @@ struct AmericanExpressCreditCardPDFTests {
             subject: .instrument,
             value: resolvedInstrumentValue
         )
+        let existingPeriod = try #require(existing.declaredStatementPeriod)
         let declaredPeriod = try DeclaredStatementPeriod(
-            start: statementStart ?? existing.declaredStatementPeriod.start,
-            end: existing.declaredStatementPeriod.end
+            start: statementStart ?? existingPeriod.start,
+            end: existingPeriod.end
         )
         let evidence = try CardStatementEvidence(
             statementDate: existing.statementDate,

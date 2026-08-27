@@ -226,22 +226,40 @@ public final class SQLiteDatabase {
         try execute(sql: "CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, version INTEGER NOT NULL, name TEXT, applied_at DATETIME NOT NULL, checksum TEXT);")
 
         for migration in migrations.dropFirst(persistedRecords.count) {
-            try beginTransaction()
+            if migration.requiresForeignKeysDisabled {
+                try execute(sql: "PRAGMA foreign_keys = OFF;")
+            }
             do {
+                try beginTransaction()
                 for check in migration.preflightChecks {
                     guard try check.run(self) else {
                         throw MigrationPreflightError.failed(issueCode: check.issueCode)
                     }
                 }
                 try execute(sql: migration.sql)
+                if migration.requiresForeignKeysDisabled {
+                    let foreignKeyViolations = try query(
+                        sql: "PRAGMA foreign_key_check;",
+                        params: []
+                    ) { _ in true }
+                    guard foreignKeyViolations.isEmpty else {
+                        throw MigrationPreflightError.failed(issueCode: "migration.foreign-key-check")
+                    }
+                }
                 let now = iso8601Now()
                 try executePrepared(
                     sql: "INSERT INTO schema_migrations(version, name, applied_at, checksum) VALUES(?, ?, ?, ?);",
                     params: [migration.version, migration.name, now, migration.checksum]
                 )
                 try commit()
+                if migration.requiresForeignKeysDisabled {
+                    try execute(sql: "PRAGMA foreign_keys = ON;")
+                }
             } catch {
                 try? rollback()
+                if migration.requiresForeignKeysDisabled {
+                    try? execute(sql: "PRAGMA foreign_keys = ON;")
+                }
                 throw error
             }
         }

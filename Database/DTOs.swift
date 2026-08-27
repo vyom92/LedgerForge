@@ -20,32 +20,68 @@ enum CardStatementProfileContract: Equatable, Sendable {
     case amex
     case cbqV1
     case cbqV2
+    case axis
 
     init?(reconciliationRuleIdentifier rule: String) {
         switch rule {
         case "amex.qar.previous-minus-credits-plus-debits.v1": self = .amex
         case "cbq.qar.v1.previous-plus-billed-minus-payment.v1": self = .cbqV1
         case "cbq.qar.v2.previous-minus-payment-minus-credit-plus-components.v1": self = .cbqV2
+        case "axis.inr.previous-plus-row-ledger-equals-total-due.v1",
+             "axis.inr.app.previous-plus-row-ledger-equals-total-due.v1": self = .axis
         default: return nil
         }
     }
 
-    var institutionCode: String { self == .amex ? "American Express" : "Commercial Bank of Qatar" }
-    var profileID: String { self == .amex ? "amex.credit-card.pdf" : "cbq.credit-card.pdf" }
+    var institutionCode: String {
+        switch self {
+        case .amex: return "American Express"
+        case .cbqV1, .cbqV2: return "Commercial Bank of Qatar"
+        case .axis: return "Axis Bank"
+        }
+    }
+    var profileID: String {
+        switch self {
+        case .amex: return "amex.credit-card.pdf"
+        case .cbqV1, .cbqV2: return "cbq.credit-card.pdf"
+        case .axis: return "axis.credit-card.pdf"
+        }
+    }
+    func accepts(profileID: String) -> Bool {
+        self == .axis
+            ? ["axis.credit-card.pdf", "axis.credit-card.xlsx"].contains(profileID)
+            : profileID == self.profileID
+    }
     var profileVersion: String { "1" }
-    var statementFamilyCode: String { "\(profileID)@\(profileVersion)" }
-    var supportsSemanticSourceGrouping: Bool { self == .amex }
-    var requiresCBQSummaryMembership: Bool { self != .amex }
-    var accountObservationKindCode: String {
-        self == .amex ? "amex_membership_number" : "cbq_card_account_reference"
+    var statementFamilyCode: String {
+        switch self {
+        case .axis: return "axis.credit-card@1"
+        default: return "\(profileID)@\(profileVersion)"
+        }
     }
-    var instrumentObservationKindCode: String {
-        self == .amex ? "amex_card_account_number" : "cbq_masked_card_number"
+    var supportsSemanticSourceGrouping: Bool { self == .amex || self == .axis }
+    var requiresCBQSummaryMembership: Bool { self == .cbqV1 || self == .cbqV2 }
+    var requiresPhysicalSections: Bool { self != .axis }
+    var accountObservationKindCode: String? {
+        switch self {
+        case .amex: return "amex_membership_number"
+        case .cbqV1, .cbqV2: return "cbq_card_account_reference"
+        case .axis: return nil
+        }
     }
-    var sectionRule: String {
-        self == .amex
-            ? "amex.section.signed-increases-minus-decreases.v1"
-            : "cbq.section.signed-source-membership.v1"
+    var instrumentObservationKindCode: String? {
+        switch self {
+        case .amex: return "amex_card_account_number"
+        case .cbqV1, .cbqV2: return "cbq_masked_card_number"
+        case .axis: return nil
+        }
+    }
+    var sectionRule: String? {
+        switch self {
+        case .amex: return "amex.section.signed-increases-minus-decreases.v1"
+        case .cbqV1, .cbqV2: return "cbq.section.signed-source-membership.v1"
+        case .axis: return nil
+        }
     }
     var requiredSummaryCodes: Set<String> {
         switch self {
@@ -55,13 +91,33 @@ enum CardStatementProfileContract: Equatable, Sendable {
             return ["previous_balance", "amount_billed", "payment_received", "new_balance", "due_date", "source_section_net_total"]
         case .cbqV2:
             return ["previous_balance", "total_payment", "credit_reversal", "purchases", "billed_installment", "fees_charges", "new_balance", "due_date", "source_section_net_total"]
+        case .axis:
+            return []
         }
+    }
+    var allowedSummaryCodes: Set<String> {
+        switch self {
+        case .axis:
+            return ["previous_balance", "axis_total_payment_due", "due_date"]
+        default:
+            return requiredSummaryCodes
+        }
+    }
+    func requiredSummaryCodes(sourceFormatCode: String) -> Set<String> {
+        requiredSummaryCodes
+    }
+    func usesAxisAppReconciliationRule(_ rule: String) -> Bool {
+        self == .axis && rule == "axis.inr.app.previous-plus-row-ledger-equals-total-due.v1"
+    }
+    func requiredSummaryCodes(reconciliationRuleIdentifier rule: String, sourceFormatCode: String) -> Set<String> {
+        return requiredSummaryCodes(sourceFormatCode: sourceFormatCode)
     }
     var accountLevelMemberships: Set<CardTransactionSummaryMembership> {
         switch self {
         case .amex: return []
         case .cbqV1: return [.cbqV1PaymentReceived]
         case .cbqV2: return [.cbqV2TotalPayment]
+        case .axis: return []
         }
     }
     var instrumentMemberships: Set<CardTransactionSummaryMembership> {
@@ -69,6 +125,7 @@ enum CardStatementProfileContract: Equatable, Sendable {
         case .amex: return []
         case .cbqV1: return [.cbqV1AmountBilled]
         case .cbqV2: return [.cbqV2CreditReversal, .cbqV2Purchases, .cbqV2BilledInstallment, .cbqV2FeesCharges]
+        case .axis: return []
         }
     }
 }
@@ -380,9 +437,10 @@ public struct CardStatementDTO: nonisolated Equatable, Sendable {
     public let normalizedDocumentId: String
     public let parserProfileId: String
     public let parserProfileVersion: String
-    public let statementDateISO: String
-    public let statementStartDateISO: String
-    public let statementEndDateISO: String
+    public let statementDateISO: String?
+    public let statementStartDateISO: String?
+    public let statementEndDateISO: String?
+    public let selectedStatementMonthISO: String?
     public let statementCurrency: String
     public let sourceRowCount: Int
     public let reconciliationRuleCode: String
@@ -456,11 +514,12 @@ public struct CardStatementSemanticProjectionSectionDTO: nonisolated Equatable, 
 public struct CardStatementSemanticProjectionEventDTO: nonisolated Equatable, Sendable {
     public let id: String
     public let projectionId: String
-    public let canonicalTransactionId: String
+    public let canonicalTransactionId: String?
     public let normalizedRowId: String
     public let sourceOrdinal: Int
-    public let postingDateISO: String
-    public let sourceTransactionDateISO: String
+    public let financialDateISO: String
+    public let financialDateRoleCode: String
+    public let sourceTransactionDateISO: String?
     public let liabilityEffectCode: String
     public let postedCurrency: String
     public let postedAmountMinor: Int64
@@ -487,9 +546,11 @@ public struct CardStatementSemanticProjectionRecordDTO: nonisolated Equatable, S
     public let statementFamilyCode: String
     public let parserProfileId: String
     public let parserProfileVersion: String
-    public let statementDateISO: String
-    public let statementStartDateISO: String
-    public let statementEndDateISO: String
+    public let statementDateISO: String?
+    public let statementStartDateISO: String?
+    public let statementEndDateISO: String?
+    public let selectedStatementMonthISO: String?
+    public let cycleMonthISO: String?
     public let nativeCurrency: String
     public let eventCount: Int
     public let sectionCount: Int
@@ -505,8 +566,9 @@ public struct CardStatementSemanticGroupDTO: nonisolated Equatable, Sendable {
     public let liabilityAccountId: String
     public let institutionCode: String
     public let statementFamilyCode: String
-    public let statementStartDateISO: String
-    public let statementEndDateISO: String
+    public let statementStartDateISO: String?
+    public let statementEndDateISO: String?
+    public let cycleMonthISO: String?
     public let nativeCurrency: String
     public let projectionAlgorithm: String
     public let projectionDigest: String

@@ -10,11 +10,25 @@ public extension ImportFramework {
             snapshot: SourceContentSnapshot
         ) async -> ImportResult
         func confirmSuccessfulPassword(for request: ImportRequest, institutionCode: String) async throws
+        func confirmSuccessfulPassword(
+            for request: ImportRequest,
+            target: StatementPasswordCredentialTarget
+        ) async throws
         func discardStagedPassword(for request: ImportRequest) async
     }
 }
 
 public extension ImportFramework.ImportCoordinator {
     func confirmSuccessfulPassword(for request: ImportRequest, institutionCode: String) async throws {}
+    func confirmSuccessfulPassword(
+        for request: ImportRequest,
+        target: ImportFramework.StatementPasswordCredentialTarget
+    ) async throws {
+        try await confirmSuccessfulPassword(
+            for: request,
+            institutionCode: target.institutionCode
+        )
+    }
+
     func discardStagedPassword(for request: ImportRequest) async {}
 }

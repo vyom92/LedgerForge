@@ -60,18 +60,34 @@ final class ImportValidator {
         let annotationsByID = Dictionary(
             uniqueKeysWithValues: evidence.transactionAnnotations.map { ($0.parserTransactionID, $0) }
         )
+        let sourceOrdinals = transactions.compactMap { $0.sourceProvenance.first?.sourceOrdinal }
+        let axisSourceOrderIsValid = sourceOrdinals.count == transactions.count
+            && sourceOrdinals.allSatisfy { $0 > 0 }
+            && sourceOrdinals == sourceOrdinals.sorted()
+            && Set(sourceOrdinals).count == sourceOrdinals.count
 
+        let temporalEvidenceValid: Bool
+        if contract == .axis {
+            temporalEvidenceValid = true
+        } else {
+            temporalEvidenceValid = evidence.statementDate != nil && evidence.declaredStatementPeriod != nil &&
+                evidence.statementDate == evidence.declaredStatementPeriod?.end && evidence.selectedStatementMonth == nil
+        }
         if financialDocument.metadata.institution.rawValue != contract.institutionCode ||
             financialDocument.metadata.documentType != .creditCard ||
-            financialDocument.metadata.fileFormat != .pdf ||
+            !((contract == .axis && [.pdf, .xlsx].contains(financialDocument.metadata.fileFormat)) ||
+              (contract != .axis && financialDocument.metadata.fileFormat == .pdf)) ||
             financialDocument.bookedCurrency != currency ||
             financialDocument.declaredStatementPeriod != evidence.declaredStatementPeriod ||
-            evidence.statementDate != evidence.declaredStatementPeriod.end {
+            !temporalEvidenceValid {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card statement metadata conflicts with parser evidence."))
         }
         if transactions.isEmpty || annotationsByID.count != transactions.count ||
             Set(transactions.map(\.id)) != Set(annotationsByID.keys) {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Every card financial row requires exactly one transaction annotation."))
+        }
+        if contract == .axis && !axisSourceOrderIsValid {
+            issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Axis source physical order is incomplete or contradictory."))
         }
 
         var increaseValues: [Money] = []
@@ -88,18 +104,19 @@ final class ImportValidator {
                 issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Card row is missing posting-date or annotation evidence."))
                 continue
             }
-            if postingDate < evidence.declaredStatementPeriod.start || postingDate > evidence.declaredStatementPeriod.end {
-                issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Card posting date is outside the declared statement period."))
+            if contract != .axis, let period = evidence.declaredStatementPeriod,
+               (postingDate > period.end || postingDate < period.start) {
+                issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Card financial date is outside the source-proven statement period."))
             }
-            if transaction.financialDateRole != .postingDate ||
+            if transaction.financialDateRole != (contract == .axis ? .transactionDate : .postingDate) ||
                 transaction.money.currency != currency ||
                 transaction.debitMoney != nil || transaction.creditMoney != nil ||
                 transaction.runningBalanceMoney != nil ||
                 transaction.cardLiabilityEffect != annotation.liabilityEffect ||
                 transaction.sourceProvenance.count != 1 ||
                 transaction.sourceProvenance[0].sourceTransactionDate != annotation.sourceTransactionDate ||
-                transaction.sourceProvenance[0].sourceOrdinal != index + 1 ||
-                transaction.sourceProvenance[0].parserProfileID != contract.profileID ||
+                (contract != .axis && transaction.sourceProvenance[0].sourceOrdinal != index + 1) ||
+                !contract.accepts(profileID: transaction.sourceProvenance[0].parserProfileID) ||
                 transaction.sourceProvenance[0].parserProfileVersion != contract.profileVersion {
                 issues.append(ValidationIssue(severity: .error, rowNumber: row, message: "Card row semantics or provenance are incomplete."))
             }
@@ -155,22 +172,46 @@ final class ImportValidator {
         }
 
         let previous = evidence.summary(code: "previous_balance")?.money
-        let newBalance = evidence.summary(code: "new_balance")?.money
+        let newBalance = contract == .axis
+            ? evidence.summary(code: "axis_total_payment_due")?.money
+            : evidence.summary(code: "new_balance")?.money
         let dueDate = evidence.summary(code: "due_date")?.date
-        if dueDate == nil || previous == nil || newBalance == nil ||
-            evidence.summaryComponents.compactMap(\.money).contains(where: { $0.currency != currency }) ||
-            Set(evidence.summaryComponents.map(\.persistenceCode)) != contract.requiredSummaryCodes {
+        let summaryCodes = Set(evidence.summaryComponents.map(\.persistenceCode))
+        let summaryContractInvalid = contract == .axis
+            ? !summaryCodes.isSubset(of: contract.allowedSummaryCodes)
+            : dueDate == nil || previous == nil || newBalance == nil ||
+                summaryCodes != contract.requiredSummaryCodes(
+                    reconciliationRuleIdentifier: evidence.reconciliationRuleIdentifier,
+                    sourceFormatCode: financialDocument.metadata.fileFormat.rawValue
+                )
+        if summaryContractInvalid ||
+            evidence.summaryComponents.compactMap(\.money).contains(where: { $0.currency != currency }) {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card summary components are incomplete or contradictory."))
         }
-        if evidence.accountSourceIdentityObservations.count != 1 ||
-            evidence.accountSourceIdentityObservations.first?.kind.rawValue != contract.accountObservationKindCode ||
-            evidence.accountSourceIdentityObservations.first?.subject != .liabilityAccount ||
-            evidence.instrumentSections.contains(where: { section in
-                section.reconciliationRuleIdentifier != contract.sectionRule ||
-                    section.sourceIdentityObservations.count != 1 ||
-                    section.sourceIdentityObservations.first?.kind.rawValue != contract.instrumentObservationKindCode ||
-                    section.sourceIdentityObservations.first?.subject != .instrument
-            }) {
+        let structuralIdentityIsInvalid: Bool
+        if contract == .axis {
+            structuralIdentityIsInvalid = !evidence.accountSourceIdentityObservations.isEmpty ||
+                !evidence.instrumentSections.isEmpty ||
+                evidence.transactionAnnotations.contains {
+                    $0.financialScope != .accountLevel || $0.documentScopedSectionID != nil
+                }
+        } else if let accountKind = contract.accountObservationKindCode,
+                  let instrumentKind = contract.instrumentObservationKindCode,
+                  let sectionRule = contract.sectionRule {
+            structuralIdentityIsInvalid = evidence.accountSourceIdentityObservations.count != 1 ||
+                evidence.accountSourceIdentityObservations.first?.kind.rawValue != accountKind ||
+                evidence.accountSourceIdentityObservations.first?.subject != .liabilityAccount ||
+                evidence.instrumentSections.isEmpty ||
+                evidence.instrumentSections.contains(where: { section in
+                    section.reconciliationRuleIdentifier != sectionRule ||
+                        section.sourceIdentityObservations.count != 1 ||
+                        section.sourceIdentityObservations.first?.kind.rawValue != instrumentKind ||
+                        section.sourceIdentityObservations.first?.subject != .instrument
+                })
+        } else {
+            structuralIdentityIsInvalid = true
+        }
+        if structuralIdentityIsInvalid {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card source identity or section evidence is incompatible with its exact profile."))
         }
 
@@ -191,18 +232,20 @@ final class ImportValidator {
             currency: currency,
             issues: &issues
         )
-        for section in evidence.instrumentSections {
-            guard let values = sectionValues[section.documentScopedSectionID], !values.isEmpty,
-                  let calculated = try? moneySum(values, currency: currency),
-                  calculated == section.signedNetTotal else {
-                issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card instrument section does not equal its printed signed total."))
-                continue
+        if contract != .axis {
+            for section in evidence.instrumentSections {
+                guard let values = sectionValues[section.documentScopedSectionID], !values.isEmpty,
+                      let calculated = try? moneySum(values, currency: currency),
+                      calculated == section.signedNetTotal else {
+                    issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card instrument section does not equal its printed signed total."))
+                    continue
+                }
             }
-        }
-        let sectionsTotal = try? moneySum(evidence.instrumentSections.map(\.signedNetTotal), currency: currency)
-        let expectedSectionCoverage = contract == .amex ? instrumentTotal : allRowsTotal
-        if sectionsTotal != expectedSectionCoverage {
-            issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card structural sections do not cover the exact source financial rows."))
+            let sectionsTotal = try? moneySum(evidence.instrumentSections.map(\.signedNetTotal), currency: currency)
+            let expectedSectionCoverage = contract == .amex ? instrumentTotal : allRowsTotal
+            if sectionsTotal != expectedSectionCoverage {
+                issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card structural sections do not cover the exact source financial rows."))
+            }
         }
 
         return ImportValidationResult(
@@ -279,6 +322,8 @@ final class ImportValidator {
                 total(.cbqV2CreditReversal, magnitude: true) != credit || total(.cbqV2Purchases) != purchases ||
                 total(.cbqV2BilledInstallment) != installment || total(.cbqV2FeesCharges) != fees ||
                 allRowsTotal != sectionNet
+        case .axis:
+            mismatch = false
         }
         if mismatch {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card statement summary does not reconcile under its exact profile contract."))

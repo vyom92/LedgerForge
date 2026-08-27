@@ -60,6 +60,7 @@ enum ImportPersistenceSourceFormat: Equatable, Sendable {
     case csv
     case pdf
     case xls
+    case xlsx
 
     var mimeType: String {
         switch self {
@@ -69,6 +70,8 @@ enum ImportPersistenceSourceFormat: Equatable, Sendable {
             return "application/pdf"
         case .xls:
             return "application/vnd.ms-excel"
+        case .xlsx:
+            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         }
     }
 
@@ -76,7 +79,7 @@ enum ImportPersistenceSourceFormat: Equatable, Sendable {
         switch self {
         case .csv:
             return DocumentFingerprintDTO.rawTextSHA256Algorithm
-        case .pdf, .xls:
+        case .pdf, .xls, .xlsx:
             return DocumentFingerprintDTO.sourceBytesSHA256Algorithm
         }
     }
@@ -89,7 +92,9 @@ enum ImportPersistenceSourceFormat: Equatable, Sendable {
             self = .pdf
         case .xls:
             self = .xls
-        case .xlsx, .unknown:
+        case .xlsx:
+            self = .xlsx
+        case .unknown:
             throw ImportPersistenceError.unsupportedPreparedSourceFormat
         }
 
@@ -111,6 +116,8 @@ enum ImportPersistenceSourceFormat: Equatable, Sendable {
             self = .pdf
         case "application/vnd.ms-excel":
             self = .xls
+        case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+            self = .xlsx
         default:
             return nil
         }
@@ -525,12 +532,25 @@ struct ImportPersistenceMapper {
                 .contains(evidence.reconciliationRuleIdentifier) &&
             payload.normalizedDocument.profileId == "cbq.credit-card.pdf" &&
             payload.normalizedDocument.profileVersion == "1"
-        guard (isAmex || isCBQ),
+        let isAxis = financialDocument.metadata.institution == .axis &&
+            [CardStatementEvidence.axisINRRowLedgerReconciliationRule,
+             CardStatementEvidence.axisINRAppRowLedgerReconciliationRule]
+                .contains(evidence.reconciliationRuleIdentifier) &&
+            ((financialDocument.metadata.fileFormat == .pdf && payload.normalizedDocument.profileId == "axis.credit-card.pdf") ||
+             (financialDocument.metadata.fileFormat == .xlsx && payload.normalizedDocument.profileId == "axis.credit-card.xlsx")) &&
+            payload.normalizedDocument.profileVersion == "1"
+        guard (isAmex || isCBQ || isAxis),
               financialDocument.metadata.documentType == .creditCard,
-              financialDocument.metadata.fileFormat == .pdf,
+              ((isAxis && [.pdf, .xlsx].contains(financialDocument.metadata.fileFormat)) ||
+               (!isAxis && financialDocument.metadata.fileFormat == .pdf)),
               payload.transactions.count == financialDocument.transactions.count,
               payload.transactions.count == evidence.transactionAnnotations.count,
               ["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"].contains(associationAuthority) else {
+            throw ImportPersistenceError.conflictingTransactionProvenance
+        }
+        guard isAxis
+            ? evidence.instrumentSections.isEmpty && evidence.accountSourceIdentityObservations.isEmpty
+            : !evidence.instrumentSections.isEmpty && evidence.accountSourceIdentityObservations.count == 1 else {
             throw ImportPersistenceError.conflictingTransactionProvenance
         }
         let statementID = "card-statement-\(payload.importSession.id.lowercased())"
@@ -636,6 +656,13 @@ struct ImportPersistenceMapper {
                 createdAtISO: payload.completedAtISO
             )
         }
+        let selectedStatementMonthISO = evidence.selectedStatementMonth?.canonical
+        let cycleMonthISO: String?
+        if isAxis {
+            cycleMonthISO = evidence.selectedStatementMonth?.canonical
+        } else {
+            cycleMonthISO = nil
+        }
         let statement = CardStatementDTO(
             id: statementID,
             workspaceId: workspaceId,
@@ -645,9 +672,10 @@ struct ImportPersistenceMapper {
             normalizedDocumentId: payload.normalizedDocument.id,
             parserProfileId: payload.normalizedDocument.profileId,
             parserProfileVersion: payload.normalizedDocument.profileVersion,
-            statementDateISO: evidence.statementDate.canonical,
-            statementStartDateISO: evidence.declaredStatementPeriod.start.canonical,
-            statementEndDateISO: evidence.declaredStatementPeriod.end.canonical,
+            statementDateISO: evidence.statementDate?.canonical,
+            statementStartDateISO: evidence.declaredStatementPeriod?.start.canonical,
+            statementEndDateISO: evidence.declaredStatementPeriod?.end.canonical,
+            selectedStatementMonthISO: selectedStatementMonthISO,
             statementCurrency: evidence.nativeCurrency.code,
             sourceRowCount: payload.transactions.count,
             reconciliationRuleCode: evidence.reconciliationRuleIdentifier,
@@ -696,7 +724,7 @@ struct ImportPersistenceMapper {
             )
         }
         let semanticProjection: CardStatementSemanticProjectionDTO?
-        if isAmex {
+        if isAmex || isAxis {
             let projectionID = "card-semantic-projection-\(payload.importSession.id.lowercased())"
             let projectionSections = sectionDecisions.map { decision in
             CardStatementSemanticProjectionSectionDTO(
@@ -721,14 +749,15 @@ struct ImportPersistenceMapper {
                   let normalizedRow = transaction.rawRows.first,
                   transaction.rawRows.count == 1,
                   normalizedRow.sourceOrdinal == provenance.sourceOrdinal,
-                  let postingDate = source.statementDate else {
+                  let financialDate = source.statementDate else {
                 throw ImportPersistenceError.missingTransactionProvenance
             }
             return CardStatementSemanticProjectionEventPlanDTO(
                 incomingTransactionId: transaction.id,
                 normalizedRowId: normalizedRow.normalizedRowId,
                 sourceOrdinal: provenance.sourceOrdinal,
-                postingDateISO: postingDate.canonical,
+                financialDateISO: financialDate.canonical,
+                financialDateRoleCode: source.financialDateRole.rawValue,
                 sourceTransactionDateISO: persistedEvidence.sourceTransactionDateISO,
                 liabilityEffectCode: persistedEvidence.liabilityEffectCode,
                 postedCurrency: source.money.currency.code,
@@ -745,15 +774,19 @@ struct ImportPersistenceMapper {
             }.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
             let provisionalProjection = CardStatementSemanticProjectionDTO(
             id: projectionID,
-            algorithmIdentifier: CardStatementSemanticProjectionDTO.algorithm,
+            algorithmIdentifier: isAxis
+                ? CardStatementSemanticProjectionDTO.axisMultisetAlgorithm
+                : CardStatementSemanticProjectionDTO.amexAlgorithm,
             digest: String(repeating: "0", count: 64),
-            institutionCode: Institution.amex.rawValue,
-            statementFamilyCode: "amex.credit-card.pdf@1",
+            institutionCode: (isAxis ? Institution.axis : Institution.amex).rawValue,
+            statementFamilyCode: isAxis ? "axis.credit-card@1" : "amex.credit-card.pdf@1",
             parserProfileId: payload.normalizedDocument.profileId,
             parserProfileVersion: payload.normalizedDocument.profileVersion,
             statementDateISO: statement.statementDateISO,
             statementStartDateISO: statement.statementStartDateISO,
             statementEndDateISO: statement.statementEndDateISO,
+            selectedStatementMonthISO: statement.selectedStatementMonthISO,
+            cycleMonthISO: cycleMonthISO,
             nativeCurrency: statement.statementCurrency,
             reconciliationRuleCode: statement.reconciliationRuleCode,
             summaryComponents: summary,
@@ -771,6 +804,8 @@ struct ImportPersistenceMapper {
             statementDateISO: provisionalProjection.statementDateISO,
             statementStartDateISO: provisionalProjection.statementStartDateISO,
             statementEndDateISO: provisionalProjection.statementEndDateISO,
+            selectedStatementMonthISO: provisionalProjection.selectedStatementMonthISO,
+            cycleMonthISO: provisionalProjection.cycleMonthISO,
             nativeCurrency: provisionalProjection.nativeCurrency,
             reconciliationRuleCode: provisionalProjection.reconciliationRuleCode,
             summaryComponents: provisionalProjection.summaryComponents,
@@ -784,11 +819,9 @@ struct ImportPersistenceMapper {
         } else {
             semanticProjection = nil
         }
-        guard let firstDecision = sectionDecisions.first else {
-            throw ImportPersistenceError.conflictingTransactionProvenance
-        }
+        let firstDecision = sectionDecisions.first
         let legacyInstrumentObservations: [CardSourceIdentityObservationDTO]
-        if sectionCount == 1 {
+        if sectionCount == 1, let firstDecision {
             legacyInstrumentObservations = zip(
                 evidence.instrumentSections[0].sourceIdentityObservations,
                 firstDecision.sourceObservations
@@ -814,8 +847,8 @@ struct ImportPersistenceMapper {
         }
         return ConfirmedCardImportPlanDTO(
             liabilityAccountId: selectedAccountId,
-            instrumentChoice: firstDecision.instrumentChoice,
-            proposedInstrument: firstDecision.proposedInstrument,
+            instrumentChoice: firstDecision?.instrumentChoice ?? .unspecified,
+            proposedInstrument: firstDecision?.proposedInstrument,
             sourceObservations: accountObservations + legacyInstrumentObservations,
             relationships: sectionDecisions.flatMap(\.relationships),
             statement: statement,

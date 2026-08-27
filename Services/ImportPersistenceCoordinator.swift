@@ -196,27 +196,35 @@ enum ImportIdentityReview: Equatable, Sendable {
     case unavailable
     case matchedExisting(accountId: String)
     case choiceRequired(eligibleAccountIds: [String])
+    /// Axis credit-card statements carry account-level financial rows but no
+    /// source-proven instrument sections. Keep that review boundary typed
+    /// separately from the instrument-aware card choices used by Amex/CBQ.
+    case liabilityAccountChoiceRequired(eligibleLiabilityAccountIds: [String])
     case ambiguous
     case conflict
     case cardChoiceRequired(eligibleLiabilityAccountIds: [String])
 
     var eligibleAccountIds: [String] {
         switch self {
-        case .choiceRequired(let values), .cardChoiceRequired(let values): return values
+        case .choiceRequired(let values),
+                .liabilityAccountChoiceRequired(let values),
+                .cardChoiceRequired(let values):
+            return values
         default: return []
         }
     }
 
     var requiresExplicitChoice: Bool {
         switch self {
-        case .choiceRequired, .cardChoiceRequired: return true
+        case .choiceRequired, .liabilityAccountChoiceRequired, .cardChoiceRequired: return true
         default: return false
         }
     }
 
     var blocksConfirmation: Bool {
         switch self {
-        case .choiceRequired, .cardChoiceRequired, .ambiguous, .conflict:
+        case .choiceRequired, .liabilityAccountChoiceRequired, .cardChoiceRequired,
+                .ambiguous, .conflict:
             return true
         case .unavailable, .matchedExisting:
             return false
@@ -864,7 +872,60 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         providerGeneration: ProviderGenerationToken
     ) throws -> ConfirmedImportPlanDTO {
         guard let evidence = financialDocument.cardStatementEvidence,
-              evidence.accountSourceIdentityObservations.count == 1,
+              let contract = CardStatementProfileContract(
+                reconciliationRuleIdentifier: evidence.reconciliationRuleIdentifier
+              ) else {
+            throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+        }
+
+        if contract == .axis {
+            guard evidence.accountSourceIdentityObservations.isEmpty,
+                  evidence.instrumentSections.isEmpty,
+                  evidence.transactionAnnotations.allSatisfy({
+                      $0.financialScope == .accountLevel && $0.documentScopedSectionID == nil
+                  }) else {
+                throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+            }
+            let proposedAccountID = "account-\(importSession.id.uuidString.lowercased())"
+            let selectedAccountID: String
+            let confirmedAccountChoice: ConfirmedImportAccountChoiceDTO
+            switch accountChoice {
+            case .createNewAccount:
+                selectedAccountID = proposedAccountID
+                confirmedAccountChoice = .createProposedAccount
+            case .useExistingAccount(let accountID):
+                selectedAccountID = accountID
+                confirmedAccountChoice = .useExistingAccount(accountId: accountID)
+            case .createNewCardLiabilityAccountAndInstrument,
+                 .useExistingCardLiabilityAccount,
+                 .useExistingCardLiabilityAccountSections:
+                // Axis zero-section evidence has no instrument boundary. An
+                // instrument-oriented choice is invalid rather than being
+                // silently coerced into an account decision.
+                throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
+            case nil:
+                selectedAccountID = proposedAccountID
+                confirmedAccountChoice = .unspecified
+            }
+            let plan = try mapper.confirmedImportPlan(
+                financialDocument: financialDocument,
+                importSession: importSession,
+                validation: validation,
+                fingerprintSet: fingerprintSet,
+                providerGeneration: providerGeneration,
+                advisoryIdentity: .noMatch,
+                accountChoice: confirmedAccountChoice,
+                selectedAccountId: selectedAccountID,
+                cardAssociationAuthority: "user_confirmed",
+                cardSectionChoices: [:],
+                cardSectionAuthorities: [:],
+                cardSectionRelationships: [:]
+            )
+            try validate(confirmedPlan: plan)
+            return plan
+        }
+
+        guard evidence.accountSourceIdentityObservations.count == 1,
               !evidence.instrumentSections.isEmpty,
               evidence.instrumentSections.allSatisfy({ $0.sourceIdentityObservations.count == 1 }) else {
             throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
@@ -1097,6 +1158,28 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         }
         if let evidence = financialDocument.cardStatementEvidence {
             let snapshot = try provider.cardRepo.snapshot(workspaceId: mapper.workspaceId)
+            if CardStatementProfileContract(
+                reconciliationRuleIdentifier: evidence.reconciliationRuleIdentifier
+            ) == .axis {
+                guard financialDocument.metadata.institution == .axis,
+                      financialDocument.metadata.documentType == .creditCard,
+                      [.pdf, .xlsx].contains(financialDocument.metadata.fileFormat),
+                      evidence.nativeCurrency.code == "INR",
+                      evidence.accountSourceIdentityObservations.isEmpty,
+                      evidence.instrumentSections.isEmpty else {
+                    return .conflict
+                }
+                let eligible = try provider.accountRepo.accounts(workspaceId: mapper.workspaceId)
+                    .filter {
+                        $0.accountType == "credit_card" &&
+                            $0.nativeCurrency == evidence.nativeCurrency.code &&
+                            $0.institutionId == Institution.axis.rawValue
+                    }
+                    .map(\.id).sorted()
+                // Institution/family similarity never auto-selects an Axis
+                // liability account; the user must review this choice.
+                return .liabilityAccountChoiceRequired(eligibleLiabilityAccountIds: eligible)
+            }
             guard let accountObservation = evidence.accountSourceIdentityObservations.first,
                   evidence.instrumentSections.allSatisfy({ $0.sourceIdentityObservations.count == 1 }) else {
                 return .unavailable

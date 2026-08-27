@@ -779,25 +779,30 @@ final class RepositoryStoreHydrator {
             guard instrument.workspaceId == workspaceID,
                   let account = accountByID[instrument.liabilityAccountId],
                   account.workspaceId == workspaceID,
-                  account.accountType == "credit_card", account.nativeCurrency == "QAR",
-                  [Institution.amex.rawValue, Institution.cbq.rawValue].contains(account.institutionId),
+                  account.accountType == "credit_card",
                   let lifecycle = CardInstrumentLifecycleState(rawValue: instrument.lifecycleStateCode) else {
                 throw RepositoryStoreHydrationError.invalidCardState("instrument account relationship")
             }
-            let expectedProfileID = account.institutionId == Institution.amex.rawValue
-                ? CardStatementProfileContract.amex.profileID
-                : CardStatementProfileContract.cbqV1.profileID
-            let expectedObservationKind = account.institutionId == Institution.amex.rawValue
-                ? CardSourceIdentityObservationKind.instrumentCardAccountNumber
-                : CardSourceIdentityObservationKind.cbqInstrumentMaskedCardNumber
+            let contract: CardStatementProfileContract
+            let expectedObservationKind: CardSourceIdentityObservationKind
+            switch account.institutionId {
+            case Institution.amex.rawValue where account.nativeCurrency == "QAR":
+                contract = .amex
+                expectedObservationKind = .instrumentCardAccountNumber
+            case Institution.cbq.rawValue where account.nativeCurrency == "QAR":
+                contract = .cbqV1
+                expectedObservationKind = .cbqInstrumentMaskedCardNumber
+            default:
+                throw RepositoryStoreHydrationError.invalidCardState("instrument account relationship")
+            }
             let legacyObservations = try snapshot.sourceObservations.filter {
                 $0.subjectKind == CardSourceIdentitySubject.instrument.rawValue && $0.subjectId == instrument.id
             }.map { observation -> CardSourceIdentityObservation in
                 guard observation.workspaceId == workspaceID,
                       let kind = CardSourceIdentityObservationKind(rawValue: observation.observationKind),
                       kind == expectedObservationKind,
-                      observation.parserProfileId == expectedProfileID,
-                      observation.parserProfileVersion == CardStatementProfileContract.amex.profileVersion else {
+                      contract.accepts(profileID: observation.parserProfileId),
+                      observation.parserProfileVersion == contract.profileVersion else {
                     throw RepositoryStoreHydrationError.invalidCardState("instrument source observation")
                 }
                 return try CardSourceIdentityObservation(kind: kind, subject: .instrument, value: observation.sourceValue)
@@ -807,8 +812,8 @@ final class RepositoryStoreHydrator {
             }.map { observation -> CardSourceIdentityObservation in
                 guard observation.workspaceId == workspaceID,
                       observation.observationKind == expectedObservationKind.rawValue,
-                      observation.parserProfileId == expectedProfileID,
-                      observation.parserProfileVersion == CardStatementProfileContract.amex.profileVersion else {
+                      contract.accepts(profileID: observation.parserProfileId),
+                      observation.parserProfileVersion == contract.profileVersion else {
                     throw RepositoryStoreHydrationError.invalidCardState("section source observation")
                 }
                 return try CardSourceIdentityObservation(
@@ -864,14 +869,22 @@ final class RepositoryStoreHydrator {
                   let statementAccount = accountByID[statement.liabilityAccountId],
                   statementAccount.accountType == "credit_card",
                   statementAccount.institutionId == contract.institutionCode,
-                  statement.parserProfileId == contract.profileID,
+                  contract.accepts(profileID: statement.parserProfileId),
                   statement.parserProfileVersion == contract.profileVersion,
-                  statement.statementCurrency == "QAR",
+                  statement.statementCurrency == (contract == .axis ? "INR" : "QAR"),
                   statement.sourceRowCount > 0 else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement relationship")
             }
             let statementComponents = snapshot.summaryComponents.filter { $0.cardStatementId == statement.id }
-            guard Set(statementComponents.map(\.componentCode)) == contract.requiredSummaryCodes else {
+            let sourceFormat = statement.parserProfileId.hasSuffix(".xlsx") ? "xlsx" : "pdf"
+            let summaryCodes = Set(statementComponents.map(\.componentCode))
+            let summaryCoverageIsValid = contract == .axis
+                ? summaryCodes.isSubset(of: contract.allowedSummaryCodes)
+                : summaryCodes == contract.requiredSummaryCodes(
+                    reconciliationRuleIdentifier: statement.reconciliationRuleCode,
+                    sourceFormatCode: sourceFormat
+                )
+            guard summaryCoverageIsValid, summaryCodes.count == statementComponents.count else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement summary coverage")
             }
             let components: [CardStatementSummaryComponent] = try statementComponents.map { component in
@@ -880,7 +893,8 @@ final class RepositoryStoreHydrator {
                           component.moneyMinor == nil, component.moneyDecimal == nil else {
                         throw RepositoryStoreHydrationError.invalidCardState("due-date component")
                     }
-                    return .dueDate(try StatementDate(canonical: dateISO))
+                    let date = try StatementDate(canonical: dateISO)
+                    return .dueDate(date)
                 }
                 guard component.dateISO == nil, let currency = component.moneyCurrency,
                       let minor = component.moneyMinor, let decimal = component.moneyDecimal,
@@ -903,26 +917,30 @@ final class RepositoryStoreHydrator {
                 case "new_balance": return .newBalance(decimalMoney)
                 case "instrument_net_total": return .instrumentNetTotal(decimalMoney)
                 case "source_section_net_total": return .sourceSectionNetTotal(decimalMoney)
+                case "axis_total_payment_due": return .axisTotalPaymentDue(decimalMoney)
                 default: throw RepositoryStoreHydrationError.invalidCardState("unknown summary component")
                 }
             }
             let componentByCode = Dictionary(uniqueKeysWithValues: components.map { ($0.persistenceCode, $0) })
-            guard let previous = componentByCode["previous_balance"]?.money,
-                  let balance = componentByCode["new_balance"]?.money else {
+            let previous = componentByCode["previous_balance"]?.money
+            let balance = componentByCode[contract == .axis ? "axis_total_payment_due" : "new_balance"]?.money
+            guard contract == .axis || (previous != nil && balance != nil) else {
                 throw RepositoryStoreHydrationError.invalidCardState("summary balance coverage")
             }
             let durableSections = snapshot.sections.filter { $0.cardStatementId == statement.id }
                 .sorted { $0.sourceOrdinal < $1.sourceOrdinal }
-            guard !durableSections.isEmpty,
-                  durableSections.map(\.sourceOrdinal) == Array(1...durableSections.count),
+            guard (contract == .axis ? durableSections.isEmpty : !durableSections.isEmpty),
+                  durableSections.map(\.sourceOrdinal) == durableSections.indices.map({ $0 + 1 }),
                   Set(durableSections.map(\.documentScopedSectionId)).count == durableSections.count else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement section coverage")
             }
             let runtimeSections: [CardStatementSection] = try durableSections.map { section in
-                guard let instrument = instrumentByID[section.instrumentId],
+                guard let sectionRule = contract.sectionRule,
+                      let instrumentObservationKindCode = contract.instrumentObservationKindCode,
+                      let instrument = instrumentByID[section.instrumentId],
                       instrument.liabilityAccountId == statement.liabilityAccountId,
                       section.signedTotalCurrency == statement.statementCurrency,
-                      section.reconciliationRuleCode == contract.sectionRule,
+                      section.reconciliationRuleCode == sectionRule,
                       let byDecimal = try? Money(
                         canonicalDecimal: section.signedTotalDecimal,
                         currency: section.signedTotalCurrency
@@ -941,13 +959,13 @@ final class RepositoryStoreHydrator {
                           observation.normalizedDocumentId == statement.normalizedDocumentId,
                           observation.parserProfileId == statement.parserProfileId,
                           observation.parserProfileVersion == statement.parserProfileVersion,
-                          observation.observationKind == contract.instrumentObservationKindCode,
+                          observation.observationKind == instrumentObservationKindCode,
                           ["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"]
                             .contains(observation.associationAuthority) else {
                         throw RepositoryStoreHydrationError.invalidCardState("section observation graph")
                     }
                     guard let observationKind = CardSourceIdentityObservationKind(
-                        rawValue: contract.instrumentObservationKindCode
+                        rawValue: instrumentObservationKindCode
                     ) else {
                         throw RepositoryStoreHydrationError.invalidCardState("section observation kind")
                     }
@@ -977,6 +995,7 @@ final class RepositoryStoreHydrator {
                 snapshot.semanticMembers.first { $0.projectionId == projection.id }
             }
             let isSupportingSource: Bool
+            let semanticGroupID: String?
             if let projection = semanticProjection, let member = semanticMember,
                let group = groupByID[member.groupId] {
                 guard contract.supportsSemanticSourceGrouping,
@@ -992,11 +1011,13 @@ final class RepositoryStoreHydrator {
                     throw RepositoryStoreHydrationError.invalidCardState("semantic projection graph")
                 }
                 isSupportingSource = member.role == .supporting
+                semanticGroupID = group.id
             } else if semanticProjection == nil && semanticMember == nil {
                 // Historical V13 Amex rows may predate a semantic projection;
                 // source-byte CBQ statements never create one. In either case,
                 // the authoritative statement graph remains hydratable.
                 isSupportingSource = false
+                semanticGroupID = nil
             } else {
                 throw RepositoryStoreHydrationError.invalidCardState("semantic membership coverage")
             }
@@ -1025,6 +1046,7 @@ final class RepositoryStoreHydrator {
                 let scope: CardTransactionScope
                 if evidence.rowScopeCode == CardTransactionScope.accountLevel.persistenceCode {
                     guard evidence.instrumentId == nil,
+                          (contract != .axis || evidence.documentScopedSectionId == nil),
                           evidence.documentScopedSectionId.map(sectionNetByID.keys.contains) ?? true else {
                         throw RepositoryStoreHydrationError.invalidCardState("account-level scope")
                     }
@@ -1059,7 +1081,7 @@ final class RepositoryStoreHydrator {
                 }
                 if let sectionID = evidence.documentScopedSectionId {
                     sectionNetByID[sectionID, default: 0] += transaction.amountMinor
-                } else if contract != .amex {
+                } else if contract != .amex && contract != .axis {
                     throw RepositoryStoreHydrationError.invalidCardState("CBQ structural section coverage")
                 }
                 allRowsNet += transaction.amountMinor
@@ -1089,6 +1111,7 @@ final class RepositoryStoreHydrator {
             }
             if isSupportingSource, let semanticProjection {
                 for event in semanticProjection.events {
+                    allRowsNet += event.postedAmountMinor
                     switch CardLiabilityEffect(rawValue: event.liabilityEffectCode) {
                     case .increasesAmountOwed: increase += event.postedAmountMinor
                     case .decreasesAmountOwed: decrease += -event.postedAmountMinor
@@ -1100,23 +1123,24 @@ final class RepositoryStoreHydrator {
                     }
                 }
             }
-            let previousMinor = try previous.minorUnits()
-            let balanceMinor = try balance.minorUnits()
+            let previousMinor = try previous.map { try $0.minorUnits() }
+            let balanceMinor = try balance.map { try $0.minorUnits() }
             let sectionNet = durableSections.reduce(Int64(0)) { $0 + $1.signedTotalMinor }
             let summaryValid: Bool
             switch contract {
             case .amex:
-                summaryValid = componentByCode["new_debits"]?.money.flatMap { try? $0.minorUnits() } == increase &&
+                summaryValid = previousMinor != nil && balanceMinor != nil &&
+                    componentByCode["new_debits"]?.money.flatMap { try? $0.minorUnits() } == increase &&
                     componentByCode["new_credits"]?.money.flatMap { try? $0.minorUnits() } == decrease &&
                     componentByCode["instrument_net_total"]?.money.flatMap { try? $0.minorUnits() } == instrumentNet &&
-                    previousMinor - decrease + increase == balanceMinor && sectionNet == instrumentNet
+                    previousMinor! - decrease + increase == balanceMinor! && sectionNet == instrumentNet
             case .cbqV1:
                 let billed = componentByCode["amount_billed"]?.money.flatMap { try? $0.minorUnits() }
                 let payment = componentByCode["payment_received"]?.money.flatMap { try? $0.minorUnits() }
                 summaryValid = billed == membershipTotals[.cbqV1AmountBilled, default: 0] &&
                     payment == -membershipTotals[.cbqV1PaymentReceived, default: 0] &&
                     componentByCode["source_section_net_total"]?.money.flatMap { try? $0.minorUnits() } == allRowsNet &&
-                    billed.flatMap { billed in payment.map { previousMinor + billed - $0 == balanceMinor } } == true &&
+                    billed.flatMap { billed in payment.flatMap { paid in previousMinor.flatMap { opening in balanceMinor.map { opening + billed - paid == $0 } } } } == true &&
                     sectionNet == allRowsNet
             case .cbqV2:
                 let payment = componentByCode["total_payment"]?.money.flatMap { try? $0.minorUnits() }
@@ -1128,7 +1152,13 @@ final class RepositoryStoreHydrator {
                     credit.flatMap { credited in
                         purchases.flatMap { bought in
                             installment.flatMap { billed in
-                                fees.map { previousMinor - paid - credited + bought + billed + $0 == balanceMinor }
+                                fees.flatMap { fee in
+                                    previousMinor.flatMap { opening in
+                                        balanceMinor.map {
+                                            opening - paid - credited + bought + billed + fee == $0
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1139,24 +1169,65 @@ final class RepositoryStoreHydrator {
                     installment == membershipTotals[.cbqV2BilledInstallment, default: 0] &&
                     fees == membershipTotals[.cbqV2FeesCharges, default: 0] &&
                     componentByCode["source_section_net_total"]?.money.flatMap { try? $0.minorUnits() } == allRowsNet &&
-                    equationValid && sectionNet == allRowsNet
+                    equationValid && previousMinor != nil && balanceMinor != nil && sectionNet == allRowsNet
+            case .axis:
+                summaryValid = true
             }
             guard summaryValid, durableSections.allSatisfy({
                       sectionNetByID[$0.documentScopedSectionId] == $0.signedTotalMinor
                   }) else {
                 throw RepositoryStoreHydrationError.invalidCardState("transaction totals")
             }
-            let start = try StatementDate(canonical: statement.statementStartDateISO)
-            let end = try StatementDate(canonical: statement.statementEndDateISO)
-            let statementDate = try StatementDate(canonical: statement.statementDateISO)
-            guard start <= end else { throw RepositoryStoreHydrationError.invalidCardState("statement period") }
+            // `Optional.map` invokes its transform in a synchronous
+            // nonisolated closure under the target's default MainActor
+            // isolation. Parse each optional in this actor-owned context so
+            // the immutable date initializer is not incorrectly crossed from
+            // that closure. The explicit branches preserve the prior nil and
+            // throwing behavior exactly.
+            let statementDate: StatementDate?
+            if let canonical = statement.statementDateISO {
+                statementDate = try StatementDate(canonical: canonical)
+            } else {
+                statementDate = nil
+            }
+            let start: StatementDate?
+            if let canonical = statement.statementStartDateISO {
+                start = try StatementDate(canonical: canonical)
+            } else {
+                start = nil
+            }
+            let end: StatementDate?
+            if let canonical = statement.statementEndDateISO {
+                end = try StatementDate(canonical: canonical)
+            } else {
+                end = nil
+            }
+            guard (start == nil) == (end == nil) else {
+                throw RepositoryStoreHydrationError.invalidCardState("statement period")
+            }
+            let period: DeclaredStatementPeriod?
+            if let start, let end {
+                guard start <= end else { throw RepositoryStoreHydrationError.invalidCardState("statement period") }
+                period = try DeclaredStatementPeriod(start: start, end: end)
+            } else {
+                period = nil
+            }
+            let selectedMonth: SelectedStatementMonth?
+            if let canonical = statement.selectedStatementMonthISO {
+                selectedMonth = try SelectedStatementMonth(canonical: canonical)
+            } else {
+                selectedMonth = nil
+            }
+            guard contract == .axis || statementDate != nil || period != nil || selectedMonth != nil else {
+                throw RepositoryStoreHydrationError.invalidCardState("statement chronology evidence")
+            }
             let usedInstrumentIDs = durableSections.map(\.instrumentId)
             runtimeStatements.append(CardStatement(
                 id: statement.id, liabilityAccountID: statement.liabilityAccountId,
                 instrumentIDs: usedInstrumentIDs, sourceDocumentID: statement.documentId,
                 importSessionID: statement.importSessionId, parserProfileID: statement.parserProfileId,
                 parserProfileVersion: statement.parserProfileVersion, statementDate: statementDate,
-                period: try DeclaredStatementPeriod(start: start, end: end),
+                period: period, selectedStatementMonth: selectedMonth, semanticGroupID: semanticGroupID,
                 currency: try CurrencyCode(statement.statementCurrency), sourceRowCount: statement.sourceRowCount,
                 reconciliationRuleCode: statement.reconciliationRuleCode,
                 summaryComponents: components,
@@ -1209,10 +1280,19 @@ final class RepositoryStoreHydrator {
             let isCardDirection = CardLiabilityEffect(rawValue: transaction.direction) != nil
             return isCardDirection == evidencedTransactionIDs.contains(transaction.id)
         }) else { throw RepositoryStoreHydrationError.invalidCardState("transaction evidence coverage") }
+        let sortedStatements = runtimeStatements.sorted { lhs, rhs in
+            let lhsMonth = lhs.selectedStatementMonth?.canonical ?? lhs.statementDate.map { String(format: "%04d-%02d", $0.year, $0.month) } ?? lhs.period.map { String(format: "%04d-%02d", $0.end.year, $0.end.month) } ?? ""
+            let rhsMonth = rhs.selectedStatementMonth?.canonical ?? rhs.statementDate.map { String(format: "%04d-%02d", $0.year, $0.month) } ?? rhs.period.map { String(format: "%04d-%02d", $0.end.year, $0.end.month) } ?? ""
+            if lhsMonth != rhsMonth { return lhsMonth < rhsMonth }
+            let lhsExact = lhs.statementDate?.canonical ?? ""
+            let rhsExact = rhs.statementDate?.canonical ?? ""
+            if lhsExact != rhsExact { return lhsExact < rhsExact }
+            return lhs.id < rhs.id
+        }
         return CardStoreSnapshot(
             instruments: runtimeInstruments,
             relationships: runtimeRelationships.sorted { $0.id < $1.id },
-            statements: runtimeStatements.sorted { ($0.period.end, $0.id) < ($1.period.end, $1.id) },
+            statements: sortedStatements,
             transactionEvidence: runtimeEvidence.sorted { ($0.statementID, $0.transactionID) < ($1.statementID, $1.transactionID) }
         )
     }
@@ -1236,6 +1316,7 @@ final class RepositoryStoreHydrator {
               persisted.statementDateISO == statement.statementDateISO,
               persisted.statementStartDateISO == statement.statementStartDateISO,
               persisted.statementEndDateISO == statement.statementEndDateISO,
+              persisted.selectedStatementMonthISO == statement.selectedStatementMonthISO,
               persisted.nativeCurrency == statement.statementCurrency,
               persisted.reconciliationRuleCode == statement.reconciliationRuleCode,
               persisted.eventCount == persisted.events.count,
@@ -1248,11 +1329,19 @@ final class RepositoryStoreHydrator {
               group.liabilityAccountId == persisted.liabilityAccountId,
               group.institutionCode == persisted.institutionCode,
               group.statementFamilyCode == persisted.statementFamilyCode,
-              group.statementStartDateISO == persisted.statementStartDateISO,
-              group.statementEndDateISO == persisted.statementEndDateISO,
               group.nativeCurrency == persisted.nativeCurrency,
               group.projectionAlgorithm == persisted.algorithm,
               group.projectionDigest == persisted.digest else { return false }
+        if persisted.algorithm == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm {
+            guard group.cycleMonthISO == nil,
+                  group.statementStartDateISO == nil,
+                  group.statementEndDateISO == nil else { return false }
+        } else {
+            guard persisted.cycleMonthISO == nil,
+                  group.cycleMonthISO == nil,
+                  group.statementStartDateISO == persisted.statementStartDateISO,
+                  group.statementEndDateISO == persisted.statementEndDateISO else { return false }
+        }
         switch member.role {
         case .authoritative:
             guard group.authoritativeProjectionId == persisted.id else { return false }
@@ -1275,10 +1364,11 @@ final class RepositoryStoreHydrator {
 
         let eventPlans = persisted.events.map { event in
             CardStatementSemanticProjectionEventPlanDTO(
-                incomingTransactionId: event.canonicalTransactionId,
+                incomingTransactionId: event.canonicalTransactionId ?? event.id,
                 normalizedRowId: event.normalizedRowId,
                 sourceOrdinal: event.sourceOrdinal,
-                postingDateISO: event.postingDateISO,
+                financialDateISO: event.financialDateISO,
+                financialDateRoleCode: event.financialDateRoleCode,
                 sourceTransactionDateISO: event.sourceTransactionDateISO,
                 liabilityEffectCode: event.liabilityEffectCode,
                 postedCurrency: event.postedCurrency,
@@ -1293,17 +1383,29 @@ final class RepositoryStoreHydrator {
                 documentSectionOrdinal: event.documentSectionOrdinal
             )
         }
+        func axisEventKey(_ event: CardStatementSemanticProjectionEventDTO) -> String {
+            [event.financialDateISO, event.liabilityEffectCode, event.postedCurrency, event.postedAmountDecimal]
+                .map { "\($0.utf8.count):\($0)" }.joined()
+        }
+        let axisKeyCounts = Dictionary(grouping: persisted.events, by: axisEventKey).mapValues(\.count)
         guard persisted.events.allSatisfy({ event in
-            guard event.projectionId == persisted.id,
-                  !event.normalizedRowId.isEmpty,
-                  let transaction = transactionsByID[event.canonicalTransactionId],
-                  transaction.accountId == persisted.liabilityAccountId,
-                  transaction.postedDateISO == event.postingDateISO,
-                  transaction.direction == event.liabilityEffectCode,
-                  transaction.nativeCurrency == event.postedCurrency,
-                  transaction.amountMinor == event.postedAmountMinor,
-                  transaction.amountDecimal == event.postedAmountDecimal,
-                  transaction.reference == event.sourceReference else { return false }
+            guard event.projectionId == persisted.id, !event.normalizedRowId.isEmpty else { return false }
+            if let canonicalID = event.canonicalTransactionId {
+                guard let transaction = transactionsByID[canonicalID],
+                      transaction.accountId == persisted.liabilityAccountId,
+                      transaction.postedDateISO == event.financialDateISO,
+                      transaction.financialDateRole == event.financialDateRoleCode,
+                      transaction.direction == event.liabilityEffectCode,
+                      transaction.nativeCurrency == event.postedCurrency,
+                      transaction.amountMinor == event.postedAmountMinor,
+                      transaction.amountDecimal == event.postedAmountDecimal,
+                      (persisted.algorithm == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm ||
+                       transaction.reference == event.sourceReference) else { return false }
+            } else {
+                guard persisted.algorithm == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm,
+                      member.role == .supporting,
+                      axisKeyCounts[axisEventKey(event), default: 0] > 1 else { return false }
+            }
             if event.rowScopeCode == CardTransactionScope.accountLevel.persistenceCode {
                 return event.documentScopedSectionId == nil && event.documentSectionOrdinal == nil
             }
@@ -1313,6 +1415,9 @@ final class RepositoryStoreHydrator {
                   let section = durableSectionsByOrdinal[ordinal] else { return false }
             return section.documentScopedSectionId == sectionID
         }) else { return false }
+        if member.role == .authoritative && persisted.events.contains(where: { $0.canonicalTransactionId == nil }) {
+            return false
+        }
 
         let projection = CardStatementSemanticProjectionDTO(
             id: persisted.id,
@@ -1325,6 +1430,8 @@ final class RepositoryStoreHydrator {
             statementDateISO: persisted.statementDateISO,
             statementStartDateISO: persisted.statementStartDateISO,
             statementEndDateISO: persisted.statementEndDateISO,
+            selectedStatementMonthISO: persisted.selectedStatementMonthISO,
+            cycleMonthISO: persisted.cycleMonthISO,
             nativeCurrency: persisted.nativeCurrency,
             reconciliationRuleCode: persisted.reconciliationRuleCode,
             summaryComponents: summaryComponents,
@@ -1344,9 +1451,36 @@ final class RepositoryStoreHydrator {
             let accountTransactions = transactions.filter { $0.repositoryAccountId == accountDTO.id }
             let latestBalance: Money?
             if accountDTO.accountType == "credit_card" {
-                let latestStatement = cardSnapshot.statements
-                    .filter { $0.liabilityAccountID == accountDTO.id }
-                    .max { ($0.statementDate, $0.period.end, $0.id) < ($1.statementDate, $1.period.end, $1.id) }
+                let accountStatements = cardSnapshot.statements.filter { $0.liabilityAccountID == accountDTO.id }
+                let latestStatement: CardStatement?
+                if accountStatements.allSatisfy({ !$0.parserProfileID.hasPrefix("axis.credit-card.") }) {
+                    // Preserve accepted Amex/CBQ exact-date chronology semantics.
+                    latestStatement = accountStatements.max {
+                        (($0.statementDate?.canonical ?? ""), ($0.period?.end.canonical ?? ""), $0.id) <
+                        (($1.statementDate?.canonical ?? ""), ($1.period?.end.canonical ?? ""), $1.id)
+                    }
+                } else {
+                    func cycleMonth(_ statement: CardStatement) -> String? {
+                        if let month = statement.selectedStatementMonth { return month.canonical }
+                        if let date = statement.statementDate { return String(format: "%04d-%02d", date.year, date.month) }
+                        if let end = statement.period?.end { return String(format: "%04d-%02d", end.year, end.month) }
+                        return nil
+                    }
+                    let keyed = accountStatements.compactMap { statement in cycleMonth(statement).map { ($0, statement) } }
+                    if let latestMonth = keyed.map(\.0).max() {
+                        let cycle = keyed.filter { $0.0 == latestMonth }.map(\.1)
+                        if let exactDate = cycle.compactMap(\.statementDate).max() {
+                            let exact = cycle.filter { $0.statementDate == exactDate }
+                            let groupIDs = Set(exact.compactMap(\.semanticGroupID))
+                            latestStatement = exact.count == 1 || (groupIDs.count == 1 && exact.allSatisfy({ $0.semanticGroupID != nil })) ? exact.first : nil
+                        } else {
+                            let groupIDs = Set(cycle.compactMap(\.semanticGroupID))
+                            latestStatement = cycle.count == 1 || (groupIDs.count == 1 && cycle.allSatisfy({ $0.semanticGroupID != nil })) ? cycle.first : nil
+                        }
+                    } else {
+                        latestStatement = nil
+                    }
+                }
                 if let newBalance = latestStatement?.newBalance {
                     guard newBalance.currency.code == accountDTO.nativeCurrency else {
                         throw RepositoryStoreHydrationError.accountCurrencyMismatch

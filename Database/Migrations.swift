@@ -9,16 +9,24 @@ public struct Migration {
     public let name: String
     public let sql: String
     let preflightChecks: [MigrationPreflightCheck]
+    let requiresForeignKeysDisabled: Bool
 
     public init(version: Int, name: String, sql: String) {
-        self.init(version: version, name: name, sql: sql, preflightChecks: [])
+        self.init(version: version, name: name, sql: sql, preflightChecks: [], requiresForeignKeysDisabled: false)
     }
 
-    init(version: Int, name: String, sql: String, preflightChecks: [MigrationPreflightCheck]) {
+    init(
+        version: Int,
+        name: String,
+        sql: String,
+        preflightChecks: [MigrationPreflightCheck],
+        requiresForeignKeysDisabled: Bool = false
+    ) {
         self.version = version
         self.name = name
         self.sql = sql
         self.preflightChecks = preflightChecks
+        self.requiresForeignKeysDisabled = requiresForeignKeysDisabled
     }
 }
 
@@ -1599,7 +1607,326 @@ END;
 """
 )
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14]
+public let migrationV15 = Migration(
+    version: 15,
+    name: "Axis card observations and representation-neutral semantic events",
+    sql: """
+PRAGMA legacy_alter_table = ON;
+DROP TRIGGER validate_card_source_identity;
+DROP TRIGGER validate_card_statement_section_observation;
+DROP TRIGGER validate_card_semantic_projection_event;
+DROP TRIGGER validate_card_semantic_projection;
+DROP TRIGGER validate_card_statement;
+
+ALTER TABLE card_statement_summary_components RENAME TO card_statement_summary_components_v14;
+CREATE TABLE card_statement_summary_components (
+  id TEXT PRIMARY KEY, card_statement_id TEXT NOT NULL,
+  component_code TEXT NOT NULL CHECK(component_code IN (
+    'previous_balance', 'new_credits', 'new_debits', 'amount_billed', 'payment_received',
+    'total_payment', 'credit_reversal', 'purchases', 'billed_installment', 'fees_charges',
+    'new_balance', 'due_date', 'instrument_net_total', 'source_section_net_total',
+    'axis_total_payment_due'
+  )),
+  money_currency TEXT, money_minor INTEGER, money_decimal TEXT, date_value DATE,
+  UNIQUE(card_statement_id, component_code),
+  CHECK((component_code = 'due_date' AND date_value IS NOT NULL AND money_currency IS NULL AND money_minor IS NULL AND money_decimal IS NULL) OR
+        (component_code != 'due_date' AND date_value IS NULL AND money_currency IS NOT NULL AND money_minor IS NOT NULL AND money_decimal IS NOT NULL)),
+  FOREIGN KEY(card_statement_id) REFERENCES card_statements(id) ON DELETE RESTRICT
+);
+INSERT INTO card_statement_summary_components SELECT * FROM card_statement_summary_components_v14;
+DROP TABLE card_statement_summary_components_v14;
+
+ALTER TABLE card_statements RENAME TO card_statements_v14;
+CREATE TABLE card_statements (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  liability_account_id TEXT NOT NULL,
+  document_id TEXT NOT NULL UNIQUE,
+  import_session_id TEXT NOT NULL UNIQUE,
+  normalized_document_id TEXT NOT NULL UNIQUE,
+  parser_profile_id TEXT NOT NULL,
+  parser_profile_version TEXT NOT NULL,
+  statement_date DATE,
+  statement_start_date DATE,
+  statement_end_date DATE,
+  selected_statement_month TEXT,
+  statement_currency TEXT NOT NULL,
+  source_row_count INTEGER NOT NULL CHECK(source_row_count > 0),
+  reconciliation_rule_code TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  CHECK((statement_start_date IS NULL AND statement_end_date IS NULL) OR
+        (statement_start_date IS NOT NULL AND statement_end_date IS NOT NULL AND statement_start_date <= statement_end_date)),
+  CHECK(selected_statement_month IS NULL OR
+        (length(selected_statement_month) = 7 AND substr(selected_statement_month, 5, 1) = '-' AND
+         CAST(substr(selected_statement_month, 6, 2) AS INTEGER) BETWEEN 1 AND 12)),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(liability_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+INSERT INTO card_statements (
+  id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id,
+  parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date,
+  selected_statement_month, statement_currency, source_row_count, reconciliation_rule_code, created_at
+)
+SELECT id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id,
+  parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date,
+  NULL, statement_currency, source_row_count, reconciliation_rule_code, created_at
+FROM card_statements_v14;
+DROP TABLE card_statements_v14;
+CREATE INDEX idx_card_statement_current ON card_statements(workspace_id, liability_account_id, statement_end_date, statement_date, selected_statement_month);
+
+ALTER TABLE card_statement_semantic_projections RENAME TO card_statement_semantic_projections_v14;
+CREATE TABLE card_statement_semantic_projections (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  liability_account_id TEXT NOT NULL,
+  card_statement_id TEXT NOT NULL UNIQUE,
+  document_id TEXT NOT NULL UNIQUE,
+  import_session_id TEXT NOT NULL UNIQUE,
+  algorithm TEXT NOT NULL,
+  digest TEXT NOT NULL CHECK(length(digest) = 64),
+  institution_code TEXT NOT NULL,
+  statement_family_code TEXT NOT NULL,
+  parser_profile_id TEXT NOT NULL,
+  parser_profile_version TEXT NOT NULL,
+  statement_date DATE,
+  statement_start_date DATE,
+  statement_end_date DATE,
+  selected_statement_month TEXT,
+  cycle_month TEXT,
+  native_currency TEXT NOT NULL,
+  event_count INTEGER NOT NULL CHECK(event_count > 0),
+  section_count INTEGER NOT NULL CHECK(section_count >= 0),
+  reconciliation_rule_code TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  CHECK((algorithm = 'ledgerforge.axis-card-statement-multiset.sha256.v1' AND section_count = 0) OR
+        (algorithm != 'ledgerforge.axis-card-statement-multiset.sha256.v1' AND section_count > 0)),
+  CHECK((statement_start_date IS NULL AND statement_end_date IS NULL) OR
+        (statement_start_date IS NOT NULL AND statement_end_date IS NOT NULL AND statement_start_date <= statement_end_date)),
+  CHECK(selected_statement_month IS NULL OR
+        (length(selected_statement_month) = 7 AND substr(selected_statement_month, 5, 1) = '-' AND
+         CAST(substr(selected_statement_month, 6, 2) AS INTEGER) BETWEEN 1 AND 12)),
+  CHECK(cycle_month IS NULL OR
+        (length(cycle_month) = 7 AND substr(cycle_month, 5, 1) = '-' AND
+         CAST(substr(cycle_month, 6, 2) AS INTEGER) BETWEEN 1 AND 12)),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(liability_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(card_statement_id) REFERENCES card_statements(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT
+);
+INSERT INTO card_statement_semantic_projections (
+  id, workspace_id, liability_account_id, card_statement_id, document_id, import_session_id,
+  algorithm, digest, institution_code, statement_family_code, parser_profile_id, parser_profile_version,
+  statement_date, statement_start_date, statement_end_date, selected_statement_month, cycle_month,
+  native_currency, event_count, section_count, reconciliation_rule_code, created_at
+)
+SELECT id, workspace_id, liability_account_id, card_statement_id, document_id, import_session_id,
+  algorithm, digest, institution_code, statement_family_code, parser_profile_id, parser_profile_version,
+  statement_date, statement_start_date, statement_end_date, NULL, NULL,
+  native_currency, event_count, section_count, reconciliation_rule_code, created_at
+FROM card_statement_semantic_projections_v14;
+DROP TABLE card_statement_semantic_projections_v14;
+CREATE INDEX idx_card_semantic_projection_period
+  ON card_statement_semantic_projections(workspace_id, liability_account_id, statement_start_date, statement_end_date, cycle_month);
+
+ALTER TABLE card_statement_semantic_groups RENAME TO card_statement_semantic_groups_v14;
+CREATE TABLE card_statement_semantic_groups (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  liability_account_id TEXT NOT NULL,
+  institution_code TEXT NOT NULL,
+  statement_family_code TEXT NOT NULL,
+  statement_start_date DATE,
+  statement_end_date DATE,
+  cycle_month TEXT,
+  native_currency TEXT NOT NULL,
+  projection_algorithm TEXT NOT NULL,
+  projection_digest TEXT NOT NULL CHECK(length(projection_digest) = 64),
+  authoritative_projection_id TEXT NOT NULL UNIQUE,
+  created_at DATETIME NOT NULL,
+  CHECK((cycle_month IS NOT NULL AND statement_start_date IS NULL AND statement_end_date IS NULL) OR
+        (cycle_month IS NULL AND statement_start_date IS NOT NULL AND statement_end_date IS NOT NULL AND statement_start_date <= statement_end_date) OR
+        (cycle_month IS NULL AND statement_start_date IS NULL AND statement_end_date IS NULL AND
+         projection_algorithm = 'ledgerforge.axis-card-statement-multiset.sha256.v1')),
+  CHECK(cycle_month IS NULL OR
+        (length(cycle_month) = 7 AND substr(cycle_month, 5, 1) = '-' AND
+         CAST(substr(cycle_month, 6, 2) AS INTEGER) BETWEEN 1 AND 12)),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(liability_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(authoritative_projection_id) REFERENCES card_statement_semantic_projections(id) ON DELETE RESTRICT
+);
+INSERT INTO card_statement_semantic_groups (
+  id, workspace_id, liability_account_id, institution_code, statement_family_code,
+  statement_start_date, statement_end_date, cycle_month, native_currency, projection_algorithm,
+  projection_digest, authoritative_projection_id, created_at
+)
+SELECT id, workspace_id, liability_account_id, institution_code, statement_family_code,
+  statement_start_date, statement_end_date, NULL, native_currency, projection_algorithm,
+  projection_digest, authoritative_projection_id, created_at
+FROM card_statement_semantic_groups_v14;
+DROP TABLE card_statement_semantic_groups_v14;
+CREATE UNIQUE INDEX idx_card_semantic_group_period_identity
+  ON card_statement_semantic_groups(workspace_id, liability_account_id, institution_code, statement_family_code, statement_start_date, statement_end_date, native_currency)
+  WHERE cycle_month IS NULL;
+CREATE UNIQUE INDEX idx_card_semantic_group_cycle_identity
+  ON card_statement_semantic_groups(workspace_id, liability_account_id, institution_code, statement_family_code, cycle_month, native_currency)
+  WHERE cycle_month IS NOT NULL;
+CREATE UNIQUE INDEX idx_card_semantic_group_axis_digest_identity
+  ON card_statement_semantic_groups(workspace_id, liability_account_id, institution_code, statement_family_code, native_currency, projection_algorithm, projection_digest)
+  WHERE cycle_month IS NULL AND statement_start_date IS NULL AND statement_end_date IS NULL
+    AND projection_algorithm = 'ledgerforge.axis-card-statement-multiset.sha256.v1';
+
+ALTER TABLE card_statement_semantic_projection_events RENAME TO card_statement_semantic_projection_events_v14;
+CREATE TABLE card_statement_semantic_projection_events (
+  id TEXT PRIMARY KEY, projection_id TEXT NOT NULL, canonical_transaction_id TEXT,
+  normalized_row_id TEXT NOT NULL, source_ordinal INTEGER NOT NULL CHECK(source_ordinal > 0),
+  financial_date DATE NOT NULL,
+  financial_date_role TEXT NOT NULL CHECK(financial_date_role IN ('transaction_date', 'posting_date')),
+  source_transaction_date DATE,
+  liability_effect TEXT NOT NULL CHECK(liability_effect IN ('card_increase_owed', 'card_decrease_owed')),
+  posted_currency TEXT NOT NULL, posted_amount_minor INTEGER NOT NULL, posted_amount_decimal TEXT NOT NULL,
+  original_currency TEXT, original_amount_minor INTEGER, original_amount_decimal TEXT,
+  source_reference TEXT, row_scope TEXT NOT NULL CHECK(row_scope IN ('account_level', 'instrument_level')),
+  document_scoped_section_id TEXT, document_section_ordinal INTEGER,
+  UNIQUE(projection_id, source_ordinal),
+  CHECK((row_scope = 'account_level' AND document_scoped_section_id IS NULL AND document_section_ordinal IS NULL) OR
+        (row_scope = 'instrument_level' AND document_scoped_section_id IS NOT NULL AND document_section_ordinal IS NOT NULL)),
+  CHECK((original_currency IS NULL AND original_amount_minor IS NULL AND original_amount_decimal IS NULL) OR
+        (original_currency IS NOT NULL AND original_amount_minor IS NOT NULL AND original_amount_decimal IS NOT NULL)),
+  FOREIGN KEY(projection_id) REFERENCES card_statement_semantic_projections(id) ON DELETE RESTRICT,
+  FOREIGN KEY(canonical_transaction_id) REFERENCES transactions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_row_id) REFERENCES normalized_rows(id) ON DELETE RESTRICT
+);
+INSERT INTO card_statement_semantic_projection_events (
+  id, projection_id, canonical_transaction_id, normalized_row_id, source_ordinal,
+  financial_date, financial_date_role, source_transaction_date, liability_effect,
+  posted_currency, posted_amount_minor, posted_amount_decimal, original_currency,
+  original_amount_minor, original_amount_decimal, source_reference, row_scope,
+  document_scoped_section_id, document_section_ordinal
+)
+SELECT id, projection_id, canonical_transaction_id, normalized_row_id, source_ordinal,
+  posting_date, 'posting_date', source_transaction_date, liability_effect,
+  posted_currency, posted_amount_minor, posted_amount_decimal, original_currency,
+  original_amount_minor, original_amount_decimal, source_reference, row_scope,
+  document_scoped_section_id, document_section_ordinal
+FROM card_statement_semantic_projection_events_v14;
+DROP TABLE card_statement_semantic_projection_events_v14;
+CREATE INDEX idx_card_semantic_event_transaction ON card_statement_semantic_projection_events(canonical_transaction_id, projection_id, source_ordinal);
+
+CREATE TRIGGER validate_card_source_identity
+BEFORE INSERT ON card_source_identity_observations
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d JOIN import_sessions s ON s.id = d.import_session_id
+    JOIN normalized_documents n ON n.document_id = d.id AND n.import_session_id = s.id
+    WHERE d.id = NEW.document_id AND s.id = NEW.import_session_id
+      AND n.id = NEW.normalized_document_id AND d.workspace_id = NEW.workspace_id
+      AND n.profile_id = NEW.parser_profile_id AND n.profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'card observation source relationship invalid') END;
+  SELECT CASE WHEN NEW.subject_kind = 'liability_account' AND NOT EXISTS (
+    SELECT 1 FROM accounts a WHERE a.id = NEW.subject_id AND a.workspace_id = NEW.workspace_id AND a.account_type = 'credit_card'
+  ) THEN RAISE(ABORT, 'card observation liability account invalid') END;
+  SELECT CASE WHEN NEW.subject_kind = 'instrument' AND NOT EXISTS (
+    SELECT 1 FROM card_instruments i WHERE i.id = NEW.subject_id AND i.workspace_id = NEW.workspace_id
+  ) THEN RAISE(ABORT, 'card observation instrument invalid') END;
+END;
+
+CREATE TRIGGER validate_card_statement_section_observation
+BEFORE INSERT ON card_statement_section_observations
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statement_sections cs
+    JOIN card_statements s ON s.id = cs.card_statement_id
+    JOIN normalized_documents n ON n.id = NEW.normalized_document_id
+    WHERE cs.id = NEW.card_statement_section_id AND s.workspace_id = NEW.workspace_id
+      AND s.document_id = NEW.document_id AND s.import_session_id = NEW.import_session_id
+      AND s.normalized_document_id = NEW.normalized_document_id
+      AND s.parser_profile_id = NEW.parser_profile_id AND s.parser_profile_version = NEW.parser_profile_version
+      AND n.document_id = NEW.document_id AND n.import_session_id = NEW.import_session_id
+  ) THEN RAISE(ABORT, 'card section observation relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_card_statement
+BEFORE INSERT ON card_statements
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM accounts a WHERE a.id = NEW.liability_account_id
+      AND a.workspace_id = NEW.workspace_id AND a.account_type = 'credit_card'
+  ) THEN RAISE(ABORT, 'card statement liability account invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d JOIN import_sessions s ON s.id = d.import_session_id
+    JOIN normalized_documents n ON n.document_id = d.id AND n.import_session_id = s.id
+    WHERE d.id = NEW.document_id AND s.id = NEW.import_session_id
+      AND n.id = NEW.normalized_document_id AND d.workspace_id = NEW.workspace_id
+      AND n.profile_id = NEW.parser_profile_id AND n.profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'card statement source relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_card_semantic_projection
+BEFORE INSERT ON card_statement_semantic_projections
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statements s
+    WHERE s.id = NEW.card_statement_id
+      AND s.workspace_id = NEW.workspace_id
+      AND s.liability_account_id = NEW.liability_account_id
+      AND s.document_id = NEW.document_id
+      AND s.import_session_id = NEW.import_session_id
+      AND s.statement_date IS NEW.statement_date
+      AND s.statement_start_date IS NEW.statement_start_date
+      AND s.statement_end_date IS NEW.statement_end_date
+      AND s.selected_statement_month IS NEW.selected_statement_month
+      AND s.statement_currency = NEW.native_currency
+      AND s.parser_profile_id = NEW.parser_profile_id
+      AND s.parser_profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'card semantic projection relationship invalid') END;
+  SELECT CASE WHEN NEW.algorithm = 'ledgerforge.amex-card-statement-semantic.sha256.v1'
+    AND (NEW.statement_date IS NULL OR NEW.statement_start_date IS NULL OR NEW.statement_end_date IS NULL OR NEW.cycle_month IS NOT NULL)
+    THEN RAISE(ABORT, 'Amex semantic projection requires exact period') END;
+END;
+
+CREATE TRIGGER validate_card_semantic_projection_event
+BEFORE INSERT ON card_statement_semantic_projection_events
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statement_semantic_projections p
+    JOIN normalized_rows r ON r.id = NEW.normalized_row_id
+    JOIN normalized_documents n ON n.id = r.normalized_document_id
+    WHERE p.id = NEW.projection_id AND n.document_id = p.document_id
+      AND n.import_session_id = p.import_session_id
+  ) THEN RAISE(ABORT, 'card semantic event source relationship invalid') END;
+  SELECT CASE WHEN NEW.canonical_transaction_id IS NULL AND NOT EXISTS (
+    SELECT 1 FROM card_statement_semantic_projections p
+    WHERE p.id = NEW.projection_id AND p.algorithm = 'ledgerforge.axis-card-statement-multiset.sha256.v1'
+  ) THEN RAISE(ABORT, 'unbound semantic event is not permitted for this algorithm') END;
+  SELECT CASE WHEN NEW.canonical_transaction_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM card_statement_semantic_projections p
+    JOIN transactions t ON t.id = NEW.canonical_transaction_id
+    WHERE p.id = NEW.projection_id AND t.account_id = p.liability_account_id
+      AND t.posted_date = NEW.financial_date AND t.financial_date_role = NEW.financial_date_role
+  ) THEN RAISE(ABORT, 'card semantic event canonical relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_card_semantic_authoritative_bindings
+BEFORE INSERT ON card_statement_semantic_members
+WHEN NEW.role = 'authoritative'
+BEGIN
+  SELECT CASE WHEN EXISTS (
+    SELECT 1 FROM card_statement_semantic_projection_events e
+    WHERE e.projection_id = NEW.projection_id AND e.canonical_transaction_id IS NULL
+  ) THEN RAISE(ABORT, 'authoritative semantic projection contains unbound event') END;
+END;
+
+PRAGMA legacy_alter_table = OFF;
+""",
+    preflightChecks: [],
+    requiresForeignKeysDisabled: true
+)
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain
@@ -1717,7 +2044,9 @@ enum MigrationChainValidator {
 
 extension Migration {
     var checksum: String {
-        let source = preflightChecks.isEmpty ? sql : preflightChecks.map(\.issueCode).joined(separator: "\n") + "\n" + sql
+        let preflightSource = preflightChecks.isEmpty ? "" : preflightChecks.map(\.issueCode).joined(separator: "\n") + "\n"
+        let executionSource = requiresForeignKeysDisabled ? "requires_foreign_keys_disabled\n" : ""
+        let source = executionSource + preflightSource + sql
         guard let data = source.data(using: .utf8) else { return "" }
         var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
         data.withUnsafeBytes { bytes in

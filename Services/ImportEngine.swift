@@ -196,6 +196,9 @@ struct PreparedImport: Identifiable {
     let advisoryPreviousImport: PreviouslyImportedStatement?
     let statementEquivalenceReview: StatementEquivalenceReviewResult
     let providerGeneration: ProviderGenerationToken
+    /// Transient production-owned structural evidence for exact Axis card PDF
+    /// presentation. Never persisted and never inferred from filename/path.
+    let axisCreditCardPDFPresentation: AxisCreditCardPDFPresentation?
 
     init(
         id: UUID = UUID(),
@@ -213,7 +216,8 @@ struct PreparedImport: Identifiable {
         fingerprintSet: PreparedDocumentFingerprintSet? = nil,
         advisoryPreviousImport: PreviouslyImportedStatement? = nil,
         statementEquivalenceReview: StatementEquivalenceReviewResult = .notApplicable,
-        providerGeneration: ProviderGenerationToken = DatabaseProvider.shared.generationToken
+        providerGeneration: ProviderGenerationToken = DatabaseProvider.shared.generationToken,
+        axisCreditCardPDFPresentation: AxisCreditCardPDFPresentation? = nil
     ) {
         self.id = id
         self.sourceURL = sourceURL
@@ -236,6 +240,7 @@ struct PreparedImport: Identifiable {
         self.advisoryPreviousImport = advisoryPreviousImport
         self.statementEquivalenceReview = statementEquivalenceReview
         self.providerGeneration = providerGeneration
+        self.axisCreditCardPDFPresentation = axisCreditCardPDFPresentation
     }
 
     var transactionCount: Int {
@@ -502,7 +507,7 @@ final class ImportEngine {
         }
 
         try publishPreparationProgress(.detectingInstitution, requestId: requestId, progress: progress)
-        let detection = InstitutionDetector().detectWithReasons(from: contents)
+        let detection = InstitutionDetector().detectWithReasons(in: rawDocument)
         let institutionCandidate = detection.importCandidate
 
         try publishPreparationProgress(.classifyingStatement, requestId: requestId, progress: progress)
@@ -514,6 +519,8 @@ final class ImportEngine {
         let normalizedRows: [NormalizedRow]
         let normalizedHeader: NormalizedRow?
         let sourceContext: NormalizedDocument.SourceContext
+        var statementPasswordCredentialTarget: ImportFramework.StatementPasswordCredentialTarget?
+        var axisCreditCardPDFPresentation: AxisCreditCardPDFPresentation?
         switch sourceFormat {
         case .csv:
             let csvDocument = CSVAnalyzer().analyze(text: contents, fileURL: url)
@@ -525,13 +532,36 @@ final class ImportEngine {
             normalizedRows = normalization.rows
             normalizedHeader = normalization.header
             sourceContext = normalization.sourceContext
+            statementPasswordCredentialTarget = nil
         case .pdf:
             switch institutionCandidate.institutionCode {
             case Institution.axis.rawValue:
-                let normalization = try AxisBankAccountPDFNormalizer().normalize(
-                    text: contents,
-                    fileURL: url
-                )
+                let normalization: (document: Document, rows: [NormalizedRow], header: NormalizedRow?, sourceContext: NormalizedDocument.SourceContext)
+                if classification.documentType == .creditCardStatement {
+                    let card = try (rawDocument.pdfPageTexts.map {
+                        try AxisCreditCardPDFNormalizer().normalize(
+                            text: contents,
+                            pageTexts: $0,
+                            pageEvidence: rawDocument.pdfPageEvidence,
+                            taggedTables: rawDocument.pdfTaggedTables,
+                            fileURL: url
+                        )
+                    } ?? snapshot.withBytes {
+                        try AxisCreditCardPDFNormalizer().normalize(text: contents, sourceBytes: $0, fileURL: url)
+                    })
+                    normalization = (card.document, card.rows, card.header, card.sourceContext)
+                    axisCreditCardPDFPresentation = card.presentation
+                    statementPasswordCredentialTarget = .init(
+                        institutionCode: KeychainStatementPasswordCredentialStore.axisInstitutionScope,
+                        scope: card.presentation == .appPDF
+                            ? KeychainStatementPasswordCredentialStore.axisAppPDFScope
+                            : KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope
+                    )
+                } else {
+                    let bank = try AxisBankAccountPDFNormalizer().normalize(text: contents, fileURL: url)
+                    normalization = (bank.document, bank.rows, bank.header, bank.sourceContext)
+                    statementPasswordCredentialTarget = nil
+                }
                 document = normalization.document
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
@@ -544,6 +574,7 @@ final class ImportEngine {
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
                 sourceContext = normalization.sourceContext
+                statementPasswordCredentialTarget = nil
             case Institution.cbq.rawValue:
                 let normalization: (document: Document, rows: [NormalizedRow], header: NormalizedRow?, sourceContext: NormalizedDocument.SourceContext)
                 if classification.documentType == .creditCardStatement {
@@ -569,6 +600,7 @@ final class ImportEngine {
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
                 sourceContext = normalization.sourceContext
+                statementPasswordCredentialTarget = nil
             case Institution.amex.rawValue:
                 let normalization = try (rawDocument.pdfPageTexts.map {
                     try AmericanExpressCreditCardPDFNormalizer().normalize(
@@ -583,6 +615,7 @@ final class ImportEngine {
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
                 sourceContext = normalization.sourceContext
+                statementPasswordCredentialTarget = nil
             default:
                 throw ImportError.invalidDocument(message: "No suitable PDF normalizer found.")
             }
@@ -596,6 +629,7 @@ final class ImportEngine {
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
                 sourceContext = normalization.sourceContext
+                statementPasswordCredentialTarget = nil
             case Institution.hdfc.rawValue:
                 let normalization = try HDFCBankAccountXLSNormalizer().normalize(
                     rawDocument: rawDocument
@@ -604,6 +638,7 @@ final class ImportEngine {
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
                 sourceContext = normalization.sourceContext
+                statementPasswordCredentialTarget = nil
             case Institution.cbq.rawValue:
                 let normalization = try CBQCurrentAccountXLSNormalizer().normalize(
                     rawDocument: rawDocument
@@ -612,12 +647,32 @@ final class ImportEngine {
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
                 sourceContext = normalization.sourceContext
+                statementPasswordCredentialTarget = nil
             default:
                 throw ImportError.invalidDocument(
                     message: "No suitable XLS normalizer found."
                 )
             }
-        case .xlsx, .unknown:
+        case .xlsx:
+            switch institutionCandidate.institutionCode {
+            case Institution.axis.rawValue:
+                guard classification.documentType == .creditCardStatement else {
+                    throw ImportError.invalidDocument(message: "No suitable XLSX normalizer found.")
+                }
+                let normalization = try AxisCreditCardXLSXNormalizer().normalize(
+                    rawDocument: rawDocument
+                )
+                document = normalization.document
+                normalizedRows = normalization.rows
+                normalizedHeader = normalization.header
+                sourceContext = normalization.sourceContext
+                statementPasswordCredentialTarget = nil
+            default:
+                throw ImportError.invalidDocument(
+                    message: "No suitable XLSX normalizer found."
+                )
+            }
+        case .unknown:
             throw ImportError.unsupportedFile(extension: rawDocument.fileExtension)
         }
 
@@ -674,9 +729,11 @@ final class ImportEngine {
         try Task.checkCancellation()
         developerConsole.info(.validation, "Validation completed", metadata: ["passed": validation.passed ? "true" : "false", "issues": "\(validation.issues.count)"])
         if validation.passed {
+            let credentialTarget = statementPasswordCredentialTarget
+                ?? .init(institutionCode: detection.metadata.institution.statementPasswordCredentialScope)
             try await importCoordinator.confirmSuccessfulPassword(
                 for: passwordRequest,
-                institutionCode: detection.metadata.institution.statementPasswordCredentialScope
+                target: credentialTarget
             )
         }
 
@@ -720,7 +777,8 @@ final class ImportEngine {
             fingerprintSet: fingerprintSet,
             advisoryPreviousImport: advisoryPreviousImport,
             statementEquivalenceReview: statementEquivalenceReview,
-            providerGeneration: preparationGeneration
+            providerGeneration: preparationGeneration,
+            axisCreditCardPDFPresentation: axisCreditCardPDFPresentation
         )
 #if DEBUG
         await lifecycleLease.transition(to: .preparedAwaitingConfirmation)
@@ -1330,6 +1388,8 @@ final class ImportEngine {
             return .pdf
         case FileFormat.xls.rawValue:
             return .xls
+        case FileFormat.xlsx.rawValue:
+            return .xlsx
         default:
             throw ImportError.unsupportedFile(extension: fileType.lowercased())
         }
@@ -1346,10 +1406,10 @@ final class ImportEngine {
         case .csv:
             rawTextIsAuthority = true
             sourceBytesIsAuthority = false
-        case .pdf, .xls:
+        case .pdf, .xls, .xlsx:
             rawTextIsAuthority = false
             sourceBytesIsAuthority = true
-        case .xlsx, .unknown:
+        case .unknown:
             throw ImportError.unsupportedFile(extension: sourceFormat.rawValue.lowercased())
         }
 

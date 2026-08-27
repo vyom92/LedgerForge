@@ -1,6 +1,8 @@
 // LedgerForgeTests/PDFDocumentReaderTests.swift
 
 import Foundation
+import CoreGraphics
+import CoreText
 import PDFKit
 import Testing
 @testable import LedgerForge
@@ -48,6 +50,33 @@ struct PDFDocumentReaderTests {
         } catch {
             Issue.record("Expected ImportError.invalidDocument, got \(error).")
         }
+    }
+
+    @Test func readerPreservesDeterministicGenericRangeRectangles() async throws {
+        let sourceText = "Alpha  Beta\nGamma"
+        let fileURL = try temporaryFileURL(
+            extension: "pdf",
+            contents: try selectablePDFData(lines: ["Alpha  Beta", "Gamma"])
+        )
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+
+        let reader = PDFDocumentReader()
+        let raw = try await reader.read(
+            request: ImportRequest(fileURL: fileURL),
+            password: nil
+        )
+        let pages = try #require(raw.pdfPageEvidence)
+        let fragments = try #require(pages.first?.fragments)
+
+        #expect(fragments.map(\.text) == sourceText.split(whereSeparator: \.isWhitespace).map(String.init))
+        #expect(fragments.allSatisfy { fragment in
+            guard let geometry = fragment.geometry else { return false }
+            return geometry.isCanonical && geometry.maxX > geometry.minX
+                && fragment.x == geometry.minX
+                && fragment.y == geometry.baselineY
+        })
+        #expect(fragments[0].y == fragments[1].y)
+        #expect(fragments[2].y < fragments[0].y)
     }
 
     @Test func approvedAxisPDFFixtureExists() async throws {
@@ -165,6 +194,37 @@ struct PDFDocumentReaderTests {
         #expect(pageTexts.joined(separator: "\n") == text)
     }
 
+    @Test func rawDocumentTaggedEvidenceIsOptionalGenericAndEquatable() {
+        let direct = RawPDFTaggedMarkedContentEvidence(
+            pageNumber: 1, mcid: 10, textBlocks: [], rectangleCount: 1
+        )
+        let nested = RawPDFTaggedMarkedContentEvidence(
+            pageNumber: 1, mcid: 11, textBlocks: ["logical cell text"], rectangleCount: 0
+        )
+        let table = RawPDFTaggedTableEvidence(rows: [
+            RawPDFTaggedRowEvidence(cells: [
+                RawPDFTaggedCellEvidence(
+                    role: .data,
+                    children: [
+                        .markedContent(direct),
+                        .structure(.init(role: "NonStruct", markedContent: [nested]))
+                    ]
+                )
+            ])
+        ])
+        let url = URL(fileURLWithPath: "/tmp/tagged.pdf")
+        let plain = RawDocument(
+            sourceURL: url, fileName: "tagged.pdf", fileExtension: "pdf", content: .text("text")
+        )
+        let tagged = RawDocument(
+            sourceURL: url, fileName: "tagged.pdf", fileExtension: "pdf", content: .text("text"),
+            pdfTaggedTables: [table]
+        )
+        #expect(plain.pdfTaggedTables == nil)
+        #expect(tagged.pdfTaggedTables == [table])
+        #expect(table == tagged.pdfTaggedTables?.first)
+    }
+
     private func approvedAxisPDFFixtureURL() -> URL {
         FixtureLocator.axisPDF("axis_bank_nre_account_statement_baseline.pdf")
     }
@@ -196,6 +256,35 @@ struct PDFDocumentReaderTests {
         try contents.write(to: fileURL)
         return fileURL
     }
+
+    private func selectablePDFData(lines: [String]) throws -> Data {
+        let buffer = NSMutableData()
+        guard let consumer = CGDataConsumer(data: buffer as CFMutableData) else {
+            throw PDFReaderFixtureError.creationFailed
+        }
+        var mediaBox = CGRect(x: 0, y: 0, width: 300, height: 200)
+        guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
+            throw PDFReaderFixtureError.creationFailed
+        }
+        context.beginPDFPage(nil)
+        context.textMatrix = .identity
+        let font = CTFontCreateWithName("Courier" as CFString, 12, nil)
+        let attributes = [kCTFontAttributeName: font] as CFDictionary
+        for (offset, line) in lines.enumerated() {
+            guard let attributed = CFAttributedStringCreate(nil, line as CFString, attributes) else {
+                throw PDFReaderFixtureError.creationFailed
+            }
+            context.textPosition = CGPoint(x: 20, y: 150 - CGFloat(offset * 24))
+            CTLineDraw(CTLineCreateWithAttributedString(attributed), context)
+        }
+        context.endPDFPage()
+        context.closePDF()
+        return buffer as Data
+    }
+}
+
+private enum PDFReaderFixtureError: Error {
+    case creationFailed
 }
 
 private struct PDFTextExpectation {

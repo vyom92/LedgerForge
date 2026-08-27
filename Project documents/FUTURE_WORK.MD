@@ -1,5 +1,16 @@
 # LedgerForge Future Work
 
+##Recovery Executor Mode, approved 20 August 2026
+
+When Codex is unavailable because its included usage allowance is exhausted, or when I explicitly choose the recovery path, a standalone ChatGPT session may execute a complete LedgerForge implementation prompt approved by this LedgerForge Chat through the authenticated LedgerForge Recovery Executor.
+Planning, sprint selection, architecture decisions, prompt approval, scope changes, corrective-sprint classification, and final implementation acceptance remain owned by this LedgerForge Chat.
+Recovery execution must obey the same repository authority, financial-truth, privacy, migration/ADR, testing, Git/worktree, source-oracle, and stop-condition rules that apply to Codex.
+The Recovery Executor may not widen scope, infer authorization, overwrite unexplained work, or continue after a required HEAD/SHA/worktree/source-truth guard fails.
+Recovery execution reports are claims requiring verification here before acceptance.
+Git publication remains separately gated. Commit/push is not authorized merely by enabling Recovery Executor Mode.
+Before the first real LedgerForge write, the executor capabilities required by that approved sprint must themselves have been qualified non-destructively.
+Codex remains the normal executor when its included usage is available. Recovery Executor Mode is an authorized fallback, not a different architecture or weaker correctness standard.
+
 ## Purpose
 
 This document is the canonical planning queue for LedgerForge work that is not yet authorized for execution.
@@ -552,15 +563,15 @@ Each family may require a separate ADR and implementation increment. No family m
 **Status:** Candidate
 **Depends on:** Approved fixtures for each layout
 
-**Supplied shared-layout Axis NRO CSV slice completed 2026-07-23; source truth restored 2026-07-26; bounded PDF and XLS slices subsequently completed:** supported NRE and NRO bank-account CSV imports use `axis.bank-account.csv` version `2`; the selected account-neutral PDF grammar uses `axis.bank-account.pdf@1`; and the exact Axis NRO XLS grammar uses `axis.bank-account.xls@1`. Physical DR is debit and physical CR is credit. Two distinct full institution account identifiers preserve separate durable accounts. CSV version `1` is historical-only provenance and may require separate integrity detection. These completions do not establish broader Axis NRO layouts, XLSX, generic spreadsheets or card support.
+**Supplied shared-layout Axis NRO CSV slice completed 2026-07-23; source truth restored 2026-07-26; bounded PDF and XLS slices subsequently completed:** supported NRE and NRO bank-account CSV imports use `axis.bank-account.csv` version `2`; the selected account-neutral PDF grammar uses `axis.bank-account.pdf@1`; and the exact Axis NRO XLS grammar uses `axis.bank-account.xls@1`. Physical DR is debit and physical CR is credit. Two distinct full institution account identifiers preserve separate durable accounts. CSV version `1` is historical-only provenance and may require separate integrity detection. Sprint 78B separately completed the exact Axis credit-card PDF/XLSX family; this bank-account expansion item therefore retains only broader or changed bank-account layouts.
 
 Expand deterministic Axis coverage in dependency and fixture-readiness order:
 
 1. additional NRE layouts;
 2. additional NRO account layouts beyond the supplied shared CSV grammar;
 3. savings and current-account layouts;
-4. broader bank-account layouts; Axis cards remain separate future card-family work subject to card semantics and fixtures;
-5. historical or changed layouts.
+4. broader bank-account layouts;
+5. historical or changed bank-account layouts.
 
 Each supported layout requires:
 
@@ -622,10 +633,10 @@ ADR-043 and the separate Sprint 77 card profile under ADR-044.
 
 ## FW-P1-04 — Additional Credit-Card Parser Families
 
-**Status:** Partially completed; remaining families are ready for discovery
+**Status:** Partially completed through Sprint 78B; remaining families are ready for discovery
 **Fixture state:** Clean-room American Express, CBQ and Axis card fixture families are integrated.  
-**Completed boundary:** Sprint 76A accepts exact native-text `amex.credit-card.pdf@1` under ADR-044, including ordered multi-instrument sections, encrypted-source unlock and institution-scoped Keychain reuse, exact byte-distinct semantic-source grouping, card-aware validation, Migration V13, provider parity, hydration/relaunch and bounded presentation. Sprint 77 adds exact encrypted `cbq.credit-card.pdf@1` v1/v2 through the same shared card domain with Migration V14 and source-byte duplicate authority.
-**Remaining boundary:** Axis card, HDFC card, other American Express/CBQ layouts and every other issuer/layout require separate source truth, exact profile, parser and acceptance authority. The shared domain does not make them production-supported.
+**Completed boundary:** Sprint 76A accepts exact native-text `amex.credit-card.pdf@1` under ADR-044, including ordered multi-instrument sections, encrypted-source unlock and institution-scoped Keychain reuse, exact byte-distinct semantic-source grouping, card-aware validation, Migration V13, provider parity, hydration/relaunch and bounded presentation. Sprint 77 adds exact encrypted `cbq.credit-card.pdf@1` v1/v2 through the same shared card domain with Migration V14 and source-byte duplicate authority. Sprint 78B adds exact `axis.credit-card.pdf@1` and `axis.credit-card.xlsx@1`, dual canonical PDF credential scopes, one explicit liability-account decision, zero fabricated Axis instruments/sections, representation-neutral exact financial multiset equivalence, App-PDF/XLSX ordered narration equivalence and Migration V15.
+**Remaining boundary:** HDFC card, other American Express/CBQ/Axis layouts and every other issuer/layout require separate source truth, exact profile, parser and acceptance authority. The shared domain does not make them production-supported.
 
 Future discovery should compare the strongest remaining fixture/source-backed options rather than select by issuer label alone.
 
@@ -640,7 +651,7 @@ Each remaining family requires:
 - explicit exclusion of unsupported universal card assumptions.
 
 No additional parser family may claim production support from fixtures,
-classification, the V14 schema or the shared card domain alone.
+classification, the V15 schema or the shared card domain alone.
 
 ---
 
@@ -739,13 +750,13 @@ The original source structure and every user-approved mapping must remain inspec
 
 ## FW-P1-09 — Credit-Card Financial Semantics Foundation
 
-**Status:** Partially completed through Sprint 77; remaining semantics are future work
+**Status:** Partially completed through Sprint 78B; remaining semantics are future work
 **Discovery:** Shared cross-family semantic discovery is complete.  
 **Architecture:** ADR-034 is implemented/refined by accepted ADR-044 for the completed boundary.
-**Completed boundary:** Shared liability-account/card-instrument separation, independent financial scope and physical source-section membership, card-specific liability effects, typed source observations without weak-evidence promotion, explicit instrument relationships/lifecycle authority, exact family reconciliation, Migration V14, provider-owned atomic commit, SQLite/In-Memory parity, hydration/relaunch, newest-source-date balance authority and bounded presentation are implemented for exact `amex.credit-card.pdf@1` and `cbq.credit-card.pdf@1`. Exact semantic-source grouping remains Amex-only.
+**Completed boundary:** Shared liability-account/card-instrument separation, independent financial scope and physical source-section membership, card-specific liability effects, typed source observations without weak-evidence promotion, explicit instrument relationships/lifecycle authority, exact family reconciliation, provider-owned atomic commit, SQLite/In-Memory parity, hydration/relaunch and bounded presentation are implemented for exact `amex.credit-card.pdf@1`, `cbq.credit-card.pdf@1`, `axis.credit-card.pdf@1` and `axis.credit-card.xlsx@1`. Sprint 78B adds representation-neutral Axis semantic-source equivalence, source-owned selected-month chronology, explicit liability-only review with zero fabricated Axis instruments, and Migration V15. Exact ordered semantic-source grouping remains Amex-only.
 
-The production card foundation is complete for the exact Sprint 76A Amex and
-Sprint 77 CBQ profiles. It preserves:
+The production card foundation is complete for the exact Sprint 76A Amex,
+Sprint 77 CBQ and Sprint 78B Axis profiles. It preserves:
 
 - authoritative posted statement amount and currency;
 - source-proven effect on amount owed without bank debit/credit reuse;
@@ -759,7 +770,10 @@ Remaining future semantics include rewards persistence/valuation, payment
 allocation, bank-card payment matching, refund/reversal matching, installments
 or loans, calculated FX, fee/markup/tax contracts, manual merge/split,
 historical repair/backfill and any generic card profile or masked-identity
-framework. Each requires its own approved authority; absence is not inferred.
+framework. The Axis Active Loans Summary / EMI metadata remains explicitly
+excluded from historical transaction persistence and is future work; no loan
+history, installment relationship or card ownership is inferred from it. Each
+future semantic requires its own approved authority; absence is not inferred.
 
 Sprint 75's completed CBQ current-account source-lineage work remains separate
 from Sprint 77 card semantics and does not generalize ADR-043 to CBQ cards. Sprint 73's
@@ -770,8 +784,9 @@ Missing rates, fees, taxes, aggregates or other evidence must not be invented.
 Payment allocation, rewards accounting, reversal matching and universal card
 taxonomy remain excluded from the completed boundary.
 
-Do not claim card support beyond exact `amex.credit-card.pdf@1` and
-`cbq.credit-card.pdf@1` from fixture integration, schema capacity,
+Do not claim card support beyond exact `amex.credit-card.pdf@1`,
+`cbq.credit-card.pdf@1`, `axis.credit-card.pdf@1` and
+`axis.credit-card.xlsx@1` from fixture integration, schema capacity,
 classification or parser candidates.
 
 ---

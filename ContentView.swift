@@ -613,6 +613,15 @@ struct ImportIdentityReviewUIProjection: Equatable {
             tone = .warning
             matchedAccountID = nil
             self.eligibleAccountIDs = eligibleAccountIDs
+        case .liabilityAccountChoiceRequired(let eligibleLiabilityAccountIDs):
+            presentation = ImportAccountOutcomePresentation(
+                label: "Choose a liability account",
+                explanation: "This Axis credit-card statement has no instrument sections. Choose an eligible existing liability account or create a separate one."
+            )
+            iconName = "creditcard.badge.questionmark"
+            tone = .warning
+            matchedAccountID = nil
+            self.eligibleAccountIDs = eligibleLiabilityAccountIDs
         case .cardChoiceRequired(let eligibleLiabilityAccountIDs):
             presentation = ImportAccountOutcomePresentationMapper.presentation(for: .choiceRequired)
             iconName = "creditcard.badge.questionmark"
@@ -651,13 +660,18 @@ enum ImportAccountConfirmationPolicy {
             return eligibleAccountIDs.contains(accountID)
         case (.choiceRequired, .some(.createNewAccount)):
             return true
+        case let (.liabilityAccountChoiceRequired(eligibleAccountIDs), .some(.useExistingAccount(accountID))):
+            return eligibleAccountIDs.contains(accountID)
+        case (.liabilityAccountChoiceRequired, .some(.createNewAccount)):
+            return true
         case let (.cardChoiceRequired(eligibleAccountIDs), .some(.useExistingCardLiabilityAccount(accountID, _))):
             return eligibleAccountIDs.contains(accountID)
         case let (.cardChoiceRequired(eligibleAccountIDs), .some(.useExistingCardLiabilityAccountSections(accountID, sectionChoices))):
             return eligibleAccountIDs.contains(accountID) && !sectionChoices.isEmpty
         case (.cardChoiceRequired, .some(.createNewCardLiabilityAccountAndInstrument)):
             return true
-        case (.choiceRequired, _), (.cardChoiceRequired, _), (.ambiguous, _), (.conflict, _):
+        case (.choiceRequired, _), (.liabilityAccountChoiceRequired, _),
+                (.cardChoiceRequired, _), (.ambiguous, _), (.conflict, _):
             return false
         }
     }
@@ -2818,6 +2832,51 @@ struct ContentView: View {
                     } label: {
                         HStack {
                             Text("Create New Account")
+                            Spacer()
+                            Image(systemName: importAccountChoice == .createNewAccount ? "checkmark.circle.fill" : "circle")
+                        }
+                        .padding(10)
+                        .background(LFTheme.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(LFTheme.text)
+                }
+                if case .liabilityAccountChoiceRequired = importIdentityReview {
+                    ForEach(accountsViewModel.accounts.filter { projection.eligibleAccountIDs.contains($0.id) }) { account in
+                        Button {
+                            cardSectionDraftAccountID = nil
+                            cardSectionDraftChoices = [:]
+                            importAccountChoice = .useExistingAccount(accountId: account.id)
+                            refreshPartialImportReview(preparedImport)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text("Use existing liability account")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(account.displayName)
+                                    Text(account.institution)
+                                        .font(.caption)
+                                        .foregroundStyle(LFTheme.textSecondary)
+                                }
+                                Spacer()
+                                Image(systemName: importAccountChoice == .useExistingAccount(accountId: account.id) ? "checkmark.circle.fill" : "circle")
+                            }
+                            .padding(10)
+                            .background(LFTheme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(LFTheme.text)
+                    }
+                    Button {
+                        cardSectionDraftAccountID = nil
+                        cardSectionDraftChoices = [:]
+                        importAccountChoice = .createNewAccount
+                        refreshPartialImportReview(preparedImport)
+                    } label: {
+                        HStack {
+                            Text("Create separate Axis credit-card liability account")
                             Spacer()
                             Image(systemName: importAccountChoice == .createNewAccount ? "checkmark.circle.fill" : "circle")
                         }

@@ -9,6 +9,7 @@ final class DefaultReaderRegistry: ImportFramework.ReaderRegistry {
     init(readers: [any ImportFramework.DocumentReader] = [
         CSVDocumentReaderAdapter(),
         PDFDocumentReader(),
+        OOXMLDocumentReader(),
         LegacyXLSDocumentReader()
     ]) {
         self.readers = readers

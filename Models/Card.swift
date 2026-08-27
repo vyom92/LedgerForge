@@ -43,15 +43,20 @@ struct CardStatement: Identifiable, Equatable, Sendable {
     let importSessionID: String
     let parserProfileID: String
     let parserProfileVersion: String
-    let statementDate: StatementDate
-    let period: DeclaredStatementPeriod
+    let statementDate: StatementDate?
+    let period: DeclaredStatementPeriod?
+    let selectedStatementMonth: SelectedStatementMonth?
+    let semanticGroupID: String?
     let currency: CurrencyCode
     let sourceRowCount: Int
     let reconciliationRuleCode: String
     let summaryComponents: [CardStatementSummaryComponent]
     let sections: [CardStatementSection]
 
-    var newBalance: Money? { summaryComponents.first { $0.persistenceCode == "new_balance" }?.money }
+    var newBalance: Money? {
+        summaryComponents.first { $0.persistenceCode == "new_balance" }?.money
+            ?? summaryComponents.first { $0.persistenceCode == "axis_total_payment_due" }?.money
+    }
     var dueDate: StatementDate? { summaryComponents.first { $0.persistenceCode == "due_date" }?.date }
 }
 

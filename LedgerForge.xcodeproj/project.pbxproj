@@ -110,6 +110,12 @@
 		760000043076000000000001 /* CardStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 760000143076000000000001 /* CardStore.swift */; };
 		770000013077000000000001 /* CBQCreditCardPDFNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 770000113077000000000001 /* CBQCreditCardPDFNormalizer.swift */; };
 		770000023077000000000001 /* CBQCreditCardPDFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 770000123077000000000001 /* CBQCreditCardPDFParser.swift */; };
+		780000013078000000000001 /* OOXMLDocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780000113078000000000001 /* OOXMLDocumentReader.swift */; };
+		780000023078000000000001 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 780000233078000000000001 /* ZIPFoundation */; };
+		790000013079000000000001 /* AxisCreditCardPDFNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790000113079000000000001 /* AxisCreditCardPDFNormalizer.swift */; };
+		790000023079000000000001 /* AxisCreditCardXLSXNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790000123079000000000001 /* AxisCreditCardXLSXNormalizer.swift */; };
+		790000033079000000000001 /* AxisCreditCardPDFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790000133079000000000001 /* AxisCreditCardPDFParser.swift */; };
+		790000043079000000000001 /* AxisCreditCardXLSXParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790000143079000000000001 /* AxisCreditCardXLSXParser.swift */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
@@ -299,6 +305,11 @@
 		760000143076000000000001 /* CardStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStore.swift; sourceTree = "<group>"; };
 		770000113077000000000001 /* CBQCreditCardPDFNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBQCreditCardPDFNormalizer.swift; sourceTree = "<group>"; };
 		770000123077000000000001 /* CBQCreditCardPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBQCreditCardPDFParser.swift; sourceTree = "<group>"; };
+		780000113078000000000001 /* OOXMLDocumentReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OOXMLDocumentReader.swift; sourceTree = "<group>"; };
+		790000113079000000000001 /* AxisCreditCardPDFNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisCreditCardPDFNormalizer.swift; sourceTree = "<group>"; };
+		790000123079000000000001 /* AxisCreditCardXLSXNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisCreditCardXLSXNormalizer.swift; sourceTree = "<group>"; };
+		790000133079000000000001 /* AxisCreditCardPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisCreditCardPDFParser.swift; sourceTree = "<group>"; };
+		790000143079000000000001 /* AxisCreditCardXLSXParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisCreditCardXLSXParser.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
 		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
@@ -356,6 +367,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				710000043071000000000001 /* LegacyXLS in Frameworks */,
+				780000023078000000000001 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -451,6 +463,7 @@
 			isa = PBXGroup;
 			children = (
 				710000113071000000000001 /* LegacyXLSDocumentReader.swift */,
+				780000113078000000000001 /* OOXMLDocumentReader.swift */,
 				286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */,
 				286242542FFCE80D00B8AA66 /* DefaultReaderRegistry.swift */,
 				286242552FFCE80D00B8AA66 /* PDFDocumentReader.swift */,
@@ -571,6 +584,8 @@
 		288EB0DF2FF7A3D200F09BC9 /* Parsers */ = {
 			isa = PBXGroup;
 			children = (
+				790000133079000000000001 /* AxisCreditCardPDFParser.swift */,
+				790000143079000000000001 /* AxisCreditCardXLSXParser.swift */,
 				770000123077000000000001 /* CBQCreditCardPDFParser.swift */,
 				760000123076000000000001 /* AmericanExpressCreditCardPDFParser.swift */,
 				750000123075000000000001 /* CBQCurrentAccountPDFParser.swift */,
@@ -679,6 +694,8 @@
 		288EB12E2FF7E10200F09BC9 /* Normalizers */ = {
 			isa = PBXGroup;
 			children = (
+				790000113079000000000001 /* AxisCreditCardPDFNormalizer.swift */,
+				790000123079000000000001 /* AxisCreditCardXLSXNormalizer.swift */,
 				770000113077000000000001 /* CBQCreditCardPDFNormalizer.swift */,
 				760000113076000000000001 /* AmericanExpressCreditCardPDFNormalizer.swift */,
 				750000113075000000000001 /* CBQCurrentAccountPDFNormalizer.swift */,
@@ -746,6 +763,7 @@
 			name = LedgerForge;
 			packageProductDependencies = (
 				710000233071000000000001 /* LegacyXLS */,
+				780000233078000000000001 /* ZIPFoundation */,
 			);
 			productName = LedgerForge;
 			productReference = 288EB0AD2FF7955200F09BC9 /* LedgerForge.app */;
@@ -850,6 +868,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				710000223071000000000001 /* XCLocalSwiftPackageReference "Vendor/LegacyXLS" */,
+				780000223078000000000001 /* XCLocalSwiftPackageReference "Vendor/ZIPFoundation" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 288EB0AE2FF7955200F09BC9 /* Products */;
@@ -908,7 +927,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -eu\nhelper=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/LedgerForgeSubprocessProbe\"\ntest_bundle=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nentitlements=\"${SRCROOT}/SubprocessProbe/LedgerForgeSubprocessProbe.entitlements\"\nentitlements_output=\"${TARGET_TEMP_DIR}/LedgerForgeSubprocessProbe-entitlements.plist\"\ncase \"${helper}\" in \"${test_bundle}\"/Contents/Resources/LedgerForgeSubprocessProbe) ;; *) echo \"Subprocess helper path is outside the expected test-bundle resources directory.\" >&2; exit 1 ;; esac\nif [ ! -f \"${helper}\" ] || [ ! -f \"${entitlements}\" ]; then echo \"Subprocess helper or approved entitlements are missing.\" >&2; exit 1; fi\nidentity=\"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\n/usr/bin/codesign --force --sign \"${identity}\" --entitlements \"${entitlements}\" --options runtime \"${helper}\"\n/usr/bin/codesign --verify --strict --verbose=4 \"${helper}\"\n/usr/bin/codesign -d --entitlements :- \"${helper}\" > \"${entitlements_output}\" 2>/dev/null\nkeys=$(/usr/libexec/PlistBuddy -c Print \"${entitlements_output}\" | /usr/bin/awk -F ' = ' '/ = / { gsub(/^[[:space:]]+/, \"\", $1); print $1 }' | /usr/bin/sort)\nexpected='com.apple.security.app-sandbox\ncom.apple.security.inherit'\nif [ \"${keys}\" != \"${expected}\" ]; then echo \"Subprocess helper has an unexpected entitlement key set.\" >&2; printf '%s\\n' \"${keys}\" >&2; exit 1; fi\n";
+			shellScript = "set -eu\nhelper=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/LedgerForgeSubprocessProbe\"\ntest_bundle=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nentitlements=\"${SRCROOT}/SubprocessProbe/LedgerForgeSubprocessProbe.entitlements\"\nentitlements_output=\"${TARGET_TEMP_DIR}/LedgerForgeSubprocessProbe-entitlements.plist\"\ncase \"${helper}\" in \"${test_bundle}\"/Contents/Resources/LedgerForgeSubprocessProbe) ;; *) echo \"Subprocess helper path is outside the expected test-bundle resources directory.\" >&2; exit 1 ;; esac\nif [ ! -f \"${helper}\" ] || [ ! -f \"${entitlements}\" ]; then echo \"Subprocess helper or approved entitlements are missing.\" >&2; exit 1; fi\nidentity=\"${EXPANDED_CODE_SIGN_IDENTITY:-}\"\nif [ -z \"$identity\" ] || [ \"$identity\" = \"-\" ]; then echo \"Stable development signing identity is unavailable for LedgerForgeSubprocessProbe.\" >&2; exit 1; fi\n/usr/bin/codesign --force --sign \"$identity\" --entitlements \"$entitlements\" --options runtime \"$helper\"\n/usr/bin/codesign --verify --strict --verbose=4 \"$helper\"\n/usr/bin/codesign -d --entitlements :- \"$helper\" > \"$entitlements_output\" 2>/dev/null\nkeys=$(/usr/libexec/PlistBuddy -c Print \"$entitlements_output\" | /usr/bin/awk -F ' = ' '/ = / { gsub(/^[[:space:]]+/, \"\", $1); print $1 }' | /usr/bin/sort)\nexpected='com.apple.security.app-sandbox\ncom.apple.security.inherit'\nif [ \"$keys\" != \"$expected\" ]; then echo \"Subprocess helper has an unexpected entitlement key set.\" >&2; printf '%s\\n' \"$keys\" >&2; exit 1; fi\n";
 		};
 		F58000050000000000000001 /* Copy DEBUG approved fixtures */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -942,6 +961,11 @@
 				760000013076000000000001 /* AmericanExpressCreditCardPDFNormalizer.swift in Sources */,
 				760000023076000000000001 /* AmericanExpressCreditCardPDFParser.swift in Sources */,
 				710000013071000000000001 /* LegacyXLSDocumentReader.swift in Sources */,
+				780000013078000000000001 /* OOXMLDocumentReader.swift in Sources */,
+				790000013079000000000001 /* AxisCreditCardPDFNormalizer.swift in Sources */,
+				790000023079000000000001 /* AxisCreditCardXLSXNormalizer.swift in Sources */,
+				790000033079000000000001 /* AxisCreditCardPDFParser.swift in Sources */,
+				790000043079000000000001 /* AxisCreditCardXLSXParser.swift in Sources */,
 				750000013075000000000001 /* CBQCurrentAccountPDFNormalizer.swift in Sources */,
 				750000023075000000000001 /* CBQCurrentAccountPDFParser.swift in Sources */,
 				740000013074000000000001 /* CBQCurrentAccountXLSNormalizer.swift in Sources */,
@@ -1231,10 +1255,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = T45VZQAFDY;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
 				ENABLE_FILE_ACCESS_MOVIES_FOLDER = readwrite;
@@ -1347,8 +1371,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T45VZQAFDY;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
@@ -1445,8 +1471,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = SubprocessProbe/LedgerForgeSubprocessProbe.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = T45VZQAFDY;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
@@ -1534,11 +1562,23 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		780000223078000000000001 /* XCLocalSwiftPackageReference "Vendor/ZIPFoundation" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Vendor/ZIPFoundation;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		710000233071000000000001 /* LegacyXLS */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 710000223071000000000001 /* XCLocalSwiftPackageReference "Vendor/LegacyXLS" */;
 			productName = LegacyXLS;
+		};
+		780000233078000000000001 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 780000223078000000000001 /* XCLocalSwiftPackageReference "Vendor/ZIPFoundation" */;
+			productName = ZIPFoundation;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

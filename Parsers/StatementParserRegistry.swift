@@ -24,7 +24,9 @@ final class StatementParserRegistry {
             CBQCurrentAccountPDFParser(),
             CBQCurrentAccountXLSParser(),
             CBQCreditCardPDFParser(),
-            AmericanExpressCreditCardPDFParser()
+            AmericanExpressCreditCardPDFParser(),
+            AxisCreditCardPDFParser(),
+            AxisCreditCardXLSXParser()
 
         ]
 

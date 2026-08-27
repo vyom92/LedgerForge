@@ -24,6 +24,17 @@ struct StatementClassificationDetector: ImportFramework.StatementClassifier {
                 reasons: ["RawDocument did not contain extracted text."]
             )
         }
+        if institution?.institutionCode == Institution.axis.rawValue,
+           AxisCreditCardAppStructuralSignature.matches(document) {
+            return StatementClassification(
+                documentType: .creditCardStatement,
+                confidence: 0.90,
+                reasons: [
+                    "Matched exact Axis bank-app tagged transaction-table structure.",
+                    "Matched \(Institution.axis.rawValue) institution context."
+                ]
+            )
+        }
         let normalizedText = Self.normalized(document.searchableText)
 
         for rule in rules {
@@ -107,6 +118,8 @@ struct StatementClassificationRule: Equatable, Sendable {
             StatementClassificationSignature(token: "CARD ACCOUNT NUMBER:", reason: "Matched a card-instrument section."),
             StatementClassificationSignature(token: "NEW CREDITS", reason: "Matched card liability summary evidence."),
             StatementClassificationSignature(token: "CREDIT CARD", reason: "Matched credit card statement phrase."),
+            StatementClassificationSignature(token: "DATE TRANSACTION DETAILS AMOUNT (INR) DEBIT/CREDIT", reason: "Matched an exact card transaction header."),
+            StatementClassificationSignature(token: "DATE TRANSACTION DETAILS MERCHANT CATEGORY AMOUNT (RS.)", reason: "Matched an exact card transaction header."),
             StatementClassificationSignature(token: "MINIMUM AMOUNT DUE", reason: "Matched minimum amount due label."),
             StatementClassificationSignature(token: "PAYMENT DUE DATE", reason: "Matched payment due date label."),
             StatementClassificationSignature(token: "TOTAL AMOUNT DUE", reason: "Matched total amount due label."),

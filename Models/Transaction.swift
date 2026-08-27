@@ -64,6 +64,43 @@ struct StatementDate: Comparable, Equatable, Sendable, Hashable {
     }
 }
 
+/// A source-declared statement month. Like `StatementDate`, this is calendar
+/// evidence rather than an instant and must never be expanded into invented
+/// day-level boundaries.
+struct SelectedStatementMonth: Equatable, Sendable, Hashable, Comparable {
+    let year: Int
+    let month: Int
+
+    enum Error: Swift.Error, Equatable {
+        case invalidComponents(year: Int, month: Int)
+        case malformedCanonical(String)
+    }
+
+    init(year: Int, month: Int) throws {
+        guard year >= 1900, year <= 9999, (1...12).contains(month) else {
+            throw Error.invalidComponents(year: year, month: month)
+        }
+        self.year = year
+        self.month = month
+    }
+
+    init(canonical: String) throws {
+        let pieces = canonical.split(separator: "-", omittingEmptySubsequences: false)
+        guard pieces.count == 2, pieces[0].count == 4, pieces[1].count == 2,
+              let year = Int(pieces[0]), let month = Int(pieces[1]) else {
+            throw Error.malformedCanonical(canonical)
+        }
+        try self.init(year: year, month: month)
+        guard self.canonical == canonical else { throw Error.malformedCanonical(canonical) }
+    }
+
+    var canonical: String { String(format: "%04d-%02d", year, month) }
+
+    static func < (lhs: SelectedStatementMonth, rhs: SelectedStatementMonth) -> Bool {
+        (lhs.year, lhs.month) < (rhs.year, rhs.month)
+    }
+}
+
 enum FinancialDateRole: String, CaseIterable, Equatable, Sendable {
     case transactionDate = "transaction_date"
     case postingDate = "posting_date"

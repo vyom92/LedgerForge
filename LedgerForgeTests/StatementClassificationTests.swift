@@ -90,6 +90,98 @@ struct StatementClassificationTests {
         #expect(classification.reasons.contains("Matched Axis Bank institution context."))
     }
 
+    @Test func axisCardClassificationUsesTransactionStructureWithoutOptionalSummaryMetadata() async throws {
+        for (fileExtension, text) in [
+            ("pdf", "AXIS CREDIT CARD STATEMENT CREDIT CARD NUMBER DATE TRANSACTION DETAILS MERCHANT CATEGORY AMOUNT (RS.)"),
+            ("xlsx", "AXIS CREDIT CARD STATEMENT CREDIT CARD NUMBER DATE TRANSACTION DETAILS AMOUNT (INR) DEBIT/CREDIT")
+        ] {
+            let raw = RawDocument(
+                sourceURL: URL(fileURLWithPath: "/tmp/fictional-axis-card.\(fileExtension)"),
+                fileName: "fictional-axis-card.\(fileExtension)",
+                fileExtension: fileExtension,
+                content: .text(text)
+            )
+            let institution = try await SignatureInstitutionDetector().detectInstitution(in: raw)
+            let classification = try await StatementClassificationDetector().classify(
+                document: raw,
+                institution: institution
+            )
+
+            #expect(institution.institutionCode == Institution.axis.rawValue)
+            #expect(classification.documentType == .creditCardStatement)
+        }
+    }
+
+    @Test func fragmentedAxisAppPDFUsesExactTaggedStructureForDetectionAndClassification() async throws {
+        let raw = RawDocument(
+            sourceURL: URL(fileURLWithPath: "/tmp/fictional-fragmented-axis-app.pdf"),
+            fileName: "fictional-fragmented-axis-app.pdf",
+            fileExtension: "pdf",
+            content: .text("""
+            Axis B
+            nk M
+            a
+            gnus Credit C
+            ard Monthly St
+            atement
+            Tot
+            al P
+            ayment Due
+            D
+            ate Transa
+            ction Details Amount (INR) De
+            bit/Credit
+            """),
+            pdfTaggedTables: [axisAppTaggedTable()]
+        )
+        let detector = SignatureInstitutionDetector()
+        let institution = try await detector.detectInstitution(in: raw)
+        let classification = try await StatementClassificationDetector().classify(
+            document: raw,
+            institution: institution
+        )
+
+        #expect(institution.institutionCode == Institution.axis.rawValue)
+        #expect(classification.documentType == .creditCardStatement)
+        #expect(classification.reasons.contains("Matched exact Axis bank-app tagged transaction-table structure."))
+    }
+
+    @Test func fragmentedAxisAppTextWithoutExactTaggedHeaderDoesNotClaimCardSupport() async throws {
+        let raw = RawDocument(
+            sourceURL: URL(fileURLWithPath: "/tmp/fictional-fragmented-axis-near-match.pdf"),
+            fileName: "fictional-fragmented-axis-near-match.pdf",
+            fileExtension: "pdf",
+            content: .text("Axis B\nnk Credit C\nard Monthly St\natement"),
+            pdfTaggedTables: [axisAppTaggedTable(amountHeader: "Amount (USD)")]
+        )
+        let detector = SignatureInstitutionDetector()
+        let institution = try await detector.detectInstitution(in: raw)
+        let classification = try await StatementClassificationDetector().classify(
+            document: raw,
+            institution: institution
+        )
+
+        #expect(institution.institutionCode == nil)
+        #expect(classification.documentType == .unknown)
+    }
+
+    @Test func axisBankStatementWithCardMarketingTextDoesNotEnterCardRoute() async throws {
+        let raw = RawDocument(
+            sourceURL: URL(fileURLWithPath: "/tmp/fictional-axis-bank.pdf"),
+            fileName: "fictional-axis-bank.pdf",
+            fileExtension: "pdf",
+            content: .text("AXIS BANK STATEMENT OF AXIS ACCOUNT TRAN DATE PARTICULARS CREDIT CARD OFFER")
+        )
+        let institution = try await SignatureInstitutionDetector().detectInstitution(in: raw)
+        let classification = try await StatementClassificationDetector().classify(
+            document: raw,
+            institution: institution
+        )
+
+        #expect(institution.institutionCode == Institution.axis.rawValue)
+        #expect(classification.documentType == .bankStatement)
+    }
+
     @Test func axisPDFFixtureClassifiesAsBankStatement() async throws {
         let rawDocument = try await axisPDFRawDocument()
         let institution = try await SignatureInstitutionDetector().detectInstitution(in: rawDocument)
@@ -189,6 +281,34 @@ struct StatementClassificationTests {
             request: ImportRequest(fileURL: pdfURL),
             password: nil
         )
+    }
+
+    private func axisAppTaggedTable(amountHeader: String = "Amount (INR)") -> RawPDFTaggedTableEvidence {
+        var nextMCID = 1
+        func cell(role: RawPDFTaggedCellRole, text: String) -> RawPDFTaggedCellEvidence {
+            defer { nextMCID += 2 }
+            return RawPDFTaggedCellEvidence(
+                role: role,
+                children: [
+                    .markedContent(.init(
+                        pageNumber: 1, mcid: nextMCID, textBlocks: [], rectangleCount: 1
+                    )),
+                    .structure(.init(
+                        role: "NonStruct",
+                        markedContent: [.init(
+                            pageNumber: 1, mcid: nextMCID + 1, textBlocks: [text], rectangleCount: 0
+                        )]
+                    ))
+                ]
+            )
+        }
+
+        let header = ["Date", "Transaction Details", amountHeader, "Debit/Credit"]
+        let values = ["17 May '26", "Fictional Merchant", "INR1.00", "Debit"]
+        return RawPDFTaggedTableEvidence(rows: [
+            RawPDFTaggedRowEvidence(cells: header.map { cell(role: .header, text: $0) }),
+            RawPDFTaggedRowEvidence(cells: values.map { cell(role: .data, text: $0) })
+        ])
     }
 
     private func rawText(from rawDocument: RawDocument) throws -> String {

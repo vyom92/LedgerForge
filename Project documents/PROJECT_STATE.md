@@ -1,22 +1,173 @@
 # Repository State
 
+## Current Alignment — 2026-08-27
+
+This section is the current alignment layer. Historical sections below are preserved for traceability; this alignment supersedes their pre-Sprint-78B support, migration and planning limits where they conflict.
+
+### Accepted production baseline
+
+- **Primary branch:** `main`.
+- **Accepted implementation:** Sprint 78B in this closure commit on `main`; the exact commit is recorded by Git history.
+- **Latest accepted numbered sprint:** Sprint 78B.
+- **Latest accepted ADR:** ADR-044, amended through Sprint 78B; ADR-015 is also amended for the accepted Axis credential boundary.
+- **Accepted migration:** V15.
+- **Accepted card profiles:** exact `amex.credit-card.pdf@1`, exact `cbq.credit-card.pdf@1`, and the exact Axis `axis.credit-card.pdf@1` / `axis.credit-card.xlsx@1` families accepted by Sprint 78B. No generic card/PDF/XLSX support is implied.
+- **Personal-v1 adoption:** still undeclared; release/adoption certification remains a separate future gate.
+
+### Sprint 78B closure and current planning
+
+- Sprint 78 failed and Sprint 78A failed; Sprint 78B is accepted and completes the Sprint 78 outcome.
+- Exact Axis credit-card PDF/XLSX support, the dual Axis PDF credential scopes, zero-instrument liability semantics, cross-format equivalence and Migration V15 are accepted production state.
+- Sprint 79 is unblocked for Chat planning but remains unimplemented; planning and this closure do not authorize Sprint 79 execution.
+- No Sprint 78C exists because Sprint 78B completed the required outcome.
+- This closure commit publishes the accepted Sprint 78B implementation, separately approved `Project_Guide.md` PG-55 state, and reconciled authorities.
+
+### Accepted Sprint 78B source authority
+
+The active private Axis credit-card corpus is Jan–Jul 2026:
+
+- 7 locked App PDFs;
+- 7 unlocked App PDFs;
+- 7 App XLSX files;
+- 7 locked traditional PDFs;
+- 7 unlocked traditional PDFs;
+- **35 physical active files total**;
+- **21 logical representations total**: 7 App PDF, 7 XLSX, 7 traditional PDF.
+
+Archived/ignored material is excluded.
+
+Current source-proven financial row counts are:
+
+| Month | Rows |
+|---|---:|
+| Jan | 89 |
+| Feb | 95 |
+| Mar | 56 |
+| Apr | 178 |
+| May | 143 |
+| Jun | 154 |
+| Jul | 81 |
+
+Each logical representation family totals **796** financial rows.
+
+Cross-format financial equivalence is exact multiset equality, including multiplicity, over financial date + liability effect + native currency + exact Money. Narration is not financial identity.
+
+March contains 56 rows / 55 unique neutral financial keys with one multiplicity-two key. June contains 154 rows / 153 unique keys with one multiplicity-two key.
+
+App PDF and XLSX additionally preserve exact source financial order and narration after only approved inert whitespace/Unicode normalization. Traditional PDF source order is not required to match App/XLSX order.
+
+App PDF and XLSX use source-proven selected statement month. Do not invent a statement day or period.
+
+Active Loans Summary is excluded from Sprint 78 financial transactions and historical statement chronology.
+
+### Current Axis ownership semantics
+
+Current authentic Axis sources do not prove row-level primary/add-on physical-card ownership.
+
+Sprint 78B therefore requires:
+
+- one explicit liability-account decision where strong source identity is absent;
+- account-level Axis transaction evidence;
+- zero fabricated Axis `CardInstrument` records;
+- zero fabricated statement instrument sections;
+- zero fake mask-derived strong identities;
+- no automatic same-bank/family account merge.
+
+The primary/add-on physical-card distinction is not required for the current Axis outcome.
+
+### Accepted Axis PDF/XLSX implementation boundary
+
+- App PDF tagged transaction-table evidence is the current authoritative App transaction carrier.
+- The prior positioned App-PDF financial reconstruction/veto is superseded and must not regain acceptance authority.
+- Traditional PDF may use the generic positioned-evidence path required by that exact layout.
+- `PDFDocumentReader` remains generic source extraction and must not own Axis financial or credential-family policy.
+- The accepted Axis XLSX profile uses a bounded deterministic OOXML reader with pinned/vendored ZIPFoundation and strict package/XML validation; this does not establish generic XLSX support.
+- V1–V14 migrations remain immutable.
+- Additive V15 is accepted with Sprint 78B. No V16 is authorized.
+
+### Accepted Axis credential architecture
+
+Explicit user-settled source fact: **Axis App PDFs and Axis traditional PDFs use two different legitimate passwords.**
+
+The accepted Sprint 78B architecture uses two durable canonical credential scopes:
+
+```text
+axis-bank.credit-card.app-pdf
+axis-bank.credit-card.traditional-pdf
+```
+
+The old unscoped `axis-bank` item and registered historical Axis legacy item(s) are compatibility candidates only.
+
+Required behavior:
+
+- uncredentialed read first;
+- deterministic bounded remembered candidates;
+- secure challenge only after remembered candidates fail;
+- exact App/traditional target determined only after successful decryption and structural recognition;
+- remembered success in the exact canonical family causes no Keychain write;
+- compatibility-origin success may migrate only to the proven family scope after parse + validation;
+- challenge success writes only the proven family scope after parse + validation;
+- one family rotation must never overwrite the other;
+- credentials never enter SQLite, financial evidence, fixtures or logs.
+
+This credential architecture is accepted production state and is published by the 2026-08-27 ADR-015 alignment amendment.
+
+### Sprint 78B acceptance record
+
+Sprint 78B was technically accepted on 2026-08-27 after the final stable post-credential-correction candidate proved, at minimum:
+
+- exact 35-file active private inventory and locked/unlocked pairing;
+- locked and unlocked production-path equivalence for each monthly PDF family;
+- Jan–Jul 796-row App/XLSX/traditional financial multisets with exact multiplicity;
+- March and June duplicate multiplicity in all three representation families;
+- exact App↔XLSX source order and narration;
+- source-proven selected month;
+- zero Active-Loans transaction leakage;
+- May representative In-Memory and SQLite multi-source campaigns;
+- one liability account, zero fabricated Axis instruments/sections;
+- first May source creates 143 canonical transactions and later exact-equivalent representations create zero new canonical transactions;
+- SQLite checkpoint/close/reopen and canonical hydration;
+- zero accepted financial residue on rejection;
+- focused credential/Axis/Amex/CBQ/parser/provider/hydration tests;
+- fresh Debug build;
+- fresh optimized Release build;
+- exactly one authoritative complete `TestPlan.xctestplan` after the shared credential correction stabilizes;
+- privacy/residue and `git diff --check` review.
+
+Final accepted validation completed the focused shared boundary, authentic 35-file Axis private gate, fresh Debug build, fresh optimized Release build and exactly one authoritative complete TestPlan. The TestPlan executed 804 tests: 799 passed, 5 external-private-context tests were intentionally skipped with visible reasons, and 0 failed. Earlier green Sprint 78B results from before the dual-credential correction remain historical evidence only.
+
+### Current documentation and execution authorities
+
+- Repository bootstrap: `AGENTS.md`.
+- Human routing guide: `Project documents/Project_Guide.md`.
+- Current cycle roadmap: `Project documents/LedgerForge_Roadmap_Sprints_70-79_Current.md`.
+- Standing execution method: `Project documents/LedgerForge_Standing_Execution_Harness_Guide.md`.
+- Accepted state: this file.
+- Unscheduled queue: `Project documents/FUTURE_WORK.MD`.
+- Accepted architecture: `Project documents/ADR.md`.
+- Current task authorization: complete Chat-approved prompt.
+
+ChatGPT Chat owns sprint/architecture/prompt/acceptance decisions. MCP executor is the Chat plugin for guarded local Mac repository/Xcode access. Codex is a separate execution environment and does not automatically inherit Chat-only context. Model capability order is **Sol > Terra > Luna** and is independent of execution environment.
+
+---
+
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current repository implementation baseline:** Sprint 77 exact encrypted CBQ credit-card PDF v1/v2 support over the shared card domain; the implementation commit is recorded by Git history
-- **Documentation alignment:** Reconciled for the Sprint 77 implementation and acceptance boundary
+- **Current repository implementation baseline:** Sprint 78B exact Axis credit-card PDF/XLSX support and equivalence over the shared card domain; the closure commit is recorded by Git history
+- **Documentation alignment:** Reconciled for the Sprint 78B implementation and acceptance boundary
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration and Sprint 65's clean-room PDF fixture replacement are included in the accepted baseline; no historical financial data was altered
-- **Latest chronologically accepted production implementation:** Sprint 77 exact encrypted CBQ credit-card PDF v1/v2 support
+- **Latest chronologically accepted production implementation:** Sprint 78B exact Axis credit-card PDF/XLSX support and equivalence
 - **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed numbered increment:** Sprint 77 — Exact Encrypted CBQ Credit-Card PDF v1/v2 Support
+- **Latest verified completed numbered increment:** Sprint 78B — Exact Axis Credit-Card PDF/XLSX Support and Equivalence
 - **Accepted Sprint 63 implementation ref:** `7e1345e3817d3c3e91c24f881b962a48279fd73b`
 - **Latest accepted ADR:** ADR-044 — Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence
-- **Current migration:** V14
+- **Current migration:** V15
 - **DBP-01 classification:** Accepted DEBUG-only developer tooling and development-database lifecycle implementation; it is not a production financial capability, production database-profile feature, numbered sprint, Sprint 65, schema migration or personal-v1 adoption
 - **Sprint 55A:** Axis Bank Source-Truth Restoration, ending at `f3154dbd13a340714179da7f972a6accdd3aca54`; parallel shared-runtime-store isolation remains Sprint 55 acceptance/test infrastructure
 - **Sprint 57A:** Category Reconciliation Closure, complete at `251a547cb44712a789a9ad7b23a4eabca742900b`; no migration was added
@@ -1228,33 +1379,24 @@ Detailed implementation history remains in Git and accepted ADRs.
 
 ---
 
-## Current Planning State
+## Current Planning State — 2026-08-27
 
-- The current planning alignment is based on completed Sprints 50–77, including the Sprint 68B test-only correction, the DBP-01 maintenance correction, the Sprint 69 local validation closure, the bounded Sprint 71, Sprint 72 and Sprint 74 XLS increments, Sprint 73 exact HDFC PDF/XLS equivalence, Sprint 75 exact CBQ PDF/multi-source lineage, Sprint 76 exact Amex PDF/shared card foundation, Sprint 76A multi-instrument/encrypted/semantic-source hardening and Sprint 77 exact encrypted CBQ card v1/v2 support, together with Migration V14 and amended ADR-044.
-- DBP-01 is complete and no DBP-01 implementation remains pending. It is a separate post-Sprint-64 Debug tooling increment, not a numbered sprint or Sprint 65; no sprint renumbering occurred.
-- Sprint 63 implementation of the ADR-041 source-snapshot and source-byte foundation is complete; no source-snapshot implementation remains in the unscheduled queue.
-- `FW-P1-10 — Production PDF Statement Support` is completed and removed from the unscheduled queue by Sprint 65 for the selected exact account-neutral Axis bank-account grammar. Other Axis PDF layouts, OCR, password workflow, generic Axis PDF support and cross-format equivalence remain unsupported.
-- `FW-P1-14 — XLS and XLSX Support` is partially completed for the exact Axis NRO, shared HDFC NRE/NRO and CBQ current-account history XLS v1 profiles. XLSX, generic spreadsheets, other institutions and other layouts remain unscheduled.
-- `FW-P1-16` is partially completed for the exact HDFC PDF/XLS v1 pair under ADR-042 and for the separate exact three-profile CBQ current-account observation/overlap boundary under ADR-043. Axis PDF/CSV/XLS, card cross-format equivalence, same-format semantic duplicates, generic partial overlap and every other relationship remain future work.
-- `FW-P1-40 — Deterministic Approved-Fixture Launcher` was completed by Sprint 58 and is removed from the unscheduled queue.
-- `FW-P1-37` retains only broader structured diagnostics work not completed by Sprint 58; its bounded privacy-safe preparation-failure summary and Developer Console fixture-workflow slice is complete.
-- `FW-P1-28 — Confirmed-Persistence Recovery and Unsupported Retry` is complete in Sprint 66 and removed from the unscheduled queue.
-- `FW-P1-29 — Better Validation Guidance` retains only broader validation education outside the typed immediate-result and recovery guidance completed by Sprint 66.
-- The exact retained HDFC PDF v1 slice, exact CBQ current-account XLS/history-PDF/monthly-PDF lineage slice and exact Amex/CBQ QAR native-text card PDF slices are complete. HDFC card, Axis card, other Amex/CBQ layouts and other card families remain eligible for targeted discovery but are not production support.
-- `FW-P2-20 — Category Model and Management` is complete in Sprint 57 and removed from the unscheduled queue.
-- `FW-P2-21 — Deterministic Categorization Rules` is now eligible for bounded discovery; no rule behavior is implemented or authorized.
-- Repair and reversal families whose shared ADR-037 and lifecycle prerequisites are complete are eligible for targeted family-specific discovery, not broad implementation.
-- `FW-P0-24 — Durable Import-Outcome Presentation Exhaustiveness` is complete and no longer remains in the unscheduled queue.
-- Sprint 77 is the highest-numbered completed increment. The selected Axis PDF, exact Axis NRO XLS, exact shared HDFC NRE/NRO PDF/XLS, exact CBQ current-account XLS/history-PDF/monthly-PDF and exact multi-instrument encrypted Amex/CBQ credit-card PDF boundaries are accepted. Broader PDF/XLS layouts, XLSX, OCR, arbitrary encrypted-PDF workflows, generic spreadsheet/card support and cross-format/semantic behavior beyond ADR-042, ADR-043, the exact ADR-044 Amex projection and exact CBQ source-byte authority remain unscheduled or blocked.
+- Sprint 78B is the highest-numbered **accepted** implementation, with amended ADR-044/ADR-015 and Migration V15 as the accepted architecture/migration baseline.
+- Sprint 78 and Sprint 78A failed; Sprint 78B completed the Sprint 78 outcome and no Sprint 78C exists.
+- The exact accepted Axis source, ownership, credential, V15 and acceptance boundaries are recorded in the `Current Alignment — 2026-08-27` section above and in `LedgerForge_Roadmap_Sprints_70-79_Current.md`.
+- Exact Axis card PDF/XLSX production support is accepted only for the Sprint 78B profiles and source-proven boundaries; broader Axis/card/XLSX claims remain unsupported.
+- Sprint 79 is unblocked for Chat planning but remains unimplemented and requires its own architecture and complete execution prompt.
+- `FUTURE_WORK.MD` remains the canonical queue for work that is not currently selected for execution. It is not the active-sprint authority.
 
 ---
 
 ## Planning Boundary
 
-- `PROJECT_STATE.md` records verified repository reality.
+- `PROJECT_STATE.md` records accepted repository reality plus explicitly labelled active unaccepted WIP.
+- `LedgerForge_Roadmap_Sprints_70-79_Current.md` is the repository planning authority for the current cycle's sprint numbering, corrective suffixes, status and next gates.
+- `LedgerForge_Standing_Execution_Harness_Guide.md` is the repository standing execution/review-method authority.
 - `FUTURE_WORK.MD` is the canonical unscheduled planning queue.
-- Accepted ADRs govern architecture.
-- The private sprint roadmap is a non-authoritative Chat-user planning aid.
-- No repository-stored active work contract exists.
-- The complete Chat-approved prompt supplied directly in the current conversation is the sole execution contract.
-- Before Codex execution, local branch, HEAD, divergence, worktree, branch, stash and linked-worktree safeguards must be verified.
+- Accepted ADRs govern accepted architecture; the Sprint 78B ADR-015 and ADR-044 amendments are now part of accepted state.
+- The complete Chat-approved prompt is the execution contract for the current task.
+- Chat owns sprint/architecture/acceptance decisions. MCP executor provides guarded local Mac repository/Xcode access inside Chat. Codex is a separate execution environment and must receive a self-contained prompt plus repository-local authorities.
+- Before any write, exact branch/HEAD/divergence, worktree/index state, branches/worktrees/stashes, active Git operations, validations, MCP lease and independent external writers must be verified.

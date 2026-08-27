@@ -372,15 +372,47 @@ final class AccountsViewModel: ObservableObject {
                 return lhs.0.name < rhs.0.name
             }
 
+        // Compute calendar sort keys while still on the view model's actor.
+        // `sorted` receives a synchronous nonisolated closure, so calling the
+        // actor-isolated `SelectedStatementMonth.canonical` property from
+        // inside that closure is not a meaningful isolation hop. The keys are
+        // immutable strings and are safe to capture for the comparison.
+        var statementCycleKeys: [String: String] = [:]
+        for statement in cardStore.snapshot.statements {
+            if let selected = statement.selectedStatementMonth {
+                statementCycleKeys[statement.id] = selected.canonical
+            } else if let end = statement.period?.end {
+                statementCycleKeys[statement.id] = String(format: "%04d-%02d", end.year, end.month)
+            } else if let date = statement.statementDate {
+                statementCycleKeys[statement.id] = String(format: "%04d-%02d", date.year, date.month)
+            } else {
+                statementCycleKeys[statement.id] = ""
+            }
+        }
+
         accounts = runtimeAccounts.map { account, repositoryAccountID in
             let latestCardStatement = cardStore.snapshot.statements
                 .filter { $0.liabilityAccountID == repositoryAccountID }
                 .sorted { lhs, rhs in
-                    if lhs.period.end != rhs.period.end { return lhs.period.end > rhs.period.end }
-                    if lhs.statementDate != rhs.statementDate { return lhs.statementDate > rhs.statementDate }
-                    return lhs.id > rhs.id
+                    let lhsCycle = statementCycleKeys[lhs.id] ?? ""
+                    let rhsCycle = statementCycleKeys[rhs.id] ?? ""
+                    if lhsCycle != rhsCycle { return lhsCycle > rhsCycle }
+                    let lhsExact = lhs.statementDate?.canonical ?? lhs.period?.end.canonical
+                    let rhsExact = rhs.statementDate?.canonical ?? rhs.period?.end.canonical
+                    switch (lhsExact, rhsExact) {
+                    case let (left?, right?) where left != right: return left > right
+                    case (_?, nil): return true
+                    case (nil, _?): return false
+                    default: return false
+                    }
                 }.first
             let instrumentCount = cardStore.snapshot.instruments.filter { $0.liabilityAccountID == repositoryAccountID }.count
+            let latestStatementPeriod = latestCardStatement.flatMap { statement -> String? in
+                if let period = statement.period {
+                    return "\(period.start.presentation) – \(period.end.presentation)"
+                }
+                return statement.selectedStatementMonth?.canonical
+            }
             return AccountsAccountPresentation(
                 id: repositoryAccountID,
                 displayName: account.nickname ?? account.name,
@@ -390,7 +422,7 @@ final class AccountsViewModel: ObservableObject {
                 currentBalance: account.currentBalance,
                 identitySummaries: account.identitySummaries,
                 currentBalanceLabel: account.type == .creditCard ? "Current Liability" : "Current Balance",
-                latestStatementPeriod: latestCardStatement.map { "\($0.period.start.presentation) – \($0.period.end.presentation)" },
+                latestStatementPeriod: latestStatementPeriod,
                 dueDate: latestCardStatement?.dueDate?.presentation,
                 cardInstrumentCount: account.type == .creditCard ? instrumentCount : nil
             )

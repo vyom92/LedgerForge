@@ -278,7 +278,12 @@ struct HDFCBankAccountPDFAndProjectionTests {
         }
     }
 
-    @Test
+    @Test(
+        .enabled(
+            if: Self.privateOriginalContextConfigured,
+            "Requires the private HDFC originals root"
+        )
+    )
     func privateOriginalPairsProduceExactProductionProjectionsWhenConfigured() async throws {
         let rootText: String
         if let configuredRoot = ProcessInfo.processInfo.environment["LEDGERFORGE_PRIVATE_HDFC_ORIGINALS_ROOT"] {
@@ -481,6 +486,18 @@ struct HDFCBankAccountPDFAndProjectionTests {
         #expect(rowCounts == [7, 16, 62, 76])
         #expect(projectionMismatches == 0)
         #expect(importCampaignFailures == 0)
+    }
+
+    nonisolated private static var privateOriginalContextConfigured: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        if environment["LEDGERFORGE_PRIVATE_HDFC_ORIGINALS_ROOT"]?.isEmpty == false {
+            return true
+        }
+        guard let pointer = environment["LEDGERFORGE_PRIVATE_HDFC_ORIGINALS_FILE"],
+              !pointer.isEmpty else {
+            return false
+        }
+        return FileManager.default.fileExists(atPath: pointer)
     }
 
     private static func privatePDFFailureBucket(_ error: Error) -> String {

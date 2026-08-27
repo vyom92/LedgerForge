@@ -344,7 +344,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         contract: CardStatementProfileContract
     ) -> Bool {
         account.workspaceId == plan.workspace.id && account.accountType == "credit_card" &&
-        account.nativeCurrency == "QAR" && account.institutionId == contract.institutionCode
+        account.nativeCurrency == (contract == .axis ? "INR" : "QAR") &&
+        account.institutionId == contract.institutionCode
     }
 
     private func insertCardGraph(
@@ -354,15 +355,16 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         transactions: [TransactionDTO],
         isSupportingSource: Bool
     ) throws -> ConfirmedImportRepositoryResult? {
-        // Plans produced before V13 remain on the singular V1-V12 path.  A
-        // supporting source cannot use that path because there is no durable
-        // semantic projection with which its rows could be represented.
-        if card.sectionDecisions.isEmpty {
-            guard !isSupportingSource else { return .repositoryIntegrityConflict }
-        } else {
-            guard let contract = CardStatementProfileContract(
-                reconciliationRuleIdentifier: card.statement.reconciliationRuleCode
-            ) else { return .repositoryIntegrityConflict }
+        guard let contract = CardStatementProfileContract(
+            reconciliationRuleIdentifier: card.statement.reconciliationRuleCode
+        ) else { return .repositoryIntegrityConflict }
+        if contract.supportsSemanticSourceGrouping, card.semanticProjection != nil {
+            return try insertV13CardGraph(
+                card, plan: plan, account: account, transactions: transactions,
+                isSupportingSource: isSupportingSource
+            )
+        }
+        if !card.sectionDecisions.isEmpty {
             if contract.supportsSemanticSourceGrouping {
                 return try insertV13CardGraph(
                     card, plan: plan, account: account, transactions: transactions,
@@ -374,6 +376,10 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
                 isSupportingSource: isSupportingSource, contract: contract
             )
         }
+        // Plans produced before V13 remain on the singular V1-V12 path. A
+        // supporting source cannot use that path because it has no semantic
+        // projection. Axis zero-section plans are routed above, not here.
+        guard !isSupportingSource else { return .repositoryIntegrityConflict }
         let history = plan.historyTemplate
         guard card.liabilityAccountId == account.id,
               cardAccountIsCompatible(account: account, plan: plan),
@@ -393,17 +399,18 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         case .unspecified:
             return .explicitAccountChoiceRequired
         case .createProposedInstrument:
-            guard card.proposedInstrument.workspaceId == plan.workspace.id,
-                  card.proposedInstrument.liabilityAccountId == account.id,
-                  card.proposedInstrument.lifecycleStateCode == "unknown",
-                  try count("SELECT COUNT(*) FROM card_instruments WHERE id = ?;", [card.proposedInstrument.id]) == 0 else {
+            guard let proposedInstrument = card.proposedInstrument,
+                  proposedInstrument.workspaceId == plan.workspace.id,
+                  proposedInstrument.liabilityAccountId == account.id,
+                  proposedInstrument.lifecycleStateCode == "unknown",
+                  try count("SELECT COUNT(*) FROM card_instruments WHERE id = ?;", [proposedInstrument.id]) == 0 else {
                 return .repositoryIntegrityConflict
             }
             try db.executePrepared(
                 sql: "INSERT INTO card_instruments (id, workspace_id, liability_account_id, lifecycle_state, created_at) VALUES (?,?,?,?,?);",
-                params: [card.proposedInstrument.id, card.proposedInstrument.workspaceId, card.proposedInstrument.liabilityAccountId, card.proposedInstrument.lifecycleStateCode, card.proposedInstrument.createdAtISO]
+                params: [proposedInstrument.id, proposedInstrument.workspaceId, proposedInstrument.liabilityAccountId, proposedInstrument.lifecycleStateCode, proposedInstrument.createdAtISO]
             )
-            selectedInstrumentID = card.proposedInstrument.id
+            selectedInstrumentID = proposedInstrument.id
         case .useExistingInstrument(let instrumentID):
             guard try count("SELECT COUNT(*) FROM card_instruments WHERE id = ? AND workspace_id = ? AND liability_account_id = ?;", [instrumentID, plan.workspace.id, account.id]) == 1 else {
                 return .selectedAccountIneligible
@@ -522,8 +529,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         }
 
         try db.executePrepared(
-            sql: "INSERT INTO card_statements (id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, statement_currency, source_row_count, reconciliation_rule_code, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
-            params: [card.statement.id, card.statement.workspaceId, card.statement.liabilityAccountId, card.statement.documentId, card.statement.importSessionId, card.statement.normalizedDocumentId, card.statement.parserProfileId, card.statement.parserProfileVersion, card.statement.statementDateISO, card.statement.statementStartDateISO, card.statement.statementEndDateISO, card.statement.statementCurrency, card.statement.sourceRowCount, card.statement.reconciliationRuleCode, card.statement.createdAtISO]
+            sql: "INSERT INTO card_statements (id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, selected_statement_month, statement_currency, source_row_count, reconciliation_rule_code, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+            params: [card.statement.id, card.statement.workspaceId, card.statement.liabilityAccountId, card.statement.documentId, card.statement.importSessionId, card.statement.normalizedDocumentId, card.statement.parserProfileId, card.statement.parserProfileVersion, card.statement.statementDateISO ?? NSNull(), card.statement.statementStartDateISO ?? NSNull(), card.statement.statementEndDateISO ?? NSNull(), card.statement.selectedStatementMonthISO ?? NSNull(), card.statement.statementCurrency, card.statement.sourceRowCount, card.statement.reconciliationRuleCode, card.statement.createdAtISO]
         )
         for component in card.summaryComponents {
             try db.executePrepared(
@@ -777,6 +784,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         switch contract {
         case .amex:
             summaryValid = false
+        case .axis:
+            summaryValid = false
         case .cbqV1:
             let billed = byCode["amount_billed"]?.moneyMinor
             let payment = byCode["payment_received"]?.moneyMinor
@@ -828,8 +837,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             )
         }
         try db.executePrepared(
-            sql: "INSERT INTO card_statements (id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, statement_currency, source_row_count, reconciliation_rule_code, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
-            params: [card.statement.id, card.statement.workspaceId, card.statement.liabilityAccountId, card.statement.documentId, card.statement.importSessionId, card.statement.normalizedDocumentId, card.statement.parserProfileId, card.statement.parserProfileVersion, card.statement.statementDateISO, card.statement.statementStartDateISO, card.statement.statementEndDateISO, card.statement.statementCurrency, card.statement.sourceRowCount, card.statement.reconciliationRuleCode, card.statement.createdAtISO]
+            sql: "INSERT INTO card_statements (id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, selected_statement_month, statement_currency, source_row_count, reconciliation_rule_code, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+            params: [card.statement.id, card.statement.workspaceId, card.statement.liabilityAccountId, card.statement.documentId, card.statement.importSessionId, card.statement.normalizedDocumentId, card.statement.parserProfileId, card.statement.parserProfileVersion, card.statement.statementDateISO ?? NSNull(), card.statement.statementStartDateISO ?? NSNull(), card.statement.statementEndDateISO ?? NSNull(), card.statement.selectedStatementMonthISO ?? NSNull(), card.statement.statementCurrency, card.statement.sourceRowCount, card.statement.reconciliationRuleCode, card.statement.createdAtISO]
         )
         for component in card.summaryComponents {
             try db.executePrepared(
@@ -873,7 +882,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         isSupportingSource: Bool
     ) throws -> ConfirmedImportRepositoryResult? {
         let history = plan.historyTemplate
-        guard let projection = card.semanticProjection,
+        guard let contract = CardStatementProfileContract(reconciliationRuleIdentifier: card.statement.reconciliationRuleCode),
+              let projection = card.semanticProjection,
               projection.isValid(),
               card.liabilityAccountId == account.id,
               cardAccountIsCompatible(account: account, plan: plan),
@@ -882,10 +892,11 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               card.statement.documentId == history.document.id,
               card.statement.importSessionId == history.importSession.id,
               card.statement.normalizedDocumentId == history.normalizedDocument?.id,
-              card.statement.parserProfileId == "amex.credit-card.pdf",
-              card.statement.parserProfileVersion == "1",
-              card.statement.statementCurrency == "QAR",
-              card.statement.reconciliationRuleCode == "amex.qar.previous-minus-credits-plus-debits.v1",
+              contract.supportsSemanticSourceGrouping,
+              contract.accepts(profileID: card.statement.parserProfileId),
+              card.statement.parserProfileVersion == contract.profileVersion,
+              card.statement.statementCurrency == (contract == .axis ? "INR" : "QAR"),
+              projection.reconciliationRuleCode == card.statement.reconciliationRuleCode,
               card.statement.sourceRowCount == projection.events.count,
               plan.transactionTemplates.count == projection.events.count,
               history.normalizedRows.count == projection.events.count,
@@ -897,8 +908,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
 
         let decisions = card.sectionDecisions.sorted { $0.section.sourceOrdinal < $1.section.sourceOrdinal }
         let projectionSections = projection.sections.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
-        guard decisions.map(\.section.sourceOrdinal) == Array(1...decisions.count),
-              projectionSections.map(\.sourceOrdinal) == Array(1...projectionSections.count),
+        guard decisions.map(\.section.sourceOrdinal) == decisions.indices.map({ $0 + 1 }),
+              projectionSections.map(\.sourceOrdinal) == projectionSections.indices.map({ $0 + 1 }),
               decisions.map(\.section.documentScopedSectionId) == projectionSections.map(\.documentScopedSectionId),
               decisions.map(\.section.sourceOrdinal) == projectionSections.map(\.sourceOrdinal),
               zip(decisions.map(\.section), projectionSections).allSatisfy({ section, projected in
@@ -911,10 +922,20 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               projection.summaryComponents == card.summaryComponents,
               Set(decisions.map(\.section.id)).count == decisions.count,
               Set(decisions.flatMap(\.sourceObservations).map(\.id)).count == decisions.flatMap(\.sourceObservations).count,
-              decisions.allSatisfy({ !$0.sourceObservations.isEmpty }),
+              (contract == .axis
+                ? decisions.isEmpty && projectionSections.isEmpty
+                : !decisions.isEmpty && decisions.allSatisfy({ !$0.sourceObservations.isEmpty })),
               decisions.allSatisfy({ $0.section.cardStatementId == card.statement.id }),
               Set(card.sourceObservations.map(\.id)).count == card.sourceObservations.count else {
             return .repositoryIntegrityConflict
+        }
+        if contract == .axis {
+            guard card.instrumentChoice == .unspecified,
+                  card.proposedInstrument == nil,
+                  card.instrumentIdentifiers.isEmpty,
+                  card.relationships.isEmpty else {
+                return .repositoryIntegrityConflict
+            }
         }
         guard Set(decisions.map(\.section.instrumentId)).count == decisions.count else {
             return .repositoryIntegrityConflict
@@ -980,8 +1001,9 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         let allowedAuthorities = Set(["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"])
         let accountObservations = card.sourceObservations.filter { $0.subjectKind == "liability_account" }
         let legacyInstrumentObservations = card.sourceObservations.filter { $0.subjectKind == "instrument" }
-        guard accountObservations.count == 1,
-              legacyInstrumentObservations.count <= 1,
+        guard (contract == .axis
+                ? accountObservations.isEmpty && legacyInstrumentObservations.isEmpty && card.sourceObservations.isEmpty
+                : accountObservations.count == 1 && legacyInstrumentObservations.count <= 1),
               (decisions.count > 1 ? legacyInstrumentObservations.isEmpty : true),
               Set(card.sourceObservations.map(\.id)).count == card.sourceObservations.count else {
             return .repositoryIntegrityConflict
@@ -1030,20 +1052,42 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             )
         }
 
-        let requiredComponents = Set(["previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"])
-        guard Set(card.summaryComponents.map(\.componentCode)) == requiredComponents,
+        let sourceFormat = card.statement.parserProfileId.hasSuffix(".xlsx") ? "xlsx" : "pdf"
+        let requiredComponents = contract.requiredSummaryCodes(
+            reconciliationRuleIdentifier: card.statement.reconciliationRuleCode,
+            sourceFormatCode: sourceFormat
+        )
+        let summaryCodes = Set(card.summaryComponents.map(\.componentCode))
+        let summaryCoverageIsValid = contract == .axis
+            ? summaryCodes.isSubset(of: contract.allowedSummaryCodes)
+            : summaryCodes == requiredComponents
+        guard summaryCoverageIsValid,
+              summaryCodes.count == card.summaryComponents.count,
               card.summaryComponents.allSatisfy({ $0.cardStatementId == card.statement.id }) else { return .repositoryIntegrityConflict }
         let summary = Dictionary(uniqueKeysWithValues: card.summaryComponents.map { ($0.componentCode, $0) })
-        guard let previous = summary["previous_balance"], let credits = summary["new_credits"],
-              let debits = summary["new_debits"], let balance = summary["new_balance"],
-              let instrumentTotal = summary["instrument_net_total"],
-              previous.moneyCurrency == "QAR", credits.moneyCurrency == "QAR", debits.moneyCurrency == "QAR",
-              balance.moneyCurrency == "QAR", instrumentTotal.moneyCurrency == "QAR",
-              previous.moneyMinor != nil, credits.moneyMinor != nil, debits.moneyMinor != nil,
-              balance.moneyMinor != nil, instrumentTotal.moneyMinor != nil,
-              summary["due_date"]?.dateISO != nil,
-              previous.moneyMinor! - credits.moneyMinor! + debits.moneyMinor! == balance.moneyMinor! else {
+        let previous = summary["previous_balance"]
+        let balance = summary[contract == .axis ? "axis_total_payment_due" : "new_balance"]
+        let previousMinor = previous?.moneyMinor
+        let balanceMinor = balance?.moneyMinor
+        guard contract == .axis ||
+                (previous?.moneyCurrency == card.statement.statementCurrency &&
+                 balance?.moneyCurrency == card.statement.statementCurrency &&
+                 previousMinor != nil && balanceMinor != nil && summary["due_date"]?.dateISO != nil) else {
             return .repositoryIntegrityConflict
+        }
+        let instrumentTotal: CardStatementSummaryComponentDTO? = contract == .axis
+            ? nil
+            : summary["instrument_net_total"]
+        if contract != .axis {
+            guard let instrumentTotal, instrumentTotal.moneyMinor != nil else { return .repositoryIntegrityConflict }
+        }
+        if contract == .amex {
+            guard let credits = summary["new_credits"], let debits = summary["new_debits"],
+                  credits.moneyCurrency == "QAR", debits.moneyCurrency == "QAR",
+                  credits.moneyMinor != nil, debits.moneyMinor != nil,
+                  previousMinor! - credits.moneyMinor! + debits.moneyMinor! == balanceMinor! else {
+                return .repositoryIntegrityConflict
+            }
         }
         for component in card.summaryComponents {
             if let decimal = component.moneyDecimal, let minor = component.moneyMinor, let currency = component.moneyCurrency {
@@ -1063,7 +1107,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
                   let template = templateByID[event.incomingTransactionId],
                   evidence.cardStatementId == card.statement.id,
                   evidence.liabilityEffectCode == event.liabilityEffectCode,
-                  evidence.sourceTransactionDateISO == event.sourceTransactionDateISO,
+                  (event.sourceTransactionDateISO == nil || evidence.sourceTransactionDateISO == event.sourceTransactionDateISO),
                   evidence.rowScopeCode == event.rowScopeCode,
                   evidence.documentScopedSectionId == event.documentScopedSectionId,
                   evidence.originalCurrency == event.originalCurrency,
@@ -1073,7 +1117,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
                   template.amountMinor == event.postedAmountMinor,
                   template.amountDecimal == event.postedAmountDecimal,
                   (try? Money(canonicalDecimal: event.postedAmountDecimal, currency: event.postedCurrency).minorUnits()) == event.postedAmountMinor,
-                  template.postedDateISO == event.postingDateISO,
+                  template.postedDateISO == event.financialDateISO,
+                  template.financialDateRole == event.financialDateRoleCode,
                   template.reference == event.sourceReference,
                   history.normalizedRows.contains(where: { $0.id == event.normalizedRowId && $0.sourceOrdinal == event.sourceOrdinal }),
                   event.postedCurrency == card.statement.statementCurrency,
@@ -1092,11 +1137,13 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         guard sectionTotals.allSatisfy({ sectionID, total in
             guard let section = decisions.first(where: { $0.section.documentScopedSectionId == sectionID }) else { return false }
             return total == section.section.signedTotalMinor
-        }), aggregateInstrumentTotal == instrumentTotal.moneyMinor else { return .repositoryIntegrityConflict }
-
+        }) else { return .repositoryIntegrityConflict }
+        if let instrumentTotal {
+            guard aggregateInstrumentTotal == instrumentTotal.moneyMinor else { return .repositoryIntegrityConflict }
+        }
         try db.executePrepared(
-            sql: "INSERT INTO card_statements (id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, statement_currency, source_row_count, reconciliation_rule_code, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
-            params: [card.statement.id, card.statement.workspaceId, card.statement.liabilityAccountId, card.statement.documentId, card.statement.importSessionId, card.statement.normalizedDocumentId, card.statement.parserProfileId, card.statement.parserProfileVersion, card.statement.statementDateISO, card.statement.statementStartDateISO, card.statement.statementEndDateISO, card.statement.statementCurrency, card.statement.sourceRowCount, card.statement.reconciliationRuleCode, card.statement.createdAtISO]
+            sql: "INSERT INTO card_statements (id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, selected_statement_month, statement_currency, source_row_count, reconciliation_rule_code, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+            params: [card.statement.id, card.statement.workspaceId, card.statement.liabilityAccountId, card.statement.documentId, card.statement.importSessionId, card.statement.normalizedDocumentId, card.statement.parserProfileId, card.statement.parserProfileVersion, card.statement.statementDateISO ?? NSNull(), card.statement.statementStartDateISO ?? NSNull(), card.statement.statementEndDateISO ?? NSNull(), card.statement.selectedStatementMonthISO ?? NSNull(), card.statement.statementCurrency, card.statement.sourceRowCount, card.statement.reconciliationRuleCode, card.statement.createdAtISO]
         )
         for component in card.summaryComponents {
             try db.executePrepared(sql: "INSERT INTO card_statement_summary_components (id, card_statement_id, component_code, money_currency, money_minor, money_decimal, date_value) VALUES (?,?,?,?,?,?,?);", params: [component.id, component.cardStatementId, component.componentCode, component.moneyCurrency ?? NSNull(), component.moneyMinor ?? NSNull(), component.moneyDecimal ?? NSNull(), component.dateISO ?? NSNull()])
@@ -1112,7 +1159,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
                       observation.normalizedDocumentId == history.normalizedDocument?.id,
                       observation.parserProfileId == card.statement.parserProfileId,
                       observation.parserProfileVersion == card.statement.parserProfileVersion,
-                      observation.observationKind == "amex_card_account_number",
+                      observation.observationKind == contract.instrumentObservationKindCode,
                       !observation.sourceValue.isEmpty,
                       allowedAuthorities.contains(observation.associationAuthority) else { return .repositoryIntegrityConflict }
                 if observation.associationAuthority == "prior_user_confirmed_mapping" {
@@ -1145,30 +1192,62 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               projection.isValid(),
               card.sectionDecisions.count == projection.sections.count else { return .repositoryIntegrityConflict }
         let history = plan.historyTemplate
-        let canonicalByOrdinal: [Int: String]
+        let isAxisProjection = projection.algorithmIdentifier == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm
+        func matchingGroup() throws -> (String, String)? {
+            if isAxisProjection {
+                return try db.query(sql: "SELECT id, authoritative_projection_id FROM card_statement_semantic_groups WHERE workspace_id = ? AND liability_account_id = ? AND institution_code = ? AND statement_family_code = ? AND statement_start_date IS NULL AND statement_end_date IS NULL AND cycle_month IS NULL AND native_currency = ? AND projection_algorithm = ? AND projection_digest = ? LIMIT 1;", params: [plan.workspace.id, account.id, projection.institutionCode, projection.statementFamilyCode, projection.nativeCurrency, projection.algorithmIdentifier, projection.digest], map: { ($0.string(at: 0) ?? "", $0.string(at: 1) ?? "") }).first
+            }
+            guard let start = projection.statementStartDateISO, let end = projection.statementEndDateISO else { return nil }
+            return try db.query(sql: "SELECT id, authoritative_projection_id FROM card_statement_semantic_groups WHERE workspace_id = ? AND liability_account_id = ? AND institution_code = ? AND statement_family_code = ? AND statement_start_date = ? AND statement_end_date = ? AND cycle_month IS NULL AND native_currency = ? AND projection_algorithm = ? AND projection_digest = ? LIMIT 1;", params: [plan.workspace.id, account.id, projection.institutionCode, projection.statementFamilyCode, start, end, projection.nativeCurrency, projection.algorithmIdentifier, projection.digest], map: { ($0.string(at: 0) ?? "", $0.string(at: 1) ?? "") }).first
+        }
+        let canonicalByOrdinal: [Int: String?]
         switch equivalenceReview {
         case .firstAcceptedSource where !isSupportingSource:
-            canonicalByOrdinal = Dictionary(uniqueKeysWithValues: projection.events.map { ($0.sourceOrdinal, $0.incomingTransactionId) })
+            canonicalByOrdinal = Dictionary(uniqueKeysWithValues: projection.events.map { ($0.sourceOrdinal, Optional($0.incomingTransactionId)) })
         case .equivalent where isSupportingSource:
-            guard let group = try db.query(sql: "SELECT id, authoritative_projection_id FROM card_statement_semantic_groups WHERE workspace_id = ? AND liability_account_id = ? AND institution_code = ? AND statement_family_code = ? AND statement_start_date = ? AND statement_end_date = ? AND native_currency = ? AND projection_algorithm = ? AND projection_digest = ? LIMIT 1;", params: [plan.workspace.id, account.id, projection.institutionCode, projection.statementFamilyCode, projection.statementStartDateISO, projection.statementEndDateISO, projection.nativeCurrency, projection.algorithmIdentifier, projection.digest], map: { ($0.string(at: 0) ?? "", $0.string(at: 1) ?? "") }).first, !group.0.isEmpty else { return .repositoryIntegrityConflict }
-            let rows = try db.query(sql: "SELECT source_ordinal, canonical_transaction_id FROM card_statement_semantic_projection_events WHERE projection_id = ? ORDER BY source_ordinal;", params: [group.1]) { (Int($0.int64(at: 0) ?? 0), $0.string(at: 1) ?? "") }
-            guard rows.count == projection.events.count,
-                  rows.map(\.0) == projection.events.map(\.sourceOrdinal) else { return .repositoryIntegrityConflict }
-            canonicalByOrdinal = Dictionary(uniqueKeysWithValues: rows)
+            guard let group = try matchingGroup(), !group.0.isEmpty else { return .repositoryIntegrityConflict }
+            if isAxisProjection {
+                let rows = try db.query(sql: "SELECT canonical_transaction_id, financial_date, liability_effect, posted_currency, posted_amount_decimal FROM card_statement_semantic_projection_events WHERE projection_id = ? ORDER BY source_ordinal;", params: [group.1]) {
+                    ($0.string(at: 0), $0.string(at: 1) ?? "", $0.string(at: 2) ?? "", $0.string(at: 3) ?? "", $0.string(at: 4) ?? "")
+                }
+                let authoritativeBuckets = Dictionary(grouping: rows) { cardSemanticMultisetKey(date: $0.1, effect: $0.2, currency: $0.3, decimal: $0.4) }
+                let incomingBuckets = Dictionary(grouping: projection.events) { cardSemanticMultisetKey(date: $0.financialDateISO, effect: $0.liabilityEffectCode, currency: $0.postedCurrency, decimal: $0.postedAmountDecimal) }
+                guard Set(authoritativeBuckets.keys) == Set(incomingBuckets.keys) else { return .repositoryIntegrityConflict }
+                var resolved: [Int: String?] = [:]
+                for (key, incomingBucket) in incomingBuckets {
+                    guard let authoritativeBucket = authoritativeBuckets[key], authoritativeBucket.count == incomingBucket.count else { return .repositoryIntegrityConflict }
+                    if incomingBucket.count == 1 {
+                        guard let canonicalID = authoritativeBucket[0].0, !canonicalID.isEmpty else { return .repositoryIntegrityConflict }
+                        resolved[incomingBucket[0].sourceOrdinal] = canonicalID
+                    } else {
+                        for incoming in incomingBucket {
+                            resolved.updateValue(nil, forKey: incoming.sourceOrdinal)
+                        }
+                    }
+                }
+                canonicalByOrdinal = resolved
+            } else {
+                let rows = try db.query(sql: "SELECT source_ordinal, canonical_transaction_id FROM card_statement_semantic_projection_events WHERE projection_id = ? ORDER BY source_ordinal;", params: [group.1]) { (Int($0.int64(at: 0) ?? 0), $0.string(at: 1)) }
+                guard rows.count == projection.events.count,
+                      rows.map(\.0) == projection.events.map(\.sourceOrdinal),
+                      rows.allSatisfy({ $0.1?.isEmpty == false }) else { return .repositoryIntegrityConflict }
+                canonicalByOrdinal = Dictionary(uniqueKeysWithValues: rows)
+            }
         default:
             return .repositoryIntegrityConflict
         }
         guard canonicalByOrdinal.count == projection.events.count else { return .repositoryIntegrityConflict }
-        try db.executePrepared(sql: "INSERT INTO card_statement_semantic_projections (id, workspace_id, liability_account_id, card_statement_id, document_id, import_session_id, algorithm, digest, institution_code, statement_family_code, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, native_currency, event_count, section_count, reconciliation_rule_code, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [projection.id, plan.workspace.id, account.id, card.statement.id, card.statement.documentId, card.statement.importSessionId, projection.algorithmIdentifier, projection.digest, projection.institutionCode, projection.statementFamilyCode, projection.parserProfileId, projection.parserProfileVersion, projection.statementDateISO, projection.statementStartDateISO, projection.statementEndDateISO, projection.nativeCurrency, projection.events.count, projection.sections.count, projection.reconciliationRuleCode, card.statement.createdAtISO])
+        try db.executePrepared(sql: "INSERT INTO card_statement_semantic_projections (id, workspace_id, liability_account_id, card_statement_id, document_id, import_session_id, algorithm, digest, institution_code, statement_family_code, parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date, selected_statement_month, cycle_month, native_currency, event_count, section_count, reconciliation_rule_code, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [projection.id, plan.workspace.id, account.id, card.statement.id, card.statement.documentId, card.statement.importSessionId, projection.algorithmIdentifier, projection.digest, projection.institutionCode, projection.statementFamilyCode, projection.parserProfileId, projection.parserProfileVersion, projection.statementDateISO ?? NSNull(), projection.statementStartDateISO ?? NSNull(), projection.statementEndDateISO ?? NSNull(), projection.selectedStatementMonthISO ?? NSNull(), projection.cycleMonthISO ?? NSNull(), projection.nativeCurrency, projection.events.count, projection.sections.count, projection.reconciliationRuleCode, card.statement.createdAtISO])
         for section in projection.sections {
             try db.executePrepared(sql: "INSERT INTO card_statement_semantic_projection_sections (id, projection_id, source_ordinal, document_scoped_section_id, signed_total_currency, signed_total_minor, signed_total_decimal, reconciliation_rule_code) VALUES (?,?,?,?,?,?,?,?);", params: [section.id, projection.id, section.sourceOrdinal, section.documentScopedSectionId, section.signedTotalCurrency, section.signedTotalMinor, section.signedTotalDecimal, section.reconciliationRuleCode])
         }
         for event in projection.events {
-            guard let canonical = canonicalByOrdinal[event.sourceOrdinal],
-                  canonical == event.incomingTransactionId || isSupportingSource,
+            guard canonicalByOrdinal.keys.contains(event.sourceOrdinal),
                   let row = history.normalizedRows.first(where: { $0.id == event.normalizedRowId && $0.sourceOrdinal == event.sourceOrdinal }) else { return .repositoryIntegrityConflict }
-            let canonicalID = isSupportingSource ? canonical : event.incomingTransactionId
-            try db.executePrepared(sql: "INSERT INTO card_statement_semantic_projection_events (id, projection_id, canonical_transaction_id, normalized_row_id, source_ordinal, posting_date, source_transaction_date, liability_effect, posted_currency, posted_amount_minor, posted_amount_decimal, original_currency, original_amount_minor, original_amount_decimal, source_reference, row_scope, document_scoped_section_id, document_section_ordinal) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", params: ["\(projection.id)-event-\(event.sourceOrdinal)", projection.id, canonicalID, row.id, event.sourceOrdinal, event.postingDateISO, event.sourceTransactionDateISO, event.liabilityEffectCode, event.postedCurrency, event.postedAmountMinor, event.postedAmountDecimal, event.originalCurrency ?? NSNull(), event.originalAmountMinor ?? NSNull(), event.originalAmountDecimal ?? NSNull(), event.sourceReference ?? NSNull(), event.rowScopeCode, event.documentScopedSectionId ?? NSNull(), event.documentSectionOrdinal ?? NSNull()])
+            let mappedCanonical = canonicalByOrdinal[event.sourceOrdinal] ?? nil
+            if !isSupportingSource && mappedCanonical != event.incomingTransactionId { return .repositoryIntegrityConflict }
+            if (!isAxisProjection || !isSupportingSource) && mappedCanonical == nil { return .repositoryIntegrityConflict }
+            try db.executePrepared(sql: "INSERT INTO card_statement_semantic_projection_events (id, projection_id, canonical_transaction_id, normalized_row_id, source_ordinal, financial_date, financial_date_role, source_transaction_date, liability_effect, posted_currency, posted_amount_minor, posted_amount_decimal, original_currency, original_amount_minor, original_amount_decimal, source_reference, row_scope, document_scoped_section_id, document_section_ordinal) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", params: ["\(projection.id)-event-\(event.sourceOrdinal)", projection.id, mappedCanonical ?? NSNull(), row.id, event.sourceOrdinal, event.financialDateISO, event.financialDateRoleCode, event.sourceTransactionDateISO ?? NSNull(), event.liabilityEffectCode, event.postedCurrency, event.postedAmountMinor, event.postedAmountDecimal, event.originalCurrency ?? NSNull(), event.originalAmountMinor ?? NSNull(), event.originalAmountDecimal ?? NSNull(), event.sourceReference ?? NSNull(), event.rowScopeCode, event.documentScopedSectionId ?? NSNull(), event.documentSectionOrdinal ?? NSNull()])
         }
         let groupID: String
         let role: StatementEquivalenceMemberRole
@@ -1176,9 +1255,12 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         case .firstAcceptedSource where !isSupportingSource:
             groupID = "card-semantic-group-\(projection.id)"
             role = .authoritative
-            try db.executePrepared(sql: "INSERT INTO card_statement_semantic_groups (id, workspace_id, liability_account_id, institution_code, statement_family_code, statement_start_date, statement_end_date, native_currency, projection_algorithm, projection_digest, authoritative_projection_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [groupID, plan.workspace.id, account.id, projection.institutionCode, projection.statementFamilyCode, projection.statementStartDateISO, projection.statementEndDateISO, projection.nativeCurrency, projection.algorithmIdentifier, projection.digest, projection.id, card.statement.createdAtISO])
+            let groupStart = isAxisProjection ? nil : projection.statementStartDateISO
+            let groupEnd = isAxisProjection ? nil : projection.statementEndDateISO
+            let groupCycle = isAxisProjection ? nil : projection.cycleMonthISO
+            try db.executePrepared(sql: "INSERT INTO card_statement_semantic_groups (id, workspace_id, liability_account_id, institution_code, statement_family_code, statement_start_date, statement_end_date, cycle_month, native_currency, projection_algorithm, projection_digest, authoritative_projection_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [groupID, plan.workspace.id, account.id, projection.institutionCode, projection.statementFamilyCode, groupStart ?? NSNull(), groupEnd ?? NSNull(), groupCycle ?? NSNull(), projection.nativeCurrency, projection.algorithmIdentifier, projection.digest, projection.id, card.statement.createdAtISO])
         case .equivalent where isSupportingSource:
-            guard let existing = try db.query(sql: "SELECT id FROM card_statement_semantic_groups WHERE workspace_id = ? AND liability_account_id = ? AND institution_code = ? AND statement_family_code = ? AND statement_start_date = ? AND statement_end_date = ? AND native_currency = ? AND projection_algorithm = ? AND projection_digest = ? LIMIT 1;", params: [plan.workspace.id, account.id, projection.institutionCode, projection.statementFamilyCode, projection.statementStartDateISO, projection.statementEndDateISO, projection.nativeCurrency, projection.algorithmIdentifier, projection.digest], map: { $0.string(at: 0) ?? "" }).first, !existing.isEmpty else { return .repositoryIntegrityConflict }
+            guard let existing = try matchingGroup()?.0, !existing.isEmpty else { return .repositoryIntegrityConflict }
             groupID = existing
             role = .supporting
         default:
@@ -1530,6 +1612,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               card.statement.statementDateISO == projection.statementDateISO,
               card.statement.statementStartDateISO == projection.statementStartDateISO,
               card.statement.statementEndDateISO == projection.statementEndDateISO,
+              card.statement.selectedStatementMonthISO == projection.selectedStatementMonthISO,
               card.statement.statementCurrency == projection.nativeCurrency,
               card.statement.reconciliationRuleCode == projection.reconciliationRuleCode,
               card.sectionDecisions.count == projection.sections.count,
@@ -1546,24 +1629,51 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             accountID = nil
         }
         guard let accountID else { return .firstAcceptedSource }
-        let groups = try db.query(
-            sql: "SELECT id, projection_algorithm, projection_digest, authoritative_projection_id FROM card_statement_semantic_groups WHERE workspace_id = ? AND liability_account_id = ? AND institution_code = ? AND statement_family_code = ? AND statement_start_date = ? AND statement_end_date = ? AND native_currency = ? LIMIT 1;",
-            params: [plan.workspace.id, accountID, projection.institutionCode, projection.statementFamilyCode, projection.statementStartDateISO, projection.statementEndDateISO, projection.nativeCurrency]
-        ) { row in
-            (row.string(at: 0) ?? "", row.string(at: 1) ?? "", row.string(at: 2) ?? "", row.string(at: 3) ?? "")
+        let groups: [(String, String, String, String)]
+        if projection.algorithmIdentifier == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm {
+            groups = try db.query(
+                sql: "SELECT id, projection_algorithm, projection_digest, authoritative_projection_id FROM card_statement_semantic_groups WHERE workspace_id = ? AND liability_account_id = ? AND institution_code = ? AND statement_family_code = ? AND statement_start_date IS NULL AND statement_end_date IS NULL AND cycle_month IS NULL AND native_currency = ? AND projection_algorithm = ? AND projection_digest = ? LIMIT 1;",
+                params: [plan.workspace.id, accountID, projection.institutionCode, projection.statementFamilyCode, projection.nativeCurrency, projection.algorithmIdentifier, projection.digest]
+            ) { row in
+                (row.string(at: 0) ?? "", row.string(at: 1) ?? "", row.string(at: 2) ?? "", row.string(at: 3) ?? "")
+            }
+        } else {
+            guard let start = projection.statementStartDateISO, let end = projection.statementEndDateISO else { return .evidenceUnavailable }
+            groups = try db.query(
+                sql: "SELECT id, projection_algorithm, projection_digest, authoritative_projection_id FROM card_statement_semantic_groups WHERE workspace_id = ? AND liability_account_id = ? AND institution_code = ? AND statement_family_code = ? AND statement_start_date = ? AND statement_end_date = ? AND cycle_month IS NULL AND native_currency = ? LIMIT 1;",
+                params: [plan.workspace.id, accountID, projection.institutionCode, projection.statementFamilyCode, start, end, projection.nativeCurrency]
+            ) { row in
+                (row.string(at: 0) ?? "", row.string(at: 1) ?? "", row.string(at: 2) ?? "", row.string(at: 3) ?? "")
+            }
         }
         if let group = groups.first {
             guard group.1 == projection.algorithmIdentifier, group.2 == projection.digest else {
                 return .conflict
             }
-            let sessions = try db.query(
-                sql: "SELECT import_session_id FROM card_statement_semantic_projections WHERE id = ? LIMIT 1;",
+            let authoritativeRows = try db.query(
+                sql: "SELECT import_session_id, selected_statement_month FROM card_statement_semantic_projections WHERE id = ? LIMIT 1;",
                 params: [group.3]
-            ) { $0.string(at: 0) ?? "" }
-            guard let authoritativeSession = sessions.first, !authoritativeSession.isEmpty else {
+            ) { row in
+                (importSessionID: row.string(at: 0) ?? "", selectedStatementMonthISO: row.string(at: 1))
+            }
+            guard let authoritative = authoritativeRows.first,
+                  !authoritative.importSessionID.isEmpty else {
                 return .evidenceUnavailable
             }
-            return .equivalent(authoritativeImportSessionID: authoritativeSession)
+            if let incomingMonth = projection.selectedStatementMonthISO,
+               let authoritativeMonth = authoritative.selectedStatementMonthISO,
+               incomingMonth != authoritativeMonth {
+                return .conflict
+            }
+            return .equivalent(authoritativeImportSessionID: authoritative.importSessionID)
+        }
+        if projection.algorithmIdentifier == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm,
+           let cycleMonth = projection.cycleMonthISO,
+           try count(
+               "SELECT COUNT(*) FROM card_statement_semantic_groups g JOIN card_statement_semantic_projections p ON p.id = g.authoritative_projection_id WHERE g.workspace_id = ? AND g.liability_account_id = ? AND g.institution_code = ? AND g.statement_family_code = ? AND g.native_currency = ? AND g.projection_algorithm = ? AND p.cycle_month = ?;",
+               [plan.workspace.id, accountID, projection.institutionCode, projection.statementFamilyCode, projection.nativeCurrency, projection.algorithmIdentifier, cycleMonth]
+           ) > 0 {
+            return .conflict
         }
         if try count(
             "SELECT COUNT(*) FROM card_statements WHERE workspace_id = ? AND liability_account_id = ? AND parser_profile_id = 'amex.credit-card.pdf' AND parser_profile_version = '1' AND statement_start_date = ? AND statement_end_date = ?;",
@@ -1982,6 +2092,9 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
 
     private func loadAccount(id: String) throws -> AccountDTO? { try db.query(sql: "SELECT id, workspace_id, name, institution_id, account_type, native_currency, description, created_at FROM accounts WHERE id = ?;", params: [id]) { row in AccountDTO(id: row.string(at: 0) ?? "", workspaceId: row.string(at: 1) ?? "", name: row.string(at: 2) ?? "", institutionId: row.string(at: 3), accountType: row.string(at: 4), nativeCurrency: row.string(at: 5) ?? "", description: row.string(at: 6), createdAtISO: row.string(at: 7) ?? "") }.first }
     private func count(_ sql: String, _ params: [Any?]) throws -> Int { Int(try db.query(sql: sql, params: params) { $0.int64(at: 0) ?? 0 }.first ?? 0) }
+    private func cardSemanticMultisetKey(date: String, effect: String, currency: String, decimal: String) -> String {
+        [date, effect, currency, decimal].map { "\($0.utf8.count):\($0)" }.joined()
+    }
     private func finalTransaction(_ t: TransactionDTO, accountID: String, history: ConfirmedImportHistoryTemplateDTO) -> TransactionDTO { TransactionDTO(id: t.id, workspaceId: t.workspaceId, accountId: accountID, importSessionId: history.importSession.id, documentId: history.document.id, originalRowId: t.originalRowId, postedDateISO: t.postedDateISO, financialDateRole: t.financialDateRole, statementTimezoneEvidence: t.statementTimezoneEvidence, valueDateISO: t.valueDateISO, description: t.description, payee: t.payee, reference: t.reference, nativeCurrency: t.nativeCurrency, amountMinor: t.amountMinor, amountDecimal: t.amountDecimal, direction: t.direction, runningBalanceMinor: t.runningBalanceMinor, isReconciled: t.isReconciled, isTrusted: t.isTrusted, trustedAtISO: t.trustedAtISO, createdAtISO: t.createdAtISO, updatedAtISO: t.updatedAtISO, rawRows: t.rawRows) }
 
     private func ensureInstitutionExists(id: String?, createdAtISO: String) throws {

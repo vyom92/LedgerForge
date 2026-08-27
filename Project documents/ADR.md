@@ -25,13 +25,13 @@ When reading this file:
 4. use `PROJECT_STATE.md` for verified implementation reality;
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
-**Status alignment date:** 2026-08-17
-**Repository implementation ref reviewed:** `main` — Sprint 77 implementation in this commit; the exact ref is recorded by Git history
-**Latest verified production implementation:** Sprint 77 — Exact Encrypted CBQ Credit-Card PDF v1/v2 Support
+**Status alignment date:** 2026-08-27
+**Repository implementation ref reviewed:** `main` — Sprint 78B implementation in this closure commit; the exact ref is recorded by Git history
+**Latest verified production implementation:** Sprint 78B — Exact Axis Credit-Card PDF/XLSX Support and Equivalence
 **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`
-**Latest completed numbered outcome:** Sprint 77
+**Latest completed numbered outcome:** Sprint 78B
 **Latest accepted ADR:** ADR-044
-**Current migration:** V14
+**Current migration:** V15
 
 No alignment note authorizes implementation.
 
@@ -53,7 +53,7 @@ No alignment note authorizes implementation.
 | ADR-012 | Separation of Readers and Parsers | Accepted and implemented. | Readers own extraction; parsers own financial interpretation. |
 | ADR-013 | Store Ownership | Accepted, refined by ADR-024. | Dedicated stores own runtime domain state. |
 | ADR-014 | Document-First Architecture | Accepted product direction. | Document-oriented extraction and classification foundations exist. |
-| ADR-015 | Automatic Password Management | Accepted and implemented as shared institution-scoped PDF credential infrastructure for exact approved profiles. | Exact Amex and CBQ credit-card PDF profiles are proven production consumers; broader encrypted-document support remains outside the accepted boundary. |
+| ADR-015 | Automatic Password Management | Accepted and implemented as shared exact-profile PDF credential infrastructure. | Exact Amex/CBQ profiles and the Sprint 78B Axis App/traditional PDF families are proven consumers; Axis uses two independent canonical scopes and broader encrypted-document support remains outside the boundary. |
 | ADR-016 | Universal Import Pipeline | Accepted, superseded in part by ADR-030, ADR-031, ADR-032, ADR-038 and ADR-039. | The unified pipeline remains authoritative, but its current ordering and persistence boundary have changed. |
 | ADR-017 | Deterministic Before Intelligent | Accepted foundational principle. | Deterministic processing remains mandatory at trusted boundaries. |
 | ADR-018 | Unified Import Framework Operational | Accepted and implemented in Sprint 11C. | CSV entered the unified framework. |
@@ -82,7 +82,7 @@ No alignment note authorizes implementation.
 | ADR-041 | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority | Accepted and implemented in Sprint 63. | Immutable source snapshots and exact source-byte fingerprint authority are operational for supported CSV, PDF and XLS imports. |
 | ADR-042 | Exact Cross-Format Statement Equivalence and Supporting-Source Persistence | Accepted and implemented in Sprint 73. | Exact whole-statement equivalence is operational only for the independently approved HDFC bank-account PDF/XLS v1 pair. |
 | ADR-043 | Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts | Accepted and implemented in Sprint 75. | Exact CBQ history XLS, history PDF and monthly PDF sources coexist through bounded masked/full account resolution and one canonical transaction with durable per-source observations. |
-| ADR-044 | Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence | Accepted and implemented in Sprint 76; amended and implemented in Sprints 76A and 77. | The shared provider-owned card domain, Migration V14, independent financial scope and physical-section membership, family-specific reconciliation, exact Amex semantic-source grouping and exact CBQ v1/v2 support preserve liability effects, identity, evidence and newest-source-date balance authority. |
+| ADR-044 | Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence | Accepted and implemented in Sprint 76; amended and implemented in Sprints 76A, 77 and 78B. | The shared provider-owned card domain through Migration V15 supports exact Amex, CBQ and Axis boundaries, including Axis zero-instrument liability ownership and representation-neutral PDF/XLSX equivalence without generic card support. |
 
 ## Alignment Policy
 
@@ -446,11 +446,11 @@ Every supported institution provides financial documents in one or more formats.
 
 # ADR-015 — Automatic Password Management
 
-## Current Alignment — 2026-08-17
+## Current Alignment — 2026-08-27
 
-- **Decision standing:** Accepted and implemented as shared institution-scoped Keychain-backed PDF credential infrastructure, with production use limited to exact approved profiles.
-- **Implementation:** Import coordination tries bounded remembered candidates, the secure challenge accepts replacement input, and a namespaced generic-password Keychain item is written only after the same immutable source unlocks and an authoritative supported profile successfully parses and validates. Readers receive only an optional candidate and never access Keychain, UI prompting or institution password policy.
-- **Current qualification:** The workflow is proven for exact `amex.credit-card.pdf@1` and `cbq.credit-card.pdf@1`; it does not claim arbitrary encrypted PDFs, filename-based institution inference or generic credential profiles. Production credentials never enter SQLite, source evidence or diagnostics. Deterministic tests use injected or in-memory credential stores; the real-Keychain smoke boundary uses unique fictional items and removes them during cleanup.
+- **Decision standing:** Accepted and implemented as shared Keychain-backed PDF credential infrastructure with exact institution/profile-family scopes. Sprint 78B extends the accepted boundary to Axis without turning the reader or filenames into credential policy.
+- **Implementation:** Import coordination first attempts uncredentialed reading, then bounded remembered candidates, then a secure challenge. A canonical credential is written only after the same immutable source successfully unlocks, structurally identifies the exact supported family, parses and validates. Axis uses two independent durable canonical scopes, `axis-bank.credit-card.app-pdf` and `axis-bank.credit-card.traditional-pdf`; rotating one never overwrites the other. The unscoped `axis-bank` item and registered historical Axis item(s) are compatibility candidates only and are not rewritten merely because they succeed. Readers receive only an optional candidate and never access Keychain, UI prompting, filename selection or institution password policy.
+- **Current qualification:** The workflow is proven for exact `amex.credit-card.pdf@1`, exact `cbq.credit-card.pdf@1`, and the encrypted App/traditional PDF families accepted under `axis.credit-card.pdf@1`. Axis XLSX support is non-PDF and does not use this credential path. The decision does not claim arbitrary encrypted PDFs, filename-based institution inference or generic credential profiles. Production credentials never enter SQLite, source evidence, fixtures, private result payloads or diagnostics. Deterministic tests use injected/in-memory stores and bounded fictional real-Keychain smoke items.
 
 
 ## Status
@@ -5312,7 +5312,7 @@ Git.
 
 ## Status
 
-Accepted and implemented in Sprint 76; amended and implemented by Sprints 76A and 77
+Accepted and implemented in Sprint 76; amended and implemented by Sprints 76A, 77 and 78B
 
 ## Context
 
@@ -5335,6 +5335,16 @@ payment may be printed within, and participate in the subtotal of, an
 instrument section without becoming an instrument transaction. It also proves
 that statement reconciliation is an exact family/layout contract rather than
 an Amex invariant.
+
+Sprint 78B adds the exact Axis App PDF, traditional PDF and XLSX credit-card
+families. The authentic Jan–Jul corpus proves a different valid use of the same
+domain: one liability account may own accepted card statements while the source
+proves zero durable card instruments and zero statement instrument sections.
+Axis therefore requires an explicit liability-account decision and account-level
+financial rows without inventing ownership from a masked suffix, holder text,
+filename or import order. It also establishes representation-neutral exact
+financial multiset equivalence across App PDF, traditional PDF and XLSX, with
+additional exact source-order/narration equality only for App PDF ↔ XLSX.
 
 A card statement records activity against a liability account and may separate
 account-level rows from activity belonging to individual physical or virtual
@@ -5377,6 +5387,17 @@ reuse the durable user-confirmed section mapping unless stronger evidence confli
 Changed weak evidence requires an explicit account and per-section instrument
 decision. Same holder text never merges sections, and section absence or
 reappearance never changes lifecycle.
+
+For the exact Axis Sprint 78B profiles, current authentic sources prove no
+account strong identifier and no instrument sections. Import review therefore
+always requires an explicit liability-account decision: reuse one eligible Axis
+INR credit-card liability account or create a separate one. Even exactly one
+eligible account is never auto-selected. Axis evidence cannot create, reuse or
+relate a `CardInstrument`; instrument-oriented choices fail closed at the
+persistence boundary. A physical replacement card may continue the same
+liability account only because the user explicitly chooses that existing
+liability account. A changed card suffix does not itself create a new account,
+a new instrument, a replacement relationship or lifecycle transition.
 
 Instrument relationships are stored separately as `additional/concurrent`,
 `replacement`, `renewal` or `upgrade`. They are created only by explicit user
@@ -5446,7 +5467,18 @@ ownership remains unchanged. Printed summary membership determines the exact
 component totals. Credit balances, source CR forms and zero remain liability
 evidence; installments, fees, FX and causal relationships are not inferred.
 
-### Atomic persistence and Migrations V12–V14
+For exact `axis.credit-card.pdf@1` and `axis.credit-card.xlsx@1`, native INR rows
+are account-level and use `CardLiabilityEffect`. Cross-format financial identity
+is exact multiset equality, including multiplicity, over financial date +
+liability effect + native currency + exact Money. App PDF and XLSX additionally
+preserve exact financial source order and narration after only accepted inert
+Unicode/whitespace normalization. Traditional PDF order need not equal App/XLSX
+order. App PDF/XLSX chronology is the source-owned selected statement month;
+statement day/period, filename-derived cycles and count-derived cycles are not
+invented. Active Loans Summary is excluded from accepted transaction history
+and does not establish loan/installment history.
+
+### Atomic persistence and Migrations V12–V15
 
 The confirmed-import plan carries one bounded card plan containing one
 liability-account decision plus an ordered decision for every document-scoped
@@ -5497,6 +5529,15 @@ physical section membership while still prohibiting an instrument relationship.
 Existing V13 Amex graphs are copied without semantic change and with summary
 membership absent; V14 invents no CBQ history or historical card semantics.
 
+Additive Migration V15 leaves V1–V14 SQL immutable and extends the shared card
+evidence graph only for the accepted Axis requirements. It permits the exact
+Axis statement/summary forms and representation-neutral semantic events needed
+for multiplicity-safe cross-format support while preserving zero instrument and
+zero section ownership for Axis. Source-owned selected statement month may be
+retained where proved. V15 performs no speculative Axis identity, instrument,
+loan, summary-family or historical backfill and preserves SQLite/In-Memory
+validation parity and zero-residue rejection.
+
 ### Exact semantic duplicate boundary
 
 Exact source bytes remain the duplicate authority for a document. Separately,
@@ -5509,6 +5550,16 @@ total and the statement reconciliation contract. The first accepted projection
 is authoritative; an exact later projection is retained as supporting source
 evidence with zero duplicate canonical transactions. Any mismatch fails closed.
 
+For the exact Axis Sprint 78B profiles, semantic equivalence is representation-
+neutral and multiplicity-safe over financial date, `CardLiabilityEffect`, native
+currency and exact Money. The first accepted representation owns canonical
+transactions; exact-equivalent later App PDF/XLSX/traditional representations
+are durable supporting sources with zero duplicate canonical transactions. App
+PDF and XLSX additionally require exact source financial order and normalized
+narration equality; traditional PDF cross-format order is not an identity
+requirement. Any financial multiset or required App-PDF/XLSX order/narration
+mismatch fails closed with zero additional accepted financial residue.
+
 ### Hydration, balance and presentation
 
 `RepositoryStoreHydrator` reads and validates the card graph with accounts,
@@ -5517,10 +5568,12 @@ observer-consistent snapshot including a dedicated `CardStore`. View models are
 not durable owners.
 
 Bank balances retain their existing running-balance authority. A credit-card
-account selects its current statement by the newest source statement end/date,
-never import time. Source amount owed is presented in runtime net-worth sign:
-an amount owed is negative and a credit balance is positive. Older statements
-imported later cannot replace newer balance authority.
+account selects its current statement from source-owned chronology, never import
+time. Amex/CBQ use their accepted statement date/period authority; Axis uses its
+source-owned selected statement month where no statement day/period is proved.
+Source amount owed is presented in runtime net-worth sign: an amount owed is
+negative and a credit balance is positive. Older statements imported later
+cannot replace newer source chronology.
 
 Presentation distinguishes amount owed, latest statement period, due date,
 instruments, transaction scope, charge/increase-owed and
@@ -5558,6 +5611,19 @@ Encrypted Amex and CBQ card sources both use ADR-015; exact source bytes remain
 the document-duplicate authority. CBQ does not participate in Amex's exact
 same-format semantic-source grouping.
 
+Sprint 78B additionally accepts `axis.credit-card.pdf@1` and
+`axis.credit-card.xlsx@1` only for the exact Jan–Jul Axis family established by
+the approved private source corpus. The PDF profile covers exact App and
+traditional PDF layouts through their separate structural recognizers and
+separate canonical credential scopes; the XLSX profile uses the bounded OOXML
+reader with locally vendored ZIPFoundation. App PDF tagged transaction-table
+evidence is authoritative for that layout; traditional PDF may use the generic
+positioned-evidence carrier. The accepted family preserves native INR, liability
+effect, exact Money, source multiplicity, App-PDF/XLSX order and narration,
+source-owned selected month, durable source provenance and zero fabricated Axis
+instruments/sections. Generic XLSX, other Axis card layouts and structural
+similarity remain unsupported.
+
 ## Consequences
 
 - Account and instrument identity remain separate and explicit.
@@ -5572,12 +5638,13 @@ same-format semantic-source grouping.
 
 ## Exclusions
 
-ADR-044 does not authorize Axis, HDFC or other card parsing, XLS/XLSX card readers, a
-generic card parser/profile framework, generic masked account identity,
-rewards valuation or persistence, payment allocation, bank-card payment
-matching, refund/reversal matching, installments, loans, calculated FX,
-invented fees/markup/tax, account merge/split, historical repair/backfill,
-cloud or multi-user architecture, OCR, arbitrary encrypted PDFs or generic
-card support. ADR-043 CBQ bank overlap does not generalize to cards, and the
-Sprint 76A exact Amex semantic projection does not authorize CBQ or generic card
-equivalence.
+ADR-044 does not authorize HDFC or other unaccepted card parsing, other Axis/
+Amex/CBQ layouts, a generic XLSX reader, a generic card parser/profile framework,
+generic masked account identity, rewards valuation or persistence, payment
+allocation, bank-card payment matching, refund/reversal matching, Active Loans
+history, generic installments/loans, calculated FX, invented fees/markup/tax,
+automatic account merge/split, historical repair/backfill, cloud or multi-user
+architecture, OCR, arbitrary encrypted PDFs or generic card support. ADR-043 CBQ
+bank overlap does not generalize to cards. Accepted Amex semantic grouping and
+accepted Axis representation-neutral equivalence remain exact family contracts,
+not generic card equivalence.

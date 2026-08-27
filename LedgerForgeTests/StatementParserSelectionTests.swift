@@ -87,6 +87,40 @@ struct StatementParserSelectionTests {
         #expect(selection.reasons.contains("No parser selected because institution is unknown."))
     }
 
+    @Test func axisCreditCardPDFAndXLSXSelectTheirExactParsers() {
+        let institution = ImportInstitutionCandidate(
+            institutionCode: Institution.axis.rawValue,
+            confidence: 0.995,
+            reasons: ["Matched fictional Axis card structure."]
+        )
+        let classification = StatementClassification(
+            documentType: .creditCardStatement,
+            confidence: 0.90,
+            reasons: ["Matched fictional card transaction header."]
+        )
+
+        for (fileExtension, expectedType) in [
+            ("pdf", "AxisCreditCardPDFParser"),
+            ("xlsx", "AxisCreditCardXLSXParser")
+        ] {
+            let raw = RawDocument(
+                sourceURL: URL(fileURLWithPath: "/tmp/fictional-axis-card.\(fileExtension)"),
+                fileName: "fictional-axis-card.\(fileExtension)",
+                fileExtension: fileExtension,
+                content: .text("fictional")
+            )
+            let selection = StatementParserSelector().selectParser(
+                for: documentShell(for: raw),
+                institution: institution,
+                classification: classification
+            )
+
+            #expect(selection.matched)
+            #expect(selection.parser.map { String(describing: type(of: $0)) } == expectedType)
+            #expect(selection.legacyMetadata.documentType == .creditCard)
+        }
+    }
+
     @Test func unknownStatementTypeDoesNotSelectParser() async throws {
         let rawDocument = try axisCSVRawDocument()
         let document = documentShell(for: rawDocument)

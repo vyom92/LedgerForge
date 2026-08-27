@@ -123,7 +123,10 @@ private final class InMemoryCardRepo: CardRepository {
         state.stateLock.lock(); defer { state.stateLock.unlock() }
         let instruments = state.cardInstruments.values.filter { $0.workspaceId == workspaceId }.sorted { $0.id < $1.id }
         let instrumentIDs = Set(instruments.map(\.id))
-        let statements = state.cardStatements.values.filter { $0.workspaceId == workspaceId }.sorted { ($0.statementEndDateISO, $0.id) < ($1.statementEndDateISO, $1.id) }
+        let statements = state.cardStatements.values.filter { $0.workspaceId == workspaceId }.sorted {
+            ($0.statementEndDateISO ?? $0.selectedStatementMonthISO ?? "", $0.id) <
+                ($1.statementEndDateISO ?? $1.selectedStatementMonthISO ?? "", $1.id)
+        }
         let statementIDs = Set(statements.map(\.id))
         return CardRepositorySnapshotDTO(
             instruments: instruments,
@@ -135,8 +138,14 @@ private final class InMemoryCardRepo: CardRepository {
             transactionEvidence: state.cardTransactionEvidence.values.filter { statementIDs.contains($0.cardStatementId) }.sorted { ($0.cardStatementId, $0.id) < ($1.cardStatementId, $1.id) },
             sections: state.cardSections.values.filter { statementIDs.contains($0.cardStatementId) }.sorted { ($0.cardStatementId, $0.sourceOrdinal) < ($1.cardStatementId, $1.sourceOrdinal) },
             sectionObservations: state.cardSectionObservations.values.filter { $0.workspaceId == workspaceId }.sorted { ($0.createdAtISO, $0.id) < ($1.createdAtISO, $1.id) },
-            semanticProjections: state.cardSemanticProjections.values.filter { $0.workspaceId == workspaceId }.sorted { ($0.statementEndDateISO, $0.id) < ($1.statementEndDateISO, $1.id) },
-            semanticGroups: state.cardSemanticGroups.values.filter { $0.workspaceId == workspaceId }.sorted { ($0.statementEndDateISO, $0.id) < ($1.statementEndDateISO, $1.id) },
+            semanticProjections: state.cardSemanticProjections.values.filter { $0.workspaceId == workspaceId }.sorted {
+                ($0.statementEndDateISO ?? $0.cycleMonthISO ?? "", $0.id) <
+                    ($1.statementEndDateISO ?? $1.cycleMonthISO ?? "", $1.id)
+            },
+            semanticGroups: state.cardSemanticGroups.values.filter { $0.workspaceId == workspaceId }.sorted {
+                ($0.statementEndDateISO ?? $0.cycleMonthISO ?? "", $0.id) <
+                    ($1.statementEndDateISO ?? $1.cycleMonthISO ?? "", $1.id)
+            },
             semanticMembers: state.cardSemanticMembers.values.filter { member in
                 state.cardSemanticGroups[member.groupId]?.workspaceId == workspaceId
             }.sorted { $0.id < $1.id }
@@ -1485,7 +1494,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
     private func cardAccountIsCompatible(account: AccountDTO, plan: ConfirmedImportPlanDTO, contract: CardStatementProfileContract) -> Bool {
         account.workspaceId == plan.workspace.id &&
         account.accountType == "credit_card" &&
-        account.nativeCurrency == "QAR" &&
+        account.nativeCurrency == (contract == .axis ? "INR" : "QAR") &&
         account.institutionId == contract.institutionCode
     }
 
@@ -1524,13 +1533,13 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               card.statement.documentId == history.document.id,
               card.statement.importSessionId == history.importSession.id,
               card.statement.normalizedDocumentId == history.normalizedDocument?.id,
-              card.statement.parserProfileId == contract.profileID,
+              contract.accepts(profileID: card.statement.parserProfileId),
               card.statement.parserProfileVersion == contract.profileVersion,
-              card.statement.statementCurrency == "QAR",
+              card.statement.statementCurrency == (contract == .axis ? "INR" : "QAR"),
               card.statement.sourceRowCount == incomingTransactions.count,
               statements[card.statement.id] == nil,
-              !card.sectionDecisions.isEmpty,
-              card.sectionDecisions.map(\.section.sourceOrdinal).sorted() == Array(1...card.sectionDecisions.count),
+              (contract == .axis ? card.sectionDecisions.isEmpty : !card.sectionDecisions.isEmpty),
+              card.sectionDecisions.map(\.section.sourceOrdinal).sorted() == card.sectionDecisions.indices.map({ $0 + 1 }),
               Set(card.sectionDecisions.map(\.section.id)).count == card.sectionDecisions.count,
               Set(card.sectionDecisions.map(\.section.documentScopedSectionId)).count == card.sectionDecisions.count,
               Set(card.sectionDecisions.map(\.section.instrumentId)).count == card.sectionDecisions.count,
@@ -1539,6 +1548,14 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                 : card.semanticProjection == nil),
               finalTransactions.count == (isSupportingSource ? 0 : incomingTransactions.count) else {
             return .repositoryIntegrityConflict
+        }
+        if contract == .axis {
+            guard card.instrumentChoice == .unspecified,
+                  card.proposedInstrument == nil,
+                  card.instrumentIdentifiers.isEmpty,
+                  card.relationships.isEmpty else {
+                return .repositoryIntegrityConflict
+            }
         }
 
         let preexistingSourceObservations = sourceObservations
@@ -1648,7 +1665,11 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             }
         }
 
-        guard (card.sectionDecisions.count == 1 ? (1...2).contains(card.sourceObservations.count) : card.sourceObservations.count == 1),
+        guard (contract == .axis
+                ? card.sourceObservations.isEmpty
+                : (card.sectionDecisions.count == 1
+                    ? (1...2).contains(card.sourceObservations.count)
+                    : card.sourceObservations.count == 1)),
               Set(card.sourceObservations.map(\.id)).count == card.sourceObservations.count else { return .repositoryIntegrityConflict }
         for observation in card.sourceObservations {
             let subjectValid = (observation.subjectKind == "liability_account" && observation.subjectId == account.id) ||
@@ -1680,14 +1701,23 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             return .repositoryIntegrityConflict
         }
 
-        guard Set(card.summaryComponents.map(\.componentCode)) == contract.requiredSummaryCodes,
+        let sourceFormat = card.statement.parserProfileId.hasSuffix(".xlsx") ? "xlsx" : "pdf"
+        let summaryCodes = Set(card.summaryComponents.map(\.componentCode))
+        let summaryCoverageIsValid = contract == .axis
+            ? summaryCodes.isSubset(of: contract.allowedSummaryCodes)
+            : summaryCodes == contract.requiredSummaryCodes(
+                reconciliationRuleIdentifier: card.statement.reconciliationRuleCode,
+                sourceFormatCode: sourceFormat
+            )
+        guard summaryCoverageIsValid,
+              summaryCodes.count == card.summaryComponents.count,
               card.summaryComponents.allSatisfy({ $0.cardStatementId == card.statement.id && summaryComponents[$0.id] == nil }) else {
             return .repositoryIntegrityConflict
         }
         let byCode = Dictionary(uniqueKeysWithValues: card.summaryComponents.map { ($0.componentCode, $0) })
-        guard let previous = byCode["previous_balance"]?.moneyMinor,
-              let balance = byCode["new_balance"]?.moneyMinor,
-              byCode["due_date"]?.dateISO != nil,
+        let previous = byCode["previous_balance"]?.moneyMinor
+        let balance = byCode[contract == .axis ? "axis_total_payment_due" : "new_balance"]?.moneyMinor
+        guard (contract == .axis || (previous != nil && balance != nil && byCode["due_date"]?.dateISO != nil)),
               card.summaryComponents.allSatisfy({ component in
                   guard let currency = component.moneyCurrency,
                         let minor = component.moneyMinor,
@@ -1728,6 +1758,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             if let membership { membershipTotals[membership, default: 0] += transaction.amountMinor }
             if evidence.rowScopeCode == "account_level" {
                 guard evidence.instrumentId == nil,
+                      (contract != .axis || evidence.documentScopedSectionId == nil),
                       (!contract.requiresCBQSummaryMembership || membership.map(contract.accountLevelMemberships.contains) == true) else {
                     return .repositoryIntegrityConflict
                 }
@@ -1743,7 +1774,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             if let sectionID = evidence.documentScopedSectionId {
                 guard selectedBySectionID[sectionID] != nil else { return .repositoryIntegrityConflict }
                 sectionTotals[sectionID, default: 0] += transaction.amountMinor
-            } else if contract != .amex {
+            } else if contract != .amex && contract != .axis {
                 return .repositoryIntegrityConflict
             }
             guard (evidence.originalCurrency == nil && evidence.originalAmountMinor == nil && evidence.originalAmountDecimal == nil) ||
@@ -1760,15 +1791,18 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         let summaryValid: Bool
         switch contract {
         case .amex:
-            summaryValid = byCode["new_debits"]?.moneyMinor == increaseTotal &&
+            summaryValid = previous != nil && balance != nil &&
+                byCode["new_debits"]?.moneyMinor == increaseTotal &&
                 byCode["new_credits"]?.moneyMinor == decreaseTotal &&
                 byCode["instrument_net_total"]?.moneyMinor == instrumentNet &&
-                previous - decreaseTotal + increaseTotal == balance && sectionNet == instrumentNet
+                previous! - decreaseTotal + increaseTotal == balance! && sectionNet == instrumentNet
         case .cbqV1:
             let billed = byCode["amount_billed"]?.moneyMinor
             let payment = byCode["payment_received"]?.moneyMinor
             let equationValid = billed.flatMap { amount in
-                payment.map { previous + amount - $0 == balance }
+                payment.flatMap { paid in
+                    previous.flatMap { opening in balance.map { opening + amount - paid == $0 } }
+                }
             } ?? false
             summaryValid = billed == membershipTotals[.cbqV1AmountBilled, default: 0] &&
                 payment == -membershipTotals[.cbqV1PaymentReceived, default: 0] &&
@@ -1786,8 +1820,10 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                 installment == membershipTotals[.cbqV2BilledInstallment, default: 0] &&
                 fees == membershipTotals[.cbqV2FeesCharges, default: 0] &&
                 byCode["source_section_net_total"]?.moneyMinor == allRowsNet &&
-                payment.flatMap { paid in credit.flatMap { credited in purchases.flatMap { bought in installment.flatMap { billed in fees.map { previous - paid - credited + bought + billed + $0 == balance } } } } } == true &&
+                payment.flatMap { paid in credit.flatMap { credited in purchases.flatMap { bought in installment.flatMap { billed in fees.flatMap { fee in previous.flatMap { opening in balance.map { opening - paid - credited + bought + billed + fee == $0 } } } } } } } == true &&
                 sectionNet == allRowsNet
+        case .axis:
+            summaryValid = true
         }
         guard summaryValid,
               card.sectionDecisions.allSatisfy({ sectionTotals[$0.section.documentScopedSectionId] == $0.section.signedTotalMinor }) else {
@@ -1819,6 +1855,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               projection.statementDateISO == card.statement.statementDateISO,
               projection.statementStartDateISO == card.statement.statementStartDateISO,
               projection.statementEndDateISO == card.statement.statementEndDateISO,
+              projection.summaryComponents == card.summaryComponents,
               projection.nativeCurrency == card.statement.statementCurrency,
               projection.reconciliationRuleCode == card.statement.reconciliationRuleCode,
               projection.sections == card.sectionDecisions.map(\.section).map({ section in
@@ -1838,7 +1875,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             return .repositoryIntegrityConflict
         }
 
-        let canonicalIDsByOrdinal: [Int: String]
+        let canonicalIDsByOrdinal: [Int: String?]
         if isSupportingSource {
             guard case .equivalent = equivalenceReview,
                   let group = matchingCardSemanticGroup(projection, workspaceID: plan.workspace.id, accountID: account.id, groups: groups),
@@ -1848,16 +1885,43 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                   authoritative.events.count == projection.events.count else {
                 return .repositoryIntegrityConflict
             }
-            let authoritativeByOrdinal = Dictionary(uniqueKeysWithValues: authoritative.events.map { ($0.sourceOrdinal, $0) })
-            guard projection.events.allSatisfy({ incoming in
-                guard let existing = authoritativeByOrdinal[incoming.sourceOrdinal] else { return false }
-                return cardSemanticEventMatches(existing, incoming)
-            }) else { return .repositoryIntegrityConflict }
-            canonicalIDsByOrdinal = authoritativeByOrdinal.mapValues(\.canonicalTransactionId)
+            if projection.algorithmIdentifier == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm {
+                let authoritativeBuckets = Dictionary(grouping: authoritative.events) {
+                    cardSemanticMultisetKey(date: $0.financialDateISO, effect: $0.liabilityEffectCode, currency: $0.postedCurrency, decimal: $0.postedAmountDecimal)
+                }
+                let incomingBuckets = Dictionary(grouping: projection.events) {
+                    cardSemanticMultisetKey(date: $0.financialDateISO, effect: $0.liabilityEffectCode, currency: $0.postedCurrency, decimal: $0.postedAmountDecimal)
+                }
+                guard Set(authoritativeBuckets.keys) == Set(incomingBuckets.keys) else { return .repositoryIntegrityConflict }
+                var resolved: [Int: String?] = [:]
+                for (key, incomingBucket) in incomingBuckets {
+                    guard let authoritativeBucket = authoritativeBuckets[key],
+                          authoritativeBucket.count == incomingBucket.count else { return .repositoryIntegrityConflict }
+                    if incomingBucket.count == 1 {
+                        guard let canonicalID = authoritativeBucket[0].canonicalTransactionId, !canonicalID.isEmpty else {
+                            return .repositoryIntegrityConflict
+                        }
+                        resolved[incomingBucket[0].sourceOrdinal] = canonicalID
+                    } else {
+                        for incoming in incomingBucket {
+                            resolved.updateValue(nil, forKey: incoming.sourceOrdinal)
+                        }
+                    }
+                }
+                canonicalIDsByOrdinal = resolved
+            } else {
+                let authoritativeByOrdinal = Dictionary(uniqueKeysWithValues: authoritative.events.map { ($0.sourceOrdinal, $0) })
+                guard projection.events.allSatisfy({ incoming in
+                    guard let existing = authoritativeByOrdinal[incoming.sourceOrdinal],
+                          existing.canonicalTransactionId != nil else { return false }
+                    return cardSemanticEventMatches(existing, incoming)
+                }) else { return .repositoryIntegrityConflict }
+                canonicalIDsByOrdinal = authoritativeByOrdinal.mapValues { $0.canonicalTransactionId }
+            }
         } else {
             guard case .firstAcceptedSource = equivalenceReview else { return .repositoryIntegrityConflict }
             canonicalIDsByOrdinal = Dictionary(uniqueKeysWithValues: projection.events.map {
-                ($0.sourceOrdinal, $0.incomingTransactionId)
+                ($0.sourceOrdinal, Optional($0.incomingTransactionId))
             })
         }
 
@@ -1865,10 +1929,11 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             CardStatementSemanticProjectionEventDTO(
                 id: "\(projection.id)-event-\(event.sourceOrdinal)",
                 projectionId: projection.id,
-                canonicalTransactionId: canonicalIDsByOrdinal[event.sourceOrdinal] ?? "",
+                canonicalTransactionId: canonicalIDsByOrdinal[event.sourceOrdinal] ?? nil,
                 normalizedRowId: event.normalizedRowId,
                 sourceOrdinal: event.sourceOrdinal,
-                postingDateISO: event.postingDateISO,
+                financialDateISO: event.financialDateISO,
+                financialDateRoleCode: event.financialDateRoleCode,
                 sourceTransactionDateISO: event.sourceTransactionDateISO,
                 liabilityEffectCode: event.liabilityEffectCode,
                 postedCurrency: event.postedCurrency,
@@ -1883,8 +1948,10 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                 documentSectionOrdinal: event.documentSectionOrdinal
             )
         }
-        guard eventRecords.allSatisfy({ !$0.canonicalTransactionId.isEmpty }) else {
-            return .repositoryIntegrityConflict
+        if !isSupportingSource || projection.algorithmIdentifier != CardStatementSemanticProjectionDTO.axisMultisetAlgorithm {
+            guard eventRecords.allSatisfy({ $0.canonicalTransactionId?.isEmpty == false }) else {
+                return .repositoryIntegrityConflict
+            }
         }
         projections[projection.id] = CardStatementSemanticProjectionRecordDTO(
             id: projection.id,
@@ -1902,6 +1969,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             statementDateISO: projection.statementDateISO,
             statementStartDateISO: projection.statementStartDateISO,
             statementEndDateISO: projection.statementEndDateISO,
+            selectedStatementMonthISO: projection.selectedStatementMonthISO,
+            cycleMonthISO: projection.cycleMonthISO,
             nativeCurrency: projection.nativeCurrency,
             eventCount: projection.events.count,
             sectionCount: projection.sections.count,
@@ -1919,8 +1988,11 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                 liabilityAccountId: account.id,
                 institutionCode: projection.institutionCode,
                 statementFamilyCode: projection.statementFamilyCode,
-                statementStartDateISO: projection.statementStartDateISO,
-                statementEndDateISO: projection.statementEndDateISO,
+                statementStartDateISO: projection.algorithmIdentifier == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm ? nil : projection.statementStartDateISO,
+                statementEndDateISO: projection.algorithmIdentifier == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm ? nil : projection.statementEndDateISO,
+                cycleMonthISO: projection.algorithmIdentifier == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm
+                    ? nil
+                    : projection.cycleMonthISO,
                 nativeCurrency: projection.nativeCurrency,
                 projectionAlgorithm: projection.algorithmIdentifier,
                 projectionDigest: projection.digest,
@@ -1965,12 +2037,19 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         groups: [String: CardStatementSemanticGroupDTO]
     ) -> CardStatementSemanticGroupDTO? {
         groups.values.first {
-            $0.workspaceId == workspaceID && $0.liabilityAccountId == accountID &&
-            $0.institutionCode == projection.institutionCode &&
-            $0.statementFamilyCode == projection.statementFamilyCode &&
-            $0.statementStartDateISO == projection.statementStartDateISO &&
-            $0.statementEndDateISO == projection.statementEndDateISO &&
-            $0.nativeCurrency == projection.nativeCurrency
+            guard $0.workspaceId == workspaceID && $0.liabilityAccountId == accountID &&
+                $0.institutionCode == projection.institutionCode &&
+                $0.statementFamilyCode == projection.statementFamilyCode &&
+                $0.nativeCurrency == projection.nativeCurrency else { return false }
+            if projection.algorithmIdentifier == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm {
+                return $0.statementStartDateISO == nil && $0.statementEndDateISO == nil &&
+                    $0.cycleMonthISO == nil &&
+                    $0.projectionAlgorithm == projection.algorithmIdentifier &&
+                    $0.projectionDigest == projection.digest
+            }
+            return $0.cycleMonthISO == nil &&
+                $0.statementStartDateISO == projection.statementStartDateISO &&
+                $0.statementEndDateISO == projection.statementEndDateISO
         }
     }
 
@@ -1979,7 +2058,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         _ incoming: CardStatementSemanticProjectionEventPlanDTO
     ) -> Bool {
         persisted.sourceOrdinal == incoming.sourceOrdinal &&
-        persisted.postingDateISO == incoming.postingDateISO &&
+        persisted.financialDateISO == incoming.financialDateISO &&
+        persisted.financialDateRoleCode == incoming.financialDateRoleCode &&
         persisted.sourceTransactionDateISO == incoming.sourceTransactionDateISO &&
         persisted.liabilityEffectCode == incoming.liabilityEffectCode &&
         persisted.postedCurrency == incoming.postedCurrency &&
@@ -1992,6 +2072,10 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         persisted.rowScopeCode == incoming.rowScopeCode &&
         persisted.documentScopedSectionId == incoming.documentScopedSectionId &&
         persisted.documentSectionOrdinal == incoming.documentSectionOrdinal
+    }
+
+    private func cardSemanticMultisetKey(date: String, effect: String, currency: String, decimal: String) -> String {
+        [date, effect, currency, decimal].map { "\($0.utf8.count):\($0)" }.joined()
     }
 
     private func validCardMoney(currency: String, minor: Int64, decimal: String) -> Bool {
@@ -2143,6 +2227,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                   card.statement.statementDateISO == projection.statementDateISO,
                   card.statement.statementStartDateISO == projection.statementStartDateISO,
                   card.statement.statementEndDateISO == projection.statementEndDateISO,
+                  card.statement.selectedStatementMonthISO == projection.selectedStatementMonthISO,
                   card.statement.statementCurrency == projection.nativeCurrency,
                   card.sectionDecisions.count == projection.sections.count,
                   plan.historyTemplate.normalizedRows.count == projection.events.count,
@@ -2158,20 +2243,39 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                 accountID = nil
             }
             guard let accountID else { return .firstAcceptedSource }
-            if let group = state.cardSemanticGroups.values.first(where: {
-                $0.workspaceId == plan.workspace.id && $0.liabilityAccountId == accountID &&
-                $0.institutionCode == projection.institutionCode &&
-                $0.statementFamilyCode == projection.statementFamilyCode &&
-                $0.statementStartDateISO == projection.statementStartDateISO &&
-                $0.statementEndDateISO == projection.statementEndDateISO &&
-                $0.nativeCurrency == projection.nativeCurrency
-            }) {
+            if let group = matchingCardSemanticGroup(
+                projection,
+                workspaceID: plan.workspace.id,
+                accountID: accountID,
+                groups: state.cardSemanticGroups
+            ) {
                 guard group.projectionAlgorithm == projection.algorithmIdentifier,
                       group.projectionDigest == projection.digest,
                       let authoritative = state.cardSemanticProjections[group.authoritativeProjectionId] else {
                     return .conflict
                 }
+                if let incomingMonth = projection.selectedStatementMonthISO,
+                   let authoritativeMonth = authoritative.selectedStatementMonthISO,
+                   incomingMonth != authoritativeMonth {
+                    return .conflict
+                }
                 return .equivalent(authoritativeImportSessionID: authoritative.importSessionId)
+            }
+            if projection.algorithmIdentifier == CardStatementSemanticProjectionDTO.axisMultisetAlgorithm,
+               let cycleMonth = projection.cycleMonthISO,
+               state.cardSemanticGroups.values.contains(where: { group in
+                   guard group.workspaceId == plan.workspace.id,
+                         group.liabilityAccountId == accountID,
+                         group.institutionCode == projection.institutionCode,
+                         group.statementFamilyCode == projection.statementFamilyCode,
+                         group.nativeCurrency == projection.nativeCurrency,
+                         group.projectionAlgorithm == projection.algorithmIdentifier,
+                         let authoritative = state.cardSemanticProjections[group.authoritativeProjectionId] else {
+                       return false
+                   }
+                   return authoritative.cycleMonthISO == cycleMonth
+               }) {
+                return .conflict
             }
             if state.cardStatements.values.contains(where: {
                 $0.workspaceId == plan.workspace.id && $0.liabilityAccountId == accountID &&

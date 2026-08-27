@@ -229,6 +229,7 @@ enum CardStatementSummaryComponent: Equatable, Sendable {
     case dueDate(StatementDate)
     case instrumentNetTotal(Money)
     case sourceSectionNetTotal(Money)
+    case axisTotalPaymentDue(Money)
 
     var persistenceCode: String {
         switch self {
@@ -246,6 +247,7 @@ enum CardStatementSummaryComponent: Equatable, Sendable {
         case .dueDate: return "due_date"
         case .instrumentNetTotal: return "instrument_net_total"
         case .sourceSectionNetTotal: return "source_section_net_total"
+        case .axisTotalPaymentDue: return "axis_total_payment_due"
         }
     }
 
@@ -255,14 +257,16 @@ enum CardStatementSummaryComponent: Equatable, Sendable {
                 .amountBilled(let value), .paymentReceived(let value), .totalPayment(let value),
                 .creditReversal(let value), .purchases(let value), .billedInstallment(let value),
                 .feesCharges(let value), .newBalance(let value), .instrumentNetTotal(let value),
-                .sourceSectionNetTotal(let value): return value
+                .sourceSectionNetTotal(let value), .axisTotalPaymentDue(let value): return value
         case .dueDate: return nil
         }
     }
 
     var date: StatementDate? {
-        guard case .dueDate(let value) = self else { return nil }
-        return value
+        switch self {
+        case .dueDate(let value): return value
+        default: return nil
+        }
     }
 }
 
@@ -286,9 +290,12 @@ struct CardStatementEvidence: Equatable, Sendable {
     static let amexQARReconciliationRule = "amex.qar.previous-minus-credits-plus-debits.v1"
     static let cbqV1QARReconciliationRule = "cbq.qar.v1.previous-plus-billed-minus-payment.v1"
     static let cbqV2QARReconciliationRule = "cbq.qar.v2.previous-minus-payment-minus-credit-plus-components.v1"
+    static let axisINRRowLedgerReconciliationRule = "axis.inr.previous-plus-row-ledger-equals-total-due.v1"
+    static let axisINRAppRowLedgerReconciliationRule = "axis.inr.app.previous-plus-row-ledger-equals-total-due.v1"
 
-    let statementDate: StatementDate
-    let declaredStatementPeriod: DeclaredStatementPeriod
+    let statementDate: StatementDate?
+    let declaredStatementPeriod: DeclaredStatementPeriod?
+    let selectedStatementMonth: SelectedStatementMonth?
     let nativeCurrency: CurrencyCode
     let accountSourceIdentityObservations: [CardSourceIdentityObservation]
     let instrumentSections: [CardInstrumentSectionEvidence]
@@ -297,8 +304,9 @@ struct CardStatementEvidence: Equatable, Sendable {
     let reconciliationRuleIdentifier: String
 
     init(
-        statementDate: StatementDate,
-        declaredStatementPeriod: DeclaredStatementPeriod,
+        statementDate: StatementDate?,
+        declaredStatementPeriod: DeclaredStatementPeriod?,
+        selectedStatementMonth: SelectedStatementMonth? = nil,
         nativeCurrency: CurrencyCode,
         accountSourceIdentityObservations: [CardSourceIdentityObservation],
         instrumentSections: [CardInstrumentSectionEvidence],
@@ -338,6 +346,7 @@ struct CardStatementEvidence: Equatable, Sendable {
         }
         self.statementDate = statementDate
         self.declaredStatementPeriod = declaredStatementPeriod
+        self.selectedStatementMonth = selectedStatementMonth
         self.nativeCurrency = nativeCurrency
         self.accountSourceIdentityObservations = accountSourceIdentityObservations
         self.instrumentSections = instrumentSections

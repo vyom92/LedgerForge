@@ -31,6 +31,10 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
             .cbqCurrentAccountMonthlyPDF,
             .cbqCurrentAccountHistoryPDF,
             .cbqCurrentAccountXLS,
+            // Axis card signatures must precede the deliberately broad Axis
+            // bank-account rule. Exact card identity and transaction-table
+            // structure keep ordinary Axis account statements on their route.
+            .axisCreditCard,
             .axisBankAccount
         ]
     ) {
@@ -46,19 +50,25 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
             }
         }
 
-        return InstitutionDetectionResult(
-            metadata: DocumentMetadata(
-                institution: .unknown,
-                documentType: .unknown,
-                fileFormat: .unknown,
-                confidence: 0.0
-            ),
-            reasons: ["No institution signatures matched."]
-        )
+        return Self.unknownResult(reason: "No institution signatures matched.")
     }
 
-    func detectInstitution(in document: RawDocument) async throws -> ImportInstitutionCandidate {
+    func detect(in document: RawDocument) -> InstitutionDetectionResult {
         guard case .data = document.content else {
+            if AxisCreditCardAppStructuralSignature.matches(document) {
+                return InstitutionDetectionResult(
+                    metadata: DocumentMetadata(
+                        institution: .axis,
+                        documentType: .creditCard,
+                        fileFormat: .unknown,
+                        confidence: 0.995
+                    ),
+                    reasons: [
+                        "Matched Axis source identity with the exact bank-app tagged transaction-table structure."
+                    ]
+                )
+            }
+
             let applicableRules: [InstitutionDetectionRule]
             switch document.fileExtension {
             case "xls", "xlsx":
@@ -66,6 +76,7 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
                     $0 != .hdfcBankAccountPDF
                         && $0 != .cbqCurrentAccountMonthlyPDF
                         && $0 != .cbqCurrentAccountHistoryPDF
+                        && $0 != .cbqCreditCardPDF
                 }
             case "pdf":
                 applicableRules = rules.filter {
@@ -77,12 +88,23 @@ struct SignatureInstitutionDetector: ImportFramework.InstitutionDetector {
             }
             return SignatureInstitutionDetector(rules: applicableRules)
                 .detect(from: document.searchableText)
-                .importCandidate
         }
-        return ImportInstitutionCandidate(
-            institutionCode: nil,
-            confidence: 0.0,
-            reasons: ["RawDocument did not contain extracted text."]
+        return Self.unknownResult(reason: "RawDocument did not contain extracted text.")
+    }
+
+    func detectInstitution(in document: RawDocument) async throws -> ImportInstitutionCandidate {
+        detect(in: document).importCandidate
+    }
+
+    private static func unknownResult(reason: String) -> InstitutionDetectionResult {
+        InstitutionDetectionResult(
+            metadata: DocumentMetadata(
+                institution: .unknown,
+                documentType: .unknown,
+                fileFormat: .unknown,
+                confidence: 0.0
+            ),
+            reasons: [reason]
         )
     }
 
@@ -130,6 +152,22 @@ struct InstitutionDetectionRule: Equatable, Sendable {
             InstitutionSignature(token: "AXIS BANK", reason: "Matched Axis Bank name."),
             InstitutionSignature(token: "UTIB", reason: "Matched Axis Bank IFSC prefix."),
             InstitutionSignature(token: "STATEMENT OF AXIS ACCOUNT", reason: "Matched Axis account statement title.")
+        ]
+    )
+
+    static let axisCreditCard = InstitutionDetectionRule(
+        institution: .axis,
+        documentType: .creditCard,
+        confidence: 0.995,
+        requiredMatchCount: 3,
+        signatures: [
+            InstitutionSignature(token: "CREDIT CARD NUMBER", reason: "Matched the Axis card-number label."),
+            InstitutionSignature(token: "TOTAL PAYMENT DUE", reason: "Matched the Axis card total-payment label."),
+            InstitutionSignature(token: "DATE TRANSACTION DETAILS", reason: "Matched the Axis card transaction header."),
+            InstitutionSignature(token: "AMOUNT (INR)", reason: "Matched the Axis INR card amount column."),
+            InstitutionSignature(token: "DEBIT/CREDIT", reason: "Matched the Axis card liability direction column."),
+            InstitutionSignature(token: "MERCHANT CATEGORY", reason: "Matched the Axis traditional card category column."),
+            InstitutionSignature(token: "MINIMUM PAYMENT DUE", reason: "Matched the Axis card minimum-payment label.")
         ]
     )
 
@@ -269,5 +307,71 @@ struct InstitutionSignature: Equatable, Sendable {
 
     var normalizedToken: String {
         token.uppercased()
+    }
+}
+
+/// Exact structural signature for the proven Axis bank-app credit-card PDF
+/// presentation. The generic reader owns extraction; this detector consumes only
+/// source identity plus the reader's tagged logical-table evidence.
+/// Financial row interpretation remains in the Axis normalizer/parser.
+enum AxisCreditCardAppStructuralSignature {
+    private static let expectedHeader = [
+        "DATE", "TRANSACTIONDETAILS", "AMOUNT(INR)", "DEBIT/CREDIT"
+    ]
+
+    static func matches(_ document: RawDocument) -> Bool {
+        guard document.fileExtension == "pdf",
+              let taggedTables = document.pdfTaggedTables,
+              !taggedTables.isEmpty else { return false }
+
+        let compactSource = document.searchableText
+            .uppercased()
+            .replacingOccurrences(of: #"\s+"#, with: "", options: .regularExpression)
+        guard compactSource.contains("AXIS"), compactSource.contains("CREDITCARD") else {
+            return false
+        }
+
+        let candidates = taggedTables.filter { table in
+            guard table.rows.count > 1,
+                  let header = table.rows.first,
+                  header.cells.count == expectedHeader.count,
+                  header.cells.allSatisfy({ $0.role == .header }) else { return false }
+            let values = header.cells.compactMap(logicalCellText).map(compactHeader)
+            return values == expectedHeader
+        }
+        return candidates.count == 1
+    }
+
+    nonisolated private static func logicalCellText(_ cell: RawPDFTaggedCellEvidence) -> String? {
+        guard cell.children.count == 2,
+              case .markedContent(let direct) = cell.children[0],
+              case .structure(let nested) = cell.children[1],
+              nested.role == "NonStruct",
+              nested.markedContent.count == 1,
+              let textEvidence = nested.markedContent.first,
+              direct.pageNumber == textEvidence.pageNumber,
+              direct.mcid != textEvidence.mcid,
+              direct.rectangleCount > 0,
+              direct.textBlocks.isEmpty,
+              textEvidence.rectangleCount == 0,
+              !textEvidence.textBlocks.isEmpty else { return nil }
+
+        let blocks = textEvidence.textBlocks
+            .map(normalizeWhitespace)
+            .filter { !$0.isEmpty }
+        guard blocks.count == textEvidence.textBlocks.count, !blocks.isEmpty else { return nil }
+        return blocks.joined(separator: " ")
+    }
+
+    nonisolated private static func normalizeWhitespace(_ value: String) -> String {
+        value.replacingOccurrences(of: "\u{00A0}", with: " ")
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    nonisolated private static func compactHeader(_ value: String) -> String {
+        normalizeWhitespace(value)
+            .replacingOccurrences(of: #"\s+"#, with: "", options: .regularExpression)
+            .uppercased()
     }
 }

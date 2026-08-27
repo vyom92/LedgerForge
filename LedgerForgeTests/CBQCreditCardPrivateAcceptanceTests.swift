@@ -7,6 +7,14 @@ import Testing
 /// private encrypted CBQ corpus. The directory is supplied at runtime; no
 /// private path, credential, source value, or row is committed or printed.
 @MainActor
+@Suite(
+    .enabled(
+        if: ProcessInfo.processInfo.environment[
+            "LEDGERFORGE_PRIVATE_CBQ_TEXT_DIRECTORY"
+        ]?.isEmpty == false,
+        "Requires the private CBQ credit-card corpus"
+    )
+)
 struct CBQCreditCardPrivateAcceptanceTests {
     private static let directoryEnvironmentKey = "LEDGERFORGE_PRIVATE_CBQ_TEXT_DIRECTORY"
     private static let expectedChronologicalRowCounts = [15, 19, 28, 14, 11, 18, 12, 16]
@@ -104,23 +112,25 @@ struct CBQCreditCardPrivateAcceptanceTests {
         #expect(Set(instrumentValues).count == 2)
 
         let chronological = documents.sorted {
-            $0.cardStatementEvidence!.declaredStatementPeriod.start <
-                $1.cardStatementEvidence!.declaredStatementPeriod.start
+            $0.cardStatementEvidence!.declaredStatementPeriod!.start <
+                $1.cardStatementEvidence!.declaredStatementPeriod!.start
         }
         var validAdjacentContinuities = 0
         for (earlier, later) in zip(chronological, chronological.dropFirst()) {
             let earlierEvidence = try #require(earlier.cardStatementEvidence)
             let laterEvidence = try #require(later.cardStatementEvidence)
+            let earlierPeriod = try #require(earlierEvidence.declaredStatementPeriod)
+            let laterPeriod = try #require(laterEvidence.declaredStatementPeriod)
             let calendar = Calendar(identifier: .gregorian)
             let endDate = try #require(calendar.date(from: DateComponents(
-                year: earlierEvidence.declaredStatementPeriod.end.year,
-                month: earlierEvidence.declaredStatementPeriod.end.month,
-                day: earlierEvidence.declaredStatementPeriod.end.day
+                year: earlierPeriod.end.year,
+                month: earlierPeriod.end.month,
+                day: earlierPeriod.end.day
             )))
             let startDate = try #require(calendar.date(from: DateComponents(
-                year: laterEvidence.declaredStatementPeriod.start.year,
-                month: laterEvidence.declaredStatementPeriod.start.month,
-                day: laterEvidence.declaredStatementPeriod.start.day
+                year: laterPeriod.start.year,
+                month: laterPeriod.start.month,
+                day: laterPeriod.start.day
             )))
             let nextDay = calendar.date(
                 byAdding: .day,
@@ -134,8 +144,8 @@ struct CBQCreditCardPrivateAcceptanceTests {
         #expect(validAdjacentContinuities == 6)
 
         let chronologicalSources = sources.sorted {
-            $0.document.cardStatementEvidence!.declaredStatementPeriod.start <
-                $1.document.cardStatementEvidence!.declaredStatementPeriod.start
+            $0.document.cardStatementEvidence!.declaredStatementPeriod!.start <
+                $1.document.cardStatementEvidence!.declaredStatementPeriod!.start
         }
         let mixedIndices = [7, 2, 5, 0, 6, 1, 4, 3]
         let mixed = mixedIndices.map { chronologicalSources[$0] }
@@ -240,8 +250,8 @@ struct CBQCreditCardPrivateAcceptanceTests {
         #expect(!duplicate.persisted)
 
         let newest = try #require(sources.max {
-            $0.document.cardStatementEvidence!.statementDate <
-                $1.document.cardStatementEvidence!.statementDate
+            $0.document.cardStatementEvidence!.statementDate! <
+                $1.document.cardStatementEvidence!.statementDate!
         })
         let newestBalance = try #require(
             newest.document.cardStatementEvidence?.summary(code: "new_balance")?.money

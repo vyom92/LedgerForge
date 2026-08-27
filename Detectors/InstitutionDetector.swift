@@ -14,4 +14,8 @@ final class InstitutionDetector {
     func detectWithReasons(from text: String) -> InstitutionDetectionResult {
         signatureDetector.detect(from: text)
     }
+
+    func detectWithReasons(in document: RawDocument) -> InstitutionDetectionResult {
+        signatureDetector.detect(in: document)
+    }
 }

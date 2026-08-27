@@ -33,7 +33,15 @@ struct AmericanExpressPrivateAcceptanceTests {
         #expect(source.oracle.rows.contains { $0.effect == .decreasesAmountOwed })
     }
 
-    @Test(.globalRuntimeStateIsolation)
+    @Test(
+        .globalRuntimeStateIsolation,
+        .enabled(
+            if: ProcessInfo.processInfo.environment[
+                "LEDGERFORGE_PRIVATE_AMEX_DIRECTORY"
+            ]?.isEmpty == false,
+            "Requires the private American Express corpus"
+        )
+    )
     func completePrivateCorpusMatchesIndependentOracleAndAllAcceptanceCampaigns() async throws {
         guard let directoryPath = ProcessInfo.processInfo.environment[Self.directoryEnvironmentKey] else {
             return

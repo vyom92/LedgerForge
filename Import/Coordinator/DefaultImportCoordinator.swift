@@ -68,6 +68,16 @@ public final class DefaultImportCoordinator: ImportFramework.ImportCoordinator {
         )
     }
 
+    public func confirmSuccessfulPassword(
+        for request: ImportRequest,
+        target: ImportFramework.StatementPasswordCredentialTarget
+    ) async throws {
+        try await passwordProvider?.confirmSuccessfulPassword(
+            for: request,
+            target: target
+        )
+    }
+
     public func discardStagedPassword(for request: ImportRequest) async {
         await passwordProvider?.discardStagedPassword(for: request)
     }
@@ -83,9 +93,9 @@ public final class DefaultImportCoordinator: ImportFramework.ImportCoordinator {
         }
 
         guard let passwordProvider else { throw ImportError.passwordRequired }
-        for candidate in try await passwordProvider.rememberedPasswords(for: request) {
+        for candidate in try await passwordProvider.rememberedPasswordCandidates(for: request) {
             do {
-                let document = try await read(candidate)
+                let document = try await read(candidate.value)
                 await passwordProvider.stageSuccessfulPassword(candidate, for: request)
                 return document
             } catch let error as ImportError where error == .incorrectPassword || error == .passwordRequired {
@@ -97,7 +107,10 @@ public final class DefaultImportCoordinator: ImportFramework.ImportCoordinator {
             throw ImportError.passwordRequired
         }
         let document = try await read(supplied)
-        await passwordProvider.stageSuccessfulPassword(supplied, for: request)
+        await passwordProvider.stageSuccessfulPassword(
+            .init(value: supplied, origin: .challenge),
+            for: request
+        )
         return document
     }
 }

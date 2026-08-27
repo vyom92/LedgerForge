@@ -146,8 +146,9 @@ public struct CardStatementSemanticProjectionEventPlanDTO: nonisolated Equatable
     public let incomingTransactionId: String
     public let normalizedRowId: String
     public let sourceOrdinal: Int
-    public let postingDateISO: String
-    public let sourceTransactionDateISO: String
+    public let financialDateISO: String
+    public let financialDateRoleCode: String
+    public let sourceTransactionDateISO: String?
     public let liabilityEffectCode: String
     public let postedCurrency: String
     public let postedAmountMinor: Int64
@@ -162,7 +163,9 @@ public struct CardStatementSemanticProjectionEventPlanDTO: nonisolated Equatable
 }
 
 public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendable {
-    public static let algorithm = "ledgerforge.amex-card-statement-semantic.sha256.v1"
+    public static let amexAlgorithm = "ledgerforge.amex-card-statement-semantic.sha256.v1"
+    public static let axisMultisetAlgorithm = "ledgerforge.axis-card-statement-multiset.sha256.v1"
+    public static let algorithm = amexAlgorithm
 
     public let id: String
     public let algorithmIdentifier: String
@@ -171,9 +174,11 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
     public let statementFamilyCode: String
     public let parserProfileId: String
     public let parserProfileVersion: String
-    public let statementDateISO: String
-    public let statementStartDateISO: String
-    public let statementEndDateISO: String
+    public let statementDateISO: String?
+    public let statementStartDateISO: String?
+    public let statementEndDateISO: String?
+    public let selectedStatementMonthISO: String?
+    public let cycleMonthISO: String?
     public let nativeCurrency: String
     public let reconciliationRuleCode: String
     public let summaryComponents: [CardStatementSummaryComponentDTO]
@@ -181,9 +186,22 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
     public let events: [CardStatementSemanticProjectionEventPlanDTO]
 
     public func calculatedDigest() -> String {
+        if algorithmIdentifier == Self.axisMultisetAlgorithm {
+            var fields = [
+                algorithmIdentifier, institutionCode, statementFamilyCode,
+                nativeCurrency, String(events.count)
+            ]
+            let eventKeys = events.map {
+                [$0.financialDateISO, $0.liabilityEffectCode, $0.postedCurrency, $0.postedAmountDecimal]
+                    .map { "\($0.utf8.count):\($0)" }.joined()
+            }.sorted()
+            fields.append(contentsOf: eventKeys)
+            let payload = fields.map { "\($0.utf8.count):\($0)" }.joined()
+            return SHA256.hash(data: Data(payload.utf8)).map { String(format: "%02x", $0) }.joined()
+        }
         var fields = [
             algorithmIdentifier, institutionCode, statementFamilyCode, parserProfileId,
-            parserProfileVersion, statementDateISO, statementStartDateISO, statementEndDateISO,
+            parserProfileVersion, statementDateISO ?? "", statementStartDateISO ?? "", statementEndDateISO ?? "",
             nativeCurrency, reconciliationRuleCode, String(events.count), String(sections.count)
         ]
         for component in summaryComponents.sorted(by: { $0.componentCode < $1.componentCode }) {
@@ -201,7 +219,8 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
         }
         for event in events.sorted(by: { $0.sourceOrdinal < $1.sourceOrdinal }) {
             fields += [
-                String(event.sourceOrdinal), event.postingDateISO, event.sourceTransactionDateISO,
+                String(event.sourceOrdinal), event.financialDateISO, event.financialDateRoleCode,
+                event.sourceTransactionDateISO ?? "",
                 event.liabilityEffectCode, event.postedCurrency, event.postedAmountDecimal,
                 event.originalCurrency == nil ? "0" : "1", event.originalCurrency ?? "",
                 event.originalAmountDecimal ?? "", event.sourceReference == nil ? "0" : "1",
@@ -215,23 +234,41 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
 
     public func isValid() -> Bool {
         let hex = CharacterSet(charactersIn: "0123456789abcdef")
-        guard algorithmIdentifier == Self.algorithm,
+        let isAmex = algorithmIdentifier == Self.amexAlgorithm
+        let isAxis = algorithmIdentifier == Self.axisMultisetAlgorithm
+        let exactPeriodIsPaired = (statementStartDateISO == nil) == (statementEndDateISO == nil)
+        let exactPeriodIsValid: Bool = {
+            guard exactPeriodIsPaired else { return false }
+            guard let start = statementStartDateISO, let end = statementEndDateISO else { return true }
+            return (try? StatementDate(canonical: start)) != nil &&
+                (try? StatementDate(canonical: end)) != nil && start <= end
+        }()
+        let statementDateIsValid = statementDateISO.map { (try? StatementDate(canonical: $0)) != nil } ?? true
+        let selectedMonthIsValid = selectedStatementMonthISO.map { (try? SelectedStatementMonth(canonical: $0)) != nil } ?? true
+        let cycleMonthIsValid = cycleMonthISO.map { (try? SelectedStatementMonth(canonical: $0)) != nil } ?? true
+        let temporalContractValid = isAmex
+            ? statementDateISO != nil && statementStartDateISO != nil && statementEndDateISO != nil &&
+                statementDateIsValid && exactPeriodIsValid && selectedStatementMonthISO == nil && cycleMonthISO == nil
+            : statementDateIsValid && exactPeriodIsValid && selectedMonthIsValid && cycleMonthIsValid &&
+                (selectedStatementMonthISO == nil || selectedStatementMonthISO == cycleMonthISO)
+        guard (isAmex || isAxis),
               digest.count == 64, digest.unicodeScalars.allSatisfy(hex.contains),
-              institutionCode == "American Express",
-              statementFamilyCode == "amex.credit-card.pdf@1",
-              parserProfileId == "amex.credit-card.pdf", parserProfileVersion == "1",
-              (try? StatementDate(canonical: statementDateISO)) != nil,
-              (try? StatementDate(canonical: statementStartDateISO)) != nil,
-              (try? StatementDate(canonical: statementEndDateISO)) != nil,
-              statementStartDateISO <= statementEndDateISO,
+              (isAmex ? institutionCode == "American Express" : institutionCode == "Axis Bank"),
+              (isAmex ? statementFamilyCode == "amex.credit-card.pdf@1" : statementFamilyCode == "axis.credit-card@1"),
+              (isAmex ? parserProfileId == "amex.credit-card.pdf" : ["axis.credit-card.pdf", "axis.credit-card.xlsx"].contains(parserProfileId)),
+              parserProfileVersion == "1", temporalContractValid,
               (try? CurrencyCode(nativeCurrency)) != nil,
-              !events.isEmpty, !sections.isEmpty,
-              events.map(\.sourceOrdinal) == events.indices.map({ $0 + 1 }),
-              sections.map(\.sourceOrdinal).sorted() == Array(1...sections.count),
+              !events.isEmpty,
+              (isAmex ? !sections.isEmpty : sections.isEmpty),
+              events.allSatisfy({ $0.sourceOrdinal > 0 }),
+              events.map(\.sourceOrdinal) == events.map(\.sourceOrdinal).sorted(),
+              Set(events.map(\.sourceOrdinal)).count == events.count,
+              sections.map(\.sourceOrdinal).sorted() == sections.indices.map({ $0 + 1 }),
               Set(sections.map(\.documentScopedSectionId)).count == sections.count,
-              Set(summaryComponents.map(\.componentCode)) == Set([
-                "previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"
-              ]) else {
+              Set(summaryComponents.map(\.componentCode)).count == summaryComponents.count,
+              (isAmex
+                ? Set(summaryComponents.map(\.componentCode)) == Set(["previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"])
+                : Set(summaryComponents.map(\.componentCode)).isSubset(of: CardStatementProfileContract.axis.allowedSummaryCodes)) else {
             return false
         }
         let sectionOrdinals = Dictionary(uniqueKeysWithValues: sections.map {
@@ -262,11 +299,12 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
                   let postedMinor = try? posted.minorUnits(),
                   postedMinor == event.postedAmountMinor,
                   event.postedAmountMinor != 0,
-                  (try? StatementDate(canonical: event.postingDateISO)) != nil,
-                  (try? StatementDate(canonical: event.sourceTransactionDateISO)) != nil,
-                  event.postingDateISO >= statementStartDateISO,
-                  event.postingDateISO <= statementEndDateISO,
-                  event.sourceReference?.isEmpty == false,
+                  (try? StatementDate(canonical: event.financialDateISO)) != nil,
+                  (event.sourceTransactionDateISO.map { (try? StatementDate(canonical: $0)) != nil } ?? true),
+                  (isAxis || (statementStartDateISO.map { event.financialDateISO >= $0 } ?? false)),
+                  (isAxis || (statementEndDateISO.map { event.financialDateISO <= $0 } ?? false)),
+                  (isAxis || event.sourceReference?.isEmpty == false),
+                  event.financialDateRoleCode == (isAxis ? FinancialDateRole.transactionDate.rawValue : FinancialDateRole.postingDate.rawValue),
                   [CardLiabilityEffect.increasesAmountOwed.rawValue, CardLiabilityEffect.decreasesAmountOwed.rawValue]
                     .contains(event.liabilityEffectCode) else { return false }
             guard (event.liabilityEffectCode == CardLiabilityEffect.increasesAmountOwed.rawValue && event.postedAmountMinor > 0) ||
@@ -290,12 +328,22 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
             if event.rowScopeCode == "account_level" {
                 return event.documentScopedSectionId == nil && event.documentSectionOrdinal == nil
             }
-            guard event.rowScopeCode == "instrument_level",
+            guard !isAxis,
+                  event.rowScopeCode == "instrument_level",
                   let sectionID = event.documentScopedSectionId,
                   let ordinal = event.documentSectionOrdinal else { return false }
             return sectionOrdinals[sectionID] == ordinal
         }) else { return false }
         let summaryByCode = Dictionary(uniqueKeysWithValues: summaryComponents.map { ($0.componentCode, $0) })
+        if isAxis {
+            guard sections.isEmpty,
+                  events.allSatisfy({
+                      $0.rowScopeCode == "account_level" &&
+                        $0.documentScopedSectionId == nil &&
+                        $0.documentSectionOrdinal == nil
+                  }) else { return false }
+            return digest == calculatedDigest()
+        }
         guard let previous = summaryByCode["previous_balance"]?.moneyMinor,
               let credits = summaryByCode["new_credits"]?.moneyMinor,
               let debits = summaryByCode["new_debits"]?.moneyMinor,
@@ -319,7 +367,7 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
 public struct ConfirmedCardImportPlanDTO: nonisolated Equatable, Sendable {
     public let liabilityAccountId: String
     public let instrumentChoice: ConfirmedCardInstrumentChoiceDTO
-    public let proposedInstrument: CardInstrumentDTO
+    public let proposedInstrument: CardInstrumentDTO?
     public let instrumentIdentifiers: [CardInstrumentIdentifierDTO]
     public let sourceObservations: [CardSourceIdentityObservationDTO]
     public let relationships: [CardInstrumentRelationshipDTO]
@@ -332,7 +380,7 @@ public struct ConfirmedCardImportPlanDTO: nonisolated Equatable, Sendable {
     public init(
         liabilityAccountId: String,
         instrumentChoice: ConfirmedCardInstrumentChoiceDTO,
-        proposedInstrument: CardInstrumentDTO,
+        proposedInstrument: CardInstrumentDTO?,
         instrumentIdentifiers: [CardInstrumentIdentifierDTO] = [],
         sourceObservations: [CardSourceIdentityObservationDTO],
         relationships: [CardInstrumentRelationshipDTO] = [],
