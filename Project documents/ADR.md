@@ -30,7 +30,7 @@ When reading this file:
 **Latest verified production implementation:** Sprint 78B — Exact Axis Credit-Card PDF/XLSX Support and Equivalence
 **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 **Latest completed numbered outcome:** Sprint 78B
-**Latest accepted ADR:** ADR-044
+**Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner (implementation pending)
 **Current migration:** V15
 
 No alignment note authorizes implementation.
@@ -83,6 +83,7 @@ No alignment note authorizes implementation.
 | ADR-042 | Exact Cross-Format Statement Equivalence and Supporting-Source Persistence | Accepted and implemented in Sprint 73. | Exact whole-statement equivalence is operational only for the independently approved HDFC bank-account PDF/XLS v1 pair. |
 | ADR-043 | Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts | Accepted and implemented in Sprint 75. | Exact CBQ history XLS, history PDF and monthly PDF sources coexist through bounded masked/full account resolution and one canonical transaction with durable per-source observations. |
 | ADR-044 | Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence | Accepted and implemented in Sprint 76; amended and implemented in Sprints 76A, 77 and 78B. | The shared provider-owned card domain through Migration V15 supports exact Amex, CBQ and Axis boundaries, including Axis zero-instrument liability ownership and representation-neutral PDF/XLSX equivalence without generic card support. |
+| ADR-045 | Qatar Airways Salary Actuals and Current-Month Funding Planner | Accepted architecture for Sprint 79; implementation pending. | Defines the exact Qatar Airways salary domain, dedicated Salary UX, editable current-month QAR/INR funding plan, explicit account-balance snapshots, plan-local FX, Migration V16 and non-automation boundaries without generic payroll/budgeting/FX support. |
 
 ## Alignment Policy
 
@@ -5648,3 +5649,209 @@ architecture, OCR, arbitrary encrypted PDFs or generic card support. ADR-043 CBQ
 bank overlap does not generalize to cards. Accepted Amex semantic grouping and
 accepted Axis representation-neutral equivalence remain exact family contracts,
 not generic card equivalence.
+
+# ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner
+
+**Status:** Accepted architecture for Sprint 79; implementation pending  
+**Date:** 2026-08-27  
+**Decision owner:** Chat / user-approved Sprint 79 planning
+
+## Context
+
+LedgerForge has source/document vocabulary for salary statements but no production salary parser, truthful salary persistence, runtime salary store or planning domain. The existing confirmed-import model is intentionally account/transaction-centric and must not be abused by converting payroll components into bank transactions.
+
+Complete private discovery over the active Qatar Airways salary boundary establishes 20 distinct, native-text, unlocked PDF sources spanning monthly salary/payslip, Adhoc Payment and Annual Discretionary Bonus variants. Source-owned pay period can differ materially from print date, a month may contain more than one source document, and source earning/deduction section membership carries financial direction. The source does not classify imported earnings as fixed or variable.
+
+The user's existing Budget Analysis workbook demonstrates the desired monthly workflow: expected salary, Qatar obligations, India requirements, an explicit planning FX assumption and transfer fee are combined manually, while Indian account balances live separately and must currently be considered by hand. Sprint 79 productizes this workflow without treating the workbook as salary source truth or an acceptance oracle.
+
+## Decision
+
+### Exact profile and source authority
+
+Sprint 79 may implement only `qatar-airways.salary.pdf@1` for the source-proven active family. Exact source-byte fingerprint remains physical duplicate authority. Structural similarity does not authorize another employer or changed payroll layout.
+
+Qatar Airways is employer/source authority, not a fabricated bank/card `Institution`. Implementation may introduce the smallest typed employer/source concept required by this exact salary profile while leaving existing financial-institution semantics intact.
+
+The generic PDF reader remains extraction-only. Salary recognition, period/kind interpretation, source-section meaning, exact Money and payroll reconciliation belong downstream in the exact salary normalizer/parser.
+
+### Salary actual domain
+
+An accepted salary source produces a typed salary payload, not fabricated `FinancialDocument.transactions` and not an Account.
+
+The durable salary statement must preserve at least:
+
+- immutable source/import provenance and exact profile/version;
+- employer/source authority;
+- source-owned pay period;
+- separately retained print date where present;
+- source kind: monthly salary/payslip, Adhoc Payment or Annual Discretionary Bonus for this exact profile;
+- native QAR currency;
+- ordered earning and deduction components with source side, ordinal, label and exact Money;
+- source-printed earnings, deductions, net and payment totals with explicit absence preserved where a total/section is not printed.
+
+Positive source magnitudes obtain financial meaning from source Earnings versus Deductions membership. Labels alone do not determine side. Missing deduction evidence is not silently converted into a printed zero.
+
+Imported salary actuals are immutable source truth. Fixed-versus-variable is not imported payroll semantics and must never be inferred retrospectively.
+
+Monthly actual salary is a derived aggregation over every accepted salary-domain document whose source-owned pay period belongs to that month. The aggregate is labelled derived, not source-printed. Presence of a bonus/ad-hoc source does not prove that an otherwise missing monthly payslip exists.
+
+### Unified import boundary
+
+Sprint 79 reuses the existing immutable source snapshot, exact fingerprint, generic reader, deterministic recognition, validation, review, import-history and provenance infrastructure. It introduces a typed salary payload/persistence branch within that pipeline rather than a parallel import subsystem.
+
+Salary acceptance must fail closed on unsupported headings/layouts, ambiguous section ownership, malformed Money, contradictory printed totals, unsupported currency or incomplete required source evidence. Rejection leaves zero accepted salary residue.
+
+### Current-month funding-plan domain
+
+Sprint 79 adds one editable current-month funding plan per workspace. Planning state is explicitly separate from imported salary actuals.
+
+Expected salary inputs are user-owned QAR Money:
+
+```text
+expected net
+= expected fixed earnings
++ expected variable earnings
+- expected deductions
+```
+
+The three inputs are planning semantics only. They may be carried forward from the prior month as editable defaults and may be edited at any time.
+
+Explicit rollover creates/seeds the next target month from the previous editable plan. Carried values and balance-inclusion choices remain editable and should retain enough provenance to distinguish carried state from a later user edit. Rollover never copies or mutates imported salary actuals.
+
+### Account-balance selection and provenance
+
+Planner liquidity is account-driven, not hardcoded as one universal opening-balance field.
+
+Each eligible selected account contributes a planning-balance record containing at least account identity, native Money, included/excluded state and value provenance. Value provenance distinguishes:
+
+- carried from the previous plan;
+- manual user entry/edit;
+- explicitly refreshed/captured current LedgerForge account balance, with capture time.
+
+A captured account balance becomes a planning snapshot and is not live-linked. LedgerForge never silently claims that a current hydrated account balance represented pre-salary cash at an earlier cutoff.
+
+Current product requirements include the selectable QAR account set, presently CBQ, and the independently selectable India INR accounts Axis NRE, Axis NRO, HDFC NRE and HDFC NRO. Architecture remains account-ID driven so future eligible accounts do not require hardcoded schema columns.
+
+Only checked balances contribute to planner liquidity.
+
+### Commitments and funding flow
+
+Qatar and India obligations are editable user-controlled planning lines in native currency. A commitment may optionally reference a funding account for routing math, but it is not a transaction, bill, card-payment allocation or executable transfer.
+
+The approved funding flow is conceptually:
+
+```text
+selected QAR liquidity + expected salary
+    -> Qatar obligations
+    -> India funding shortfall + transfer fee
+    -> available for investment
+    -> optional planned investment
+    -> final QAR buffer
+```
+
+India liquidity is the sum of checked INR planning balances. India funding shortfall is:
+
+```text
+max(0, INR commitments - selected INR liquidity)
+```
+
+No account transfer, salary-bank match, card-payment match or amount/date reconciliation is inferred or executed automatically.
+
+### Plan-local FX and rounding
+
+Sprint 79 does not activate the dormant global `exchange_rates` persistence or a generic FX/reporting-currency domain.
+
+The funding plan may persist one explicit, dated, user-entered planning quote oriented as:
+
+```text
+1 QAR = X INR
+```
+
+The rate is exact decimal planning input with explicit provenance as user-entered. It never overwrites native Money and is not presented as market/source truth.
+
+Where INR funding shortfall requires conversion to QAR principal:
+
+```text
+exact QAR requirement = INR shortfall / INR-per-QAR rate
+```
+
+The payable/funding principal rounds **upward** to the next QAR minor unit. This explicit derived-planning rounding rule exists solely to avoid underfunding the stated INR requirement and does not weaken ADR-033's no-implicit-rounding rule for imported/persisted native Money.
+
+The editable transfer fee is native QAR Money and initially defaults to QAR 25.00.
+
+### Derived planner outputs
+
+At minimum the planner may derive:
+
+```text
+expected QAR available
+= selected QAR liquidity + expected net salary
+
+QAR before investment
+= expected QAR available
+- Qatar commitments
+- rounded QAR principal required for India
+- transfer fee
+
+available for investment
+= QAR before investment
+```
+
+Planned investment is a separate editable user input. Final QAR buffer is derived after subtracting planned investment. Negative values are presented as shortfalls, never silently clamped to zero.
+
+Dashboard summaries may expose expected-this-month, planned obligations/funding position and available-for-investment, but native QAR/INR obligations remain visibly currency-specific. Any QAR-equivalent funding figure must display the plan-local rate/date context rather than masquerading as global net worth.
+
+### UX
+
+The frozen v1 sidebar is amended for Sprint 79 with one dedicated `Salary` destination:
+
+```text
+Dashboard
+Accounts
+Transactions
+Import
+Salary
+Settings
+```
+
+`Salary` owns two bounded views/sections:
+
+- **This Month** — expected salary, balances to consider, Qatar commitments, India commitments, India funding/FX and investment capacity;
+- **Salary History** — imported source-truth salary statements grouped by source-owned period, including legitimate multiple documents in one month.
+
+Dashboard remains deliberately summary-only and does not host salary records or the editable funding calculator.
+
+Every Salary/planner value must be visually attributable to one of four truth classes: imported source truth, account snapshot, user/carried input or derived result.
+
+### Persistence and Migration V16
+
+Sprint 79 authorizes additive Migration V16 because no current table truthfully owns salary actuals or current-month planning state.
+
+V16 must add concrete, queryable persistence for salary statements/ordered lines and current funding-plan state, including account-balance selections/snapshots and commitments. Exact table/DTO names are implementation choices, but generic JSON blobs are not an acceptable substitute for the durable relationships required by the product.
+
+SQLite and In-Memory providers must expose equivalent successful values and equivalent failures. `RepositoryStoreHydrator` remains the sole persistence-to-runtime hydration boundary, with dedicated runtime store ownership for the new domain. Close/reopen/relaunch must preserve salary actuals and the current editable plan exactly.
+
+V1–V15 remain immutable. V15 remains the latest accepted migration until Sprint 79 implementation and V16 are technically accepted.
+
+### Acceptance oracle
+
+Financial/source acceptance uses all 20 authentic salary PDFs in the approved active corpus.
+
+A reviewed source-native expected manifest, derived independently from authentic source evidence rather than production parser output, must cover per source at least period, kind, ordered earning/deduction components, exact Money, printed totals/explicit absence, net/payment reconciliation and source-byte identity.
+
+Acceptance must explicitly exercise period-versus-print-date divergence, multiple salary documents in one financial month, bonus/ad-hoc variants, missing deduction evidence, source-side label ambiguity, exact duplicate handling and arithmetic reconciliation.
+
+Production salary parser output is never the sole oracle. A second giant competing payroll parser is not required and should not be built merely to create an oracle.
+
+## Consequences
+
+- Salary actuals become a first-class immutable financial-document domain without contaminating account transactions.
+- The user's spreadsheet-style monthly calculator becomes durable, traceable and editable while retaining explicit user control.
+- Existing account balances can accelerate planning without pretending a live balance has historical cutoff authority.
+- India liquidity reduces only the funding shortfall the user elects to consider, which makes available-for-investment a meaningful derived result.
+- Sprint 79 establishes one narrow plan-local FX use case without silently activating global FX architecture.
+- The dedicated Salary destination prevents Dashboard from becoming the editing surface for payroll and funding assumptions.
+
+## Exclusions
+
+ADR-045 does not authorize generic payroll/employer support, OCR/image payroll, automatic employer-bank matching, salary transaction creation, automatic card-payment allocation, automatic current-obligation inference, automatic transfers, bank-to-bank routing execution, recurring-obligation detection, generic budgeting, investment purchase/execution, global `exchange_rates` activation, market-rate retrieval, historical/reporting-currency FX, consolidated mixed-currency net worth, tax/remittance/NRE/NRO legality inference, historical planner analytics, or any source/format outside the exact approved Qatar Airways salary profile.

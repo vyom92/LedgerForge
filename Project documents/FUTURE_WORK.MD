@@ -657,20 +657,22 @@ classification, the V15 schema or the shared card domain alone.
 
 ## FW-P1-05 — Brokerage, Mutual-Fund, Salary, Insurance, Tax and Government Document Families
 
-**Status:** Research
+**Status:** Partially scheduled through Sprint 79; all other families remain research
 **Depends on:** Domain-model and product-scope decisions
 
-Investigate support for:
+Sprint 79 selects one exact salary slice: `qatar-airways.salary.pdf@1` over the complete approved private salary corpus. ADR-045 requires a dedicated salary-actual domain inside the unified import/provenance pipeline rather than forcing payroll lines into bank transactions. The exact Sprint 79 boundary includes source-owned pay period/kind, ordered earnings/deductions, exact native QAR Money, printed totals/payment evidence, durable source provenance, provider parity, hydration and dedicated Salary presentation.
 
+Remaining research includes:
+
+- other employers/payroll layouts and generic salary support;
 - brokerage statements;
 - mutual-fund statements and consolidated account statements;
-- salary slips;
 - insurance documents;
 - tax documents;
 - AIS and Form 16;
 - other government financial records.
 
-Determine whether each document family fits existing account and transaction models or requires a dedicated financial domain.
+Every remaining family still requires its own source truth and a decision on whether it fits an existing domain or needs a dedicated one. No profile may claim support from structural similarity to the Qatar Airways salary family.
 
 Do not force materially different financial documents into the bank-statement model merely to avoid designing the correct one.
 
@@ -1976,23 +1978,26 @@ Internal transfers must never be presented as new income or expense.
 
 ## FW-P3-08 — Salary and Planning Workspace
 
-**Status:** Blocked
-**Depends on:** Salary-slip support, reliable transaction identity, account relationships and planning-domain decisions
+**Status:** Partially scheduled through Sprint 79; broader workspace remains future work
+**Depends on:** Exact salary-family support plus future transaction/account relationship and planning expansions
 
-Create the monthly Salary & Planning workspace described by Product Vision.
+Sprint 79 approves a bounded first production slice under ADR-045:
 
-Candidate outcomes include:
+- dedicated `Salary` sidebar destination with Salary History and This Month planning;
+- exact Qatar Airways salary actuals and monthly actual aggregation;
+- editable expected fixed/variable/deduction planning inputs;
+- explicit editable rollover from the prior month's plan;
+- account-driven QAR/INR balance inclusion with carried/manual/refreshed snapshot provenance;
+- user-controlled Qatar and India commitments and optional funding-account routing;
+- dated user-entered plan-local QAR→INR rate and editable transfer fee;
+- India funding-shortfall calculation after selected INR liquidity;
+- derived funding position, available-for-investment and final buffer;
+- summary-only Dashboard integration;
+- explicit user control throughout, with no automatic transaction creation, transfer execution or amount/date matching.
 
-- expected salary and actual salary comparison;
-- salary-slip verification;
-- configurable monthly allocation planning;
-- planned transfers between accounts;
-- credit-card funding plans;
-- savings and investment contribution plans;
-- explicit user review before any action;
-- variance explanation after actual transactions arrive.
+The approved UI revision is limited to this dedicated Salary destination and bounded Dashboard summaries.
 
-This module requires an approved UI revision because it is not part of the current frozen v1.0 screen inventory.
+The broader Product Vision workspace remains future work, including generic salary support, recurring-obligation detection, automated or executable transfer planning, automatic card-payment reconciliation, generic budgeting/allocation, savings/investment execution, historical planner analytics and variance explanation after actual bank transactions arrive.
 
 ---
 

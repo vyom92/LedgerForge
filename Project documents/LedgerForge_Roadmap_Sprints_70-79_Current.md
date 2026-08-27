@@ -10,9 +10,9 @@
 - **Execution authority:** None. A complete Chat-approved prompt authorizes each task.
 - **Accepted production baseline:** Sprint 78B in this closure commit on `main`; the exact commit is recorded by Git history.
 - **Current migration baseline:** V15 accepted.
-- **Latest accepted ADR:** ADR-044, amended through Sprint 78B; ADR-015 is also amended for the accepted Axis dual-credential boundary.
+- **Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner; implementation is pending. ADR-044 remains the latest implemented production-domain ADR.
 - **Current active correction:** none. Sprint 78B was technically accepted on 2026-08-27.
-- **Sprint 79:** unblocked for Chat planning; no Sprint 79 implementation is authorized until Chat selects the work and supplies a complete execution prompt.
+- **Sprint 79:** architecture approved by Chat on 2026-08-27; implementation remains unauthorized until Chat supplies the complete execution prompt. Migration V16 is authorized for that implementation but is not yet an accepted migration.
 - **Standing method:** `LedgerForge_Standing_Execution_Harness_Guide.md`.
 - **Post-cycle gate:** Sprint 80 remains reserved for Swift 6 migration-readiness analysis before investment implementation.
 
@@ -138,7 +138,7 @@ axis.credit-card.xlsx@1
 
 Sprint 78B was not test-only. Chat authorized the production corrections required to achieve the Sprint 78 outcome while preserving unrelated work.
 
-Technical acceptance and governance reconciliation are complete. Sprint 79 is unblocked for Chat planning, but remains unimplemented and requires its own approved architecture and execution prompt.
+Technical acceptance and governance reconciliation are complete. Sprint 79 architecture is now approved by Chat, remains unimplemented, and requires its complete execution prompt before implementation.
 
 ---
 
@@ -412,7 +412,7 @@ Completed on 2026-08-27:
 1. Chat performed the technical acceptance review and accepted Sprint 78B.
 2. ADR-015 and ADR-044 are reconciled for the accepted Axis credential, ownership and source-equivalence boundary.
 3. `PROJECT_STATE.md`, this roadmap and `FUTURE_WORK.MD` are reconciled.
-4. Sprint 79 is unblocked for Chat planning. Planning does not authorize implementation.
+4. Sprint 79 was unblocked for Chat planning; its architecture was subsequently approved on 2026-08-27. Implementation still requires the complete Chat-approved execution prompt.
 
 No Sprint 78C is created because Sprint 78B completed the Sprint 78 outcome.
 
@@ -422,39 +422,52 @@ No Sprint 78C is created because Sprint 78B completed the Sprint 78 outcome.
 
 ## Status
 
-**Unblocked for Chat planning after Sprint 78B acceptance and governance reconciliation. No implementation is authorized until Chat approves Sprint 79 architecture and supplies a complete execution prompt.**
+**Architecture approved by Chat on 2026-08-27. Implementation remains unauthorized until Chat supplies the complete Sprint 79 execution prompt.**
 
 ## Outcome
 
-Implement the exact Qatar Airways salary PDF family plus a current-month expected-salary and QAR/INR funding planner.
+Implement the exact Qatar Airways salary PDF family plus a dedicated Salary workspace that replaces the user's current manual monthly funding worksheet with deterministic, editable QAR/INR planning while keeping imported actuals, account snapshots, user assumptions and derived values visibly distinct.
 
-Private source discovery establishes:
+Authoritative private discovery now covers the complete active `Originals/Salary` boundary and supersedes the earlier seven-document planning note:
 
-- six regular salary statements;
-- one ad-hoc payment statement;
-- one pay period with more than one salary document.
+- 20 active native-text, unlocked PDF sources;
+- source-owned monthly salary/payslip documents;
+- one source-explicit Adhoc Payment variant;
+- one source-explicit Annual Discretionary Bonus variant;
+- at least one financial month with more than one salary document;
+- print date is separate from pay-period authority;
+- exact source-byte identity remains duplicate authority.
 
-Key product decisions remain:
+Accepted Sprint 79 architecture:
 
 ```text
-expected net
-= expected fixed earnings
-+ expected variable earnings
-- expected deductions
+expected net QAR
+= expected fixed earnings QAR
++ expected variable earnings QAR
+- expected deductions QAR
 ```
 
-- imported salary actuals remain durable source truth;
-- one month may contain multiple salary documents;
-- expectation history is current-month only;
-- rollover is explicit;
-- future salary-bank linking is explicit/manual only;
-- no automatic amount/date matching;
-- opening CBQ balance is pre-salary available cash;
+- imported salary actuals are immutable durable source truth and are not bank transactions;
+- source earning/deduction section membership and source order are preserved; imported lines are not invented as fixed/variable;
+- monthly actual salary is derived from every accepted salary-domain source whose source-owned pay period belongs to that month;
+- Qatar Airways is employer/source authority for this exact profile and must not be fabricated as a financial `Institution` merely to reuse bank/card routing;
+- the existing unified source snapshot/fingerprint/reader/import-history pipeline is reused, but salary receives a typed payload/persistence branch rather than fabricated `FinancialDocument.transactions`;
+- a dedicated `Salary` sidebar destination owns Salary History and This Month planning; Dashboard receives summary-only expected-this-month, planned-obligations/funding-position and available-for-investment values;
+- one current-month funding plan is editable user state; explicit rollover seeds the new month from the previous editable plan and every carried value remains editable at any time;
+- balance selection is account-driven and explicit: checked accounts contribute an editable planning balance, with provenance distinguishing carried, manual and explicitly refreshed account snapshots;
+- current Qatar planning uses the selected QAR account set, presently CBQ; current India planning may select Axis NRE, Axis NRO, HDFC NRE and HDFC NRO independently;
+- current account balances are never silently treated as historical opening cash; refresh/capture is user-triggered and captured planning balances are not live-linked;
+- India funding shortfall is calculated only after checked INR liquidity is considered; commitments may optionally target a funding account for routing math without creating transfers or transactions;
+- salary-to-bank and card-to-bank matching remain explicit/manual only; no amount/date auto-match is authorized;
 - transfer fee is editable QAR planning input, initially QAR 25;
-- planning FX rate is explicit, dated and user-entered;
-- local QAR and India INR commitments are user-controlled planning lines.
+- planning FX is a plan-local, explicit, dated, user-entered quote in `INR per 1 QAR`; Sprint 79 does not activate the dormant global `exchange_rates` domain;
+- when INR commitments require QAR funding, the derived QAR principal rounds upward to the next QAR minor unit so the plan does not underfund the stated INR requirement;
+- available-for-investment is a derived result after checked Qatar liquidity, expected salary, Qatar obligations, India funding shortfall and transfer fee; planned investment remains a separate editable user input;
+- the manual Budget Analysis workflow is a product-behaviour reference only, not salary source truth or an acceptance oracle.
 
-Sprint 79 requires its own architecture/migration decision after Sprint 78B closes.
+Sprint 79 authorizes a new additive **Migration V16** for dedicated salary-actual and current-month funding-plan persistence. V15 remains the latest accepted migration until Sprint 79 implementation is technically accepted.
+
+ADR-045 governs the approved Sprint 79 salary/planning architecture. Broader budgeting, recurring-obligation detection, automated transfers, global FX/reporting-currency conversion, investment execution and generic payroll support remain outside Sprint 79.
 
 ---
 
