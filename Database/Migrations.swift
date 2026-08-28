@@ -1926,7 +1926,166 @@ PRAGMA legacy_alter_table = OFF;
     requiresForeignKeysDisabled: true
 )
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15]
+public let migrationV16 = Migration(
+    version: 16,
+    name: "Qatar Airways salary actuals and current-month funding plans",
+    sql: """
+CREATE TABLE salary_statements (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  document_id TEXT NOT NULL UNIQUE,
+  import_session_id TEXT NOT NULL UNIQUE,
+  normalized_document_id TEXT NOT NULL UNIQUE,
+  source_fingerprint_algorithm TEXT NOT NULL,
+  source_fingerprint_digest TEXT NOT NULL CHECK(length(source_fingerprint_digest) = 64),
+  source_authority TEXT NOT NULL CHECK(source_authority = 'qatar_airways'),
+  parser_profile_id TEXT NOT NULL CHECK(parser_profile_id = 'qatar-airways.salary.pdf'),
+  parser_profile_version TEXT NOT NULL CHECK(parser_profile_version = '1'),
+  financial_period TEXT NOT NULL CHECK(
+    length(financial_period) = 7 AND substr(financial_period, 5, 1) = '-' AND
+    CAST(substr(financial_period, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+  ),
+  print_date DATE,
+  document_kind TEXT NOT NULL CHECK(document_kind IN ('regular_salary', 'adhoc_payment', 'annual_discretionary_bonus')),
+  native_currency TEXT NOT NULL CHECK(native_currency = 'QAR'),
+  printed_earnings_minor INTEGER NOT NULL,
+  printed_earnings_decimal TEXT NOT NULL,
+  printed_deductions_present INTEGER NOT NULL CHECK(printed_deductions_present IN (0, 1)),
+  printed_deductions_minor INTEGER,
+  printed_deductions_decimal TEXT,
+  printed_net_minor INTEGER NOT NULL,
+  printed_net_decimal TEXT NOT NULL,
+  printed_payment_minor INTEGER NOT NULL,
+  printed_payment_decimal TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  CHECK((printed_deductions_present = 0 AND printed_deductions_minor IS NULL AND printed_deductions_decimal IS NULL) OR
+        (printed_deductions_present = 1 AND printed_deductions_minor IS NOT NULL AND printed_deductions_decimal IS NOT NULL)),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_salary_statements_period ON salary_statements(workspace_id, financial_period, created_at, id);
+
+CREATE TABLE salary_components (
+  id TEXT PRIMARY KEY,
+  salary_statement_id TEXT NOT NULL,
+  side TEXT NOT NULL CHECK(side IN ('earning', 'deduction')),
+  source_ordinal INTEGER NOT NULL CHECK(source_ordinal > 0),
+  source_label TEXT NOT NULL CHECK(length(trim(source_label)) BETWEEN 1 AND 240),
+  amount_currency TEXT NOT NULL CHECK(amount_currency = 'QAR'),
+  amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
+  amount_decimal TEXT NOT NULL,
+  UNIQUE(salary_statement_id, side, source_ordinal),
+  FOREIGN KEY(salary_statement_id) REFERENCES salary_statements(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_salary_components_order ON salary_components(salary_statement_id, side, source_ordinal);
+
+CREATE TABLE funding_plans (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  plan_month TEXT NOT NULL CHECK(
+    length(plan_month) = 7 AND substr(plan_month, 5, 1) = '-' AND
+    CAST(substr(plan_month, 6, 2) AS INTEGER) BETWEEN 1 AND 12
+  ),
+  rollover_source_plan_id TEXT,
+  expected_fixed_minor INTEGER NOT NULL,
+  expected_fixed_decimal TEXT NOT NULL,
+  expected_fixed_provenance TEXT NOT NULL CHECK(expected_fixed_provenance IN ('manual', 'carried')),
+  expected_variable_minor INTEGER NOT NULL,
+  expected_variable_decimal TEXT NOT NULL,
+  expected_variable_provenance TEXT NOT NULL CHECK(expected_variable_provenance IN ('manual', 'carried')),
+  expected_deductions_minor INTEGER NOT NULL,
+  expected_deductions_decimal TEXT NOT NULL,
+  expected_deductions_provenance TEXT NOT NULL CHECK(expected_deductions_provenance IN ('manual', 'carried')),
+  configured_fee_minor INTEGER NOT NULL,
+  configured_fee_decimal TEXT NOT NULL,
+  configured_fee_provenance TEXT NOT NULL CHECK(configured_fee_provenance IN ('manual', 'carried')),
+  fx_inr_per_qar_decimal TEXT,
+  fx_observation_date DATE,
+  fx_provenance TEXT CHECK(fx_provenance IS NULL OR fx_provenance = 'user_entered'),
+  planned_investment_minor INTEGER NOT NULL,
+  planned_investment_decimal TEXT NOT NULL,
+  planned_investment_provenance TEXT NOT NULL CHECK(planned_investment_provenance IN ('manual', 'carried')),
+  updated_at DATETIME NOT NULL,
+  UNIQUE(workspace_id, plan_month),
+  CHECK((fx_inr_per_qar_decimal IS NULL AND fx_observation_date IS NULL AND fx_provenance IS NULL) OR
+        (fx_inr_per_qar_decimal IS NOT NULL AND fx_observation_date IS NOT NULL AND fx_provenance = 'user_entered')),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(rollover_source_plan_id) REFERENCES funding_plans(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_funding_plans_current ON funding_plans(workspace_id, plan_month);
+
+CREATE TABLE funding_plan_balances (
+  id TEXT PRIMARY KEY,
+  funding_plan_id TEXT NOT NULL,
+  source_ordinal INTEGER NOT NULL CHECK(source_ordinal > 0),
+  account_id TEXT NOT NULL,
+  native_currency TEXT NOT NULL CHECK(native_currency IN ('QAR', 'INR')),
+  included INTEGER NOT NULL CHECK(included IN (0, 1)),
+  amount_currency TEXT,
+  amount_minor INTEGER,
+  amount_decimal TEXT,
+  provenance TEXT NOT NULL CHECK(provenance IN ('manual', 'carried', 'captured_account_balance')),
+  carried_source_plan_id TEXT,
+  captured_at DATETIME,
+  UNIQUE(funding_plan_id, account_id),
+  UNIQUE(funding_plan_id, source_ordinal),
+  CHECK((amount_currency IS NULL AND amount_minor IS NULL AND amount_decimal IS NULL) OR
+        (amount_currency IS NOT NULL AND amount_minor IS NOT NULL AND amount_decimal IS NOT NULL)),
+  CHECK((provenance = 'carried' AND carried_source_plan_id IS NOT NULL AND captured_at IS NULL) OR
+        (provenance = 'captured_account_balance' AND carried_source_plan_id IS NULL AND captured_at IS NOT NULL) OR
+        (provenance = 'manual' AND carried_source_plan_id IS NULL AND captured_at IS NULL)),
+  FOREIGN KEY(funding_plan_id) REFERENCES funding_plans(id) ON DELETE CASCADE,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(carried_source_plan_id) REFERENCES funding_plans(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE funding_plan_commitments (
+  id TEXT PRIMARY KEY,
+  funding_plan_id TEXT NOT NULL,
+  region TEXT NOT NULL CHECK(region IN ('qatar', 'india')),
+  source_ordinal INTEGER NOT NULL CHECK(source_ordinal > 0),
+  label TEXT NOT NULL CHECK(length(trim(label)) BETWEEN 1 AND 240),
+  amount_currency TEXT NOT NULL,
+  amount_minor INTEGER NOT NULL,
+  amount_decimal TEXT NOT NULL,
+  included INTEGER NOT NULL CHECK(included IN (0, 1)),
+  funding_account_id TEXT,
+  provenance TEXT NOT NULL CHECK(provenance IN ('manual', 'carried')),
+  carried_source_plan_id TEXT,
+  UNIQUE(funding_plan_id, region, source_ordinal),
+  CHECK((region = 'qatar' AND amount_currency = 'QAR') OR (region = 'india' AND amount_currency = 'INR')),
+  CHECK((provenance = 'carried' AND carried_source_plan_id IS NOT NULL) OR
+        (provenance = 'manual' AND carried_source_plan_id IS NULL)),
+  FOREIGN KEY(funding_plan_id) REFERENCES funding_plans(id) ON DELETE CASCADE,
+  FOREIGN KEY(funding_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(carried_source_plan_id) REFERENCES funding_plans(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_funding_plan_balances ON funding_plan_balances(funding_plan_id, included, account_id);
+CREATE INDEX idx_funding_plan_commitments ON funding_plan_commitments(funding_plan_id, region, source_ordinal);
+
+CREATE TRIGGER validate_salary_statement_source
+BEFORE INSERT ON salary_statements
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d
+    JOIN import_sessions s ON s.id = d.import_session_id
+    JOIN normalized_documents n ON n.document_id = d.id AND n.import_session_id = s.id
+    JOIN document_fingerprints f ON f.document_id = d.id
+    WHERE d.id = NEW.document_id AND d.workspace_id = NEW.workspace_id
+      AND s.id = NEW.import_session_id AND s.workspace_id = NEW.workspace_id
+      AND n.id = NEW.normalized_document_id
+      AND n.profile_id = NEW.parser_profile_id AND n.profile_version = NEW.parser_profile_version
+      AND f.algorithm = NEW.source_fingerprint_algorithm
+      AND f.fingerprint = NEW.source_fingerprint_digest
+      AND f.is_duplicate_authority = 1
+  ) THEN RAISE(ABORT, 'salary source relationship invalid') END;
+END;
+"""
+)
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

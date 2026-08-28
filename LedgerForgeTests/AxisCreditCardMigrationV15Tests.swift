@@ -8,11 +8,11 @@ import Testing
 struct AxisCreditCardMigrationV15Tests {
     @Test func freshV1ThroughV15InstallsAnExactChainAndAxisSchema() throws {
         try withDatabase(named: "FreshV15") { database in
-            try database.runMigrations(allMigrations)
+            try database.runMigrations(Array(allMigrations.prefix(15)))
 
             #expect(try database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 15)
             #expect(try database.queryInt("SELECT COUNT(*) FROM schema_migrations;") == 15)
-            #expect(allMigrations.map(\.version) == Array(1...15))
+            #expect(Array(allMigrations.prefix(15)).map(\.version) == Array(1...15))
             #expect(migrationV15.name == "Axis card observations and representation-neutral semantic events")
 
             let observationSQL = try database.query(
@@ -48,7 +48,7 @@ struct AxisCreditCardMigrationV15Tests {
                 columns: 4
             )
 
-            try database.runMigrations(allMigrations)
+            try database.runMigrations(Array(allMigrations.prefix(15)))
 
             #expect(try rows(in: database, sql: "SELECT id,observation_kind,source_value FROM card_source_identity_observations ORDER BY id;", columns: 3) == beforeSource)
             #expect(try rows(in: database, sql: "SELECT id,observation_kind,source_value FROM card_statement_section_observations ORDER BY id;", columns: 3) == beforeSections)

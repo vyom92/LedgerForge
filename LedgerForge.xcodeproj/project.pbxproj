@@ -116,6 +116,15 @@
 		790000023079000000000001 /* AxisCreditCardXLSXNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790000123079000000000001 /* AxisCreditCardXLSXNormalizer.swift */; };
 		790000033079000000000001 /* AxisCreditCardPDFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790000133079000000000001 /* AxisCreditCardPDFParser.swift */; };
 		790000043079000000000001 /* AxisCreditCardXLSXParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790000143079000000000001 /* AxisCreditCardXLSXParser.swift */; };
+		7A790001307A000000000001 /* Salary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A790000307A000000000001 /* Salary.swift */; };
+		7A790003307A000000000001 /* QatarAirwaysSalaryPDFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A790002307A000000000001 /* QatarAirwaysSalaryPDFParser.swift */; };
+		7A790005307A000000000001 /* SalaryPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A790004307A000000000001 /* SalaryPersistence.swift */; };
+		7A790007307A000000000001 /* SQLiteSalaryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A790006307A000000000001 /* SQLiteSalaryRepository.swift */; };
+		7A790008307A000000000001 /* SalaryPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A790004307A000000000001 /* SalaryPersistence.swift */; };
+		7A790009307A000000000001 /* SQLiteSalaryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A790006307A000000000001 /* SQLiteSalaryRepository.swift */; };
+		7A79000B307A000000000001 /* SalaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A79000A307A000000000001 /* SalaryStore.swift */; };
+		7A79000D307A000000000001 /* SalaryWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A79000C307A000000000001 /* SalaryWorkspaceViewModel.swift */; };
+		7A79000F307A000000000001 /* SalaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A79000E307A000000000001 /* SalaryView.swift */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
@@ -310,6 +319,13 @@
 		790000123079000000000001 /* AxisCreditCardXLSXNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisCreditCardXLSXNormalizer.swift; sourceTree = "<group>"; };
 		790000133079000000000001 /* AxisCreditCardPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisCreditCardPDFParser.swift; sourceTree = "<group>"; };
 		790000143079000000000001 /* AxisCreditCardXLSXParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisCreditCardXLSXParser.swift; sourceTree = "<group>"; };
+		7A790000307A000000000001 /* Salary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Salary.swift; sourceTree = "<group>"; };
+		7A790002307A000000000001 /* QatarAirwaysSalaryPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QatarAirwaysSalaryPDFParser.swift; sourceTree = "<group>"; };
+		7A790004307A000000000001 /* SalaryPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryPersistence.swift; sourceTree = "<group>"; };
+		7A790006307A000000000001 /* SQLiteSalaryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteSalaryRepository.swift; sourceTree = "<group>"; };
+		7A79000A307A000000000001 /* SalaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryStore.swift; sourceTree = "<group>"; };
+		7A79000C307A000000000001 /* SalaryWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryWorkspaceViewModel.swift; sourceTree = "<group>"; };
+		7A79000E307A000000000001 /* SalaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryView.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
 		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
@@ -530,6 +546,7 @@
 		288EB0D72FF7995800F09BC9 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				7A790000307A000000000001 /* Salary.swift */,
 				760000133076000000000001 /* Card.swift */,
 				D57000013057000000000001 /* Category.swift */,
 				3A4400013004000000000001 /* Money.swift */,
@@ -549,6 +566,7 @@
 		288EB0DD2FF7A3D000F09BC9 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				7A79000A307A000000000001 /* SalaryStore.swift */,
 				760000143076000000000001 /* CardStore.swift */,
 				D57000023057000000000001 /* CategoryStore.swift */,
 				28B87B4B2FFBD95D009BEE8C /* AccountStore.swift */,
@@ -584,6 +602,7 @@
 		288EB0DF2FF7A3D200F09BC9 /* Parsers */ = {
 			isa = PBXGroup;
 			children = (
+				7A790002307A000000000001 /* QatarAirwaysSalaryPDFParser.swift */,
 				790000133079000000000001 /* AxisCreditCardPDFParser.swift */,
 				790000143079000000000001 /* AxisCreditCardXLSXParser.swift */,
 				770000123077000000000001 /* CBQCreditCardPDFParser.swift */,
@@ -623,6 +642,7 @@
 		288EB0E22FF7A3D400F09BC9 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				7A79000C307A000000000001 /* SalaryWorkspaceViewModel.swift */,
 				DBB00001305E000000000001 /* DeveloperDatabaseProfileViewModel.swift */,
 				28B87B382FFBBD71009BEE8C /* DashboardViewModel.swift */,
 				28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */,
@@ -634,6 +654,7 @@
 		288EB0E32FF7A3D500F09BC9 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				7A79000E307A000000000001 /* SalaryView.swift */,
 				DBB00003305E000000000001 /* DeveloperDatabaseProfileWarningView.swift */,
 				D57000043057000000000001 /* CategoryManagementView.swift */,
 				28B87B252FFB24C3009BEE8C /* TransactionListView.swift */,
@@ -648,6 +669,8 @@
 		288EB0E42FF7A3D500F09BC9 /* Database */ = {
 			isa = PBXGroup;
 			children = (
+				7A790004307A000000000001 /* SalaryPersistence.swift */,
+				7A790006307A000000000001 /* SQLiteSalaryRepository.swift */,
 				DBA00001305D000000000001 /* DevelopmentDatabaseProfiles.swift */,
 				281BB1362FFC4160006E7424 /* Repository.swift */,
 				281BB1372FFC4184006E7424 /* SQLiteDatabase.swift */,
@@ -954,6 +977,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7A79000F307A000000000001 /* SalaryView.swift in Sources */,
+				7A79000D307A000000000001 /* SalaryWorkspaceViewModel.swift in Sources */,
+				7A79000B307A000000000001 /* SalaryStore.swift in Sources */,
+				7A790001307A000000000001 /* Salary.swift in Sources */,
+				7A790003307A000000000001 /* QatarAirwaysSalaryPDFParser.swift in Sources */,
+				7A790005307A000000000001 /* SalaryPersistence.swift in Sources */,
+				7A790007307A000000000001 /* SQLiteSalaryRepository.swift in Sources */,
 				760000033076000000000001 /* Card.swift in Sources */,
 				760000043076000000000001 /* CardStore.swift in Sources */,
 				770000013077000000000001 /* CBQCreditCardPDFNormalizer.swift in Sources */,
@@ -1097,6 +1127,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7A790008307A000000000001 /* SalaryPersistence.swift in Sources */,
+				7A790009307A000000000001 /* SQLiteSalaryRepository.swift in Sources */,
 				B60000013050000000000001 /* main.swift in Sources */,
 				B60000023050000000000001 /* Repository.swift in Sources */,
 				B60000033050000000000001 /* SQLiteDatabase.swift in Sources */,
@@ -1560,9 +1592,6 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Vendor/LegacyXLS;
 		};
-/* End XCLocalSwiftPackageReference section */
-
-/* Begin XCLocalSwiftPackageReference section */
 		780000223078000000000001 /* XCLocalSwiftPackageReference "Vendor/ZIPFoundation" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Vendor/ZIPFoundation;

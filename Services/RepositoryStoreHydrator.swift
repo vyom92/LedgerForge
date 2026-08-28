@@ -54,6 +54,8 @@ struct RepositoryStoreHydrationResult: Equatable {
     let importAttemptCount: Int
     let categoryCount: Int
     let categoryAssignmentCount: Int
+    let salaryStatementCount: Int
+    let fundingPlanCount: Int
 
     init(
         didHydrate: Bool,
@@ -62,7 +64,9 @@ struct RepositoryStoreHydrationResult: Equatable {
         importSessionCount: Int = 0,
         importAttemptCount: Int = 0,
         categoryCount: Int = 0,
-        categoryAssignmentCount: Int = 0
+        categoryAssignmentCount: Int = 0,
+        salaryStatementCount: Int = 0,
+        fundingPlanCount: Int = 0
     ) {
         self.didHydrate = didHydrate
         self.accountCount = accountCount
@@ -71,6 +75,8 @@ struct RepositoryStoreHydrationResult: Equatable {
         self.importAttemptCount = importAttemptCount
         self.categoryCount = categoryCount
         self.categoryAssignmentCount = categoryAssignmentCount
+        self.salaryStatementCount = salaryStatementCount
+        self.fundingPlanCount = fundingPlanCount
     }
 }
 
@@ -83,6 +89,8 @@ struct RepositoryRuntimeSnapshot {
     let importAttempts: [RepositoryImportAttempt]
     let categorySnapshot: CategorySnapshot
     let cardSnapshot: CardStoreSnapshot
+    let salaryStatements: [SalaryStatement]
+    let fundingPlans: [FundingPlan]
     let hydrationResult: RepositoryStoreHydrationResult
     let providerGeneration: ProviderGenerationToken?
 
@@ -93,6 +101,8 @@ struct RepositoryRuntimeSnapshot {
         importAttempts: [RepositoryImportAttempt],
         categorySnapshot: CategorySnapshot,
         cardSnapshot: CardStoreSnapshot,
+        salaryStatements: [SalaryStatement],
+        fundingPlans: [FundingPlan],
         providerGeneration: ProviderGenerationToken?
     ) {
         self.accounts = accounts
@@ -101,6 +111,8 @@ struct RepositoryRuntimeSnapshot {
         self.importAttempts = importAttempts
         self.categorySnapshot = categorySnapshot
         self.cardSnapshot = cardSnapshot
+        self.salaryStatements = salaryStatements
+        self.fundingPlans = fundingPlans
         self.providerGeneration = providerGeneration
         self.hydrationResult = RepositoryStoreHydrationResult(
             didHydrate: true,
@@ -109,7 +121,9 @@ struct RepositoryRuntimeSnapshot {
             importSessionCount: importSessions.count,
             importAttemptCount: importAttempts.count,
             categoryCount: categorySnapshot.categories.count,
-            categoryAssignmentCount: categorySnapshot.assignments.count
+            categoryAssignmentCount: categorySnapshot.assignments.count,
+            salaryStatementCount: salaryStatements.count,
+            fundingPlanCount: fundingPlans.count
         )
     }
 }
@@ -130,6 +144,8 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
     case invalidStatementEquivalence(String)
     case invalidCategoryState(String)
     case invalidCardState(String)
+    case invalidSalaryState(String)
+    case invalidFundingPlanState(String)
 
     var errorDescription: String? {
         switch self {
@@ -163,6 +179,10 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
             return "Persisted category metadata is invalid. Runtime data was not replaced."
         case .invalidCardState:
             return "Persisted credit-card evidence is invalid. Runtime data was not replaced."
+        case .invalidSalaryState:
+            return "Persisted salary evidence is invalid. Runtime data was not replaced."
+        case .invalidFundingPlanState:
+            return "Persisted funding-plan state is invalid. Runtime data was not replaced."
         }
     }
 }
@@ -174,12 +194,16 @@ final class RepositoryStoreHydrator {
     private let transactionRepo: TransactionRepository
     private let categoryRepo: CategoryRepository
     private let cardRepo: CardRepository
+    private let salaryRepo: SalaryRepository
+    private let fundingPlanRepo: FundingPlanRepository
     private let accountStore: AccountStore
     private let importSessionStore: ImportSessionStore
     private let importAttemptStore: ImportAttemptStore
     private let transactionStore: TransactionStore
     private let categoryStore: CategoryStore
     private let cardStore: CardStore
+    private let salaryStore: SalaryStore
+    private let fundingPlanStore: FundingPlanStore
     private let workspaceId: String
     private let persistenceState: PersistenceState
     private let providerGeneration: ProviderGenerationToken?
@@ -206,10 +230,14 @@ final class RepositoryStoreHydrator {
             transactionRepo: databaseProvider.transactionRepo,
             categoryRepo: databaseProvider.categoryRepo,
             cardRepo: databaseProvider.cardRepo,
+            salaryRepo: databaseProvider.salaryRepo,
+            fundingPlanRepo: databaseProvider.fundingPlanRepo,
             accountStore: accountStore,
             transactionStore: transactionStore,
             categoryStore: categoryStore,
             cardStore: .shared,
+            salaryStore: .shared,
+            fundingPlanStore: .shared,
             importSessionStore: importSessionStore,
             importAttemptStore: importAttemptStore,
             workspaceId: workspaceId,
@@ -226,10 +254,14 @@ final class RepositoryStoreHydrator {
         transactionRepo: TransactionRepository,
         categoryRepo: CategoryRepository = EmptyCategoryRepo(),
         cardRepo: CardRepository = EmptyCardRepo(),
+        salaryRepo: SalaryRepository = EmptySalaryRepo(),
+        fundingPlanRepo: FundingPlanRepository = EmptyFundingPlanRepo(),
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
         categoryStore: CategoryStore = .shared,
         cardStore: CardStore = .shared,
+        salaryStore: SalaryStore = .shared,
+        fundingPlanStore: FundingPlanStore = .shared,
         importSessionStore: ImportSessionStore = .shared,
         importAttemptStore: ImportAttemptStore = .shared,
         workspaceId: String = "default-workspace",
@@ -243,10 +275,14 @@ final class RepositoryStoreHydrator {
         self.transactionRepo = transactionRepo
         self.categoryRepo = categoryRepo
         self.cardRepo = cardRepo
+        self.salaryRepo = salaryRepo
+        self.fundingPlanRepo = fundingPlanRepo
         self.accountStore = accountStore
         self.transactionStore = transactionStore
         self.categoryStore = categoryStore
         self.cardStore = cardStore
+        self.salaryStore = salaryStore
+        self.fundingPlanStore = fundingPlanStore
         self.importSessionStore = importSessionStore
         self.importAttemptStore = importAttemptStore
         self.workspaceId = workspaceId
@@ -280,7 +316,9 @@ final class RepositoryStoreHydrator {
                 importSessionCount: importSessionStore.importSessions.count,
                 importAttemptCount: importAttemptStore.attempts.count,
                 categoryCount: categoryStore.categories.count,
-                categoryAssignmentCount: categoryStore.snapshot.assignments.count
+                categoryAssignmentCount: categoryStore.snapshot.assignments.count,
+                salaryStatementCount: salaryStore.statements.count,
+                fundingPlanCount: fundingPlanStore.plans.count
             )
         }
 
@@ -300,6 +338,8 @@ final class RepositoryStoreHydrator {
         let categoryDTOs = try categoryRepo.categories(workspaceId: workspaceId)
         let categoryAssignmentDTOs = try categoryRepo.assignments(workspaceId: workspaceId)
         let cardDTOs = try cardRepo.snapshot(workspaceId: workspaceId)
+        let salaryDTOs = try salaryRepo.snapshot(workspaceId: workspaceId)
+        let fundingPlanDTOs = try fundingPlanRepo.plans(workspaceId: workspaceId)
         let identitiesByAccountID = Dictionary(
             uniqueKeysWithValues: try accountDTOs.map { accountDTO in
                 (accountDTO.id, try Self.identitySummaries(from: accountRepo.identifiers(accountId: accountDTO.id, workspaceId: workspaceId)))
@@ -308,6 +348,11 @@ final class RepositoryStoreHydrator {
         let preferredSources = try importSessionRepo.preferredTransactionSources(workspaceId: workspaceId)
         let preferredSourcesByTransactionID = Dictionary(uniqueKeysWithValues: preferredSources.map { ($0.transactionId, $0) })
         var importedDocumentsByID = try referencedImportedDocuments(from: transactionDTOs)
+        for documentID in Set(salaryDTOs.statements.map(\.documentId)) where importedDocumentsByID[documentID] == nil {
+            if let document = try importSessionRepo.importedDocument(id: documentID) {
+                importedDocumentsByID[documentID] = document
+            }
+        }
         for documentID in Set(preferredSources.map(\.documentId)) where importedDocumentsByID[documentID] == nil {
             if let document = try importSessionRepo.importedDocument(id: documentID) {
                 importedDocumentsByID[documentID] = document
@@ -319,7 +364,8 @@ final class RepositoryStoreHydrator {
         let statementMembers = try importSessionRepo.statementEquivalenceMembers(workspaceId: workspaceId)
         let importSessions = try referencedImportSessions(
             from: transactionDTOs,
-            statementProjections: statementProjections
+            statementProjections: statementProjections,
+            salaryStatements: salaryDTOs.statements
         )
         try Self.validatePartialAttemptConsistency(
             sessions: importSessions,
@@ -362,6 +408,8 @@ final class RepositoryStoreHydrator {
             trustedTransactions: transactionDTOs,
             workspaceID: workspaceId
         )
+        let salaryStatements = try Self.salaryStatements(from: salaryDTOs, workspaceID: workspaceId)
+        let fundingPlans = try Self.fundingPlans(from: fundingPlanDTOs, accounts: accountDTOs, workspaceID: workspaceId)
 
         return RepositoryRuntimeSnapshot(
             accounts: accounts,
@@ -370,6 +418,8 @@ final class RepositoryStoreHydrator {
             importAttempts: importAttempts,
             categorySnapshot: categorySnapshot,
             cardSnapshot: cardSnapshot,
+            salaryStatements: salaryStatements,
+            fundingPlans: fundingPlans,
             providerGeneration: providerGeneration
         )
     }
@@ -395,6 +445,8 @@ final class RepositoryStoreHydrator {
         importAttemptStore.installAttemptsWithoutObservation(snapshot.importAttempts)
         categoryStore.installSnapshotWithoutObservation(snapshot.categorySnapshot)
         cardStore.installSnapshotWithoutObservation(snapshot.cardSnapshot)
+        salaryStore.installWithoutObservation(snapshot.salaryStatements)
+        fundingPlanStore.installWithoutObservation(snapshot.fundingPlans)
         if let providerGeneration = snapshot.providerGeneration {
             categoryReconciliationGate?.clearAfterCanonicalHydration(for: providerGeneration)
         }
@@ -413,6 +465,230 @@ final class RepositoryStoreHydrator {
         importAttemptStore.notifyAttemptsOfInstalledValue()
         categoryStore.notifySnapshotOfInstalledValue()
         cardStore.notifySnapshotOfInstalledValue()
+        salaryStore.notifyInstalledValue()
+        fundingPlanStore.notifyInstalledValue()
+    }
+
+    private static func salaryStatements(
+        from snapshot: SalaryRepositorySnapshotDTO,
+        workspaceID: String
+    ) throws -> [SalaryStatement] {
+        guard Set(snapshot.statements.map(\.id)).count == snapshot.statements.count,
+              snapshot.statements.allSatisfy({ $0.workspaceId == workspaceID }) else {
+            throw RepositoryStoreHydrationError.invalidSalaryState("statement identity or workspace mismatch")
+        }
+        return try snapshot.statements.map { dto in
+            guard dto.sourceAuthorityCode == SalarySourceAuthority.qatarAirways.rawValue,
+                  dto.parserProfileId == SalaryStatementEvidence.profileID,
+                  dto.parserProfileVersion == SalaryStatementEvidence.profileVersion,
+                  let authority = SalarySourceAuthority(rawValue: dto.sourceAuthorityCode),
+                  let kind = SalaryDocumentKind(rawValue: dto.documentKindCode),
+                  let period = try? SelectedStatementMonth(canonical: dto.financialPeriodISO),
+                  let currency = try? CurrencyCode(dto.nativeCurrency),
+                  dto.sourceFingerprintDigest.count == 64 else {
+                throw RepositoryStoreHydrationError.invalidSalaryState("unsupported source identity")
+            }
+            let printDate: StatementDate?
+            if let value = dto.printDateISO {
+                guard let parsed = try? StatementDate(canonical: value) else {
+                    throw RepositoryStoreHydrationError.invalidSalaryState("invalid print date")
+                }
+                printDate = parsed
+            } else { printDate = nil }
+            let earningsDTOs = dto.components.filter { $0.sideCode == SalaryComponentSide.earning.rawValue }
+                .sorted { $0.sourceOrdinal < $1.sourceOrdinal }
+            let deductionsDTOs = dto.components.filter { $0.sideCode == SalaryComponentSide.deduction.rawValue }
+                .sorted { $0.sourceOrdinal < $1.sourceOrdinal }
+            guard earningsDTOs.count + deductionsDTOs.count == dto.components.count,
+                  Set(dto.components.map(\.id)).count == dto.components.count else {
+                throw RepositoryStoreHydrationError.invalidSalaryState("invalid component side or identity")
+            }
+            func component(_ value: SalaryComponentDTO, side: SalaryComponentSide) throws -> SalaryComponent {
+                let money = try persistedMoney(currency: value.amountCurrency, minor: value.amountMinor, decimal: value.amountDecimal)
+                do { return try SalaryComponent(side: side, sourceOrdinal: value.sourceOrdinal, sourceLabel: value.sourceLabel, money: money) }
+                catch { throw RepositoryStoreHydrationError.invalidSalaryState("invalid component") }
+            }
+            let earnings = try earningsDTOs.map { try component($0, side: .earning) }
+            let deductions = try deductionsDTOs.map { try component($0, side: .deduction) }
+            let printedEarnings = try persistedMoney(currency: dto.nativeCurrency, minor: dto.printedEarningsMinor, decimal: dto.printedEarningsDecimal)
+            let printedDeductions: Money?
+            switch (dto.printedDeductionsMinor, dto.printedDeductionsDecimal) {
+            case let (minor?, decimal?):
+                printedDeductions = try persistedMoney(currency: dto.nativeCurrency, minor: minor, decimal: decimal)
+            case (nil, nil):
+                printedDeductions = nil
+            default:
+                throw RepositoryStoreHydrationError.invalidSalaryState("partial optional deduction total")
+            }
+            let evidence: SalaryStatementEvidence
+            do {
+                evidence = try SalaryStatementEvidence(
+                    sourceAuthority: authority,
+                    profileID: dto.parserProfileId,
+                    profileVersion: dto.parserProfileVersion,
+                    financialPeriod: period,
+                    printDate: printDate,
+                    kind: kind,
+                    nativeCurrency: currency,
+                    earnings: earnings,
+                    deductions: deductions,
+                    printedEarningsTotal: printedEarnings,
+                    printedDeductionsTotal: printedDeductions,
+                    printedNet: try persistedMoney(currency: dto.nativeCurrency, minor: dto.printedNetMinor, decimal: dto.printedNetDecimal),
+                    printedPaymentTotal: try persistedMoney(currency: dto.nativeCurrency, minor: dto.printedPaymentMinor, decimal: dto.printedPaymentDecimal)
+                )
+            } catch {
+                throw RepositoryStoreHydrationError.invalidSalaryState("salary arithmetic or source evidence mismatch")
+            }
+            return SalaryStatement(
+                id: dto.id,
+                workspaceID: dto.workspaceId,
+                documentID: dto.documentId,
+                importSessionID: dto.importSessionId,
+                fingerprintAlgorithm: dto.sourceFingerprintAlgorithm,
+                fingerprintDigest: dto.sourceFingerprintDigest,
+                evidence: evidence,
+                importedAtISO: dto.createdAtISO
+            )
+        }
+    }
+
+    private static func fundingPlans(
+        from dtos: [FundingPlanDTO],
+        accounts: [AccountDTO],
+        workspaceID: String
+    ) throws -> [FundingPlan] {
+        guard Set(dtos.map(\.id)).count == dtos.count,
+              Set(dtos.map(\.planMonthISO)).count == dtos.count,
+              dtos.allSatisfy({ $0.workspaceId == workspaceID }) else {
+            throw RepositoryStoreHydrationError.invalidFundingPlanState("plan identity or workspace mismatch")
+        }
+        let accountIDs = Set(accounts.filter { $0.workspaceId == workspaceID }.map(\.id))
+        let planIDs = Set(dtos.map(\.id))
+        return try dtos.map { dto in
+            guard let month = try? SelectedStatementMonth(canonical: dto.planMonthISO),
+                  dto.rolloverSourcePlanId.map(planIDs.contains) ?? true else {
+                throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid month or rollover")
+            }
+            func inputProvenance(_ code: String) throws -> FundingPlanValueProvenance {
+                switch code {
+                case "manual": return .manual
+                case "carried":
+                    guard let source = dto.rolloverSourcePlanId else {
+                        throw RepositoryStoreHydrationError.invalidFundingPlanState("carried input without rollover source")
+                    }
+                    return .carried(sourcePlanID: source)
+                default: throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid input provenance")
+                }
+            }
+            let expectedBalanceOrdinals = dto.balances.isEmpty ? [] : Array(1...dto.balances.count)
+            guard dto.balances.map(\.sourceOrdinal) == expectedBalanceOrdinals,
+                  Set(dto.balances.map(\.id)).count == dto.balances.count,
+                  Set(dto.balances.map(\.accountId)).count == dto.balances.count else {
+                throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid balance identity or order")
+            }
+            let balances = try dto.balances.map { value -> FundingPlanBalance in
+                guard value.planId == dto.id, accountIDs.contains(value.accountId),
+                      let nativeCurrency = try? CurrencyCode(value.nativeCurrency),
+                      ["QAR", "INR"].contains(nativeCurrency.code) else {
+                    throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid balance relationship")
+                }
+                let money: Money?
+                switch (value.amountCurrency, value.amountMinor, value.amountDecimal) {
+                case let (currency?, minor?, decimal?):
+                    money = try persistedMoney(currency: currency, minor: minor, decimal: decimal)
+                    guard money?.currency == nativeCurrency else {
+                        throw RepositoryStoreHydrationError.invalidFundingPlanState("balance currency mismatch")
+                    }
+                case (nil, nil, nil): money = nil
+                default: throw RepositoryStoreHydrationError.invalidFundingPlanState("partial planning balance")
+                }
+                let provenance: FundingPlanValueProvenance
+                switch value.provenanceCode {
+                case "manual" where value.carriedSourcePlanId == nil && value.capturedAtISO == nil:
+                    provenance = .manual
+                case "carried" where value.capturedAtISO == nil:
+                    guard let source = value.carriedSourcePlanId, planIDs.contains(source) else {
+                        throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid carried balance")
+                    }
+                    provenance = .carried(sourcePlanID: source)
+                case "captured_account_balance" where value.carriedSourcePlanId == nil:
+                    guard let captured = value.capturedAtISO, !captured.isEmpty else {
+                        throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid captured balance")
+                    }
+                    provenance = .capturedAccountBalance(capturedAtISO: captured)
+                default: throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid balance provenance")
+                }
+                return FundingPlanBalance(id: value.id, accountID: value.accountId, nativeCurrency: nativeCurrency, included: value.included, money: money, provenance: provenance)
+            }
+            func commitments(region: String, currency: String) throws -> [FundingPlanCommitment] {
+                let values = dto.commitments.filter { $0.regionCode == region }.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
+                let expectedOrdinals = values.isEmpty ? [] : Array(1...values.count)
+                guard values.map(\.sourceOrdinal) == expectedOrdinals else {
+                    throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid commitment order")
+                }
+                return try values.map { value in
+                    guard value.planId == dto.id,
+                          value.fundingAccountId.map(accountIDs.contains) ?? true else {
+                        throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid commitment relationship")
+                    }
+                    let provenance: FundingPlanValueProvenance
+                    if value.provenanceCode == "manual", value.carriedSourcePlanId == nil { provenance = .manual }
+                    else if value.provenanceCode == "carried", let source = value.carriedSourcePlanId, planIDs.contains(source) { provenance = .carried(sourcePlanID: source) }
+                    else { throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid commitment provenance") }
+                    return FundingPlanCommitment(
+                        id: value.id,
+                        label: value.label,
+                        money: try persistedMoney(currency: currency, minor: value.amountMinor, decimal: value.amountDecimal),
+                        included: value.included,
+                        fundingAccountID: value.fundingAccountId,
+                        provenance: provenance
+                    )
+                }
+            }
+            let fx: FundingPlanFX?
+            switch (dto.fxINRPerQARDecimal, dto.fxObservationDateISO) {
+            case let (decimal?, date?):
+                guard let value = Decimal(string: decimal, locale: Locale(identifier: "en_US_POSIX")),
+                      let observed = try? StatementDate(canonical: date) else {
+                    throw RepositoryStoreHydrationError.invalidFundingPlanState("invalid planning FX")
+                }
+                fx = try FundingPlanFX(inrPerQAR: value, observationDate: observed)
+            case (nil, nil): fx = nil
+            default: throw RepositoryStoreHydrationError.invalidFundingPlanState("partial planning FX")
+            }
+            return FundingPlan(
+                id: dto.id,
+                workspaceID: dto.workspaceId,
+                month: month,
+                rolloverSourcePlanID: dto.rolloverSourcePlanId,
+                expectedFixedEarnings: try persistedMoney(currency: "QAR", minor: dto.expectedFixedMinor, decimal: dto.expectedFixedDecimal),
+                expectedFixedProvenance: try inputProvenance(dto.expectedFixedProvenance),
+                expectedVariableEarnings: try persistedMoney(currency: "QAR", minor: dto.expectedVariableMinor, decimal: dto.expectedVariableDecimal),
+                expectedVariableProvenance: try inputProvenance(dto.expectedVariableProvenance),
+                expectedDeductions: try persistedMoney(currency: "QAR", minor: dto.expectedDeductionsMinor, decimal: dto.expectedDeductionsDecimal),
+                expectedDeductionsProvenance: try inputProvenance(dto.expectedDeductionsProvenance),
+                balances: balances,
+                qatarCommitments: try commitments(region: "qatar", currency: "QAR"),
+                indiaCommitments: try commitments(region: "india", currency: "INR"),
+                configuredTransferFee: try persistedMoney(currency: "QAR", minor: dto.configuredFeeMinor, decimal: dto.configuredFeeDecimal),
+                configuredTransferFeeProvenance: try inputProvenance(dto.configuredFeeProvenance),
+                planningFX: fx,
+                plannedInvestment: try persistedMoney(currency: "QAR", minor: dto.plannedInvestmentMinor, decimal: dto.plannedInvestmentDecimal),
+                plannedInvestmentProvenance: try inputProvenance(dto.plannedInvestmentProvenance),
+                updatedAtISO: dto.updatedAtISO
+            )
+        }
+    }
+
+    private static func persistedMoney(currency: String, minor: Int64, decimal: String) throws -> Money {
+        do {
+            let byMinor = try Money.fromMinorUnits(minor, currency: currency)
+            let byDecimal = try Money(canonicalDecimal: decimal, currency: currency)
+            guard byMinor == byDecimal else { throw RepositoryStoreHydrationError.decimalMinorMismatch }
+            return byMinor
+        } catch let error as RepositoryStoreHydrationError { throw error }
+        catch { throw RepositoryStoreHydrationError.malformedMoney }
     }
 
     private static func categorySnapshot(
@@ -585,7 +861,8 @@ final class RepositoryStoreHydrator {
 
     private func referencedImportSessions(
         from transactions: [TransactionDTO],
-        statementProjections: [StatementFinancialProjectionRecordDTO]
+        statementProjections: [StatementFinancialProjectionRecordDTO],
+        salaryStatements: [SalaryStatementDTO]
     ) throws -> [RepositoryImportSession] {
         var referencedSessionIDs = Set(
             transactions.compactMap { transaction -> String? in
@@ -596,6 +873,7 @@ final class RepositoryStoreHydrator {
             }
         )
         referencedSessionIDs.formUnion(statementProjections.map(\.importSessionID))
+        referencedSessionIDs.formUnion(salaryStatements.map(\.importSessionId))
 
         let transactionsByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
         return try referencedSessionIDs.sorted().compactMap { sessionID in

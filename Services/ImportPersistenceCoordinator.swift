@@ -16,6 +16,7 @@ struct ImportPersistenceResult: Equatable {
     let recognizedExistingRowCount: Int?
     let isPartialImport: Bool
     let isEquivalentSupportingSource: Bool
+    let isSalaryImport: Bool
     let accountOutcome: ImportAccountOutcome
 
     init(
@@ -31,6 +32,7 @@ struct ImportPersistenceResult: Equatable {
         recognizedExistingRowCount: Int? = nil,
         isPartialImport: Bool = false,
         isEquivalentSupportingSource: Bool = false,
+        isSalaryImport: Bool = false,
         accountOutcome: ImportAccountOutcome = .unavailable
     ) {
         self.persisted = persisted
@@ -45,6 +47,7 @@ struct ImportPersistenceResult: Equatable {
         self.recognizedExistingRowCount = recognizedExistingRowCount
         self.isPartialImport = isPartialImport
         self.isEquivalentSupportingSource = isEquivalentSupportingSource
+        self.isSalaryImport = isSalaryImport
         self.accountOutcome = accountOutcome
     }
 
@@ -90,6 +93,13 @@ struct SourceSnapshotRejectionRecord: Equatable, Sendable {
 }
 
 protocol ImportPersistenceCoordinating {
+    func persistValidatedSalaryImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ImportPersistenceResult
     func persistValidatedImport(
         financialDocument: FinancialDocument,
         importSession: ImportSession,
@@ -168,6 +178,18 @@ protocol ImportPersistenceCoordinating {
         accountChoice: ImportAccountChoice?,
         providerGeneration: ProviderGenerationToken
     ) throws -> StatementEquivalenceReviewResult
+}
+
+extension ImportPersistenceCoordinating {
+    func persistValidatedSalaryImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ImportPersistenceResult {
+        throw ImportPersistenceCoordinationError.unclassified
+    }
 }
 
 enum ImportCardInstrumentChoice: Equatable {
@@ -721,6 +743,183 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             generationToken: generationToken
         )
         self.init(databaseProviderProvider: { provider }, mapper: mapper, developerConsole: developerConsole)
+    }
+
+    func persistValidatedSalaryImport(
+        financialDocument: FinancialDocument,
+        importSession: ImportSession,
+        validation: ImportValidationResult,
+        fingerprintSet: PreparedDocumentFingerprintSet,
+        providerGeneration: ProviderGenerationToken
+    ) throws -> ImportPersistenceResult {
+        let provider = databaseProviderProvider()
+        guard provider.persistenceState.isUsable,
+              validation.passed,
+              let evidence = financialDocument.salaryStatementEvidence,
+              financialDocument.transactions.isEmpty,
+              financialDocument.financialIdentifiers.isEmpty,
+              fingerprintSet.isValid,
+              let authority = fingerprintSet.duplicateAuthority,
+              authority.algorithm == DocumentFingerprintDTO.sourceBytesSHA256Algorithm,
+              let rawText = fingerprintSet.fingerprints.first(where: {
+                  $0.algorithm == DocumentFingerprintDTO.rawTextSHA256Algorithm
+              }) else {
+            throw ImportPersistenceCoordinationError.unclassified
+        }
+        let importedAt = ISO8601DateFormatter().string(from: importSession.importedAt)
+        let suffix = importSession.id.uuidString.lowercased()
+        let sessionID = importSession.id.uuidString
+        let documentID = "document-\(suffix)"
+        let normalizedID = "normalized-document-\(suffix)"
+        let statementID = "salary-statement-\(suffix)"
+        let fingerprints = fingerprintSet.fingerprints.enumerated().map { index, fingerprint in
+            DocumentFingerprintDTO(
+                id: "fingerprint-\(suffix)-\(index)",
+                documentId: documentID,
+                importSessionId: sessionID,
+                algorithm: fingerprint.algorithm,
+                fingerprint: fingerprint.digest,
+                fingerprintData: nil,
+                isDuplicateAuthority: fingerprint.isDuplicateAuthority,
+                createdAtISO: importedAt
+            )
+        }
+        func componentDTO(_ component: SalaryComponent) throws -> SalaryComponentDTO {
+            SalaryComponentDTO(
+                id: "salary-component-\(suffix)-\(component.side.rawValue)-\(component.sourceOrdinal)",
+                salaryStatementId: statementID,
+                sideCode: component.side.rawValue,
+                sourceOrdinal: component.sourceOrdinal,
+                sourceLabel: component.sourceLabel,
+                amountCurrency: component.money.currency.code,
+                amountMinor: try component.money.minorUnits(),
+                amountDecimal: try component.money.canonicalDecimalString()
+            )
+        }
+        let statement = SalaryStatementDTO(
+            id: statementID,
+            workspaceId: mapper.workspaceId,
+            documentId: documentID,
+            importSessionId: sessionID,
+            normalizedDocumentId: normalizedID,
+            sourceFingerprintAlgorithm: authority.algorithm,
+            sourceFingerprintDigest: authority.digest,
+            sourceAuthorityCode: evidence.sourceAuthority.rawValue,
+            parserProfileId: evidence.profileID,
+            parserProfileVersion: evidence.profileVersion,
+            financialPeriodISO: evidence.financialPeriod.canonical,
+            printDateISO: evidence.printDate?.canonical,
+            documentKindCode: evidence.kind.rawValue,
+            nativeCurrency: evidence.nativeCurrency.code,
+            printedEarningsMinor: try evidence.printedEarningsTotal.minorUnits(),
+            printedEarningsDecimal: try evidence.printedEarningsTotal.canonicalDecimalString(),
+            printedDeductionsMinor: try evidence.printedDeductionsTotal?.minorUnits(),
+            printedDeductionsDecimal: try evidence.printedDeductionsTotal?.canonicalDecimalString(),
+            printedNetMinor: try evidence.printedNet.minorUnits(),
+            printedNetDecimal: try evidence.printedNet.canonicalDecimalString(),
+            printedPaymentMinor: try evidence.printedPaymentTotal.minorUnits(),
+            printedPaymentDecimal: try evidence.printedPaymentTotal.canonicalDecimalString(),
+            createdAtISO: importedAt,
+            components: try (evidence.earnings + evidence.deductions).map(componentDTO)
+        )
+        let document = ImportedDocumentDTO(
+            id: documentID,
+            workspaceId: mapper.workspaceId,
+            importSessionId: sessionID,
+            filename: importSession.fileName,
+            mimeType: "application/pdf",
+            sizeBytes: authority.byteCount,
+            legacyRawTextSHA256: rawText.digest,
+            createdAtISO: importedAt
+        )
+        let session = ImportSessionDTO(
+            id: sessionID,
+            workspaceId: mapper.workspaceId,
+            userVisibleName: importSession.fileName,
+            startedAtISO: importedAt,
+            validationStatus: "pending",
+            readerVersion: nil,
+            parserVersion: "\(evidence.profileID)@\(evidence.profileVersion)",
+            layoutVersion: nil
+        )
+        let attempt = ImportAttemptDTO(
+            workspaceId: mapper.workspaceId,
+            createdAtISO: importedAt,
+            outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
+            coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
+            accountDecisionCode: ImportAttemptAccountDecision.noFinancialMutation.rawValue,
+            guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
+            persistenceCode: ImportAttemptPersistence.committed.rawValue,
+            transactionCount: 0,
+            importSessionId: sessionID,
+            documentId: documentID,
+            sourceRowCount: evidence.earnings.count + evidence.deductions.count,
+            importedTransactionCount: 0,
+            recognizedExistingRowCount: 0,
+            blockedRowCount: 0
+        )
+        let plan = SalaryImportPlanDTO(
+            providerGeneration: providerGeneration,
+            workspace: mapper.workspace(createdAt: importSession.importedAt),
+            history: ConfirmedImportHistoryTemplateDTO(
+                document: document,
+                fingerprints: fingerprints,
+                importSession: session,
+                completedAtISO: importedAt,
+                successfulAttempt: attempt,
+                normalizedDocument: NormalizedDocumentDTO(
+                    id: normalizedID,
+                    importSessionId: sessionID,
+                    documentId: documentID,
+                    profileId: evidence.profileID,
+                    profileVersion: evidence.profileVersion
+                )
+            ),
+            statement: statement
+        )
+        switch provider.salaryRepo.commitImportedSalary(plan) {
+        case .committed(_, let persistedSessionID, _):
+            return ImportPersistenceResult(
+                persisted: true,
+                workspaceId: mapper.workspaceId,
+                accountId: nil,
+                importSessionId: persistedSessionID,
+                transactionCount: 0,
+                importAttemptId: attempt.id,
+                sourceRowCount: evidence.earnings.count + evidence.deductions.count,
+                recognizedExistingRowCount: 0,
+                isSalaryImport: true,
+                accountOutcome: .unavailable
+            )
+        case .exactSourceDuplicate(let previous):
+            let attemptID = recordAttempt(
+                provider: provider,
+                outcome: .exactStatementDuplicate,
+                coverage: .evaluatedSupportedOnly,
+                decision: .noFinancialMutation,
+                guidance: .reviewPriorImport,
+                persistence: .rejectedRecorded,
+                transactionCount: 0,
+                relatedImportSessionId: previous.importSessionId
+            )
+            return ImportPersistenceResult(
+                persisted: false,
+                workspaceId: mapper.workspaceId,
+                accountId: nil,
+                importSessionId: previous.importSessionId,
+                transactionCount: 0,
+                previousImport: Self.previousImport(from: previous),
+                importAttemptId: attemptID,
+                isSalaryImport: true,
+                accountOutcome: .unavailable
+            )
+        case .staleProviderGeneration:
+            throw ImportPersistenceCoordinationError.staleProviderGeneration
+        case .retryableContention:
+            throw ImportPersistenceCoordinationError.retryableContention
+        case .repositoryIntegrityConflict, .persistenceUnavailable:
+            throw ImportPersistenceCoordinationError.unclassified
+        }
     }
 
     private func makeConfirmedPlan(

@@ -12,6 +12,8 @@ public final class InMemoryRepositoryProvider {
     public let importSessionRepo: ImportSessionRepository
     public let generationToken: ProviderGenerationToken
     public let confirmedImportRepo: ConfirmedImportRepository
+    public let salaryRepo: SalaryRepository
+    public let fundingPlanRepo: FundingPlanRepository
 
     private let state = InMemoryRepositoryState()
 
@@ -25,6 +27,8 @@ public final class InMemoryRepositoryProvider {
         self.cardRepo = InMemoryCardRepo(state: state)
         self.importSessionRepo = InMemoryImportSessionRepo(state: state)
         self.confirmedImportRepo = InMemoryConfirmedImportRepo(state: state, generationToken: generationToken)
+        self.salaryRepo = InMemorySalaryRepo(state: state, generationToken: generationToken)
+        self.fundingPlanRepo = InMemoryFundingPlanRepo(state: state)
     }
 
     /// Test-only deterministic failure boundary for proving that an accepted
@@ -111,8 +115,120 @@ private final class InMemoryRepositoryState {
     var cardSemanticProjections: [String: CardStatementSemanticProjectionRecordDTO] = [:]
     var cardSemanticGroups: [String: CardStatementSemanticGroupDTO] = [:]
     var cardSemanticMembers: [String: CardStatementSemanticMemberDTO] = [:]
+    var salaryStatements: [String: SalaryStatementDTO] = [:]
+    var fundingPlans: [String: FundingPlanDTO] = [:]
     var confirmedImportFailureInjection: ConfirmedImportFailureInjectionPoint?
     var supportingSourceFailureInjection: SupportingSourceFailureInjectionPoint?
+}
+
+private final class InMemorySalaryRepo: SalaryRepository {
+    private let state: InMemoryRepositoryState
+    private let generationToken: ProviderGenerationToken
+
+    init(state: InMemoryRepositoryState, generationToken: ProviderGenerationToken) {
+        self.state = state
+        self.generationToken = generationToken
+    }
+
+    func commitImportedSalary(_ plan: SalaryImportPlanDTO) -> SalaryImportRepositoryResult {
+        guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        do { try plan.history.validateFingerprints() } catch { return .repositoryIntegrityConflict }
+        do { try SalaryPersistenceDTOValidator.validate(statement: plan.statement) } catch { return .repositoryIntegrityConflict }
+        guard let authority = plan.history.duplicateAuthorityFingerprint,
+              plan.workspace.id == plan.statement.workspaceId,
+              plan.history.document.workspaceId == plan.workspace.id,
+              plan.history.importSession.workspaceId == plan.workspace.id,
+              plan.history.document.importSessionId == plan.history.importSession.id,
+              plan.statement.documentId == plan.history.document.id,
+              plan.statement.importSessionId == plan.history.importSession.id,
+              plan.statement.normalizedDocumentId == plan.history.normalizedDocument?.id,
+              plan.statement.sourceFingerprintAlgorithm == authority.algorithm,
+              plan.statement.sourceFingerprintDigest == authority.fingerprint,
+              plan.statement.components.allSatisfy({ $0.salaryStatementId == plan.statement.id }) else {
+            return .repositoryIntegrityConflict
+        }
+        if let existing = state.documentFingerprints.values.first(where: {
+            $0.isDuplicateAuthority && $0.algorithm == authority.algorithm && $0.fingerprint == authority.fingerprint
+        }) {
+            let session = state.importSessions[existing.importSessionId]
+            return .exactSourceDuplicate(PriorImportedStatementDTO(
+                importSessionId: existing.importSessionId,
+                completedAtISO: session?.completedAtISO,
+                transactionCount: 0,
+                accountId: nil,
+                accountDisplayName: nil
+            ))
+        }
+        guard state.salaryStatements[plan.statement.id] == nil,
+              state.documents[plan.history.document.id] == nil,
+              state.importSessions[plan.history.importSession.id] == nil,
+              plan.history.fingerprints.allSatisfy({ state.documentFingerprints[$0.id] == nil }),
+              state.importAttempts[plan.history.successfulAttempt.id] == nil,
+              let normalized = plan.history.normalizedDocument,
+              state.normalizedDocuments[normalized.id] == nil else {
+            return .repositoryIntegrityConflict
+        }
+
+        state.workspaces[plan.workspace.id] = plan.workspace
+        state.importSessions[plan.history.importSession.id] = ImportSessionRecordDTO(
+            id: plan.history.importSession.id,
+            workspaceId: plan.history.importSession.workspaceId,
+            userVisibleName: plan.history.importSession.userVisibleName,
+            startedAtISO: plan.history.importSession.startedAtISO,
+            completedAtISO: plan.history.completedAtISO,
+            validationStatus: "passed",
+            readerVersion: plan.history.importSession.readerVersion,
+            parserVersion: plan.history.importSession.parserVersion,
+            layoutVersion: plan.history.importSession.layoutVersion
+        )
+        state.documents[plan.history.document.id] = plan.history.document
+        for fingerprint in plan.history.fingerprints { state.documentFingerprints[fingerprint.id] = fingerprint }
+        state.normalizedDocuments[normalized.id] = normalized
+        state.importAttempts[plan.history.successfulAttempt.id] = plan.history.successfulAttempt
+        state.salaryStatements[plan.statement.id] = plan.statement
+        return .committed(statementId: plan.statement.id, importSessionId: plan.history.importSession.id, documentId: plan.history.document.id)
+    }
+
+    func snapshot(workspaceId: String) throws -> SalaryRepositorySnapshotDTO {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return SalaryRepositorySnapshotDTO(statements: state.salaryStatements.values
+            .filter { $0.workspaceId == workspaceId }
+            .sorted { ($0.financialPeriodISO, $0.createdAtISO, $0.id) < ($1.financialPeriodISO, $1.createdAtISO, $1.id) })
+    }
+}
+
+private final class InMemoryFundingPlanRepo: FundingPlanRepository {
+    private let state: InMemoryRepositoryState
+    init(state: InMemoryRepositoryState) { self.state = state }
+
+    func plans(workspaceId: String) throws -> [FundingPlanDTO] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.fundingPlans.values.filter { $0.workspaceId == workspaceId }.sorted { $0.planMonthISO < $1.planMonthISO }
+    }
+
+    func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO {
+        try SalaryPersistenceDTOValidator.validate(plan: plan)
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        guard state.workspaces[plan.workspaceId] != nil,
+              state.fundingPlans.values.first(where: { $0.workspaceId == plan.workspaceId && $0.planMonthISO == plan.planMonthISO && $0.id != plan.id }) == nil,
+              state.fundingPlans[plan.id].map({ $0.workspaceId == plan.workspaceId && $0.planMonthISO == plan.planMonthISO }) ?? true,
+              plan.rolloverSourcePlanId.map({ sourceID in
+                  state.fundingPlans[sourceID].map({ $0.workspaceId == plan.workspaceId && $0.planMonthISO < plan.planMonthISO }) ?? false
+              }) ?? true,
+              plan.balances.allSatisfy({ balance in
+                  guard balance.planId == plan.id, let account = state.accounts[balance.accountId] else { return false }
+                  return account.workspaceId == plan.workspaceId && account.nativeCurrency == balance.nativeCurrency
+              }),
+              plan.commitments.allSatisfy({ commitment in
+                  guard commitment.planId == plan.id else { return false }
+                  guard let accountID = commitment.fundingAccountId else { return true }
+                  guard let account = state.accounts[accountID] else { return false }
+                  return account.workspaceId == plan.workspaceId && account.nativeCurrency == commitment.amountCurrency
+              }) else { throw RepositoryError.relationshipViolation("Funding plan relationships are invalid.") }
+        state.fundingPlans[plan.id] = plan
+        return plan
+    }
 }
 
 private final class InMemoryCardRepo: CardRepository {

@@ -78,6 +78,7 @@ struct ImportEngineResult: Equatable {
     let recognizedExistingRowCount: Int?
     let isPartialImport: Bool
     let isEquivalentSupportingSource: Bool
+    let isSalaryImport: Bool
     let accountOutcome: ImportAccountOutcome
     let recoveryRoute: ConfirmedImportRecoveryRoute
 #if DEBUG
@@ -101,6 +102,7 @@ struct ImportEngineResult: Equatable {
         recognizedExistingRowCount: Int? = nil,
         isPartialImport: Bool = false,
         isEquivalentSupportingSource: Bool = false,
+        isSalaryImport: Bool = false,
         accountOutcome: ImportAccountOutcome = .unavailable,
         recoveryRoute: ConfirmedImportRecoveryRoute = .unavailable
     ) {
@@ -120,6 +122,7 @@ struct ImportEngineResult: Equatable {
         self.recognizedExistingRowCount = recognizedExistingRowCount
         self.isPartialImport = isPartialImport
         self.isEquivalentSupportingSource = isEquivalentSupportingSource
+        self.isSalaryImport = isSalaryImport
         self.accountOutcome = accountOutcome
         self.recoveryRoute = recoveryRoute
 #if DEBUG
@@ -506,6 +509,57 @@ final class ImportEngine {
             throw ImportError.invalidDocument(message: "Imported document is empty.")
         }
 
+        if sourceFormat == .pdf {
+            let salaryParser = QatarAirwaysSalaryPDFParser()
+            if salaryParser.canRecognize(rawDocument) {
+                try publishPreparationProgress(.classifyingStatement, requestId: requestId, progress: progress)
+                let financialDocument = try salaryParser.parse(rawDocument)
+                try Task.checkCancellation()
+                try publishPreparationProgress(.validatingPreparedContent, requestId: requestId, progress: progress)
+                let validation = ImportValidator.validate(financialDocument: financialDocument)
+                try Task.checkCancellation()
+                let importSession = ImportSession(
+                    fileName: rawDocument.fileName,
+                    institution: nil,
+                    documentType: .salarySlip,
+                    parserName: QatarAirwaysSalaryPDFParser.name,
+                    transactionCount: 0,
+                    validation: validation
+                )
+                let advisoryPreviousImport = validation.passed
+                    ? try importPersistenceCoordinatorFactory().priorImportedStatement(fingerprint: fingerprint)
+                    : nil
+                try publishPreparationProgress(.preparingConfirmationPreview, requestId: requestId, progress: progress)
+                let preparedImport = PreparedImport(
+                    sourceURL: url,
+                    rawContents: contents,
+                    fileName: rawDocument.fileName,
+                    detectedInstitution: .unknown,
+                    detectedDocumentType: .salarySlip,
+                    parserName: QatarAirwaysSalaryPDFParser.name,
+                    financialDocument: financialDocument,
+                    validation: validation,
+                    importSession: importSession,
+                    fingerprint: fingerprint,
+                    sourceSnapshot: snapshot,
+                    fingerprintSet: fingerprintSet,
+                    advisoryPreviousImport: advisoryPreviousImport,
+                    statementEquivalenceReview: .notApplicable,
+                    providerGeneration: preparationGeneration
+                )
+#if DEBUG
+                await lifecycleLease.transition(to: .preparedAwaitingConfirmation)
+                livePreparedImports[preparedImport.id] = LivePreparedImport(
+                    sourceSnapshot: snapshot,
+                    lifecycleLease: lifecycleLease
+                )
+                transfersLifecycleLease = true
+#endif
+                transfersSnapshot = true
+                return preparedImport
+            }
+        }
+
         try publishPreparationProgress(.detectingInstitution, requestId: requestId, progress: progress)
         let detection = InstitutionDetector().detectWithReasons(in: rawDocument)
         let institutionCandidate = detection.importCandidate
@@ -801,6 +855,9 @@ final class ImportEngine {
             throw PersistenceWorkflowError.unavailable
         }
         guard !reconciliationGate.isBlocked else { return .unavailable }
+        if preparedImport.financialDocument.salaryStatementEvidence != nil {
+            return .unavailable
+        }
         return try importPersistenceCoordinatorFactory().reviewValidatedImport(
             financialDocument: preparedImport.financialDocument,
             validation: preparedImport.validation
@@ -816,6 +873,9 @@ final class ImportEngine {
               preparedImport.advisoryPreviousImport == nil,
               !reconciliationGate.isBlocked else {
             return .unsupportedEvidence
+        }
+        if preparedImport.financialDocument.salaryStatementEvidence != nil {
+            return .ordinaryFullImport
         }
         return try importPersistenceCoordinatorFactory().reviewPartialImport(
             financialDocument: preparedImport.financialDocument,
@@ -991,7 +1051,15 @@ final class ImportEngine {
         var failureRecoveryRoute: ConfirmedImportRecoveryRoute?
         do {
             let importPersistenceCoordinator = importPersistenceCoordinatorFactory()
-            if let reviewedPartialPlan {
+            if preparedImport.financialDocument.salaryStatementEvidence != nil {
+                persistenceResult = try importPersistenceCoordinator.persistValidatedSalaryImport(
+                    financialDocument: preparedImport.financialDocument,
+                    importSession: preparedImport.importSession,
+                    validation: preparedImport.validation,
+                    fingerprintSet: preparedImport.fingerprintSet,
+                    providerGeneration: preparedImport.providerGeneration
+                )
+            } else if let reviewedPartialPlan {
                 persistenceResult = try importPersistenceCoordinator.persistReviewedPartialImport(
                     reviewedPartialPlan
                 )
@@ -1108,6 +1176,7 @@ final class ImportEngine {
             recognizedExistingRowCount: persistenceResult.recognizedExistingRowCount,
             isPartialImport: persistenceResult.isPartialImport,
             isEquivalentSupportingSource: persistenceResult.isEquivalentSupportingSource,
+            isSalaryImport: persistenceResult.isSalaryImport,
             accountOutcome: persistenceResult.accountOutcome,
             recoveryRoute: recoveryRoute
         )

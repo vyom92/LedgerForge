@@ -43,6 +43,15 @@ struct ImportOutcomePresentationTests {
         #expect(!presentation.allowsViewingTransactions)
     }
 
+    @Test func salaryImportRoutesToSalaryHistoryWithoutClaimingTransactions() {
+        let presentation = ImportOutcomePresentation(result: ImportEngineResult(
+            fileName: "sanitized-salary.pdf", transactionCount: 0, validationPassed: true,
+            persisted: true, errorMessage: nil, isSalaryImport: true))
+        #expect(presentation.isSalaryImport)
+        #expect(!presentation.allowsViewingTransactions)
+        #expect(presentation.fileSubtitle == "Imported Salary actual — source truth is available in Salary History")
+    }
+
     @Test func validationFailureShowsNotPersistedAndHidesTransactionsAction() {
         let presentation = ImportOutcomePresentation(
             result: ImportEngineResult(

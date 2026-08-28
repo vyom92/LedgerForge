@@ -24,6 +24,7 @@ struct LedgerForgeTests {
             .accounts,
             .transactions,
             .imports,
+            .salary,
             .settings
         ])
         #expect(AppShellSection.ordinaryNavigation.map(\.rawValue) == [
@@ -31,6 +32,7 @@ struct LedgerForgeTests {
             "Accounts",
             "Transactions",
             "Import",
+            "Salary",
             "Settings"
         ])
         #expect(!AppShellSection.ordinaryNavigation.contains(.developer))

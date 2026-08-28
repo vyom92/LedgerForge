@@ -304,6 +304,8 @@ public final class DatabaseProvider {
     /// never presented or logged.
     public let generationToken: ProviderGenerationToken
     public let confirmedImportRepo: ConfirmedImportRepository
+    public let salaryRepo: SalaryRepository
+    public let fundingPlanRepo: FundingPlanRepository
     private let generationValidity: ProviderGenerationValidity?
 
     public init(
@@ -314,6 +316,8 @@ public final class DatabaseProvider {
         cardRepo: CardRepository = PlaceholderCardRepo(),
         importSessionRepo: ImportSessionRepository,
         confirmedImportRepo: ConfirmedImportRepository = PlaceholderConfirmedImportRepo(),
+        salaryRepo: SalaryRepository? = nil,
+        fundingPlanRepo: FundingPlanRepository? = nil,
         generationToken: ProviderGenerationToken = ProviderGenerationToken(),
         persistenceState: PersistenceState = .intentionalNonDurable(.testMemory),
         protectsGeneration: Bool = false
@@ -321,6 +325,8 @@ public final class DatabaseProvider {
         self.persistenceState = persistenceState
         self.generationToken = generationToken
         let resolvedCategoryRepo = categoryRepo ?? PlaceholderCategoryRepo()
+        let resolvedSalaryRepo = salaryRepo ?? EmptySalaryRepo()
+        let resolvedFundingPlanRepo = fundingPlanRepo ?? EmptyFundingPlanRepo()
         if protectsGeneration {
             let validity = ProviderGenerationValidity()
             self.generationValidity = validity
@@ -331,6 +337,8 @@ public final class DatabaseProvider {
             self.cardRepo = GenerationCheckedCardRepository(base: cardRepo, validity: validity)
             self.importSessionRepo = GenerationCheckedImportSessionRepository(base: importSessionRepo, validity: validity)
             self.confirmedImportRepo = GenerationCheckedConfirmedImportRepository(base: confirmedImportRepo, validity: validity)
+            self.salaryRepo = GenerationCheckedSalaryRepository(base: resolvedSalaryRepo, validity: validity)
+            self.fundingPlanRepo = GenerationCheckedFundingPlanRepository(base: resolvedFundingPlanRepo, validity: validity)
             return
         }
         self.generationValidity = nil
@@ -341,6 +349,8 @@ public final class DatabaseProvider {
         self.cardRepo = cardRepo
         self.importSessionRepo = importSessionRepo
         self.confirmedImportRepo = confirmedImportRepo
+        self.salaryRepo = resolvedSalaryRepo
+        self.fundingPlanRepo = resolvedFundingPlanRepo
     }
 
     /// Convenience initializer for an isolated in-memory provider. This is
@@ -355,6 +365,8 @@ public final class DatabaseProvider {
             cardRepo: provider.cardRepo,
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
+            salaryRepo: provider.salaryRepo,
+            fundingPlanRepo: provider.fundingPlanRepo,
             generationToken: provider.generationToken,
             persistenceState: .intentionalNonDurable(.testMemory),
             protectsGeneration: true
@@ -370,6 +382,8 @@ public final class DatabaseProvider {
             cardRepo: PlaceholderCardRepo(),
             importSessionRepo: PlaceholderImportSessionRepo(),
             confirmedImportRepo: PlaceholderConfirmedImportRepo(),
+            salaryRepo: PlaceholderSalaryRepo(),
+            fundingPlanRepo: PlaceholderFundingPlanRepo(),
             persistenceState: .unavailable(reason)
         )
     }
@@ -384,6 +398,8 @@ public final class DatabaseProvider {
             cardRepo: provider.cardRepo,
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
+            salaryRepo: provider.salaryRepo,
+            fundingPlanRepo: provider.fundingPlanRepo,
             generationToken: provider.generationToken,
             persistenceState: .intentionalNonDurable(purpose),
             protectsGeneration: true
@@ -399,6 +415,8 @@ public final class DatabaseProvider {
             cardRepo: provider.cardRepo,
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
+            salaryRepo: provider.salaryRepo,
+            fundingPlanRepo: provider.fundingPlanRepo,
             generationToken: provider.generationToken,
             persistenceState: .verifiedSQLite,
             protectsGeneration: protectsGeneration
@@ -539,6 +557,36 @@ private struct GenerationCheckedConfirmedImportRepository: ConfirmedImportReposi
     func commitReviewedCBQSourceOverlap(_ plan: ReviewedCBQSourceOverlapPlanDTO) -> ConfirmedImportRepositoryResult {
         do { try validity.check(); return base.commitReviewedCBQSourceOverlap(plan) }
         catch { return .staleProviderGeneration }
+    }
+}
+
+private struct GenerationCheckedSalaryRepository: SalaryRepository {
+    let base: SalaryRepository
+    let validity: ProviderGenerationValidity
+
+    func commitImportedSalary(_ plan: SalaryImportPlanDTO) -> SalaryImportRepositoryResult {
+        do { try validity.check(); return base.commitImportedSalary(plan) }
+        catch { return .staleProviderGeneration }
+    }
+
+    func snapshot(workspaceId: String) throws -> SalaryRepositorySnapshotDTO {
+        try validity.check()
+        return try base.snapshot(workspaceId: workspaceId)
+    }
+}
+
+private struct GenerationCheckedFundingPlanRepository: FundingPlanRepository {
+    let base: FundingPlanRepository
+    let validity: ProviderGenerationValidity
+
+    func plans(workspaceId: String) throws -> [FundingPlanDTO] {
+        try validity.check()
+        return try base.plans(workspaceId: workspaceId)
+    }
+
+    func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO {
+        try validity.check()
+        return try base.savePlan(plan)
     }
 }
 

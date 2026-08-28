@@ -24,6 +24,8 @@ struct RepositoryStoreHydratorTests {
         #expect(stores.importSessions.importSessions.isEmpty)
         #expect(stores.importAttempts.attempts.isEmpty)
         #expect(stores.categories.snapshot == .empty)
+        #expect(stores.salary.statements.isEmpty)
+        #expect(stores.fundingPlans.plans.isEmpty)
         #expect(snapshot.accounts.map { $0.repositoryAccountId } == ["account-dashboard"])
         #expect(snapshot.transactions.map { $0.repositoryTransactionId } == ["transaction-trusted"])
         #expect(snapshot.importSessions.map(\.id) == ["import-dashboard"])
@@ -38,6 +40,8 @@ struct RepositoryStoreHydratorTests {
         #expect(stores.importSessions.importSessions == snapshot.importSessions)
         #expect(stores.importAttempts.attempts == snapshot.importAttempts)
         #expect(stores.categories.snapshot == snapshot.categorySnapshot)
+        #expect(stores.salary.statements == snapshot.salaryStatements)
+        #expect(stores.fundingPlans.plans == snapshot.fundingPlans)
         #expect(snapshot.hydrationResult.accountCount == 1)
         #expect(snapshot.hydrationResult.transactionCount == 1)
     }
@@ -57,6 +61,8 @@ struct RepositoryStoreHydratorTests {
         let sessionsBefore = stores.importSessions.importSessions
         let attemptsBefore = stores.importAttempts.attempts
         let categoriesBefore = stores.categories.snapshot
+        let salaryBefore = stores.salary.statements
+        let fundingPlansBefore = stores.fundingPlans.plans
 
         transactionRepo.transactions = [trustedTransaction(amountDecimal: "99.99")]
         #expect(throws: RepositoryStoreHydrationError.self) {
@@ -68,6 +74,8 @@ struct RepositoryStoreHydratorTests {
         #expect(stores.importSessions.importSessions == sessionsBefore)
         #expect(stores.importAttempts.attempts == attemptsBefore)
         #expect(stores.categories.snapshot == categoriesBefore)
+        #expect(stores.salary.statements == salaryBefore)
+        #expect(stores.fundingPlans.plans == fundingPlansBefore)
     }
 
     @Test func hydratorLoadsTrustedRepositoryDataIntoRuntimeStores() throws {
@@ -395,6 +403,8 @@ private struct RuntimeStores {
     let importSessions = ImportSessionStore()
     let importAttempts = ImportAttemptStore()
     let categories = CategoryStore()
+    let salary = SalaryStore()
+    let fundingPlans = FundingPlanStore()
 }
 
 private func makeHydrator(
@@ -412,9 +422,13 @@ private func makeHydrator(
         importSessionRepo: resolvedImportSessionRepo,
         transactionRepo: transactionRepo,
         categoryRepo: provider.categoryRepo,
+        salaryRepo: provider.salaryRepo,
+        fundingPlanRepo: provider.fundingPlanRepo,
         accountStore: stores.accounts,
         transactionStore: stores.transactions,
         categoryStore: stores.categories,
+        salaryStore: stores.salary,
+        fundingPlanStore: stores.fundingPlans,
         importSessionStore: stores.importSessions,
         importAttemptStore: stores.importAttempts,
         workspaceId: "workspace-dashboard"

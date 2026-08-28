@@ -83,6 +83,7 @@ enum AppShellSection: String, CaseIterable {
     case accounts = "Accounts"
     case transactions = "Transactions"
     case imports = "Import"
+    case salary = "Salary"
     case settings = "Settings"
     case developer = "Developer Console"
 
@@ -91,6 +92,7 @@ enum AppShellSection: String, CaseIterable {
         .accounts,
         .transactions,
         .imports,
+        .salary,
         .settings
     ]
 
@@ -112,6 +114,8 @@ enum AppShellSection: String, CaseIterable {
             return "arrow.left.arrow.right.square"
         case .imports:
             return "square.and.arrow.down"
+        case .salary:
+            return "banknote"
         case .settings:
             return "gearshape"
         case .developer:
@@ -1003,6 +1007,7 @@ struct ImportOutcomePresentation: Equatable {
     var recoveryRoute: ConfirmedImportRecoveryRoute
     let isPartialImport: Bool
     let isEquivalentSupportingSource: Bool
+    let isSalaryImport: Bool
     let sourceRowCount: Int?
     let recognizedExistingRowCount: Int?
     let accountOutcomePresentation: ImportAccountOutcomePresentation?
@@ -1014,6 +1019,7 @@ struct ImportOutcomePresentation: Equatable {
         validationStatus = result.validationPassed ? "Validation Passed" : "Validation Failed"
         allowsViewingTransactions = Self.provesCommittedSuccess(result)
             && !result.isEquivalentSupportingSource
+            && !result.isSalaryImport
             && (result.recoveryRoute == .none || result.recoveryRoute == .unavailable)
         accountId = result.accountId
         importSessionId = result.importSessionId
@@ -1025,6 +1031,7 @@ struct ImportOutcomePresentation: Equatable {
         recoveryRoute = result.recoveryRoute
         isPartialImport = result.isPartialImport
         isEquivalentSupportingSource = result.isEquivalentSupportingSource
+        isSalaryImport = result.isSalaryImport
         sourceRowCount = result.sourceRowCount
         recognizedExistingRowCount = result.recognizedExistingRowCount
         accountOutcomePresentation = result.accountOutcome == .unavailable
@@ -1134,6 +1141,9 @@ struct ImportOutcomePresentation: Equatable {
         }
         if isEquivalentSupportingSource {
             return "Equivalent source evidence recorded — 0 additional transactions"
+        }
+        if isSalaryImport && persistenceStatus.hasPrefix("Persistence") {
+            return "Imported Salary actual — source truth is available in Salary History"
         }
         if allowsViewingTransactions {
             return "Imported \(transactionCount) transaction(s)"
@@ -1326,6 +1336,7 @@ struct ContentView: View {
     @StateObject private var importHistoryViewModel = ImportHistoryViewModel()
     @ObservedObject private var importAttemptStore: ImportAttemptStore = .shared
     @ObservedObject private var cardStore: CardStore = .shared
+    @ObservedObject private var fundingPlanStore: FundingPlanStore = .shared
     @State private var selectedSection: AppShellSection = .dashboard
     @State private var didStartRepositoryHydration = false
 #if DEBUG
@@ -1533,6 +1544,8 @@ struct ContentView: View {
             TransactionListView()
         case .imports:
             importWizardContent
+        case .salary:
+            SalaryView()
         case .settings:
             settingsContent
         case .developer:
@@ -1569,12 +1582,56 @@ struct ContentView: View {
                     .frame(width: 324)
                 }
 
+                salaryDashboardSummary
+
                 recentTransactionsCard
                     .frame(maxWidth: .infinity)
             }
             .padding(28)
         }
         .background(LFTheme.backgroundGradient)
+    }
+
+    private var salaryDashboardSummary: some View {
+        LFPanel(title: "Salary funding summary", trailing: AnyView(linkButton("Open Salary") { selectedSection = .salary })) {
+            if let plan = currentDashboardFundingPlan {
+                let calculation = FundingPlanCalculator.calculate(plan)
+                HStack(spacing: 28) {
+                    dashboardSalaryValue("Expected this month", calculation.expectedNet)
+                    dashboardSalaryValue("India funding shortfall", calculation.indiaFundingShortfall)
+                    dashboardSalaryValue("QAR funding principal", calculation.requiredQARPrincipal)
+                    dashboardSalaryValue("Available for investment", calculation.availableForInvestment)
+                }
+                if let fx = plan.planningFX, calculation.requiredQARPrincipal != nil {
+                    Text("India QAR equivalent uses the plan-local rate 1 QAR = \(NSDecimalNumber(decimal: fx.inrPerQAR).stringValue) INR, observed \(fx.observationDate.canonical).")
+                        .font(.caption)
+                        .foregroundStyle(LFTheme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 8)
+                }
+            } else {
+                Text("No current-month funding plan. Open Salary to enter user-owned planning values.")
+                    .foregroundStyle(LFTheme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var currentDashboardFundingPlan: FundingPlan? {
+        let components = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
+        guard let year = components.year, let month = components.month,
+              let current = try? SelectedStatementMonth(year: year, month: month) else { return nil }
+        return fundingPlanStore.plans.first { $0.workspaceID == "default-workspace" && $0.month == current }
+    }
+
+    private func dashboardSalaryValue(_ label: String, _ money: Money?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.caption).foregroundStyle(LFTheme.textSecondary)
+            Text(money.map { MoneyFormatting.display($0) } ?? "Incomplete / unavailable")
+                .font(.headline)
+                .foregroundStyle(money == nil ? LFTheme.warning : LFTheme.text)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var accountsContent: some View {
@@ -3282,10 +3339,11 @@ struct ContentView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
                 .disabled(
-                    !ImportAccountConfirmationPolicy.allowsConfirmation(
-                        review: importIdentityReview,
-                        choice: importAccountChoice
-                    ) ||
+                    (preparedImport.financialDocument.salaryStatementEvidence == nil &&
+                     !ImportAccountConfirmationPolicy.allowsConfirmation(
+                         review: importIdentityReview,
+                         choice: importAccountChoice
+                     )) ||
                     partialReviewBlocksConfirmation ||
                     statementEquivalenceBlocksConfirmation(preparedImport)
                 )
@@ -3355,10 +3413,23 @@ struct ContentView: View {
                         )
                     }
 
-                    LFInfoRow(title: "Rows Read", value: "\(preparedImport.validation.rowsRead)")
-                    LFInfoRow(title: "Transactions Parsed", value: "\(preparedImport.validation.transactionsParsed)")
-                    LFInfoRow(title: "Debit Total", value: balanceText(preparedImport.validation.debitTotal, currency: preparedImport.detectedCurrency))
-                    LFInfoRow(title: "Credit Total", value: balanceText(preparedImport.validation.creditTotal, currency: preparedImport.detectedCurrency))
+                    if let salary = preparedImport.financialDocument.salaryStatementEvidence {
+                        LFStatusBadge(title: "Imported Source Truth", color: LFTheme.info)
+                        LFInfoRow(title: "Document Kind", value: salary.kind.displayName)
+                        LFInfoRow(title: "Pay Period", value: salary.financialPeriod.canonical)
+                        LFInfoRow(title: "Print Date", value: salary.printDate?.canonical ?? "Not printed")
+                        LFInfoRow(title: "Earnings", value: formatCurrency(salary.printedEarningsTotal.amount, currencyCode: "QAR"))
+                        LFInfoRow(title: "Deductions", value: salary.printedDeductionsTotal.map { formatCurrency($0.amount, currencyCode: "QAR") } ?? "Not printed")
+                        LFInfoRow(title: "Payment Total", value: formatCurrency(salary.printedPaymentTotal.amount, currencyCode: "QAR"))
+                        Text("\(salary.earnings.count) earning line(s) and \(salary.deductions.count) deduction line(s), preserved in source order.")
+                            .font(.caption)
+                            .foregroundStyle(LFTheme.textSecondary)
+                    } else {
+                        LFInfoRow(title: "Rows Read", value: "\(preparedImport.validation.rowsRead)")
+                        LFInfoRow(title: "Transactions Parsed", value: "\(preparedImport.validation.transactionsParsed)")
+                        LFInfoRow(title: "Debit Total", value: balanceText(preparedImport.validation.debitTotal, currency: preparedImport.detectedCurrency))
+                        LFInfoRow(title: "Credit Total", value: balanceText(preparedImport.validation.creditTotal, currency: preparedImport.detectedCurrency))
+                    }
 
                     Text("No data has been written.")
                         .font(.caption.weight(.semibold))
@@ -3537,6 +3608,8 @@ struct ContentView: View {
             return "All your transactions, in one place"
         case .imports:
             return "Import statements in a few simple steps"
+        case .salary:
+            return "Imported salary actuals and current-month funding plan"
         case .settings:
             return "Configure LedgerForge to work the way you do"
         case .developer:

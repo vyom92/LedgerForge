@@ -380,6 +380,9 @@ struct FinancialDocument: Identifiable {
     let cbqSourceIdentityObservations: [CBQSourceIdentityObservation]
     let sourceStatementEvidence: SourceStatementEvidence?
     let cardStatementEvidence: CardStatementEvidence?
+    /// Exact typed salary payload. Salary documents deliberately contain no
+    /// fabricated bank transactions or Account identity.
+    let salaryStatementEvidence: SalaryStatementEvidence?
     let selectionReasons: [String]
     let createdAt: Date
 
@@ -395,6 +398,7 @@ struct FinancialDocument: Identifiable {
         cbqSourceIdentityObservations: [CBQSourceIdentityObservation] = [],
         sourceStatementEvidence: SourceStatementEvidence? = nil,
         cardStatementEvidence: CardStatementEvidence? = nil,
+        salaryStatementEvidence: SalaryStatementEvidence? = nil,
         selectionReasons: [String] = [],
         createdAt: Date = Date()
     ) {
@@ -409,6 +413,7 @@ struct FinancialDocument: Identifiable {
         self.cbqSourceIdentityObservations = cbqSourceIdentityObservations
         self.sourceStatementEvidence = sourceStatementEvidence
         self.cardStatementEvidence = cardStatementEvidence
+        self.salaryStatementEvidence = salaryStatementEvidence
         self.selectionReasons = selectionReasons
         self.createdAt = createdAt
     }

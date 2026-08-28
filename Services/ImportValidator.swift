@@ -11,6 +11,9 @@ import Foundation
 final class ImportValidator {
 
     static func validate(financialDocument: FinancialDocument) -> ImportValidationResult {
+        if let salaryEvidence = financialDocument.salaryStatementEvidence {
+            return validateSalaryStatement(financialDocument: financialDocument, evidence: salaryEvidence)
+        }
         if let cardEvidence = financialDocument.cardStatementEvidence {
             return validateCardStatement(
                 financialDocument: financialDocument,
@@ -33,6 +36,55 @@ final class ImportValidator {
             transactions: financialDocument.transactions,
             statementCurrency: financialDocument.bookedCurrency,
             reconcileSourceOrderBalances: !usesRowAssociatedBalancesWithoutSourceOrderRecurrence
+        )
+    }
+
+    private static func validateSalaryStatement(
+        financialDocument: FinancialDocument,
+        evidence: SalaryStatementEvidence
+    ) -> ImportValidationResult {
+        var issues: [ValidationIssue] = []
+        if financialDocument.metadata.institution != .unknown ||
+            financialDocument.metadata.documentType != .salarySlip ||
+            financialDocument.metadata.fileFormat != .pdf ||
+            financialDocument.bookedCurrency != evidence.nativeCurrency ||
+            !financialDocument.transactions.isEmpty ||
+            !financialDocument.financialIdentifiers.isEmpty ||
+            evidence.sourceAuthority != .qatarAirways ||
+            evidence.profileID != SalaryStatementEvidence.profileID ||
+            evidence.profileVersion != SalaryStatementEvidence.profileVersion {
+            issues.append(ValidationIssue(
+                severity: .error,
+                rowNumber: nil,
+                message: "Salary source metadata conflicts with the exact profile."
+            ))
+        }
+        let allComponents = evidence.earnings + evidence.deductions
+        if allComponents.contains(where: { $0.money.currency != evidence.nativeCurrency || $0.money.amount <= 0 }) {
+            issues.append(ValidationIssue(
+                severity: .error,
+                rowNumber: nil,
+                message: "Salary component Money is invalid."
+            ))
+        }
+        if evidence.earnings.map(\.sourceOrdinal) != evidence.earnings.indices.map({ $0 + 1 }) ||
+            evidence.deductions.map(\.sourceOrdinal) != evidence.deductions.indices.map({ $0 + 1 }) {
+            issues.append(ValidationIssue(
+                severity: .error,
+                rowNumber: nil,
+                message: "Salary component source order is incomplete."
+            ))
+        }
+        return ImportValidationResult(
+            rowsRead: allComponents.count,
+            transactionsParsed: 0,
+            statementCurrency: evidence.nativeCurrency,
+            debitTotalMoney: evidence.printedDeductionsTotal,
+            creditTotalMoney: evidence.printedEarningsTotal,
+            openingBalanceMoney: nil,
+            closingBalanceMoney: evidence.printedNet,
+            passed: issues.isEmpty,
+            issues: issues
         )
     }
 

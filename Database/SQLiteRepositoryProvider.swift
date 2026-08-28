@@ -333,6 +333,8 @@ public final class SQLiteRepositoryProvider {
     public let importSessionRepo: ImportSessionRepository
     public let generationToken: ProviderGenerationToken
     public let confirmedImportRepo: ConfirmedImportRepository
+    public let salaryRepo: SalaryRepository
+    public let fundingPlanRepo: FundingPlanRepository
 
     public convenience init(path: String? = nil) throws {
         try self.init(path: path, migrations: allMigrations)
@@ -382,6 +384,10 @@ public final class SQLiteRepositoryProvider {
             sql: "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'card_instruments';",
             params: []
         ) { _ in true }.isEmpty == false) ?? false
+        let supportsSalary = (try? database.query(
+            sql: "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'salary_statements';",
+            params: []
+        ) { _ in true }.isEmpty == false) ?? false
         self.database = database
         self.generationToken = generationToken
 
@@ -394,6 +400,12 @@ public final class SQLiteRepositoryProvider {
         self.confirmedImportRepo = supportsConfirmedImport
             ? SQLiteConfirmedImportRepository(db: database, generationToken: generationToken)
             : PlaceholderConfirmedImportRepo()
+        self.salaryRepo = supportsSalary
+            ? SQLiteSalaryRepository(db: database, generationToken: generationToken)
+            : PlaceholderSalaryRepo()
+        self.fundingPlanRepo = supportsSalary
+            ? SQLiteFundingPlanRepository(db: database)
+            : PlaceholderFundingPlanRepo()
     }
 
     public static func defaultDBPath() throws -> String {
@@ -1438,6 +1450,8 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
             cardRepo: provider.cardRepo,
             importSessionRepo: provider.importSessionRepo,
             confirmedImportRepo: provider.confirmedImportRepo,
+            salaryRepo: provider.salaryRepo,
+            fundingPlanRepo: provider.fundingPlanRepo,
             generationToken: provider.generationToken,
             persistenceState: state,
             protectsGeneration: true
