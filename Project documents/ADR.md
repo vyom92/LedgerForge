@@ -25,13 +25,13 @@ When reading this file:
 4. use `PROJECT_STATE.md` for verified implementation reality;
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
-**Status alignment date:** 2026-08-27
-**Repository implementation ref reviewed:** `main` — Sprint 78B implementation in this closure commit; the exact ref is recorded by Git history
-**Latest verified production implementation:** Sprint 78B — Exact Axis Credit-Card PDF/XLSX Support and Equivalence
+**Status alignment date:** 2026-08-28
+**Repository implementation ref reviewed:** `main@9489f6b21c9d585d2d90f2ba4798a931590057f7` — accepted Sprint 79 implementation
+**Latest verified production implementation:** Sprint 79 — Qatar Airways Salary Actuals and Current-Month Funding Planner
 **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`
-**Latest completed numbered outcome:** Sprint 78B
-**Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner (implementation pending)
-**Current migration:** V15
+**Latest completed numbered outcome:** Sprint 79
+**Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner (implemented)
+**Current migration:** V16
 
 No alignment note authorizes implementation.
 
@@ -83,7 +83,7 @@ No alignment note authorizes implementation.
 | ADR-042 | Exact Cross-Format Statement Equivalence and Supporting-Source Persistence | Accepted and implemented in Sprint 73. | Exact whole-statement equivalence is operational only for the independently approved HDFC bank-account PDF/XLS v1 pair. |
 | ADR-043 | Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts | Accepted and implemented in Sprint 75. | Exact CBQ history XLS, history PDF and monthly PDF sources coexist through bounded masked/full account resolution and one canonical transaction with durable per-source observations. |
 | ADR-044 | Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence | Accepted and implemented in Sprint 76; amended and implemented in Sprints 76A, 77 and 78B. | The shared provider-owned card domain through Migration V15 supports exact Amex, CBQ and Axis boundaries, including Axis zero-instrument liability ownership and representation-neutral PDF/XLSX equivalence without generic card support. |
-| ADR-045 | Qatar Airways Salary Actuals and Current-Month Funding Planner | Accepted architecture for Sprint 79; implementation pending. | Defines the exact Qatar Airways salary domain, dedicated Salary UX, editable current-month QAR/INR funding plan, explicit account-balance snapshots, plan-local FX, Migration V16 and non-automation boundaries without generic payroll/budgeting/FX support. |
+| ADR-045 | Qatar Airways Salary Actuals and Current-Month Funding Planner | Accepted and implemented in Sprint 79. | Exact `qatar-airways.salary.pdf@1`, dedicated Salary UX, editable current-month QAR/INR funding plan, explicit account-balance snapshots, plan-local FX and Migration V16 are operational within the bounded non-automation boundary. |
 
 ## Alignment Policy
 
@@ -5652,9 +5652,15 @@ not generic card equivalence.
 
 # ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner
 
-**Status:** Accepted architecture for Sprint 79; implementation pending  
+**Status:** Accepted and implemented in Sprint 79
 **Date:** 2026-08-27  
 **Decision owner:** Chat / user-approved Sprint 79 planning
+
+## Current Alignment — 2026-08-28
+
+ADR-045 is implemented and accepted in Sprint 79. The production implementation is published at `main@9489f6b21c9d585d2d90f2ba4798a931590057f7`. Additive Migration V16 is accepted and is the current migration baseline; V1–V15 remain immutable. The final authentic Salary suite passed 9/9 including the complete 20-source oracle gate, and the authoritative complete TestPlan passed 814 of 819 tests with 5 intentionally skipped external/private-context tests and 0 failures. The historical decision text below is retained as the architecture that governed implementation.
+
+The separately diagnosed authentic July 2026 CBQ credit-card compatibility defect is `PRE_EXISTING_OR_EXTERNAL` relative to Sprint 79 and remains outside this ADR.
 
 ## Context
 

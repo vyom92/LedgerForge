@@ -1,18 +1,18 @@
 # LedgerForge Roadmap: Sprints 70–79
 
 **Status:** Current repository cycle roadmap  
-**Refreshed:** 2026-08-27  
+**Refreshed:** 2026-08-28
 **Supersedes:** dated/private Sprints 70–79 roadmap copies through 2026-08-03
 
 ## Control
 
 - **Planning authority:** This file is the repository authority for Sprints 70–79 numbering, corrective suffixes, cycle status and next gates.
 - **Execution authority:** None. A complete Chat-approved prompt authorizes each task.
-- **Accepted production baseline:** Sprint 78B in this closure commit on `main`; the exact commit is recorded by Git history.
-- **Current migration baseline:** V15 accepted.
-- **Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner; implementation is pending. ADR-044 remains the latest implemented production-domain ADR.
-- **Current active correction:** none. Sprint 78B was technically accepted on 2026-08-27.
-- **Sprint 79:** architecture approved by Chat on 2026-08-27; implementation remains unauthorized until Chat supplies the complete execution prompt. Migration V16 is authorized for that implementation but is not yet an accepted migration.
+- **Accepted production baseline:** Sprint 79 on `main` at implementation commit `9489f6b21c9d585d2d90f2ba4798a931590057f7`; the subsequent documentation-reconciliation commit is recorded by Git history.
+- **Current migration baseline:** V16 accepted with Sprint 79.
+- **Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner; implemented and accepted with Sprint 79. ADR-044 remains the accepted card-domain authority.
+- **Current active correction:** none. Sprint 79 was technically accepted on 2026-08-28.
+- **Sprint 79:** **Accepted 2026-08-28.** Exact `qatar-airways.salary.pdf@1`, the dedicated Salary workspace/current-month funding planner and additive Migration V16 are accepted production state.
 - **Standing method:** `LedgerForge_Standing_Execution_Harness_Guide.md`.
 - **Post-cycle gate:** Sprint 80 remains reserved for Swift 6 migration-readiness analysis before investment implementation.
 
@@ -64,7 +64,7 @@ Classify material claims as verified, explicit user decision, reported only or i
 | 78 | Exact Axis credit-card PDF/XLSX support/equivalence | Failed |
 | 78A | First bounded Sprint-78 correction | Failed |
 | 78B | Bounded Sprint-78 correction that completed the outcome | **Accepted 2026-08-27** |
-| 79 | Qatar Airways salary + current-month funding planner | Architecture approved; execution awaits complete Chat prompt |
+| 79 | Qatar Airways salary + current-month funding planner | **Accepted 2026-08-28** |
 
 ---
 
@@ -138,7 +138,7 @@ axis.credit-card.xlsx@1
 
 Sprint 78B was not test-only. Chat authorized the production corrections required to achieve the Sprint 78 outcome while preserving unrelated work.
 
-Technical acceptance and governance reconciliation are complete. Sprint 79 architecture is now approved by Chat, remains unimplemented, and requires its complete execution prompt before implementation.
+Technical acceptance and governance reconciliation for Sprint 78B are complete. Sprint 79 was subsequently implemented and technically accepted on 2026-08-28.
 
 ---
 
@@ -412,7 +412,7 @@ Completed on 2026-08-27:
 1. Chat performed the technical acceptance review and accepted Sprint 78B.
 2. ADR-015 and ADR-044 are reconciled for the accepted Axis credential, ownership and source-equivalence boundary.
 3. `PROJECT_STATE.md`, this roadmap and `FUTURE_WORK.MD` are reconciled.
-4. Sprint 79 was unblocked for Chat planning; its architecture was subsequently approved on 2026-08-27. Implementation still requires the complete Chat-approved execution prompt.
+4. Sprint 79 was unblocked for Chat planning, approved on 2026-08-27, and subsequently implemented and accepted on 2026-08-28.
 
 No Sprint 78C is created because Sprint 78B completed the Sprint 78 outcome.
 
@@ -422,7 +422,7 @@ No Sprint 78C is created because Sprint 78B completed the Sprint 78 outcome.
 
 ## Status
 
-**Architecture approved by Chat on 2026-08-27. Implementation remains unauthorized until Chat supplies the complete Sprint 79 execution prompt.**
+**Accepted and implemented on 2026-08-28. Product implementation commit: `9489f6b21c9d585d2d90f2ba4798a931590057f7`.**
 
 ## Outcome
 
@@ -465,9 +465,22 @@ expected net QAR
 - available-for-investment is a derived result after checked Qatar liquidity, expected salary, Qatar obligations, India funding shortfall and transfer fee; planned investment remains a separate editable user input;
 - the manual Budget Analysis workflow is a product-behaviour reference only, not salary source truth or an acceptance oracle.
 
-Sprint 79 authorizes a new additive **Migration V16** for dedicated salary-actual and current-month funding-plan persistence. V15 remains the latest accepted migration until Sprint 79 implementation is technically accepted.
+Sprint 79 accepts additive **Migration V16** for dedicated salary-actual and current-month funding-plan persistence. V16 is now the current accepted migration baseline; V1–V15 remain immutable historical migrations.
 
-ADR-045 governs the approved Sprint 79 salary/planning architecture. Broader budgeting, recurring-obligation detection, automated transfers, global FX/reporting-currency conversion, investment execution and generic payroll support remain outside Sprint 79.
+ADR-045 governs the accepted Sprint 79 salary/planning implementation. Broader budgeting, recurring-obligation detection, automated transfers, global FX/reporting-currency conversion, investment execution and generic payroll support remain outside Sprint 79.
+
+## Sprint 79 acceptance closure
+
+Accepted on 2026-08-28:
+
+- implementation commit `9489f6b21c9d585d2d90f2ba4798a931590057f7` is published on `main`;
+- exact `qatar-airways.salary.pdf@1` salary actuals and the dedicated current-month funding planner are production state under ADR-045;
+- additive Migration V16 is accepted with SQLite/In-Memory parity and canonical hydration;
+- the authentic Salary acceptance suite passed 9/9, including the complete 20-source private oracle gate;
+- the authoritative complete TestPlan executed 819 tests: 814 passed, 5 intentionally skipped external/private-context tests, and 0 failed;
+- the pre-publication privacy scan passed with no private-path or credential residue in the 30-path Sprint 79 implementation commit.
+
+The separately diagnosed authentic July 2026 CBQ credit-card compatibility defect is classified `PRE_EXISTING_OR_EXTERNAL` relative to Sprint 79 and remains future work; it does not reopen Sprint 79.
 
 ---
 

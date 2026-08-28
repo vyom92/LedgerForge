@@ -1,28 +1,28 @@
 # Repository State
 
-## Current Alignment — 2026-08-27
+## Current Alignment — 2026-08-28
 
-This section is the current alignment layer. Historical sections below are preserved for traceability; this alignment supersedes their pre-Sprint-78B support, migration and planning limits where they conflict.
+This section is the current alignment layer. Historical sections below are preserved for traceability; this alignment supersedes earlier support, migration and planning limits where they conflict.
 
 ### Accepted production baseline
 
 - **Primary branch:** `main`.
-- **Accepted implementation:** Sprint 78B in this closure commit on `main`; the exact commit is recorded by Git history.
-- **Latest accepted numbered sprint:** Sprint 78B.
-- **Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner; implementation pending. ADR-044 remains the latest implemented production-domain ADR.
-- **Accepted migration:** V15.
+- **Accepted implementation:** Sprint 79 on `main` at implementation commit `9489f6b21c9d585d2d90f2ba4798a931590057f7`; the documentation-reconciliation commit is recorded by Git history.
+- **Latest accepted numbered sprint:** Sprint 79.
+- **Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner; implemented with Sprint 79. ADR-044 remains the accepted card-domain authority.
+- **Accepted migration:** V16.
 - **Accepted card profiles:** exact `amex.credit-card.pdf@1`, exact `cbq.credit-card.pdf@1`, and the exact Axis `axis.credit-card.pdf@1` / `axis.credit-card.xlsx@1` families accepted by Sprint 78B. No generic card/PDF/XLSX support is implied.
 - **Personal-v1 adoption:** still undeclared; release/adoption certification remains a separate future gate.
 
-### Sprint 78B closure and current planning
+### Sprint 79 closure and current planning
 
 - Sprint 78 failed and Sprint 78A failed; Sprint 78B is accepted and completes the Sprint 78 outcome.
 - Exact Axis credit-card PDF/XLSX support, the dual Axis PDF credential scopes, zero-instrument liability semantics, cross-format equivalence and Migration V15 are accepted production state.
-- Sprint 79 architecture is approved by Chat but remains unimplemented; execution requires the complete Chat-approved Sprint 79 prompt. Additive V16 is authorized for Sprint 79 implementation but is not yet an accepted migration.
+- Sprint 79 is technically accepted and published. Exact `qatar-airways.salary.pdf@1`, the dedicated Salary workspace/current-month funding planner and additive Migration V16 are accepted production state.
 - No Sprint 78C exists because Sprint 78B completed the required outcome.
-- This closure commit publishes the accepted Sprint 78B implementation, separately approved `Project_Guide.md` PG-55 state, and reconciled authorities.
+- Sprint 78B remains the accepted Axis credit-card closure; Sprint 79 builds on that baseline without reopening the completed Sprint 78 outcome.
 
-### Sprint 79 approved architecture
+### Sprint 79 accepted implementation
 
 Sprint 79 is the exact Qatar Airways salary-PDF and current-month funding-planner increment. Private discovery over the complete active salary boundary proves 20 native-text unlocked PDFs across monthly salary/payslip, Adhoc Payment and Annual Discretionary Bonus source kinds. The earlier seven-document planning statement is superseded.
 
@@ -43,9 +43,13 @@ The approved product boundary is:
 - available-for-investment and final buffer are derived planner outputs, while planned investment is editable user input;
 - no automatic salary-bank matching, card-payment matching, transfers, obligation inference or investment execution is authorized.
 
-Additive Migration V16 is authorized to introduce truthful salary-actual and current-month funding-plan persistence with SQLite/In-Memory parity and canonical `RepositoryStoreHydrator` integration. V15 remains the accepted migration baseline until Sprint 79 is technically accepted.
+Additive Migration V16 is accepted for truthful salary-actual and current-month funding-plan persistence with SQLite/In-Memory parity and canonical `RepositoryStoreHydrator` integration. V16 is the current migration baseline; V1–V15 remain immutable.
 
-ADR-045 is the accepted architecture authority for this unimplemented Sprint 79 boundary.
+ADR-045 is the accepted and implemented architecture authority for the Sprint 79 boundary.
+
+Sprint 79 acceptance evidence on the final privacy-safe candidate includes a 9/9 Salary parser/planner suite with the complete 20-source authentic oracle gate, plus the authoritative complete TestPlan at 819 total / 814 passed / 5 intentionally skipped / 0 failed. The published implementation commit is `9489f6b21c9d585d2d90f2ba4798a931590057f7`.
+
+The authentic July 2026 CBQ credit-card compatibility defect was separately classified `PRE_EXISTING_OR_EXTERNAL` relative to Sprint 79. It remains future work and does not alter Sprint 79 acceptance.
 
 ### Accepted Sprint 78B source authority
 
@@ -108,7 +112,7 @@ The primary/add-on physical-card distinction is not required for the current Axi
 - `PDFDocumentReader` remains generic source extraction and must not own Axis financial or credential-family policy.
 - The accepted Axis XLSX profile uses a bounded deterministic OOXML reader with pinned/vendored ZIPFoundation and strict package/XML validation; this does not establish generic XLSX support.
 - V1–V14 migrations remain immutable.
-- Additive V15 is accepted with Sprint 78B. Sprint 79 now authorizes additive V16 for its pending implementation; V16 is not yet an accepted migration.
+- Additive V15 remains the accepted Sprint 78B migration. Additive V16 is accepted with Sprint 79 and is now the current migration baseline.
 
 ### Accepted Axis credential architecture
 
@@ -1404,13 +1408,13 @@ Detailed implementation history remains in Git and accepted ADRs.
 
 ---
 
-## Current Planning State — 2026-08-27
+## Current Planning State — 2026-08-28
 
-- Sprint 78B is the highest-numbered **accepted** implementation, with amended ADR-044/ADR-015 and Migration V15 as the accepted architecture/migration baseline.
+- Sprint 79 is the highest-numbered **accepted** implementation, with ADR-045 and Migration V16 as the current accepted architecture/migration baseline.
 - Sprint 78 and Sprint 78A failed; Sprint 78B completed the Sprint 78 outcome and no Sprint 78C exists.
 - The exact accepted Axis source, ownership, credential, V15 and acceptance boundaries are recorded in the `Current Alignment — 2026-08-27` section above and in `LedgerForge_Roadmap_Sprints_70-79_Current.md`.
 - Exact Axis card PDF/XLSX production support is accepted only for the Sprint 78B profiles and source-proven boundaries; broader Axis/card/XLSX claims remain unsupported.
-- Sprint 79 architecture is approved but remains unimplemented and requires the complete Chat-approved execution prompt.
+- Sprint 79 is accepted and published; Sprint 80 remains the reserved next gate for Swift 6 migration-readiness analysis before investment implementation.
 - `FUTURE_WORK.MD` remains the canonical queue for work that is not currently selected for execution. It is not the active-sprint authority.
 
 ---
@@ -1421,7 +1425,7 @@ Detailed implementation history remains in Git and accepted ADRs.
 - `LedgerForge_Roadmap_Sprints_70-79_Current.md` is the repository planning authority for the current cycle's sprint numbering, corrective suffixes, status and next gates.
 - `LedgerForge_Standing_Execution_Harness_Guide.md` is the repository standing execution/review-method authority.
 - `FUTURE_WORK.MD` is the canonical unscheduled planning queue.
-- Accepted ADRs govern accepted architecture; ADR-045 now governs the approved but unimplemented Sprint 79 salary/planning boundary, while the Sprint 78B ADR-015 and ADR-044 amendments remain accepted implemented state.
+- Accepted ADRs govern accepted architecture; ADR-045 governs the implemented Sprint 79 salary/planning boundary, while the Sprint 78B ADR-015 and ADR-044 amendments remain accepted implemented state for their domains.
 - The complete Chat-approved prompt is the execution contract for the current task.
 - Chat owns sprint/architecture/acceptance decisions. MCP executor provides guarded local Mac repository/Xcode access inside Chat. Codex is a separate execution environment and must receive a self-contained prompt plus repository-local authorities.
 - Before any write, exact branch/HEAD/divergence, worktree/index state, branches/worktrees/stashes, active Git operations, validations, MCP lease and independent external writers must be verified.

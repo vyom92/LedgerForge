@@ -781,6 +781,8 @@ Sprint 75's completed CBQ current-account source-lineage work remains separate
 from Sprint 77 card semantics and does not generalize ADR-043 to CBQ cards. Sprint 73's
 exact whole-statement HDFC contract also does not authorize card overlap.
 
+**Verified compatibility defect — 2026-08-28:** the authentic encrypted July 2026 CBQ credit-card source unlocks through the production credential path and reaches the accepted CBQ credit-card normalization boundary, then fails with `CBQCreditCardPDFNormalizationError.malformedPreamble`. Baseline comparison classified this `PRE_EXISTING_OR_EXTERNAL` relative to Sprint 79, not a Sprint 79 regression. Repair remains source-bounded future work and does not broaden or revoke the accepted Sprint 77 CBQ profile.
+
 Card-liability effects remain separate from bank-account debit/credit semantics.
 Missing rates, fees, taxes, aggregates or other evidence must not be invented.
 Payment allocation, rewards accounting, reversal matching and universal card
@@ -1978,26 +1980,23 @@ Internal transfers must never be presented as new income or expense.
 
 ## FW-P3-08 — Salary and Planning Workspace
 
-**Status:** Partially scheduled through Sprint 79; broader workspace remains future work
-**Depends on:** Exact salary-family support plus future transaction/account relationship and planning expansions
+**Status:** Partially completed; the remaining broader workspace is future work
+**Depends on:** Future transaction/account relationships, recurring-obligation detection and separately approved planning expansions
 
-Sprint 79 approves a bounded first production slice under ADR-045:
+Sprint 79 completed the bounded Qatar Airways Salary History / This Month planner slice under ADR-045 and Migration V16. That accepted implementation is recorded in `PROJECT_STATE.md` and ADR-045 and is no longer queued here.
 
-- dedicated `Salary` sidebar destination with Salary History and This Month planning;
-- exact Qatar Airways salary actuals and monthly actual aggregation;
-- editable expected fixed/variable/deduction planning inputs;
-- explicit editable rollover from the prior month's plan;
-- account-driven QAR/INR balance inclusion with carried/manual/refreshed snapshot provenance;
-- user-controlled Qatar and India commitments and optional funding-account routing;
-- dated user-entered plan-local QAR→INR rate and editable transfer fee;
-- India funding-shortfall calculation after selected INR liquidity;
-- derived funding position, available-for-investment and final buffer;
-- summary-only Dashboard integration;
-- explicit user control throughout, with no automatic transaction creation, transfer execution or amount/date matching.
+Remaining future work includes:
 
-The approved UI revision is limited to this dedicated Salary destination and bounded Dashboard summaries.
+- generic salary/employer support beyond exact `qatar-airways.salary.pdf@1`;
+- recurring-obligation detection and broader cash-flow planning;
+- automated or executable transfer planning;
+- automatic card-payment reconciliation;
+- generic budgeting/allocation;
+- savings/investment execution;
+- historical planner analytics and variance explanation after actual bank transactions arrive;
+- any broader global-FX/reporting-currency integration, only under separate architecture and source authority.
 
-The broader Product Vision workspace remains future work, including generic salary support, recurring-obligation detection, automated or executable transfer planning, automatic card-payment reconciliation, generic budgeting/allocation, savings/investment execution, historical planner analytics and variance explanation after actual bank transactions arrive.
+The accepted dedicated Salary destination and bounded Dashboard summaries remain Sprint 79 production state; this future-work item does not authorize expansion of that boundary.
 
 ---
 
