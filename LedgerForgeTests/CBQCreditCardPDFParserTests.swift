@@ -80,18 +80,24 @@ struct CBQCreditCardPDFParserTests {
     }
 
     @Test
-    func arbitraryFinancialAndChangedPostTerminationTailsReject() throws {
+    func nonFinancialPostTerminationVariationIsAcceptedButFinancialOrStructuralReentryRejects() throws {
         let approved = fixturePages(version: "v1")
-        let arbitrary = [approved[0], approved[1], "unapproved boilerplate text"]
-        let financial = [approved[0], approved[1], "01/01/25 02/01/25 1.00"]
+        let harmless = [approved[0], approved[1], "unapproved boilerplate text mentioning the next statement and card"]
         let changed = [approved[0], approved[1], approved[2].replacingOccurrences(of: "commercial", with: "altered", options: .caseInsensitive, range: nil)]
-        var categoryShift = approved[2].split(separator: " ").map(String.init)
-        let urlIndex = try #require(categoryShift.firstIndex(where: { $0.hasPrefix("https://") }))
-        let fillerIndex = try #require(categoryShift.firstIndex(of: "boilerplate"))
-        categoryShift.swapAt(urlIndex, fillerIndex)
-        let changedCategory = [approved[0], approved[1], categoryShift.joined(separator: " ")]
 
-        for pages in [arbitrary, financial, changed, changedCategory] {
+        for pages in [harmless, changed] {
+            let normalized = try CBQCreditCardPDFNormalizer().normalize(
+                text: pages.joined(separator: "\n"), pageTexts: pages,
+                fileURL: URL(fileURLWithPath: "/tmp/cbq-card-tail-non-financial.pdf")
+            )
+            #expect(!normalized.rows.isEmpty)
+        }
+
+        let financial = [approved[0], approved[1], "01/01/25 02/01/25 1.00"]
+        let structural = [approved[0], approved[1], "Card Account Reference"]
+        let secondTermination = [approved[0], approved[1], "XXXX End of Statement"]
+        let continuation = [approved[0], approved[1], "Continued on next page..."]
+        for pages in [financial, structural, secondTermination, continuation] {
             #expect(throws: CBQCreditCardPDFNormalizationError.self) {
                 _ = try CBQCreditCardPDFNormalizer().normalize(
                     text: pages.joined(separator: "\n"), pageTexts: pages,
@@ -102,17 +108,161 @@ struct CBQCreditCardPDFParserTests {
     }
 
     @Test
+    func v1SummaryIgnoresExplanatoryLabelReuseButRejectsDuplicateFinancialField() throws {
+        var explanatory = fixturePages(version: "v1")
+        explanatory[0] = explanatory[0].replacingOccurrences(
+            of: "Current Outstanding Balance 92.00",
+            with: "Current Outstanding Balance 92.00\nAmount billed includes purchases and reversals posted in the statement"
+        )
+        let normalized = try CBQCreditCardPDFNormalizer().normalize(
+            text: explanatory.joined(separator: "\n"), pageTexts: explanatory,
+            fileURL: URL(fileURLWithPath: "/tmp/cbq-card-v1-explanatory-label.pdf")
+        )
+        #expect(!normalized.rows.isEmpty)
+
+        var duplicate = fixturePages(version: "v1")
+        duplicate[0] = duplicate[0].replacingOccurrences(
+            of: "Amount Billed 12.00",
+            with: "Amount Billed 12.00\nAmount Billed 13.00"
+        )
+        #expect(throws: CBQCreditCardPDFNormalizationError.malformedSummary) {
+            _ = try CBQCreditCardPDFNormalizer().normalize(
+                text: duplicate.joined(separator: "\n"), pageTexts: duplicate,
+                fileURL: URL(fileURLWithPath: "/tmp/cbq-card-v1-duplicate-summary.pdf")
+            )
+        }
+    }
+
+    @Test
+    func v2StatementBalanceRequiresMatchingCreditSignAndMagnitude() throws {
+        var credit = fixturePages(version: "v2")
+        credit[0] = credit[0]
+            .replacingOccurrences(of: "Total Statement Balance QAR 80.00", with: "Total Statement Balance QAR CR 80.00")
+            .replacingOccurrences(of: "80.00 =", with: ")80.00( =")
+        let accepted = try CBQCreditCardPDFNormalizer().normalize(
+            text: credit.joined(separator: "\n"), pageTexts: credit,
+            fileURL: URL(fileURLWithPath: "/tmp/cbq-card-v2-credit-balance.pdf")
+        )
+        #expect(!accepted.rows.isEmpty)
+
+        var signMismatch = credit
+        signMismatch[0] = signMismatch[0].replacingOccurrences(
+            of: "Total Statement Balance QAR CR 80.00",
+            with: "Total Statement Balance QAR 80.00"
+        )
+        #expect(throws: CBQCreditCardPDFNormalizationError.malformedSummary) {
+            _ = try CBQCreditCardPDFNormalizer().normalize(
+                text: signMismatch.joined(separator: "\n"), pageTexts: signMismatch,
+                fileURL: URL(fileURLWithPath: "/tmp/cbq-card-v2-sign-mismatch.pdf")
+            )
+        }
+
+        var magnitudeMismatch = credit
+        magnitudeMismatch[0] = magnitudeMismatch[0].replacingOccurrences(
+            of: "Total Statement Balance QAR CR 80.00",
+            with: "Total Statement Balance QAR CR 81.00"
+        )
+        #expect(throws: CBQCreditCardPDFNormalizationError.malformedSummary) {
+            _ = try CBQCreditCardPDFNormalizer().normalize(
+                text: magnitudeMismatch.joined(separator: "\n"), pageTexts: magnitudeMismatch,
+                fileURL: URL(fileURLWithPath: "/tmp/cbq-card-v2-magnitude-mismatch.pdf")
+            )
+        }
+    }
+
+    @Test
+    func continuationPageMayRepeatTableHeaderWithoutRepeatingProductLabel() throws {
+        var pages = fixturePages(version: "v2")
+        var lines = pages[1].components(separatedBy: .newlines)
+        if let index = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines) == "Diners Club" }) {
+            lines.remove(at: index)
+        }
+        pages[1] = lines.joined(separator: "\n")
+        let normalized = try CBQCreditCardPDFNormalizer().normalize(
+            text: pages.joined(separator: "\n"), pageTexts: pages,
+            fileURL: URL(fileURLWithPath: "/tmp/cbq-card-v2-continuation.pdf")
+        )
+        #expect(!normalized.rows.isEmpty)
+    }
+
+    @Test
+    func wrappedMoneyTailCreatesItsOwnTransaction() throws {
+        var pages = fixturePages(version: "v2")
+        pages[0] = pages[0].replacingOccurrences(
+            of: "05/11/25 06/11/25 continuation date-looking narration\nfollow-up narration",
+            with: "05/11/25 06/11/25 WRAPPED MERCHANT\nEUR 10.00 37.50"
+        )
+        let normalized = try CBQCreditCardPDFNormalizer().normalize(
+            text: pages.joined(separator: "\n"), pageTexts: pages,
+            fileURL: URL(fileURLWithPath: "/tmp/cbq-card-v2-wrapped-money.pdf")
+        )
+        #expect(normalized.rows.count == 6)
+        let wrapped = try #require(normalized.rows.first { $0.values[2] == "WRAPPED MERCHANT" })
+        #expect(wrapped.values[4] == "10.00")
+        #expect(wrapped.values[5] == "EUR")
+        #expect(wrapped.values[6] == "37.50")
+        #expect(wrapped.values[7] == CardLiabilityEffect.increasesAmountOwed.rawValue)
+    }
+
+    @Test
     func conflictingDuplicatePreambleEvidenceFailsClosed() throws {
         var pages = fixturePages(version: "v1")
         pages[0] = pages[0].replacingOccurrences(
-            of: "Statement Date 30/11/25",
-            with: "Statement Date 30/11/25\nStatement Date 31/12/25"
+            of: "Statement Date 30 November, 2025",
+            with: "Statement Date 30 November, 2025\nStatement Date 31 December, 2025"
         )
         #expect(throws: CBQCreditCardPDFNormalizationError.malformedPreamble) {
             _ = try CBQCreditCardPDFNormalizer().normalize(
                 text: pages.joined(separator: "\n"), pageTexts: pages,
                 fileURL: URL(fileURLWithPath: "/tmp/cbq-card-fictional-duplicate-preamble.pdf")
             )
+        }
+    }
+
+    @Test
+    func authenticFourDigitAndFullMonthPreambleCanonicalizesToExistingParserContract() throws {
+        let normalized = try normalize(version: "v1")
+        let fragments = normalized.sourceContext.preTransactionFragments.map(\.text)
+        #expect(fragments.contains("STATEMENT_DATE\t30/11/25"))
+        #expect(fragments.contains("PERIOD\t01/11/25\t30/11/25"))
+        #expect(fragments.contains("DUE_DATE\t15/12/25"))
+    }
+
+    @Test
+    func legacyShortPreambleRemainsAccepted() throws {
+        var pages = fixturePages(version: "v1")
+        pages[0] = pages[0]
+            .replacingOccurrences(of: "Statement Date 30 November, 2025", with: "Statement Date 30/11/25")
+            .replacingOccurrences(of: "Statement Period 01/11/2025 - 30/11/2025", with: "Statement Period 01/11/25 to 30/11/25")
+            .replacingOccurrences(of: "Payment Due Date 15 December, 2025", with: "Payment Due Date 15/12/25")
+        let normalized = try CBQCreditCardPDFNormalizer().normalize(
+            text: pages.joined(separator: "\n"), pageTexts: pages,
+            fileURL: URL(fileURLWithPath: "/tmp/cbq-card-fictional-legacy-preamble.pdf")
+        )
+        #expect(!normalized.rows.isEmpty)
+    }
+
+    @Test
+    func mixedInvalidAndConflictingPeriodEvidenceFailsClosed() throws {
+        let replacements = [
+            "Statement Period 01/11/25 - 30/11/2025",
+            "Statement Period 01/11/202 - 30/11/202",
+            "Statement Period 31/02/2025 - 30/11/2025",
+            "Statement Period 30/11/2025 - 01/11/2025",
+            "Statement Period 01/11/2025 - 30/11/2025\nStatement Period 01/12/2025 - 31/12/2025"
+        ]
+        for replacement in replacements {
+            var pages = fixturePages(version: "v1")
+            pages[0] = pages[0].replacingOccurrences(
+                of: "Statement Period 01/11/2025 - 30/11/2025",
+                with: replacement
+            )
+            #expect(throws: CBQCreditCardPDFNormalizationError.malformedPreamble) {
+                _ = try CBQCreditCardPDFNormalizer().normalize(
+                    text: pages.joined(separator: "\n"), pageTexts: pages,
+                    fileURL: URL(fileURLWithPath: "/tmp/cbq-card-fictional-invalid-period.pdf")
+                )
+            }
         }
     }
 
@@ -131,16 +281,16 @@ struct CBQCreditCardPDFParserTests {
     private func fixturePages(version: String, tailVariant: String? = nil) -> [String] {
         let summary: String
         if version == "v1" {
-            summary = "Previous Outstanding Balance 100.00 Amount Billed 12.00 Payment Received CR 20.00 Current Outstanding Balance 92.00"
+            summary = "Previous Outstanding Balance 100.00\nAmount Billed 12.00\nPayment Received CR 20.00\nCurrent Outstanding Balance 92.00"
         } else {
-            summary = "Reversal Purchases Billed Installment Fees/\n80.00 = 6.00 + 0.00 + 3.00 + 100.00 - 20.00 - )9.00("
+            summary = "Reversal Purchases Billed Installment Fees/\nTotal Statement Balance QAR 80.00\n80.00 = 3.00 + 0.00 + 6.00 + 9.00 - 20.00 - 100.00"
         }
         let page1 = """
         Card Account Reference
         470012345678901
-        Statement Date 30/11/25
-        Statement Period 01/11/25 to 30/11/25
-        Payment Due Date 15/12/25
+        Statement Date 30 November, 2025
+        Statement Period 01/11/2025 - 30/11/2025
+        Payment Due Date 15 December, 2025
         """ + "\n" + summary + "\n" + """
         Diners Club
         Card Number Card Holder Name Product Card Limit
@@ -177,70 +327,12 @@ struct CBQCreditCardPDFParserTests {
 
 @MainActor
 func fictionalCBQApprovedTail(version: String) -> String {
-        let keywordPositions: [(Int, [String])]
-        let tokenCount: Int
-        let numericPositions: [Int]
-        let urlPositions: [Int]
-        switch version {
-        case "v1":
-            keywordPositions = [
-                (3, ["statement"]), (5, ["visit"]), (6, ["www"]), (10, ["card"]),
-                (15, ["customer"]), (30, ["customer"]), (194, ["commercial"]), (195, ["bank"]),
-                (200, ["card"]), (201, ["commercial"]), (202, ["bank"]), (207, ["card"])
-            ]
-            tokenCount = 255
-            numericPositions = [17, 32, 75, 77, 149, 150, 158, 159, 228, 230, 235, 237, 254]
-            urlPositions = [6]
-        case "v2-extended":
-            keywordPositions = [
-                (3, ["statement"]), (5, ["visit"]), (6, ["www"]), (10, ["card"]),
-                (15, ["customer"]), (30, ["customer"]), (78, ["important"]), (84, ["card"]),
-                (85, ["statement"]), (137, ["statement"]), (140, ["mobile"]), (141, ["bank"]),
-                (148, ["card"]), (154, ["commercial"]), (155, ["bank"]), (156, ["reward"]),
-                (158, ["please"]), (163, ["mobile"]), (164, ["bank"]), (181, ["statement"]),
-                (191, ["statement"]), (209, ["statement"]), (244, ["statement"]), (275, ["statement"]),
-                (293, ["app"]), (321, ["statement"]), (329, ["app"]), (333, ["card"]),
-                (358, ["card", "www"]), (366, ["please"]), (367, ["visit"]), (369, ["website"]),
-                (374, ["visit"]), (375, ["www"]), (379, ["card"]), (384, ["customer"]),
-                (399, ["customer"]), (563, ["commercial"]), (564, ["bank"]), (569, ["card"]),
-                (570, ["commercial"]), (571, ["bank"]), (576, ["card"])
-            ]
-            tokenCount = 624
-            numericPositions = [17, 32, 75, 77, 102, 115, 200, 238, 240, 291, 323, 386, 401, 444, 446, 518, 519, 527, 528, 597, 599, 604, 606, 623]
-            urlPositions = [6, 358, 375]
-        default:
-            keywordPositions = [
-                (3, ["statement"]), (5, ["important"]), (11, ["card"]), (12, ["statement"]),
-                (64, ["statement"]), (67, ["mobile"]), (68, ["bank"]), (75, ["card"]),
-                (81, ["commercial"]), (82, ["bank"]), (83, ["reward"]), (85, ["please"]),
-                (90, ["mobile"]), (91, ["bank"]), (108, ["statement"]), (118, ["statement"]),
-                (136, ["statement"]), (171, ["statement"]), (202, ["statement"]), (220, ["app"]),
-                (248, ["statement"]), (256, ["app"]), (260, ["card"]), (285, ["card", "www"]),
-                (293, ["please"]), (294, ["visit"]), (296, ["website"]), (301, ["visit"]),
-                (302, ["www"]), (306, ["card"]), (311, ["customer"]), (326, ["customer"]),
-                (490, ["commercial"]), (491, ["bank"]), (496, ["card"]), (497, ["commercial"]),
-                (498, ["bank"]), (503, ["card"])
-            ]
-            tokenCount = 551
-            numericPositions = [29, 42, 127, 165, 167, 218, 250, 313, 328, 371, 373, 445, 446, 454, 455, 524, 526, 531, 533, 550]
-            urlPositions = [285, 302]
-        }
-        var tokens = Array(repeating: "boilerplate", count: tokenCount)
-        tokens[0] = "XXXX"
-        tokens[1] = "End"
-        tokens[2] = "of"
-        tokens[3] = "Statement"
-        for (index, categories) in keywordPositions {
-            let token = categories.contains("www")
-                ? (categories.contains("card") ? "www.card.example.test" : "www.example.test")
-                : categories.joined(separator: "-")
-            tokens[index] = token
-        }
-        for index in numericPositions {
-            tokens[index] = "1"
-        }
-        for index in urlPositions {
-            tokens[index] = "https://" + tokens[index]
-        }
-        return tokens.dropFirst(4).joined(separator: " ")
+    switch version {
+    case "v1":
+        return "For your next statement visit www.example.test for card and commercial bank information."
+    case "v2-extended":
+        return "Important card statement information. Please visit www.example.test and the bank website.\nReward and mobile app information may change on the next statement."
+    default:
+        return "Important card statement information. Reward details and commercial bank notices are available at www.example.test."
+    }
 }

@@ -1129,6 +1129,17 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
               evidence.instrumentSections.allSatisfy({ $0.sourceIdentityObservations.count == 1 }) else {
             throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
         }
+        let identityResolution = try resolver(accountRepo: provider.accountRepo).resolve(
+            workspaceId: mapper.workspaceId,
+            identifiers: financialDocument.financialIdentifiers
+        )
+        let advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO
+        switch identityResolution {
+        case .resolved(let accountID): advisoryIdentity = .resolved(accountId: accountID)
+        case .noMatch: advisoryIdentity = .noMatch
+        case .ambiguous: advisoryIdentity = .ambiguous
+        case .conflict: advisoryIdentity = .conflict
+        }
         let snapshot = try provider.cardRepo.snapshot(workspaceId: mapper.workspaceId)
         let accountObservation = evidence.accountSourceIdentityObservations[0]
         let accountCandidates = Set(snapshot.sourceObservations.filter {
@@ -1258,7 +1269,7 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             validation: validation,
             fingerprintSet: fingerprintSet,
             providerGeneration: providerGeneration,
-            advisoryIdentity: .noMatch,
+            advisoryIdentity: advisoryIdentity,
             accountChoice: confirmedAccountChoice,
             selectedAccountId: selectedAccountID,
             cardAssociationAuthority: accountAssociationAuthority,

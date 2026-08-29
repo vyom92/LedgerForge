@@ -186,6 +186,10 @@ final class CBQCreditCardPDFNormalizer {
                     index += 1
                     continue
                 }
+                if version == .v2, Self.isV2StatementBalanceLine(line) {
+                    index += 1
+                    continue
+                }
                 if let total = Self.subtotal(line: line) {
                     guard let sectionID = currentSectionID,
                           let expected = sections.first(where: { $0.id == sectionID }),
@@ -205,14 +209,35 @@ final class CBQCreditCardPDFNormalizer {
                     guard currentSectionID != nil else {
                         throw CBQCreditCardPDFNormalizationError.malformedInstrumentSection
                     }
-                    guard let tail = Self.moneyTail(start.description) else {
+                    var resolvedTail = Self.moneyTail(start.description)
+                    var tailEndIndex = index
+                    if resolvedTail == nil {
+                        var candidateDescription = start.description
+                        var probe = index + 1
+                        while probe < lines.count {
+                            let candidate = lines[probe]
+                            if candidate.isEmpty { probe += 1; continue }
+                            if Self.rowStart(candidate) != nil || Self.sectionDescriptor(line: candidate) != nil ||
+                                Self.subtotal(line: candidate) != nil || Self.isEndOfStatement(candidate) ||
+                                candidate == "Continued on next page..." || Self.isStructuralHeader(candidate) ||
+                                candidate.hasPrefix("Reference:") { break }
+                            candidateDescription += " " + candidate
+                            if let wrappedTail = Self.moneyTail(candidateDescription) {
+                                resolvedTail = wrappedTail
+                                tailEndIndex = probe
+                                break
+                            }
+                            probe += 1
+                        }
+                    }
+                    guard let tail = resolvedTail else {
                         if rows.isEmpty { throw CBQCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: sourceOrdinal + 1) }
                         var continuation = line
                         var next = index + 1
                         while next < lines.count {
                             let candidate = lines[next]
                             if candidate.isEmpty { next += 1; continue }
-                            if let candidateStart = Self.rowStart(candidate), Self.moneyTail(candidateStart.description) != nil { break }
+                            if Self.rowStart(candidate) != nil { break }
                             if Self.sectionDescriptor(line: candidate) != nil || Self.subtotal(line: candidate) != nil ||
                                 Self.isEndOfStatement(candidate) || candidate == "Continued on next page..." { break }
                             continuation += "\n" + candidate
@@ -225,7 +250,7 @@ final class CBQCreditCardPDFNormalizer {
                     sourceOrdinal += 1
                     var description = tail.description
                     var reference: String?
-                    var next = index + 1
+                    var next = tailEndIndex + 1
                     while next < lines.count {
                         let candidate = lines[next]
                         if candidate.isEmpty { next += 1; continue }
@@ -258,9 +283,9 @@ final class CBQCreditCardPDFNormalizer {
                 index += 1
             }
             if sawContinuation {
-                guard pageIndex + 1 < pages.count, let open = currentSectionID,
-                      let section = sections.first(where: { $0.id == open }),
-                      pages[pageIndex + 1].contains(section.label),
+                guard pageIndex + 1 < pages.count,
+                      let open = currentSectionID,
+                      sections.contains(where: { $0.id == open }),
                       pages[pageIndex + 1].contains("Card Number Card Holder Name Product Card Limit") else {
                     throw CBQCreditCardPDFNormalizationError.malformedInstrumentSection
                 }
@@ -440,125 +465,14 @@ final class CBQCreditCardPDFNormalizer {
         line.range(of: #"\d{2}/\d{2}/\d{2}.*[0-9]+(?:,[0-9]{3})*\.[0-9]{2}"#, options: .regularExpression) != nil
     }
 
-    private struct PostTerminationSignature {
-        let version: InternalVersion
-        let tokenCount: Int
-        let keywordPositions: [KeywordPosition]
-        let numericPositions: [[Int]]
-        let urlPositions: [Int]
-    }
-
-    private struct KeywordPosition: Equatable {
-        let index: Int
-        let categories: [String]
-    }
-
-    private static let postTerminationSignatures: [PostTerminationSignature] = [
-        PostTerminationSignature(
-            version: .v1,
-            tokenCount: 255,
-            keywordPositions: [
-                .init(index: 3, categories: ["statement"]), .init(index: 5, categories: ["visit"]),
-                .init(index: 6, categories: ["www"]), .init(index: 10, categories: ["card"]),
-                .init(index: 15, categories: ["customer"]), .init(index: 30, categories: ["customer"]),
-                .init(index: 194, categories: ["commercial"]), .init(index: 195, categories: ["bank"]),
-                .init(index: 200, categories: ["card"]), .init(index: 201, categories: ["commercial"]),
-                .init(index: 202, categories: ["bank"]), .init(index: 207, categories: ["card"])
-            ],
-            numericPositions: [
-                [17, 32, 35, 77, 149, 150, 158, 159, 228, 230, 235, 237, 254],
-                [17, 32, 75, 77, 149, 150, 158, 159, 228, 230, 235, 237, 254]
-            ],
-            urlPositions: [6]
-        ),
-        PostTerminationSignature(
-            version: .v2,
-            tokenCount: 624,
-            keywordPositions: [
-                .init(index: 3, categories: ["statement"]), .init(index: 5, categories: ["visit"]),
-                .init(index: 6, categories: ["www"]), .init(index: 10, categories: ["card"]),
-                .init(index: 15, categories: ["customer"]), .init(index: 30, categories: ["customer"]),
-                .init(index: 78, categories: ["important"]), .init(index: 84, categories: ["card"]),
-                .init(index: 85, categories: ["statement"]), .init(index: 137, categories: ["statement"]),
-                .init(index: 140, categories: ["mobile"]), .init(index: 141, categories: ["bank"]),
-                .init(index: 148, categories: ["card"]), .init(index: 154, categories: ["commercial"]),
-                .init(index: 155, categories: ["bank"]), .init(index: 156, categories: ["reward"]),
-                .init(index: 158, categories: ["please"]), .init(index: 163, categories: ["mobile"]),
-                .init(index: 164, categories: ["bank"]), .init(index: 181, categories: ["statement"]),
-                .init(index: 191, categories: ["statement"]), .init(index: 209, categories: ["statement"]),
-                .init(index: 244, categories: ["statement"]), .init(index: 275, categories: ["statement"]),
-                .init(index: 293, categories: ["app"]), .init(index: 321, categories: ["statement"]),
-                .init(index: 329, categories: ["app"]), .init(index: 333, categories: ["card"]),
-                .init(index: 358, categories: ["card", "www"]), .init(index: 366, categories: ["please"]),
-                .init(index: 367, categories: ["visit"]), .init(index: 369, categories: ["website"]),
-                .init(index: 374, categories: ["visit"]), .init(index: 375, categories: ["www"]),
-                .init(index: 379, categories: ["card"]), .init(index: 384, categories: ["customer"]),
-                .init(index: 399, categories: ["customer"]), .init(index: 563, categories: ["commercial"]),
-                .init(index: 564, categories: ["bank"]), .init(index: 569, categories: ["card"]),
-                .init(index: 570, categories: ["commercial"]), .init(index: 571, categories: ["bank"]),
-                .init(index: 576, categories: ["card"])
-            ],
-            numericPositions: [[17, 32, 75, 77, 102, 115, 200, 238, 240, 291, 323, 386, 401, 444, 446, 518, 519, 527, 528, 597, 599, 604, 606, 623]],
-            urlPositions: [6, 358, 375]
-        ),
-        PostTerminationSignature(
-            version: .v2,
-            tokenCount: 551,
-            keywordPositions: [
-                .init(index: 3, categories: ["statement"]), .init(index: 5, categories: ["important"]),
-                .init(index: 11, categories: ["card"]), .init(index: 12, categories: ["statement"]),
-                .init(index: 64, categories: ["statement"]), .init(index: 67, categories: ["mobile"]),
-                .init(index: 68, categories: ["bank"]), .init(index: 75, categories: ["card"]),
-                .init(index: 81, categories: ["commercial"]), .init(index: 82, categories: ["bank"]),
-                .init(index: 83, categories: ["reward"]), .init(index: 85, categories: ["please"]),
-                .init(index: 90, categories: ["mobile"]), .init(index: 91, categories: ["bank"]),
-                .init(index: 108, categories: ["statement"]), .init(index: 118, categories: ["statement"]),
-                .init(index: 136, categories: ["statement"]), .init(index: 171, categories: ["statement"]),
-                .init(index: 202, categories: ["statement"]), .init(index: 220, categories: ["app"]),
-                .init(index: 248, categories: ["statement"]), .init(index: 256, categories: ["app"]),
-                .init(index: 260, categories: ["card"]), .init(index: 285, categories: ["card", "www"]),
-                .init(index: 293, categories: ["please"]), .init(index: 294, categories: ["visit"]),
-                .init(index: 296, categories: ["website"]), .init(index: 301, categories: ["visit"]),
-                .init(index: 302, categories: ["www"]), .init(index: 306, categories: ["card"]),
-                .init(index: 311, categories: ["customer"]), .init(index: 326, categories: ["customer"]),
-                .init(index: 490, categories: ["commercial"]), .init(index: 491, categories: ["bank"]),
-                .init(index: 496, categories: ["card"]), .init(index: 497, categories: ["commercial"]),
-                .init(index: 498, categories: ["bank"]), .init(index: 503, categories: ["card"])
-            ],
-            numericPositions: [[29, 42, 127, 165, 167, 218, 250, 313, 328, 371, 373, 445, 446, 454, 455, 524, 526, 531, 533, 550]],
-            urlPositions: [285, 302]
-        )
-    ]
-
-    private static func matchesPostTerminationTail(_ lines: [String], version: InternalVersion) -> Bool {
-        guard let marker = lines.firstIndex(where: isEndOfStatement), marker == 0 else { return false }
-        let tail = lines.joined(separator: " ")
-        let normalized = boundedWhitespace(tail)
-        let tokens = normalized.split(separator: " ").map(String.init)
-        guard !tokens.contains(where: { isEndOfStatement($0) }),
-              !tokens.contains(where: { $0 == "Continued" || $0 == "next" }) else { return false }
-        guard !lines.dropFirst().contains(where: hasFinancialEvidence) else { return false }
-        let keywordPositions = tokens.enumerated().compactMap { index, token -> KeywordPosition? in
-            let lower = token.lowercased()
-            let categories = [
-                "commercial", "bank", "customer", "card", "statement", "visit", "www", "reward",
-                "important", "please", "website", "mobile", "app"
-            ].filter { lower.contains($0) }
-            return categories.isEmpty ? nil : KeywordPosition(index: index, categories: categories)
+    private static func matchesPostTerminationTail(_ lines: [String], version _: InternalVersion) -> Bool {
+        guard let first = lines.first, isEndOfStatement(first) else { return false }
+        for line in lines.dropFirst() {
+            if isEndOfStatement(line) || line == "Continued on next page..." || hasFinancialEvidence(line) {
+                return false
+            }
         }
-        let numericPositions = tokens.enumerated().compactMap { index, token in
-            token.range(of: #"\d"#, options: .regularExpression) == nil ? nil : index
-        }
-        let urlPositions = tokens.enumerated().compactMap { index, token in
-            matches(#"(?i)\b(?:https?://|www\.)\S+"#, in: token).isEmpty ? nil : index
-        }
-        return postTerminationSignatures.contains { signature in
-            signature.version == version &&
-            signature.tokenCount == tokens.count &&
-            signature.keywordPositions == keywordPositions &&
-            signature.numericPositions.contains(numericPositions) &&
-            signature.urlPositions == urlPositions
-        }
+        return true
     }
 
     private static func hasFinancialEvidence(_ line: String) -> Bool {
@@ -580,47 +494,133 @@ final class CBQCreditCardPDFNormalizer {
         return matches[0][0]
     }
 
+    private struct CanonicalPreambleDate {
+        let text: String
+        let value: StatementDate
+    }
+
     private static func requiredDate(labels: [String], in text: String, error: CBQCreditCardPDFNormalizationError) throws -> String {
         let alternatives = labels
             .sorted { $0.count > $1.count }
             .map(NSRegularExpression.escapedPattern(for:))
             .joined(separator: "|")
         let bounded = boundedWhitespace(text)
-        let short = allCaptures(#"(?:"# + alternatives + #")\s*[:\-]?\s*(\d{2}/\d{2}/\d{2})"#, in: bounded)
-        let long = allCaptures(
-            #"(?:"# + alternatives + #")\s*[:\-]?\s*(\d{1,2})\s+([A-Za-z]{3}),\s*(\d{4})"#,
+        let shortTwoDigitYear = allCaptures(
+            #"(?:"# + alternatives + #")\s*[:\-]?\s*(\d{2}/\d{2}/\d{2})(?!\d)"#,
             in: bounded
         )
-        guard short.count + long.count == 1 else { throw error }
-        if let value = short.first?.first { return value }
-        guard let values = long.first, values.count == 3,
-              let day = Int(values[0]), let year = Int(values[2]),
-              let month = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
-                .firstIndex(of: values[1].lowercased()) else { throw error }
-        return String(format: "%02d/%02d/%02d", day, month + 1, year % 100)
+        let shortFourDigitYear = allCaptures(
+            #"(?:"# + alternatives + #")\s*[:\-]?\s*(\d{2}/\d{2}/\d{4})(?!\d)"#,
+            in: bounded
+        )
+        let named = allCaptures(
+            #"(?:"# + alternatives + #")\s*[:\-]?\s*(\d{1,2})\s+([A-Za-z]+),\s*(\d{4})(?!\d)"#,
+            in: bounded
+        )
+
+        var candidates: [CanonicalPreambleDate] = []
+        for values in shortTwoDigitYear + shortFourDigitYear {
+            guard values.count == 1 else { throw error }
+            candidates.append(try canonicalSlashDate(values[0], error: error))
+        }
+        for values in named {
+            guard values.count == 3,
+                  let day = Int(values[0]),
+                  let year = Int(values[2]),
+                  let month = monthNumber(values[1]) else { throw error }
+            candidates.append(try canonicalDate(day: day, month: month, year: year, error: error))
+        }
+
+        guard candidates.count == 1 else { throw error }
+        return candidates[0].text
     }
 
     private static func requiredPeriod(in text: String) throws -> (start: String, end: String) {
-        let matches = allCaptures(#"(?:Statement Period)\s*[:\-]?\s*(\d{2}/\d{2}/\d{2})\s*(?:to|-)\s*(\d{2}/\d{2}/\d{2})"#, in: text)
+        let bounded = boundedWhitespace(text)
+        let twoDigitYear = allCaptures(
+            #"(?:Statement Period)\s*[:\-]?\s*(\d{2}/\d{2}/\d{2})(?!\d)\s*(?:to|-)\s*(\d{2}/\d{2}/\d{2})(?!\d)"#,
+            in: bounded
+        )
+        let fourDigitYear = allCaptures(
+            #"(?:Statement Period)\s*[:\-]?\s*(\d{2}/\d{2}/\d{4})(?!\d)\s*(?:to|-)\s*(\d{2}/\d{2}/\d{4})(?!\d)"#,
+            in: bounded
+        )
+        let matches = twoDigitYear + fourDigitYear
         guard matches.count == 1, matches[0].count == 2 else {
             throw CBQCreditCardPDFNormalizationError.malformedPreamble
         }
-        return (matches[0][0], matches[0][1])
+
+        let start = try canonicalSlashDate(matches[0][0], error: .malformedPreamble)
+        let end = try canonicalSlashDate(matches[0][1], error: .malformedPreamble)
+        guard start.value <= end.value else {
+            throw CBQCreditCardPDFNormalizationError.malformedPreamble
+        }
+        return (start.text, end.text)
+    }
+
+    private static func canonicalSlashDate(
+        _ value: String,
+        error: CBQCreditCardPDFNormalizationError
+    ) throws -> CanonicalPreambleDate {
+        let parts = value.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              parts[0].count == 2,
+              parts[1].count == 2,
+              parts[2].count == 2 || parts[2].count == 4,
+              let day = Int(parts[0]),
+              let month = Int(parts[1]),
+              let rawYear = Int(parts[2]) else { throw error }
+        let year = parts[2].count == 2 ? 2000 + rawYear : rawYear
+        return try canonicalDate(day: day, month: month, year: year, error: error)
+    }
+
+    private static func canonicalDate(
+        day: Int,
+        month: Int,
+        year: Int,
+        error: CBQCreditCardPDFNormalizationError
+    ) throws -> CanonicalPreambleDate {
+        guard (2000...2099).contains(year),
+              let date = try? StatementDate(year: year, month: month, day: day) else { throw error }
+        return CanonicalPreambleDate(
+            text: String(format: "%02d/%02d/%02d", day, month, year - 2000),
+            value: date
+        )
+    }
+
+    private static func monthNumber(_ token: String) -> Int? {
+        switch token.lowercased() {
+        case "jan", "january": return 1
+        case "feb", "february": return 2
+        case "mar", "march": return 3
+        case "apr", "april": return 4
+        case "may": return 5
+        case "jun", "june": return 6
+        case "jul", "july": return 7
+        case "aug", "august": return 8
+        case "sep", "sept", "september": return 9
+        case "oct", "october": return 10
+        case "nov", "november": return 11
+        case "dec", "december": return 12
+        default: return nil
+        }
     }
 
     private static func requiredMoneyToken(label: String, in text: String) throws -> String {
-        guard allCaptures(NSRegularExpression.escapedPattern(for: label), in: text).count == 1 else {
+        let candidates = text.components(separatedBy: .newlines).compactMap { rawLine -> String? in
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard line.range(of: label, options: [.anchored, .caseInsensitive]) != nil else { return nil }
+            let remainder = String(line.dropFirst(label.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            if remainder.uppercased().hasPrefix("CR ") {
+                let amount = String(remainder.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+                return isSummaryMoney(amount) ? "CR " + amount : nil
+            }
+            return isSummaryMoney(remainder) ? remainder : nil
+        }
+        guard candidates.count == 1 else {
             throw CBQCreditCardPDFNormalizationError.malformedSummary
         }
-        let tokens = tokensAfter(label: label, in: text)
-        for (index, token) in tokens.enumerated() {
-            if token.uppercased() == "CR", index + 1 < tokens.count,
-               isSummaryMoney(tokens[index + 1]) {
-                return "CR " + tokens[index + 1]
-            }
-            if isSummaryMoney(token) { return token }
-        }
-        throw CBQCreditCardPDFNormalizationError.malformedSummary
+        return candidates[0]
     }
 
     private static func summaryFragments(version: InternalVersion, in text: String) throws -> [(String, String)] {
@@ -634,33 +634,82 @@ final class CBQCreditCardPDFNormalizer {
                 ("NEW_BALANCE", try requiredMoneyToken(label: "Current Outstanding Balance", in: summarySource))
             ]
         case .v2:
-            // PDFKit's native text order is the equation order:
-            // total, purchases, billed installment, fees, previous, payment, credit.
-            let equationValues: [String]
-            if summarySource.contains("=") {
-                equationValues = try summaryEquationValues(in: summarySource)
-            } else {
-                equationValues = [
-                    try requiredMoneyToken(label: "Current Outstanding Balance", in: summarySource),
-                    try requiredMoneyToken(label: "Purchases", in: summarySource),
-                    try requiredMoneyToken(label: "Billed Installment", in: summarySource),
-                    try requiredMoneyToken(label: "Fees and Charges", in: summarySource),
-                    try requiredMoneyToken(label: "Previous Outstanding Balance", in: summarySource),
-                    try requiredMoneyToken(label: "Total Payment", in: summarySource),
-                    try requiredMoneyToken(label: "Credit Reversal", in: summarySource)
-                ]
-            }
+            // The authentic v2 equation is printed left-to-right as previous balance,
+            // payment, credit/reversal, purchases, billed installment, fees/charges,
+            // and total statement balance. PDFKit emits the numeric row in reverse
+            // horizontal order, so its native text values are:
+            // total, fees, billed installment, purchases, credit, payment, previous.
+            let equationValues = try summaryEquationValues(in: summarySource)
             guard equationValues.count == 7 else { throw CBQCreditCardPDFNormalizationError.malformedSummary }
+            let labeledBalance = try v2StatementBalance(in: summarySource)
+            let equationBalance = try signedSummaryAmount(equationValues[0])
+            guard labeledBalance == equationBalance else {
+                throw CBQCreditCardPDFNormalizationError.malformedSummary
+            }
             return [
-                ("PURCHASES", equationValues[1]),
+                ("PURCHASES", equationValues[3]),
                 ("BILLED_INSTALLMENT", equationValues[2]),
-                ("FEES_CHARGES", equationValues[3]),
-                ("PREVIOUS_BALANCE", equationValues[4]),
+                ("FEES_CHARGES", equationValues[1]),
+                ("PREVIOUS_BALANCE", equationValues[6]),
                 ("TOTAL_PAYMENT", equationValues[5]),
-                ("CREDIT_REVERSAL", equationValues[6]),
+                ("CREDIT_REVERSAL", equationValues[4]),
                 ("NEW_BALANCE", equationValues[0])
             ]
         }
+    }
+
+    private struct SignedSummaryAmount: Equatable {
+        let magnitude: Decimal
+        let isCredit: Bool
+    }
+
+    nonisolated private static func v2StatementBalanceToken(in line: String) -> String? {
+        let label = "Total Statement Balance QAR"
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.range(of: label, options: [.anchored, .caseInsensitive]) != nil else { return nil }
+        let remainder = String(trimmed.dropFirst(label.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        if remainder.uppercased().hasPrefix("CR ") {
+            let amount = String(remainder.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+            return isSummaryMoney(amount) ? "CR " + amount : nil
+        }
+        return isSummaryMoney(remainder) ? remainder : nil
+    }
+
+    private static func isV2StatementBalanceLine(_ line: String) -> Bool {
+        v2StatementBalanceToken(in: line) != nil
+    }
+
+    private static func v2StatementBalance(in text: String) throws -> SignedSummaryAmount {
+        let candidates = text.components(separatedBy: .newlines).compactMap(v2StatementBalanceToken)
+        guard candidates.count == 1 else {
+            throw CBQCreditCardPDFNormalizationError.malformedSummary
+        }
+        return try signedSummaryAmount(candidates[0])
+    }
+
+    private static func signedSummaryAmount(_ token: String) throws -> SignedSummaryAmount {
+        let normalized = boundedWhitespace(token)
+        let upper = normalized.uppercased()
+        let isCredit: Bool
+        let numeric: String
+        if upper.hasPrefix("CR ") {
+            isCredit = true
+            numeric = String(normalized.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+        } else if normalized.hasPrefix(")") && normalized.hasSuffix("(") {
+            isCredit = true
+            numeric = String(normalized.dropFirst().dropLast())
+        } else {
+            isCredit = false
+            numeric = normalized
+        }
+        guard let amount = Decimal(
+            string: numeric.replacingOccurrences(of: ",", with: ""),
+            locale: Locale(identifier: "en_US_POSIX")
+        ) else {
+            throw CBQCreditCardPDFNormalizationError.malformedSummary
+        }
+        let magnitude = amount < .zero ? -amount : amount
+        return SignedSummaryAmount(magnitude: magnitude, isCredit: isCredit && magnitude != .zero)
     }
 
     private static func summaryEquationValues(in text: String) throws -> [String] {
@@ -709,7 +758,7 @@ final class CBQCreditCardPDFNormalizer {
         return result
     }
 
-    private static func isSummaryMoney(_ value: String) -> Bool {
+    nonisolated private static func isSummaryMoney(_ value: String) -> Bool {
         captures(#"^[0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?$"#, in: value) != nil ||
             captures(#"^[)][0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?[(]$"#, in: value) != nil
     }
@@ -720,7 +769,7 @@ final class CBQCreditCardPDFNormalizer {
         return bounded[range.upperBound...].split(separator: " ").map(String.init)
     }
 
-    private static func captures(_ pattern: String, in text: String) -> [String]? {
+    nonisolated private static func captures(_ pattern: String, in text: String) -> [String]? {
         guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
         guard let match = expression.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
         return (1..<match.numberOfRanges).map { index in

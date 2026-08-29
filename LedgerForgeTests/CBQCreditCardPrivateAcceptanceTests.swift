@@ -1,11 +1,15 @@
-import CryptoKit
 import Foundation
+import PDFKit
 import Testing
 @testable import LedgerForge
 
-/// Opt-in aggregate-only acceptance for task-local text extracted from the
-/// private encrypted CBQ corpus. The directory is supplied at runtime; no
-/// private path, credential, source value, or row is committed or printed.
+/// Opt-in production-path acceptance for the private encrypted CBQ corpus.
+/// The private root is supplied only at runtime; the credential must already exist
+/// in the ordinary production Keychain scope and is consumed only through
+/// `DefaultPasswordProvider`. Encrypted source bytes traverse the ordinary snapshot,
+/// coordinator, PDFKit reader, normalizer, parser, validator, persistence, and
+/// hydration boundaries. No private path, credential, source value, decrypted PDF,
+/// or row is committed or printed.
 @MainActor
 @Suite(
     .enabled(
@@ -16,81 +20,154 @@ import Testing
     )
 )
 struct CBQCreditCardPrivateAcceptanceTests {
-    private static let directoryEnvironmentKey = "LEDGERFORGE_PRIVATE_CBQ_TEXT_DIRECTORY"
-    private static let expectedChronologicalRowCounts = [15, 19, 28, 14, 11, 18, 12, 16]
+    // Keep the historical root key so existing private-context wiring remains compatible.
+    // The value is now treated as the CBQ private root, not as a text-fixture directory.
+    private static let rootEnvironmentKey = "LEDGERFORGE_PRIVATE_CBQ_TEXT_DIRECTORY"
 
     @Test(.globalRuntimeStateIsolation)
-    func completePrivateCorpusMatchesProductionGrammarAndAggregateOracle() throws {
-        guard let directoryPath = ProcessInfo.processInfo.environment[Self.directoryEnvironmentKey] else {
-            return
+    func completePrivateCorpusMatchesProductionGrammarAndAggregateOracle() async throws {
+        guard let rootPath = ProcessInfo.processInfo.environment[Self.rootEnvironmentKey],
+              !rootPath.isEmpty else {
+            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
         }
-        let directory = URL(fileURLWithPath: directoryPath, isDirectory: true)
-        let urls = try FileManager.default.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ).filter {
-            $0.pathExtension.caseInsensitiveCompare("txt") == .orderedSame &&
-                $0.lastPathComponent.hasPrefix("source-")
-        }.sorted { numericOrdinal($0) < numericOrdinal($1) }
+        let root = URL(fileURLWithPath: rootPath, isDirectory: true)
+        let urls = try privateCardPDFs(root: root)
         guard urls.count == 8 else { throw PrivateCBQAcceptanceError.unexpectedCorpusShape }
 
+        let passwordProvider = DefaultPasswordProvider(
+            supportedInstitutionCodes: [Institution.cbq.statementPasswordCredentialScope],
+            challenge: { _ in throw PrivateCBQAcceptanceError.credentialUnavailable }
+        )
+        let credentialProbe = ImportRequest(
+            fileURL: URL(fileURLWithPath: "/cbq-authentic-credential-probe.pdf")
+        )
+        let canonicalCandidates = try await passwordProvider
+            .rememberedPasswordCandidates(for: credentialProbe)
+            .filter { candidate in
+                candidate.origins.contains { origin in
+                    guard case .canonical(let scope) = origin else { return false }
+                    return scope == Institution.cbq.statementPasswordCredentialScope
+                }
+            }
+        guard canonicalCandidates.count == 1 else {
+            throw PrivateCBQAcceptanceError.credentialUnavailable
+        }
+        let password = canonicalCandidates[0].value
+
+        let preparationProvider = DatabaseProvider(inMemory: true)
+        let engine = ImportEngine(
+            importCoordinator: DefaultImportCoordinator(
+                readerRegistry: DefaultReaderRegistry(),
+                passwordProvider: passwordProvider
+            ),
+            importPersistenceCoordinator: DefaultImportPersistenceCoordinator(
+                databaseProvider: preparationProvider,
+                mapper: ImportPersistenceMapper(
+                    workspaceId: "cbq-authentic-preparation-\(UUID().uuidString)",
+                    workspaceName: "CBQ authentic preparation"
+                )
+            ),
+            persistenceStateProvider: { preparationProvider.persistenceState },
+            providerGenerationProvider: { preparationProvider.generationToken },
+            forcedHydration: {
+                RepositoryStoreHydrationResult(didHydrate: true, accountCount: 0, transactionCount: 0)
+            },
+            rejectedAttemptHydration: {}
+        )
+
         var sources = [PrivateCBQSource]()
-        var rowCounts = [Int]()
         var rowMismatchCount = 0
         var sectionMismatchCount = 0
         var summaryMismatchCount = 0
+
         for url in urls {
-            let source = try String(contentsOf: url, encoding: .utf8)
-            let pages = try splitPages(source)
-            let normalized = try CBQCreditCardPDFNormalizer().normalize(
-                text: pages.joined(separator: "\n"),
-                pageTexts: pages,
-                fileURL: URL(fileURLWithPath: "/private/cbq-card-source.pdf")
-            )
-            let document = try CBQCreditCardPDFParser().parse(document: NormalizedDocument(
-                document: normalized.document,
-                metadata: DocumentMetadata(
-                    institution: .cbq,
-                    documentType: .creditCard,
-                    fileFormat: .pdf,
-                    confidence: 1
-                ),
-                rows: normalized.rows,
-                header: normalized.header,
-                sourceContext: normalized.sourceContext
-            ))
-            guard ImportValidator.validate(financialDocument: document).passed,
-                  let evidence = document.cardStatementEvidence,
-                  evidence.instrumentSections.count == 2,
-                  evidence.transactionAnnotations.count == document.transactions.count else {
+            do {
+                let bytes = try Data(contentsOf: url, options: [.mappedIfSafe])
+                guard let lockedDocument = PDFDocument(data: bytes), lockedDocument.isLocked else {
+                    throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                }
+
+                let request = ImportRequest(fileURL: url)
+                let directSnapshot = SourceContentSnapshot(bytes: bytes)
+                let raw = try await PDFDocumentReader().read(
+                    request: request,
+                    snapshot: directSnapshot,
+                    password: password
+                )
+                guard let pages = raw.pdfPageTexts, pages.count == 3,
+                      let positioned = raw.pdfPageEvidence, positioned.count == 3,
+                      positioned.allSatisfy({ !$0.fragments.isEmpty }) else {
+                    throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                }
+                let rawText = pages.joined(separator: "\n")
+                guard rawText.range(
+                    of: #"Statement Period\s+\d{2}/\d{2}/\d{4}\s*-\s*\d{2}/\d{2}/\d{4}"#,
+                    options: .regularExpression
+                ) != nil,
+                rawText.range(
+                    of: #"Statement Date\s+\d{1,2}\s+[A-Za-z]+,\s*\d{4}"#,
+                    options: .regularExpression
+                ) != nil,
+                rawText.range(
+                    of: #"Payment Due Date\s+\d{1,2}\s+[A-Za-z]+,\s*\d{4}"#,
+                    options: .regularExpression
+                ) != nil else {
+                    throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                }
+
+                let prepared = try await engine.prepareImport(from: url)
+                defer { engine.cancelPreparedImport(prepared) }
+                guard prepared.validation.passed,
+                      prepared.detectedInstitution == .cbq,
+                      prepared.detectedDocumentType == .creditCard,
+                      prepared.rawContents == rawText,
+                      prepared.sourceSnapshot.sourceByteFingerprint == directSnapshot.sourceByteFingerprint else {
+                    throw PrivateCBQAcceptanceError.productionRejectedSource
+                }
+
+                let normalized = try CBQCreditCardPDFNormalizer().normalize(
+                    text: rawText,
+                    pageTexts: pages,
+                    fileURL: url
+                )
+                let document = prepared.financialDocument
+                guard let evidence = document.cardStatementEvidence,
+                      evidence.instrumentSections.count == 2,
+                      evidence.transactionAnnotations.count == document.transactions.count else {
+                    throw PrivateCBQAcceptanceError.productionRejectedSource
+                }
+                let oracle = try independentOracle(pages: pages, positioned: positioned)
+                rowMismatchCount += financialMismatchCount(
+                    oracleRows: oracle.rows,
+                    normalizedRows: normalized.rows,
+                    document: document,
+                    evidence: evidence
+                )
+                sectionMismatchCount += independentSectionMismatchCount(oracle: oracle, evidence: evidence)
+                summaryMismatchCount += independentSummaryMismatchCount(oracle: oracle, evidence: evidence)
+                sources.append(PrivateCBQSource(
+                    document: document,
+                    fingerprintSet: prepared.fingerprintSet,
+                    oracleRowCount: oracle.rows.count
+                ))
+            } catch let error as PrivateCBQAcceptanceError {
+                throw error
+            } catch {
                 throw PrivateCBQAcceptanceError.productionRejectedSource
             }
-            let oracle = try independentOracle(pages: pages)
-            rowMismatchCount += financialMismatchCount(
-                oracleRows: oracle.rows,
-                normalizedRows: normalized.rows,
-                document: document,
-                evidence: evidence
-            )
-            sectionMismatchCount += independentSectionMismatchCount(
-                oracle: oracle,
-                evidence: evidence
-            )
-            summaryMismatchCount += independentSummaryMismatchCount(
-                oracle: oracle,
-                evidence: evidence
-            )
-            sources.append(PrivateCBQSource(
-                document: document,
-                fingerprintSet: fingerprintSet(source: source)
-            ))
-            rowCounts.append(document.transactions.count)
         }
 
-        let documents = sources.map(\.document)
-        #expect(rowCounts == Self.expectedChronologicalRowCounts)
-        #expect(rowCounts.reduce(0, +) == 133)
+        let chronologicalSources = sources.sorted {
+            $0.document.cardStatementEvidence!.declaredStatementPeriod!.start <
+                $1.document.cardStatementEvidence!.declaredStatementPeriod!.start
+        }
+        let documents = chronologicalSources.map(\.document)
+        let productionRowCounts = documents.map { $0.transactions.count }
+        let oracleRowCounts = chronologicalSources.map(\.oracleRowCount)
+        let expectedCanonicalTransactionCount = oracleRowCounts.reduce(0, +)
+        #expect(productionRowCounts == oracleRowCounts)
+        #expect(productionRowCounts.reduce(0, +) == expectedCanonicalTransactionCount)
+        print("CBQ_PRIVATE_ACCEPTANCE sources=8 canonicalTransactions=\(expectedCanonicalTransactionCount)")
         #expect(rowMismatchCount == 0)
         #expect(sectionMismatchCount == 0)
         #expect(summaryMismatchCount == 0)
@@ -111,53 +188,70 @@ struct CBQCreditCardPrivateAcceptanceTests {
         #expect(Set(accountValues).count == 1)
         #expect(Set(instrumentValues).count == 2)
 
-        let chronological = documents.sorted {
-            $0.cardStatementEvidence!.declaredStatementPeriod!.start <
-                $1.cardStatementEvidence!.declaredStatementPeriod!.start
-        }
         var validAdjacentContinuities = 0
-        for (earlier, later) in zip(chronological, chronological.dropFirst()) {
+        for (earlier, later) in zip(documents, documents.dropFirst()) {
             let earlierEvidence = try #require(earlier.cardStatementEvidence)
             let laterEvidence = try #require(later.cardStatementEvidence)
             let earlierPeriod = try #require(earlierEvidence.declaredStatementPeriod)
             let laterPeriod = try #require(laterEvidence.declaredStatementPeriod)
             let calendar = Calendar(identifier: .gregorian)
             let endDate = try #require(calendar.date(from: DateComponents(
-                year: earlierPeriod.end.year,
-                month: earlierPeriod.end.month,
-                day: earlierPeriod.end.day
+                year: earlierPeriod.end.year, month: earlierPeriod.end.month, day: earlierPeriod.end.day
             )))
             let startDate = try #require(calendar.date(from: DateComponents(
-                year: laterPeriod.start.year,
-                month: laterPeriod.start.month,
-                day: laterPeriod.start.day
+                year: laterPeriod.start.year, month: laterPeriod.start.month, day: laterPeriod.start.day
             )))
-            let nextDay = calendar.date(
-                byAdding: .day,
-                value: 1,
-                to: endDate
-            )
-            if nextDay == startDate {
+            if calendar.date(byAdding: .day, value: 1, to: endDate) == startDate {
                 validAdjacentContinuities += 1
             }
         }
         #expect(validAdjacentContinuities == 6)
 
-        let chronologicalSources = sources.sorted {
-            $0.document.cardStatementEvidence!.declaredStatementPeriod!.start <
-                $1.document.cardStatementEvidence!.declaredStatementPeriod!.start
-        }
         let mixedIndices = [7, 2, 5, 0, 6, 1, 4, 3]
         let mixed = mixedIndices.map { chronologicalSources[$0] }
         for inMemory in [true, false] {
-            try runCampaign(chronologicalSources, inMemory: inMemory, label: "chronological")
-            try runCampaign(chronologicalSources.reversed(), inMemory: inMemory, label: "reverse")
-            try runCampaign(mixed, inMemory: inMemory, label: "mixed")
+            try runCampaign(
+                chronologicalSources,
+                expectedTransactionCount: expectedCanonicalTransactionCount,
+                inMemory: inMemory,
+                label: "chronological"
+            )
+            try runCampaign(
+                chronologicalSources.reversed(),
+                expectedTransactionCount: expectedCanonicalTransactionCount,
+                inMemory: inMemory,
+                label: "reverse"
+            )
+            try runCampaign(
+                mixed,
+                expectedTransactionCount: expectedCanonicalTransactionCount,
+                inMemory: inMemory,
+                label: "mixed"
+            )
         }
+    }
+
+    private func privateCardPDFs(root: URL) throws -> [URL] {
+        let creditCards = root.appendingPathComponent("CreditCards", isDirectory: true)
+        var isDirectory: ObjCBool = false
+        let directory = FileManager.default.fileExists(atPath: creditCards.path, isDirectory: &isDirectory) && isDirectory.boolValue
+            ? creditCards
+            : root
+        return try FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ).filter { url in
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey])
+            return values?.isRegularFile == true &&
+                url.pathExtension.caseInsensitiveCompare("pdf") == .orderedSame &&
+                url.lastPathComponent.hasPrefix("CardStatement-")
+        }.sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
     private func runCampaign<S: Sequence>(
         _ sourceSequence: S,
+        expectedTransactionCount: Int,
         inMemory: Bool,
         label: String
     ) throws where S.Element == PrivateCBQSource {
@@ -259,6 +353,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
         try verifyCampaignGraph(
             provider: provider,
             workspaceID: workspaceID,
+            expectedTransactionCount: expectedTransactionCount,
             newestBalance: newestBalance
         )
         if let sqlite {
@@ -268,6 +363,7 @@ struct CBQCreditCardPrivateAcceptanceTests {
             try verifyCampaignGraph(
                 provider: reopened,
                 workspaceID: workspaceID,
+                expectedTransactionCount: expectedTransactionCount,
                 newestBalance: newestBalance
             )
             try reopenedSQLite.database.checkpointAndClose()
@@ -306,17 +402,18 @@ struct CBQCreditCardPrivateAcceptanceTests {
     private func verifyCampaignGraph(
         provider: DatabaseProvider,
         workspaceID: String,
+        expectedTransactionCount: Int,
         newestBalance: Money
     ) throws {
         #expect(try provider.accountRepo.accounts(workspaceId: workspaceID).count == 1)
-        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == 133)
+        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == expectedTransactionCount)
         let card = try provider.cardRepo.snapshot(workspaceId: workspaceID)
         #expect(card.instruments.count == 2)
         #expect(card.instruments.allSatisfy { $0.lifecycleStateCode == CardInstrumentLifecycleState.unknown.rawValue })
         #expect(card.relationships.isEmpty)
         #expect(card.statements.count == 8)
         #expect(card.sections.count == 16)
-        #expect(card.transactionEvidence.count == 133)
+        #expect(card.transactionEvidence.count == expectedTransactionCount)
         #expect(card.semanticGroups.isEmpty && card.semanticProjections.isEmpty && card.semanticMembers.isEmpty)
 
         let hydrator = RepositoryStoreHydrator(
@@ -339,61 +436,95 @@ struct CBQCreditCardPrivateAcceptanceTests {
         let hydrated = try hydrator.stageHydration()
         let expectedLiability = try Money(amount: -newestBalance.amount, currency: newestBalance.currency)
         #expect(hydrated.accounts.first?.currentBalanceMoney == expectedLiability)
-        #expect(hydrated.transactions.count == 133)
+        #expect(hydrated.transactions.count == expectedTransactionCount)
         #expect(hydrated.cardSnapshot.instruments.count == 2)
         #expect(hydrated.cardSnapshot.statements.count == 8)
     }
 
-    private func fingerprintSet(source: String) -> PreparedDocumentFingerprintSet {
-        func digest(_ bytes: Data) -> String {
-            SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
-        }
-        let sourceBytes = Data(source.utf8)
-        let rawBytes = Data(("native-text\n" + source).utf8)
-        return PreparedDocumentFingerprintSet(fingerprints: [
-            VersionedDocumentFingerprint(
-                algorithm: ExactStatementFingerprint.algorithm,
-                digest: digest(rawBytes),
-                byteCount: Int64(rawBytes.count),
-                isDuplicateAuthority: false
-            ),
-            VersionedDocumentFingerprint(
-                algorithm: SourceContentSnapshot.algorithm,
-                digest: digest(sourceBytes),
-                byteCount: Int64(sourceBytes.count),
-                isDuplicateAuthority: true
-            )
-        ])
-    }
-
-    private func independentOracle(pages: [String]) throws -> PrivateCBQOracle {
+    private func independentOracle(
+        pages: [String],
+        positioned: [RawPDFPageEvidence]
+    ) throws -> PrivateCBQOracle {
         var rows = [PrivateCBQOracleRow]()
         var sectionTotals = [Int: Money]()
         var sectionOrdinal: Int?
+        let rowPattern = #"^(\d{2}/\d{2}/\d{2})\s+(\d{2}/\d{2}/\d{2})\s+(.+)$"#
+
         for (pageOffset, page) in pages.enumerated() {
-            for rawLine in page.components(separatedBy: .newlines) {
-                let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            let lines = page.components(separatedBy: .newlines).map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            var index = 0
+            while index < lines.count {
+                let line = lines[index]
                 if line.range(of: "Diners Club", options: .caseInsensitive) != nil,
                    line.range(of: #"[0-9X*]{8,}"#, options: .regularExpression) != nil {
                     sectionOrdinal = 1
+                    index += 1
                     continue
                 }
                 if line.range(of: "Mastercard Platinum", options: .caseInsensitive) != nil,
                    line.range(of: #"[0-9X*]{8,}"#, options: .regularExpression) != nil {
                     sectionOrdinal = 2
+                    index += 1
                     continue
                 }
                 if let total = try oracleSectionTotal(line) {
-                    guard let currentOrdinal = sectionOrdinal else { throw PrivateCBQAcceptanceError.unexpectedCorpusShape }
+                    guard let currentOrdinal = sectionOrdinal else {
+                        throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+                    }
                     sectionTotals[currentOrdinal] = total
                     sectionOrdinal = nil
+                    index += 1
                     continue
                 }
-                guard let values = captures(
-                    #"^(\d{2}/\d{2}/\d{2})\s+(\d{2}/\d{2}/\d{2})\s+(.+)$"#,
-                    in: line
-                ), values.count == 3, let sectionOrdinal,
-                      let tail = try oracleMoneyTail(values[2]) else { continue }
+
+                guard let values = captures(rowPattern, in: line),
+                      values.count == 3,
+                      let activeSection = sectionOrdinal else {
+                    index += 1
+                    continue
+                }
+
+                var assembledTail = values[2]
+                var resolvedTail = try oracleMoneyTail(assembledTail)
+                var tailEndIndex = index
+                if resolvedTail == nil {
+                    var probe = index + 1
+                    while probe < lines.count {
+                        let candidate = lines[probe]
+                        if candidate.isEmpty {
+                            probe += 1
+                            continue
+                        }
+                        let startsAnotherRow = captures(rowPattern, in: candidate) != nil
+                        let startsSection = (
+                            candidate.range(of: "Diners Club", options: .caseInsensitive) != nil ||
+                            candidate.range(of: "Mastercard Platinum", options: .caseInsensitive) != nil
+                        ) && candidate.range(of: #"[0-9X*]{8,}"#, options: .regularExpression) != nil
+                        let isSectionTotal = try oracleSectionTotal(candidate) != nil
+                        let isStructuralBoundary = startsAnotherRow || startsSection || isSectionTotal ||
+                            candidate == "Continued on next page..." ||
+                            candidate.contains("End of Statement") ||
+                            candidate.hasPrefix("Card Number Card Holder Name Product Card Limit") ||
+                            candidate.hasPrefix("Post Date Purchase") ||
+                            candidate.hasPrefix("Date Description & Referance")
+                        if isStructuralBoundary { break }
+
+                        assembledTail += " " + candidate
+                        if let tail = try oracleMoneyTail(assembledTail) {
+                            resolvedTail = tail
+                            tailEndIndex = probe
+                            break
+                        }
+                        probe += 1
+                    }
+                }
+
+                guard let tail = resolvedTail else {
+                    index += 1
+                    continue
+                }
                 rows.append(PrivateCBQOracleRow(
                     sourceOrdinal: rows.count + 1,
                     sourcePage: pageOffset + 1,
@@ -403,15 +534,16 @@ struct CBQCreditCardPrivateAcceptanceTests {
                     postedMoney: tail.postedMoney,
                     originalMoney: tail.originalMoney,
                     accountLevel: tail.description.hasPrefix("Paid using bankDirect"),
-                    sectionOrdinal: sectionOrdinal
+                    sectionOrdinal: activeSection
                 ))
+                index = tailEndIndex + 1
             }
         }
         guard sectionTotals.count == 2 else { throw PrivateCBQAcceptanceError.unexpectedCorpusShape }
         return PrivateCBQOracle(
             rows: rows,
             sectionTotals: sectionTotals,
-            summary: try independentSummary(pages: pages)
+            summary: try independentSummary(pages: pages, positioned: positioned)
         )
     }
 
@@ -479,7 +611,10 @@ struct CBQCreditCardPrivateAcceptanceTests {
         return mismatch
     }
 
-    private func independentSummary(pages: [String]) throws -> [String: Money] {
+    private func independentSummary(
+        pages: [String],
+        positioned: [RawPDFPageEvidence]
+    ) throws -> [String: Money] {
         let preamble = pages.joined(separator: "\n").components(separatedBy: "Diners Club").first ?? ""
         let bounded = preamble.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         if bounded.contains("Previous Outstanding Balance") && bounded.contains("Amount Billed") {
@@ -498,28 +633,18 @@ struct CBQCreditCardPrivateAcceptanceTests {
             ]
         }
 
-        let candidates = preamble.components(separatedBy: .newlines).filter {
-            $0.contains("=") && $0.filter { $0 == "+" }.count == 3 &&
-                $0.filter { $0 == "-" }.count == 2
-        }
-        guard candidates.count == 1 else { throw PrivateCBQAcceptanceError.unexpectedCorpusShape }
-        let moneyPattern = #"\)?[0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?\(?"#
-        guard let expression = try? NSRegularExpression(pattern: moneyPattern) else {
+        let values = try positionedV2SummaryValues(positioned)
+        let previous = values[0]
+        let payment = try positive(values[1])
+        let credit = try positive(values[2])
+        let purchases = try positive(values[3])
+        let installment = try positive(values[4])
+        let fees = try positive(values[5])
+        let current = values[6]
+        let labeledCurrent = try oracleLineBoundMoney("Total Statement Balance QAR", in: preamble)
+        guard labeledCurrent == current else {
             throw PrivateCBQAcceptanceError.unexpectedCorpusShape
         }
-        let line = candidates[0]
-        let tokens = expression.matches(in: line, range: NSRange(line.startIndex..., in: line)).compactMap {
-            Range($0.range, in: line).map { String(line[$0]) }
-        }
-        guard tokens.count == 7 else { throw PrivateCBQAcceptanceError.unexpectedCorpusShape }
-        let values = try tokens.map(oracleSummaryMoney)
-        let current = values[0]
-        let purchases = try positive(values[1])
-        let installment = try positive(values[2])
-        let fees = try positive(values[3])
-        let previous = values[4]
-        let payment = try positive(values[5])
-        let credit = try positive(values[6])
         guard previous.amount - payment.amount - credit.amount + purchases.amount +
                 installment.amount + fees.amount == current.amount else {
             throw PrivateCBQAcceptanceError.unexpectedCorpusShape
@@ -535,6 +660,53 @@ struct CBQCreditCardPrivateAcceptanceTests {
         ]
     }
 
+    private func positionedV2SummaryValues(_ pages: [RawPDFPageEvidence]) throws -> [Money] {
+        let moneyPattern = #"^\)?[0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?\(?$"#
+        var candidates = [[RawPDFTextFragment]]()
+        for page in pages {
+            for row in positionedFragmentRows(from: page) {
+                let rowText = row.map(\.text).joined(separator: " ")
+                let moneyFragments = row.filter {
+                    $0.text.range(of: moneyPattern, options: .regularExpression) != nil
+                }
+                if moneyFragments.count == 7,
+                   rowText.filter({ $0 == "+" }).count == 3,
+                   rowText.filter({ $0 == "-" }).count == 2,
+                   rowText.contains("=") {
+                    candidates.append(moneyFragments.sorted { $0.x < $1.x })
+                }
+            }
+        }
+        guard candidates.count == 1 else {
+            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+        }
+        return try candidates[0].map { try oracleSummaryMoney($0.text) }
+    }
+
+    private func positionedFragmentRows(from evidence: RawPDFPageEvidence) -> [[RawPDFTextFragment]] {
+        let ordered = evidence.fragments.enumerated().sorted { lhs, rhs in
+            if abs(lhs.element.y - rhs.element.y) > 1.5 { return lhs.element.y > rhs.element.y }
+            if abs(lhs.element.x - rhs.element.x) > 0.1 { return lhs.element.x < rhs.element.x }
+            return lhs.offset < rhs.offset
+        }
+        var rows: [[(offset: Int, element: RawPDFTextFragment)]] = []
+        for item in ordered {
+            if let last = rows.indices.last,
+               let anchor = rows[last].first?.element,
+               abs(anchor.y - item.element.y) <= 1.5 {
+                rows[last].append((item.offset, item.element))
+            } else {
+                rows.append([(item.offset, item.element)])
+            }
+        }
+        return rows.map { row in
+            row.sorted { lhs, rhs in
+                if abs(lhs.element.x - rhs.element.x) > 0.1 { return lhs.element.x < rhs.element.x }
+                return lhs.offset < rhs.offset
+            }.map(\.element)
+        }
+    }
+
     private func oracleLabeledMoney(_ label: String, in text: String) throws -> Money {
         let escaped = NSRegularExpression.escapedPattern(for: label)
         let token = #"(?:CR\s+)?\)?[0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?\(?"#
@@ -544,6 +716,20 @@ struct CBQCreditCardPrivateAcceptanceTests {
             throw PrivateCBQAcceptanceError.unexpectedCorpusShape
         }
         return try oracleSummaryMoney(raw)
+    }
+
+    private func oracleLineBoundMoney(_ label: String, in text: String) throws -> Money {
+        let escaped = NSRegularExpression.escapedPattern(for: label)
+        let token = #"(?:CR\s+)?\)?[0-9]+(?:,[0-9]{3})*(?:\.[0-9]{1,2})?\(?"#
+        let candidates = text.components(separatedBy: .newlines).compactMap { line -> String? in
+            guard let values = captures(#"^\s*"# + escaped + #"\s+("# + token + #")\s*$"#, in: line),
+                  let raw = values.first(where: { !$0.isEmpty }) else { return nil }
+            return raw
+        }
+        guard candidates.count == 1 else {
+            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
+        }
+        return try oracleSummaryMoney(candidates[0])
     }
 
     private func oracleSummaryMoney(_ raw: String) throws -> Money {
@@ -639,29 +825,11 @@ struct CBQCreditCardPrivateAcceptanceTests {
         }
     }
 
-    private func splitPages(_ source: String) throws -> [String] {
-        var pages = [String]()
-        var current = [String]()
-        for line in source.components(separatedBy: .newlines) {
-            current.append(line)
-            if line.trimmingCharacters(in: .whitespacesAndNewlines) == String(pages.count + 1) {
-                pages.append(current.joined(separator: "\n"))
-                current = []
-            }
-        }
-        guard pages.count == 3,
-              current.allSatisfy({ $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
-            throw PrivateCBQAcceptanceError.unexpectedCorpusShape
-        }
-        return pages
-    }
 
-    private func numericOrdinal(_ url: URL) -> Int {
-        Int(url.deletingPathExtension().lastPathComponent.split(separator: "-").last ?? "") ?? 0
-    }
 }
 
 private enum PrivateCBQAcceptanceError: Error {
+    case credentialUnavailable
     case unexpectedCorpusShape
     case productionRejectedSource
     case persistenceRejectedSource
@@ -672,6 +840,7 @@ private enum PrivateCBQAcceptanceError: Error {
 private struct PrivateCBQSource {
     let document: FinancialDocument
     let fingerprintSet: PreparedDocumentFingerprintSet
+    let oracleRowCount: Int
 }
 
 @MainActor

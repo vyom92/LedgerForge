@@ -58,7 +58,14 @@ struct CBQCreditCardPersistenceTests {
         )
         #expect(result.persisted)
         #expect(result.transactionCount == 4)
-        try verifyGraph(provider: provider, workspaceID: workspaceID)
+        try verifyGraph(
+            provider: provider,
+            workspaceID: workspaceID,
+            transactionCount: 4,
+            statementCount: 1,
+            sectionCount: 2,
+            expectedLiabilityBalance: try Money(amount: -92, currency: "QAR")
+        )
 
         let duplicateSession = ImportSession(
             fileName: document.sourceDocument.filename,
@@ -77,28 +84,86 @@ struct CBQCreditCardPersistenceTests {
             providerGeneration: provider.generationToken
         )
         #expect(!duplicate.persisted)
-        try verifyGraph(provider: provider, workspaceID: workspaceID)
+        try verifyGraph(
+            provider: provider,
+            workspaceID: workspaceID,
+            transactionCount: 4,
+            statementCount: 1,
+            sectionCount: 2,
+            expectedLiabilityBalance: try Money(amount: -92, currency: "QAR")
+        )
+
+        let secondDocument = try syntheticDocument(
+            month: "12",
+            statementDay: "31",
+            dueDate: "15/01/26",
+            previousBalance: "92.00",
+            currentBalance: "84.00"
+        )
+        let secondValidation = ImportValidator.validate(financialDocument: secondDocument)
+        #expect(secondValidation.passed)
+        let secondSession = ImportSession(
+            fileName: secondDocument.sourceDocument.filename,
+            institution: .cbq,
+            documentType: .creditCard,
+            parserName: "CBQ Credit Card PDF",
+            transactionCount: secondDocument.transactions.count,
+            validation: secondValidation
+        )
+        let second = try coordinator.persistValidatedImport(
+            financialDocument: secondDocument,
+            importSession: secondSession,
+            validation: secondValidation,
+            fingerprintSet: fingerprintSet(label: "second"),
+            accountChoice: nil,
+            providerGeneration: provider.generationToken
+        )
+        #expect(second.persisted)
+        #expect(second.accountId == result.accountId)
+        #expect(second.transactionCount == 4)
+        try verifyGraph(
+            provider: provider,
+            workspaceID: workspaceID,
+            transactionCount: 8,
+            statementCount: 2,
+            sectionCount: 4,
+            expectedLiabilityBalance: try Money(amount: -84, currency: "QAR")
+        )
 
         if let sqlite {
             try sqlite.database.checkpointAndClose()
             let reopenedSQLite = try SQLiteRepositoryProvider(path: databaseURL.path)
             let reopened = DatabaseProvider.verifiedSQLite(reopenedSQLite, protectsGeneration: false)
-            try verifyGraph(provider: reopened, workspaceID: workspaceID)
+            try verifyGraph(
+                provider: reopened,
+                workspaceID: workspaceID,
+                transactionCount: 8,
+                statementCount: 2,
+                sectionCount: 4,
+                expectedLiabilityBalance: try Money(amount: -84, currency: "QAR")
+            )
             try reopenedSQLite.database.checkpointAndClose()
         }
     }
 
-    private func verifyGraph(provider: DatabaseProvider, workspaceID: String) throws {
+    private func verifyGraph(
+        provider: DatabaseProvider,
+        workspaceID: String,
+        transactionCount: Int,
+        statementCount: Int,
+        sectionCount: Int,
+        expectedLiabilityBalance: Money
+    ) throws {
         #expect(try provider.accountRepo.accounts(workspaceId: workspaceID).count == 1)
-        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == 4)
+        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count == transactionCount)
         let card = try provider.cardRepo.snapshot(workspaceId: workspaceID)
         #expect(card.instruments.count == 2)
         #expect(card.instruments.allSatisfy { $0.lifecycleStateCode == CardInstrumentLifecycleState.unknown.rawValue })
         #expect(card.relationships.isEmpty)
-        #expect(card.statements.count == 1)
-        #expect(card.sections.count == 2)
-        #expect(card.sectionObservations.count == 2)
-        #expect(card.transactionEvidence.count == 4)
+        #expect(card.statements.count == statementCount)
+        #expect(card.sections.count == sectionCount)
+        #expect(card.sectionObservations.count == sectionCount)
+        #expect(card.transactionEvidence.count == transactionCount)
         #expect(card.transactionEvidence.allSatisfy { $0.summaryMembershipCode != nil })
         #expect(card.transactionEvidence.contains {
             $0.rowScopeCode == CardTransactionScope.accountLevel.persistenceCode &&
@@ -126,30 +191,36 @@ struct CBQCreditCardPersistenceTests {
             participatesInLifecycleGate: false
         )
         let hydrated = try hydrator.stageHydration()
-        #expect(hydrated.accounts.first?.currentBalanceMoney == (try Money(amount: -92, currency: "QAR")))
-        #expect(hydrated.transactions.count == 4)
+        #expect(hydrated.accounts.first?.currentBalanceMoney == expectedLiabilityBalance)
+        #expect(hydrated.transactions.count == transactionCount)
         #expect(hydrated.cardSnapshot.instruments.count == 2)
-        #expect(hydrated.cardSnapshot.statements.count == 1)
-        #expect(hydrated.cardSnapshot.transactionEvidence.count == 4)
+        #expect(hydrated.cardSnapshot.statements.count == statementCount)
+        #expect(hydrated.cardSnapshot.transactionEvidence.count == transactionCount)
     }
 
-    private func syntheticDocument() throws -> FinancialDocument {
+    private func syntheticDocument(
+        month: String = "11",
+        statementDay: String = "30",
+        dueDate: String = "15/12/25",
+        previousBalance: String = "100.00",
+        currentBalance: String = "92.00"
+    ) throws -> FinancialDocument {
         let pages = [
             """
             Card Account Reference
             470012345678901
-            Statement Date 30/11/25
-            Statement Period 01/11/25 to 30/11/25
-            Payment Due Date 15/12/25
-            Previous Outstanding Balance 100.00 Amount Billed 12.00 Payment Received CR 20.00 Current Outstanding Balance 92.00
+            Statement Date \(statementDay)/\(month)/25
+            Statement Period 01/\(month)/25 to \(statementDay)/\(month)/25
+            Payment Due Date \(dueDate)
+            Previous Outstanding Balance \(previousBalance)\n            Amount Billed 12.00\n            Payment Received CR 20.00\n            Current Outstanding Balance \(currentBalance)
             Diners Club
             Card Number Card Holder Name Product Card Limit
             1234XXXXXXXX5678 FICTIONAL HOLDER Diners Club FICTIONAL PRODUCT 5000.00
             Post Date Purchase
             Date Description & Referance Foreign Currency Amount in QAR
-            02/11/25 01/11/25 Paid using bankDirect CR 20.00
-            04/11/25 03/11/25 FICTIONAL PURCHASE ONE 5.00
-            05/11/25 04/11/25 continuation narration
+            02/\(month)/25 01/\(month)/25 Paid using bankDirect CR 20.00
+            04/\(month)/25 03/\(month)/25 FICTIONAL PURCHASE ONE 5.00
+            05/\(month)/25 04/\(month)/25 continuation narration
             Continued on next page...
             """,
             """
@@ -158,12 +229,12 @@ struct CBQCreditCardPersistenceTests {
             1234XXXXXXXX5678 FICTIONAL HOLDER Diners Club FICTIONAL PRODUCT 5000.00
             Post Date Purchase
             Date Description & Referance Foreign Currency Amount in QAR
-            06/11/25 05/11/25 FICTIONAL PURCHASE TWO 4.00
+            06/\(month)/25 05/\(month)/25 FICTIONAL PURCHASE TWO 4.00
             DINERS-TOTAL CR 11.00
             Mastercard Platinum
             Card Number Card Holder Name Product Card Limit
             4321XXXXXXXX8765 FICTIONAL HOLDER Mastercard Platinum FICTIONAL PRODUCT 7000.00
-            08/11/25 07/11/25 CASH ADVANCE FEE 3.00
+            08/\(month)/25 07/\(month)/25 CASH ADVANCE FEE 3.00
             MASTERCARD-TOTAL 3.00
             XXXX End of Statement
             """,
