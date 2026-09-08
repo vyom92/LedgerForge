@@ -9,7 +9,7 @@ struct CSVDocumentReaderAdapterTests {
 
     @Test func adapterAcceptsCSVInput() async throws {
         let adapter = CSVDocumentReaderAdapter()
-        let request = ImportRequest(fileURL: approvedCSVFixtureURL())
+        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/generic.csv"))
 
         #expect(adapter.supportedFileExtensions == ["csv"])
         #expect(adapter.supportedFileExtensions.contains(request.fileExtension))
@@ -29,9 +29,10 @@ struct CSVDocumentReaderAdapterTests {
         }
     }
 
-    @Test func adapterProducesRawTextDocumentForApprovedCSVFixture() async throws {
+    @Test func adapterProducesRawTextDocumentForGenericCSV() async throws {
         let adapter = CSVDocumentReaderAdapter()
-        let fixtureURL = approvedCSVFixtureURL()
+        let fixtureURL = try genericCSVFixtureURL()
+        defer { try? FileManager.default.removeItem(at: fixtureURL.deletingLastPathComponent()) }
         let request = ImportRequest(fileURL: fixtureURL)
 
         let rawDocument = try await adapter.read(request: request, password: nil)
@@ -45,13 +46,13 @@ struct CSVDocumentReaderAdapterTests {
             return
         }
 
-        #expect(text.contains("Statement of Account No"))
-        #expect(text.contains("Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL"))
+        #expect(text == "Name,Value\nAlpha,1\nBeta,2\n")
     }
 
-    @Test func adapterOutputMatchesLegacyCSVReaderForApprovedFixture() async throws {
+    @Test func adapterOutputMatchesLegacyCSVReaderForGenericInput() async throws {
         let adapter = CSVDocumentReaderAdapter()
-        let fixtureURL = approvedCSVFixtureURL()
+        let fixtureURL = try genericCSVFixtureURL()
+        defer { try? FileManager.default.removeItem(at: fixtureURL.deletingLastPathComponent()) }
         let request = ImportRequest(fileURL: fixtureURL)
         let legacyText = try CSVReader().read(from: fixtureURL)
 
@@ -67,6 +68,10 @@ struct CSVDocumentReaderAdapterTests {
 
 }
 
-private func approvedCSVFixtureURL() -> URL {
-    FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+private func genericCSVFixtureURL() throws -> URL {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let url = directory.appendingPathComponent("generic.csv")
+    try Data("Name,Value\nAlpha,1\nBeta,2\n".utf8).write(to: url)
+    return url
 }

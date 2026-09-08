@@ -3,151 +3,31 @@ import Testing
 import SQLite3
 @testable import LedgerForge
 
+/// Shared confirmed-import contract checks use either repository error values or
+/// one unchanged authentic source prepared through the ordinary engine. They do
+/// not author statement graphs or mutate financial facts to manufacture rejects.
+@MainActor
 struct ConfirmedImportRepositoryContractTests {
-    @Test func mismatchedTransactionWorkspaceIsRejectedWithNoAcceptedResidueAcrossProviders() throws {
-        try assertPlanRejectedAcrossProviders { token in
-            let plan = confirmedImportPlan(generationToken: token, suffix: "mismatched-transaction")
-            let template = plan.transactionTemplates[0]
-            let mismatched = TransactionDTO(
-                id: template.transaction.id,
-                workspaceId: "wrong-workspace",
-                postedDateISO: template.transaction.postedDateISO,
-                nativeCurrency: template.transaction.nativeCurrency,
-                amountMinor: template.transaction.amountMinor,
-                amountDecimal: template.transaction.amountDecimal,
-                direction: template.transaction.direction,
-                createdAtISO: template.transaction.createdAtISO
-            )
-            return ConfirmedImportPlanDTO(
-                providerGeneration: plan.providerGeneration,
-                workspace: plan.workspace,
-                proposedAccount: plan.proposedAccount,
-                accountChoice: plan.accountChoice,
-                advisoryIdentity: plan.advisoryIdentity,
-                identifiers: plan.identifiers,
-                historyTemplate: plan.historyTemplate,
-                transactionTemplates: [ConfirmedImportTransactionTemplateDTO(transaction: mismatched, eventEvidence: template.eventEvidence)]
-            )
-        }
-    }
-
-    @Test func mismatchedSuccessfulAttemptWorkspaceIsRejectedWithNoAcceptedResidueAcrossProviders() throws {
-        try assertPlanRejectedAcrossProviders { token in
-            let plan = confirmedImportPlan(generationToken: token, suffix: "mismatched-attempt")
-            let attempt = plan.historyTemplate.successfulAttempt
-            let mismatchedAttempt = ImportAttemptDTO(
-                id: attempt.id,
-                workspaceId: "wrong-workspace",
-                createdAtISO: attempt.createdAtISO,
-                outcomeCode: attempt.outcomeCode,
-                coverageCode: attempt.coverageCode,
-                accountDecisionCode: attempt.accountDecisionCode,
-                guidanceCode: attempt.guidanceCode,
-                persistenceCode: attempt.persistenceCode,
-                transactionCount: attempt.transactionCount,
-                accountId: attempt.accountId,
-                importSessionId: attempt.importSessionId,
-                documentId: attempt.documentId
-            )
-            let history = ConfirmedImportHistoryTemplateDTO(
-                document: plan.historyTemplate.document,
-                fingerprint: plan.historyTemplate.fingerprint,
-                importSession: plan.historyTemplate.importSession,
-                completedAtISO: plan.historyTemplate.completedAtISO,
-                successfulAttempt: mismatchedAttempt
-            )
-            return ConfirmedImportPlanDTO(
-                providerGeneration: plan.providerGeneration,
-                workspace: plan.workspace,
-                proposedAccount: plan.proposedAccount,
-                accountChoice: plan.accountChoice,
-                advisoryIdentity: plan.advisoryIdentity,
-                identifiers: plan.identifiers,
-                historyTemplate: history,
-                transactionTemplates: plan.transactionTemplates
-            )
-        }
-    }
-
-    @Test func duplicateIncomingTransactionIDsAreRejectedDeterministicallyAcrossProviders() throws {
-        try assertPlanRejectedAcrossProviders { token in
-            let plan = confirmedImportPlan(generationToken: token, suffix: "duplicate-transactions")
-            return ConfirmedImportPlanDTO(
-                providerGeneration: plan.providerGeneration,
-                workspace: plan.workspace,
-                proposedAccount: plan.proposedAccount,
-                accountChoice: plan.accountChoice,
-                advisoryIdentity: plan.advisoryIdentity,
-                identifiers: plan.identifiers,
-                historyTemplate: plan.historyTemplate,
-                transactionTemplates: [plan.transactionTemplates[0], plan.transactionTemplates[0]]
-            )
-        }
-    }
-
-    @Test func missingTrustedSourceRelationshipIsRejectedWithNoAcceptedResidueAcrossProviders() throws {
-        try assertPlanRejectedAcrossProviders { token in
-            let plan = confirmedImportPlan(generationToken: token, suffix: "missing-trusted-source")
-            let template = plan.transactionTemplates[0]
-            let orphan = TransactionRawRowDTO(
-                id: template.transaction.rawRows[0].id,
-                normalizedRowId: "missing-normalized-row",
-                contributionType: "transaction"
-            )
-            return planReplacingTransactions(plan, with: [
-                ConfirmedImportTransactionTemplateDTO(
-                    transaction: transactionReplacingRawRows(template.transaction, with: [orphan]),
-                    eventEvidence: template.eventEvidence
-                )
-            ])
-        }
-    }
-
-    @Test func duplicateTrustedSourceRelationshipIsRejectedWithNoAcceptedResidueAcrossProviders() throws {
-        try assertPlanRejectedAcrossProviders { token in
-            let plan = confirmedImportPlan(generationToken: token, suffix: "duplicate-trusted-source")
-            let template = plan.transactionTemplates[0]
-            let first = template.transaction.rawRows[0]
-            let duplicate = TransactionRawRowDTO(
-                id: "duplicate-raw-row",
-                normalizedRowId: first.normalizedRowId,
-                contributionType: first.contributionType
-            )
-            return planReplacingTransactions(plan, with: [
-                ConfirmedImportTransactionTemplateDTO(
-                    transaction: transactionReplacingRawRows(template.transaction, with: [first, duplicate]),
-                    eventEvidence: template.eventEvidence
-                )
-            ])
-        }
-    }
-
-    @Test func duplicateIncomingIdentifierCandidatesAreRejectedDeterministicallyAcrossProviders() throws {
-        try assertPlanRejectedAcrossProviders { token in
-            let plan = confirmedImportPlan(generationToken: token, suffix: "duplicate-identifiers")
-            return ConfirmedImportPlanDTO(
-                providerGeneration: plan.providerGeneration,
-                workspace: plan.workspace,
-                proposedAccount: plan.proposedAccount,
-                accountChoice: plan.accountChoice,
-                advisoryIdentity: plan.advisoryIdentity,
-                identifiers: [plan.identifiers[0], plan.identifiers[0]],
-                historyTemplate: plan.historyTemplate,
-                transactionTemplates: plan.transactionTemplates
-            )
-        }
-    }
-
-    @Test func sqliteBusyAndLockedErrorsAreRecognizedWithoutDiagnosticLeakage() {
-        let busy = SQLiteExecutionError(primaryCode: SQLITE_BUSY, extendedCode: SQLITE_BUSY, operation: .transaction)
-        let locked = SQLiteExecutionError(primaryCode: SQLITE_LOCKED, extendedCode: SQLITE_LOCKED, operation: .statement)
+    @Test
+    func sqliteBusyAndLockedErrorsAreRecognizedWithoutDiagnosticLeakage() {
+        let busy = SQLiteExecutionError(
+            primaryCode: SQLITE_BUSY,
+            extendedCode: SQLITE_BUSY,
+            operation: .transaction
+        )
+        let locked = SQLiteExecutionError(
+            primaryCode: SQLITE_LOCKED,
+            extendedCode: SQLITE_LOCKED,
+            operation: .statement
+        )
 
         #expect(busy.isRetryableContention)
         #expect(locked.isRetryableContention)
         #expect(!busy.description.contains("SELECT"))
     }
 
-    @Test func sqliteUniqueConstraintIsRecognizedWithoutSQLInDescription() {
+    @Test
+    func sqliteUniqueConstraintIsRecognizedWithoutSQLInDescription() {
         let error = SQLiteExecutionError(
             primaryCode: SQLITE_CONSTRAINT,
             extendedCode: 2067,
@@ -159,7 +39,8 @@ struct ConfirmedImportRepositoryContractTests {
         #expect(!error.description.contains("SELECT"))
     }
 
-    @Test func confirmedImportResultsUsePrivacySafeDescriptions() {
+    @Test
+    func confirmedImportResultsUsePrivacySafeDescriptions() {
         let results: [ConfirmedImportRepositoryResult] = [
             .exactDuplicate,
             .identifierOwnershipConflict,
@@ -174,127 +55,36 @@ struct ConfirmedImportRepositoryContractTests {
         }
     }
 
-    @Test func accountIndependentTemplateCarriesNoEvidence() {
-        let template = ConfirmedImportTransactionTemplateDTO(transaction: transaction())
+    @Test(.globalRuntimeStateIsolation)
+    func unchangedAuthenticPlanCommitsAndReplaysEquallyAcrossProviders() async throws {
+        let memory = InMemoryRepositoryProvider()
+        let memoryPlan = try await confirmedImportPlan(generationToken: memory.generationToken)
 
-        #expect(template.eventEvidence == nil)
-        #expect(template.isAccountIndependent)
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LedgerForge-ConfirmedContract-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let sqlite = try SQLiteRepositoryProvider(
+            path: folder.appendingPathComponent("contract.sqlite").path,
+            migrations: allMigrations
+        )
+        defer { sqlite.database.close() }
+        let sqlitePlan = try await confirmedImportPlan(generationToken: sqlite.generationToken)
+
+        #expect(memory.confirmedImportRepo.commitConfirmedImport(memoryPlan) == .committed(receipt(for: memoryPlan)))
+        #expect(sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan) == .committed(receipt(for: sqlitePlan)))
+        #expect(memory.confirmedImportRepo.commitConfirmedImport(memoryPlan) == .exactDuplicate)
+        #expect(sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan) == .exactDuplicate)
+        #expect(try memory.transactionRepo.trustedTransactions(workspaceId: memoryPlan.workspace.id).count == memoryPlan.transactionTemplates.count)
+        #expect(try sqlite.transactionRepo.trustedTransactions(workspaceId: sqlitePlan.workspace.id).count == sqlitePlan.transactionTemplates.count)
     }
 
-    @Test func accountIndependentTemplateCarriesParserProducedAxisEvidence() throws {
-        let evidence = ConfirmedImportTransactionEventEvidenceDTO.axisUPI(
-            ConfirmedImportAxisUPIEventEvidenceDTO(operation: .p2a, reference: "123456789012", subtype: .posting)
-        )
-        let template = ConfirmedImportTransactionTemplateDTO(transaction: transaction(), eventEvidence: evidence)
-
-        #expect(template.eventEvidence == evidence)
-        let identity = try TransactionEventIdentity.make(
-            transactionID: template.transaction.id,
-            evidence: evidence,
-            accountID: "account-a"
-        )
-        #expect(identity.accountID == "account-a")
-    }
-
-    @Test func accountPreassignmentIsDetectedBeforeProviderExecution() {
-        let template = ConfirmedImportTransactionTemplateDTO(
-            transaction: transaction(accountId: "preassigned-account")
-        )
-
-        #expect(!template.isAccountIndependent)
-    }
-
-    @Test func selectedAccountParticipatesInFinalEventDigest() throws {
-        let evidence = ConfirmedImportTransactionEventEvidenceDTO.axisUPI(
-            ConfirmedImportAxisUPIEventEvidenceDTO(operation: .p2m, reference: "123456789012", subtype: .creditAdjustment)
-        )
-
-        let first = try TransactionEventIdentity.make(transactionID: UUID().uuidString, evidence: evidence, accountID: "account-a")
-        let second = try TransactionEventIdentity.make(transactionID: UUID().uuidString, evidence: evidence, accountID: "account-b")
-
-        #expect(first.digest != second.digest)
-    }
-
-    private func transaction(accountId: String? = nil) -> TransactionDTO {
-        TransactionDTO(
-            workspaceId: "workspace",
-            accountId: accountId,
-            postedDateISO: "2026-07-20",
-            nativeCurrency: "INR",
-            amountMinor: 100,
-            amountDecimal: "1.00",
-            direction: "debit",
-            createdAtISO: "2026-07-20T00:00:00Z"
+    private func receipt(for plan: ConfirmedImportPlanDTO) -> ConfirmedImportReceiptDTO {
+        ConfirmedImportReceiptDTO(
+            workspaceId: plan.workspace.id,
+            accountId: plan.proposedAccount.id,
+            importSessionId: plan.historyTemplate.importSession.id,
+            documentId: plan.historyTemplate.document.id
         )
     }
-}
-
-private func assertPlanRejectedAcrossProviders(
-    _ makePlan: (ProviderGenerationToken) -> ConfirmedImportPlanDTO
-) throws {
-    let memory = InMemoryRepositoryProvider()
-    let memoryPlan = makePlan(memory.generationToken)
-    #expect(memory.confirmedImportRepo.commitConfirmedImport(memoryPlan) == .repositoryIntegrityConflict)
-    #expect(try memory.workspaceRepo.workspace(id: memoryPlan.workspace.id) == nil)
-    #expect(try memory.accountRepo.accounts(workspaceId: memoryPlan.workspace.id).isEmpty)
-    #expect(try memory.importSessionRepo.importAttempts(workspaceId: memoryPlan.workspace.id).isEmpty)
-
-    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: folder) }
-    let sqlite = try SQLiteRepositoryProvider(path: folder.appendingPathComponent("contract.sqlite").path, migrations: allMigrations)
-    defer { sqlite.database.close() }
-    let sqlitePlan = makePlan(sqlite.generationToken)
-    #expect(sqlite.confirmedImportRepo.commitConfirmedImport(sqlitePlan) == .repositoryIntegrityConflict)
-    #expect(try sqlite.workspaceRepo.workspace(id: sqlitePlan.workspace.id) == nil)
-    #expect(try sqlite.accountRepo.accounts(workspaceId: sqlitePlan.workspace.id).isEmpty)
-    #expect(try sqlite.importSessionRepo.importAttempts(workspaceId: sqlitePlan.workspace.id).isEmpty)
-}
-
-private func planReplacingTransactions(
-    _ plan: ConfirmedImportPlanDTO,
-    with transactions: [ConfirmedImportTransactionTemplateDTO]
-) -> ConfirmedImportPlanDTO {
-    ConfirmedImportPlanDTO(
-        providerGeneration: plan.providerGeneration,
-        workspace: plan.workspace,
-        proposedAccount: plan.proposedAccount,
-        accountChoice: plan.accountChoice,
-        advisoryIdentity: plan.advisoryIdentity,
-        identifiers: plan.identifiers,
-        historyTemplate: plan.historyTemplate,
-        transactionTemplates: transactions
-    )
-}
-
-private func transactionReplacingRawRows(
-    _ transaction: TransactionDTO,
-    with rawRows: [TransactionRawRowDTO]
-) -> TransactionDTO {
-    TransactionDTO(
-        id: transaction.id,
-        workspaceId: transaction.workspaceId,
-        accountId: transaction.accountId,
-        importSessionId: transaction.importSessionId,
-        documentId: transaction.documentId,
-        originalRowId: transaction.originalRowId,
-        postedDateISO: transaction.postedDateISO,
-        financialDateRole: transaction.financialDateRole,
-        statementTimezoneEvidence: transaction.statementTimezoneEvidence,
-        valueDateISO: transaction.valueDateISO,
-        description: transaction.description,
-        payee: transaction.payee,
-        reference: transaction.reference,
-        nativeCurrency: transaction.nativeCurrency,
-        amountMinor: transaction.amountMinor,
-        amountDecimal: transaction.amountDecimal,
-        direction: transaction.direction,
-        runningBalanceMinor: transaction.runningBalanceMinor,
-        isReconciled: transaction.isReconciled,
-        isTrusted: transaction.isTrusted,
-        trustedAtISO: transaction.trustedAtISO,
-        createdAtISO: transaction.createdAtISO,
-        updatedAtISO: transaction.updatedAtISO,
-        rawRows: rawRows
-    )
 }

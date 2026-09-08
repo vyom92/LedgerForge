@@ -2252,7 +2252,7 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
             ) { row in
                 StatementFinancialProjectionEventDTO(
                     id: row.string(at: 0) ?? "", ordinal: Int(row.int64(at: 1) ?? 0),
-                    statementDateISO: row.string(at: 2) ?? "", valueDateISO: row.string(at: 3) ?? "",
+                    statementDateISO: row.string(at: 2) ?? "", valueDateISO: row.string(at: 3),
                     direction: row.string(at: 4) ?? "", signedAmountMinor: row.int64(at: 5) ?? 0,
                     signedAmountDecimal: row.string(at: 6) ?? "", runningBalanceMinor: row.int64(at: 7) ?? 0,
                     runningBalanceDecimal: row.string(at: 8) ?? "", reference: row.string(at: 9)
@@ -2277,6 +2277,58 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
                 documentID: record.2,
                 importSessionID: record.3,
                 createdAtISO: record.25
+            )
+        }
+    }
+
+    func statementZeroActivityControls(workspaceId: String) throws -> [StatementZeroActivityControlDTO] {
+        try db.query(
+            sql: "SELECT id, workspace_id, account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, source_format_code, institution_code, statement_family_code, statement_date, statement_start_date, statement_end_date, selected_statement_month, semantic_cycle_key, native_currency, opening_balance_minor, opening_balance_decimal, closing_balance_minor, closing_balance_decimal, debit_total_minor, debit_total_decimal, credit_total_minor, credit_total_decimal, card_previous_balance_minor, card_previous_balance_decimal, card_total_payment_due_minor, card_total_payment_due_decimal, card_payment_due_date, evidence_kind, financial_region_descriptor, financial_region_source_unit, financial_region_start_ordinal, financial_region_end_ordinal, financial_region_signature, semantic_digest_algorithm, semantic_digest, source_fingerprint_algorithm, source_fingerprint_digest, authority_role, created_at FROM statement_zero_activity_controls WHERE workspace_id = ? ORDER BY created_at, id;",
+            params: [workspaceId]
+        ) { row in
+            StatementZeroActivityControlDTO(
+                id: row.string(at: 0) ?? "",
+                workspaceId: row.string(at: 1) ?? "",
+                accountId: row.string(at: 2) ?? "",
+                documentId: row.string(at: 3) ?? "",
+                importSessionId: row.string(at: 4) ?? "",
+                normalizedDocumentId: row.string(at: 5) ?? "",
+                parserProfileId: row.string(at: 6) ?? "",
+                parserProfileVersion: row.string(at: 7) ?? "",
+                sourceFormatCode: row.string(at: 8) ?? "",
+                institutionCode: row.string(at: 9) ?? "",
+                statementFamilyCode: row.string(at: 10) ?? "",
+                statementDateISO: row.string(at: 11),
+                statementStartDateISO: row.string(at: 12),
+                statementEndDateISO: row.string(at: 13),
+                selectedStatementMonthISO: row.string(at: 14),
+                semanticCycleKey: row.string(at: 15) ?? "",
+                nativeCurrency: row.string(at: 16) ?? "",
+                openingBalanceMinor: row.int64(at: 17),
+                openingBalanceDecimal: row.string(at: 18),
+                closingBalanceMinor: row.int64(at: 19),
+                closingBalanceDecimal: row.string(at: 20),
+                debitTotalMinor: row.int64(at: 21),
+                debitTotalDecimal: row.string(at: 22),
+                creditTotalMinor: row.int64(at: 23),
+                creditTotalDecimal: row.string(at: 24),
+                cardPreviousBalanceMinor: row.int64(at: 25),
+                cardPreviousBalanceDecimal: row.string(at: 26),
+                cardTotalPaymentDueMinor: row.int64(at: 27),
+                cardTotalPaymentDueDecimal: row.string(at: 28),
+                cardPaymentDueDateISO: row.string(at: 29),
+                evidenceKind: row.string(at: 30) ?? "",
+                financialRegionDescriptor: row.string(at: 31),
+                financialRegionSourceUnit: row.string(at: 32),
+                financialRegionStartOrdinal: row.int64(at: 33).map(Int.init),
+                financialRegionEndOrdinal: row.int64(at: 34).map(Int.init),
+                financialRegionSignature: row.string(at: 35),
+                semanticDigestAlgorithm: row.string(at: 36) ?? "",
+                semanticDigest: row.string(at: 37) ?? "",
+                sourceFingerprintAlgorithm: row.string(at: 38) ?? "",
+                sourceFingerprintDigest: row.string(at: 39) ?? "",
+                authorityRole: row.string(at: 40) ?? "",
+                createdAtISO: row.string(at: 41) ?? ""
             )
         }
     }
@@ -2478,8 +2530,14 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
           df.import_session_id,
           s.completed_at,
           (SELECT COUNT(*) FROM transactions t WHERE t.import_session_id = df.import_session_id),
-          (SELECT t.account_id FROM transactions t WHERE t.import_session_id = df.import_session_id AND t.account_id IS NOT NULL ORDER BY t.id LIMIT 1),
-          (SELECT a.name FROM accounts a WHERE a.id = (SELECT t.account_id FROM transactions t WHERE t.import_session_id = df.import_session_id AND t.account_id IS NOT NULL ORDER BY t.id LIMIT 1))
+          COALESCE(
+            (SELECT t.account_id FROM transactions t WHERE t.import_session_id = df.import_session_id AND t.account_id IS NOT NULL ORDER BY t.id LIMIT 1),
+            (SELECT z.account_id FROM statement_zero_activity_controls z WHERE z.import_session_id = df.import_session_id ORDER BY z.id LIMIT 1)
+          ),
+          (SELECT a.name FROM accounts a WHERE a.id = COALESCE(
+            (SELECT t.account_id FROM transactions t WHERE t.import_session_id = df.import_session_id AND t.account_id IS NOT NULL ORDER BY t.id LIMIT 1),
+            (SELECT z.account_id FROM statement_zero_activity_controls z WHERE z.import_session_id = df.import_session_id ORDER BY z.id LIMIT 1)
+          ))
         FROM document_fingerprints df
         INNER JOIN import_sessions s ON s.id = df.import_session_id
         WHERE df.algorithm = ? AND df.fingerprint = ?

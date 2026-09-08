@@ -12,13 +12,13 @@ public struct RawPDFTextGeometry: Equatable, Sendable {
     public let maxX: Double
     public let baselineY: Double
 
-    public init(minX: Double, maxX: Double, baselineY: Double) {
+    public nonisolated init(minX: Double, maxX: Double, baselineY: Double) {
         self.minX = minX
         self.maxX = maxX
         self.baselineY = baselineY
     }
 
-    public var isCanonical: Bool {
+    public nonisolated var isCanonical: Bool {
         minX.isFinite && maxX.isFinite && baselineY.isFinite && maxX >= minX
     }
 }
@@ -31,21 +31,51 @@ public struct RawPDFTextFragment: Equatable, Sendable {
     public let x: Double
     public let y: Double
     public let geometry: RawPDFTextGeometry?
+    /// Complete selectable-text rectangle in the original page coordinate space.
+    public let bounds: CGRect?
 
-    public init(text: String, geometry: RawPDFTextGeometry) {
+    public nonisolated init(text: String, geometry: RawPDFTextGeometry, bounds: CGRect? = nil) {
         self.text = text
         self.x = geometry.minX
         self.y = geometry.baselineY
         self.geometry = geometry
+        self.bounds = bounds
+    }
+}
+
+/// Transient PDF resource evidence retained only long enough for a profile to
+/// distinguish source-semantic image pages from an inert repeated masthead.
+/// This is structural metadata only; no source image bytes are retained.
+public struct RawPDFPageResourceEvidence: Equatable, Sendable {
+    public let imageResourceCount: Int
+    public let largestImageWidth: Int
+    public let largestImageHeight: Int
+
+    public nonisolated init(
+        imageResourceCount: Int,
+        largestImageWidth: Int = 0,
+        largestImageHeight: Int = 0
+    ) {
+        self.imageResourceCount = max(0, imageResourceCount)
+        self.largestImageWidth = max(0, largestImageWidth)
+        self.largestImageHeight = max(0, largestImageHeight)
     }
 }
 
 /// Positioned text evidence for one PDF page, in source extraction order.
 public struct RawPDFPageEvidence: Equatable, Sendable {
     public let fragments: [RawPDFTextFragment]
+    public let resourceEvidence: RawPDFPageResourceEvidence?
+    public let bounds: CGRect?
 
-    public init(fragments: [RawPDFTextFragment]) {
+    public nonisolated init(
+        fragments: [RawPDFTextFragment],
+        resourceEvidence: RawPDFPageResourceEvidence? = nil,
+        bounds: CGRect? = nil
+    ) {
         self.fragments = fragments
+        self.resourceEvidence = resourceEvidence
+        self.bounds = bounds
     }
 }
 
@@ -129,6 +159,12 @@ public struct RawDocument: Equatable, Sendable {
     /// Array order is source page order. Financial semantics are deliberately
     /// not interpreted at the reader boundary.
     public let pdfPageEvidence: [RawPDFPageEvidence]?
+    /// Reader-owned, in-memory-only PDF page resource evidence. This carrier is
+    /// intentionally independent from positioned text extraction: a page may
+    /// have useful image/resource metadata even when one positioned text range
+    /// cannot be resolved. Array order is source page order and, when present,
+    /// always matches the native PDF page count.
+    public let pdfPageResourceEvidence: [RawPDFPageResourceEvidence]?
     /// Reader-owned, in-memory-only tagged logical table evidence. Absence is
     /// ordinary for untagged PDFs and does not change existing reader behavior.
     public let pdfTaggedTables: [RawPDFTaggedTableEvidence]?
@@ -142,6 +178,7 @@ public struct RawDocument: Equatable, Sendable {
         content: RawDocumentContent,
         pdfPageTexts: [String]? = nil,
         pdfPageEvidence: [RawPDFPageEvidence]? = nil,
+        pdfPageResourceEvidence: [RawPDFPageResourceEvidence]? = nil,
         pdfTaggedTables: [RawPDFTaggedTableEvidence]? = nil,
         extractedAt: Date = Date()
     ) {
@@ -152,6 +189,7 @@ public struct RawDocument: Equatable, Sendable {
         self.content = content
         self.pdfPageTexts = pdfPageTexts
         self.pdfPageEvidence = pdfPageEvidence
+        self.pdfPageResourceEvidence = pdfPageResourceEvidence
         self.pdfTaggedTables = pdfTaggedTables
         self.extractedAt = extractedAt
     }

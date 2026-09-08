@@ -5,6 +5,18 @@ import CoreGraphics
 final class PDFDocumentReader: ImportFramework.DocumentReader {
     let supportedFileExtensions: Set<String> = ["pdf"]
 
+    /// The positioned extractor is deliberately injectable for reader tests:
+    /// resource extraction must remain available even when an individual
+    /// geometry/range lookup fails. Production intake uses the strict
+    /// PDFKitPositionedTextExtractor implementation below.
+    private let positionedEvidenceExtractor: (PDFDocument) -> [RawPDFPageEvidence]?
+
+    init(
+        positionedEvidenceExtractor: @escaping (PDFDocument) -> [RawPDFPageEvidence]? = PDFKitPositionedTextExtractor.extractPages
+    ) {
+        self.positionedEvidenceExtractor = positionedEvidenceExtractor
+    }
+
     func read(
         request: ImportRequest,
         snapshot: SourceContentSnapshot,
@@ -18,6 +30,7 @@ final class PDFDocumentReader: ImportFramework.DocumentReader {
             text: String,
             pages: [String],
             pageEvidence: [RawPDFPageEvidence]?,
+            pageResourceEvidence: [RawPDFPageResourceEvidence]?,
             taggedTables: [RawPDFTaggedTableEvidence]?
         ) in
             guard let document = PDFDocument(data: bytes) else {
@@ -34,30 +47,45 @@ final class PDFDocumentReader: ImportFramework.DocumentReader {
                 }
             }
 
-            let pdfKitText = document.string
-            let pages = (0..<document.pageCount).compactMap { pageIndex -> String? in
-                guard let pageText = document.page(at: pageIndex)?.string,
-                      !pageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                    return nil
+            guard document.pageCount > 0 else {
+                throw ImportError.invalidDocument(message: "PDF document contains no pages.")
+            }
+            var pages: [String] = []
+            pages.reserveCapacity(document.pageCount)
+            for pageIndex in 0..<document.pageCount {
+                guard let page = document.page(at: pageIndex) else {
+                    throw ImportError.invalidDocument(message: "PDF document contains an unreadable physical page.")
                 }
-                return pageText
+                // An empty string is deliberate physical-page evidence. Never
+                // compact it away: downstream family analysis owns whether a
+                // textless page is inert, requires another extraction mode, or
+                // makes the financial source ambiguous.
+                pages.append(page.string ?? "")
             }
-            guard let pdfKitText,
-                  !pdfKitText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  pages.count == document.pageCount else {
-                throw ImportError.invalidDocument(message: "PDF document contains no extractable text.")
-            }
-            let pageEvidence = PDFKitPositionedTextExtractor.extractPages(document: document)
             let text = pages.joined(separator: "\n")
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw ImportError.invalidDocument(message: "PDF document contains no extractable text.")
             }
+            // Resource evidence is cheap, bounded metadata and is collected
+            // independently. Do not lose it merely because positioned text
+            // extraction is all-or-nothing for a page.
+            let pageResourceEvidence = PDFKitPageResourceExtractor.extractPages(document: document)
+            let pageEvidence = positionedEvidenceExtractor(document)
             let taggedTables = TaggedPDFTableExtractor.extractTables(
                 bytes: bytes,
                 password: password,
                 expectedPageCount: document.pageCount
             )
-            return (text, pages, pageEvidence, taggedTables)
+            guard let pageResourceEvidence,
+                  pageResourceEvidence.count == document.pageCount else {
+                throw ImportError.invalidDocument(message: "PDF page resource evidence is incomplete.")
+            }
+            if let pageEvidence {
+                guard pageEvidence.count == document.pageCount else {
+                    throw ImportError.invalidDocument(message: "PDF positioned page evidence is incomplete.")
+                }
+            }
+            return (text, pages, pageEvidence, pageResourceEvidence, taggedTables)
         }
 
         return RawDocument(
@@ -67,6 +95,7 @@ final class PDFDocumentReader: ImportFramework.DocumentReader {
             content: .text(extracted.text),
             pdfPageTexts: extracted.pages,
             pdfPageEvidence: extracted.pageEvidence,
+            pdfPageResourceEvidence: extracted.pageResourceEvidence,
             pdfTaggedTables: extracted.taggedTables
         )
     }
@@ -76,26 +105,36 @@ final class PDFDocumentReader: ImportFramework.DocumentReader {
 /// text. Segmentation is driven only by source whitespace and retains each
 /// range's horizontal rectangle plus canonical page-space row coordinate.
 private enum PDFKitPositionedTextExtractor {
-    static func extractPages(document: PDFDocument) -> [RawPDFPageEvidence]? {
+    nonisolated static func extractPages(document: PDFDocument) -> [RawPDFPageEvidence]? {
         guard document.pageCount > 0 else { return nil }
         var result: [RawPDFPageEvidence] = []
         result.reserveCapacity(document.pageCount)
+        guard let tokenRegex = try? NSRegularExpression(pattern: #"\S+"#) else {
+            return nil
+        }
         for pageIndex in 0..<document.pageCount {
-            guard let page = document.page(at: pageIndex),
-                  let pageText = page.string,
-                  !pageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  let tokenRegex = try? NSRegularExpression(pattern: #"\S+"#) else {
+            guard let page = document.page(at: pageIndex) else {
                 return nil
+            }
+            let pageText = page.string ?? ""
+            guard !pageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                result.append(RawPDFPageEvidence(fragments: [], bounds: page.bounds(for: .mediaBox)))
+                continue
             }
             let pageRange = NSRange(pageText.startIndex..., in: pageText)
             let matches = tokenRegex.matches(in: pageText, range: pageRange)
-            guard !matches.isEmpty else { return nil }
+            guard !matches.isEmpty else {
+                result.append(RawPDFPageEvidence(fragments: [], bounds: page.bounds(for: .mediaBox)))
+                continue
+            }
             var fragments: [RawPDFTextFragment] = []
             fragments.reserveCapacity(matches.count)
+            var extractionFailed = false
             for match in matches {
                 guard let textRange = Range(match.range, in: pageText),
                       let selection = page.selection(for: match.range) else {
-                    return nil
+                    extractionFailed = true
+                    break
                 }
                 let text = String(pageText[textRange])
                 let bounds = selection.bounds(for: page)
@@ -105,14 +144,78 @@ private enum PDFKitPositionedTextExtractor {
                     baselineY: Double(bounds.midY)
                 )
                 guard !text.isEmpty, geometry.isCanonical, geometry.maxX > geometry.minX else {
-                    return nil
+                    extractionFailed = true
+                    break
                 }
-                fragments.append(RawPDFTextFragment(text: text, geometry: geometry))
+                fragments.append(RawPDFTextFragment(text: text, geometry: geometry, bounds: bounds))
             }
-            guard !fragments.isEmpty else { return nil }
-            result.append(RawPDFPageEvidence(fragments: fragments))
+            result.append(RawPDFPageEvidence(
+                fragments: extractionFailed ? [] : fragments,
+                bounds: page.bounds(for: .mediaBox)
+            ))
         }
         return result
+    }
+}
+
+/// Minimal, page-count-validated resource evidence that does not depend on
+/// positioned text extraction. It intentionally retains no image bytes.
+private enum PDFKitPageResourceExtractor {
+    static func extractPages(document: PDFDocument) -> [RawPDFPageResourceEvidence]? {
+        guard document.pageCount > 0 else { return nil }
+        return (0..<document.pageCount).map { index in
+            guard let page = document.page(at: index) else {
+                return RawPDFPageResourceEvidence(imageResourceCount: 0)
+            }
+            return resourceEvidence(for: page)
+        }
+    }
+
+    /// Retain only bounded, source-agnostic resource dimensions/counts so a
+    /// downstream family parser can reason about page evidence without keeping
+    /// decrypted image bytes or moving financial interpretation into the
+    /// reader.
+    private static func resourceEvidence(for page: PDFPage) -> RawPDFPageResourceEvidence {
+        guard let dictionary = page.pageRef?.dictionary else {
+            return RawPDFPageResourceEvidence(imageResourceCount: 0)
+        }
+        var resources: CGPDFDictionaryRef?
+        guard CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources),
+              let resources else {
+            return RawPDFPageResourceEvidence(imageResourceCount: 0)
+        }
+        var xObjects: CGPDFDictionaryRef?
+        guard CGPDFDictionaryGetDictionary(resources, "XObject", &xObjects),
+              let xObjects else {
+            return RawPDFPageResourceEvidence(imageResourceCount: 0)
+        }
+        var imageCount = 0
+        var largestWidth = 0
+        var largestHeight = 0
+        CGPDFDictionaryApplyBlock(xObjects, { _, object, _ in
+            guard CGPDFObjectGetType(object) == .stream else { return true }
+            var stream: CGPDFStreamRef?
+            guard CGPDFObjectGetValue(object, .stream, &stream),
+                  let stream,
+                  let streamDictionary = CGPDFStreamGetDictionary(stream) else { return true }
+            var subtype: UnsafePointer<CChar>?
+            guard CGPDFDictionaryGetName(streamDictionary, "Subtype", &subtype),
+                  let subtype,
+                  String(cString: subtype) == "Image" else { return true }
+            imageCount += 1
+            var width = 0
+            var height = 0
+            _ = CGPDFDictionaryGetInteger(streamDictionary, "Width", &width)
+            _ = CGPDFDictionaryGetInteger(streamDictionary, "Height", &height)
+            largestWidth = max(largestWidth, width)
+            largestHeight = max(largestHeight, height)
+            return true
+        }, nil)
+        return RawPDFPageResourceEvidence(
+            imageResourceCount: imageCount,
+            largestImageWidth: largestWidth,
+            largestImageHeight: largestHeight
+        )
     }
 }
 

@@ -52,9 +52,9 @@ final class OOXMLDocumentReader: ImportFramework.DocumentReader {
 }
 
 private struct Limits {
-    // The approved clean-room workbooks are 8 entries/75,215 uncompressed
-    // bytes and 162 rows x 6 columns. These ceilings leave useful room for
-    // the same bounded profile without admitting an unbounded ZIP/XML input.
+    // Source-independent resource ceilings bound ZIP/XML extraction work.
+    // They are technical input limits, not institution or statement-profile
+    // rules; financial support is established downstream from source semantics.
     let maximumEntryCount = 32
     let maximumSourceBytes = 4 * 1024 * 1024
     let maximumTotalUncompressedBytes = 8 * 1024 * 1024

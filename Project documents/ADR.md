@@ -25,13 +25,13 @@ When reading this file:
 4. use `PROJECT_STATE.md` for verified implementation reality;
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
-**Status alignment date:** 2026-08-28
-**Repository implementation ref reviewed:** `main@9489f6b21c9d585d2d90f2ba4798a931590057f7` — accepted Sprint 79 implementation
-**Latest verified production implementation:** Sprint 79 — Qatar Airways Salary Actuals and Current-Month Funding Planner
+**Status alignment date:** 2026-09-09
+**Repository implementation ref reviewed:** `main@335b152c631bde5c38d05e728ed6ddd57e91e6fe` — pre-publication baseline for the technically accepted unnumbered reset; publication is recorded separately by Git history
+**Latest technically accepted production implementation:** unnumbered P0 Authentic-Corpus Parser / Import Reliability Reset; Sprint 79 remains the latest accepted numbered implementation
 **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`
-**Latest completed numbered outcome:** Sprint 79
-**Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner (implemented)
-**Current migration:** V16
+**Latest completed numbered implementation outcome:** Sprint 79
+**Latest accepted ADR:** ADR-046 — Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation (architecture authority; no product implementation or migration implied)
+**Current migration:** V17; V1–V16 remain immutable
 
 No alignment note authorizes implementation.
 
@@ -57,7 +57,7 @@ No alignment note authorizes implementation.
 | ADR-016 | Universal Import Pipeline | Accepted, superseded in part by ADR-030, ADR-031, ADR-032, ADR-038 and ADR-039. | The unified pipeline remains authoritative, but its current ordering and persistence boundary have changed. |
 | ADR-017 | Deterministic Before Intelligent | Accepted foundational principle. | Deterministic processing remains mandatory at trusted boundaries. |
 | ADR-018 | Unified Import Framework Operational | Accepted and implemented in Sprint 11C. | CSV entered the unified framework. |
-| ADR-019 | Reference Fixtures Define Financial Truth | Accepted, clarified by ADR-030, ADR-031, ADR-034 and ADR-039. | Approved fixtures and independent expected evidence remain architectural acceptance inputs. |
+| ADR-019 | Reference Fixtures Define Financial Truth | Historical accepted decision; superseded by ADR-046 as current fixture/source-support authority. | Original fixture-based acceptance remains historical record only; synthetic/sanitized/reconstructed financial-source fixtures cannot certify current parser support. |
 | ADR-020 | Deterministic Institution Detection | Accepted and implemented in Sprint 12C. | Institution detection is a deterministic pipeline stage. |
 | ADR-021 | Deterministic Statement Classification | Accepted and implemented in Sprint 13. | Statement classification is a deterministic pipeline stage. |
 | ADR-022 | Preview Compatibility During Test Builds | Accepted and implemented as a toolchain-compatibility decision. | Historical Sprint 18 build compatibility evidence remains valid for that toolchain. |
@@ -83,7 +83,8 @@ No alignment note authorizes implementation.
 | ADR-042 | Exact Cross-Format Statement Equivalence and Supporting-Source Persistence | Accepted and implemented in Sprint 73. | Exact whole-statement equivalence is operational only for the independently approved HDFC bank-account PDF/XLS v1 pair. |
 | ADR-043 | Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts | Accepted and implemented in Sprint 75. | Exact CBQ history XLS, history PDF and monthly PDF sources coexist through bounded masked/full account resolution and one canonical transaction with durable per-source observations. |
 | ADR-044 | Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence | Accepted and implemented in Sprint 76; amended and implemented in Sprints 76A, 77 and 78B. | The shared provider-owned card domain through Migration V15 supports exact Amex, CBQ and Axis boundaries, including Axis zero-instrument liability ownership and representation-neutral PDF/XLSX equivalence without generic card support. |
-| ADR-045 | Qatar Airways Salary Actuals and Current-Month Funding Planner | Accepted and implemented in Sprint 79. | Exact `qatar-airways.salary.pdf@1`, dedicated Salary UX, editable current-month QAR/INR funding plan, explicit account-balance snapshots, plan-local FX and Migration V16 are operational within the bounded non-automation boundary. |
+| ADR-045 | Qatar Airways Salary Actuals and Current-Month Funding Planner | Accepted and implemented in Sprint 79; historical implementation architecture remains recorded. | Salary domain/planner and Migration V16 remain implemented; current parser reliability certification is separately governed by ADR-046. |
+| ADR-046 | Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation | Accepted by explicit user decision on 2026-09-01; complete registered-corpus implementation technically accepted on 2026-09-09. | Current parser/import/source-support authority; the unnumbered reset implements its reliability boundary through additive Migration V17 without changing the original architecture decision. |
 
 ## Alignment Policy
 
@@ -91,7 +92,7 @@ No alignment note authorizes implementation.
 - Current Alignment blocks are authoritative for present status.
 - Historical limitations are not silently deleted.
 - A decision is not marked implemented without verified repository evidence.
-- Fixture presence, schema capacity, protocol presence or UI placeholders do not establish production support.
+- Fixture presence, schema capacity, protocol presence or UI placeholders do not establish production support. Under ADR-046, synthetic/sanitized/reconstructed financial-source fixtures are prohibited as parser/source regression or acceptance authority; complete affected authentic corpora are required.
 - Future corrections should add a dated amendment or a new ADR rather than retroactively rewriting architectural history.
 
 ---
@@ -154,7 +155,7 @@ All new features should improve the dashboard, reduce manual work or increase co
 
 - **Decision standing:** Accepted and implemented incrementally.
 - **Implementation:** Unified import orchestration became operational in Sprint 11C and was extended by later ADRs.
-- **Current qualification:** Supporting a new institution still requires independently approved reader, detection, classification, parser, validation, identity, duplicate, persistence and fixture boundaries. A parser profile alone is not sufficient.
+- **Current qualification:** Supporting a new institution still requires independently approved reader, detection, classification, parser, validation, identity, duplicate, persistence and complete authentic-corpus boundaries under ADR-046. A parser profile or synthetic fixture alone is not sufficient.
 
 
 ## Status
@@ -345,11 +346,11 @@ Incorrect financial data is more damaging than delayed imports. Validation shoul
 
 # ADR-011 — Unified FinancialDocument Pipeline
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-09-01
 
-- **Decision standing:** Accepted architectural direction.
-- **Implementation:** Current production support remains limited to the approved shared Axis bank-account CSV grammar.
-- **Current qualification:** Format convergence does not make every listed format supported. Each source format, institution, layout and document family remains independently gated.
+- **Decision standing:** Accepted architectural direction, refined by ADR-046.
+- **Implementation:** Supported formats continue to converge on shared downstream financial domains. Historical profile acceptances remain implementation history; current parser reliability requires complete authentic-corpus recertification.
+- **Current qualification:** Source support is gated by financial/source semantics, not stationery or incidental formatting. Different transports may share one source-family parser when their semantic contract is the same; a separate profile/parser requires a materially different source/financial semantic contract. Complete affected authentic corpora, not representative fixtures, establish current reliability.
 
 
 ## Status
@@ -371,11 +372,11 @@ Keeping downstream components independent of file formats dramatically simplifie
 
 # ADR-012 — Separation of Readers and Parsers
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-09-01
 
-- **Decision standing:** Accepted and implemented.
-- **Implementation:** Readers own extraction; parsers own financial interpretation.
-- **Current qualification:** Later ADRs preserve this boundary for identifiers, transaction-event evidence, card evidence and source provenance.
+- **Decision standing:** Accepted and implemented; refined by ADR-046.
+- **Implementation:** Readers own generic extraction/evidence preservation; source-family parsers own financial interpretation.
+- **Current qualification:** Readers must preserve physical source evidence and must not encode institution-specific financial-layout decisions. For PDF, a nonfinancial/image-only/no-native-text page does not by itself invalidate an otherwise readable document. Downstream source-family analysis determines financial/nonfinancial/alternate-extraction/ambiguity meaning.
 
 
 ## Status
@@ -473,11 +474,11 @@ Most financial institutions consistently use the same password pattern for month
 
 # ADR-016 — Universal Import Pipeline
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-09-01
 
-- **Decision standing:** Accepted, superseded in part by ADR-030, ADR-031, ADR-032, ADR-038 and ADR-039.
-- **Implementation:** The unified pipeline remains authoritative, but its current ordering and persistence boundary have changed.
-- **Current qualification:** Current flow is reading → detection → classification → parser selection → FinancialDocument → validation → duplicate/event evaluation → account/identity review → explicit confirmation → provider-owned atomic persistence → canonical hydration. Cross-format duplicate identity is not established.
+- **Decision standing:** Accepted, superseded/refined in part by ADR-030, ADR-031, ADR-032, ADR-038, ADR-039 and ADR-046.
+- **Implementation:** The unified import pipeline remains authoritative; ADR-046 establishes the current batch-capable direction without authorizing implementation.
+- **Current qualification:** Canonical direction is batch intake (single import = queue length one) → unlock as required → generic source extraction → identify/segregate statements → deterministic source-family routing → adaptive semantic parser → source-owned financial events → normalize → validate/reconcile → duplicate/equivalence evaluation → explicit review/confirmation where required → provider-owned atomic persistence → one canonical database/canonical financial rows → query/extraction/presentation/viewer layers. Each statement remains independently authorized.
 
 
 ## Status
@@ -551,11 +552,11 @@ ADR-011 introduced the concept of a unified downstream pipeline. ADR-016 defines
 
 # ADR-017 — Deterministic Before Intelligent
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-09-01
 
-- **Decision standing:** Accepted foundational principle.
-- **Implementation:** Deterministic processing remains mandatory at trusted boundaries.
-- **Current qualification:** AI remains advisory and cannot become the sole authority for parsing, validation, identity, persistence or financial mutation.
+- **Decision standing:** Accepted foundational principle, refined by ADR-046.
+- **Implementation:** Deterministic processing remains mandatory at trusted financial boundaries.
+- **Current qualification:** Deterministic does **not** mean hard-coded page counts, absolute row/line coordinates or rigid stationery templates. Adaptive deterministic parsing may combine multiple reproducible source signals such as labels, column roles, data shapes, dates, Money, balance transitions, controls, continuity and ordering. AI is not required for ordinary recurring parsing and remains non-authority unless separately approved for genuine ambiguity/adjudication.
 
 
 ## Status
@@ -591,11 +592,11 @@ Structured documents should be processed using deterministic rules. AI should on
 
 # ADR-018 — Unified Import Framework Operational
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-09-01
 
-- **Decision standing:** Accepted and implemented in Sprint 11C.
-- **Implementation:** CSV entered the unified framework.
-- **Current qualification:** The pipeline diagram and downstream atomicity limitations are historical. Later ADRs govern duplicate evaluation, attempt history, provider-owned confirmation and source provenance. Current production support is one approved Axis CSV grammar, not generic CSV.
+- **Decision standing:** Accepted and implemented in Sprint 11C; current parser/source acceptance is refined by ADR-046.
+- **Implementation:** The unified framework remains historical and operational infrastructure.
+- **Current qualification:** The original pipeline diagram and fixture-based observable-behaviour consequence are historical. Current routing/persistence ordering follows later ADRs; current source-family reliability requires complete authentic-corpus ordinary-production acceptance under ADR-046. Existing synthetic/reference fixtures cannot define or regression-certify financial source support.
 
 
 ## Status
@@ -685,12 +686,12 @@ This establishes a single extensible architecture for every supported import for
 
 # ADR-019 — Reference Fixtures Define Financial Truth
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-09-01
 
-- **Decision standing:** Accepted, clarified by ADR-030, ADR-031, ADR-034 and ADR-039.
-- **Implementation:** Approved fixtures and independent expected evidence remain architectural acceptance inputs.
-- **Current qualification:** Source semantics outrank derived expected JSON. Cross-format equivalence must be proven for each approved pair and does not create exact-content duplicate identity or broad format support.
-- **Axis source-truth restoration:** `axis.bank-account.csv@2` derives its accepted conventional DR-debit/CR-credit semantics from immutable private-source balance deltas and independently supplied opening evidence. Legacy NRE and partial-overlap derivatives without immutable transformation lineage are quarantined from financial-truth acceptance; parser output, expected JSON and internally coherent synthetic arithmetic cannot substitute for source lineage.
+- **Decision standing:** Historical accepted decision, **superseded by ADR-046 as current fixture/source-support authority**.
+- **Implementation:** Historical fixture documentation remains a record only. Fabricated financial-statement artifacts may not execute at any stage, including mechanics; source-independent mechanics must use nonfinancial values/files. The all-stages rule in ADR-046 supersedes the former financial-fixture mechanics exception.
+- **Current qualification:** The complete registered authentic corpus is cumulative parser reliability authority. Every newly supplied recurring statement extends it unless explicitly excluded/archived. Source semantics and independently derived source-oracle facts outrank generated expected data.
+- **Historical text below:** retained verbatim to document the earlier architecture; its statement that fixtures define financial truth is no longer current authority.
 
 
 ## Status
@@ -736,11 +737,11 @@ Using approved reference fixtures creates a deterministic financial baseline tha
 
 # ADR-020 — Deterministic Institution Detection
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-09-01
 
-- **Decision standing:** Accepted and implemented in Sprint 12C.
-- **Implementation:** Institution detection is a deterministic pipeline stage.
-- **Current qualification:** CSV/PDF fixture tests do not establish production PDF support. Detection evidence must remain specific to the approved family and extracted-content boundary.
+- **Decision standing:** Accepted and implemented in Sprint 12C; refined by ADR-046.
+- **Implementation:** Institution/source-family detection remains deterministic and explainable downstream of generic extraction.
+- **Current qualification:** Detection must use coherent semantic/content evidence rather than incidental physical coordinates or synthetic reference stationery. Complete authentic-corpus production-path evidence is required for current supported-family reliability; synthetic fixture tests cannot establish it. AI does not become ordinary detection authority.
 
 
 ## Status
@@ -803,11 +804,11 @@ Deterministic rules preserve reproducibility, simplify regression testing and en
 
 # ADR-021 — Deterministic Statement Classification
 
-## Current Alignment — 2026-07-24
+## Current Alignment — 2026-09-01
 
-- **Decision standing:** Accepted and implemented in Sprint 13.
-- **Implementation:** Statement classification is a deterministic pipeline stage.
-- **Current qualification:** Fixture-backed classification does not establish parser, persistence or end-user support for that document family.
+- **Decision standing:** Accepted and implemented in Sprint 13; refined by ADR-046.
+- **Implementation:** Statement classification remains deterministic and explainable downstream of source-family detection.
+- **Current qualification:** Classification must be based on source-semantic evidence, not fixed page count, transaction count, absolute row/line position or synthetic reference stationery. Complete authentic-corpus production-path evidence is required for current family reliability; classification alone never certifies parser/persistence/end-user support.
 
 
 ## Status
@@ -4984,6 +4985,10 @@ authority for PDF and XLS while adding ADR-042 as a separate, format-neutral
 financial-equivalence contract. No existing fingerprint or historical source
 record is reinterpreted.
 
+### Current Alignment — 2026-09-01
+
+ADR-046 supersedes the historical implementation-readiness sentence that required revalidation of a sanitized fixture as parser/source acceptance evidence. Exact source-byte identity and snapshot architecture remain valid; current parser reliability instead requires the complete affected authentic corpus through ordinary production.
+
 ---
 
 # ADR-042 — Exact Cross-Format Statement Equivalence and Supporting-Source Persistence
@@ -5314,6 +5319,10 @@ Git.
 ## Status
 
 Accepted and implemented in Sprint 76; amended and implemented by Sprints 76A, 77 and 78B
+
+## Current Alignment — 2026-09-01
+
+ADR-044 remains historical accepted card-domain implementation architecture. ADR-046 supersedes any reading of its historical exact-layout/page-count wording as current parser identity or reliability authority. In particular, an incidental three-page CBQ month, fixed page boundary or prior stationery shape cannot define support; the recurring family must be interpreted semantically and recertified against its complete authentic corpus. A separate parser/profile remains justified only by materially different financial/source semantics. Card persistence, liability direction, source provenance and reconciliation structures remain historical implemented facts.
 
 ## Context
 
@@ -5861,3 +5870,177 @@ Production salary parser output is never the sole oracle. A second giant competi
 ## Exclusions
 
 ADR-045 does not authorize generic payroll/employer support, OCR/image payroll, automatic employer-bank matching, salary transaction creation, automatic card-payment allocation, automatic current-obligation inference, automatic transfers, bank-to-bank routing execution, recurring-obligation detection, generic budgeting, investment purchase/execution, global `exchange_rates` activation, market-rate retrieval, historical/reporting-currency FX, consolidated mixed-currency net worth, tax/remittance/NRE/NRO legality inference, historical planner analytics, or any source/format outside the exact approved Qatar Airways salary profile.
+
+---
+
+# ADR-046 — Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation
+
+**Status:** Accepted by explicit user decision
+**Date:** 2026-09-01
+**Decision owner:** User-settled LedgerForge parser/import architecture
+**Migration:** None. This ADR does not authorize product code, parser edits, test edits, fixture creation or source mutation.
+
+## Current Alignment — 2026-09-09
+
+ADR-046 is the current authority for reader/parser/source-support evidence and supersedes ADR-019 wherever ADR-019 treats reference/sanitized/synthetic financial-source fixtures as current financial truth or regression authority. ADR-019 remains intact as historical architecture. Historical sprint/profile acceptance remains historical fact. Chat technically accepted the unnumbered complete registered-corpus reliability reset on 2026-09-09: additive Migration V17 is the current accepted migration, V1–V16 remain immutable, and personal-v1 adoption remains a separate undeclared gate. The accepted boundary covers 127 financial carriers, 103 logical statements, 3,165 canonical bank/card transactions and 258 separate salary components through the successful 443-test / 72-suite / 500-expanded-execution TestPlan and all six provider/order campaigns. Genuine zero-activity statements and the absent CBQ transaction-history XLS remain source-uncertified; EML remains certification-only container provenance; no multi-file UI or batch-wide atomicity is implied.
+
+## Context
+
+LedgerForge accumulated exact-layout and fixture-bounded parser acceptance rules that could remain green while the user's real recurring statements evolved in harmless presentation details or exposed untested source structure. Authentic defects across multiple recurring institution families demonstrate that synthetic representations, representative months and rigid physical coordinates create false confidence. Financial software must be flexible about inert packaging while remaining uncompromising about Money, direction, dates, balances, controls, identity, multiplicity, ordering and provenance.
+
+## Decision
+
+### 1. Authentic corpus is parser reliability authority
+
+For each supported financial source family, the complete registered set of authentic statements supplied by the user is the cumulative parser regression and acceptance corpus. There is no representative-month shortcut and no sampling substitute. Every newly supplied recurring statement extends the active corpus unless the user explicitly excludes or archives it.
+
+A parser/profile is not currently reliability-certified merely because unit tests, synthetic regression tests, a full TestPlan, persistence/hydration tests or a subset of authentic examples pass. The complete affected authentic corpus must pass the ordinary production path.
+
+Private authentic originals remain outside Git and read-only.
+
+### 2. No fabricated financial statements at any stage
+
+By explicit user clarification, no synthetic, generated, recreated, sanitized, reconstructed, representative, reduced, mutated, hand-authored or model-created financial statement may be created or used at any stage. This includes development/debugging, reader/normalizer semantics, detector/classifier/parser tests, source oracles/expected outputs, edge cases, migration/persistence, import/batch acceptance, developer/debug UI and adversarial review. Generated-statement catalogs, reconstructed resources, mutation variants and financial-statement factories must be removed or rewritten around authentic inputs. Hand-built statement/domain/DTO graphs must not replace authentic intake. <!-- user-specified -->
+
+Only authentic statements from the registered real corpus may exercise statement-dependent behaviour. Operational exact working copies, necessary decrypted copies and the actual PDF bytes extracted from an authentic EML are permitted authentic carriers; original source bytes remain provenance/fingerprint authority. EML is container provenance, not authorization for general email import support.
+
+Pure source-independent algorithms may use ordinary nonfinancial values/files, but nothing shaped or authored to impersonate a financial statement. If the authentic corpus lacks a zero-activity, malformed or other case, that case remains source-uncertified until a genuine source exists. Do not manufacture coverage. The former historical/mechanics exception for fabricated financial-statement artifacts is withdrawn; historical documentation remains a record, not permission to execute those artifacts.
+
+### 3. Adaptive deterministic source-family interpretation
+
+One recurring financial source family should have one smart runtime parser unless a materially different source/financial semantic contract requires a separate parser/profile. Do not proliferate January/February, three-page/four-page or row-21/row-22 parsers for incidental layout variation.
+
+Deterministic means reproducible, explainable and source-evidenced. It does **not** mean hard-coded physical coordinates. A parser may deterministically combine multiple coherent signals, including semantic labels, column roles, data shapes, date/Money structure, debit/credit or liability direction, running-balance transitions, opening/closing controls, statement/section totals, continuity, source ordering and surrounding structure.
+
+Fail closed when financial meaning is ambiguous, contradictory, malformed or unsupported. Do not fail merely because inert presentation changed.
+
+### 4. Flexible packaging; strict financial semantics
+
+Incidental layout does not define a supported source family. In particular, support must not depend on:
+
+- physical page count or statement length;
+- transaction count;
+- absolute worksheet row or PDF line number;
+- harmless whitespace, Unicode or typographic variation;
+- blank rows;
+- benign nonfinancial preamble/footer lines or marketing pages;
+- financial rows continuing onto additional pages;
+- a financial table moving to another physical row;
+- semantically equivalent header wording; or
+- benign page-break changes.
+
+A coherent statement may contain zero transactions, one transaction or hundreds. It may contain one financial page or many. Zero-transaction statements must be supportable when source controls coherently establish no financial activity. Variable page count is expected recurring-source behavior. Technical resource ceilings may protect the application, but they must be explicit resource limits rather than financial recognition rules.
+
+### 5. Reader responsibility
+
+Generic readers extract and preserve source evidence; they do not make institution-specific financial-layout decisions. PDF extraction must preserve physical page boundaries and evidence even when a page contains no extractable native text. A nonfinancial/image-only/marketing page does not by itself make an otherwise readable statement invalid. Downstream source-family analysis decides whether a page is financial, nonfinancial, requires another approved extraction mode or is genuinely ambiguous.
+
+Reader-level rejection is reserved for reader concerns such as corrupt/unreadable source material, unresolved encryption or resource failure.
+
+ADR-011 and ADR-012 are refined accordingly: formats converge into shared domains, readers preserve evidence, and financial interpretation belongs to adaptive source-family parsers.
+
+### 6. Detection, classification and routing
+
+ADR-020 and ADR-021 remain binding deterministic stages, refined as follows. Detection/classification/routing must be explainable and source-semantic; they must not identify support from synthetic stationery, fixed page count or other incidental coordinates. Unknown or materially ambiguous sources remain unknown/unsupported rather than guessed.
+
+A new parser/profile requires a materially different financial/source semantic contract, not merely a changed month or pagination.
+
+### 7. Canonical import pipeline
+
+The intended user import architecture is:
+
+```text
+Batch intake
+    ↓
+unlock sources as required
+    ↓
+generic source extraction
+    ↓
+identify / segregate statements
+    ↓
+route each statement to the correct supported source-family parser
+    ↓
+parser runtime semantically analyzes the actual source
+    ↓
+extract source-owned financial events
+    ↓
+normalize
+    ↓
+validate and reconcile
+    ↓
+duplicate/equivalence evaluation
+    ↓
+explicit review/confirmation where required
+    ↓
+atomic persistence
+    ↓
+one canonical database
+    ↓
+individual canonical financial transaction rows
+    ↓
+customizable query / extraction / presentation / viewer layers
+```
+
+A batch of one uses the same pipeline with queue length one. Each statement remains independently identified, parsed, validated, reviewed, confirmed, persisted and audited. Institution-specific parsers are ingestion modules, not institution-specific analytical silos. Accepted canonical financial movements belong to the common financial database; related source/account/card/provenance records may remain normalized where required.
+
+This refines ADR-016 and ADR-018 without authorizing the future batch UI/queue implementation itself.
+
+### 8. Validation, reconciliation and duplicate/equivalence
+
+Validation precedes accepted persistence and verifies financial correctness as applicable: Money/currency, direction, source dates, balances, statement/section controls, multiplicity, source order, references and provenance. Rigid formatting is not a substitute for financial validation.
+
+Duplicate/equivalence evaluation operates on validated financial semantics plus source provenance according to the applicable accepted duplicate/equivalence architecture. Flexible presentation parsing does not weaken exact-source identity or financial equivalence rules.
+
+### 9. Shared-infrastructure regression
+
+A change to any shared ingestion component capable of affecting source interpretation requires complete authentic-corpus regression for every affected supported source family. This includes generic readers, unlock/password orchestration, source snapshots, institution/source detection, classification, routing, normalizer infrastructure, Money, common validation, duplicate/equivalence semantics and persistence mapping.
+
+A green shared unit suite or complete application TestPlan is necessary where otherwise required but is insufficient as parser reliability evidence without the complete affected authentic corpora.
+
+### 10. Independent source oracle and semantic projection
+
+An independent source oracle records what the authentic source says and must not import LedgerForge implementation assumptions merely to mimic production schema. Source-oracle facts may include printed amount, DR/CR marker or liability effect evidence, printed/source dates, balance, reference, physical section/page ownership, source order and printed controls.
+
+Acceptance comparison is:
+
+```text
+authentic source truth
+    ↓
+explicit architecture-aware semantic projection
+    ↓
+expected LedgerForge financial meaning
+```
+
+versus ordinary production output. Raw Oracle JSON equality with raw production JSON is **not** an acceptance rule when the representations intentionally differ. A representation difference is not automatically a financial defect.
+
+Deterministic/native extraction is preferred wherever structured evidence permits it, especially for XLS/XLSX. Model/LLM analysis is reserved for genuinely ambiguous source interpretation or independent adjudication; it is not a substitute for structured recurring parsing and is not financial authority unless separately approved.
+
+### 11. Historical acceptance and current certification
+
+Historical sprint acceptance remains a factual implementation record and is not erased. From 2026-09-01 onward documentation and planning must distinguish:
+
+```text
+historical implementation acceptance
+```
+
+from:
+
+```text
+current authentic-corpus production reliability certification
+```
+
+No parser/profile is considered personal-v1 reliability-certified solely because it was historically accepted. Current certification requires the ADR-046 complete-authentic-corpus gate. Personal-v1 remains undeclared until separately certified.
+
+## Consequences
+
+- Parser design becomes resilient to recurring benign presentation variation while preserving strict financial correctness.
+- Page count and transaction count become provenance/source data, not profile identity.
+- Shared ingestion work has a broader but truthful regression cost because every affected authentic corpus must be rerun.
+- Historical synthetic/sanitized fixture campaigns remain understandable but cannot create present support confidence.
+- Reader and parser responsibilities are clearer: readers preserve evidence; family parsers interpret finance.
+- One canonical financial database remains the accepted post-persistence truth for transaction query/reporting layers rather than institution-specific analytical stores.
+- Source-oracle independence is preserved without forcing architecture-inappropriate raw schema equality.
+
+## Exclusions
+
+ADR-046 does **not** implement or authorize parser fixes, reader changes, batch-import UI, migrations, source mutation, fixture creation, test edits, new supported institutions, AI parsing authority, OCR support, new duplicate semantics or any other product feature. It records current architecture and acceptance authority only.

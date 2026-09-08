@@ -95,10 +95,12 @@ struct DeveloperDatabaseProfileTests {
         #expect(!identity.authorizesCleanup(of: temporary))
     }
 
-    @Test(arguments: [0, 16, Int.max])
-    func migrationSandboxRejectsNonHistoricalSourceVersions(_ version: Int) {
-        #expect(throws: DevelopmentDatabaseProfileDomainError.invalidMigrationSourceVersion) {
-            _ = try DevelopmentDatabaseProfile.resolve(.migrationSandbox(sourceVersion: version))
+    @Test
+    func migrationSandboxRejectsNonHistoricalSourceVersions() {
+        for version in [0, DevelopmentDatabaseProfile.currentSchemaVersion, Int.max] {
+            #expect(throws: DevelopmentDatabaseProfileDomainError.invalidMigrationSourceVersion) {
+                _ = try DevelopmentDatabaseProfile.resolve(.migrationSandbox(sourceVersion: version))
+            }
         }
     }
 
@@ -111,7 +113,7 @@ struct DeveloperDatabaseProfileTests {
         )
 
         #expect(descriptor.displayName == "Migration Sandbox")
-        #expect(descriptor.migrationSourceVersion == 15)
+        #expect(descriptor.migrationSourceVersion == allMigrations.count - 1)
         #expect(!String(describing: DevelopmentDatabaseProfileActivationResult.activityBlocked).contains("/"))
         #expect(!String(describing: DevelopmentDatabaseProfileActivationResult.migrationFailed).contains("sqlite"))
     }
@@ -148,11 +150,11 @@ struct DeveloperDatabaseProfileTests {
         }
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set("temporary-invalid-location", forKey: DevelopmentDatabaseProfilePreferences.rememberedProfileKey)
-        defaults.set(16, forKey: DevelopmentDatabaseProfilePreferences.rememberedMigrationSourceVersionKey)
+        defaults.set(DevelopmentDatabaseProfile.currentSchemaVersion, forKey: DevelopmentDatabaseProfilePreferences.rememberedMigrationSourceVersionKey)
 
         let preferences = DevelopmentDatabaseProfilePreferences(defaults: defaults)
         #expect(preferences.rememberedDevelopmentProfile == .persistentDebug)
-        #expect(preferences.rememberedMigrationSourceVersion == 15)
+        #expect(preferences.rememberedMigrationSourceVersion == allMigrations.count - 1)
     }
 
     @Test(.globalRuntimeStateIsolation)

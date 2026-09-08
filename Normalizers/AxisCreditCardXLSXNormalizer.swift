@@ -72,6 +72,7 @@ final class AxisCreditCardXLSXNormalizer {
 
         var rows: [NormalizedRow] = []
         var ended = false
+        var endMarkerRow: RawTabularRow?
         for row in sheet.rows where row.sourceRow > header.sourceRow {
             guard let physical = Self.physicalValues(row) else {
                 throw AxisCreditCardXLSXNormalizationError.malformedTransaction(sourceOrdinal: row.sourceRow)
@@ -90,17 +91,19 @@ final class AxisCreditCardXLSXNormalizer {
                 values: values,
                 mergedRanges: sheet.mergedRanges
             ) {
-                guard !rows.isEmpty else {
+                guard endMarkerRow == nil else {
                     throw AxisCreditCardXLSXNormalizationError.malformedTransaction(
                         sourceOrdinal: row.sourceRow
                     )
                 }
+                endMarkerRow = row
                 ended = true
                 continue
             }
 
             if values.allSatisfy(\.isEmpty) {
-                if !rows.isEmpty { ended = true }
+                // Empty physical rows are inert packaging. Only the
+                // source-defined end marker closes the financial region.
                 continue
             }
             if ended {
@@ -114,13 +117,17 @@ final class AxisCreditCardXLSXNormalizer {
                 throw AxisCreditCardXLSXNormalizationError.malformedTransaction(sourceOrdinal: row.sourceRow)
             }
             let details = values[1]
+            let references = AxisCreditCardPDFNormalizer.sourceReferences(in: details)
+            guard references.count <= 1 else {
+                throw AxisCreditCardXLSXNormalizationError.malformedTransaction(
+                    sourceOrdinal: row.sourceRow
+                )
+            }
             rows.append(NormalizedRow(rowNumber: row.sourceRow, values: [
                 date, details, amount, direction, "account_level",
-                "", "", "", ""
+                "", references.first ?? "", "", ""
             ]))
         }
-        guard !rows.isEmpty else { throw AxisCreditCardXLSXNormalizationError.noTransactions }
-
         var document = Document(filename: rawDocument.fileName, url: rawDocument.sourceURL,
                                 fileType: FileFormat.xlsx.rawValue, importedAt: now())
         document.rowCount = sheet.rows.count
@@ -128,11 +135,35 @@ final class AxisCreditCardXLSXNormalizer {
         document.firstTransactionRow = rows.first?.rowNumber
         document.columnCount = sheet.columnCount
         document.encoding = "UTF-8"
+        let financialRegion: NormalizedDocument.ExhaustedFinancialRegionEvidence?
+        if let endMarkerRow {
+            let regionRows = sheet.rows.filter {
+                $0.sourceRow >= header.sourceRow && $0.sourceRow <= endMarkerRow.sourceRow
+            }
+            let mergeRecords = sheet.mergedRanges.filter {
+                $0.startRow >= header.sourceRow && $0.endRow <= endMarkerRow.sourceRow
+            }.map {
+                "\($0.startRow):\($0.startColumn):\($0.endRow):\($0.endColumn):\($0.reference)"
+            }
+            financialRegion = try .init(
+                descriptor: "Axis XLSX transaction table through merged end marker",
+                sourceUnit: .row,
+                startOrdinal: header.sourceRow,
+                endOrdinal: endMarkerRow.sourceRow,
+                recognizedFinancialRowCount: rows.count,
+                sourceRecords: regionRows.map(Self.sourceRecord) + mergeRecords
+            )
+        } else {
+            financialRegion = nil
+        }
         return AxisCreditCardXLSXNormalizationResult(
             document: document,
             rows: rows,
             header: NormalizedRow(rowNumber: header.sourceRow, values: Self.logicalHeader),
-            sourceContext: .init(preTransactionFragments: fragments)
+            sourceContext: .init(
+                preTransactionFragments: fragments,
+                exhaustedFinancialRegion: financialRegion
+            )
         )
     }
 
@@ -152,6 +183,13 @@ final class AxisCreditCardXLSXNormalizer {
             result[cell.sourceColumn] = trimmed(cell.value)
         }
         return result
+    }
+
+    nonisolated private static func sourceRecord(_ row: RawTabularRow) -> String {
+        let cells = row.cells.map {
+            "\($0.sourceRow):\($0.sourceColumn):\($0.value.canonicalText)"
+        }
+        return cells.map { "\($0.utf8.count):\($0)" }.joined()
     }
 
     nonisolated private static func isExactHeader(_ row: RawTabularRow) -> Bool {

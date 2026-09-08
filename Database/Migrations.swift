@@ -2085,7 +2085,655 @@ END;
 """
 )
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16]
+/// V17 is the only additive migration in the authentic-parser reset.  V1-V16
+/// above are intentionally byte-identical historical migrations.  This
+/// migration widens the existing card summary vocabulary (including the
+/// source-proven `minimum_amount_due` component), permits a coherent empty
+/// card statement, and adds a typed zero-activity control graph.  It does not
+/// backfill or manufacture any statement rows.
+public let migrationV17 = Migration(
+    version: 17,
+    name: "zero-activity controls, CBQ minimum amount due, and Axis statement equivalence",
+    sql: """
+PRAGMA legacy_alter_table = ON;
+
+-- Axis bank statements expose one booking date and no distinct value date.
+-- Rebuild the complete V10 statement-equivalence graph so that HDFC retains
+-- its original v1 algorithm and mandatory value date while the separately
+-- identified Axis algorithm preserves that source-proven absence. Every V16
+-- row remains valid under the HDFC branch and is copied without backfill.
+DROP TRIGGER validate_statement_projection_relationships;
+DROP TRIGGER validate_statement_equivalence_group;
+DROP TRIGGER validate_statement_equivalence_member;
+
+ALTER TABLE statement_equivalence_members RENAME TO statement_equivalence_members_v16;
+ALTER TABLE statement_equivalence_groups RENAME TO statement_equivalence_groups_v16;
+ALTER TABLE statement_financial_projection_events RENAME TO statement_financial_projection_events_v16;
+ALTER TABLE statement_financial_projections RENAME TO statement_financial_projections_v16;
+
+CREATE TABLE statement_financial_projections (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  document_id TEXT NOT NULL UNIQUE,
+  import_session_id TEXT NOT NULL UNIQUE,
+  algorithm TEXT NOT NULL,
+  digest TEXT NOT NULL CHECK(length(digest) = 64 AND digest NOT GLOB '*[^0-9a-f]*'),
+  institution_code TEXT NOT NULL,
+  statement_family_code TEXT NOT NULL CHECK(length(statement_family_code) > 0),
+  parser_profile_id TEXT NOT NULL CHECK(length(parser_profile_id) > 0),
+  parser_profile_version TEXT NOT NULL CHECK(length(parser_profile_version) > 0),
+  source_format_code TEXT NOT NULL CHECK(source_format_code IN ('csv', 'pdf', 'xls')),
+  statement_start_date DATE NOT NULL,
+  statement_end_date DATE NOT NULL,
+  native_currency TEXT NOT NULL,
+  event_count INTEGER NOT NULL CHECK(event_count > 0),
+  opening_balance_minor INTEGER NOT NULL,
+  opening_balance_decimal TEXT NOT NULL CHECK(length(opening_balance_decimal) > 0),
+  debit_count INTEGER NOT NULL CHECK(debit_count >= 0),
+  credit_count INTEGER NOT NULL CHECK(credit_count >= 0),
+  debit_total_minor INTEGER NOT NULL CHECK(debit_total_minor >= 0),
+  debit_total_decimal TEXT NOT NULL CHECK(length(debit_total_decimal) > 0),
+  credit_total_minor INTEGER NOT NULL CHECK(credit_total_minor >= 0),
+  credit_total_decimal TEXT NOT NULL CHECK(length(credit_total_decimal) > 0),
+  closing_balance_minor INTEGER NOT NULL,
+  closing_balance_decimal TEXT NOT NULL CHECK(length(closing_balance_decimal) > 0),
+  created_at DATETIME NOT NULL,
+  CHECK(statement_start_date <= statement_end_date),
+  CHECK(event_count = debit_count + credit_count),
+  CHECK(
+    (algorithm = 'ledgerforge.statement-financial-projection.sha256.v1'
+      AND institution_code = 'hdfc'
+      AND statement_family_code = 'hdfc.bank-account'
+      AND source_format_code IN ('pdf', 'xls')
+      AND parser_profile_id = 'hdfc.bank-account.' || source_format_code
+      AND parser_profile_version = '1')
+    OR
+    (algorithm = 'ledgerforge.axis-bank-statement-financial-projection.sha256.v1'
+      AND institution_code = 'axis'
+      AND statement_family_code = 'axis.bank-account'
+      AND native_currency = 'INR'
+      AND parser_profile_id = 'axis.bank-account.' || source_format_code
+      AND parser_profile_version = CASE source_format_code WHEN 'csv' THEN '3' ELSE '1' END)
+  ),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE statement_financial_projection_events (
+  id TEXT PRIMARY KEY,
+  projection_id TEXT NOT NULL,
+  event_ordinal INTEGER NOT NULL CHECK(event_ordinal > 0),
+  statement_date DATE NOT NULL,
+  value_date DATE,
+  direction TEXT NOT NULL CHECK(direction IN ('debit', 'credit')),
+  signed_amount_minor INTEGER NOT NULL,
+  signed_amount_decimal TEXT NOT NULL CHECK(length(signed_amount_decimal) > 0),
+  running_balance_minor INTEGER NOT NULL,
+  running_balance_decimal TEXT NOT NULL CHECK(length(running_balance_decimal) > 0),
+  reference TEXT,
+  created_at DATETIME NOT NULL,
+  UNIQUE(projection_id, event_ordinal),
+  CHECK((direction = 'debit' AND signed_amount_minor < 0) OR
+        (direction = 'credit' AND signed_amount_minor > 0)),
+  FOREIGN KEY(projection_id) REFERENCES statement_financial_projections(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE statement_equivalence_groups (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  institution_code TEXT NOT NULL,
+  statement_family_code TEXT NOT NULL,
+  statement_start_date DATE NOT NULL,
+  statement_end_date DATE NOT NULL,
+  native_currency TEXT NOT NULL,
+  projection_algorithm TEXT NOT NULL,
+  projection_digest TEXT NOT NULL CHECK(length(projection_digest) = 64 AND projection_digest NOT GLOB '*[^0-9a-f]*'),
+  authoritative_projection_id TEXT NOT NULL UNIQUE,
+  created_at DATETIME NOT NULL,
+  CHECK(statement_start_date <= statement_end_date),
+  UNIQUE(workspace_id, account_id, institution_code, statement_family_code, statement_start_date, statement_end_date, native_currency),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(authoritative_projection_id) REFERENCES statement_financial_projections(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE statement_equivalence_members (
+  id TEXT PRIMARY KEY,
+  group_id TEXT NOT NULL,
+  projection_id TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL CHECK(role IN ('authoritative', 'supporting')),
+  source_format_code TEXT NOT NULL CHECK(source_format_code IN ('csv', 'pdf', 'xls')),
+  created_at DATETIME NOT NULL,
+  UNIQUE(group_id, source_format_code),
+  FOREIGN KEY(group_id) REFERENCES statement_equivalence_groups(id) ON DELETE RESTRICT,
+  FOREIGN KEY(projection_id) REFERENCES statement_financial_projections(id) ON DELETE RESTRICT
+);
+
+INSERT INTO statement_financial_projections
+  (id, workspace_id, account_id, document_id, import_session_id, algorithm, digest,
+   institution_code, statement_family_code, parser_profile_id, parser_profile_version,
+   source_format_code, statement_start_date, statement_end_date, native_currency, event_count,
+   opening_balance_minor, opening_balance_decimal, debit_count, credit_count,
+   debit_total_minor, debit_total_decimal, credit_total_minor, credit_total_decimal,
+   closing_balance_minor, closing_balance_decimal, created_at)
+SELECT id, workspace_id, account_id, document_id, import_session_id, algorithm, digest,
+   institution_code, statement_family_code, parser_profile_id, parser_profile_version,
+   source_format_code, statement_start_date, statement_end_date, native_currency, event_count,
+   opening_balance_minor, opening_balance_decimal, debit_count, credit_count,
+   debit_total_minor, debit_total_decimal, credit_total_minor, credit_total_decimal,
+   closing_balance_minor, closing_balance_decimal, created_at
+FROM statement_financial_projections_v16;
+
+INSERT INTO statement_financial_projection_events
+  (id, projection_id, event_ordinal, statement_date, value_date, direction,
+   signed_amount_minor, signed_amount_decimal, running_balance_minor,
+   running_balance_decimal, reference, created_at)
+SELECT id, projection_id, event_ordinal, statement_date, value_date, direction,
+   signed_amount_minor, signed_amount_decimal, running_balance_minor,
+   running_balance_decimal, reference, created_at
+FROM statement_financial_projection_events_v16;
+
+INSERT INTO statement_equivalence_groups
+  (id, workspace_id, account_id, institution_code, statement_family_code,
+   statement_start_date, statement_end_date, native_currency, projection_algorithm,
+   projection_digest, authoritative_projection_id, created_at)
+SELECT id, workspace_id, account_id, institution_code, statement_family_code,
+   statement_start_date, statement_end_date, native_currency, projection_algorithm,
+   projection_digest, authoritative_projection_id, created_at
+FROM statement_equivalence_groups_v16;
+
+INSERT INTO statement_equivalence_members
+  (id, group_id, projection_id, role, source_format_code, created_at)
+SELECT id, group_id, projection_id, role, source_format_code, created_at
+FROM statement_equivalence_members_v16;
+
+DROP TABLE statement_equivalence_members_v16;
+DROP TABLE statement_equivalence_groups_v16;
+DROP TABLE statement_financial_projection_events_v16;
+DROP TABLE statement_financial_projections_v16;
+
+CREATE INDEX idx_statement_projection_group_lookup
+  ON statement_financial_projections(workspace_id, account_id, statement_family_code, statement_start_date, statement_end_date, native_currency);
+CREATE UNIQUE INDEX idx_statement_equivalence_one_authoritative_member
+  ON statement_equivalence_members(group_id)
+  WHERE role = 'authoritative';
+
+CREATE TRIGGER validate_statement_projection_relationships
+BEFORE INSERT ON statement_financial_projections
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM accounts a
+    WHERE a.id = NEW.account_id AND a.workspace_id = NEW.workspace_id
+  ) THEN RAISE(ABORT, 'statement projection account relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d
+    WHERE d.id = NEW.document_id
+      AND d.workspace_id = NEW.workspace_id
+      AND d.import_session_id = NEW.import_session_id
+  ) THEN RAISE(ABORT, 'statement projection document relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM import_sessions s
+    WHERE s.id = NEW.import_session_id AND s.workspace_id = NEW.workspace_id
+  ) THEN RAISE(ABORT, 'statement projection session relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_statement_projection_event_value_date
+BEFORE INSERT ON statement_financial_projection_events
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM statement_financial_projections p
+    WHERE p.id = NEW.projection_id
+      AND ((p.algorithm = 'ledgerforge.statement-financial-projection.sha256.v1' AND NEW.value_date IS NOT NULL)
+        OR (p.algorithm = 'ledgerforge.axis-bank-statement-financial-projection.sha256.v1' AND NEW.value_date IS NULL))
+  ) THEN RAISE(ABORT, 'statement projection value date contract invalid') END;
+END;
+
+CREATE TRIGGER validate_statement_equivalence_group
+BEFORE INSERT ON statement_equivalence_groups
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM statement_financial_projections p
+    WHERE p.id = NEW.authoritative_projection_id
+      AND p.workspace_id = NEW.workspace_id
+      AND p.account_id = NEW.account_id
+      AND p.institution_code = NEW.institution_code
+      AND p.statement_family_code = NEW.statement_family_code
+      AND p.statement_start_date = NEW.statement_start_date
+      AND p.statement_end_date = NEW.statement_end_date
+      AND p.native_currency = NEW.native_currency
+      AND p.algorithm = NEW.projection_algorithm
+      AND p.digest = NEW.projection_digest
+      AND (SELECT COUNT(*) FROM statement_financial_projection_events e WHERE e.projection_id = p.id) = p.event_count
+  ) THEN RAISE(ABORT, 'statement equivalence authoritative projection invalid') END;
+END;
+
+CREATE TRIGGER validate_statement_equivalence_member
+BEFORE INSERT ON statement_equivalence_members
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1
+    FROM statement_equivalence_groups g
+    JOIN statement_financial_projections p ON p.id = NEW.projection_id
+    WHERE g.id = NEW.group_id
+      AND p.workspace_id = g.workspace_id
+      AND p.account_id = g.account_id
+      AND p.institution_code = g.institution_code
+      AND p.statement_family_code = g.statement_family_code
+      AND p.statement_start_date = g.statement_start_date
+      AND p.statement_end_date = g.statement_end_date
+      AND p.native_currency = g.native_currency
+      AND p.algorithm = g.projection_algorithm
+      AND p.digest = g.projection_digest
+      AND p.source_format_code = NEW.source_format_code
+      AND (SELECT COUNT(*) FROM statement_financial_projection_events e WHERE e.projection_id = p.id) = p.event_count
+  ) THEN RAISE(ABORT, 'statement equivalence member projection invalid') END;
+  SELECT CASE WHEN NEW.role = 'authoritative' AND NOT EXISTS (
+    SELECT 1 FROM statement_equivalence_groups g
+    WHERE g.id = NEW.group_id AND g.authoritative_projection_id = NEW.projection_id
+  ) THEN RAISE(ABORT, 'statement equivalence authoritative member invalid') END;
+  SELECT CASE WHEN NEW.role = 'supporting' AND EXISTS (
+    SELECT 1 FROM statement_equivalence_groups g
+    WHERE g.id = NEW.group_id AND g.authoritative_projection_id = NEW.projection_id
+  ) THEN RAISE(ABORT, 'statement equivalence supporting member invalid') END;
+  SELECT CASE WHEN NEW.role = 'authoritative' AND (
+    SELECT COUNT(*) FROM transactions t
+    JOIN statement_financial_projections p ON p.id = NEW.projection_id
+    WHERE t.import_session_id = p.import_session_id AND t.document_id = p.document_id
+  ) != (
+    SELECT event_count FROM statement_financial_projections p WHERE p.id = NEW.projection_id
+  ) THEN RAISE(ABORT, 'statement equivalence authoritative transaction ownership invalid') END;
+  SELECT CASE WHEN NEW.role = 'supporting' AND EXISTS (
+    SELECT 1 FROM transactions t
+    JOIN statement_financial_projections p ON p.id = NEW.projection_id
+    WHERE t.import_session_id = p.import_session_id OR t.document_id = p.document_id
+  ) THEN RAISE(ABORT, 'statement equivalence supporting transaction ownership invalid') END;
+END;
+
+-- The V16 card summary table cannot be ALTERed to widen its CHECK constraint.
+-- Rebuild it while preserving every existing row byte-for-byte.
+ALTER TABLE card_statement_summary_components RENAME TO card_statement_summary_components_v16;
+CREATE TABLE card_statement_summary_components (
+  id TEXT PRIMARY KEY,
+  card_statement_id TEXT NOT NULL,
+  component_code TEXT NOT NULL CHECK(component_code IN (
+    'previous_balance', 'new_credits', 'new_debits', 'amount_billed', 'payment_received',
+    'total_payment', 'credit_reversal', 'purchases', 'billed_installment', 'fees_charges',
+    'new_balance', 'due_date', 'instrument_net_total', 'source_section_net_total',
+    'axis_total_payment_due', 'minimum_amount_due'
+  )),
+  money_currency TEXT,
+  money_minor INTEGER,
+  money_decimal TEXT,
+  date_value DATE,
+  UNIQUE(card_statement_id, component_code),
+  CHECK((component_code = 'due_date' AND date_value IS NOT NULL AND money_currency IS NULL AND money_minor IS NULL AND money_decimal IS NULL) OR
+        (component_code != 'due_date' AND date_value IS NULL AND money_currency IS NOT NULL AND money_minor IS NOT NULL AND money_decimal IS NOT NULL)),
+  FOREIGN KEY(card_statement_id) REFERENCES card_statements(id) ON DELETE RESTRICT
+);
+INSERT INTO card_statement_summary_components
+  (id, card_statement_id, component_code, money_currency, money_minor, money_decimal, date_value)
+SELECT id, card_statement_id, component_code, money_currency, money_minor, money_decimal, date_value
+FROM card_statement_summary_components_v16;
+DROP TABLE card_statement_summary_components_v16;
+
+-- V15 made source_row_count positive because every certified card statement
+-- carried a transaction.  Zero-activity evidence is now represented by the
+-- typed control table below, so the durable statement row may contain zero.
+DROP TRIGGER validate_card_statement;
+ALTER TABLE card_statements RENAME TO card_statements_v16;
+CREATE TABLE card_statements (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  liability_account_id TEXT NOT NULL,
+  document_id TEXT NOT NULL UNIQUE,
+  import_session_id TEXT NOT NULL UNIQUE,
+  normalized_document_id TEXT NOT NULL UNIQUE,
+  parser_profile_id TEXT NOT NULL,
+  parser_profile_version TEXT NOT NULL,
+  statement_date DATE,
+  statement_start_date DATE,
+  statement_end_date DATE,
+  selected_statement_month TEXT,
+  statement_currency TEXT NOT NULL,
+  source_row_count INTEGER NOT NULL CHECK(source_row_count >= 0),
+  reconciliation_rule_code TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  CHECK((statement_start_date IS NULL AND statement_end_date IS NULL) OR
+        (statement_start_date IS NOT NULL AND statement_end_date IS NOT NULL AND statement_start_date <= statement_end_date)),
+  CHECK(selected_statement_month IS NULL OR
+        (length(selected_statement_month) = 7 AND substr(selected_statement_month, 5, 1) = '-' AND
+         CAST(substr(selected_statement_month, 6, 2) AS INTEGER) BETWEEN 1 AND 12)),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(liability_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+INSERT INTO card_statements (
+  id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id,
+  parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date,
+  selected_statement_month, statement_currency, source_row_count, reconciliation_rule_code, created_at
+)
+SELECT id, workspace_id, liability_account_id, document_id, import_session_id, normalized_document_id,
+  parser_profile_id, parser_profile_version, statement_date, statement_start_date, statement_end_date,
+  selected_statement_month, statement_currency, source_row_count, reconciliation_rule_code, created_at
+FROM card_statements_v16;
+DROP TABLE card_statements_v16;
+CREATE INDEX IF NOT EXISTS idx_card_statement_current
+  ON card_statements(workspace_id, liability_account_id, statement_end_date, statement_date, selected_statement_month);
+
+CREATE TRIGGER validate_card_statement
+BEFORE INSERT ON card_statements
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM accounts a WHERE a.id = NEW.liability_account_id
+      AND a.workspace_id = NEW.workspace_id AND a.account_type = 'credit_card'
+  ) THEN RAISE(ABORT, 'card statement liability account invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d JOIN import_sessions s ON s.id = d.import_session_id
+    JOIN normalized_documents n ON n.document_id = d.id AND n.import_session_id = s.id
+    WHERE d.id = NEW.document_id AND s.id = NEW.import_session_id
+      AND n.id = NEW.normalized_document_id AND d.workspace_id = NEW.workspace_id
+      AND n.profile_id = NEW.parser_profile_id AND n.profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'card statement source relationship invalid') END;
+END;
+
+-- The semantic projection is the durable card representation used by the
+-- equivalence providers.  Its historical `event_count > 0` check would
+-- reject an otherwise valid zero-activity card before the typed control row
+-- could be attached, so widen only that boundary and retain every other
+-- relationship/index.  The projection still carries the exact profile and
+-- period; providers/hydrators enforce its event-count/control consistency.
+DROP TRIGGER validate_card_semantic_projection_event;
+DROP TRIGGER validate_card_semantic_projection;
+DROP TRIGGER validate_card_semantic_authoritative_bindings;
+ALTER TABLE card_statement_semantic_projections RENAME TO card_statement_semantic_projections_v16;
+CREATE TABLE card_statement_semantic_projections (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  liability_account_id TEXT NOT NULL,
+  card_statement_id TEXT NOT NULL UNIQUE,
+  document_id TEXT NOT NULL UNIQUE,
+  import_session_id TEXT NOT NULL UNIQUE,
+  algorithm TEXT NOT NULL,
+  digest TEXT NOT NULL CHECK(length(digest) = 64),
+  institution_code TEXT NOT NULL,
+  statement_family_code TEXT NOT NULL,
+  parser_profile_id TEXT NOT NULL,
+  parser_profile_version TEXT NOT NULL,
+  statement_date DATE,
+  statement_start_date DATE,
+  statement_end_date DATE,
+  selected_statement_month TEXT,
+  cycle_month TEXT,
+  native_currency TEXT NOT NULL,
+  event_count INTEGER NOT NULL CHECK(event_count >= 0),
+  section_count INTEGER NOT NULL CHECK(section_count >= 0),
+  reconciliation_rule_code TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  CHECK((algorithm = 'ledgerforge.axis-card-statement-multiset.sha256.v1' AND section_count = 0) OR
+        (algorithm = 'ledgerforge.amex-card-statement-semantic.sha256.v1' AND
+         (section_count > 0 OR (section_count = 0 AND event_count = 0)))),
+  CHECK((statement_start_date IS NULL AND statement_end_date IS NULL) OR
+        (statement_start_date IS NOT NULL AND statement_end_date IS NOT NULL AND statement_start_date <= statement_end_date)),
+  CHECK(selected_statement_month IS NULL OR
+        (length(selected_statement_month) = 7 AND substr(selected_statement_month, 5, 1) = '-' AND
+         CAST(substr(selected_statement_month, 6, 2) AS INTEGER) BETWEEN 1 AND 12)),
+  CHECK(cycle_month IS NULL OR
+        (length(cycle_month) = 7 AND substr(cycle_month, 5, 1) = '-' AND
+         CAST(substr(cycle_month, 6, 2) AS INTEGER) BETWEEN 1 AND 12)),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(liability_account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(card_statement_id) REFERENCES card_statements(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT
+);
+INSERT INTO card_statement_semantic_projections (
+  id, workspace_id, liability_account_id, card_statement_id, document_id, import_session_id,
+  algorithm, digest, institution_code, statement_family_code, parser_profile_id, parser_profile_version,
+  statement_date, statement_start_date, statement_end_date, selected_statement_month, cycle_month,
+  native_currency, event_count, section_count, reconciliation_rule_code, created_at
+)
+SELECT id, workspace_id, liability_account_id, card_statement_id, document_id, import_session_id,
+  algorithm, digest, institution_code, statement_family_code, parser_profile_id, parser_profile_version,
+  statement_date, statement_start_date, statement_end_date, selected_statement_month, cycle_month,
+  native_currency, event_count, section_count, reconciliation_rule_code, created_at
+FROM card_statement_semantic_projections_v16;
+DROP TABLE card_statement_semantic_projections_v16;
+CREATE INDEX idx_card_semantic_projection_period
+  ON card_statement_semantic_projections(workspace_id, liability_account_id, statement_start_date, statement_end_date, cycle_month);
+
+CREATE TRIGGER validate_card_semantic_projection
+BEFORE INSERT ON card_statement_semantic_projections
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statements s
+    WHERE s.id = NEW.card_statement_id
+      AND s.workspace_id = NEW.workspace_id
+      AND s.liability_account_id = NEW.liability_account_id
+      AND s.document_id = NEW.document_id
+      AND s.import_session_id = NEW.import_session_id
+      AND s.statement_date IS NEW.statement_date
+      AND s.statement_start_date IS NEW.statement_start_date
+      AND s.statement_end_date IS NEW.statement_end_date
+      AND s.selected_statement_month IS NEW.selected_statement_month
+      AND s.statement_currency = NEW.native_currency
+      AND s.parser_profile_id = NEW.parser_profile_id
+      AND s.parser_profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'card semantic projection relationship invalid') END;
+  SELECT CASE WHEN NEW.algorithm = 'ledgerforge.amex-card-statement-semantic.sha256.v1'
+    AND (NEW.statement_date IS NULL OR NEW.statement_start_date IS NULL OR NEW.statement_end_date IS NULL OR NEW.cycle_month IS NOT NULL)
+    THEN RAISE(ABORT, 'Amex semantic projection requires exact period') END;
+END;
+
+CREATE TRIGGER validate_card_semantic_projection_event
+BEFORE INSERT ON card_statement_semantic_projection_events
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM card_statement_semantic_projections p
+    JOIN normalized_rows r ON r.id = NEW.normalized_row_id
+    JOIN normalized_documents n ON n.id = r.normalized_document_id
+    WHERE p.id = NEW.projection_id AND n.document_id = p.document_id
+      AND n.import_session_id = p.import_session_id
+  ) THEN RAISE(ABORT, 'card semantic event source relationship invalid') END;
+  SELECT CASE WHEN NEW.canonical_transaction_id IS NULL AND NOT EXISTS (
+    SELECT 1 FROM card_statement_semantic_projections p
+    WHERE p.id = NEW.projection_id AND p.algorithm = 'ledgerforge.axis-card-statement-multiset.sha256.v1'
+  ) THEN RAISE(ABORT, 'unbound semantic event is not permitted for this algorithm') END;
+  SELECT CASE WHEN NEW.canonical_transaction_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM card_statement_semantic_projections p
+    JOIN transactions t ON t.id = NEW.canonical_transaction_id
+    WHERE p.id = NEW.projection_id AND t.account_id = p.liability_account_id
+      AND t.posted_date = NEW.financial_date AND t.financial_date_role = NEW.financial_date_role
+  ) THEN RAISE(ABORT, 'card semantic event canonical relationship invalid') END;
+END;
+
+CREATE TRIGGER validate_card_semantic_authoritative_bindings
+BEFORE INSERT ON card_statement_semantic_members
+WHEN NEW.role = 'authoritative'
+BEGIN
+  SELECT CASE WHEN EXISTS (
+    SELECT 1 FROM card_statement_semantic_projection_events e
+    WHERE e.projection_id = NEW.projection_id AND e.canonical_transaction_id IS NULL
+  ) THEN RAISE(ABORT, 'authoritative semantic projection contains unbound event') END;
+END;
+
+CREATE TABLE statement_zero_activity_controls (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  document_id TEXT NOT NULL UNIQUE,
+  import_session_id TEXT NOT NULL UNIQUE,
+  normalized_document_id TEXT NOT NULL UNIQUE,
+  parser_profile_id TEXT NOT NULL,
+  parser_profile_version TEXT NOT NULL,
+  source_format_code TEXT NOT NULL CHECK(source_format_code IN ('pdf', 'xls', 'csv', 'xlsx')),
+  institution_code TEXT NOT NULL CHECK(institution_code IN ('axis', 'hdfc', 'cbq', 'amex')),
+  statement_family_code TEXT NOT NULL,
+  statement_date DATE,
+  statement_start_date DATE,
+  statement_end_date DATE,
+  selected_statement_month TEXT,
+  semantic_cycle_key TEXT NOT NULL,
+  native_currency TEXT NOT NULL,
+  opening_balance_minor INTEGER,
+  opening_balance_decimal TEXT,
+  closing_balance_minor INTEGER,
+  closing_balance_decimal TEXT,
+  debit_total_minor INTEGER,
+  debit_total_decimal TEXT,
+  credit_total_minor INTEGER,
+  credit_total_decimal TEXT,
+  card_previous_balance_minor INTEGER,
+  card_previous_balance_decimal TEXT,
+  card_total_payment_due_minor INTEGER,
+  card_total_payment_due_decimal TEXT,
+  card_payment_due_date DATE,
+  evidence_kind TEXT NOT NULL CHECK(evidence_kind IN ('printed_controls', 'exhausted_financial_region')),
+  financial_region_descriptor TEXT,
+  financial_region_source_unit TEXT CHECK(financial_region_source_unit IN ('line', 'row', 'page', 'tagged_table_row')),
+  financial_region_start_ordinal INTEGER,
+  financial_region_end_ordinal INTEGER,
+  financial_region_signature TEXT,
+  semantic_digest_algorithm TEXT NOT NULL CHECK(semantic_digest_algorithm = 'ledgerforge.zero-activity-semantic.sha256.v1'),
+  semantic_digest TEXT NOT NULL CHECK(length(semantic_digest) = 64 AND semantic_digest NOT GLOB '*[^0-9a-f]*'),
+  source_fingerprint_algorithm TEXT NOT NULL,
+  source_fingerprint_digest TEXT NOT NULL CHECK(length(source_fingerprint_digest) = 64 AND source_fingerprint_digest NOT GLOB '*[^0-9a-f]*'),
+  authority_role TEXT NOT NULL CHECK(authority_role IN ('authoritative', 'supporting')),
+  created_at DATETIME NOT NULL,
+  CHECK(
+    (selected_statement_month IS NULL AND statement_start_date IS NULL AND statement_end_date IS NULL AND statement_date IS NOT NULL AND semantic_cycle_key = 'date:' || statement_date) OR
+    (selected_statement_month IS NULL AND statement_start_date IS NOT NULL AND statement_end_date IS NOT NULL AND statement_start_date <= statement_end_date AND semantic_cycle_key = 'period:' || statement_start_date || ':' || statement_end_date) OR
+    (selected_statement_month IS NOT NULL AND statement_date IS NULL AND statement_start_date IS NULL AND statement_end_date IS NULL AND
+      length(selected_statement_month) = 7 AND selected_statement_month GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]' AND
+      CAST(substr(selected_statement_month, 6, 2) AS INTEGER) BETWEEN 1 AND 12 AND
+      semantic_cycle_key = 'month:' || selected_statement_month)
+  ),
+  CHECK((opening_balance_minor IS NULL) = (opening_balance_decimal IS NULL)),
+  CHECK((closing_balance_minor IS NULL) = (closing_balance_decimal IS NULL)),
+  CHECK((debit_total_minor IS NULL) = (debit_total_decimal IS NULL)),
+  CHECK((credit_total_minor IS NULL) = (credit_total_decimal IS NULL)),
+  CHECK((card_previous_balance_minor IS NULL) = (card_previous_balance_decimal IS NULL)),
+  CHECK((card_total_payment_due_minor IS NULL) = (card_total_payment_due_decimal IS NULL)),
+  CHECK(
+    (financial_region_descriptor IS NULL AND financial_region_source_unit IS NULL AND financial_region_start_ordinal IS NULL AND financial_region_end_ordinal IS NULL AND financial_region_signature IS NULL) OR
+    (financial_region_descriptor IS NOT NULL AND length(trim(financial_region_descriptor)) > 0 AND financial_region_start_ordinal IS NOT NULL AND financial_region_start_ordinal > 0 AND financial_region_end_ordinal IS NOT NULL AND financial_region_end_ordinal >= financial_region_start_ordinal AND financial_region_signature IS NOT NULL AND length(financial_region_signature) = 64 AND financial_region_signature NOT GLOB '*[^0-9a-f]*')
+  ),
+  CHECK((evidence_kind = 'printed_controls' AND opening_balance_minor IS NOT NULL AND closing_balance_minor IS NOT NULL AND debit_total_minor IS NOT NULL AND credit_total_minor IS NOT NULL) OR
+        (evidence_kind = 'exhausted_financial_region' AND financial_region_descriptor IS NOT NULL AND financial_region_start_ordinal IS NOT NULL AND financial_region_end_ordinal IS NOT NULL AND financial_region_signature IS NOT NULL)),
+  CHECK((debit_total_minor IS NULL OR debit_total_minor = 0) AND (credit_total_minor IS NULL OR credit_total_minor = 0)),
+  CHECK((opening_balance_minor IS NULL OR closing_balance_minor IS NULL OR opening_balance_minor = closing_balance_minor)),
+  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+  FOREIGN KEY(document_id) REFERENCES documents(id) ON DELETE RESTRICT,
+  FOREIGN KEY(import_session_id) REFERENCES import_sessions(id) ON DELETE RESTRICT,
+  FOREIGN KEY(normalized_document_id) REFERENCES normalized_documents(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_zero_activity_semantic_lookup
+  ON statement_zero_activity_controls(workspace_id, account_id, institution_code, statement_family_code, semantic_cycle_key, native_currency, semantic_digest);
+CREATE UNIQUE INDEX idx_zero_activity_one_authority
+  ON statement_zero_activity_controls(workspace_id, account_id, institution_code, statement_family_code, semantic_cycle_key, native_currency)
+  WHERE authority_role = 'authoritative';
+
+CREATE TRIGGER validate_statement_zero_activity_control
+BEFORE INSERT ON statement_zero_activity_controls
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM accounts a WHERE a.id = NEW.account_id AND a.workspace_id = NEW.workspace_id
+      AND a.native_currency = NEW.native_currency
+      AND ((NEW.institution_code = 'axis' AND a.institution_id = 'Axis Bank') OR
+           (NEW.institution_code = 'hdfc' AND a.institution_id = 'HDFC Bank') OR
+           (NEW.institution_code = 'cbq' AND a.institution_id = 'Commercial Bank of Qatar') OR
+           (NEW.institution_code = 'amex' AND a.institution_id = 'American Express'))
+      AND ((NEW.statement_family_code LIKE '%.credit-card' AND a.account_type = 'credit_card') OR
+           (NEW.statement_family_code NOT LIKE '%.credit-card' AND a.account_type = 'bank'))
+  ) THEN RAISE(ABORT, 'zero activity account relationship invalid') END;
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM documents d
+    JOIN import_sessions s ON s.id = d.import_session_id
+    JOIN normalized_documents n ON n.document_id = d.id AND n.import_session_id = s.id
+    WHERE d.id = NEW.document_id AND d.workspace_id = NEW.workspace_id
+      AND s.id = NEW.import_session_id AND s.workspace_id = NEW.workspace_id
+      AND n.id = NEW.normalized_document_id
+      AND n.profile_id = NEW.parser_profile_id AND n.profile_version = NEW.parser_profile_version
+  ) THEN RAISE(ABORT, 'zero activity source relationship invalid') END;
+  SELECT CASE WHEN 1 != (
+    SELECT COUNT(*) FROM document_fingerprints f
+    WHERE f.document_id = NEW.document_id AND f.import_session_id = NEW.import_session_id
+      AND f.algorithm = NEW.source_fingerprint_algorithm
+      AND f.fingerprint = NEW.source_fingerprint_digest
+      AND f.is_duplicate_authority = 1
+  ) THEN RAISE(ABORT, 'zero activity source fingerprint relationship invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id = 'axis.bank-account.csv' AND NEW.parser_profile_version = '3' AND NEW.source_format_code = 'csv' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.bank-account') OR
+    (NEW.parser_profile_id = 'axis.bank-account.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.bank-account') OR
+    (NEW.parser_profile_id = 'axis.bank-account.xls' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xls' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.bank-account') OR
+    (NEW.parser_profile_id = 'hdfc.bank-account.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'hdfc' AND NEW.statement_family_code = 'hdfc.bank-account') OR
+    (NEW.parser_profile_id = 'hdfc.bank-account.xls' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xls' AND NEW.institution_code = 'hdfc' AND NEW.statement_family_code = 'hdfc.bank-account') OR
+    (NEW.parser_profile_id = 'cbq.current-account.history.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account') OR
+    (NEW.parser_profile_id = 'cbq.current-account.monthly.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account') OR
+    (NEW.parser_profile_id = 'cbq.current-account.xls' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xls' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.current-account') OR
+    (NEW.parser_profile_id = 'amex.credit-card.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'amex' AND NEW.statement_family_code = 'amex.credit-card') OR
+    (NEW.parser_profile_id = 'cbq.credit-card.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'cbq' AND NEW.statement_family_code = 'cbq.credit-card') OR
+    (NEW.parser_profile_id = 'axis.credit-card.pdf' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'pdf' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.credit-card') OR
+    (NEW.parser_profile_id = 'axis.credit-card.xlsx' AND NEW.parser_profile_version = '1' AND NEW.source_format_code = 'xlsx' AND NEW.institution_code = 'axis' AND NEW.statement_family_code = 'axis.credit-card')
+  ) THEN RAISE(ABORT, 'zero activity parser profile/source format binding invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id = 'cbq.current-account.history.pdf' AND NEW.statement_date IS NOT NULL AND NEW.statement_start_date IS NULL AND NEW.statement_end_date IS NULL AND NEW.selected_statement_month IS NULL) OR
+    (NEW.parser_profile_id = 'axis.credit-card.xlsx' AND NEW.statement_date IS NULL AND NEW.statement_start_date IS NULL AND NEW.statement_end_date IS NULL AND NEW.selected_statement_month IS NOT NULL) OR
+    (NEW.parser_profile_id = 'axis.credit-card.pdf' AND
+      ((NEW.statement_start_date IS NOT NULL AND NEW.statement_end_date IS NOT NULL AND NEW.selected_statement_month IS NULL) OR
+       (NEW.statement_date IS NULL AND NEW.statement_start_date IS NULL AND NEW.statement_end_date IS NULL AND NEW.selected_statement_month IS NOT NULL))) OR
+    (NEW.parser_profile_id NOT IN ('cbq.current-account.history.pdf', 'axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+      NEW.statement_start_date IS NOT NULL AND NEW.statement_end_date IS NOT NULL AND NEW.selected_statement_month IS NULL)
+  ) THEN RAISE(ABORT, 'zero activity temporal authority invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id IN ('axis.bank-account.csv', 'axis.bank-account.pdf', 'axis.bank-account.xls', 'axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+      NEW.financial_region_source_unit IS NOT NULL) OR
+    (NEW.parser_profile_id NOT IN ('axis.bank-account.csv', 'axis.bank-account.pdf', 'axis.bank-account.xls', 'axis.credit-card.pdf', 'axis.credit-card.xlsx'))
+  ) THEN RAISE(ABORT, 'Axis zero activity requires typed financial region bounds') END;
+  SELECT CASE WHEN NOT (
+    (NEW.parser_profile_id IN ('axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+      NEW.evidence_kind = 'exhausted_financial_region' AND
+      NEW.opening_balance_minor IS NULL AND NEW.opening_balance_decimal IS NULL AND
+      NEW.closing_balance_minor IS NULL AND NEW.closing_balance_decimal IS NULL AND
+      NEW.debit_total_minor IS NULL AND NEW.debit_total_decimal IS NULL AND
+      NEW.credit_total_minor IS NULL AND NEW.credit_total_decimal IS NULL AND
+      NEW.card_previous_balance_minor IS NOT NULL AND NEW.card_previous_balance_decimal IS NOT NULL AND
+      NEW.card_total_payment_due_minor IS NOT NULL AND NEW.card_total_payment_due_decimal IS NOT NULL AND
+      NEW.card_previous_balance_minor = NEW.card_total_payment_due_minor AND
+      NEW.card_previous_balance_decimal = NEW.card_total_payment_due_decimal AND
+      NEW.card_payment_due_date IS NOT NULL) OR
+    (NEW.parser_profile_id NOT IN ('axis.credit-card.pdf', 'axis.credit-card.xlsx') AND
+      NEW.card_previous_balance_minor IS NULL AND NEW.card_previous_balance_decimal IS NULL AND
+      NEW.card_total_payment_due_minor IS NULL AND NEW.card_total_payment_due_decimal IS NULL AND
+      NEW.card_payment_due_date IS NULL)
+  ) THEN RAISE(ABORT, 'zero activity card controls invalid') END;
+  SELECT CASE WHEN NOT (
+    (NEW.institution_code IN ('axis', 'hdfc') AND NEW.native_currency = 'INR') OR
+    (NEW.institution_code IN ('cbq', 'amex') AND NEW.native_currency = 'QAR')
+  ) THEN RAISE(ABORT, 'zero activity parser profile/native currency binding invalid') END;
+  SELECT CASE WHEN NEW.authority_role = 'supporting' AND 1 != (
+    SELECT COUNT(*) FROM statement_zero_activity_controls a
+    WHERE a.workspace_id = NEW.workspace_id AND a.account_id = NEW.account_id
+      AND a.institution_code = NEW.institution_code AND a.statement_family_code = NEW.statement_family_code
+      AND a.semantic_cycle_key = NEW.semantic_cycle_key AND a.native_currency = NEW.native_currency
+      AND a.semantic_digest = NEW.semantic_digest AND a.authority_role = 'authoritative'
+  ) THEN RAISE(ABORT, 'zero activity supporting source has no authority') END;
+END;
+
+PRAGMA legacy_alter_table = OFF;
+""",
+    preflightChecks: [],
+    requiresForeignKeysDisabled: true
+)
+
+public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17]
 
 enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain

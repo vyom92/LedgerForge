@@ -9,7 +9,7 @@ struct DefaultReaderRegistryTests {
 
     @Test func registryResolvesCSVReaderAdapter() async throws {
         let registry = DefaultReaderRegistry()
-        let request = ImportRequest(fileURL: approvedCSVFixtureURL())
+        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/generic.csv"))
 
         let reader = await registry.reader(for: request)
 
@@ -39,10 +39,11 @@ struct DefaultReaderRegistryTests {
         }
     }
 
-    @Test func coordinatorUsesRegistryToReadApprovedCSVFixture() async throws {
+    @Test func coordinatorUsesRegistryToReadGenericCSV() async throws {
         let registry = DefaultReaderRegistry()
         let coordinator = DefaultImportCoordinator(readerRegistry: registry)
-        let fixtureURL = approvedCSVFixtureURL()
+        let fixtureURL = try genericCSVFixtureURL()
+        defer { try? FileManager.default.removeItem(at: fixtureURL.deletingLastPathComponent()) }
         let request = ImportRequest(fileURL: fixtureURL)
 
         let result = await coordinator.importDocument(request)
@@ -59,8 +60,7 @@ struct DefaultReaderRegistryTests {
             return
         }
 
-        #expect(text.contains("Statement of Account No"))
-        #expect(text.contains("Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL"))
+        #expect(text == "Name,Value\nAlpha,1\nBeta,2\n")
     }
 
     @Test func coordinatorReturnsTypedFailureForUnsupportedExtension() async throws {
@@ -77,6 +77,10 @@ struct DefaultReaderRegistryTests {
 
 }
 
-private func approvedCSVFixtureURL() -> URL {
-    FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+private func genericCSVFixtureURL() throws -> URL {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let url = directory.appendingPathComponent("generic.csv")
+    try Data("Name,Value\nAlpha,1\nBeta,2\n".utf8).write(to: url)
+    return url
 }

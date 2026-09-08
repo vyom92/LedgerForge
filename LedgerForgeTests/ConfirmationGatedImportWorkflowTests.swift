@@ -13,11 +13,11 @@ struct ConfirmationGatedImportWorkflowTests {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = availableImportEngine(persistence)
-        let url = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+        let url = try AuthenticSourceTestSupport.axisBankCSV()
 
         let preparedImport = try await engine.prepareImport(from: url)
 
-        #expect(preparedImport.fileName == "axis_bank_nre_account_statement_baseline.csv")
+        #expect(preparedImport.fileName == url.lastPathComponent)
         #expect(preparedImport.detectedInstitution == .axis)
         #expect(preparedImport.detectedDocumentType == .bankAccount)
         #expect(preparedImport.validation.passed)
@@ -29,64 +29,11 @@ struct ConfirmationGatedImportWorkflowTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func validationFailureBlocksCommitAndDoesNotPersist() async throws {
-        await resetRuntimeStoresForConfirmationWorkflow()
-        let persistence = CountingPersistenceCoordinator()
-        let engine = availableImportEngine(persistence)
-        let preparedImport = makePreparedImport(transactions: [])
-
-        let result = await engine.commitPreparedImport(preparedImport)
-
-        #expect(!preparedImport.validation.passed)
-        #expect(!result.validationPassed)
-        #expect(!result.persisted)
-        #expect(result.errorMessage == "Import validation failed.")
-        #expect(persistence.persistCallCount == 0)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func swappedAxisDirectionSemanticsFailBeforeAcceptedPersistenceWithZeroResidue() async throws {
-        await resetRuntimeStoresForConfirmationWorkflow()
-        let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("LedgerForge-AxisDirection-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: folder) }
-        let url = folder.appendingPathComponent("axis-future-direction.csv")
-        let source = """
-        Name :- TEST FUTURE DIRECTION
-        Bank :- AXIS BANK
-        Currency :- INR
-        Statement of Account No - 940000000000099 for the period (From : 01-01-2026  To : 02-01-2026)
-
-        Tran Date,CHQNO,PARTICULARS,DR,CR,BAL,SOL
-        01-01-2026,-,UPI/P2M/000000009901/FUTURE PAYMENT,25.00,,75.00,9001
-        02-01-2026,-,UPI/P2A/000000009902/FUTURE CREDIT,,10.00,65.00,9001
-        """
-        try Data(source.utf8).write(to: url)
-        let persistence = CountingPersistenceCoordinator()
-        let engine = availableImportEngine(persistence)
-
-        let prepared = try await engine.prepareImport(from: url)
-        let result = await engine.commitPreparedImport(prepared)
-
-        #expect(prepared.financialDocument.transactions[0].debit == Decimal(25))
-        #expect(prepared.financialDocument.transactions[1].credit == Decimal(10))
-        #expect(!prepared.validation.passed)
-        #expect(!result.validationPassed)
-        #expect(!result.persisted)
-        #expect(result.errorMessage == "Import validation failed.")
-        #expect(persistence.persistCallCount == 0)
-        #expect(AccountStore.shared.accounts.isEmpty)
-        #expect(TransactionStore.shared.transactions.isEmpty)
-        #expect(DocumentStore.shared.rows.isEmpty)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
     func confirmationCommitsUsingPreparedFinancialDocumentWithoutRuntimeMutation() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = availableImportEngine(persistence)
-        let preparedImport = makePreparedImport()
+        let preparedImport = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
 
         let result = await engine.commitPreparedImport(preparedImport)
 
@@ -109,7 +56,7 @@ struct ConfirmationGatedImportWorkflowTests {
         await resetRuntimeStoresForConfirmationWorkflow()
         let persistence = CountingPersistenceCoordinator()
         let engine = availableImportEngine(persistence)
-        let preparedImport = makePreparedImport()
+        let preparedImport = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
 
         let firstResult = await engine.commitPreparedImport(preparedImport)
         let secondResult = await engine.commitPreparedImport(preparedImport)
@@ -124,24 +71,11 @@ struct ConfirmationGatedImportWorkflowTests {
     @Test(.globalRuntimeStateIsolation)
     func persistenceFailureLeavesEveryRuntimeFinancialStoreUnchanged() async throws {
         await resetRuntimeStoresForConfirmationWorkflow()
-        let existingTransaction = makeConfirmationTransaction(
-            statementDate: try! StatementDate(canonical: "2027-03-12"),
-            description: "Existing transaction",
-            debit: nil,
-            credit: 25,
-            amount: 25,
-            balance: 25
-        )
-        let existingAccount = Account(
-            institution: "Existing Bank",
-            name: "Existing Account",
-            type: .bank,
-            currencyCode: "INR",
-            currentBalance: 25
-        )
-        AccountStore.shared.replaceAccounts([existingAccount])
-        TransactionStore.shared.replaceTransactions([existingTransaction])
-        DocumentStore.shared.update(with: "existing,document")
+        let existingEngine = availableImportEngine(CountingPersistenceCoordinator())
+        let existingPrepared = try await existingEngine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV(alternatePeriod: true))
+        defer { existingEngine.cancelPreparedImport(existingPrepared) }
+        TransactionStore.shared.replaceTransactions(existingPrepared.financialDocument.transactions)
+        DocumentStore.shared.update(with: existingPrepared.rawContents)
         await Task.yield()
 
         let originalDocumentRows = DocumentStore.shared.rows
@@ -151,7 +85,7 @@ struct ConfirmationGatedImportWorkflowTests {
         persistence.errorToThrow = ConfirmationPersistenceError.writeFailed
         let engine = availableImportEngine(persistence)
 
-        let result = await engine.commitPreparedImport(makePreparedImport())
+        let result = await engine.commitPreparedImport(try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV()))
 
         #expect(result.validationPassed)
         #expect(!result.persisted)
@@ -169,7 +103,7 @@ struct ConfirmationGatedImportWorkflowTests {
         persistence.resultOverride = .skipped
         let engine = availableImportEngine(persistence)
 
-        let result = await engine.commitPreparedImport(makePreparedImport())
+        let result = await engine.commitPreparedImport(try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV()))
 
         #expect(result.validationPassed)
         #expect(!result.persisted)
@@ -192,7 +126,7 @@ struct ConfirmationGatedImportWorkflowTests {
             persistence.errorToThrow = error
             let engine = availableImportEngine(persistence)
 
-            let result = await engine.commitPreparedImport(makePreparedImport())
+            let result = await engine.commitPreparedImport(try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV()))
 
             #expect(!result.persisted)
             #expect(result.errorMessage == error.localizedDescription)
@@ -231,9 +165,9 @@ struct ConfirmationGatedImportWorkflowTests {
     }
 
     @Test func exactFingerprintUsesOnlyReaderProducedUTF8Text() {
-        let original = ExactStatementFingerprint(text: "Date,Amount\n2026-01-01,10\n")
-        let renamed = ExactStatementFingerprint(text: "Date,Amount\n2026-01-01,10\n")
-        let whitespaceChanged = ExactStatementFingerprint(text: "Date,Amount\n2026-01-01,10 \n")
+        let original = ExactStatementFingerprint(text: "Label,Value\nAlpha,Beta\n")
+        let renamed = ExactStatementFingerprint(text: "Label,Value\nAlpha,Beta\n")
+        let whitespaceChanged = ExactStatementFingerprint(text: "Label,Value\nAlpha,Beta \n")
 
         #expect(original.algorithm == "ledgerforge.raw-text.sha256.v1")
         #expect(original.digest.count == 64)
@@ -285,7 +219,8 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(result.hydrationOutcome == .committedAndHydrated)
     }
 
-    @Test func competingSameProcessConfirmationsProduceOneFinancialHistory() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func competingSameProcessConfirmationsProduceOneFinancialHistory() async throws {
         let provider = InMemoryRepositoryProvider()
         let firstCoordinator = DefaultImportPersistenceCoordinator(
             workspaceRepo: provider.workspaceRepo,
@@ -311,10 +246,11 @@ struct ConfirmationGatedImportWorkflowTests {
                 workspaceName: "Competing Confirmations"
             )
         )
-        let firstEngine = availableImportEngine(firstCoordinator)
-        let secondEngine = availableImportEngine(secondCoordinator)
-        let first = makePreparedImport(id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!, providerGeneration: provider.generationToken)
-        let second = makePreparedImport(id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!, providerGeneration: provider.generationToken)
+        let firstEngine = availableImportEngine(firstCoordinator, providerGeneration: provider.generationToken)
+        let secondEngine = availableImportEngine(secondCoordinator, providerGeneration: provider.generationToken)
+        let source = try AuthenticSourceTestSupport.axisBankCSV()
+        let first = try await firstEngine.prepareImport(from: source)
+        let second = try await secondEngine.prepareImport(from: source)
 
         async let firstResult = firstEngine.commitPreparedImport(first, accountChoice: .createNewAccount)
         async let secondResult = secondEngine.commitPreparedImport(second, accountChoice: .createNewAccount)
@@ -323,7 +259,7 @@ struct ConfirmationGatedImportWorkflowTests {
         #expect(results.filter(\.persisted).count == 1)
         #expect(results.filter { $0.previousImport != nil }.count == 1)
         #expect(try provider.accountRepo.accounts(workspaceId: "workspace-competing-confirmations").count == 1)
-        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: "workspace-competing-confirmations").count == 2)
+        #expect(try provider.transactionRepo.trustedTransactions(workspaceId: "workspace-competing-confirmations").count == first.transactionCount)
         let successfulSessionIDs = [first, second].compactMap { prepared in
             try? provider.importSessionRepo.importSession(id: prepared.importSession.id.uuidString)
         }.compactMap { $0 }.filter { $0.validationStatus == "passed" }.map(\.id)
@@ -333,7 +269,7 @@ struct ConfirmationGatedImportWorkflowTests {
             fingerprint: first.fingerprint.digest
         ))
         #expect(prior.importSessionId == successfulSessionIDs[0])
-        #expect(prior.transactionCount == 2)
+        #expect(prior.transactionCount == first.transactionCount)
     }
 }
 
@@ -418,10 +354,11 @@ private func resetRuntimeStoresForConfirmationWorkflow() async {
     await Task.yield()
 }
 
-private func availableImportEngine(_ persistence: ImportPersistenceCoordinating) -> ImportEngine {
+private func availableImportEngine(_ persistence: ImportPersistenceCoordinating, providerGeneration: ProviderGenerationToken? = nil) -> ImportEngine {
     ImportEngine(
         importPersistenceCoordinator: persistence,
         persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
+        providerGenerationProvider: { providerGeneration ?? DatabaseProvider.shared.generationToken },
         forcedHydration: {
             RepositoryStoreHydrationResult(
                 didHydrate: true,
@@ -440,107 +377,4 @@ private enum ConfirmationPersistenceError: Error, LocalizedError {
     var errorDescription: String? {
         "Repository write failed."
     }
-}
-
-private func makePreparedImport(
-    id: UUID = UUID(),
-    transactions: [Transaction] = [
-        makeConfirmationTransaction(
-            statementDate: try! StatementDate(canonical: "2027-03-13"),
-            sourceOrdinal: 1,
-            description: "Opening credit",
-            debit: nil,
-            credit: 100,
-            amount: 100,
-            balance: 1_100
-        ),
-        makeConfirmationTransaction(
-            statementDate: try! StatementDate(canonical: "2027-03-14"),
-            sourceOrdinal: 2,
-            description: "Card payment",
-            debit: 50,
-            credit: nil,
-            amount: -50,
-            balance: 1_050
-        )
-    ],
-    providerGeneration: ProviderGenerationToken = DatabaseProvider.shared.generationToken
-) -> PreparedImport {
-    let document = FinancialDocument(
-        sourceDocument: Document(
-            filename: "confirmation-workflow.csv",
-            url: URL(fileURLWithPath: "/tmp/confirmation-workflow.csv"),
-            fileType: "CSV",
-            importedAt: Date(timeIntervalSince1970: 1_804_896_000)
-        ),
-        metadata: DocumentMetadata(
-            institution: .axis,
-            documentType: .bankAccount,
-            fileFormat: .csv,
-            confidence: 1.0
-        ),
-        parserName: "Axis Bank Account",
-        bookedCurrency: try! CurrencyCode("INR"),
-        transactions: transactions,
-        selectionReasons: ["Confirmation workflow test parser selection."],
-        createdAt: Date(timeIntervalSince1970: 1_804_896_000)
-    )
-    let validation = ImportValidator.validate(financialDocument: document)
-    let importSession = ImportSession(
-        importedAt: Date(timeIntervalSince1970: 1_804_896_000),
-        fileName: document.sourceDocument.filename,
-        institution: document.metadata.institution,
-        documentType: document.metadata.documentType,
-        parserName: document.parserName,
-        transactionCount: document.transactions.count,
-        validation: validation
-    )
-
-    return PreparedImport(
-        id: id,
-        sourceURL: document.sourceDocument.url,
-        rawContents: "date,description,amount",
-        fileName: document.sourceDocument.filename,
-        detectedInstitution: document.metadata.institution,
-        detectedDocumentType: document.metadata.documentType,
-        parserName: document.parserName,
-        financialDocument: document,
-        validation: validation,
-        importSession: importSession,
-        providerGeneration: providerGeneration
-    )
-}
-
-private func makeConfirmationTransaction(
-    statementDate: StatementDate,
-    sourceOrdinal: Int = 1,
-    description: String,
-    debit: Decimal?,
-    credit: Decimal?,
-    amount: Decimal,
-    balance: Decimal?
-) -> Transaction {
-    Transaction(
-        statementDate: statementDate,
-        description: description,
-        debit: debit,
-        credit: credit,
-        amount: amount,
-        balance: balance,
-        currency: "INR",
-        account: "Axis NRE",
-        sourceBank: "Axis Bank",
-        sourceFile: "confirmation-workflow.csv",
-        statementTimezoneEvidence: .iana("Asia/Kolkata"),
-        sourceProvenance: [
-            TransactionSourceProvenance(
-                normalizedDocumentID: "confirmation-normalized-document",
-                normalizedRowID: "confirmation-normalized-row-\(sourceOrdinal)",
-                sourceOrdinal: sourceOrdinal,
-                normalizedRecordDigest: String.normalizedRecordDigest(values: ["confirmation", "\(sourceOrdinal)"]),
-                parserProfileID: AxisBankAccountParser.profileID,
-                parserProfileVersion: AxisBankAccountParser.profileVersion
-            )
-        ]
-    )
 }

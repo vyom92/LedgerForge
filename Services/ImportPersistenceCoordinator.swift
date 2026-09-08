@@ -1124,8 +1124,12 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
             return plan
         }
 
+        let isAccountOnlyAmexZero = contract == .amex &&
+            financialDocument.transactions.isEmpty &&
+            financialDocument.zeroActivityEvidence != nil &&
+            evidence.instrumentSections.isEmpty
         guard evidence.accountSourceIdentityObservations.count == 1,
-              !evidence.instrumentSections.isEmpty,
+              (isAccountOnlyAmexZero || !evidence.instrumentSections.isEmpty),
               evidence.instrumentSections.allSatisfy({ $0.sourceIdentityObservations.count == 1 }) else {
             throw ImportPersistenceCoordinationError.repositoryIntegrityConflict
         }
@@ -1149,6 +1153,9 @@ final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
         }.map(\.subjectId))
         var mappingsByAccount = [String: [String: [String]]]()
         for accountID in accountCandidates.sorted() {
+            // Preserve the account candidate even when a source-proven Amex
+            // zero statement truthfully has no instrument sections to map.
+            mappingsByAccount[accountID] = [:]
             for section in evidence.instrumentSections {
                 let incoming = section.sourceIdentityObservations[0]
                 let instruments = Set(snapshot.sectionObservations.compactMap { observation -> String? in

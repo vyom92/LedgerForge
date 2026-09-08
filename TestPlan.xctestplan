@@ -15,10 +15,12 @@
         "value" : "1"
       }
     ],
-    "testTimeoutsEnabled" : true
+    "testTimeoutsEnabled" : true,
+    "maximumTestExecutionTimeAllowance" : 1200
   },
   "testTargets" : [
     {
+      "parallelizable" : false,
       "target" : {
         "containerPath" : "container:LedgerForge.xcodeproj",
         "identifier" : "288EB0B92FF7955300F09BC9",

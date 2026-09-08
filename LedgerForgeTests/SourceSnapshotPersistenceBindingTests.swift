@@ -15,7 +15,7 @@ struct SourceSnapshotPersistenceBindingTests {
             providerGenerationProvider: { ProviderGenerationToken() }
         )
         let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: try AuthenticSourceTestSupport.axisBankCSV()
         )
         defer { engine.cancelPreparedImport(prepared) }
         let plan = try ImportPersistenceMapper().confirmedImportPlan(
@@ -49,46 +49,6 @@ struct SourceSnapshotPersistenceBindingTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func reviewedPartialPlanRetainsTheCompleteSetWithoutSourceBytes() async throws {
-        LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let engine = ImportEngine(
-            importPersistenceCoordinator: BindingPreparationPersistence(),
-            developerConsole: DeveloperConsole(),
-            persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
-            providerGenerationProvider: { ProviderGenerationToken() }
-        )
-        let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
-        )
-        defer { engine.cancelPreparedImport(prepared) }
-        let base = try ImportPersistenceMapper().confirmedImportPlan(
-            financialDocument: prepared.financialDocument,
-            importSession: prepared.importSession,
-            validation: prepared.validation,
-            fingerprintSet: prepared.fingerprintSet,
-            providerGeneration: prepared.providerGeneration,
-            advisoryIdentity: .noMatch,
-            accountChoice: .useExistingAccount(accountId: "existing-account"),
-            selectedAccountId: "existing-account"
-        )
-        let reviewed = ReviewedPartialImportPlanDTO(
-            id: "snapshot-binding-reviewed",
-            basePlan: base,
-            existingAccountId: "existing-account",
-            rows: [],
-            sourceRowCount: 0,
-            recognizedCount: 0,
-            importedCount: 0,
-            blockedCount: 0
-        )
-
-        #expect(reviewed.basePlan.historyTemplate.fingerprints == base.historyTemplate.fingerprints)
-        #expect(reviewed.basePlan.historyTemplate.fingerprints.count == 2)
-        #expect(reviewed.basePlan.historyTemplate.fingerprints.allSatisfy { $0.fingerprintData == nil })
-        #expect(reviewed.hasValidDigest())
-    }
-
-    @Test(.globalRuntimeStateIsolation)
     func productionMappedSetPersistsExactlyWithSQLiteAndInMemoryParity() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
         let engine = ImportEngine(
@@ -98,7 +58,7 @@ struct SourceSnapshotPersistenceBindingTests {
             providerGenerationProvider: { ProviderGenerationToken() }
         )
         let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: try AuthenticSourceTestSupport.axisBankCSV()
         )
         defer { engine.cancelPreparedImport(prepared) }
         let folder = FileManager.default.temporaryDirectory

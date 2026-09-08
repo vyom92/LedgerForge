@@ -49,14 +49,14 @@ struct QatarAirwaysSalaryPDFParser {
             }
             throw QatarAirwaysSalaryPDFParserError.unsupportedHeading
         }
-        guard let pageEvidence = rawDocument.pdfPageEvidence, let firstPage = pageEvidence.first else {
+        guard let pageEvidence = rawDocument.pdfPageEvidence, !pageEvidence.isEmpty else {
             throw QatarAirwaysSalaryPDFParserError.missingGeometry
         }
 
         let text = rawDocument.searchableText
         let title = try parseTitle(in: text)
         let printDate = try parsePrintDate(in: text)
-        let components = try parseComponents(from: firstPage)
+        let components = try parseComponents(from: pageEvidence)
         let printedEarnings = try money(match: #"Total\s+Earnings\s+([0-9][0-9,]*\.[0-9]{2})"#, in: text)
         let printedDeductions: Money?
         if text.range(of: #"Total\s+Deductions"#, options: .regularExpression) != nil {
@@ -153,11 +153,56 @@ struct QatarAirwaysSalaryPDFParser {
         let amount: Money
     }
 
-    private func parseComponents(from page: RawPDFPageEvidence) throws -> (earnings: [SalaryComponent], deductions: [SalaryComponent]) {
-        let rows = groupedRows(page.fragments)
-        guard let headerIndex = rows.firstIndex(where: { rowText($0).contains("Earning Amount (QAR)") }),
-              let totalIndex = rows.firstIndex(where: { rowText($0).contains("Total Earnings") }),
-              headerIndex < totalIndex else {
+    private struct ComponentRegion {
+        let rows: [[RawPDFTextFragment]]
+        let headerIndex: Int
+        let totalIndex: Int
+    }
+
+    private func parseComponents(
+        from pages: [RawPDFPageEvidence]
+    ) throws -> (earnings: [SalaryComponent], deductions: [SalaryComponent]) {
+        var regions: [ComponentRegion] = []
+        for page in pages {
+            let rows = groupedRows(page.fragments)
+            let headerIndices = rows.indices.filter {
+                rowText(rows[$0]).contains("Earning Amount (QAR)")
+            }
+            let totalIndices = rows.indices.filter {
+                rowText(rows[$0]).contains("Total Earnings")
+            }
+            guard !headerIndices.isEmpty || !totalIndices.isEmpty else { continue }
+            guard headerIndices.count == 1,
+                  totalIndices.count == 1,
+                  let headerIndex = headerIndices.first,
+                  let totalIndex = totalIndices.first,
+                  headerIndex < totalIndex else {
+                throw QatarAirwaysSalaryPDFParserError.unsupportedHeading
+            }
+            regions.append(
+                ComponentRegion(
+                    rows: rows,
+                    headerIndex: headerIndex,
+                    totalIndex: totalIndex
+                )
+            )
+        }
+        guard regions.count == 1, let region = regions.first else {
+            if regions.isEmpty {
+                throw QatarAirwaysSalaryPDFParserError.unsupportedHeading
+            }
+            throw QatarAirwaysSalaryPDFParserError.ambiguousSectionOwnership
+        }
+        return try parseComponents(in: region)
+    }
+
+    private func parseComponents(
+        in region: ComponentRegion
+    ) throws -> (earnings: [SalaryComponent], deductions: [SalaryComponent]) {
+        let rows = region.rows
+        let headerIndex = region.headerIndex
+        let totalIndex = region.totalIndex
+        guard headerIndex < totalIndex else {
             throw QatarAirwaysSalaryPDFParserError.unsupportedHeading
         }
         let header = rowText(rows[headerIndex])

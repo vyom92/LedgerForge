@@ -1,7 +1,7 @@
 # LedgerForge Standing Execution Harness Guide
 
 **Status:** Active repository process authority  
-**Refreshed:** 2026-08-27  
+**Refreshed:** 2026-09-01
 **Execution authority:** None by itself  
 **Architecture authority:** None by itself  
 **Purpose:** Reusable Chat/MCP/Codex planning, execution, validation and review method
@@ -32,7 +32,7 @@ Every executor/reviewer should receive:
 Before sprint selection, naming, roadmap change, execution prompt, implementation review or acceptance, Chat inspects in this order:
 
 1. exact ref/worktree under review;
-2. `LedgerForge_Roadmap_Sprints_70-79_Current.md`;
+2. `LedgerForge_Roadmap_Sprints_80-89_Current.md`;
 3. this standing harness;
 4. `PROJECT_STATE.md`;
 5. `FUTURE_WORK.MD`;
@@ -164,7 +164,7 @@ Token or schedule efficiency never weakens financial proof.
 
 For financial work:
 
-- authentic source semantics outrank fixtures;
+- no synthetic, generated, reconstructed, sanitized, representative, reduced, mutated or hand-authored financial statement may be created or used at any stage; only authentic corpus statements may exercise statement-dependent behaviour;
 - parser output is not the sole oracle;
 - preserve Money currency/scale exactly;
 - preserve financial direction/liability effect;
@@ -172,13 +172,34 @@ For financial work:
 - preserve multiplicity;
 - preserve source order where authoritative;
 - preserve source-proven identifiers and provenance;
-- fail closed on malformed/ambiguous/conflicting evidence;
+- fail closed on malformed, financially ambiguous, contradictory or unsupported evidence; harmless presentation variation alone is not a fail-closed reason;
 - rejection leaves zero accepted durable residue;
 - SQLite/In-Memory parity is required where both matter;
 - reopen/hydration are acceptance boundaries;
 - support never generalizes from visual/structural similarity.
 
 Private originals remain read-only and outside Git.
+
+---
+
+## Parser / Authentic-Corpus Acceptance Policy
+
+ADR-046 governs current reader/parser/source-support acceptance. The reusable rules are:
+
+1. **Authentic corpus only.** The complete registered authentic source corpus for every affected supported family is the parser regression and reliability authority. No sampling, representative month or synthetic/sanitized/reconstructed financial statement substitutes for it. Newly supplied recurring statements extend the corpus unless explicitly excluded or archived by the user.
+2. **All-stages authentic-input rule.** No synthetic, generated, recreated, reconstructed, sanitized, representative, reduced, mutated, hand-authored or model-created financial statement may be created or used for development, debugging, reader/normalizer semantics, detector/classifier/parser tests, oracles/expected outputs, edge cases, migration/persistence, import/batch acceptance, developer/debug UI or adversarial review. Remove generated-statement catalogs, reconstructed resources, mutation variants and financial statement factories; hand-built statement/domain/DTO graphs are not substitutes. Exact working copies, necessary decrypted copies and actual extracted PDF attachment bytes are permitted authentic carriers; retain original source-byte provenance/fingerprint authority. Pure source-independent mechanics may use nonfinancial values/files, never content shaped to impersonate a financial statement. If no authentic zero-activity, malformed or other edge case exists, record it as source-uncertified rather than manufacturing coverage. <!-- user-specified -->
+3. **Flexible packaging; strict financial semantics.** Parser support is not defined by incidental page count, transaction count, absolute source row/line number, harmless whitespace/Unicode variation, blank rows, benign page breaks, nonfinancial preambles/footers/pages or statement length. Zero-transaction and variable-page statements must remain supportable when source controls coherently establish their meaning.
+4. **Adaptive deterministic interpretation.** One recurring source-family parser dynamically identifies financial regions, roles and continuity from coherent deterministic evidence: semantic labels, column roles, data shapes, dates, Money, liability/debit-credit direction, running balances, statement/section controls, source order and surrounding structure. Determinism means reproducible/explainable semantics, not rigid physical coordinates. Separate profiles require materially different financial/source semantics.
+5. **Reader boundary.** Generic readers preserve source evidence and physical boundaries. A PDF page with no extractable text does not by itself invalidate the document; downstream family analysis decides whether it is nonfinancial, needs another extraction mode or is genuinely ambiguous. Reader-level rejection is reserved for reader failures such as corrupt/unreadable source material, unresolved encryption or resource failure.
+6. **Financial ambiguity is the stop condition.** Fail closed when financial meaning is ambiguous, contradictory, malformed or unsupported. Do not fail merely because inert packaging differs from a prior month.
+7. **Shared-infrastructure regression.** Any change to generic readers, unlock/password orchestration, source snapshots, detection, classification, routing, normalizer infrastructure, Money, common validation, duplicate/equivalence semantics or persistence mapping must rerun the complete authentic corpus for every affected supported family. Shared unit tests and a full TestPlan are supplementary, not substitutes.
+8. **Historical acceptance is not current reliability certification.** Historical sprint/profile acceptance remains a factual record. Present-day parser reliability is certified only by the complete authentic-corpus ordinary-production-path gate under ADR-046.
+9. **Oracle projection.** Independent oracles record source facts without importing production assumptions. Comparison is `authentic source truth -> explicit architecture-aware semantic projection -> expected LedgerForge financial meaning` versus ordinary production output. Raw Oracle JSON equality with raw production JSON is not an acceptance rule when architectures differ.
+10. **AI boundary.** Prefer deterministic/native extraction, especially for structured XLS/XLSX. Model analysis is reserved for genuinely ambiguous interpretation or independent adjudication and is not ordinary recurring-parser authority.
+
+The canonical user import direction is batch intake (including queue length one) -> unlock as required -> generic extraction -> identify/segregate -> route each statement -> source-family semantic parser -> source-owned financial events -> normalize -> validate/reconcile -> duplicate/equivalence evaluation -> explicit review/confirmation where required -> atomic persistence -> one canonical database -> canonical financial rows -> query/extraction/presentation/viewer layers. Institution-specific parsers are ingestion modules, not separate analytical silos.
+
+Private authentic originals remain read-only and outside Git.
 
 ---
 
@@ -235,6 +256,7 @@ For private-source acceptance:
 - define logical representations separately from duplicate physical copies;
 - do not use filenames to infer financial meaning when source evidence can prove it;
 - do not let production parser output become the independent oracle;
+- compare source truth to production through an explicit architecture-aware semantic projection rather than requiring raw oracle JSON to equal raw production JSON;
 - use exact multiset/multiplicity where order is not source-equivalent;
 - use exact ordered comparison where source order is authoritative;
 - preserve duplicate occurrences without invented occurrence identity;

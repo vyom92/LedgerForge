@@ -133,12 +133,11 @@ private enum ProtectedImportIntent {
         contextID: UUID,
         route: ConfirmedImportRecoveryRoute
     )
-    case prepareFixture(DebugApprovedFixture)
     case confirm(PreparedImport)
 
     var protectedAction: DevelopmentProtectedAction {
         switch self {
-        case .presentFileImporter, .prepareURL, .prepareRecoveryURL, .prepareFixture:
+        case .presentFileImporter, .prepareURL, .prepareRecoveryURL:
             return .importPreparation
         case .confirm:
             return .importConfirmation
@@ -1550,9 +1549,7 @@ struct ContentView: View {
             settingsContent
         case .developer:
 #if DEBUG
-            DeveloperConsoleView(profileViewModel: developerDatabaseProfileViewModel) { fixture in
-                requestProtectedImportAction(.prepareFixture(fixture))
-            }
+            DeveloperConsoleView(profileViewModel: developerDatabaseProfileViewModel)
 #else
             DeveloperConsoleView()
 #endif
@@ -3695,8 +3692,6 @@ struct ContentView: View {
                 contextID: contextID,
                 route: route
             )
-        case .prepareFixture(let fixture):
-            beginPreparation(for: fixture)
         case .confirm(let preparedImport):
             Task { await confirmPreparedImport(preparedImport) }
         }
@@ -3904,33 +3899,6 @@ struct ContentView: View {
             }
         }
     }
-
-#if DEBUG
-    private func beginPreparation(for fixture: DebugApprovedFixture) {
-        guard consumePreparedImportBeforeSourceReplacement() else { return }
-        confirmedImportRecoveryContext = nil
-        selectedImportSourceURL = nil
-        importAccountChoice = nil
-        importIdentityReview = .unavailable
-        partialImportReview = .ordinaryFullImport
-        selectedFile = fixture.title
-        importState = .preparing(fileName: fixture.title, phase: .openingSource)
-        selectedSection = .imports
-        _ = preparationOwner.start { operationID in
-            await prepareImport(
-                displayName: fixture.title,
-                operationID: operationID,
-                retrySourceURL: nil
-            ) { progress in
-                try await DebugImportFixtureLauncher().prepare(
-                    fixture,
-                    requestID: operationID,
-                    progress: progress
-                )
-            }
-        }
-    }
-#endif
 
     @MainActor
     private func prepareImport(

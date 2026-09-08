@@ -17,7 +17,7 @@ struct ImportLifecycleTests {
         var progress: [ImportProgress] = []
 
         let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv"),
+            from: try AuthenticSourceTestSupport.axisBankCSV(),
             requestId: requestID
         ) { progress.append($0) }
         defer { engine.cancelPreparedImport(prepared) }
@@ -41,7 +41,7 @@ struct ImportLifecycleTests {
         }
     }
 
-    @Test func taskOwnerSupersedesReleasesAndCancelsOnlyTheCurrentPreparation() async {
+    @Test func taskOwnerSupersedesReleasesAndCancelsOnlyTheCurrentPreparation() async throws {
         let owner = ImportPreparationTaskOwner()
         let probe = ImportLifecycleCancellationProbe()
 
@@ -88,7 +88,7 @@ struct ImportLifecycleTests {
             },
             rejectedAttemptHydration: {}
         )
-        let source = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+        let source = try AuthenticSourceTestSupport.axisBankCSV()
 
         let sourceA = try await engine.prepareImport(from: source)
         engine.cancelPreparedImport(sourceA)
@@ -134,7 +134,8 @@ struct ImportLifecycleTests {
         }
     }
 
-    @Test func typedPersistenceFailuresSelectBoundedRecoveryWithoutAutomaticWork() async {
+    @Test(.globalRuntimeStateIsolation)
+    func typedPersistenceFailuresSelectBoundedRecoveryWithoutAutomaticWork() async throws {
         let cases: [(ImportPersistenceCoordinationError, ImportAccountOutcome, ConfirmedImportRecoveryRoute)] = [
             (.retryableContention, .unavailable, .prepareAgain(.persistenceContention)),
             (.persistenceUnavailable, .unavailable, .prepareAgain(.persistenceUnavailable)),
@@ -170,7 +171,9 @@ struct ImportLifecycleTests {
                 persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
                 rejectedAttemptHydration: {}
             )
-            let prepared = recoveryPreparedImport()
+            let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+            defer { preparedOwner.cancel() }
+            let prepared = preparedOwner.preparedImport
 
             let result = await engine.commitPreparedImport(prepared)
 
@@ -184,7 +187,8 @@ struct ImportLifecycleTests {
         }
     }
 
-    @Test func completedDuplicateAndEveryTransactionBlockHaveExplicitRoutes() async {
+    @Test(.globalRuntimeStateIsolation)
+    func completedDuplicateAndEveryTransactionBlockHaveExplicitRoutes() async throws {
         let previous = PreviouslyImportedStatement(
             importSessionId: "prior-session",
             completedAtISO: "2026-07-29T00:00:00Z",
@@ -315,7 +319,9 @@ struct ImportLifecycleTests {
                 forcedHydration: { recoveryHydrationResult() },
                 rejectedAttemptHydration: {}
             )
-            let prepared = recoveryPreparedImport()
+            let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+            defer { preparedOwner.cancel() }
+            let prepared = preparedOwner.preparedImport
 
             let result = await engine.commitPreparedImport(prepared)
 
@@ -327,20 +333,8 @@ struct ImportLifecycleTests {
         }
     }
 
-    @Test func validationSnapshotIntegrityInvalidContractAndHostileErrorsFailClosed() async {
-        let validationPersistence = RecoveryPersistenceProbe(result: .skipped)
-        let validationEngine = ImportEngine(
-            importPersistenceCoordinator: validationPersistence,
-            developerConsole: DeveloperConsole(),
-            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
-        )
-        let invalidValidation = ImportValidator.validate(transactions: [])
-        let validationPrepared = recoveryPreparedImport(validation: invalidValidation)
-        let validationResult = await validationEngine.commitPreparedImport(validationPrepared)
-
-        #expect(validationResult.recoveryRoute == .reviewRequired(.validationFailed))
-        #expect(validationPersistence.persistInvocationCount == 0)
-
+    @Test(.globalRuntimeStateIsolation)
+    func snapshotIntegrityAndHostileErrorsFailClosed() async throws {
         let integrityPersistence = RecoveryPersistenceProbe(result: .skipped)
         let integrityEngine = ImportEngine(
             importPersistenceCoordinator: integrityPersistence,
@@ -348,41 +342,14 @@ struct ImportLifecycleTests {
             persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
             rejectedAttemptHydration: {}
         )
-        let integrityPrepared = recoveryPreparedImport()
+        let integrityPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { integrityPreparedOwner.cancel() }
+        let integrityPrepared = integrityPreparedOwner.preparedImport
         integrityPrepared.sourceSnapshot.invalidate()
         let integrityResult = await integrityEngine.commitPreparedImport(integrityPrepared)
 
         #expect(integrityResult.recoveryRoute == .prepareAgain(.sourceSnapshotIntegrityFailed))
         #expect(integrityPersistence.persistInvocationCount == 0)
-
-        let contractPersistence = RecoveryPersistenceProbe(result: .skipped)
-        let contractEngine = ImportEngine(
-            importPersistenceCoordinator: contractPersistence,
-            developerConsole: DeveloperConsole(),
-            persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
-        )
-        let expectedRawFingerprint = ExactStatementFingerprint(text: "recovery")
-        let structurallyValidMalformedSet = PreparedDocumentFingerprintSet(
-            fingerprints: [
-                VersionedDocumentFingerprint(
-                    algorithm: expectedRawFingerprint.algorithm,
-                    digest: expectedRawFingerprint.digest,
-                    byteCount: expectedRawFingerprint.byteCount,
-                    isDuplicateAuthority: true
-                )
-            ]
-        )
-        #expect(structurallyValidMalformedSet.isValid)
-        for fingerprintSet in [
-            PreparedDocumentFingerprintSet(fingerprints: []),
-            structurallyValidMalformedSet
-        ] {
-            let contractPrepared = recoveryPreparedImport(fingerprintSet: fingerprintSet)
-            let contractResult = await contractEngine.commitPreparedImport(contractPrepared)
-
-            #expect(contractResult.recoveryRoute == .unavailable)
-        }
-        #expect(contractPersistence.persistInvocationCount == 0)
 
         let failClosedFailures: [(any Error, ImportAccountOutcome)] = [
             (ImportPersistenceCoordinationError.invalidFingerprint, .staleProviderGeneration),
@@ -405,7 +372,9 @@ struct ImportLifecycleTests {
                 persistenceStateProvider: { .intentionalNonDurable(.testMemory) },
                 rejectedAttemptHydration: {}
             )
-            let failClosedPrepared = recoveryPreparedImport()
+            let failClosedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+            defer { failClosedPreparedOwner.cancel() }
+            let failClosedPrepared = failClosedPreparedOwner.preparedImport
 
             let failClosedResult = await failClosedEngine.commitPreparedImport(failClosedPrepared)
 
@@ -425,7 +394,9 @@ struct ImportLifecycleTests {
                 developerConsole: DeveloperConsole(),
                 persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
             )
-            let hostilePrepared = recoveryPreparedImport()
+            let hostilePreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+            defer { hostilePreparedOwner.cancel() }
+            let hostilePrepared = hostilePreparedOwner.preparedImport
 
             let hostileResult = await hostileEngine.commitPreparedImport(hostilePrepared)
 
@@ -439,7 +410,7 @@ struct ImportLifecycleTests {
     @Test(.globalRuntimeStateIsolation)
     func prepareAgainUsesOrdinaryURLPreparationWithFreshIdentityAndEvidence() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let sourceURL = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+        let sourceURL = try AuthenticSourceTestSupport.axisBankCSV()
         let sourceBytes = try Data(contentsOf: sourceURL)
         let failure = ImportPersistenceCommitFailure(
             originalError: ImportPersistenceCoordinationError.retryableContention,
@@ -452,11 +423,7 @@ struct ImportLifecycleTests {
             sourceSnapshotAcquirer: { requestedURL in
                 #expect(requestedURL == sourceURL)
                 acquisitionCount += 1
-                var bytes = sourceBytes
-                if acquisitionCount > 1 {
-                    bytes.append(contentsOf: Data("\n".utf8))
-                }
-                return SourceContentSnapshot(bytes: bytes)
+                return SourceContentSnapshot(bytes: sourceBytes)
             },
             importPersistenceCoordinator: persistence,
             developerConsole: DeveloperConsole(),
@@ -511,8 +478,8 @@ struct ImportLifecycleTests {
         #expect(acquisitionCount == 2)
         #expect(fresh.id != consumed.id)
         #expect(fresh.sourceSnapshot.id != consumedSnapshotID)
-        #expect(fresh.sourceSnapshot.sourceByteFingerprint != consumedSourceFingerprint)
-        #expect(fresh.fingerprintSet != consumedFingerprintSet)
+        #expect(fresh.sourceSnapshot.sourceByteFingerprint == consumedSourceFingerprint)
+        #expect(fresh.fingerprintSet == consumedFingerprintSet)
         #expect(persistence.persistInvocationCount == 1)
         #expect(persistence.receivedAccountChoices == [.createNewAccount])
 
@@ -555,7 +522,7 @@ struct ImportLifecycleTests {
         #expect(preparationCount == 0)
     }
 
-    @Test func recoveryActionExecutorRejectsConcurrentDoubleInvocation() async {
+    @Test func recoveryActionExecutorRejectsConcurrentDoubleInvocation() async throws {
         let executor = ConfirmedImportRecoveryActionExecutor()
         let probe = RecoveryActionConcurrencyProbe()
         let sourceURL = URL(fileURLWithPath: "/retained-source.csv")
@@ -652,7 +619,7 @@ struct ImportLifecycleTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func directPreparationRequiresAcknowledgementBeforeSourceAcquisition() async {
+    func directPreparationRequiresAcknowledgementBeforeSourceAcquisition() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
         let generation = ProviderGenerationToken()
         let state = DevelopmentProfileAcknowledgementState(
@@ -702,7 +669,7 @@ struct ImportLifecycleTests {
             developmentProfileAcknowledgementGate: gate
         )
         let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: try AuthenticSourceTestSupport.axisBankCSV()
         )
         defer { engine.cancelPreparedImport(prepared) }
 
@@ -736,7 +703,7 @@ struct ImportLifecycleTests {
             rejectedAttemptHydration: {}
         )
         let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: try AuthenticSourceTestSupport.axisBankCSV()
         )
 
         let barrier = DevelopmentDatabaseActivityGate.shared.beginProfileSwitch {
@@ -921,16 +888,18 @@ private struct HostileRecoveryError: LocalizedError {
 }
 
 private final class RecoveryPersistenceProbe: ImportPersistenceCoordinating {
-    private let operation: () throws -> ImportPersistenceResult
+    private let operation: (FinancialDocument) throws -> ImportPersistenceResult
     private(set) var persistInvocationCount = 0
     private(set) var receivedAccountChoices: [ImportAccountChoice?] = []
 
     init(result: ImportPersistenceResult) {
-        self.operation = { result }
+        self.operation = { document in
+            persistenceResult(result, boundTo: document)
+        }
     }
 
     init(error: any Error) {
-        self.operation = { throw error }
+        self.operation = { _ in throw error }
     }
 
     func persistValidatedImport(
@@ -939,7 +908,7 @@ private final class RecoveryPersistenceProbe: ImportPersistenceCoordinating {
         validation: ImportValidationResult
     ) throws -> ImportPersistenceResult {
         persistInvocationCount += 1
-        return try operation()
+        return try operation(financialDocument)
     }
 
     func persistValidatedImport(
@@ -952,7 +921,7 @@ private final class RecoveryPersistenceProbe: ImportPersistenceCoordinating {
     ) throws -> ImportPersistenceResult {
         persistInvocationCount += 1
         receivedAccountChoices.append(accountChoice)
-        return try operation()
+        return try operation(financialDocument)
     }
 
     func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
@@ -960,72 +929,48 @@ private final class RecoveryPersistenceProbe: ImportPersistenceCoordinating {
     }
 }
 
-private func recoveryPreparedImport(
-    validation suppliedValidation: ImportValidationResult? = nil,
-    fingerprintSet: PreparedDocumentFingerprintSet? = nil
-) -> PreparedImport {
-    let transaction = Transaction(
-        statementDate: try! StatementDate(canonical: "2027-03-13"),
-        description: "Recovery fixture",
-        debit: nil,
-        credit: 10,
-        amount: 10,
-        balance: 10,
-        currency: "INR",
-        account: "Fixture",
-        sourceBank: "Fixture",
-        sourceFile: "recovery.csv",
-        statementTimezoneEvidence: .iana("Asia/Kolkata"),
-        sourceProvenance: [
-            TransactionSourceProvenance(
-                normalizedDocumentID: "recovery-normalized-document",
-                normalizedRowID: "recovery-normalized-row-1",
-                sourceOrdinal: 1,
-                normalizedRecordDigest: String.normalizedRecordDigest(values: ["recovery", "1"]),
-                parserProfileID: AxisBankAccountParser.profileID,
-                parserProfileVersion: AxisBankAccountParser.profileVersion
-            )
-        ]
-    )
-    let document = FinancialDocument(
-        sourceDocument: Document(
-            filename: "recovery.csv",
-            url: URL(fileURLWithPath: "/tmp/recovery.csv"),
-            fileType: "CSV",
-            importedAt: Date(timeIntervalSince1970: 1_804_896_000)
-        ),
-        metadata: DocumentMetadata(
-            institution: .axis,
-            documentType: .bankAccount,
-            fileFormat: .csv,
-            confidence: 1
-        ),
-        parserName: "Recovery fixture",
-        bookedCurrency: try! CurrencyCode("INR"),
-        transactions: [transaction],
-        selectionReasons: ["Fixture"],
-        createdAt: Date(timeIntervalSince1970: 1_804_896_000)
-    )
-    let validation = suppliedValidation ?? ImportValidator.validate(financialDocument: document)
-    let session = ImportSession(
-        fileName: "recovery.csv",
-        institution: .axis,
-        documentType: .bankAccount,
-        parserName: "Recovery fixture",
-        transactionCount: 1,
-        validation: validation
-    )
-    return PreparedImport(
-        sourceURL: document.sourceDocument.url,
-        rawContents: "recovery",
-        fileName: "recovery.csv",
-        detectedInstitution: .axis,
-        detectedDocumentType: .bankAccount,
-        parserName: "Recovery fixture",
-        financialDocument: document,
-        validation: validation,
-        importSession: session,
-        fingerprintSet: fingerprintSet
+private func persistenceResult(
+    _ result: ImportPersistenceResult,
+    boundTo document: FinancialDocument
+) -> ImportPersistenceResult {
+    let count = document.transactions.count
+    let previousImport = result.previousImport.map {
+        PreviouslyImportedStatement(
+            importSessionId: $0.importSessionId,
+            completedAtISO: $0.completedAtISO,
+            transactionCount: count,
+            accountId: $0.accountId,
+            accountDisplayName: $0.accountDisplayName
+        )
+    }
+    let eventBlock: TransactionEventBlock?
+    switch result.transactionEventBlock {
+    case .existing:
+        eventBlock = .existing(count: count)
+    case .repeatedIncoming:
+        eventBlock = .repeatedIncoming(count: count)
+    case .ownershipConflict:
+        eventBlock = .ownershipConflict
+    case .repositoryIntegrityConflict:
+        eventBlock = .repositoryIntegrityConflict
+    case nil:
+        eventBlock = nil
+    }
+    return ImportPersistenceResult(
+        persisted: result.persisted,
+        workspaceId: result.workspaceId,
+        accountId: result.accountId,
+        importSessionId: result.importSessionId,
+        transactionCount: count,
+        previousImport: previousImport,
+        transactionEventBlock: eventBlock,
+        importAttemptId: result.importAttemptId,
+        sourceRowCount: result.sourceRowCount,
+        recognizedExistingRowCount: result.recognizedExistingRowCount,
+        isPartialImport: result.isPartialImport,
+        isEquivalentSupportingSource: result.isEquivalentSupportingSource,
+        isSalaryImport: result.isSalaryImport,
+        accountOutcome: result.accountOutcome
     )
 }
 

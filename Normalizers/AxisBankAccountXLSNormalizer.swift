@@ -70,7 +70,8 @@ final class AxisBankAccountXLSNormalizer {
 
         let logicalHeader = NormalizedRow(
             rowNumber: headerRow.sourceRow,
-            values: Self.logicalHeader
+            values: Self.logicalHeader,
+            rawValues: headerRow.cells.dropFirst().map { $0.value.canonicalText }
         )
         let preTransactionFragments = sheet.rows
             .filter { $0.sourceRow < headerRow.sourceRow }
@@ -115,16 +116,17 @@ final class AxisBankAccountXLSNormalizer {
                     sourceOrdinal: row.sourceRow
                 )
             }
+            let rawValues = row.cells.dropFirst().map { $0.value.canonicalText }
+            let values = rawValues.map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
             normalizedRows.append(
                 NormalizedRow(
                     rowNumber: row.sourceRow,
-                    values: row.cells.dropFirst().map { Self.trimmed($0.value) }
+                    values: values,
+                    rawValues: rawValues
                 )
             )
-        }
-
-        guard !normalizedRows.isEmpty else {
-            throw AxisBankAccountXLSNormalizationError.noTransactions
         }
 
         var document = Document(
@@ -139,12 +141,23 @@ final class AxisBankAccountXLSNormalizer {
         document.columnCount = sheet.columnCount
         document.encoding = "UTF-8"
 
+        let regionRows = sheet.rows.filter { $0.sourceRow >= headerRow.sourceRow }
+        let financialRegion = try NormalizedDocument.ExhaustedFinancialRegionEvidence(
+            descriptor: "Axis XLS worksheet from transaction header through final source row",
+            sourceUnit: .row,
+            startOrdinal: headerRow.sourceRow,
+            endOrdinal: max(headerRow.sourceRow, regionRows.map(\.sourceRow).max() ?? headerRow.sourceRow),
+            recognizedFinancialRowCount: normalizedRows.count,
+            sourceRecords: regionRows.map(Self.sourceRecord)
+        )
+
         return AxisBankAccountXLSNormalizationResult(
             document: document,
             rows: normalizedRows,
             header: logicalHeader,
             sourceContext: NormalizedDocument.SourceContext(
-                preTransactionFragments: preTransactionFragments
+                preTransactionFragments: preTransactionFragments,
+                exhaustedFinancialRegion: financialRegion
             )
         )
     }
@@ -175,5 +188,12 @@ final class AxisBankAccountXLSNormalizer {
 
     private static func trimmed(_ value: RawTabularCellValue) -> String {
         value.canonicalText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    nonisolated private static func sourceRecord(_ row: RawTabularRow) -> String {
+        let cells = row.cells.map {
+            "\($0.sourceRow):\($0.sourceColumn):\($0.value.canonicalText)"
+        }
+        return cells.map { "\($0.utf8.count):\($0)" }.joined()
     }
 }

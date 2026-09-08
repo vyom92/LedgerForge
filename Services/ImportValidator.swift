@@ -35,7 +35,9 @@ final class ImportValidator {
         return validate(
             transactions: financialDocument.transactions,
             statementCurrency: financialDocument.bookedCurrency,
-            reconcileSourceOrderBalances: !usesRowAssociatedBalancesWithoutSourceOrderRecurrence
+            reconcileSourceOrderBalances: !usesRowAssociatedBalancesWithoutSourceOrderRecurrence,
+            zeroActivityEvidence: financialDocument.zeroActivityEvidence,
+            financialDocument: financialDocument
         )
     }
 
@@ -95,7 +97,14 @@ final class ImportValidator {
         let transactions = financialDocument.transactions
         var issues: [ValidationIssue] = []
         let currency = evidence.nativeCurrency
-        guard let contract = CardStatementProfileContract(reconciliationRuleIdentifier: evidence.reconciliationRuleIdentifier) else {
+        // Empty cards still traverse this entire profile validator.  Typed
+        // zero evidence is an additional admission predicate; it never
+        // replaces summary, section, source-order, or reconciliation checks.
+        let zeroValidation = transactions.isEmpty
+            ? ZeroActivityStatementValidator.validate(financialDocument: financialDocument)
+            : nil
+        guard let contract = CardStatementProfileContract(reconciliationRuleIdentifier: evidence.reconciliationRuleIdentifier),
+              contract.acceptsCurrentReconciliationRule(evidence.reconciliationRuleIdentifier) else {
             return ImportValidationResult(
                 rowsRead: transactions.count,
                 transactionsParsed: transactions.count,
@@ -120,7 +129,19 @@ final class ImportValidator {
 
         let temporalEvidenceValid: Bool
         if contract == .axis {
-            temporalEvidenceValid = true
+            switch financialDocument.metadata.fileFormat {
+            case .pdf:
+                temporalEvidenceValid =
+                    (evidence.declaredStatementPeriod != nil && evidence.selectedStatementMonth == nil) ||
+                    (evidence.statementDate == nil && evidence.declaredStatementPeriod == nil &&
+                        evidence.selectedStatementMonth != nil)
+            case .xlsx:
+                temporalEvidenceValid = evidence.statementDate == nil &&
+                    evidence.declaredStatementPeriod == nil &&
+                    evidence.selectedStatementMonth != nil
+            default:
+                temporalEvidenceValid = false
+            }
         } else {
             temporalEvidenceValid = evidence.statementDate != nil && evidence.declaredStatementPeriod != nil &&
                 evidence.statementDate == evidence.declaredStatementPeriod?.end && evidence.selectedStatementMonth == nil
@@ -134,9 +155,13 @@ final class ImportValidator {
             !temporalEvidenceValid {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card statement metadata conflicts with parser evidence."))
         }
-        if transactions.isEmpty || annotationsByID.count != transactions.count ||
+        if (transactions.isEmpty && zeroValidation?.passed != true) ||
+            annotationsByID.count != transactions.count ||
             Set(transactions.map(\.id)) != Set(annotationsByID.keys) {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Every card financial row requires exactly one transaction annotation."))
+        }
+        if let zeroValidation, !zeroValidation.passed {
+            issues.append(contentsOf: zeroValidation.issues)
         }
         if contract == .axis && !axisSourceOrderIsValid {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Axis source physical order is incomplete or contradictory."))
@@ -250,10 +275,12 @@ final class ImportValidator {
         } else if let accountKind = contract.accountObservationKindCode,
                   let instrumentKind = contract.instrumentObservationKindCode,
                   let sectionRule = contract.sectionRule {
+            let permitsAccountOnlyZero = contract == .amex &&
+                transactions.isEmpty && zeroValidation?.passed == true
             structuralIdentityIsInvalid = evidence.accountSourceIdentityObservations.count != 1 ||
                 evidence.accountSourceIdentityObservations.first?.kind.rawValue != accountKind ||
                 evidence.accountSourceIdentityObservations.first?.subject != .liabilityAccount ||
-                evidence.instrumentSections.isEmpty ||
+                (evidence.instrumentSections.isEmpty && !permitsAccountOnlyZero) ||
                 evidence.instrumentSections.contains(where: { section in
                     section.reconciliationRuleIdentifier != sectionRule ||
                         section.sourceIdentityObservations.count != 1 ||
@@ -286,9 +313,20 @@ final class ImportValidator {
         )
         if contract != .axis {
             for section in evidence.instrumentSections {
-                guard let values = sectionValues[section.documentScopedSectionID], !values.isEmpty,
-                      let calculated = try? moneySum(values, currency: currency),
-                      calculated == section.signedNetTotal else {
+                let sectionValues = sectionValues[section.documentScopedSectionID] ?? []
+                let sectionReconciles: Bool
+                if sectionValues.isEmpty {
+                    // An empty card may still contain source-proven structural
+                    // sections.  Empty section activity is valid only when
+                    // the section's printed signed total is exactly zero and
+                    // the independent zero-control admission succeeded.  The
+                    // summary, identity and profile checks above still run.
+                    sectionReconciles = zeroValidation?.passed == true &&
+                        (try? section.signedNetTotal.minorUnits()) == 0
+                } else {
+                    sectionReconciles = (try? moneySum(sectionValues, currency: currency)) == section.signedNetTotal
+                }
+                guard sectionReconciles else {
                     issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card instrument section does not equal its printed signed total."))
                     continue
                 }
@@ -375,7 +413,11 @@ final class ImportValidator {
                 total(.cbqV2BilledInstallment) != installment || total(.cbqV2FeesCharges) != fees ||
                 allRowsTotal != sectionNet
         case .axis:
-            mismatch = false
+            // Axis source formats expose only previous balance and total
+            // payment due. For a source-proven empty ledger, those two actual
+            // controls must reconcile without inventing intermediate totals.
+            mismatch = evidence.transactionAnnotations.isEmpty &&
+                (previous == nil || newBalance == nil || previous != newBalance)
         }
         if mismatch {
             issues.append(ValidationIssue(severity: .error, rowNumber: nil, message: "Card statement summary does not reconcile under its exact profile contract."))
@@ -394,12 +436,17 @@ final class ImportValidator {
     private static func validate(
         transactions: [Transaction],
         statementCurrency: CurrencyCode?,
-        reconcileSourceOrderBalances: Bool
+        reconcileSourceOrderBalances: Bool,
+        zeroActivityEvidence: ZeroActivityStatementEvidence? = nil,
+        financialDocument: FinancialDocument? = nil
     ) -> ImportValidationResult {
 
         var issues: [ValidationIssue] = []
 
-        if transactions.isEmpty {
+        let zeroValidation: ImportValidationResult? = transactions.isEmpty
+            ? financialDocument.map { ZeroActivityStatementValidator.validate(financialDocument: $0) }
+            : nil
+        if transactions.isEmpty && zeroValidation?.passed != true {
             issues.append(
                 ValidationIssue(
                     severity: .error,
@@ -407,6 +454,9 @@ final class ImportValidator {
                     message: "No transactions were imported."
                 )
             )
+        }
+        if let zeroValidation, !zeroValidation.passed {
+            issues.append(contentsOf: zeroValidation.issues)
         }
 
         if !transactions.isEmpty, statementCurrency == nil {
@@ -462,11 +512,17 @@ final class ImportValidator {
             }
         }
 
-        let debitTotalMoney = try? moneySum(transactions.compactMap(\.debitMoney), currency: statementCurrency)
-        let creditTotalMoney = try? moneySum(transactions.compactMap(\.creditMoney), currency: statementCurrency)
+        let debitTotalMoney = transactions.isEmpty
+            ? zeroActivityEvidence?.debitTotal
+            : (try? moneySum(transactions.compactMap(\.debitMoney), currency: statementCurrency))
+        let creditTotalMoney = transactions.isEmpty
+            ? zeroActivityEvidence?.creditTotal
+            : (try? moneySum(transactions.compactMap(\.creditMoney), currency: statementCurrency))
 
         let firstTransaction = transactions.first
-        let openingBalanceMoney: Money? = reconcileSourceOrderBalances ? {
+        let openingBalanceMoney: Money? = transactions.isEmpty
+            ? zeroActivityEvidence?.openingBalance
+            : (reconcileSourceOrderBalances ? {
             guard let first = firstTransaction,
                   let firstBalance = first.runningBalanceMoney else {
                 return nil
@@ -475,11 +531,11 @@ final class ImportValidator {
             if let debit = first.debitMoney { opening = (try? opening + debit) ?? opening }
             if let credit = first.creditMoney { opening = (try? opening - credit) ?? opening }
             return opening
-        }() : nil
+        }() : nil)
 
-        let closingBalanceMoney = reconcileSourceOrderBalances
-            ? transactions.last?.runningBalanceMoney
-            : nil
+        let closingBalanceMoney: Money? = transactions.isEmpty
+            ? zeroActivityEvidence?.closingBalance
+            : (reconcileSourceOrderBalances ? transactions.last?.runningBalanceMoney : nil)
 
         if reconcileSourceOrderBalances, transactions.count > 1 {
             for index in 1..<transactions.count {

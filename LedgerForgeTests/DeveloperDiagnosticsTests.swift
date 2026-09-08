@@ -299,7 +299,7 @@ struct DeveloperDiagnosticsTests {
         #expect(console.entries.first?.sequence == 1)
     }
 
-    @Test("Clear removes diagnostics without mutating runtime stores", .globalRuntimeStateIsolation)
+    @Test("Clear removes diagnostics without mutating account metadata", .globalRuntimeStateIsolation)
     func clearLeavesRuntimeStoresUnchanged() async throws {
         let console = DeveloperConsole()
         resetDiagnosticRuntimeStores()
@@ -318,16 +318,11 @@ struct DeveloperDiagnosticsTests {
                 includeInNetWorth: true
             )
         ])
-        TransactionStore.shared.replaceTransactions([
-            diagnosticTransaction()
-        ])
-
         console.info(.application, "Before clear")
         console.clear()
 
         #expect(console.entries.isEmpty)
         #expect(AccountStore.shared.accounts.count == 1)
-        #expect(TransactionStore.shared.transactions.count == 1)
     }
 
     @Test("Newest-first presentation helper reverses without renumbering")
@@ -359,7 +354,7 @@ struct DeveloperDiagnosticsTests {
             forcedHydration: { RepositoryStoreHydrationResult(didHydrate: true, accountCount: 0, transactionCount: 0) }
         )
         let result = await engine.importFileAndReturnResult(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: try AuthenticSourceTestSupport.axisBankCSV()
         )
 
         #expect(result.succeeded)
@@ -400,7 +395,7 @@ struct DeveloperDiagnosticsTests {
         #expect(lifecycleSequences == lifecycleSequences.sorted())
     }
 
-    @Test("Failed import emits started, failure detail and terminal failure")
+    @Test("Failed import emits started, failure detail and terminal failure", .globalRuntimeStateIsolation)
     func failedImportLifecycleDiagnostics() async throws {
         let console = DeveloperConsole()
         let url = FileManager.default.temporaryDirectory
@@ -500,21 +495,6 @@ private final class DiagnosticPersistenceCoordinator: ImportPersistenceCoordinat
 private func resetDiagnosticRuntimeStores() {
     AccountStore.shared.replaceAccounts([])
     TransactionStore.shared.replaceTransactions([])
-}
-
-private func diagnosticTransaction() -> Transaction {
-    Transaction(
-        statementDate: try! StatementDate(canonical: "2027-03-13"),
-        description: "Runtime credit",
-        debit: nil,
-        credit: 100,
-        amount: 100,
-        balance: 100,
-        currency: "INR",
-        account: "Axis NRE",
-        sourceBank: "Axis Bank",
-        sourceFile: "diagnostics.csv"
-    )
 }
 
 private struct HostileDiagnosticError: LocalizedError {

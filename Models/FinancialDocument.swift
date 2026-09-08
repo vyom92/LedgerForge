@@ -83,21 +83,6 @@ struct SourceStatementEvidence: Equatable, Sendable {
     let closingBalance: Money?
 }
 
-struct DeclaredStatementPeriod: Equatable, Sendable {
-    let start: StatementDate
-    let end: StatementDate
-
-    enum Error: Swift.Error, Equatable {
-        case reversed
-    }
-
-    init(start: StatementDate, end: StatementDate) throws {
-        guard start <= end else { throw Error.reversed }
-        self.start = start
-        self.end = end
-    }
-}
-
 enum CardSourceIdentityObservationKind: String, CaseIterable, Equatable, Sendable, Codable {
     case liabilityMembershipNumber = "amex_membership_number"
     case instrumentCardAccountNumber = "amex_card_account_number"
@@ -226,6 +211,7 @@ enum CardStatementSummaryComponent: Equatable, Sendable {
     case billedInstallment(Money)
     case feesCharges(Money)
     case newBalance(Money)
+    case minimumAmountDue(Money)
     case dueDate(StatementDate)
     case instrumentNetTotal(Money)
     case sourceSectionNetTotal(Money)
@@ -244,6 +230,7 @@ enum CardStatementSummaryComponent: Equatable, Sendable {
         case .billedInstallment: return "billed_installment"
         case .feesCharges: return "fees_charges"
         case .newBalance: return "new_balance"
+        case .minimumAmountDue: return "minimum_amount_due"
         case .dueDate: return "due_date"
         case .instrumentNetTotal: return "instrument_net_total"
         case .sourceSectionNetTotal: return "source_section_net_total"
@@ -256,7 +243,7 @@ enum CardStatementSummaryComponent: Equatable, Sendable {
         case .previousBalance(let value), .newCredits(let value), .newDebits(let value),
                 .amountBilled(let value), .paymentReceived(let value), .totalPayment(let value),
                 .creditReversal(let value), .purchases(let value), .billedInstallment(let value),
-                .feesCharges(let value), .newBalance(let value), .instrumentNetTotal(let value),
+                .feesCharges(let value), .newBalance(let value), .minimumAmountDue(let value), .instrumentNetTotal(let value),
                 .sourceSectionNetTotal(let value), .axisTotalPaymentDue(let value): return value
         case .dueDate: return nil
         }
@@ -288,8 +275,10 @@ enum CardStatementEvidenceError: Error, Equatable, LocalizedError {
 
 struct CardStatementEvidence: Equatable, Sendable {
     static let amexQARReconciliationRule = "amex.qar.previous-minus-credits-plus-debits.v1"
-    static let cbqV1QARReconciliationRule = "cbq.qar.v1.previous-plus-billed-minus-payment.v1"
-    static let cbqV2QARReconciliationRule = "cbq.qar.v2.previous-minus-payment-minus-credit-plus-components.v1"
+    // Revision 2 requires the source's minimum due in addition to the
+    // unchanged financial equation. Historical revision 1 is hydration-only.
+    static let cbqV1QARReconciliationRule = "cbq.qar.v1.previous-plus-billed-minus-payment.v2"
+    static let cbqV2QARReconciliationRule = "cbq.qar.v2.previous-minus-payment-minus-credit-plus-components.v2"
     static let axisINRRowLedgerReconciliationRule = "axis.inr.previous-plus-row-ledger-equals-total-due.v1"
     static let axisINRAppRowLedgerReconciliationRule = "axis.inr.app.previous-plus-row-ledger-equals-total-due.v1"
 
@@ -370,6 +359,11 @@ struct FinancialDocument: Identifiable {
     let sourceDocument: Document
     let metadata: DocumentMetadata
     let parserName: String
+    /// Exact parser profile identity.  A user-facing parser name is not a
+    /// durable source binding; zero-activity evidence is admitted only when
+    /// these parser-owned values match its registered profile.
+    let parserProfileID: String?
+    let parserProfileVersion: String?
     /// Parser-owned booked currency; never inferred from only one transaction.
     let bookedCurrency: CurrencyCode?
     /// Exact parser-owned source period. It is never reconstructed from the
@@ -380,6 +374,9 @@ struct FinancialDocument: Identifiable {
     let cbqSourceIdentityObservations: [CBQSourceIdentityObservation]
     let sourceStatementEvidence: SourceStatementEvidence?
     let cardStatementEvidence: CardStatementEvidence?
+    /// Parser-owned evidence for a source-proven zero-transaction statement.
+    /// This is nil for ordinary statements and never inferred by persistence.
+    let zeroActivityEvidence: ZeroActivityStatementEvidence?
     /// Exact typed salary payload. Salary documents deliberately contain no
     /// fabricated bank transactions or Account identity.
     let salaryStatementEvidence: SalaryStatementEvidence?
@@ -391,6 +388,8 @@ struct FinancialDocument: Identifiable {
         sourceDocument: Document,
         metadata: DocumentMetadata,
         parserName: String,
+        parserProfileID: String? = nil,
+        parserProfileVersion: String? = nil,
         bookedCurrency: CurrencyCode? = nil,
         declaredStatementPeriod: DeclaredStatementPeriod? = nil,
         transactions: [Transaction],
@@ -398,6 +397,7 @@ struct FinancialDocument: Identifiable {
         cbqSourceIdentityObservations: [CBQSourceIdentityObservation] = [],
         sourceStatementEvidence: SourceStatementEvidence? = nil,
         cardStatementEvidence: CardStatementEvidence? = nil,
+        zeroActivityEvidence: ZeroActivityStatementEvidence? = nil,
         salaryStatementEvidence: SalaryStatementEvidence? = nil,
         selectionReasons: [String] = [],
         createdAt: Date = Date()
@@ -406,6 +406,8 @@ struct FinancialDocument: Identifiable {
         self.sourceDocument = sourceDocument
         self.metadata = metadata
         self.parserName = parserName
+        self.parserProfileID = parserProfileID
+        self.parserProfileVersion = parserProfileVersion
         self.bookedCurrency = bookedCurrency
         self.declaredStatementPeriod = declaredStatementPeriod
         self.transactions = transactions
@@ -413,6 +415,7 @@ struct FinancialDocument: Identifiable {
         self.cbqSourceIdentityObservations = cbqSourceIdentityObservations
         self.sourceStatementEvidence = sourceStatementEvidence
         self.cardStatementEvidence = cardStatementEvidence
+        self.zeroActivityEvidence = zeroActivityEvidence
         self.salaryStatementEvidence = salaryStatementEvidence
         self.selectionReasons = selectionReasons
         self.createdAt = createdAt
@@ -427,6 +430,7 @@ enum StatementFinancialProjectionError: Error, Equatable, LocalizedError {
     case noEvents
     case missingStatementDate(ordinal: Int)
     case missingValueDate(ordinal: Int)
+    case unexpectedValueDate(ordinal: Int)
     case missingDirection(ordinal: Int)
     case ambiguousDirection(ordinal: Int)
     case missingRunningBalance(ordinal: Int)
@@ -447,6 +451,8 @@ enum StatementFinancialProjectionError: Error, Equatable, LocalizedError {
             return "An exact statement projection event is missing its statement date."
         case .missingValueDate:
             return "An exact statement projection event is missing its value date."
+        case .unexpectedValueDate:
+            return "An exact statement projection event contains a value date that the source profile does not provide."
         case .missingDirection:
             return "An exact statement projection event is missing its direction."
         case .ambiguousDirection:
@@ -466,8 +472,82 @@ enum StatementFinancialProjectionError: Error, Equatable, LocalizedError {
 /// container evidence by construction.
 struct StatementFinancialProjection: Equatable, Sendable {
     static let algorithm = "ledgerforge.statement-financial-projection.sha256.v1"
+    static let axisAlgorithm = "ledgerforge.axis-bank-statement-financial-projection.sha256.v1"
     static let hdfcInstitutionCode = "hdfc"
     static let hdfcBankAccountFamilyCode = "hdfc.bank-account"
+    static let axisInstitutionCode = "axis"
+    static let axisBankAccountFamilyCode = "axis.bank-account"
+
+    private enum Contract {
+        case hdfc
+        case axis
+
+        var algorithmIdentifier: String {
+            switch self {
+            case .hdfc: return StatementFinancialProjection.algorithm
+            case .axis: return StatementFinancialProjection.axisAlgorithm
+            }
+        }
+
+        var institutionCode: String {
+            switch self {
+            case .hdfc: return StatementFinancialProjection.hdfcInstitutionCode
+            case .axis: return StatementFinancialProjection.axisInstitutionCode
+            }
+        }
+
+        var statementFamilyCode: String {
+            switch self {
+            case .hdfc: return StatementFinancialProjection.hdfcBankAccountFamilyCode
+            case .axis: return StatementFinancialProjection.axisBankAccountFamilyCode
+            }
+        }
+
+        var requiresValueDate: Bool { self == .hdfc }
+
+        static func resolve(for document: FinancialDocument) -> Contract? {
+            guard document.metadata.documentType == .bankAccount else { return nil }
+            switch (
+                document.metadata.institution,
+                document.metadata.fileFormat,
+                document.parserProfileID,
+                document.parserProfileVersion
+            ) {
+            case (.hdfc, .pdf, "hdfc.bank-account.pdf", "1"),
+                 (.hdfc, .xls, "hdfc.bank-account.xls", "1"):
+                return .hdfc
+            case (.axis, .csv, "axis.bank-account.csv", "3"),
+                 (.axis, .pdf, "axis.bank-account.pdf", "1"),
+                 (.axis, .xls, "axis.bank-account.xls", "1"):
+                return .axis
+            default:
+                return nil
+            }
+        }
+
+        static func resolve(
+            algorithmIdentifier: String,
+            institutionCode: String,
+            statementFamilyCode: String
+        ) -> Contract? {
+            switch (algorithmIdentifier, institutionCode, statementFamilyCode) {
+            case (
+                StatementFinancialProjection.algorithm,
+                StatementFinancialProjection.hdfcInstitutionCode,
+                StatementFinancialProjection.hdfcBankAccountFamilyCode
+            ):
+                return .hdfc
+            case (
+                StatementFinancialProjection.axisAlgorithm,
+                StatementFinancialProjection.axisInstitutionCode,
+                StatementFinancialProjection.axisBankAccountFamilyCode
+            ):
+                return .axis
+            default:
+                return nil
+            }
+        }
+    }
 
     enum Direction: String, Equatable, Sendable {
         case debit
@@ -477,7 +557,7 @@ struct StatementFinancialProjection: Equatable, Sendable {
     struct Event: Equatable, Sendable {
         let ordinal: Int
         let statementDate: StatementDate
-        let valueDate: StatementDate
+        let valueDate: StatementDate?
         let direction: Direction
         let signedAmount: Money
         let runningBalance: Money
@@ -500,15 +580,16 @@ struct StatementFinancialProjection: Equatable, Sendable {
     let digest: String
 
     static func make(from document: FinancialDocument) throws -> StatementFinancialProjection {
-        guard document.metadata.institution == .hdfc,
-              document.metadata.documentType == .bankAccount,
-              [.pdf, .xls].contains(document.metadata.fileFormat) else {
+        guard let contract = Contract.resolve(for: document) else {
             throw StatementFinancialProjectionError.unsupportedDocument
         }
         guard let period = document.declaredStatementPeriod else {
             throw StatementFinancialProjectionError.missingStatementPeriod
         }
         guard let currency = document.bookedCurrency else {
+            throw StatementFinancialProjectionError.missingCurrency
+        }
+        guard contract != .axis || currency.code == "INR" else {
             throw StatementFinancialProjectionError.missingCurrency
         }
         guard !document.transactions.isEmpty else {
@@ -526,8 +607,12 @@ struct StatementFinancialProjection: Equatable, Sendable {
             guard let statementDate = transaction.statementDate else {
                 throw StatementFinancialProjectionError.missingStatementDate(ordinal: ordinal)
             }
-            guard let valueDate = transaction.valueDate else {
+            let valueDate = transaction.valueDate
+            if contract.requiresValueDate, valueDate == nil {
                 throw StatementFinancialProjectionError.missingValueDate(ordinal: ordinal)
+            }
+            if !contract.requiresValueDate, valueDate != nil {
+                throw StatementFinancialProjectionError.unexpectedValueDate(ordinal: ordinal)
             }
             guard let runningBalance = transaction.runningBalanceMoney else {
                 throw StatementFinancialProjectionError.missingRunningBalance(ordinal: ordinal)
@@ -593,8 +678,9 @@ struct StatementFinancialProjection: Equatable, Sendable {
         let debitTotal = try Money.fromMinorUnits(debitMinor, currency: currency.code)
         let creditTotal = try Money.fromMinorUnits(creditMinor, currency: currency.code)
         let digest = try makeDigest(
-            institutionCode: hdfcInstitutionCode,
-            statementFamilyCode: hdfcBankAccountFamilyCode,
+            contract: contract,
+            institutionCode: contract.institutionCode,
+            statementFamilyCode: contract.statementFamilyCode,
             statementPeriod: period,
             nativeCurrency: currency,
             eventCount: events.count,
@@ -607,9 +693,9 @@ struct StatementFinancialProjection: Equatable, Sendable {
             events: events
         )
         return StatementFinancialProjection(
-            algorithmIdentifier: algorithm,
-            institutionCode: hdfcInstitutionCode,
-            statementFamilyCode: hdfcBankAccountFamilyCode,
+            algorithmIdentifier: contract.algorithmIdentifier,
+            institutionCode: contract.institutionCode,
+            statementFamilyCode: contract.statementFamilyCode,
             statementPeriod: period,
             nativeCurrency: currency,
             eventCount: events.count,
@@ -625,10 +711,18 @@ struct StatementFinancialProjection: Equatable, Sendable {
     }
 
     func hasValidDigest() -> Bool {
-        guard algorithmIdentifier == Self.algorithm,
+        guard let contract = Contract.resolve(
+                  algorithmIdentifier: algorithmIdentifier,
+                  institutionCode: institutionCode,
+                  statementFamilyCode: statementFamilyCode
+              ),
               eventCount == events.count,
-              eventCount == debitCount + creditCount else { return false }
+              eventCount == debitCount + creditCount,
+              events.allSatisfy({ contract.requiresValueDate ? $0.valueDate != nil : $0.valueDate == nil }) else {
+            return false
+        }
         return (try? Self.makeDigest(
+            contract: contract,
             institutionCode: institutionCode,
             statementFamilyCode: statementFamilyCode,
             statementPeriod: statementPeriod,
@@ -645,6 +739,7 @@ struct StatementFinancialProjection: Equatable, Sendable {
     }
 
     private static func makeDigest(
+        contract: Contract,
         institutionCode: String,
         statementFamilyCode: String,
         statementPeriod: DeclaredStatementPeriod,
@@ -659,7 +754,7 @@ struct StatementFinancialProjection: Equatable, Sendable {
         events: [Event]
     ) throws -> String {
         var fields = [
-            algorithm,
+            contract.algorithmIdentifier,
             institutionCode,
             statementFamilyCode,
             statementPeriod.start.canonical,
@@ -674,10 +769,19 @@ struct StatementFinancialProjection: Equatable, Sendable {
             try closingBalance.canonicalDecimalString()
         ]
         for event in events {
+            fields.append(String(event.ordinal))
+            fields.append(event.statementDate.canonical)
+            if contract.requiresValueDate {
+                guard let valueDate = event.valueDate else {
+                    throw StatementFinancialProjectionError.missingValueDate(ordinal: event.ordinal)
+                }
+                // HDFC v1 deliberately retains its historical byte stream.
+                fields.append(valueDate.canonical)
+            } else {
+                fields.append(event.valueDate == nil ? "0" : "1")
+                fields.append(event.valueDate?.canonical ?? "")
+            }
             fields.append(contentsOf: [
-                String(event.ordinal),
-                event.statementDate.canonical,
-                event.valueDate.canonical,
                 event.direction.rawValue,
                 event.signedAmount.currency.code,
                 try event.signedAmount.canonicalDecimalString(),

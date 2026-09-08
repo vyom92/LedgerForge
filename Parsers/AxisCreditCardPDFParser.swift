@@ -64,7 +64,8 @@ enum AxisCreditCardParserSupport {
             .replacingOccurrences(of: "INR", with: "", options: .caseInsensitive)
             .replacingOccurrences(of: ",", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let value = Decimal(string: normalized, locale: Locale(identifier: "en_US_POSIX")) else {
+        guard normalized.range(of: #"^[+-]?[0-9]+(?:\.[0-9]+)?$"#, options: .regularExpression) != nil,
+              let value = Decimal(string: normalized, locale: Locale(identifier: "en_US_POSIX")) else {
             throw AxisCreditCardPDFParserError.malformedSourceEvidence
         }
         return try Money(amount: value, currency: currency ?? Self.currency)
@@ -108,15 +109,16 @@ enum AxisCreditCardParserSupport {
         annotations: [CardTransactionAnnotation]
     ) throws -> CardStatementEvidence {
         let fragments = try validatedFragments(document)
-        let period = (try? period(fragments)) ?? nil
-        let selectedMonth = (try? selectedStatementMonth(fragments)) ?? nil
-        let statementDate = fragments["STATEMENT_DATE"].flatMap { try? date($0) }
+        let period = try period(fragments)
+        let selectedMonth = try selectedStatementMonth(fragments)
+        let statementDate = try fragments["STATEMENT_DATE"].map { try date($0) }
         var summary: [CardStatementSummaryComponent] = []
-        if let opening = (try? optionalSummaryMoney(fragments, "OPENING_BALANCE")) ?? nil {
+        if let opening = try optionalSummaryMoney(fragments, "OPENING_BALANCE") {
             summary.append(.previousBalance(opening))
         }
-        if let value = (try? optionalSummaryMoney(fragments, "TOTAL_PAYMENT_DUE")) ?? nil { summary.append(.axisTotalPaymentDue(value)) }
-        if let rawDueDate = fragments["PAYMENT_DUE_DATE"], let dueDate = try? date(rawDueDate) {
+        if let value = try optionalSummaryMoney(fragments, "TOTAL_PAYMENT_DUE") { summary.append(.axisTotalPaymentDue(value)) }
+        if let rawDueDate = fragments["PAYMENT_DUE_DATE"] {
+            let dueDate = try date(rawDueDate)
             summary.append(.dueDate(dueDate))
         }
         return try CardStatementEvidence(
@@ -145,12 +147,18 @@ final class AxisCreditCardPDFParser: StatementParser {
 
     func parse(document: NormalizedDocument) throws -> FinancialDocument {
         guard canParse(document: document.document, metadata: document.metadata),
-              document.header?.values == AxisCreditCardPDFNormalizer.logicalHeader,
-              !document.rows.isEmpty else { throw AxisCreditCardPDFParserError.unsupportedDocument }
+              document.header?.values == AxisCreditCardPDFNormalizer.logicalHeader else {
+            throw AxisCreditCardPDFParserError.unsupportedDocument
+        }
         do {
             let fragments = try AxisCreditCardParserSupport.validatedFragments(document)
-            let period = (try? AxisCreditCardParserSupport.period(fragments)) ?? nil
+            let period = try AxisCreditCardParserSupport.period(fragments)
             let currency = AxisCreditCardParserSupport.currency
+            guard let region = document.sourceContext.exhaustedFinancialRegion,
+                  [.page, .taggedTableRow].contains(region.sourceUnit),
+                  region.matches(normalizedFinancialRowCount: document.rows.count) else {
+                throw AxisCreditCardPDFParserError.malformedSourceEvidence
+            }
             var transactions: [Transaction] = []
             var annotations: [CardTransactionAnnotation] = []
             for row in document.rows {
@@ -169,6 +177,9 @@ final class AxisCreditCardPDFParser: StatementParser {
                     guard !row.values[7].isEmpty, !row.values[8].isEmpty else { throw AxisCreditCardPDFParserError.malformedRow(sourceOrdinal: row.rowNumber) }
                     let originalCurrency = try CurrencyCode(row.values[8])
                     let originalMagnitude = try AxisCreditCardParserSupport.money(row.values[7], currency: originalCurrency)
+                    guard originalCurrency != currency, originalMagnitude.amount > .zero else {
+                        throw AxisCreditCardPDFParserError.malformedRow(sourceOrdinal: row.rowNumber)
+                    }
                     original = try Money(amount: effect == .increasesAmountOwed ? originalMagnitude.amount : -originalMagnitude.amount, currency: originalCurrency)
                 }
                 let tx = Transaction(statementDate: date, description: row.values[1], reference: row.values[6].isEmpty ? nil : row.values[6], debitMoney: nil, creditMoney: nil, money: signed, runningBalanceMoney: nil, cardLiabilityEffect: effect, account: "Axis Credit Card", sourceBank: Institution.axis.rawValue, sourceFile: document.document.filename, financialDateRole: .transactionDate, statementTimezoneEvidence: .iana("Asia/Kolkata"), sourceProvenance: [TransactionSourceProvenance(normalizedDocumentID: document.document.id.uuidString, normalizedRowID: row.id.uuidString, sourceOrdinal: row.rowNumber, normalizedRecordDigest: String.normalizedRecordDigest(values: row.values), parserProfileID: Self.profileID, parserProfileVersion: Self.profileVersion, sourceTransactionDate: date, structuredReferenceDigest: Self.referenceDigest(row.values[6]) )])
@@ -179,7 +190,33 @@ final class AxisCreditCardPDFParser: StatementParser {
                 document: document,
                 annotations: annotations
             )
-            return FinancialDocument(sourceDocument: document.document, metadata: document.metadata, parserName: name, bookedCurrency: currency, declaredStatementPeriod: period, transactions: transactions, financialIdentifiers: [], sourceStatementEvidence: nil, cardStatementEvidence: evidence)
+            let temporalEvidenceIsExact =
+                (region.sourceUnit == .taggedTableRow && evidence.statementDate == nil && period == nil && evidence.selectedStatementMonth != nil) ||
+                (region.sourceUnit == .page && period != nil && evidence.selectedStatementMonth == nil)
+            guard temporalEvidenceIsExact else {
+                throw AxisCreditCardPDFParserError.malformedSourceEvidence
+            }
+            let zeroActivityEvidence = try transactions.isEmpty
+                ? Self.zeroActivityEvidence(
+                    cardEvidence: evidence,
+                    region: region,
+                    currency: currency
+                )
+                : nil
+            return FinancialDocument(
+                sourceDocument: document.document,
+                metadata: document.metadata,
+                parserName: name,
+                parserProfileID: Self.profileID,
+                parserProfileVersion: Self.profileVersion,
+                bookedCurrency: currency,
+                declaredStatementPeriod: period,
+                transactions: transactions,
+                financialIdentifiers: [],
+                sourceStatementEvidence: nil,
+                cardStatementEvidence: evidence,
+                zeroActivityEvidence: zeroActivityEvidence
+            )
         } catch let error as AxisCreditCardPDFParserError { throw error }
         catch MoneyError.unsupportedCurrency(let currency) { throw AxisCreditCardPDFParserError.unsupportedCurrency(currency) }
         catch MoneyError.excessPrecision(let currency) { throw AxisCreditCardPDFParserError.excessCurrencyPrecision(currency) }
@@ -189,5 +226,40 @@ final class AxisCreditCardPDFParser: StatementParser {
     private static func referenceDigest(_ value: String) -> String? {
         guard !value.isEmpty else { return nil }
         return SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func zeroActivityEvidence(
+        cardEvidence: CardStatementEvidence,
+        region: NormalizedDocument.ExhaustedFinancialRegionEvidence,
+        currency: CurrencyCode
+    ) throws -> ZeroActivityStatementEvidence {
+        let previous = cardEvidence.summary(code: "previous_balance")?.money
+        let totalDue = cardEvidence.summary(code: "axis_total_payment_due")?.money
+        let dueDate = cardEvidence.summary(code: "due_date")?.date
+        guard Set(cardEvidence.summaryComponents.map(\.persistenceCode)) ==
+                Set(["previous_balance", "axis_total_payment_due", "due_date"]),
+              let previous, previous.currency == currency,
+              let totalDue, totalDue.currency == currency,
+              previous == totalDue, dueDate != nil else {
+            throw AxisCreditCardPDFParserError.malformedSourceEvidence
+        }
+        return try ZeroActivityStatementEvidence(
+            profileID: Self.profileID,
+            profileVersion: Self.profileVersion,
+            sourceFormatCode: "pdf",
+            evidenceKind: .exhaustedFinancialRegion,
+            financialRegionDescriptor: region.descriptor,
+            financialRegionSourceUnit: region.sourceUnit,
+            financialRegionStartOrdinal: region.startOrdinal,
+            financialRegionEndOrdinal: region.endOrdinal,
+            financialRegionSignature: region.signature,
+            statementDate: cardEvidence.statementDate,
+            statementPeriod: cardEvidence.declaredStatementPeriod,
+            selectedStatementMonth: cardEvidence.selectedStatementMonth,
+            nativeCurrency: currency,
+            cardPreviousBalance: previous,
+            cardTotalPaymentDue: totalDue,
+            cardPaymentDueDate: dueDate
+        )
     }
 }

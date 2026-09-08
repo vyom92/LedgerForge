@@ -2,23 +2,11 @@ import Foundation
 import Testing
 @testable import LedgerForge
 
-struct ConfirmedImportSubprocessTests {
-    @Test func separateProcessesProduceOneAcceptedProbeResult() throws {
-        try runRace(scenario: "exact", expectedLoser: "exact-duplicate")
-    }
-
-    @Test func separateProcessesRejectCompetingIdentifierOwnership() throws {
-        for iteration in 1...20 {
-            try runRace(scenario: "identifier", expectedLoser: "identifier-ownership-conflict", iteration: iteration)
-        }
-    }
-
-    @Test func separateProcessesRejectRepeatedAccountScopedEvent() throws {
-        try runRace(scenario: "event", expectedLoser: "existing-event-duplicate", seedExistingAccount: true)
-    }
-
-    @Test func separateProcessesRejectConflictingProposedAccountGraph() throws {
-        try runRace(scenario: "account", expectedLoser: "repository-integrity-conflict")
+/// Nonfinancial process/SQLite mechanics, not confirmed-import or source
+/// acceptance. Financial subprocess scenarios require authentic statements.
+struct SQLiteSubprocessMechanicsTests {
+    @Test func separateProcessesEnforceUniqueKeyAndRollBackLosingTransaction() throws {
+        try runRace(scenario: "unique", expectedLoser: "unique-conflict")
     }
 
     @Test func subprocessClassifiesHeldSQLiteWriteLockAsRetryableContention() throws {
@@ -26,9 +14,9 @@ struct ConfirmedImportSubprocessTests {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let database = folder.appendingPathComponent("probe.sqlite").path
-        try initialize(database: database, seedExistingAccount: false)
+        try initialize(database: database)
         let testBundle = try #require(Bundle.allBundles.first { $0.bundleURL.lastPathComponent == "LedgerForgeTests.xctest" })
-        let child = try ProbeChild(executable: try #require(testBundle.resourceURL?.appendingPathComponent("LedgerForgeSubprocessProbe")), databasePath: database, scenario: "exact", variant: "1")
+        let child = try ProbeChild(executable: try #require(testBundle.resourceURL?.appendingPathComponent("LedgerForgeSubprocessProbe")), databasePath: database, scenario: "unique", variant: "1")
         let lock = SQLiteDatabase(path: database)
         try lock.open()
         try lock.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
@@ -52,15 +40,17 @@ struct ConfirmedImportSubprocessTests {
         let provider = try SQLiteRepositoryProvider(path: database, migrations: allMigrations)
         defer { provider.database.close() }
         #expect(try provider.database.queryInt("SELECT COUNT(*) FROM import_attempts;") == 0)
+        #expect(try provider.database.queryInt("SELECT COUNT(*) FROM subprocess_mechanics_launches;") == 0)
+        #expect(try provider.database.queryInt("SELECT COUNT(*) FROM subprocess_mechanics_keys;") == 0)
         #expect(try provider.database.queryInt("PRAGMA foreign_key_check;") == 0)
     }
 
-    private func runRace(scenario: String, expectedLoser: String, seedExistingAccount: Bool = false, iteration: Int = 1) throws {
+    private func runRace(scenario: String, expectedLoser: String, iteration: Int = 1) throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let database = folder.appendingPathComponent("probe.sqlite").path
-        try initialize(database: database, seedExistingAccount: seedExistingAccount)
+        try initialize(database: database)
         let testBundle = try #require(Bundle.allBundles.first { $0.bundleURL.lastPathComponent == "LedgerForgeTests.xctest" })
         let executable = try #require(testBundle.resourceURL?.appendingPathComponent("LedgerForgeSubprocessProbe"))
         #expect(FileManager.default.isExecutableFile(atPath: executable.path))
@@ -100,39 +90,34 @@ struct ConfirmedImportSubprocessTests {
         }
         #expect(codes.filter { $0 == "committed" }.count == 1, Comment(rawValue: "iteration=\(iteration),results=\(codes)"))
         #expect(codes.filter { $0 == expectedLoser }.count == 1, Comment(rawValue: "iteration=\(iteration),results=\(codes)"))
-        try assertDurableState(database: database, scenario: scenario, seededAccount: seedExistingAccount)
+        try assertDurableState(database: database)
     }
 
     private func probeFailure(iteration: Int, children: [ProbeChild], issue: String) -> Error {
         NSError(domain: "ConfirmedImportSubprocessTests", code: 2, userInfo: [NSLocalizedDescriptionKey: "iteration=\(iteration),issue=\(issue) | \(children.map(\.diagnostic).joined(separator: " | "))"])
     }
 
-    private func initialize(database: String, seedExistingAccount: Bool) throws {
+    private func initialize(database: String) throws {
         let provider = try SQLiteRepositoryProvider(path: database, migrations: allMigrations)
-        try validateIdentifierOwnershipV5Schema(provider.database)
-        if seedExistingAccount {
-            let now = "2026-07-20T00:00:00Z"
-            _ = try provider.workspaceRepo.upsertWorkspace(WorkspaceDTO(id: "probe-workspace", name: "Probe", createdAtISO: now))
-            _ = try provider.accountRepo.upsertAccount(AccountDTO(id: "probe-existing-account", workspaceId: "probe-workspace", name: "Probe", nativeCurrency: "INR", createdAtISO: now))
-        }
+        try provider.database.execute(sql: """
+            CREATE TABLE subprocess_mechanics_launches(slot TEXT PRIMARY KEY);
+            CREATE TABLE subprocess_mechanics_keys(name TEXT UNIQUE NOT NULL,payload TEXT NOT NULL);
+            """)
         provider.database.close()
     }
 
-    private func assertDurableState(database: String, scenario: String, seededAccount: Bool) throws {
+    private func assertDurableState(database: String) throws {
         let provider = try SQLiteRepositoryProvider(path: database, migrations: allMigrations)
         defer { provider.database.close() }
-        let expectedAccounts = seededAccount ? 1 : 1
         let expected = [
-            "workspaces": 1,
-            "accounts": expectedAccounts,
-            "account_identifiers": scenario == "event" ? 0 : 1,
-            "account_identifier_observations": scenario == "event" ? 0 : 1,
-            "documents": 1,
-            "document_fingerprints": 1,
-            "import_sessions": 1,
-            "transactions": 1,
-            "transaction_event_identities": scenario == "event" ? 1 : 0,
-            "import_attempts": 1,
+            "subprocess_mechanics_launches": 1,
+            "subprocess_mechanics_keys": 1,
+            "workspaces": 0,
+            "accounts": 0,
+            "documents": 0,
+            "import_sessions": 0,
+            "transactions": 0,
+            "import_attempts": 0,
         ]
         for (table, count) in expected {
             let observed = try provider.database.queryInt("SELECT COUNT(*) FROM \(table);")

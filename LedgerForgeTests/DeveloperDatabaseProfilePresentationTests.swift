@@ -23,7 +23,7 @@ struct DeveloperDatabaseProfilePresentationTests {
 
         #expect(presentation != nil)
         #expect(presentation?.title.contains(profile.displayName) == true)
-        #expect(presentation?.currentSchema == "Current schema V16")
+        #expect(presentation?.currentSchema == "Current schema V\(DevelopmentDatabaseProfile.currentSchemaVersion)")
         #expect(kind == .migrationSandbox
             ? presentation?.sourceSchema == "Source schema V3"
             : presentation?.sourceSchema == nil)
@@ -49,12 +49,12 @@ struct DeveloperDatabaseProfilePresentationTests {
             "Temporary Session",
             "Migration Sandbox"
         ])
-        #expect(DevelopmentDatabaseProfile.registeredHistoricalSourceVersions == Array(1...15))
+        #expect(DevelopmentDatabaseProfile.registeredHistoricalSourceVersions == Array(1..<allMigrations.count))
         #expect(descriptor(kind: .persistentDebug).resetActionLabel == "Reset Debug Database")
         #expect(descriptor(kind: .temporarySession).resetActionLabel == "Start Fresh Temporary Session")
         #expect(descriptor(kind: .migrationSandbox, sourceVersion: 8).resetActionLabel == "Recreate Sandbox from selected source version")
         #expect(descriptor(kind: .migrationSandbox, sourceVersion: 8).sourceSchemaLabel == "V8")
-        #expect(descriptor(kind: .migrationSandbox, sourceVersion: 14).currentSchemaLabel == "V16")
+        #expect(descriptor(kind: .migrationSandbox, sourceVersion: 14).currentSchemaLabel == "V\(DevelopmentDatabaseProfile.currentSchemaVersion)")
     }
 
     private func descriptor(
@@ -74,7 +74,7 @@ struct DeveloperDatabaseProfilePresentationTests {
             persistenceClassification: persistenceClassification,
             canReset: kind != .current,
             migrationSourceVersion: sourceVersion,
-            verifiedCurrentSchemaVersion: 16
+            verifiedCurrentSchemaVersion: DevelopmentDatabaseProfile.currentSchemaVersion
         )
     }
 }

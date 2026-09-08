@@ -28,7 +28,7 @@ struct ImportReaderSnapshotTests {
     }
 
     @Test func csvDataOverloadPreservesCurrentUTF8DecodingAndFailureSemantics() throws {
-        let text = "Tran Date,PARTICULARS\n01-01-2026,Café ₹\n"
+        let text = "Label,Value\nAlpha,Café ₹\n"
         let bytes = Data(text.utf8)
 
         #expect(try CSVReader().read(data: bytes) == text)
@@ -38,7 +38,7 @@ struct ImportReaderSnapshotTests {
     }
 
     @Test func pdfReaderUsesSnapshotAfterSourceURLIsRemoved() async throws {
-        let sourceBytes = try Data(contentsOf: FixtureLocator.axisPDF("axis_bank_nre_account_statement_baseline.pdf"))
+        let sourceBytes = try selectablePDFData(text: "Alpha Beta")
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let sourceURL = directory.appendingPathComponent("statement.pdf")
@@ -60,7 +60,7 @@ struct ImportReaderSnapshotTests {
     }
 
     @Test func pdfPasswordOutcomesRemainTypedForSnapshotData() async throws {
-        let sourceBytes = try Data(contentsOf: FixtureLocator.axisPDF("axis_bank_nre_account_statement_baseline.pdf"))
+        let sourceBytes = try selectablePDFData(text: "Alpha Beta")
         let sourceDocument = try #require(PDFDocument(data: sourceBytes))
         let writeOptions: [PDFDocumentWriteOption: Any] = [
             .userPasswordOption: "correct-password",
@@ -165,9 +165,7 @@ struct ImportReaderSnapshotTests {
     }
 
     @Test func identicalPDFSnapshotsExtractIdenticalTextDeterministically() async throws {
-        let bytes = try Data(contentsOf: FixtureLocator.axisPDF(
-            "axis_bank_nre_account_statement_baseline.pdf"
-        ))
+        let bytes = try selectablePDFData(text: "Alpha Beta")
         let firstSnapshot = SourceContentSnapshot(bytes: bytes)
         let secondSnapshot = SourceContentSnapshot(bytes: bytes)
         defer {

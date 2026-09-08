@@ -241,6 +241,7 @@ public protocol ImportSessionRepository {
     func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO?
     func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO]
     func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO]
+    func statementZeroActivityControls(workspaceId: String) throws -> [StatementZeroActivityControlDTO]
     func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO]
     func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO]
     func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO]
@@ -252,6 +253,7 @@ public extension ImportSessionRepository {
     func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? { nil }
     func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] { [] }
     func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO] { [] }
+    func statementZeroActivityControls(workspaceId: String) throws -> [StatementZeroActivityControlDTO] { [] }
     func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO] { [] }
     func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] { [] }
     func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO] { [] }
@@ -499,6 +501,7 @@ private struct GenerationCheckedImportSessionRepository: ImportSessionRepository
     func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? { try validity.check(); return try base.partialImportSummary(importSessionId: importSessionId) }
     func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] { try validity.check(); return try base.incomingRowDispositions(importSessionId: importSessionId) }
     func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO] { try validity.check(); return try base.statementFinancialProjections(workspaceId: workspaceId) }
+    func statementZeroActivityControls(workspaceId: String) throws -> [StatementZeroActivityControlDTO] { try validity.check(); return try base.statementZeroActivityControls(workspaceId: workspaceId) }
     func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO] { try validity.check(); return try base.statementEquivalenceGroups(workspaceId: workspaceId) }
     func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] { try validity.check(); return try base.statementEquivalenceMembers(workspaceId: workspaceId) }
     func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO] { try validity.check(); return try base.preferredTransactionSources(workspaceId: workspaceId) }

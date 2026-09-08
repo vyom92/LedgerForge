@@ -1,5 +1,4 @@
 import Foundation
-import PDFKit
 
 enum AmericanExpressCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedNativeText
@@ -10,6 +9,7 @@ enum AmericanExpressCreditCardPDFNormalizationError: Error, Equatable, Localized
     case malformedInstrumentSection
     case unconsumedFinancialPage(page: Int)
     case malformedNonFinancialPage(page: Int)
+    case unknownPageContent(page: Int)
 
     var errorDescription: String? {
         switch self {
@@ -21,6 +21,7 @@ enum AmericanExpressCreditCardPDFNormalizationError: Error, Equatable, Localized
         case .malformedInstrumentSection: return "The Amex card-instrument section is malformed."
         case .unconsumedFinancialPage(let page): return "Amex page \(page) contains unconsumed financial evidence."
         case .malformedNonFinancialPage(let page): return "Amex page \(page) does not match an exact non-financial page signature."
+        case .unknownPageContent(let page): return "Amex page \(page) has unknown content and cannot be accepted."
         }
     }
 }
@@ -36,7 +37,7 @@ final class AmericanExpressCreditCardPDFNormalizer {
     static let logicalHeader = [
         "Transaction Date", "Posting Date", "Details", "Reference",
         "Original Amount", "Original Currency", "Posted Amount",
-        "Liability Effect", "Scope", "Section ID"
+        "Liability Effect", "Scope", "Section ID", "Source Page"
     ]
     static let profileID = "amex.credit-card.pdf"
     static let profileVersion = "1"
@@ -52,37 +53,26 @@ final class AmericanExpressCreditCardPDFNormalizer {
         self.now = now
     }
 
-    func normalize(text: String, sourceBytes: Data, fileURL: URL) throws -> AmericanExpressCreditCardPDFNormalizationResult {
-        guard let pdf = PDFDocument(data: sourceBytes), pdf.pageCount >= 3 else {
-            throw AmericanExpressCreditCardPDFNormalizationError.unsupportedNativeText
-        }
-        let pages = try (0..<pdf.pageCount).map { index -> String in
-            guard let value = pdf.page(at: index)?.string,
-                  !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                throw AmericanExpressCreditCardPDFNormalizationError.unsupportedNativeText
-            }
-            return value
-        }
-        return try normalize(text: text, pageTexts: pages, fileURL: fileURL)
-    }
-
-    func normalize(text: String, pageTexts pages: [String], fileURL: URL) throws -> AmericanExpressCreditCardPDFNormalizationResult {
-        guard pages.count >= 3,
-              pages.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+    func normalize(
+        text: String,
+        pageTexts pages: [String],
+        pageEvidence: [RawPDFPageEvidence]? = nil,
+        fileURL: URL
+    ) throws -> AmericanExpressCreditCardPDFNormalizationResult {
+        guard !pages.isEmpty,
+              pages.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
             throw AmericanExpressCreditCardPDFNormalizationError.unsupportedNativeText
         }
         let joined = pages.joined(separator: "\n")
         guard joined == text || Self.boundedWhitespace(joined) == Self.boundedWhitespace(text) else {
             throw AmericanExpressCreditCardPDFNormalizationError.unsupportedNativeText
         }
-        guard pages.allSatisfy({ page in
-            page.contains("The Platinum Card (QAR)") &&
-            page.contains("Statement of Account") &&
-            page.contains("AMEX (MIDDLE EAST) B.S.C. (C)") &&
-            page.contains("Membership Number") &&
-            page.contains("Statement date") &&
-            page.contains("Statement Period")
-        }) else {
+        guard joined.contains("The Platinum Card (QAR)"),
+              joined.contains("Statement of Account"),
+              joined.contains("AMEX (MIDDLE EAST) B.S.C. (C)"),
+              joined.contains("Membership Number"),
+              joined.contains("Statement date"),
+              joined.contains("Statement Period") else {
             throw AmericanExpressCreditCardPDFNormalizationError.unsupportedFamily
         }
 
@@ -90,15 +80,22 @@ final class AmericanExpressCreditCardPDFNormalizer {
         let statementDate = try Self.uniqueCapture(#"Membership Number\s+Statement date\s+Statement Period\s+[0-9X-]+\s+(\d{2}/\d{2}/\d{2})\s+\d{2}/\d{2}/\d{2} to \d{2}/\d{2}/\d{2}"#, in: joined)
         let period = try Self.uniqueCapture(#"Membership Number\s+Statement date\s+Statement Period\s+[0-9X-]+\s+\d{2}/\d{2}/\d{2}\s+(\d{2}/\d{2}/\d{2} to \d{2}/\d{2}/\d{2})"#, in: joined)
         let summaryPattern = #"Previous Balance\s+New Credits\s+New Debits\s+New Balance\s+Due Date\s+- \(QAR\) \+ \(QAR\) = \(QAR\)\s+(?:\(QAR\)\s+)?([0-9,.]+)\s+([0-9,.]+)\s+([0-9,.]+)\s+([0-9,.]+)\s+(\d{2}/\d{2}/\d{2})"#
-        guard let summary = Self.captures(summaryPattern, in: pages[0]), summary.count == 5 else {
+        // Summary recognition is content-driven. It may be carried by any
+        // financial page when pagination or a statement preamble changes;
+        // requiring exactly one source equation prevents duplicate/conflicting
+        // summaries from being silently accepted.
+        let summaryMatches = pages.flatMap { Self.allCaptures(summaryPattern, in: $0) }
+        guard summaryMatches.count == 1, summaryMatches[0].count == 5,
+              let summary = summaryMatches.first else {
             throw AmericanExpressCreditCardPDFNormalizationError.malformedSummary
         }
         let sectionPattern = #"^New Transactions For (.+?) Card Account Number: ([0-9X-]+)$"#
-        let totalPattern = #"^Total of New Transactions For (.+?) ([0-9]+(?:,[0-9]{3})*\.\d{2})(?: ?(CR|DR))?$"#
+        // The source-only corpus audit found plain totals plus two totals with
+        // an explicit CR suffix; DR is not part of this Amex layout contract.
+        let totalPattern = #"^Total of New Transactions For (.+?) ([0-9]+(?:,[0-9]{3})*\.\d{2})(?: ?(CR))?$"#
         let sectionMatches = Self.allCaptures(sectionPattern, in: joined)
         let totalMatches = Self.allCaptures(totalPattern, in: joined)
-        guard !sectionMatches.isEmpty, !totalMatches.isEmpty,
-              sectionMatches.count >= totalMatches.count else {
+        guard sectionMatches.count >= totalMatches.count else {
             throw AmericanExpressCreditCardPDFNormalizationError.malformedInstrumentSection
         }
 
@@ -115,42 +112,74 @@ final class AmericanExpressCreditCardPDFNormalizer {
         var currentSectionAccount: String?
         var parsedSections: [ParsedSection] = []
         var rows: [NormalizedRow] = []
-        var sawRewards = false
-        var sawInformation = false
         for (pageIndex, page) in pages.enumerated() {
-            let hasFinancialRow = page.range(of: Self.rowStartPattern, options: [.regularExpression, .anchored], range: nil, locale: nil) != nil ||
-                page.range(of: #"(?m)^\d{2}-[A-Za-z]{3}-\d{4} \d{2}-[A-Za-z]{3}-\d{4} "#, options: .regularExpression) != nil
-            let hasFinancialStructure = hasFinancialRow ||
-                page.contains("Transaction Date Posting Date Details Non QAR Spending Amount in QAR") ||
-                page.contains("New Transactions For ") || page.contains("Total of New Transactions For ")
-            if page.contains("Membership Rewards Period") {
-                guard !hasFinancialRow,
-                      page.contains("Membership Rewards Account Number"),
-                      page.contains("New Points Card Type Account Number No. of Points"),
-                      page.contains("Total New Paid Points"),
-                      page.contains("Total Adjustments") else {
-                    throw AmericanExpressCreditCardPDFNormalizationError.malformedNonFinancialPage(page: pageIndex + 1)
+            let pageNumber = pageIndex + 1
+            // Nonfinancial pages are packaging, not required profile members.
+            // Inert inserts may precede, follow or interrupt financial pages;
+            // malformed row/control evidence may never be skipped as an insert.
+            if !Self.containsFinancialStructure(page, summaryPattern: summaryPattern) {
+                guard !Self.containsUnresolvedFinancialStructure(page) else {
+                    throw AmericanExpressCreditCardPDFNormalizationError.unconsumedFinancialPage(page: pageNumber)
                 }
-                sawRewards = true
                 continue
             }
-            if !hasFinancialStructure {
-                guard pageIndex == pages.count - 1,
-                      page.contains("This Card is issued by AMEX (Middle East) B.S.C. (c)"),
-                      !page.contains("New Transactions For"),
-                      !page.contains("Total of New Transactions For") else {
-                    throw AmericanExpressCreditCardPDFNormalizationError.malformedNonFinancialPage(page: pageIndex + 1)
+            let lines = try Self.financialLines(
+                page, evidence: pageEvidence.flatMap { $0.indices.contains(pageIndex) ? $0[pageIndex] : nil },
+                pageNumber: pageNumber
+            )
+            // Account for every non-empty line on a financial page. A line is
+            // consumed only by an exact source grammar (masthead/header,
+            // summary/table marker, section marker, row band, or repeated
+            // footer). Any residue is surfaced instead of being silently
+            // skipped by the row scanner.
+            var consumedLineIndices = Set<Int>()
+            let mastheadBoundary = lines.firstIndex(where: { Self.startsTransactionRegion($0) }) ?? 0
+            let footerBoundary = lines.firstIndex(where: { Self.isIssuerFooterStart($0) }) ?? lines.endIndex
+            var summaryValuesRemaining = 0
+            for lineIndex in lines.indices {
+                let line = lines[lineIndex]
+                if line.isEmpty {
+                    consumedLineIndices.insert(lineIndex)
+                    continue
                 }
-                sawInformation = true
-                continue
+                if lineIndex >= footerBoundary {
+                    guard !Self.containsUnresolvedFinancialStructure(line) else {
+                        throw AmericanExpressCreditCardPDFNormalizationError.unconsumedFinancialPage(page: pageNumber)
+                    }
+                    consumedLineIndices.insert(lineIndex)
+                    continue
+                }
+                if lineIndex < mastheadBoundary {
+                    // Source identity/period values are checked coherently
+                    // above. Address and contact typography do not define the
+                    // financial body and are not matched by private hashes.
+                    consumedLineIndices.insert(lineIndex)
+                    continue
+                }
+                if Self.isAcceptedFinancialPreambleLine(line) {
+                    consumedLineIndices.insert(lineIndex)
+                }
+                if Self.isAcceptedSummaryExpressionLine(line) {
+                    let valueCount = Self.allCaptures(#"([0-9]+(?:,[0-9]{3})*\.\d{2})"#, in: line).count
+                    summaryValuesRemaining = max(0, 5 - valueCount)
+                    consumedLineIndices.insert(lineIndex)
+                } else if summaryValuesRemaining > 0 {
+                    if line.range(of: #"^[0-9]+(?:,[0-9]{3})*\.\d{2}$"#, options: .regularExpression) != nil ||
+                        line.range(of: #"^\d{2}/\d{2}/\d{2}$"#, options: .regularExpression) != nil {
+                        consumedLineIndices.insert(lineIndex)
+                        summaryValuesRemaining -= 1
+                    }
+                }
             }
-            if sawRewards || sawInformation {
-                throw AmericanExpressCreditCardPDFNormalizationError.unconsumedFinancialPage(page: pageIndex + 1)
-            }
-            let lines = page.components(separatedBy: .newlines)
             var index = 0
             while index < lines.count {
-                let line = lines[index].trimmingCharacters(in: .whitespacesAndNewlines)
+                let line = lines[index]
+                if index >= footerBoundary { break }
+                if line.isEmpty {
+                    consumedLineIndices.insert(index)
+                    index += 1
+                    continue
+                }
                 if let opening = Self.captures(sectionPattern, in: line), opening.count == 2 {
                     if currentSectionID != nil {
                         guard currentSectionHolder == opening[0],
@@ -162,6 +191,7 @@ final class AmericanExpressCreditCardPDFNormalizer {
                         currentSectionHolder = opening[0]
                         currentSectionAccount = opening[1]
                     }
+                    consumedLineIndices.insert(index)
                     index += 1
                     continue
                 }
@@ -179,6 +209,7 @@ final class AmericanExpressCreditCardPDFNormalizer {
                         total: total[1],
                         isCredit: total[2] == "CR"
                     ))
+                    consumedLineIndices.insert(index)
                     currentSectionID = nil
                     currentSectionHolder = nil
                     currentSectionAccount = nil
@@ -191,15 +222,16 @@ final class AmericanExpressCreditCardPDFNormalizer {
                 }
                 let sourceOrdinal = rows.count + 1
                 var block = [start[2]]
+                consumedLineIndices.insert(index)
                 index += 1
                 while index < lines.count {
-                    let candidate = lines[index].trimmingCharacters(in: .whitespacesAndNewlines)
-                    if Self.captures(Self.rowStartPattern, in: candidate) != nil ||
+                    let candidate = lines[index]
+                    if index >= footerBoundary || Self.captures(Self.rowStartPattern, in: candidate) != nil ||
                         candidate.hasPrefix("Total of New Transactions For ") ||
-                        candidate.hasPrefix("New Transactions For ") ||
-                        candidate.hasPrefix("This Card is issued by AMEX") {
+                        candidate.hasPrefix("New Transactions For ") {
                         break
                     }
+                    consumedLineIndices.insert(index)
                     if !candidate.isEmpty { block.append(candidate) }
                     index += 1
                 }
@@ -208,13 +240,18 @@ final class AmericanExpressCreditCardPDFNormalizer {
                     transactionDate: start[0],
                     postingDate: start[1],
                     block: block,
-                    sectionID: currentSectionID
+                    sectionID: currentSectionID,
+                    sourcePage: pageNumber
                 ))
             }
+            guard !lines.indices.contains(where: { index in
+                !lines[index].isEmpty && !consumedLineIndices.contains(index)
+            }) else {
+                throw AmericanExpressCreditCardPDFNormalizationError.unconsumedFinancialPage(page: pageNumber)
+            }
         }
-        guard !rows.isEmpty, currentSectionID == nil, sawRewards, sawInformation,
-              rows.first?.values[8] == "account_level",
-              rows.dropFirst().allSatisfy({ $0.values[8] == "instrument_level" || $0.values[8] == "account_level" }),
+        guard currentSectionID == nil,
+              rows.allSatisfy({ $0.values[8] == "instrument_level" || $0.values[8] == "account_level" }),
               parsedSections.count == totalMatches.count,
               zip(parsedSections, totalMatches).allSatisfy({ section, capture in
                   capture.count == 3 && section.holder == capture[0] && section.total == capture[1] &&
@@ -253,13 +290,13 @@ final class AmericanExpressCreditCardPDFNormalizer {
         )
     }
 
-    private static func normalizedRow(sourceOrdinal: Int, transactionDate: String, postingDate: String, block: [String], sectionID: String?) throws -> NormalizedRow {
+    private static func normalizedRow(sourceOrdinal: Int, transactionDate: String, postingDate: String, block: [String], sectionID: String?, sourcePage: Int) throws -> NormalizedRow {
         let amountOnly = #"^(\#(postedMoney))(?: (CR))?$"#
         let foreign = #"^(\#(originalMoney)) ([A-Z]{3})(?: (CR))? (\#(postedMoney))(?: (CR))?$"#
         var amountMatch: (original: String, currency: String, posted: String, credit: Bool)?
         var details: [String] = []
         var reference: String?
-        for line in block {
+        for (lineIndex, line) in block.enumerated() {
             if let values = captures(foreign, in: line), values.count == 5 {
                 guard amountMatch == nil, (values[2].isEmpty == values[4].isEmpty) else {
                     throw AmericanExpressCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: sourceOrdinal)
@@ -270,26 +307,190 @@ final class AmericanExpressCreditCardPDFNormalizer {
                     throw AmericanExpressCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: sourceOrdinal)
                 }
                 amountMatch = ("", "", values[0], !values[1].isEmpty)
-            } else if line.hasPrefix("Reference: ") {
-                guard reference == nil else {
+            } else if line == "Reference:" || line.hasPrefix("Reference: ") {
+                // PDFKit may position the source Reference marker after the
+                // amount line for a bounded subset of authentic rows. The
+                // marker still belongs to the same row and remains source
+                // authority; line order must not change its semantics. An
+                // explicit empty marker or duplicate marker is malformed.
+                let rawValue = line.hasPrefix("Reference: ")
+                    ? String(line.dropFirst("Reference: ".count))
+                    : ""
+                let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !value.isEmpty else {
                     throw AmericanExpressCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: sourceOrdinal)
                 }
-                reference = String(line.dropFirst("Reference: ".count))
+                if amountMatch != nil {
+                    guard reference == nil,
+                          lineIndex == block.index(before: block.endIndex),
+                          rawValue == value else {
+                        throw AmericanExpressCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: sourceOrdinal)
+                    }
+                    reference = value
+                } else {
+                    guard reference == nil else {
+                        throw AmericanExpressCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: sourceOrdinal)
+                    }
+                    reference = value
+                }
             } else {
+                // Detail continuations belong to the source-defined row band,
+                // regardless of whether PDF extraction emitted its amount
+                // first. Merchant names and wrapped text are not allowlists.
+                // A new malformed row/control is never narration.
+                if amountMatch != nil {
+                    guard !Self.containsUnresolvedFinancialStructure(line) else {
+                        throw AmericanExpressCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: sourceOrdinal)
+                    }
+                }
                 details.append(line)
             }
         }
-        guard let amountMatch, let reference, !reference.isEmpty, !details.isEmpty else {
+        // Amex may omit a printed Reference line for certain merchant rows;
+        // preserve that source absence as an empty normalized field rather
+        // than inventing or rejecting a reference.
+        guard let amountMatch, !details.isEmpty else {
             throw AmericanExpressCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: sourceOrdinal)
         }
         let effect = amountMatch.credit ? CardLiabilityEffect.decreasesAmountOwed.rawValue : CardLiabilityEffect.increasesAmountOwed.rawValue
         let scope = sectionID == nil ? "account_level" : "instrument_level"
         return NormalizedRow(rowNumber: sourceOrdinal, values: [
-            transactionDate, postingDate, details.joined(separator: "\n"), reference,
+            transactionDate, postingDate, details.joined(separator: "\n"), reference ?? "",
             amountMatch.original, amountMatch.currency, amountMatch.posted, effect,
-            scope, sectionID ?? ""
-        ])
+            scope, sectionID ?? "", String(sourcePage)
+        ], sourcePage: sourcePage)
     }
+
+
+    private static func containsFinancialRow(_ page: String) -> Bool {
+        page.components(separatedBy: .newlines).contains { line in
+            captures(rowStartPattern, in: line.trimmingCharacters(in: .whitespacesAndNewlines))?.count == 3
+        }
+    }
+
+    private static func startsTransactionRegion(_ line: String) -> Bool {
+        line.hasPrefix("Transaction Date Posting Date") ||
+            line.hasPrefix("New Transactions For") || line.hasPrefix("Total of New Transactions For") ||
+            captures(rowStartPattern, in: line) != nil
+    }
+
+    private static func isIssuerFooterStart(_ line: String) -> Bool {
+        line.hasPrefix("This Card is issued by AMEX (Middle East)")
+    }
+
+    /// PDF extraction order can interleave footer text before the final row's
+    /// amount. Derive the footer boundary from its semantic label and reader
+    /// geometry, not its extraction index or a fixed page coordinate.
+    private static func financialLines(
+        _ page: String, evidence: RawPDFPageEvidence?, pageNumber: Int
+    ) throws -> [String] {
+        let lines = page.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard let footerIndex = lines.firstIndex(where: { isIssuerFooterStart($0) }) else { return lines }
+        guard let evidence, !evidence.fragments.isEmpty else {
+            throw AmericanExpressCreditCardPDFNormalizationError.unsupportedNativeText
+        }
+        var cursor = 0
+        var lineFragments: [[RawPDFTextFragment]] = []
+        for line in lines {
+            let tokens = line.split(whereSeparator: \.isWhitespace).map(String.init)
+            guard cursor + tokens.count <= evidence.fragments.count else {
+                throw AmericanExpressCreditCardPDFNormalizationError.unsupportedNativeText
+            }
+            let fragments = Array(evidence.fragments[cursor..<(cursor + tokens.count)])
+            guard fragments.map(\.text) == tokens, fragments.allSatisfy({ $0.geometry?.isCanonical == true }) else {
+                throw AmericanExpressCreditCardPDFNormalizationError.unsupportedNativeText
+            }
+            lineFragments.append(fragments)
+            cursor += tokens.count
+        }
+        guard cursor == evidence.fragments.count,
+              let footerY = lineFragments[footerIndex].map(\.y).max() else {
+            throw AmericanExpressCreditCardPDFNormalizationError.unsupportedNativeText
+        }
+        return try lines.indices.compactMap { index in
+            let fragments = lineFragments[index]
+            guard !fragments.isEmpty else { return lines[index] }
+            if fragments.allSatisfy({ $0.y <= footerY + 0.5 }) {
+                guard !containsUnresolvedFinancialStructure(lines[index]),
+                      captures(#"^\#(postedMoney)(?: CR)?$"#, in: lines[index]) == nil else {
+                    throw AmericanExpressCreditCardPDFNormalizationError.unconsumedFinancialPage(page: pageNumber)
+                }
+                return nil
+            }
+            return lines[index]
+        }
+    }
+
+    private static func containsUnresolvedFinancialStructure(_ text: String) -> Bool {
+        // Rewards may also print "Previous Balance" for points. Financial
+        // summary reentry requires the monetary control-label relationship,
+        // not a shared English word in isolation.
+        if text.contains("New Credits") && (text.contains("New Debits") || text.contains("New Balance")) { return true }
+        return text.components(separatedBy: .newlines).contains { raw in
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.hasPrefix("New Transactions For") || line.hasPrefix("Total of New Transactions For") ||
+                line.hasPrefix("Transaction Date Posting Date") ||
+                line.hasPrefix("- (QAR) + (QAR)") { return true }
+            // Recognize malformed/variant row starts by two source-date
+            // fields even when the exact row grammar cannot consume them.
+            return line.range(of: #"^\d{1,2}[-/][A-Za-z0-9]{2,9}[-/]\d{2,4}\s+\d{1,2}[-/][A-Za-z0-9]{2,9}[-/]\d{2,4}\b"#,
+                options: .regularExpression) != nil
+        }
+    }
+
+    private static func containsFinancialStructure(_ page: String, summaryPattern: String) -> Bool {
+        let lines = page.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let sectionPattern = "^New Transactions For (.+?) Card Account Number: ([0-9X-]+)$"
+        let totalPattern = "^Total of New Transactions For (.+?) ([0-9,.]+)(?: ?(CR))?$"
+        let hasExactSectionHeader = lines.contains {
+            guard let captures = captures(sectionPattern, in: $0) else { return false }
+            return captures.count == 2 && !captures[0].isEmpty && !captures[1].isEmpty
+        }
+        let hasExactSectionTotal = lines.contains {
+            guard let captures = captures(totalPattern, in: $0) else { return false }
+            return captures.count == 3 && !captures[0].isEmpty && !captures[1].isEmpty
+        }
+        let hasExactTableHeader = lines.contains {
+            $0 == "Transaction Date Posting Date Details Non QAR Spending Amount in QAR"
+        }
+        // Every non-row financial marker must satisfy its complete source
+        // grammar. A body containing only a partial section marker or total
+        // marker remains unknown and fails closed instead of being skipped as
+        // a financial page.
+        return containsFinancialRow(page) ||
+            hasExactTableHeader ||
+            hasExactSectionHeader ||
+            hasExactSectionTotal ||
+            !allCaptures(summaryPattern, in: page).isEmpty
+    }
+
+    /// Financial labels and source controls remain explicit. Nonfinancial
+    /// masthead/address/footer text is handled by its surrounding source region,
+    /// never a statement-specific text or hash allowlist.
+    private static func isAcceptedFinancialPreambleLine(_ line: String) -> Bool {
+        if line == "Transaction Date Posting Date Details Non QAR Spending Amount in QAR" ||
+            line == "Previous Balance" ||
+            line == "New Credits" ||
+            line == "New Debits" ||
+            line == "New Balance" ||
+            line == "Due Date" ||
+            Self.isAcceptedSummaryExpressionLine(line) {
+            return true
+        }
+        return false
+    }
+
+    /// Summary expression lines are accepted only in the complete source
+    /// grammar: one to four posted amounts (the authentic PDF may place the
+    /// remaining values on following lines) and an optional due date. A bare
+    /// expression prefix with arbitrary suffix text is not evidence.
+    private static func isAcceptedSummaryExpressionLine(_ line: String) -> Bool {
+        line.range(of: #"^- \(QAR\) \+ \(QAR\) = \(QAR\)(?: \(QAR\))? [0-9]+(?:,[0-9]{3})*\.\d{2}(?: [0-9]+(?:,[0-9]{3})*\.\d{2}){0,3}(?: \d{2}/\d{2}/\d{2})?$"#, options: .regularExpression) != nil
+    }
+
+
 
     private static func uniqueCapture(_ pattern: String, in text: String) throws -> String {
         let values = allCaptures(pattern, in: text).compactMap(\.first)

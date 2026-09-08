@@ -5,7 +5,8 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct ConfirmedImportHydrationTests {
-    @Test func committedImportHydratesBeforeReportingSuccess() async {
+    @Test(.globalRuntimeStateIsolation)
+    func committedImportHydratesBeforeReportingSuccess() async throws {
         let coordinator = HydrationPersistenceCoordinator()
         var hydrationCount = 0
         let engine = ImportEngine(
@@ -18,7 +19,9 @@ struct ConfirmedImportHydrationTests {
             reconciliationGate: ConfirmedImportReconciliationGate()
         )
 
-        let result = await engine.commitPreparedImport(hydrationPreparedImport())
+        let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { preparedOwner.cancel() }
+        let result = await engine.commitPreparedImport(preparedOwner.preparedImport)
 
         #expect(result.persisted)
         #expect(result.succeeded)
@@ -28,7 +31,8 @@ struct ConfirmedImportHydrationTests {
         #expect(coordinator.persistCount == 1)
     }
 
-    @Test func committedHydrationRecoveryActionReconcilesWithoutReimport() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func committedHydrationRecoveryActionReconcilesWithoutReimport() async throws {
         let coordinator = HydrationPersistenceCoordinator()
         let gate = ConfirmedImportReconciliationGate()
         var hydrationShouldFail = true
@@ -41,7 +45,9 @@ struct ConfirmedImportHydrationTests {
             },
             reconciliationGate: gate
         )
-        let committed = await engine.commitPreparedImport(hydrationPreparedImport())
+        let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { preparedOwner.cancel() }
+        let committed = await engine.commitPreparedImport(preparedOwner.preparedImport)
         let presentation = try #require(
             ConfirmedImportRecoveryPresentationMapper.presentation(
                 for: committed.recoveryRoute
@@ -73,7 +79,8 @@ struct ConfirmedImportHydrationTests {
         #expect(!gate.isBlocked)
     }
 
-    @Test func blockedRecoveryReconcilesBeforeRequestingFreshExplicitPreview() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func blockedRecoveryReconcilesBeforeRequestingFreshExplicitPreview() async throws {
         let coordinator = HydrationPersistenceCoordinator()
         let gate = ConfirmedImportReconciliationGate()
         var hydrationShouldFail = true
@@ -87,8 +94,12 @@ struct ConfirmedImportHydrationTests {
             reconciliationGate: gate
         )
 
-        let committed = await engine.commitPreparedImport(hydrationPreparedImport())
-        let blockedPrepared = hydrationPreparedImport()
+        let committedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { committedOwner.cancel() }
+        let committed = await engine.commitPreparedImport(committedOwner.preparedImport)
+        let blockedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { blockedPreparedOwner.cancel() }
+        let blockedPrepared = blockedPreparedOwner.preparedImport
         let blocked = await engine.commitPreparedImport(blockedPrepared)
         let presentation = try #require(
             ConfirmedImportRecoveryPresentationMapper.presentation(
@@ -101,6 +112,9 @@ struct ConfirmedImportHydrationTests {
         var freshPreview: PreparedImport?
 
         hydrationShouldFail = false
+        let requestedPreviewOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { requestedPreviewOwner.cancel() }
+        let requestedPreview = requestedPreviewOwner.preparedImport
         let execution = await executor.execute(
             action,
             sourceURL: blockedPrepared.sourceURL,
@@ -111,7 +125,7 @@ struct ConfirmedImportHydrationTests {
             requestOrdinaryPreparation: { url in
                 events.append("prepare")
                 #expect(url == blockedPrepared.sourceURL)
-                freshPreview = hydrationPreparedImport()
+                freshPreview = requestedPreview
                 return true
             }
         )
@@ -134,7 +148,8 @@ struct ConfirmedImportHydrationTests {
         #expect(coordinator.persistCount == 2)
     }
 
-    @Test func blockedRecoveryFailureDoesNotBeginPreparationOrLoop() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func blockedRecoveryFailureDoesNotBeginPreparationOrLoop() async throws {
         let coordinator = HydrationPersistenceCoordinator()
         let gate = ConfirmedImportReconciliationGate()
         let engine = ImportEngine(
@@ -144,8 +159,12 @@ struct ConfirmedImportHydrationTests {
             reconciliationGate: gate
         )
 
-        _ = await engine.commitPreparedImport(hydrationPreparedImport())
-        let blockedPrepared = hydrationPreparedImport()
+        let failedCommittedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { failedCommittedOwner.cancel() }
+        _ = await engine.commitPreparedImport(failedCommittedOwner.preparedImport)
+        let blockedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { blockedPreparedOwner.cancel() }
+        let blockedPrepared = blockedPreparedOwner.preparedImport
         let blocked = await engine.commitPreparedImport(blockedPrepared)
         let presentation = try #require(
             ConfirmedImportRecoveryPresentationMapper.presentation(
@@ -177,7 +196,8 @@ struct ConfirmedImportHydrationTests {
         #expect(gate.isBlocked)
     }
 
-    @Test func hydrationFailureBlocksLaterImportsUntilOneCanonicalRetrySucceeds() async {
+    @Test(.globalRuntimeStateIsolation)
+    func hydrationFailureBlocksLaterImportsUntilOneCanonicalRetrySucceeds() async throws {
         let coordinator = HydrationPersistenceCoordinator()
         let gate = ConfirmedImportReconciliationGate()
         var hydrationShouldFail = true
@@ -194,10 +214,14 @@ struct ConfirmedImportHydrationTests {
             reconciliationGate: gate
         )
 
-        let committedPrepared = hydrationPreparedImport()
+        let committedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { committedPreparedOwner.cancel() }
+        let committedPrepared = committedPreparedOwner.preparedImport
         let committed = await engine.commitPreparedImport(committedPrepared)
         persistenceState = .unavailable(.databaseOpenFailed)
-        let blocked = await engine.commitPreparedImport(hydrationPreparedImport())
+        let blockedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { blockedPreparedOwner.cancel() }
+        let blocked = await engine.commitPreparedImport(blockedPreparedOwner.preparedImport)
 
         #expect(committed.persisted)
         #expect(!committed.succeeded)
@@ -221,21 +245,24 @@ struct ConfirmedImportHydrationTests {
         #expect(!consumedConfirmation.persisted)
         #expect(coordinator.persistCount == 1)
 
-        let next = await engine.commitPreparedImport(hydrationPreparedImport())
+        let nextPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { nextPreparedOwner.cancel() }
+        let next = await engine.commitPreparedImport(nextPreparedOwner.preparedImport)
         #expect(next.succeeded)
         #expect(next.recoveryRoute == .none)
         #expect(coordinator.persistCount == 2)
         #expect(hydrationCount == 4)
     }
 
-    @Test func rejectedAttemptRefreshFailurePreservesTheRejection() async {
+    @Test(.globalRuntimeStateIsolation)
+    func rejectedAttemptRefreshFailurePreservesTheRejection() async throws {
         let coordinator = HydrationPersistenceCoordinator()
         coordinator.result = ImportPersistenceResult(
             persisted: false,
             workspaceId: "workspace-hydration",
             accountId: nil,
             importSessionId: nil,
-            transactionCount: 1,
+            transactionCount: 0,
             importAttemptId: "attempt-rejected"
         )
         let engine = ImportEngine(
@@ -245,7 +272,9 @@ struct ConfirmedImportHydrationTests {
             reconciliationGate: ConfirmedImportReconciliationGate()
         )
 
-        let result = await engine.commitPreparedImport(hydrationPreparedImport())
+        let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { preparedOwner.cancel() }
+        let result = await engine.commitPreparedImport(preparedOwner.preparedImport)
 
         #expect(!result.persisted)
         #expect(result.importAttemptId == "attempt-rejected")
@@ -253,7 +282,8 @@ struct ConfirmedImportHydrationTests {
         #expect(result.recoveryRoute == .unavailable)
     }
 
-    @Test func reconciliationStateDoesNotLeakBetweenWorkflowInstances() async {
+    @Test(.globalRuntimeStateIsolation)
+    func reconciliationStateDoesNotLeakBetweenWorkflowInstances() async throws {
         let blockedCoordinator = HydrationPersistenceCoordinator()
         let unrelatedCoordinator = HydrationPersistenceCoordinator()
         let blockedEngine = ImportEngine(
@@ -267,8 +297,12 @@ struct ConfirmedImportHydrationTests {
             forcedHydration: { hydrationResult() }
         )
 
-        let blocked = await blockedEngine.commitPreparedImport(hydrationPreparedImport())
-        let unrelated = await unrelatedEngine.commitPreparedImport(hydrationPreparedImport())
+        let blockedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { blockedPreparedOwner.cancel() }
+        let blocked = await blockedEngine.commitPreparedImport(blockedPreparedOwner.preparedImport)
+        let unrelatedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { unrelatedPreparedOwner.cancel() }
+        let unrelated = await unrelatedEngine.commitPreparedImport(unrelatedPreparedOwner.preparedImport)
 
         #expect(blocked.persisted)
         #expect(blocked.requiresReconciliation)
@@ -279,7 +313,8 @@ struct ConfirmedImportHydrationTests {
         #expect(unrelatedCoordinator.persistCount == 1)
     }
 
-    @Test func providerReplacementRejectsPreparedGenerationBeforeFinancialWrites() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func providerReplacementRejectsPreparedGenerationBeforeFinancialWrites() async throws {
         let first = InMemoryRepositoryProvider()
         let second = InMemoryRepositoryProvider()
         var current = databaseProvider(first)
@@ -291,7 +326,9 @@ struct ConfirmedImportHydrationTests {
             forcedHydration: { hydrationResult() },
             reconciliationGate: ConfirmedImportReconciliationGate()
         )
-        let prepared = hydrationPreparedImport(providerGeneration: first.generationToken)
+        let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV(providerGeneration: first.generationToken)
+        defer { preparedOwner.cancel() }
+        let prepared = preparedOwner.preparedImport
 
         current = databaseProvider(second)
         let result = await engine.commitPreparedImport(prepared)
@@ -306,7 +343,7 @@ struct ConfirmedImportHydrationTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func invalidatedConfirmedImportRepositoryRejectsBeforeBaseOrSQLiteWork() throws {
+    func invalidatedConfirmedImportRepositoryRejectsBeforeBaseOrSQLiteWork() async throws {
         let memory = InMemoryRepositoryProvider()
         let probe = ConfirmedImportInvocationProbe()
         let protected = DatabaseProvider(
@@ -321,7 +358,7 @@ struct ConfirmedImportHydrationTests {
             persistenceState: .intentionalNonDurable(.testMemory),
             protectsGeneration: true
         )
-        let probePlan = confirmedImportPlan(generationToken: protected.generationToken, suffix: "generation-probe")
+        let probePlan = try await confirmedImportPlan(generationToken: protected.generationToken)
         let capturedProbeRepository = protected.confirmedImportRepo
         protected.invalidateGeneration()
 
@@ -345,10 +382,7 @@ struct ConfirmedImportHydrationTests {
         defer { lifecycle.closeOwnedProvider() }
         _ = try lifecycle.installInitialProvider(sqlite)
         let sqliteRuntime = DatabaseProvider.shared
-        let sqlitePlan = confirmedImportPlan(
-            generationToken: sqliteRuntime.generationToken,
-            suffix: "generation-sqlite"
-        )
+        let sqlitePlan = try await confirmedImportPlan(generationToken: sqliteRuntime.generationToken)
         let capturedSQLiteRepository = sqliteRuntime.confirmedImportRepo
         guard case .activated = lifecycle.activate(.persistentDebug) else {
             Issue.record("Expected lifecycle switch before stale confirmed-import check")
@@ -373,20 +407,39 @@ private final class HydrationPersistenceCoordinator: ImportPersistenceCoordinati
         workspaceId: "workspace-hydration",
         accountId: "account-hydration",
         importSessionId: "session-hydration",
-        transactionCount: 1
+        transactionCount: 0
     )
 
     func persistValidatedImport(financialDocument: FinancialDocument, importSession: ImportSession, validation: ImportValidationResult) throws -> ImportPersistenceResult {
         persistCount += 1
-        return result
+        return financiallyBoundResult(to: financialDocument)
     }
 
     func persistValidatedImport(financialDocument: FinancialDocument, importSession: ImportSession, validation: ImportValidationResult, fingerprint: ExactStatementFingerprint, accountChoice: ImportAccountChoice?) throws -> ImportPersistenceResult {
         persistCount += 1
-        return result
+        return financiallyBoundResult(to: financialDocument)
     }
 
     func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? { nil }
+
+    private func financiallyBoundResult(to document: FinancialDocument) -> ImportPersistenceResult {
+        ImportPersistenceResult(
+            persisted: result.persisted,
+            workspaceId: result.workspaceId,
+            accountId: result.accountId,
+            importSessionId: result.importSessionId,
+            transactionCount: document.transactions.count,
+            previousImport: result.previousImport,
+            transactionEventBlock: result.transactionEventBlock,
+            importAttemptId: result.importAttemptId,
+            sourceRowCount: result.sourceRowCount,
+            recognizedExistingRowCount: result.recognizedExistingRowCount,
+            isPartialImport: result.isPartialImport,
+            isEquivalentSupportingSource: result.isEquivalentSupportingSource,
+            isSalaryImport: result.isSalaryImport,
+            accountOutcome: result.accountOutcome
+        )
+    }
 }
 
 private final class ConfirmedImportInvocationProbe: ConfirmedImportRepository {
@@ -409,46 +462,6 @@ private final class ConfirmedImportInvocationProbe: ConfirmedImportRepository {
         commitCount += 1
         return .repositoryIntegrityConflict
     }
-}
-
-private func hydrationPreparedImport(
-    providerGeneration: ProviderGenerationToken = DatabaseProvider.shared.generationToken
-) -> PreparedImport {
-    let transaction = Transaction(
-        statementDate: try! StatementDate(canonical: "2027-03-13"),
-        description: "Hydration fixture",
-        debit: nil,
-        credit: 10,
-        amount: 10,
-        balance: 10,
-        currency: "INR",
-        account: "Fixture",
-        sourceBank: "Fixture",
-        sourceFile: "hydration.csv",
-        statementTimezoneEvidence: .iana("Asia/Kolkata"),
-        sourceProvenance: [
-            TransactionSourceProvenance(
-                normalizedDocumentID: "hydration-normalized-document",
-                normalizedRowID: "hydration-normalized-row-1",
-                sourceOrdinal: 1,
-                normalizedRecordDigest: String.normalizedRecordDigest(values: ["hydration", "1"]),
-                parserProfileID: AxisBankAccountParser.profileID,
-                parserProfileVersion: AxisBankAccountParser.profileVersion
-            )
-        ]
-    )
-    let document = FinancialDocument(
-        sourceDocument: Document(filename: "hydration.csv", url: URL(fileURLWithPath: "/tmp/hydration.csv"), fileType: "CSV", importedAt: Date(timeIntervalSince1970: 1_804_896_000)),
-        metadata: DocumentMetadata(institution: .axis, documentType: .bankAccount, fileFormat: .csv, confidence: 1),
-        parserName: "Hydration fixture",
-        bookedCurrency: try! CurrencyCode("INR"),
-        transactions: [transaction],
-        selectionReasons: ["Fixture"],
-        createdAt: Date(timeIntervalSince1970: 1_804_896_000)
-    )
-    let validation = ImportValidator.validate(financialDocument: document)
-    let session = ImportSession(fileName: "hydration.csv", institution: .axis, documentType: .bankAccount, parserName: "Hydration fixture", transactionCount: 1, validation: validation)
-    return PreparedImport(sourceURL: document.sourceDocument.url, rawContents: "hydration", fileName: "hydration.csv", detectedInstitution: .axis, detectedDocumentType: .bankAccount, parserName: "Hydration fixture", financialDocument: document, validation: validation, importSession: session, providerGeneration: providerGeneration)
 }
 
 private func hydrationResult() -> RepositoryStoreHydrationResult {

@@ -1,12 +1,13 @@
 # LedgerForge Roadmap: Sprints 70–79
 
-**Status:** Current repository cycle roadmap  
-**Refreshed:** 2026-08-28
+**Status:** Historical prior-cycle roadmap (superseded)
+**Refreshed:** 2026-09-01
 **Supersedes:** dated/private Sprints 70–79 roadmap copies through 2026-08-03
+**Superseded by:** `Project documents/LedgerForge_Roadmap_Sprints_80-89_Current.md`
 
 ## Control
 
-- **Planning authority:** This file is the repository authority for Sprints 70–79 numbering, corrective suffixes, cycle status and next gates.
+- **Planning authority:** This file remains the historical authority for Sprints 70–79 numbering, corrective suffixes and closure status. The current-cycle authority is `Project documents/LedgerForge_Roadmap_Sprints_80-89_Current.md`.
 - **Execution authority:** None. A complete Chat-approved prompt authorizes each task.
 - **Accepted production baseline:** Sprint 79 on `main` at implementation commit `9489f6b21c9d585d2d90f2ba4798a931590057f7`; the subsequent documentation-reconciliation commit is recorded by Git history.
 - **Current migration baseline:** V16 accepted with Sprint 79.
@@ -14,7 +15,19 @@
 - **Current active correction:** none. Sprint 79 was technically accepted on 2026-08-28.
 - **Sprint 79:** **Accepted 2026-08-28.** Exact `qatar-airways.salary.pdf@1`, the dedicated Salary workspace/current-month funding planner and additive Migration V16 are accepted production state.
 - **Standing method:** `LedgerForge_Standing_Execution_Harness_Guide.md`.
-- **Post-cycle gate:** Sprint 80 remains reserved for Swift 6 migration-readiness analysis before investment implementation.
+- **Post-cycle gate:** Sprint 80 is recorded as accepted discovery in the successor roadmap; it is not a production implementation or Swift-6 migration.
+
+## Current parser-reliability alignment — 2026-09-01
+
+- Sprints 70–79 retain their recorded historical implementation/acceptance status and numbering.
+- Prior parser/profile acceptance wording in this historical roadmap is **not** current complete-authentic-corpus production reliability certification.
+- Personal-v1 parser readiness is suspended / not certified pending `FW-P0-25` and ADR-046 complete-authentic-corpus recertification.
+- Synthetic/sanitized/reconstructed financial-source fixtures and representative-month campaigns cannot establish current parser support. Historical fixture and sampled campaigns remain historical facts only.
+- Verified current financial/parser defects outrank unrelated future feature planning until the affected authentic corpora are source-correct, unless the user explicitly overrides priority.
+- This documentation reset consumes no sprint number. Sprint 80 and all later numbering positions remain exactly as recorded in the successor roadmap; later numbering does not move.
+- ADR-046 adds architecture authority only. It changes no migration and authorizes no parser/product implementation.
+
+This alignment supersedes conflicting current-support implications below without rewriting the historical sprint records themselves.
 
 Repository/source evidence overrides stale wording in this roadmap. Explicit user decisions remain binding until superseded.
 
@@ -484,9 +497,15 @@ The separately diagnosed authentic July 2026 CBQ credit-card compatibility defec
 
 ---
 
-# Sprint 80 gate
+# Sprint 80 handoff
 
-Sprint 80 remains reserved for Swift 6 migration-readiness analysis before investment implementation.
+Sprint 80 is accepted as `SWIFT6_READINESS_COMPLETE` discovery on 2026-08-28.
+The minimum current-cycle governance, bounded prerequisite families and
+post-Sprint-80 ordering are recorded in
+`Project documents/LedgerForge_Roadmap_Sprints_80-89_Current.md` and
+`Project documents/FUTURE_WORK.MD`. Sprint 79 remains the latest accepted
+production implementation; no Swift-6 migration or Import Centre implementation
+is authorized by this historical handoff.
 
 ---
 

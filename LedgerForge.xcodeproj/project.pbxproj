@@ -125,6 +125,8 @@
 		7A79000B307A000000000001 /* SalaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A79000A307A000000000001 /* SalaryStore.swift */; };
 		7A79000D307A000000000001 /* SalaryWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A79000C307A000000000001 /* SalaryWorkspaceViewModel.swift */; };
 		7A79000F307A000000000001 /* SalaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A79000E307A000000000001 /* SalaryView.swift */; };
+		A17000013000000000000002 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
+		A17000023000000000000001 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
@@ -156,7 +158,6 @@
 		DBB00004305E000000000001 /* DeveloperDatabaseProfileWarningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB00003305E000000000001 /* DeveloperDatabaseProfileWarningView.swift */; };
 		DBB00006305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBB00005305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift */; };
 		F58000010000000000000001 /* ImportFailureSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58000020000000000000001 /* ImportFailureSummary.swift */; };
-		F58000030000000000000001 /* DebugImportVerificationWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58000040000000000000001 /* DebugImportVerificationWorkspaceView.swift */; };
 		F63000020000000000000001 /* SourceContentSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = F63000010000000000000001 /* SourceContentSnapshot.swift */; };
 /* End PBXBuildFile section */
 
@@ -326,6 +327,7 @@
 		7A79000A307A000000000001 /* SalaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryStore.swift; sourceTree = "<group>"; };
 		7A79000C307A000000000001 /* SalaryWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryWorkspaceViewModel.swift; sourceTree = "<group>"; };
 		7A79000E307A000000000001 /* SalaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryView.swift; sourceTree = "<group>"; };
+		A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZeroActivityStatementEvidence.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
 		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
@@ -345,7 +347,6 @@
 		DBB00003305E000000000001 /* DeveloperDatabaseProfileWarningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperDatabaseProfileWarningView.swift; sourceTree = "<group>"; };
 		DBB00005305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevelopmentProfileAcknowledgementGate.swift; sourceTree = "<group>"; };
 		F58000020000000000000001 /* ImportFailureSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFailureSummary.swift; sourceTree = "<group>"; };
-		F58000040000000000000001 /* DebugImportVerificationWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugImportVerificationWorkspaceView.swift; sourceTree = "<group>"; };
 		F63000010000000000000001 /* SourceContentSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceContentSnapshot.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -546,6 +547,7 @@
 		288EB0D72FF7995800F09BC9 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */,
 				7A790000307A000000000001 /* Salary.swift */,
 				760000133076000000000001 /* Card.swift */,
 				D57000013057000000000001 /* Category.swift */,
@@ -660,7 +662,6 @@
 				28B87B252FFB24C3009BEE8C /* TransactionListView.swift */,
 				288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */,
 				288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */,
-				F58000040000000000000001 /* DebugImportVerificationWorkspaceView.swift */,
 				286D68F12FFFF60E0078AAC5 /* Common */,
 			);
 			path = Views;
@@ -772,7 +773,6 @@
 				288EB0A92FF7955200F09BC9 /* Sources */,
 				288EB0AA2FF7955200F09BC9 /* Frameworks */,
 				288EB0AB2FF7955200F09BC9 /* Resources */,
-				F58000050000000000000001 /* Copy DEBUG approved fixtures */,
 			);
 			buildRules = (
 			);
@@ -952,24 +952,6 @@
 			shellPath = /bin/sh;
 			shellScript = "set -eu\nhelper=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/LedgerForgeSubprocessProbe\"\ntest_bundle=\"${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}\"\nentitlements=\"${SRCROOT}/SubprocessProbe/LedgerForgeSubprocessProbe.entitlements\"\nentitlements_output=\"${TARGET_TEMP_DIR}/LedgerForgeSubprocessProbe-entitlements.plist\"\ncase \"${helper}\" in \"${test_bundle}\"/Contents/Resources/LedgerForgeSubprocessProbe) ;; *) echo \"Subprocess helper path is outside the expected test-bundle resources directory.\" >&2; exit 1 ;; esac\nif [ ! -f \"${helper}\" ] || [ ! -f \"${entitlements}\" ]; then echo \"Subprocess helper or approved entitlements are missing.\" >&2; exit 1; fi\nidentity=\"${EXPANDED_CODE_SIGN_IDENTITY:-}\"\nif [ -z \"$identity\" ] || [ \"$identity\" = \"-\" ]; then echo \"Stable development signing identity is unavailable for LedgerForgeSubprocessProbe.\" >&2; exit 1; fi\n/usr/bin/codesign --force --sign \"$identity\" --entitlements \"$entitlements\" --options runtime \"$helper\"\n/usr/bin/codesign --verify --strict --verbose=4 \"$helper\"\n/usr/bin/codesign -d --entitlements :- \"$helper\" > \"$entitlements_output\" 2>/dev/null\nkeys=$(/usr/libexec/PlistBuddy -c Print \"$entitlements_output\" | /usr/bin/awk -F ' = ' '/ = / { gsub(/^[[:space:]]+/, \"\", $1); print $1 }' | /usr/bin/sort)\nexpected='com.apple.security.app-sandbox\ncom.apple.security.inherit'\nif [ \"$keys\" != \"$expected\" ]; then echo \"Subprocess helper has an unexpected entitlement key set.\" >&2; printf '%s\\n' \"$keys\" >&2; exit 1; fi\n";
 		};
-		F58000050000000000000001 /* Copy DEBUG approved fixtures */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/LedgerForgeTests/Fixtures/Axis/CSV/axis_bank_nre_private_source_semantics.csv",
-				"$(SRCROOT)/LedgerForgeTests/Fixtures/Axis/CSV/axis_bank_nro_account_statement_baseline_csv_source_truth.csv",
-			);
-			name = "Copy DEBUG approved fixtures";
-			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LedgerForgeDebugFixtures/axis_bank_nre_private_source_semantics.csv",
-				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LedgerForgeDebugFixtures/axis_bank_nro_account_statement_baseline_csv_source_truth.csv",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "set -eu\nif [ \"${SCRIPT_INPUT_FILE_COUNT:-0}\" -ne 2 ] || [ \"${SCRIPT_OUTPUT_FILE_COUNT:-0}\" -ne 2 ]; then\n    echo \"Expected exactly two declared fixture inputs and two declared fixture outputs.\" >&2\n    exit 1\nfi\ninput_0=\"${SCRIPT_INPUT_FILE_0:?Missing declared fixture input 0.}\"\ninput_1=\"${SCRIPT_INPUT_FILE_1:?Missing declared fixture input 1.}\"\noutput_0=\"${SCRIPT_OUTPUT_FILE_0:?Missing declared fixture output 0.}\"\noutput_1=\"${SCRIPT_OUTPUT_FILE_1:?Missing declared fixture output 1.}\"\noutput_parent_0=$(/usr/bin/dirname \"${output_0}\")\noutput_parent_1=$(/usr/bin/dirname \"${output_1}\")\nif [ \"${output_parent_0}\" != \"${output_parent_1}\" ]; then\n    echo \"Declared fixture outputs must share one parent directory.\" >&2\n    exit 1\nfi\nif [ \"${CONFIGURATION}\" = \"Debug\" ]; then\n    if [ ! -f \"${input_0}\" ] || [ ! -f \"${input_1}\" ]; then\n        echo \"A declared fixture input is unavailable.\" >&2\n        exit 1\n    fi\n    /bin/mkdir -p \"${output_parent_0}\"\n    /bin/cp -f \"${input_0}\" \"${output_0}\"\n    /bin/cp -f \"${input_1}\" \"${output_1}\"\nelse\n    /bin/rm -f \"${output_0}\" \"${output_1}\"\nfi\n";
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -1062,7 +1044,6 @@
 				288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */,
 				288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */,
 				288EB0FD2FF7BA1600F09BC9 /* DeveloperConsoleView.swift in Sources */,
-				F58000030000000000000001 /* DebugImportVerificationWorkspaceView.swift in Sources */,
 				288EB1212FF7D88200F09BC9 /* Parsers/StatementParserRegistry.swift in Sources */,
 				281BB17C2FFC4D1C006E7424 /* ImportFramework.swift in Sources */,
 				28E945452FFD672000FB69E4 /* ImportPersistenceMapper.swift in Sources */,
@@ -1088,6 +1069,7 @@
 				286D68F32FFFF60E0078AAC5 /* LFTheme.swift in Sources */,
 				281BB15C2FFC4879006E7424 /* SQLiteRepositoryProvider.swift in Sources */,
 				286D63F02FFD3057000CEC65 /* FinancialDocument.swift in Sources */,
+				A17000013000000000000002 /* ZeroActivityStatementEvidence.swift in Sources */,
 				28B87B352FFB31FD009BEE8C /* Services/ImportValidator.swift in Sources */,
 				281BB1822FFC4D40006E7424 /* ImportResult.swift in Sources */,
 				288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */,
@@ -1144,6 +1126,7 @@
 				B600000D3050000000000001 /* MoneyFormatting.swift in Sources */,
 				B600000E3050000000000001 /* DeveloperConsoleStub.swift in Sources */,
 				B60000503050000000000001 /* InMemoryRepositoryProvider.swift in Sources */,
+				A17000023000000000000001 /* ZeroActivityStatementEvidence.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1514,7 +1497,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = SUBPROCESS_PROBE;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -1532,7 +1515,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = SUBPROCESS_PROBE;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

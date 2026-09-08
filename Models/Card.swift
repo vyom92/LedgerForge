@@ -57,6 +57,9 @@ struct CardStatement: Identifiable, Equatable, Sendable {
         summaryComponents.first { $0.persistenceCode == "new_balance" }?.money
             ?? summaryComponents.first { $0.persistenceCode == "axis_total_payment_due" }?.money
     }
+    var minimumAmountDue: Money? {
+        summaryComponents.first { $0.persistenceCode == "minimum_amount_due" }?.money
+    }
     var dueDate: StatementDate? { summaryComponents.first { $0.persistenceCode == "due_date" }?.date }
 }
 
@@ -85,9 +88,27 @@ struct DurableCardTransactionEvidence: Equatable, Sendable {
 
 struct CardStoreSnapshot: Equatable, Sendable {
     let instruments: [CardInstrument]
+    /// Liability-account identity observations are retained alongside the
+    /// runtime card projection so provider and hydrated digests can verify
+    /// membership authority survives close/reopen.
+    let sourceObservations: [CardSourceIdentityObservation]
     let relationships: [CardInstrumentRelationship]
     let statements: [CardStatement]
     let transactionEvidence: [DurableCardTransactionEvidence]
 
-    static let empty = CardStoreSnapshot(instruments: [], relationships: [], statements: [], transactionEvidence: [])
+    init(
+        instruments: [CardInstrument],
+        sourceObservations: [CardSourceIdentityObservation] = [],
+        relationships: [CardInstrumentRelationship],
+        statements: [CardStatement],
+        transactionEvidence: [DurableCardTransactionEvidence]
+    ) {
+        self.instruments = instruments
+        self.sourceObservations = sourceObservations
+        self.relationships = relationships
+        self.statements = statements
+        self.transactionEvidence = transactionEvidence
+    }
+
+    static let empty = CardStoreSnapshot(instruments: [], sourceObservations: [], relationships: [], statements: [], transactionEvidence: [])
 }

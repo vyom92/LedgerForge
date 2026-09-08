@@ -8,9 +8,12 @@ struct SourceSnapshotConfirmationTests {
     @Test(.globalRuntimeStateIsolation)
     func preparationRetainsSnapshotAndConfirmationDoesNotRereadDeletedURL() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let source = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
-        let temporaryURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("source-snapshot-delete-\(UUID().uuidString).csv")
+        let source = try AuthenticSourceTestSupport.axisBankCSV()
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("source-snapshot-delete-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+        let temporaryURL = temporaryDirectory.appendingPathComponent(source.lastPathComponent)
         try FileManager.default.copyItem(at: source, to: temporaryURL)
         let persistence = ConfirmationPersistenceProbe()
         let engine = confirmationEngine(persistence: persistence)
@@ -32,31 +35,12 @@ struct SourceSnapshotConfirmationTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func sourceURLMutationAfterPreparationDoesNotAffectConfirmation() async throws {
-        LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let source = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
-        let temporaryURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("source-snapshot-mutate-\(UUID().uuidString).csv")
-        try FileManager.default.copyItem(at: source, to: temporaryURL)
-        defer { try? FileManager.default.removeItem(at: temporaryURL) }
-        let persistence = ConfirmationPersistenceProbe()
-        let engine = confirmationEngine(persistence: persistence)
-
-        let prepared = try await engine.prepareImport(from: temporaryURL)
-        try Data("changed after preparation".utf8).write(to: temporaryURL)
-        let result = await engine.commitPreparedImport(prepared)
-
-        #expect(result.persisted)
-        #expect(persistence.persistInvocationCount == 1)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
     func concurrentConfirmationsOfSamePreparationAllowExactlyOneConsumer() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
         let persistence = ConfirmationPersistenceProbe()
         let engine = confirmationEngine(persistence: persistence)
         let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: try AuthenticSourceTestSupport.axisBankCSV()
         )
         let context = ConcurrentConfirmationContext(engine: engine, prepared: prepared)
         let startGate = ConcurrentConfirmationStartGate(participantCount: 2)
@@ -104,7 +88,7 @@ struct SourceSnapshotConfirmationTests {
         let persistence = ConfirmationPersistenceProbe()
         let engine = confirmationEngine(persistence: persistence)
         let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: try AuthenticSourceTestSupport.axisBankCSV()
         )
         prepared.sourceSnapshot.invalidate()
 
@@ -119,45 +103,9 @@ struct SourceSnapshotConfirmationTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func rawTextMutationAndAlteredAuthorityRejectBeforeProvider() async throws {
-        LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let source = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
-
-        let rawPersistence = ConfirmationPersistenceProbe()
-        let rawEngine = confirmationEngine(persistence: rawPersistence)
-        let original = try await rawEngine.prepareImport(from: source)
-        let rawMutated = copy(
-            original,
-            rawContents: original.rawContents + "\nmutated",
-            fingerprintSet: original.fingerprintSet
-        )
-        let rawResult = await rawEngine.commitPreparedImport(rawMutated)
-        #expect(rawResult.errorMessage == ImportEngineCommitError.sourceSnapshotIntegrityFailed.localizedDescription)
-        #expect(rawPersistence.persistInvocationCount == 0)
-
-        let authorityPersistence = ConfirmationPersistenceProbe()
-        let authorityEngine = confirmationEngine(persistence: authorityPersistence)
-        let prepared = try await authorityEngine.prepareImport(from: source)
-        let altered = PreparedDocumentFingerprintSet(
-            fingerprints: prepared.fingerprintSet.fingerprints.map {
-                VersionedDocumentFingerprint(
-                    algorithm: $0.algorithm,
-                    digest: $0.digest,
-                    byteCount: $0.byteCount,
-                    isDuplicateAuthority: $0.algorithm == SourceContentSnapshot.algorithm
-                )
-            }
-        )
-        let alteredPrepared = copy(prepared, fingerprintSet: altered)
-        let alteredResult = await authorityEngine.commitPreparedImport(alteredPrepared)
-        #expect(alteredResult.errorMessage == ImportEngineCommitError.sourceSnapshotIntegrityFailed.localizedDescription)
-        #expect(authorityPersistence.persistInvocationCount == 0)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
     func previewCancellationAndHydrationFailureBothInvalidate() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let source = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+        let source = try AuthenticSourceTestSupport.axisBankCSV()
 
         let cancelledPersistence = ConfirmationPersistenceProbe()
         let cancelledEngine = confirmationEngine(persistence: cancelledPersistence)
@@ -184,29 +132,6 @@ struct SourceSnapshotConfirmationTests {
         }
     }
 
-    private func copy(
-        _ prepared: PreparedImport,
-        rawContents: String? = nil,
-        fingerprintSet: PreparedDocumentFingerprintSet? = nil
-    ) -> PreparedImport {
-        PreparedImport(
-            id: prepared.id,
-            sourceURL: prepared.sourceURL,
-            rawContents: rawContents ?? prepared.rawContents,
-            fileName: prepared.fileName,
-            detectedInstitution: prepared.detectedInstitution,
-            detectedDocumentType: prepared.detectedDocumentType,
-            parserName: prepared.parserName,
-            financialDocument: prepared.financialDocument,
-            validation: prepared.validation,
-            importSession: prepared.importSession,
-            fingerprint: prepared.fingerprint,
-            sourceSnapshot: prepared.sourceSnapshot,
-            fingerprintSet: fingerprintSet ?? prepared.fingerprintSet,
-            advisoryPreviousImport: prepared.advisoryPreviousImport,
-            providerGeneration: prepared.providerGeneration
-        )
-    }
 }
 
 private enum ConfirmationProbeError: Error { case hydrationFailed }

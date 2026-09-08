@@ -38,8 +38,9 @@ final class CBQCreditCardPDFParser: StatementParser {
         guard canParse(document: document.document, metadata: document.metadata) else {
             throw CBQCreditCardPDFParserError.unsupportedDocument
         }
-        guard document.header?.values == CBQCreditCardPDFNormalizer.logicalHeader,
-              !document.rows.isEmpty else { throw CBQCreditCardPDFParserError.changedHeader }
+        guard document.header?.values == CBQCreditCardPDFNormalizer.logicalHeader else {
+            throw CBQCreditCardPDFParserError.changedHeader
+        }
 
         let fragments = document.sourceContext.preTransactionFragments
         let profileValues = fragments.filter { $0.text.hasPrefix("PROFILE_VERSION\t") }
@@ -79,8 +80,9 @@ final class CBQCreditCardPDFParser: StatementParser {
             let dueDate = try Self.date(dueField[0][1])
 
             let sectionFields = fields["INSTRUMENT_SECTION"] ?? []
-            guard sectionFields.count == 2,
-                  sectionFields.allSatisfy({ $0.count == 7 }) else {
+            guard !sectionFields.isEmpty,
+                  sectionFields.allSatisfy({ $0.count == 7 }),
+                  Set(sectionFields.map { $0[3] }).count == sectionFields.count else {
                 throw CBQCreditCardPDFParserError.malformedSourceEvidence
             }
             let sections = try sectionFields.enumerated().map { index, values -> CardInstrumentSectionEvidence in
@@ -114,7 +116,7 @@ final class CBQCreditCardPDFParser: StatementParser {
                     throw CBQCreditCardPDFParserError.malformedRow(sourceOrdinal: row.rowNumber)
                 }
                 let values = row.values
-                guard let sourcePage = Int(values[10]), (1...3).contains(sourcePage),
+                guard let sourcePage = Int(values[10]), sourcePage > 0,
                       values[11] == version else {
                     throw CBQCreditCardPDFParserError.malformedRow(sourceOrdinal: row.rowNumber)
                 }
@@ -210,15 +212,27 @@ final class CBQCreditCardPDFParser: StatementParser {
                 summaryComponents: components,
                 reconciliationRuleIdentifier: rule
             )
+            let zeroActivityEvidence = transactions.isEmpty
+                ? try Self.zeroActivityEvidence(
+                    version: String(version),
+                    statementDate: statementDate,
+                    period: period,
+                    currency: currency,
+                    summary: summary
+                )
+                : nil
             return FinancialDocument(
                 sourceDocument: document.document,
                 metadata: document.metadata,
                 parserName: name,
+                parserProfileID: Self.profileID,
+                parserProfileVersion: Self.profileVersion,
                 bookedCurrency: currency,
                 declaredStatementPeriod: period,
                 transactions: transactions,
                 financialIdentifiers: [identifier],
-                cardStatementEvidence: evidence
+                cardStatementEvidence: evidence,
+                zeroActivityEvidence: zeroActivityEvidence
             )
         } catch let error as CBQCreditCardPDFParserError {
             throw error
@@ -253,6 +267,7 @@ final class CBQCreditCardPDFParser: StatementParser {
         }
         if version == "v1" {
             return [
+                .minimumAmountDue(try required("MINIMUM_AMOUNT_DUE")),
                 .previousBalance(try required("PREVIOUS_BALANCE")),
                 .amountBilled(try required("AMOUNT_BILLED")),
                 .paymentReceived(try positive(try required("PAYMENT_RECEIVED"), currency: currency)),
@@ -260,6 +275,7 @@ final class CBQCreditCardPDFParser: StatementParser {
             ]
         }
         return [
+            .minimumAmountDue(try required("MINIMUM_AMOUNT_DUE")),
             .purchases(try positive(try required("PURCHASES"), currency: currency)),
             .billedInstallment(try positive(try required("BILLED_INSTALLMENT"), currency: currency)),
             .feesCharges(try positive(try required("FEES_CHARGES"), currency: currency)),
@@ -268,6 +284,60 @@ final class CBQCreditCardPDFParser: StatementParser {
             .creditReversal(try positive(try required("CREDIT_REVERSAL"), currency: currency)),
             .newBalance(try required("NEW_BALANCE"))
         ]
+    }
+
+    /// Builds zero-activity evidence only from the summary controls printed by
+    /// this exact source family. V1 prints the two movement totals directly;
+    /// V2 prints the complete debit- and credit-side equation components.
+    /// No absent control is defaulted to zero.
+    private static func zeroActivityEvidence(
+        version: String,
+        statementDate: StatementDate,
+        period: DeclaredStatementPeriod,
+        currency: CurrencyCode,
+        summary: [CardStatementSummaryComponent]
+    ) throws -> ZeroActivityStatementEvidence {
+        func required(_ code: String) throws -> Money {
+            guard let value = summary.first(where: { $0.persistenceCode == code })?.money else {
+                throw CBQCreditCardPDFParserError.malformedSourceEvidence
+            }
+            return value
+        }
+
+        let opening = try required("previous_balance")
+        let closing = try required("new_balance")
+        let debitTotal: Money
+        let creditTotal: Money
+        if version == "v1" {
+            debitTotal = try required("amount_billed")
+            creditTotal = try required("payment_received")
+        } else if version == "v2" {
+            debitTotal = try Money.aggregate([
+                required("purchases"),
+                required("billed_installment"),
+                required("fees_charges")
+            ])
+            creditTotal = try Money.aggregate([
+                required("total_payment"),
+                required("credit_reversal")
+            ])
+        } else {
+            throw CBQCreditCardPDFParserError.malformedSourceEvidence
+        }
+
+        return try ZeroActivityStatementEvidence(
+            profileID: Self.profileID,
+            profileVersion: Self.profileVersion,
+            sourceFormatCode: "pdf",
+            evidenceKind: .printedControls,
+            statementDate: statementDate,
+            statementPeriod: period,
+            nativeCurrency: currency,
+            openingBalance: opening,
+            closingBalance: closing,
+            debitTotal: debitTotal,
+            creditTotal: creditTotal
+        )
     }
 
     private static func date(_ value: String) throws -> StatementDate {

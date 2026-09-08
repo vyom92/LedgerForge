@@ -191,6 +191,32 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
                 algorithmIdentifier, institutionCode, statementFamilyCode,
                 nativeCurrency, String(events.count)
             ]
+            // Non-empty Axis equivalence intentionally remains the existing
+            // financial-event multiset. With no events, however, that digest
+            // would collapse every statement into the same value. Bind an
+            // empty projection to the exact source temporal authority and
+            // printed card controls; omit carrier/profile/physical-region
+            // provenance so independently sourced equivalent representations
+            // can still agree.
+            if events.isEmpty {
+                fields += [
+                    "zero-event-controls-v1",
+                    statementDateISO == nil ? "0" : "1", statementDateISO ?? "",
+                    statementStartDateISO == nil ? "0" : "1", statementStartDateISO ?? "",
+                    statementEndDateISO == nil ? "0" : "1", statementEndDateISO ?? "",
+                    selectedStatementMonthISO == nil ? "0" : "1", selectedStatementMonthISO ?? "",
+                    reconciliationRuleCode,
+                    String(summaryComponents.count)
+                ]
+                for component in summaryComponents.sorted(by: { $0.componentCode < $1.componentCode }) {
+                    fields += [
+                        component.componentCode,
+                        component.moneyCurrency == nil ? "0" : "1", component.moneyCurrency ?? "",
+                        component.moneyDecimal == nil ? "0" : "1", component.moneyDecimal ?? "",
+                        component.dateISO == nil ? "0" : "1", component.dateISO ?? ""
+                    ]
+                }
+            }
             let eventKeys = events.map {
                 [$0.financialDateISO, $0.liabilityEffectCode, $0.postedCurrency, $0.postedAmountDecimal]
                     .map { "\($0.utf8.count):\($0)" }.joined()
@@ -258,8 +284,12 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
               (isAmex ? parserProfileId == "amex.credit-card.pdf" : ["axis.credit-card.pdf", "axis.credit-card.xlsx"].contains(parserProfileId)),
               parserProfileVersion == "1", temporalContractValid,
               (try? CurrencyCode(nativeCurrency)) != nil,
-              !events.isEmpty,
-              (isAmex ? !sections.isEmpty : sections.isEmpty),
+              // A source-proven Amex zero statement can truthfully contain no
+              // instrument section at all. The provider admits that shape only
+              // alongside its typed zero-activity control; at this value layer,
+              // keep nonempty Amex projections unchanged and allow an empty
+              // section set only when there are no financial events.
+              (isAmex ? (!sections.isEmpty || events.isEmpty) : sections.isEmpty),
               events.allSatisfy({ $0.sourceOrdinal > 0 }),
               events.map(\.sourceOrdinal) == events.map(\.sourceOrdinal).sorted(),
               Set(events.map(\.sourceOrdinal)).count == events.count,
@@ -303,7 +333,13 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
                   (event.sourceTransactionDateISO.map { (try? StatementDate(canonical: $0)) != nil } ?? true),
                   (isAxis || (statementStartDateISO.map { event.financialDateISO >= $0 } ?? false)),
                   (isAxis || (statementEndDateISO.map { event.financialDateISO <= $0 } ?? false)),
-                  (isAxis || event.sourceReference?.isEmpty == false),
+                  // Amex statements legitimately omit a printed Reference
+                  // for some merchant rows. Preserve that source absence as
+                  // nil only for the Amex projection; keep the established
+                  // non-Amex requirement fail-closed.
+                  (isAmex
+                    ? event.sourceReference == nil || event.sourceReference?.isEmpty == false
+                    : isAxis || event.sourceReference?.isEmpty == false),
                   event.financialDateRoleCode == (isAxis ? FinancialDateRole.transactionDate.rawValue : FinancialDateRole.postingDate.rawValue),
                   [CardLiabilityEffect.increasesAmountOwed.rawValue, CardLiabilityEffect.decreasesAmountOwed.rawValue]
                     .contains(event.liabilityEffectCode) else { return false }
@@ -357,8 +393,9 @@ public struct CardStatementSemanticProjectionDTO: nonisolated Equatable, Sendabl
               sections.reduce(Int64(0), { $0 + $1.signedTotalMinor }) == instrumentNet,
               sections.allSatisfy({ section in
                   let sectionEvents = events.filter({ $0.documentScopedSectionId == section.documentScopedSectionId })
-                  return !sectionEvents.isEmpty &&
-                    sectionEvents.reduce(Int64(0), { $0 + $1.postedAmountMinor }) == section.signedTotalMinor
+                  return sectionEvents.isEmpty
+                    ? section.signedTotalMinor == 0
+                    : sectionEvents.reduce(Int64(0), { $0 + $1.postedAmountMinor }) == section.signedTotalMinor
               }) else { return false }
         return digest == calculatedDigest()
     }
@@ -590,7 +627,7 @@ public struct StatementFinancialProjectionEventDTO: nonisolated Equatable, Senda
     public let id: String
     public let ordinal: Int
     public let statementDateISO: String
-    public let valueDateISO: String
+    public let valueDateISO: String?
     public let direction: String
     public let signedAmountMinor: Int64
     public let signedAmountDecimal: String
@@ -602,7 +639,7 @@ public struct StatementFinancialProjectionEventDTO: nonisolated Equatable, Senda
         id: String,
         ordinal: Int,
         statementDateISO: String,
-        valueDateISO: String,
+        valueDateISO: String?,
         direction: String,
         signedAmountMinor: Int64,
         signedAmountDecimal: String,
@@ -625,6 +662,7 @@ public struct StatementFinancialProjectionEventDTO: nonisolated Equatable, Senda
 
 public struct StatementFinancialProjectionDTO: nonisolated Equatable, Sendable {
     public static let algorithm = "ledgerforge.statement-financial-projection.sha256.v1"
+    public static let axisAlgorithm = "ledgerforge.axis-bank-statement-financial-projection.sha256.v1"
 
     public let id: String
     public let algorithmIdentifier: String
@@ -702,15 +740,24 @@ public struct StatementFinancialProjectionDTO: nonisolated Equatable, Sendable {
 
     public func isValid() -> Bool {
         let lowercaseHex = CharacterSet(charactersIn: "0123456789abcdef")
-        guard algorithmIdentifier == Self.algorithm,
+        let isHDFC = algorithmIdentifier == Self.algorithm &&
+            institutionCode == "hdfc" && statementFamilyCode == "hdfc.bank-account" &&
+            ["hdfc.bank-account.pdf", "hdfc.bank-account.xls"].contains(parserProfileID) &&
+            parserProfileVersion == "1" && ["pdf", "xls"].contains(sourceFormatCode) &&
+            parserProfileID == "hdfc.bank-account.\(sourceFormatCode)"
+        let axisProfileVersion: String? = switch sourceFormatCode {
+        case "csv": "3"
+        case "pdf", "xls": "1"
+        default: nil
+        }
+        let isAxis = algorithmIdentifier == Self.axisAlgorithm &&
+            institutionCode == "axis" && statementFamilyCode == "axis.bank-account" &&
+            ["csv", "pdf", "xls"].contains(sourceFormatCode) &&
+            parserProfileID == "axis.bank-account.\(sourceFormatCode)" &&
+            parserProfileVersion == axisProfileVersion && nativeCurrency == "INR"
+        guard (isHDFC || isAxis),
               digest.utf8.count == 64,
               digest.unicodeScalars.allSatisfy(lowercaseHex.contains),
-              institutionCode == "hdfc",
-              statementFamilyCode == "hdfc.bank-account",
-              ["hdfc.bank-account.pdf", "hdfc.bank-account.xls"].contains(parserProfileID),
-              parserProfileVersion == "1",
-              ["pdf", "xls"].contains(sourceFormatCode),
-              parserProfileID.hasSuffix(".\(sourceFormatCode)"),
               !id.isEmpty,
               !events.isEmpty,
               eventCount == events.count,
@@ -736,7 +783,9 @@ public struct StatementFinancialProjectionDTO: nonisolated Equatable, Sendable {
         for event in events {
             guard !event.id.isEmpty,
                   (try? StatementDate(canonical: event.statementDateISO)) != nil,
-                  (try? StatementDate(canonical: event.valueDateISO)) != nil,
+                  (isHDFC
+                    ? event.valueDateISO.flatMap({ try? StatementDate(canonical: $0) }) != nil
+                    : event.valueDateISO == nil),
                   moneyMatches(event.signedAmountDecimal, minor: event.signedAmountMinor),
                   moneyMatches(event.runningBalanceDecimal, minor: event.runningBalanceMinor) else {
                 return false
@@ -799,10 +848,16 @@ public struct StatementFinancialProjectionDTO: nonisolated Equatable, Sendable {
             closingBalanceDecimal
         ]
         for event in events {
+            fields.append(String(event.ordinal))
+            fields.append(event.statementDateISO)
+            if algorithmIdentifier == Self.algorithm {
+                // Preserve the historical HDFC v1 digest byte stream exactly.
+                fields.append(event.valueDateISO ?? "")
+            } else {
+                fields.append(event.valueDateISO == nil ? "0" : "1")
+                fields.append(event.valueDateISO ?? "")
+            }
             fields.append(contentsOf: [
-                String(event.ordinal),
-                event.statementDateISO,
-                event.valueDateISO,
                 event.direction,
                 nativeCurrency,
                 event.signedAmountDecimal,
@@ -886,8 +941,12 @@ public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
     public let cbqSourceRows: [CBQSourceRowDTO]
     public let cbqStatementSourceEvidence: CBQStatementSourceEvidenceDTO?
     public let cardImportPlan: ConfirmedCardImportPlanDTO?
+    /// Optional parser-proven controls for a document with no transaction
+    /// rows.  The confirmed provider persists this atomically with the
+    /// ordinary document/session graph.
+    public let zeroActivityControl: StatementZeroActivityControlDTO?
 
-    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], historyTemplate: ConfirmedImportHistoryTemplateDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO], declaredStatementStartISO: String? = nil, declaredStatementEndISO: String? = nil, openingBalanceMinor: Int64? = nil, openingBalanceDecimal: String? = nil, closingBalanceMinor: Int64? = nil, closingBalanceDecimal: String? = nil, statementFinancialProjection: StatementFinancialProjectionDTO? = nil, cbqSourceIdentityPatterns: [CBQSourceIdentityPatternDTO] = [], cbqSourceRows: [CBQSourceRowDTO] = [], cbqStatementSourceEvidence: CBQStatementSourceEvidenceDTO? = nil, cardImportPlan: ConfirmedCardImportPlanDTO? = nil) {
+    public init(providerGeneration: ProviderGenerationToken, workspace: WorkspaceDTO, proposedAccount: AccountDTO, accountChoice: ConfirmedImportAccountChoiceDTO, advisoryIdentity: ConfirmedImportAdvisoryIdentityDTO, identifiers: [ConfirmedImportIdentifierCandidateDTO], historyTemplate: ConfirmedImportHistoryTemplateDTO, transactionTemplates: [ConfirmedImportTransactionTemplateDTO], declaredStatementStartISO: String? = nil, declaredStatementEndISO: String? = nil, openingBalanceMinor: Int64? = nil, openingBalanceDecimal: String? = nil, closingBalanceMinor: Int64? = nil, closingBalanceDecimal: String? = nil, statementFinancialProjection: StatementFinancialProjectionDTO? = nil, cbqSourceIdentityPatterns: [CBQSourceIdentityPatternDTO] = [], cbqSourceRows: [CBQSourceRowDTO] = [], cbqStatementSourceEvidence: CBQStatementSourceEvidenceDTO? = nil, cardImportPlan: ConfirmedCardImportPlanDTO? = nil, zeroActivityControl: StatementZeroActivityControlDTO? = nil) {
         self.providerGeneration = providerGeneration
         self.workspace = workspace
         self.proposedAccount = proposedAccount
@@ -907,6 +966,7 @@ public struct ConfirmedImportPlanDTO: nonisolated Equatable, Sendable {
         self.cbqSourceRows = cbqSourceRows.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
         self.cbqStatementSourceEvidence = cbqStatementSourceEvidence
         self.cardImportPlan = cardImportPlan
+        self.zeroActivityControl = zeroActivityControl
     }
 }
 

@@ -11,7 +11,7 @@ import Foundation
 /// A calendar date printed by a financial institution. It is deliberately not
 /// an instant: it contains no time-of-day or timezone and never converts to
 /// `Foundation.Date`.
-struct StatementDate: Comparable, Equatable, Sendable, Hashable {
+nonisolated struct StatementDate: Comparable, Equatable, Sendable, Hashable {
     let year: Int
     let month: Int
     let day: Int
@@ -64,10 +64,28 @@ struct StatementDate: Comparable, Equatable, Sendable, Hashable {
     }
 }
 
+/// A source-declared statement period. Like `StatementDate`, this is calendar
+/// evidence rather than an instant and must never be expanded into invented
+/// day-level boundaries.
+nonisolated struct DeclaredStatementPeriod: Equatable, Sendable {
+    let start: StatementDate
+    let end: StatementDate
+
+    enum Error: Swift.Error, Equatable {
+        case reversed
+    }
+
+    init(start: StatementDate, end: StatementDate) throws {
+        guard start <= end else { throw Error.reversed }
+        self.start = start
+        self.end = end
+    }
+}
+
 /// A source-declared statement month. Like `StatementDate`, this is calendar
 /// evidence rather than an instant and must never be expanded into invented
 /// day-level boundaries.
-struct SelectedStatementMonth: Equatable, Sendable, Hashable, Comparable {
+nonisolated struct SelectedStatementMonth: Equatable, Sendable, Hashable, Comparable {
     let year: Int
     let month: Int
 
@@ -140,6 +158,10 @@ struct TransactionSourceProvenance: Equatable, Sendable {
     let normalizedDocumentID: String
     let normalizedRowID: String
     let sourceOrdinal: Int
+    /// Transient physical page evidence when the source profile can prove it.
+    /// This is intentionally not persisted in the shared transaction lineage
+    /// schema; it is available at the prepared production boundary.
+    let sourcePage: Int?
     let normalizedRecordDigest: String
     let parserProfileID: String
     let parserProfileVersion: String
@@ -154,6 +176,7 @@ struct TransactionSourceProvenance: Equatable, Sendable {
         normalizedDocumentID: String,
         normalizedRowID: String,
         sourceOrdinal: Int,
+        sourcePage: Int? = nil,
         normalizedRecordDigest: String,
         parserProfileID: String,
         parserProfileVersion: String,
@@ -163,6 +186,7 @@ struct TransactionSourceProvenance: Equatable, Sendable {
         self.normalizedDocumentID = normalizedDocumentID
         self.normalizedRowID = normalizedRowID
         self.sourceOrdinal = sourceOrdinal
+        self.sourcePage = sourcePage
         self.normalizedRecordDigest = normalizedRecordDigest
         self.parserProfileID = parserProfileID
         self.parserProfileVersion = parserProfileVersion
@@ -178,13 +202,13 @@ extension String {
     }
 }
 
-struct AxisUPITransactionEventEvidence: Equatable, Sendable {
-    enum Operation: String, Equatable, Sendable {
+nonisolated struct AxisUPITransactionEventEvidence: Equatable, Sendable {
+    nonisolated enum Operation: String, Equatable, Sendable {
         case p2a
         case p2m
     }
 
-    enum LedgerSubtype: String, Equatable, Sendable {
+    nonisolated enum LedgerSubtype: String, Equatable, Sendable {
         case posting
         case creditAdjustment = "credit-adjustment"
     }

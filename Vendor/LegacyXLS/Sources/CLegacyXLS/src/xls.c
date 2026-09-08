@@ -781,19 +781,30 @@ static xls_error_t xls_mergedCells(xlsWorkSheet* pWS,BOF* bof,BYTE* buf)
         span=(struct MERGEDCELLS*)(buf+(2+i*sizeof(struct MERGEDCELLS)));
         xlsConvertMergedcells(span);
         //		printf("Merged Cells: [%i,%i] [%i,%i] \n",span->colf,span->rowf,span->coll,span->rowl);
-        // Sanity check:
+        /* Sanity check the merge's origin and row range before touching the
+         * materialized table. A BIFF worksheet may describe a formatting
+         * merge that extends past cells carrying values. The table dimensions
+         * remain derived from stored cell evidence, so clip only a proven
+         * in-grid merge tail rather than widening the sheet.
+         */
         if(!(   span->rowf <= span->rowl &&
                 span->rowl <= pWS->rows.lastrow &&
                 span->colf <= span->coll &&
-                span->coll <= pWS->rows.lastcol
+                span->coll < LEDGERFORGE_LIBXLS_MAX_COLUMNS &&
+                span->colf <= pWS->rows.lastcol
         )) {
             return LIBXLS_ERROR_PARSE;
         }
 
+        WORD effectiveLastColumn = span->coll;
+        if (effectiveLastColumn > pWS->rows.lastcol) {
+            effectiveLastColumn = pWS->rows.lastcol;
+        }
+
         for (r=span->rowf;r<=span->rowl;r++)
-            for (c=span->colf;c<=span->coll;c++)
+            for (c=span->colf;c<=effectiveLastColumn;c++)
                 pWS->rows.row[r].cells.cell[c].isHidden=1;
-        pWS->rows.row[span->rowf].cells.cell[span->colf].colspan=(span->coll-span->colf+1);
+        pWS->rows.row[span->rowf].cells.cell[span->colf].colspan=(effectiveLastColumn-span->colf+1);
         pWS->rows.row[span->rowf].cells.cell[span->colf].rowspan=(span->rowl-span->rowf+1);
         pWS->rows.row[span->rowf].cells.cell[span->colf].isHidden=0;
     }

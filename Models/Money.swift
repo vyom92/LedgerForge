@@ -1,6 +1,6 @@
 import Foundation
 
-enum MoneyError: Error, Equatable, LocalizedError {
+nonisolated enum MoneyError: Error, Equatable, LocalizedError {
     case malformedCurrencyCode
     case unsupportedCurrency(String)
     case excessPrecision(currency: String)
@@ -29,7 +29,7 @@ enum MoneyError: Error, Equatable, LocalizedError {
     }
 }
 
-struct CurrencyCode: RawRepresentable, Hashable, Codable, Sendable, Comparable {
+nonisolated struct CurrencyCode: RawRepresentable, Hashable, Codable, Sendable, Comparable {
     let rawValue: String
 
     init(_ rawValue: String) throws {
@@ -52,12 +52,12 @@ struct CurrencyCode: RawRepresentable, Hashable, Codable, Sendable, Comparable {
     }
 }
 
-struct CurrencyDefinition: Hashable, Sendable {
+nonisolated struct CurrencyDefinition: Hashable, Sendable {
     let code: CurrencyCode
     let fractionDigits: Int
 }
 
-struct CurrencyCatalog: Sendable {
+nonisolated struct CurrencyCatalog: Sendable {
     static let version = "ledgerforge.currency-catalog.v2"
     static let shared = CurrencyCatalog()
 
@@ -255,7 +255,7 @@ struct CurrencyCatalog: Sendable {
     }
 }
 
-struct Money: Hashable, Sendable, Codable {
+nonisolated struct Money: Hashable, Sendable, Codable {
     let amount: Decimal
     let currency: CurrencyCode
 

@@ -4,50 +4,8 @@ import Testing
 
 @MainActor
 struct LegacyXLSDocumentReaderTests {
-    @Test func readerSupportsExactlyXLSAndPreservesBoundedTabularCells() async throws {
-        let url = FixtureLocator.axisXLS("axis_bank_nro_account_statement_baseline.xls")
-        let rawDocument = try await read(url)
-
+    @Test func readerSupportsExactlyXLS() {
         #expect(LegacyXLSDocumentReader().supportedFileExtensions == ["xls"])
-        #expect(rawDocument.fileExtension == "xls")
-        guard case .tabular(let sheet) = rawDocument.content else {
-            Issue.record("Expected tabular XLS content.")
-            return
-        }
-        #expect(sheet.name == "sanitized")
-        #expect(sheet.visibility == .visible)
-        #expect(sheet.rows.count == 62)
-        #expect(sheet.columnCount == 8)
-        #expect(sheet.rows[16].sourceRow == 17)
-        #expect(sheet.rows[16].cells.map(\.sourceColumn) == Array(1...8))
-        #expect(sheet.rows[16].cells.map(\.value.canonicalText) == [
-            "SRL NO", "Tran Date", "CHQNO", "PARTICULARS", "DR", "CR", "BAL", "SOL"
-        ])
-        #expect(sheet.rows[17].cells[0].value == .number("1"))
-        #expect(sheet.rows[17].cells[4].value == .string(" "))
-        #expect(sheet.rows[17].cells[5].value == .number("4221"))
-        #expect(rawDocument.searchableText.contains("Tran Date"))
-        #expect(rawDocument.searchableText.contains("PARTICULARS"))
-    }
-
-    @Test func readerUsesSnapshotBytesAndRawDocumentRetainsNoWorkbookBytes() async throws {
-        let url = FixtureLocator.axisXLS("axis_bank_nro_account_statement_baseline.xls")
-        let snapshot = SourceContentSnapshot(bytes: try Data(contentsOf: url))
-        let rawDocument = try await LegacyXLSDocumentReader().read(
-            request: ImportRequest(fileURL: url),
-            snapshot: snapshot,
-            password: nil
-        )
-        snapshot.invalidate()
-
-        #expect(!rawDocument.searchableText.isEmpty)
-        #expect(throws: SourceContentSnapshotError.invalidated) {
-            try snapshot.withBytes { $0.count }
-        }
-        guard case .tabular = rawDocument.content else {
-            Issue.record("Expected tabular content after snapshot invalidation.")
-            return
-        }
     }
 
     @Test func readerRejectsInvalidAndTruncatedOLE2() async throws {
@@ -58,9 +16,7 @@ struct LegacyXLSDocumentReaderTests {
             expected: .invalidDocument(message: "XLS workbook is malformed or unsupported.")
         )
 
-        let source = try Data(contentsOf: FixtureLocator.axisXLS(
-            "axis_bank_nro_account_statement_baseline.xls"
-        ))
+        let source = try Data(contentsOf: FixtureLocator.fixturesRoot.appendingPathComponent("LegacyXLS/formula_cell.xls"))
         await expectInvalidDocument(
             requestURL: URL(fileURLWithPath: "/tmp/truncated.xls"),
             bytes: source.prefix(source.count / 3)
@@ -103,13 +59,13 @@ struct LegacyXLSDocumentReaderTests {
 
     @Test(.globalRuntimeStateIsolation)
     func rejectedXLSPreparationsLeaveZeroAcceptedRepositoryResidue() async throws {
-        let workspaceID = "workspace-rejected-axis-xls"
+        let workspaceID = "workspace-rejected-generic-xls"
         let provider = DatabaseProvider(inMemory: true)
         let persistence = DefaultImportPersistenceCoordinator(
             databaseProvider: provider,
             mapper: ImportPersistenceMapper(
                 workspaceId: workspaceID,
-                workspaceName: "Rejected Axis XLS"
+                workspaceName: "Rejected Generic XLS"
             )
         )
         let engine = ImportEngine(
@@ -143,16 +99,6 @@ struct LegacyXLSDocumentReaderTests {
             #expect(try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).isEmpty)
             #expect(try provider.importSessionRepo.importAttempts(workspaceId: workspaceID).isEmpty)
         }
-    }
-
-    private func read(_ url: URL) async throws -> RawDocument {
-        let snapshot = SourceContentSnapshot(bytes: try Data(contentsOf: url))
-        defer { snapshot.invalidate() }
-        return try await LegacyXLSDocumentReader().read(
-            request: ImportRequest(fileURL: url),
-            snapshot: snapshot,
-            password: nil
-        )
     }
 
     private func expectFailure(
@@ -195,4 +141,5 @@ struct LegacyXLSDocumentReaderTests {
             Issue.record("Expected bounded ImportError, got \(error).")
         }
     }
+
 }

@@ -588,21 +588,20 @@ final class ImportEngine {
             sourceContext = normalization.sourceContext
             statementPasswordCredentialTarget = nil
         case .pdf:
+            guard let readerPageTexts = rawDocument.pdfPageTexts else {
+                throw ImportError.invalidDocument(message: "PDF reader did not retain page evidence.")
+            }
             switch institutionCandidate.institutionCode {
             case Institution.axis.rawValue:
                 let normalization: (document: Document, rows: [NormalizedRow], header: NormalizedRow?, sourceContext: NormalizedDocument.SourceContext)
                 if classification.documentType == .creditCardStatement {
-                    let card = try (rawDocument.pdfPageTexts.map {
-                        try AxisCreditCardPDFNormalizer().normalize(
+                    let card = try AxisCreditCardPDFNormalizer().normalize(
                             text: contents,
-                            pageTexts: $0,
+                            pageTexts: readerPageTexts,
                             pageEvidence: rawDocument.pdfPageEvidence,
                             taggedTables: rawDocument.pdfTaggedTables,
                             fileURL: url
                         )
-                    } ?? snapshot.withBytes {
-                        try AxisCreditCardPDFNormalizer().normalize(text: contents, sourceBytes: $0, fileURL: url)
-                    })
                     normalization = (card.document, card.rows, card.header, card.sourceContext)
                     axisCreditCardPDFPresentation = card.presentation
                     statementPasswordCredentialTarget = .init(
@@ -612,7 +611,11 @@ final class ImportEngine {
                             : KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope
                     )
                 } else {
-                    let bank = try AxisBankAccountPDFNormalizer().normalize(text: contents, fileURL: url)
+                    let bank = try AxisBankAccountPDFNormalizer().normalize(
+                        text: contents,
+                        pageEvidence: rawDocument.pdfPageEvidence,
+                        fileURL: url
+                    )
                     normalization = (bank.document, bank.rows, bank.header, bank.sourceContext)
                     statementPasswordCredentialTarget = nil
                 }
@@ -621,9 +624,9 @@ final class ImportEngine {
                 normalizedHeader = normalization.header
                 sourceContext = normalization.sourceContext
             case Institution.hdfc.rawValue:
-                let normalization = try snapshot.withBytes {
-                    try HDFCBankAccountPDFNormalizer().normalize(text: contents, sourceBytes: $0, fileURL: url)
-                }
+                let normalization = try HDFCBankAccountPDFNormalizer().normalize(
+                    text: contents, pageEvidence: rawDocument.pdfPageEvidence, fileURL: url
+                )
                 document = normalization.document
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header
@@ -632,22 +635,17 @@ final class ImportEngine {
             case Institution.cbq.rawValue:
                 let normalization: (document: Document, rows: [NormalizedRow], header: NormalizedRow?, sourceContext: NormalizedDocument.SourceContext)
                 if classification.documentType == .creditCardStatement {
-                    let card = try (rawDocument.pdfPageTexts.map {
-                        try CBQCreditCardPDFNormalizer().normalize(
-                            text: contents, pageTexts: $0, fileURL: url
-                        )
-                    } ?? snapshot.withBytes {
-                        try CBQCreditCardPDFNormalizer().normalize(
-                            text: contents, sourceBytes: $0, fileURL: url
-                        )
-                    })
+                    let card = try CBQCreditCardPDFNormalizer().normalize(
+                        text: contents, pageTexts: readerPageTexts, fileURL: url
+                    )
                     normalization = (card.document, card.rows, card.header, card.sourceContext)
                 } else {
-                    let bank = try snapshot.withBytes {
-                        try CBQCurrentAccountPDFNormalizer().normalize(
-                            text: contents, sourceBytes: $0, fileURL: url
+                    let bank = try CBQCurrentAccountPDFNormalizer().normalize(
+                            text: contents,
+                            pageTexts: readerPageTexts,
+                            pageEvidence: rawDocument.pdfPageEvidence,
+                            fileURL: url
                         )
-                    }
                     normalization = (bank.document, bank.rows, bank.header, bank.sourceContext)
                 }
                 document = normalization.document
@@ -656,15 +654,12 @@ final class ImportEngine {
                 sourceContext = normalization.sourceContext
                 statementPasswordCredentialTarget = nil
             case Institution.amex.rawValue:
-                let normalization = try (rawDocument.pdfPageTexts.map {
-                    try AmericanExpressCreditCardPDFNormalizer().normalize(
+                let normalization = try AmericanExpressCreditCardPDFNormalizer().normalize(
                         text: contents,
-                        pageTexts: $0,
+                        pageTexts: readerPageTexts,
+                        pageEvidence: rawDocument.pdfPageEvidence,
                         fileURL: url
                     )
-                } ?? snapshot.withBytes {
-                    try AmericanExpressCreditCardPDFNormalizer().normalize(text: contents, sourceBytes: $0, fileURL: url)
-                })
                 document = normalization.document
                 normalizedRows = normalization.rows
                 normalizedHeader = normalization.header

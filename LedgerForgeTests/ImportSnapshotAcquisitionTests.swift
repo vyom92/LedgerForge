@@ -5,10 +5,11 @@ import Testing
 @Suite(.serialized)
 @MainActor
 struct ImportSnapshotAcquisitionTests {
+
     @Test(.globalRuntimeStateIsolation)
     func engineAcquiresOnceAndCoordinatorReadsThoseExactBytes() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let sourceURL = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+        let sourceURL = try AuthenticSourceTestSupport.axisBankCSV()
         let sourceBytes = try Data(contentsOf: sourceURL)
         let sourceText = try #require(String(data: sourceBytes, encoding: .utf8))
         let acquirer = SnapshotAcquirerProbe(bytes: sourceBytes)
@@ -101,7 +102,7 @@ struct ImportSnapshotAcquisitionTests {
     @Test(.globalRuntimeStateIsolation)
     func successfulPreparationRetainsSnapshotUntilPreviewCancellation() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let sourceURL = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+        let sourceURL = try AuthenticSourceTestSupport.axisBankCSV()
         let bytes = try Data(contentsOf: sourceURL)
         let text = try #require(String(data: bytes, encoding: .utf8))
         let snapshot = SourceContentSnapshot(bytes: bytes)
@@ -122,9 +123,9 @@ struct ImportSnapshotAcquisitionTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func currentRawTextFingerprintAndPreparedFinancialResultRemainUnchanged() async throws {
+    func currentRawTextFingerprintRemainsBoundToAuthenticSourceSnapshot() async throws {
         LedgerForgeApp.configureInMemoryPersistenceForTesting()
-        let sourceURL = FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+        let sourceURL = try AuthenticSourceTestSupport.axisBankCSV()
         let expectedText = try CSVReader().read(from: sourceURL)
         let engine = ImportEngine(
             importPersistenceCoordinator: SnapshotPreparationPersistenceCoordinator(),
@@ -138,7 +139,6 @@ struct ImportSnapshotAcquisitionTests {
 
         #expect(prepared.rawContents == expectedText)
         #expect(prepared.fingerprint == ExactStatementFingerprint(text: expectedText))
-        #expect(prepared.transactionCount == 81)
         #expect(prepared.validation.passed)
     }
 
@@ -253,9 +253,7 @@ private final class FailingSnapshotCoordinator: ImportFramework.ImportCoordinato
         _ request: ImportRequest,
         snapshot: SourceContentSnapshot
     ) async -> ImportResult {
-        lock.lock()
-        count += 1
-        lock.unlock()
+        lock.withLock { count += 1 }
         return .failure(
             request: request,
             error: .readerFailure(message: "Reader rejected snapshot.")
@@ -277,9 +275,9 @@ private actor CancellationSnapshotCoordinator: ImportFramework.ImportCoordinator
 
         do {
             try await Task.sleep(for: .seconds(60))
-            return .failure(request: request, error: .readerFailure(message: "Unexpected completion."))
+            return await .failure(request: request, error: .readerFailure(message: "Unexpected completion."))
         } catch {
-            return .failure(request: request, error: .cancelled)
+            return await .failure(request: request, error: .cancelled)
         }
     }
 

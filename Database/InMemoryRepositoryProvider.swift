@@ -98,6 +98,7 @@ private final class InMemoryRepositoryState {
     var incomingRowDispositions: [String: IncomingRowDispositionDTO] = [:]
     var identifierObservations: [String: IdentifierObservationDTO] = [:]
     var statementFinancialProjections: [String: StatementFinancialProjectionRecordDTO] = [:]
+    var statementZeroActivityControls: [String: StatementZeroActivityControlDTO] = [:]
     var statementEquivalenceGroups: [String: StatementEquivalenceGroupDTO] = [:]
     var statementEquivalenceMembers: [String: StatementEquivalenceMemberDTO] = [:]
     var cbqSourceIdentityRecords: [String: CBQSourceIdentityRecordDTO] = [:]
@@ -684,6 +685,13 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
             .sorted { $0.projection.id < $1.projection.id }
     }
 
+    func statementZeroActivityControls(workspaceId: String) throws -> [StatementZeroActivityControlDTO] {
+        state.stateLock.lock(); defer { state.stateLock.unlock() }
+        return state.statementZeroActivityControls.values
+            .filter { $0.workspaceId == workspaceId }
+            .sorted { $0.id < $1.id }
+    }
+
     func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO] {
         state.stateLock.lock(); defer { state.stateLock.unlock() }
         return state.statementEquivalenceGroups.values
@@ -864,7 +872,12 @@ private final class InMemoryImportSessionRepo: ImportSessionRepository {
 
         let importedTransactions = state.transactions.values
             .filter { $0.importSessionId == importSessionId }
-        let accountId = importedTransactions.compactMap(\.accountId).sorted().first
+        let accountId = importedTransactions.compactMap(\.accountId).sorted().first ??
+            state.statementZeroActivityControls.values
+                .filter { $0.importSessionId == importSessionId }
+                .map(\.accountId)
+                .sorted()
+                .first
         return PriorImportedStatementDTO(
             importSessionId: importSessionId,
             completedAtISO: session.completedAtISO,
@@ -1212,9 +1225,11 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               plan.historyTemplate.importSession.workspaceId == plan.workspace.id,
               plan.historyTemplate.successfulAttempt.workspaceId == plan.workspace.id,
               plan.historyTemplate.normalizedDocument != nil,
-              !plan.historyTemplate.normalizedRows.isEmpty,
+              (plan.zeroActivityControl != nil || !plan.historyTemplate.normalizedRows.isEmpty),
               Set(plan.historyTemplate.normalizedRows.map(\.sourceOrdinal)).count == plan.historyTemplate.normalizedRows.count,
-              plan.transactionTemplates.allSatisfy({ !$0.transaction.rawRows.isEmpty }),
+              (plan.zeroActivityControl != nil
+                ? (plan.transactionTemplates.isEmpty && plan.historyTemplate.normalizedRows.isEmpty)
+                : plan.transactionTemplates.allSatisfy({ !$0.transaction.rawRows.isEmpty })),
               hasValidTrustedProvenance(plan),
               Set(plan.transactionTemplates.map { $0.transaction.id }).count == plan.transactionTemplates.count,
               !hasDuplicateIdentifierCandidates(plan.identifiers) else {
@@ -1239,6 +1254,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         var attempts = state.importAttempts
         var observations = state.identifierObservations
         var statementProjections = state.statementFinancialProjections
+        var zeroActivityControls = state.statementZeroActivityControls
         var equivalenceGroups = state.statementEquivalenceGroups
         var equivalenceMembers = state.statementEquivalenceMembers
         var cardInstruments = state.cardInstruments
@@ -1307,11 +1323,11 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             account = existing
         }
 
-        let equivalenceReview = reviewStatementEquivalenceWithoutLock(
+        var equivalenceReview = reviewStatementEquivalenceWithoutLock(
             plan,
             resolvedAccountID: account.id
         )
-        let isSupportingSource: Bool
+        var isSupportingSource: Bool
         switch equivalenceReview {
         case .notApplicable, .firstAcceptedSource:
             isSupportingSource = false
@@ -1327,6 +1343,79 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             return .statementEquivalenceEvidenceUnavailable
         case .formatAlreadyRecorded:
             return .equivalentFormatAlreadyRecorded
+        }
+
+        if let incomingZero = plan.zeroActivityControl {
+            guard incomingZero.isValid(),
+                  incomingZero.matchesAccount(account),
+                  incomingZero.authorityRole == "authoritative",
+                  incomingZero.workspaceId == plan.workspace.id,
+                  incomingZero.accountId == account.id,
+                  incomingZero.documentId == plan.historyTemplate.document.id,
+                  incomingZero.importSessionId == plan.historyTemplate.importSession.id,
+                  incomingZero.normalizedDocumentId == plan.historyTemplate.normalizedDocument?.id,
+                  incomingZero.parserProfileId == plan.historyTemplate.normalizedDocument?.profileId,
+                  incomingZero.parserProfileVersion == plan.historyTemplate.normalizedDocument?.profileVersion,
+                  incomingZero.sourceFingerprintAlgorithm == authority.algorithm,
+                  incomingZero.sourceFingerprintDigest == authority.fingerprint,
+                  plan.transactionTemplates.isEmpty,
+                  plan.historyTemplate.normalizedRows.isEmpty,
+                  zeroActivityControls[incomingZero.id] == nil else {
+                return .repositoryIntegrityConflict
+            }
+            let sameSemantic = zeroActivityControls.values.filter {
+                $0.workspaceId == incomingZero.workspaceId &&
+                $0.accountId == account.id &&
+                $0.institutionCode == incomingZero.institutionCode &&
+                $0.statementFamilyCode == incomingZero.statementFamilyCode &&
+                $0.semanticCycleKey == incomingZero.semanticCycleKey &&
+                $0.nativeCurrency == incomingZero.nativeCurrency
+            }
+            if sameSemantic.contains(where: { $0.semanticDigest != incomingZero.semanticDigest }) {
+                return .statementEquivalenceConflict
+            }
+            let authorities = sameSemantic.filter { $0.authorityRole == "authoritative" }
+            guard authorities.count <= 1 else { return .repositoryIntegrityConflict }
+            if let authoritative = authorities.first {
+                guard authoritative.semanticDigest == incomingZero.semanticDigest else {
+                    return .statementEquivalenceConflict
+                }
+                guard case .useExistingAccount = plan.accountChoice else {
+                    return .statementEquivalenceEvidenceUnavailable
+                }
+                // A card semantic projection has its own equivalence graph.
+                // Keep that graph's decision independent when it has no
+                // matching group yet, but still record this zero control as a
+                // supporting source.  Generic zero-only imports use the
+                // control graph as their complete equivalence authority.
+                if plan.cardImportPlan?.semanticProjection == nil {
+                    isSupportingSource = true
+                    if case .notApplicable = equivalenceReview {
+                        equivalenceReview = .equivalent(
+                            authoritativeImportSessionID: authoritative.importSessionId
+                        )
+                    }
+                }
+                zeroActivityControls[incomingZero.id] = incomingZero.withAuthorityRole("supporting")
+            } else {
+                // A card semantic projection which was already classified as
+                // supporting must have a matching zero-control authority too;
+                // otherwise the two equivalence graphs would disagree about
+                // ownership of the same empty statement.
+                guard sameSemantic.isEmpty, !isSupportingSource else {
+                    return .statementEquivalenceEvidenceUnavailable
+                }
+                guard zeroActivityControls[incomingZero.id] == nil else {
+                    return .repositoryIntegrityConflict
+                }
+                zeroActivityControls[incomingZero.id] = incomingZero.withAuthorityRole("authoritative")
+            }
+        } else if isSupportingSource {
+            // Supporting imports with no typed control are valid for the
+            // historical transaction-bearing semantic paths only.
+            guard plan.transactionTemplates.isEmpty == false else {
+                return .statementEquivalenceEvidenceUnavailable
+            }
         }
 
         for candidate in plan.identifiers {
@@ -1417,7 +1506,9 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               attempts[history.successfulAttempt.id] == nil,
               history.successfulAttempt.accountId == account.id,
               history.successfulAttempt.importSessionId == history.importSession.id,
-              history.successfulAttempt.documentId == history.document.id else { return .repositoryIntegrityConflict }
+              history.successfulAttempt.documentId == history.document.id else {
+            return .repositoryIntegrityConflict
+        }
 
         documents[history.document.id] = history.document
         if injectedFailure == .document { return .repositoryIntegrityConflict }
@@ -1589,6 +1680,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         state.transactions = transactions; state.transactionEventIdentities = eventIdentities
         state.importAttempts = attempts
         state.statementFinancialProjections = statementProjections
+        state.statementZeroActivityControls = zeroActivityControls
         state.statementEquivalenceGroups = equivalenceGroups
         state.statementEquivalenceMembers = equivalenceMembers
         state.cardInstruments = cardInstruments
@@ -1642,6 +1734,17 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         let incomingTransactions = plan.transactionTemplates.map(\.transaction)
         let incomingByID = Dictionary(uniqueKeysWithValues: incomingTransactions.map { ($0.id, $0) })
         guard let contract = CardStatementProfileContract(reconciliationRuleIdentifier: card.statement.reconciliationRuleCode),
+              contract.acceptsCurrentReconciliationRule(card.statement.reconciliationRuleCode) else {
+            return .repositoryIntegrityConflict
+        }
+        let isAccountOnlyAmexZero = contract == .amex &&
+            plan.zeroActivityControl != nil &&
+            incomingTransactions.isEmpty &&
+            card.transactionEvidence.isEmpty &&
+            card.sectionDecisions.isEmpty &&
+            card.semanticProjection?.events.isEmpty == true &&
+            card.semanticProjection?.sections.isEmpty == true
+        guard
               card.liabilityAccountId == account.id,
               cardAccountIsCompatible(account: account, plan: plan, contract: contract),
               card.statement.workspaceId == plan.workspace.id,
@@ -1654,7 +1757,9 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               card.statement.statementCurrency == (contract == .axis ? "INR" : "QAR"),
               card.statement.sourceRowCount == incomingTransactions.count,
               statements[card.statement.id] == nil,
-              (contract == .axis ? card.sectionDecisions.isEmpty : !card.sectionDecisions.isEmpty),
+              (contract == .axis
+                ? card.sectionDecisions.isEmpty
+                : (isAccountOnlyAmexZero || !card.sectionDecisions.isEmpty)),
               card.sectionDecisions.map(\.section.sourceOrdinal).sorted() == card.sectionDecisions.indices.map({ $0 + 1 }),
               Set(card.sectionDecisions.map(\.section.id)).count == card.sectionDecisions.count,
               Set(card.sectionDecisions.map(\.section.documentScopedSectionId)).count == card.sectionDecisions.count,
@@ -1665,7 +1770,7 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
               finalTransactions.count == (isSupportingSource ? 0 : incomingTransactions.count) else {
             return .repositoryIntegrityConflict
         }
-        if contract == .axis {
+        if contract == .axis || isAccountOnlyAmexZero {
             guard card.instrumentChoice == .unspecified,
                   card.proposedInstrument == nil,
                   card.instrumentIdentifiers.isEmpty,
@@ -1689,7 +1794,9 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                   section.signedTotalCurrency == card.statement.statementCurrency,
                   section.reconciliationRuleCode == contract.sectionRule,
                   validCardMoney(currency: section.signedTotalCurrency, minor: section.signedTotalMinor, decimal: section.signedTotalDecimal),
-                  sections[section.id] == nil else { return .repositoryIntegrityConflict }
+                  sections[section.id] == nil else {
+                return .repositoryIntegrityConflict
+            }
 
             let selectedInstrumentID: String
             switch decision.instrumentChoice {
@@ -1751,7 +1858,9 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                       observation.observationKind == contract.instrumentObservationKindCode,
                       !observation.sourceValue.isEmpty,
                       allowedAuthorities.contains(observation.associationAuthority),
-                      sectionObservations[observation.id] == nil else { return .repositoryIntegrityConflict }
+                      sectionObservations[observation.id] == nil else {
+                    return .repositoryIntegrityConflict
+                }
                 if observation.associationAuthority == "prior_user_confirmed_mapping" {
                     guard preexistingSectionObservations.values.contains(where: {
                         $0.workspaceId == observation.workspaceId &&
@@ -1786,7 +1895,9 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                 : (card.sectionDecisions.count == 1
                     ? (1...2).contains(card.sourceObservations.count)
                     : card.sourceObservations.count == 1)),
-              Set(card.sourceObservations.map(\.id)).count == card.sourceObservations.count else { return .repositoryIntegrityConflict }
+              Set(card.sourceObservations.map(\.id)).count == card.sourceObservations.count else {
+            return .repositoryIntegrityConflict
+        }
         for observation in card.sourceObservations {
             let subjectValid = (observation.subjectKind == "liability_account" && observation.subjectId == account.id) ||
                 (card.sectionDecisions.count == 1 && observation.subjectKind == "instrument" && selectedInstrumentIDs.contains(observation.subjectId))
@@ -1802,7 +1913,9 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                   kindValid,
                   allowedAuthorities.contains(observation.associationAuthority),
                   !observation.sourceValue.isEmpty,
-                  sourceObservations[observation.id] == nil else { return .repositoryIntegrityConflict }
+                  sourceObservations[observation.id] == nil else {
+                return .repositoryIntegrityConflict
+            }
             if observation.associationAuthority == "prior_user_confirmed_mapping" {
                 guard preexistingSourceObservations.values.contains(where: {
                     $0.workspaceId == observation.workspaceId && $0.subjectKind == observation.subjectKind &&
@@ -1833,6 +1946,27 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         let byCode = Dictionary(uniqueKeysWithValues: card.summaryComponents.map { ($0.componentCode, $0) })
         let previous = byCode["previous_balance"]?.moneyMinor
         let balance = byCode[contract == .axis ? "axis_total_payment_due" : "new_balance"]?.moneyMinor
+        if contract == .axis, let zero = plan.zeroActivityControl {
+            let previousComponent = byCode["previous_balance"]
+            let balanceComponent = byCode["axis_total_payment_due"]
+            guard card.semanticProjection?.events.isEmpty == true,
+                  card.transactionEvidence.isEmpty,
+                  summaryCodes == Set(["previous_balance", "axis_total_payment_due", "due_date"]),
+                  zero.parserProfileId == card.statement.parserProfileId,
+                  zero.parserProfileVersion == card.statement.parserProfileVersion,
+                  zero.statementDateISO == card.statement.statementDateISO,
+                  zero.statementStartDateISO == card.statement.statementStartDateISO,
+                  zero.statementEndDateISO == card.statement.statementEndDateISO,
+                  zero.selectedStatementMonthISO == card.statement.selectedStatementMonthISO,
+                  zero.nativeCurrency == card.statement.statementCurrency,
+                  zero.cardPreviousBalanceMinor == previousComponent?.moneyMinor,
+                  zero.cardPreviousBalanceDecimal == previousComponent?.moneyDecimal,
+                  zero.cardTotalPaymentDueMinor == balanceComponent?.moneyMinor,
+                  zero.cardTotalPaymentDueDecimal == balanceComponent?.moneyDecimal,
+                  zero.cardPaymentDueDateISO == byCode["due_date"]?.dateISO else {
+                return .repositoryIntegrityConflict
+            }
+        }
         guard (contract == .axis || (previous != nil && balance != nil && byCode["due_date"]?.dateISO != nil)),
               card.summaryComponents.allSatisfy({ component in
                   guard let currency = component.moneyCurrency,
@@ -1842,11 +1976,15 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
                   }
                   return currency == card.statement.statementCurrency &&
                       validCardMoney(currency: currency, minor: minor, decimal: decimal)
-              }) else { return .repositoryIntegrityConflict }
+              }) else {
+            return .repositoryIntegrityConflict
+        }
 
         guard card.transactionEvidence.count == incomingTransactions.count,
               Set(card.transactionEvidence.map(\.transactionId)) == Set(incomingTransactions.map(\.id)),
-              Set(card.transactionEvidence.map(\.id)).count == card.transactionEvidence.count else { return .repositoryIntegrityConflict }
+              Set(card.transactionEvidence.map(\.id)).count == card.transactionEvidence.count else {
+            return .repositoryIntegrityConflict
+        }
         var increaseTotal: Int64 = 0
         var decreaseTotal: Int64 = 0
         var instrumentNet: Int64 = 0
@@ -2277,7 +2415,8 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
             closingBalanceMinor: plan.closingBalanceMinor, closingBalanceDecimal: plan.closingBalanceDecimal,
             statementFinancialProjection: plan.statementFinancialProjection,
             cbqSourceIdentityPatterns: plan.cbqSourceIdentityPatterns, cbqSourceRows: plan.cbqSourceRows,
-            cbqStatementSourceEvidence: plan.cbqStatementSourceEvidence
+            cbqStatementSourceEvidence: plan.cbqStatementSourceEvidence,
+            zeroActivityControl: plan.zeroActivityControl
         )
     }
 
@@ -2511,13 +2650,22 @@ private final class InMemoryConfirmedImportRepo: ConfirmedImportRepository {
         accountID: String
     ) -> Bool {
         let projectedSessionIDs = Set(state.statementFinancialProjections.values.map(\.importSessionID))
-        let hdfcSessionIDs = Set(state.normalizedDocuments.values.filter {
-            $0.profileId == "hdfc.bank-account.xls" || $0.profileId == "hdfc.bank-account.pdf"
+        let acceptedProfiles: Set<String>
+        switch projection.algorithmIdentifier {
+        case StatementFinancialProjectionDTO.algorithm:
+            acceptedProfiles = ["hdfc.bank-account.xls", "hdfc.bank-account.pdf"]
+        case StatementFinancialProjectionDTO.axisAlgorithm:
+            acceptedProfiles = ["axis.bank-account.csv", "axis.bank-account.pdf", "axis.bank-account.xls"]
+        default:
+            return false
+        }
+        let projectionFamilySessionIDs = Set(state.normalizedDocuments.values.filter {
+            acceptedProfiles.contains($0.profileId)
         }.map(\.importSessionId))
         let candidateSessionIDs: Set<String> = Set(state.transactions.values.compactMap { transaction -> String? in
             guard transaction.accountId == accountID,
                   let sessionID = transaction.importSessionId,
-                  hdfcSessionIDs.contains(sessionID),
+                  projectionFamilySessionIDs.contains(sessionID),
                   !projectedSessionIDs.contains(sessionID) else { return nil }
             return sessionID
         })

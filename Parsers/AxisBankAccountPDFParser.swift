@@ -18,6 +18,8 @@ enum AxisBankAccountPDFParserError: Error, Equatable, LocalizedError {
     case malformedDate(sourceOrdinal: Int)
     case dateOutsideDeclaredPeriod(sourceOrdinal: Int)
     case malformedDecimal(sourceOrdinal: Int)
+    case malformedReference(sourceOrdinal: Int)
+    case ambiguousReference(sourceOrdinal: Int)
     case missingOpeningBalance
     case repeatedOpeningBalance(sourceOrdinal: Int)
     case missingPrintedTotals
@@ -59,6 +61,10 @@ enum AxisBankAccountPDFParserError: Error, Equatable, LocalizedError {
             return "Axis PDF transaction on source line \(sourceOrdinal) is outside the declared period."
         case .malformedDecimal(let sourceOrdinal):
             return "Axis PDF financial value on source line \(sourceOrdinal) is malformed."
+        case .malformedReference(let sourceOrdinal):
+            return "Axis PDF narration on source line \(sourceOrdinal) contains a malformed reference marker."
+        case .ambiguousReference(let sourceOrdinal):
+            return "Axis PDF narration on source line \(sourceOrdinal) contains more than one reference marker."
         case .missingOpeningBalance:
             return "Axis PDF parser did not receive one opening balance."
         case .repeatedOpeningBalance(let sourceOrdinal):
@@ -129,10 +135,6 @@ final class AxisBankAccountPDFParser: StatementParser {
         guard header.values == AxisBankAccountPDFColumn.normalizedHeader else {
             throw AxisBankAccountPDFParserError.changedNormalizedLayout
         }
-        guard !document.rows.isEmpty else {
-            throw AxisBankAccountPDFParserError.noTransactions
-        }
-
         let title = try titleEvidence(
             in: document.sourceContext.preTransactionFragments
         )
@@ -158,8 +160,65 @@ final class AxisBankAccountPDFParser: StatementParser {
         }
 
         let currency = try CurrencyCode("INR")
-        let openingBalance = try requiredOpeningBalance(in: document.rows)
-        let printed = try requiredPrintedTerminals(in: document.rows)
+        guard let region = document.sourceContext.exhaustedFinancialRegion,
+              region.sourceUnit == .line,
+              region.matches(normalizedFinancialRowCount: document.rows.count),
+              let printedControls = document.sourceContext.printedBankStatementControls,
+              printedControls.profileID == Self.profileID,
+              printedControls.profileVersion == Self.profileVersion,
+              printedControls.sourceFormatCode == "pdf",
+              printedControls.openingBalance.currency == currency,
+              printedControls.debitTotal.currency == currency,
+              printedControls.creditTotal.currency == currency,
+              printedControls.closingBalance.currency == currency else {
+            throw AxisBankAccountPDFParserError.changedNormalizedLayout
+        }
+        let sourceStatementEvidence = SourceStatementEvidence(
+            sourceFormatCode: "pdf",
+            statementBoundaryDate: nil,
+            period: period,
+            openingBalance: printedControls.openingBalance,
+            closingBalance: printedControls.closingBalance
+        )
+        if document.rows.isEmpty {
+            let zeroEvidence = try ZeroActivityStatementEvidence(
+                profileID: Self.profileID,
+                profileVersion: Self.profileVersion,
+                sourceFormatCode: "pdf",
+                evidenceKind: .printedControls,
+                financialRegionDescriptor: region.descriptor,
+                financialRegionSourceUnit: region.sourceUnit,
+                financialRegionStartOrdinal: region.startOrdinal,
+                financialRegionEndOrdinal: region.endOrdinal,
+                financialRegionSignature: region.signature,
+                statementPeriod: period,
+                nativeCurrency: currency,
+                openingBalance: printedControls.openingBalance,
+                closingBalance: printedControls.closingBalance,
+                debitTotal: printedControls.debitTotal,
+                creditTotal: printedControls.creditTotal
+            )
+            return FinancialDocument(
+                sourceDocument: document.document,
+                metadata: document.metadata,
+                parserName: name,
+                parserProfileID: Self.profileID,
+                parserProfileVersion: Self.profileVersion,
+                bookedCurrency: currency,
+                declaredStatementPeriod: period,
+                transactions: [],
+                financialIdentifiers: [identifier],
+                sourceStatementEvidence: sourceStatementEvidence,
+                zeroActivityEvidence: zeroEvidence
+            )
+        }
+
+        let openingBalance = printedControls.openingBalance.amount
+        let printed = (
+            debit: printedControls.debitTotal.amount,
+            credit: printedControls.creditTotal.amount,
+            closing: printedControls.closingBalance.amount
+        )
         var priorBalance = openingBalance
         var debitTotal = Decimal.zero
         var creditTotal = Decimal.zero
@@ -202,6 +261,10 @@ final class AxisBankAccountPDFParser: StatementParser {
                     sourceOrdinal: row.rowNumber
                 )
             }
+            let reference = try Self.referenceEvidence(
+                in: value(.chequeReference, in: row),
+                sourceOrdinal: row.rowNumber
+            )
 
             let sourceDebit = try optionalDecimal(
                 value(.sourceDebit, in: row),
@@ -246,6 +309,7 @@ final class AxisBankAccountPDFParser: StatementParser {
                 Transaction(
                     statementDate: statementDate,
                     description: particulars,
+                    reference: reference.value,
                     debitMoney: try resolved.type == .debit
                         ? Money(amount: resolved.amount, currency: currency)
                         : nil,
@@ -267,11 +331,13 @@ final class AxisBankAccountPDFParser: StatementParser {
                             normalizedDocumentID: document.document.id.uuidString,
                             normalizedRowID: row.id.uuidString,
                             sourceOrdinal: row.rowNumber,
+                            sourcePage: row.sourcePage,
                             normalizedRecordDigest: String.normalizedRecordDigest(
                                 values: row.values
                             ),
                             parserProfileID: Self.profileID,
-                            parserProfileVersion: Self.profileVersion
+                            parserProfileVersion: Self.profileVersion,
+                            structuredReferenceDigest: reference.digest
                         )
                     ],
                     verifiedAxisUPIEventEvidence:
@@ -298,11 +364,27 @@ final class AxisBankAccountPDFParser: StatementParser {
             sourceDocument: document.document,
             metadata: document.metadata,
             parserName: name,
+            parserProfileID: Self.profileID,
+            parserProfileVersion: Self.profileVersion,
             bookedCurrency: currency,
             declaredStatementPeriod: period,
             transactions: transactions,
-            financialIdentifiers: [identifier]
+            financialIdentifiers: [identifier],
+            sourceStatementEvidence: sourceStatementEvidence
         )
+    }
+
+    private static func referenceEvidence(
+        in sourceValue: String,
+        sourceOrdinal: Int
+    ) throws -> (value: String?, digest: String?) {
+        do {
+            return try AxisBankAccountSourceEvidence.numericReference(sourceValue)
+        } catch {
+            throw AxisBankAccountPDFParserError.malformedReference(
+                sourceOrdinal: sourceOrdinal
+            )
+        }
     }
 
     private func titleEvidence(
@@ -343,78 +425,6 @@ final class AxisBankAccountPDFParser: StatementParser {
             throw AxisBankAccountPDFParserError.conflictingTitleEvidence
         }
         return match
-    }
-
-    private func requiredOpeningBalance(
-        in rows: [NormalizedRow]
-    ) throws -> Decimal {
-        let evidence = try rows.compactMap { row -> (Int, Decimal)? in
-            guard let amount = try optionalDecimal(
-                value(.openingBalance, in: row),
-                sourceOrdinal: row.rowNumber
-            ) else {
-                return nil
-            }
-            return (row.rowNumber, amount)
-        }
-        guard let first = evidence.first else {
-            throw AxisBankAccountPDFParserError.missingOpeningBalance
-        }
-        guard evidence.count == 1, rows.first?.rowNumber == first.0 else {
-            throw AxisBankAccountPDFParserError.repeatedOpeningBalance(
-                sourceOrdinal: evidence.dropFirst().first?.0 ?? first.0
-            )
-        }
-        return first.1
-    }
-
-    private func requiredPrintedTerminals(
-        in rows: [NormalizedRow]
-    ) throws -> (debit: Decimal, credit: Decimal, closing: Decimal) {
-        let totalRows = rows.filter {
-            !value(.printedDebitTotal, in: $0).isEmpty ||
-                !value(.printedCreditTotal, in: $0).isEmpty
-        }
-        guard let totalRow = totalRows.first else {
-            throw AxisBankAccountPDFParserError.missingPrintedTotals
-        }
-        guard totalRows.count == 1, totalRow.rowNumber == rows.last?.rowNumber else {
-            throw AxisBankAccountPDFParserError.repeatedPrintedTotals(
-                sourceOrdinal: totalRows.dropFirst().first?.rowNumber ??
-                    totalRow.rowNumber
-            )
-        }
-        guard let debit = try optionalDecimal(
-            value(.printedDebitTotal, in: totalRow),
-            sourceOrdinal: totalRow.rowNumber
-        ), let credit = try optionalDecimal(
-            value(.printedCreditTotal, in: totalRow),
-            sourceOrdinal: totalRow.rowNumber
-        ) else {
-            throw AxisBankAccountPDFParserError.missingPrintedTotals
-        }
-
-        let closingRows = rows.filter {
-            !value(.closingBalance, in: $0).isEmpty
-        }
-        guard let closingRow = closingRows.first else {
-            throw AxisBankAccountPDFParserError.missingClosingBalance
-        }
-        guard closingRows.count == 1,
-              closingRow.rowNumber == rows.last?.rowNumber else {
-            throw AxisBankAccountPDFParserError.repeatedClosingBalance(
-                sourceOrdinal: closingRows.dropFirst().first?.rowNumber ??
-                    closingRow.rowNumber
-            )
-        }
-        guard let closing = try optionalDecimal(
-            value(.closingBalance, in: closingRow),
-            sourceOrdinal: closingRow.rowNumber
-        ) else {
-            throw AxisBankAccountPDFParserError.missingClosingBalance
-        }
-
-        return (debit, credit, closing)
     }
 
     private func resolveDirection(

@@ -51,6 +51,7 @@ Read an authority only when the selected playbook requires it.
 | Current accepted repository state | `PROJECT_STATE.md` |
 | Unscheduled work / canonical queue | `FUTURE_WORK.MD` |
 | Accepted architecture | `ADR.md` + relevant architecture document |
+| Financial-source ingestion / parser support | ADR-046 + Standing Harness **Parser / Authentic-Corpus Acceptance Policy** + current `PROJECT_STATE.md` parser-reliability alignment |
 | Persistence / migrations | `Database_v1_Architecture.md` + registered migrations |
 | Financial engineering invariants | `Engineering Standards.md` |
 | Build, Xcode, Git and validation mechanics | `BUILD_AND_PROJECT_CONVENTIONS.md` |
@@ -60,6 +61,8 @@ Read an authority only when the selected playbook requires it.
 | Execution authorization | Complete current Chat-approved prompt |
 
 Memory, old conversations, uploads and reports are context, not repository authority. Reports are claims until independently verified.
+
+The user-settled all-stages authentic-input rule in ADR-046 and the Standing Harness applies before development or debugging as well as during acceptance: no generated, reconstructed, sanitized, representative, reduced, mutated or hand-authored financial statement may be created or used. Only authentic corpus inputs (including operational exact/decrypted copies or actual attachments) may exercise statement-dependent behaviour. Nonfinancial mechanics remain permitted; absent authentic cases remain source-uncertified. <!-- user-specified -->
 
 ---
 
@@ -197,7 +200,7 @@ Chat owns scope, architecture, source truth, and acceptance boundary. Codex owns
 Narrow work: Luna High parent, High reasoning, no subagents or bounded read-only specialists. Broad/cross-layer work: Luna Max parent, High reasoning, Luna High read-only specialists, normally one production writer.
 
 ## Method
-1. Consume the approved execution contract and verify live-state evidence.
+1. Consume the approved execution contract and verify live-state evidence. For any financial-source ingestion/support work, read ADR-046, the Standing Harness parser/authentic-corpus policy and the current `PROJECT_STATE.md` parser-reliability alignment before implementation.
 2. Stop on material contradiction.
 3. Acquire mutation authority only immediately before mutation.
 4. Edit only approved scope.
@@ -227,7 +230,7 @@ Use `PG-30` execution mechanics.
 1. Establish the failed acceptance condition and attribution to Sprint N.
 2. Preserve the original intended outcome.
 3. Repair only the first causal boundary plus required consequences.
-4. Add regression/falsification evidence.
+4. Add regression/falsification evidence. Parser/source repairs must use the complete affected authentic corpus; synthetic financial-source fixtures or partial authentic sampling cannot establish corrected source support.
 5. Do not absorb unrelated work or renumber later planned sprints.
 
 ## Required end state: `IMPLEMENTATION_CANDIDATE`
@@ -246,7 +249,7 @@ Determine whether a candidate actually satisfies the approved outcome.
 Chat / Coordinator. Default reasoning: **Sol High**.
 
 ## Method
-Verify candidate identity, branch/worktree handling, changed files, scope/exclusions, architecture/migration impact, independent-oracle boundary, test boundary, source truth where relevant, provider parity where relevant, persistence/hydration/relaunch/presentation where relevant, privacy/residue, falsification evidence, and final local state.
+Verify candidate identity, branch/worktree handling, changed files, scope/exclusions, architecture/migration impact, independent-oracle boundary, test boundary, source truth where relevant, provider parity where relevant, persistence/hydration/relaunch/presentation where relevant, privacy/residue, falsification evidence, and final local state. For reader/parser/source-support claims, ADR-046 requires the complete affected authentic corpus through the ordinary production path; synthetic financial-source fixtures, partial authentic sampling and a green TestPlan alone cannot authorize support.
 
 Treat execution reports as claims. Classify material claims as verified, reported only, contradicted, or missing.
 
@@ -298,6 +301,7 @@ Chat semantic reasoning
 8. Chat rereads the actual resulting files through MCP and performs semantic acceptance.
 9. Documentation-only work does not trigger application-wide tests unless executable material changed.
 10. Private planning/harness material remains outside Git unless separately authorized.
+11. When parser/source-support documentation changes, reconcile it against ADR-046, the Standing Harness parser/authentic-corpus policy and the current `PROJECT_STATE.md` parser-reliability alignment; preserve historical records but remove contradictory current authority.
 
 ## Required end state: `DOCS_RECONCILED`
 Current authorities agree; obsolete current-state claims are removed or narrowed; historical claims remain historically accurate; policy has one durable home where practical; routing points to subject authorities instead of duplicating them; no private material leaked into Git; final diff is ready for publication review.

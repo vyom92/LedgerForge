@@ -44,9 +44,11 @@ struct LedgerForgeTests {
 #endif
     }
 
-    @Test func importPresentationMappingsKeepValidationAndFooterTruthful() throws {
-        let prepared = try sprint68APreparedImport(fileName: "prepared.csv", validationPassed: true)
-        let validationFailed = try sprint68APreparedImport(fileName: "invalid.csv", validationPassed: false)
+    @Test(.globalRuntimeStateIsolation)
+    func importPresentationMappingsKeepValidationAndFooterTruthful() async throws {
+        let preparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { preparedOwner.cancel() }
+        let prepared = preparedOwner.preparedImport
         let successfulOutcome = ImportOutcomePresentation(
             result: ImportEngineResult(
                 fileName: "completed.csv",
@@ -69,12 +71,12 @@ struct LedgerForgeTests {
         #expect(ValidationReviewPresentation.presentation(for: .idle).kind == .noStatementPrepared)
         #expect(ValidationReviewPresentation.presentation(for: .preparing(fileName: "opening.csv", phase: .openingSource)).kind == .noStatementPrepared)
         #expect(ValidationReviewPresentation.presentation(for: .previewReady(prepared)).kind == .validationResults)
-        #expect(ValidationReviewPresentation.presentation(for: .validationFailed(validationFailed)).kind == .validationResults)
+        #expect(ValidationReviewPresentation.presentation(for: .validationFailed(prepared)).kind == .validationResults)
         #expect(ValidationReviewPresentation.presentation(for: .committing(prepared)).kind == .validationResults)
         #expect(ValidationReviewPresentation.presentation(for: .completed(successfulOutcome)).kind == .noStatementPrepared)
 
         #expect(ImportFooterPresentation.presentation(for: .previewReady(prepared)).kind == .confirmation)
-        #expect(ImportFooterPresentation.presentation(for: .validationFailed(validationFailed)).kind == .none)
+        #expect(ImportFooterPresentation.presentation(for: .validationFailed(prepared)).kind == .none)
         #expect(ImportFooterPresentation.presentation(for: .committing(prepared)).kind == .importing)
         #expect(ImportFooterPresentation.presentation(for: .failed(fileName: "retry.csv", message: "Read failed", retrySourceURL: URL(fileURLWithPath: "/tmp/retry.csv"))).kind == .retryPreparation)
         #expect(ImportFooterPresentation.presentation(for: .failed(fileName: "not-retryable.csv", message: "Unsupported", retrySourceURL: nil)).kind == .none)
@@ -140,7 +142,7 @@ struct LedgerForgeTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func developmentDatabaseResetSwapsToFreshProviderAndHydratesEmptyRuntimeState() throws {
+    func developmentDatabaseResetSwapsToFreshProviderAndHydratesEmptyRuntimeState() async throws {
         resetSprint30RuntimeState()
         defer {
             resetSprint30RuntimeState()
@@ -156,13 +158,13 @@ struct LedgerForgeTests {
 
         let originalPath = folder.appendingPathComponent("original.sqlite").path
         #expect(LedgerForgeApp.configurePersistence(path: originalPath))
-        try seedSprint30Repository(DatabaseProvider.shared)
+        let plan = try await seedSprint30Repository(DatabaseProvider.shared)
 
         let initialHydration = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
         #expect(initialHydration.accountCount == 1)
-        #expect(initialHydration.transactionCount == 1)
+        #expect(initialHydration.transactionCount == plan.transactionTemplates.count)
         #expect(AccountStore.shared.accounts.count == 1)
-        #expect(TransactionStore.shared.transactions.count == 1)
+        #expect(TransactionStore.shared.transactions.count == plan.transactionTemplates.count)
 
         UserDefaults.standard.set("preserved", forKey: "Sprint30PreferencePreservation")
         let lifecycleResult = LedgerForgeApp.startTemporaryEmptySession()
@@ -189,7 +191,7 @@ struct LedgerForgeTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func canonicalReloadDataRefreshesRuntimeCountsFromRepositoryState() throws {
+    func canonicalReloadDataRefreshesRuntimeCountsFromRepositoryState() async throws {
         resetSprint30RuntimeState()
         defer {
             resetSprint30RuntimeState()
@@ -203,56 +205,36 @@ struct LedgerForgeTests {
         }
 
         #expect(LedgerForgeApp.configurePersistence(path: folder.appendingPathComponent("reload.sqlite").path))
-        try seedSprint30Repository(DatabaseProvider.shared)
+        let plan = try await seedSprint30Repository(DatabaseProvider.shared)
 
         let result = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
 
         #expect(result.accountCount == 1)
-        #expect(result.transactionCount == 1)
+        #expect(result.transactionCount == plan.transactionTemplates.count)
         #expect(AccountStore.shared.accounts.count == 1)
-        #expect(TransactionStore.shared.transactions.count == 1)
+        #expect(TransactionStore.shared.transactions.count == plan.transactionTemplates.count)
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func runtimeInspectorAndRepositorySummaryUseRuntimeStoreCounts() {
+    func runtimeInspectorAndRepositorySummaryUseRuntimeStoreCounts() async throws {
         resetSprint30RuntimeState()
         defer {
             resetSprint30RuntimeState()
+            LedgerForgeApp.configureInMemoryPersistenceForTesting()
         }
 
-        AccountStore.shared.replaceAccounts([
-            Account(
-                institution: "Axis Bank",
-                name: "Axis NRE",
-                type: .bank,
-                currencyCode: "INR",
-                currentBalance: 100,
-                includeInNetWorth: true
-            )
-        ])
-        TransactionStore.shared.replaceTransactions([
-            Transaction(
-                statementDate: try! StatementDate(canonical: "2027-03-13"),
-                description: "Runtime credit",
-                debit: nil,
-                credit: 100,
-                amount: 100,
-                balance: 100,
-                currency: "INR",
-                account: "Axis NRE",
-                sourceBank: "Axis Bank",
-                sourceFile: "fixture.csv"
-            )
-        ])
+        LedgerForgeApp.configureInMemoryPersistenceForTesting()
+        let plan = try await seedSprint30Repository(DatabaseProvider.shared)
+        _ = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
 
         let snapshot = DeveloperConsole.runtimeSnapshot(
             persistenceState: .verifiedSQLite,
             hydrationStatus: "Forced refresh completed",
-            latestRefreshResult: "1 account(s), 1 transaction(s)"
+            latestRefreshResult: "1 account(s), \(plan.transactionTemplates.count) transaction(s)"
         )
 
         #expect(snapshot.accountCount == 1)
-        #expect(snapshot.transactionCount == 1)
+        #expect(snapshot.transactionCount == plan.transactionTemplates.count)
         #expect(snapshot.persistenceState == .verifiedSQLite)
         #expect(snapshot.persistenceState.displayName == "Verified SQLite")
         #expect(snapshot.persistenceState.recoveryGuidance == nil)
@@ -309,56 +291,6 @@ struct LedgerForgeTests {
     }
 }
 
-private func sprint68APreparedImport(fileName: String, validationPassed: Bool) throws -> PreparedImport {
-    let currency = try CurrencyCode("INR")
-    let transaction = Transaction(
-        statementDate: try StatementDate(canonical: "2026-08-01"),
-        description: "Sprint 68A presentation fixture",
-        debit: nil,
-        credit: 1,
-        amount: 1,
-        balance: 1,
-        currency: currency.code,
-        account: "Axis",
-        sourceBank: "Axis",
-        sourceFile: fileName
-    )
-    let document = FinancialDocument(
-        sourceDocument: Document(
-            filename: fileName,
-            url: URL(fileURLWithPath: "/tmp/\(fileName)"),
-            fileType: "CSV",
-            importedAt: Date(timeIntervalSince1970: 1_704_067_200)
-        ),
-        metadata: DocumentMetadata(institution: .axis, documentType: .bankAccount, fileFormat: .csv, confidence: 1),
-        parserName: "Sprint 68A Presentation Parser",
-        bookedCurrency: currency,
-        transactions: [transaction]
-    )
-    let validation = ImportValidationResult(
-        rowsRead: 1,
-        transactionsParsed: 1,
-        statementCurrency: currency,
-        debitTotalMoney: nil,
-        creditTotalMoney: try Money(amount: 1, currency: currency),
-        openingBalanceMoney: nil,
-        closingBalanceMoney: nil,
-        passed: validationPassed,
-        issues: []
-    )
-    return PreparedImport(
-        sourceURL: document.sourceDocument.url,
-        rawContents: "date,amount",
-        fileName: fileName,
-        detectedInstitution: .axis,
-        detectedDocumentType: .bankAccount,
-        parserName: document.parserName,
-        financialDocument: document,
-        validation: validation,
-        importSession: ImportSession(fileName: fileName, parserName: document.parserName, transactionCount: 1, validation: validation)
-    )
-}
-
 private func sprint68AContentViewSection(
     _ source: String,
     startingAt startMarker: String,
@@ -388,123 +320,12 @@ private func sprint30TemporaryFolder(named name: String) throws -> URL {
     return folder
 }
 
-private func seedSprint30Repository(_ provider: DatabaseProvider) throws {
-    let workspace = WorkspaceDTO(
-        id: sprint30WorkspaceId,
-        name: "Sprint 30 Workspace",
-        createdAtISO: "2026-07-12T00:00:00Z"
-    )
-    let account = AccountDTO(
-        id: "account-sprint-30",
-        workspaceId: workspace.id,
-        name: "Axis NRE",
-        institutionId: "Axis Bank",
-        accountType: "bank",
-        nativeCurrency: "INR",
-        description: "Sprint 30 account",
-        createdAtISO: "2026-07-12T00:01:00Z"
-    )
-    let session = ImportSessionDTO(
-        id: "import-sprint-30",
-        workspaceId: workspace.id,
-        userVisibleName: "Sprint 30 Import",
-        startedAtISO: "2026-07-12T00:02:00Z",
-        validationStatus: "passed",
-        readerVersion: nil,
-        parserVersion: "Axis Bank Account",
-        layoutVersion: nil
-    )
-    let transaction = TransactionDTO(
-        id: "transaction-sprint-30",
-        workspaceId: workspace.id,
-        accountId: nil,
-        importSessionId: nil,
-        postedDateISO: "2026-07-12",
-        description: "Sprint 30 credit",
-        nativeCurrency: "INR",
-        amountMinor: 100_00,
-        amountDecimal: "100.00",
-        direction: "credit",
-        runningBalanceMinor: 100_00,
-        isTrusted: true,
-        trustedAtISO: "2026-07-12T00:04:00Z",
-        createdAtISO: "2026-07-12T00:03:00Z",
-        rawRows: [
-            TransactionRawRowDTO(
-                id: "transaction-raw-sprint-30",
-                normalizedRowId: "normalized-row-sprint-30",
-                contributionType: "transaction"
-            )
-        ]
-    )
-    let sprint30FingerprintDigest = "462be1cd5a1e7d6cd8386ca159cbd844a4f4c0047dd35f0b0df4c4a2750c42c2"
-    let document = ImportedDocumentDTO(
-        id: "document-sprint-30",
-        workspaceId: workspace.id,
-        importSessionId: session.id,
-        filename: "sprint-30.csv",
-        mimeType: nil,
-        sizeBytes: nil,
-        sha256: sprint30FingerprintDigest,
-        createdAtISO: "2026-07-12T00:03:00Z"
-    )
-    let fingerprint = DocumentFingerprintDTO(
-        id: "fingerprint-sprint-30",
-        documentId: document.id,
-        importSessionId: session.id,
-        algorithm: DocumentFingerprintDTO.rawTextSHA256Algorithm,
-        fingerprint: sprint30FingerprintDigest,
-        fingerprintData: nil,
-        isDuplicateAuthority: true,
-        createdAtISO: "2026-07-12T00:03:00Z"
-    )
-    let normalizedDocument = NormalizedDocumentDTO(
-        id: "normalized-document-sprint-30",
-        importSessionId: session.id,
-        documentId: document.id,
-        profileId: "test.sprint30",
-        profileVersion: "1"
-    )
-    let normalizedRow = NormalizedRowDTO(
-        id: "normalized-row-sprint-30",
-        normalizedDocumentId: normalizedDocument.id,
-        sourceOrdinal: 1,
-        digest: String.normalizedRecordDigest(values: ["sprint-30"])
-    )
-    let attempt = ImportAttemptDTO(
-        id: "attempt-sprint-30",
-        workspaceId: workspace.id,
-        createdAtISO: "2026-07-12T00:04:00Z",
-        outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
-        coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
-        accountDecisionCode: ImportAttemptAccountDecision.resolvedOrCreated.rawValue,
-        guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
-        persistenceCode: ImportAttemptPersistence.committed.rawValue,
-        transactionCount: 1,
-        accountId: account.id,
-        importSessionId: session.id,
-        documentId: document.id
-    )
-    let plan = ConfirmedImportPlanDTO(
-        providerGeneration: provider.generationToken,
-        workspace: workspace,
-        proposedAccount: account,
-        accountChoice: .createProposedAccount,
-        advisoryIdentity: .noMatch,
-        identifiers: [],
-        historyTemplate: ConfirmedImportHistoryTemplateDTO(
-            document: document,
-            fingerprint: fingerprint,
-            importSession: session,
-            completedAtISO: "2026-07-12T00:04:00Z",
-            successfulAttempt: attempt,
-            normalizedDocument: normalizedDocument,
-            normalizedRows: [normalizedRow]
-        ),
-        transactionTemplates: [ConfirmedImportTransactionTemplateDTO(transaction: transaction)]
-    )
+@MainActor
+private func seedSprint30Repository(_ provider: DatabaseProvider) async throws -> ConfirmedImportPlanDTO {
+    let plan = try await confirmedImportPlan(generationToken: provider.generationToken)
     guard case .committed = provider.confirmedImportRepo.commitConfirmedImport(plan) else {
-        Issue.record("Sprint 30 test fixture failed to create its confirmed trusted graph.")
-        return
+        Issue.record("Authentic confirmed import failed to create the runtime graph.")
+        throw RepositoryError.persistenceUnavailable
     }
+    return plan
 }

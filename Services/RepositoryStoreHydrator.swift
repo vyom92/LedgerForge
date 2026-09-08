@@ -338,6 +338,7 @@ final class RepositoryStoreHydrator {
         let categoryDTOs = try categoryRepo.categories(workspaceId: workspaceId)
         let categoryAssignmentDTOs = try categoryRepo.assignments(workspaceId: workspaceId)
         let cardDTOs = try cardRepo.snapshot(workspaceId: workspaceId)
+        let zeroActivityControls = try importSessionRepo.statementZeroActivityControls(workspaceId: workspaceId)
         let salaryDTOs = try salaryRepo.snapshot(workspaceId: workspaceId)
         let fundingPlanDTOs = try fundingPlanRepo.plans(workspaceId: workspaceId)
         let identitiesByAccountID = Dictionary(
@@ -347,6 +348,7 @@ final class RepositoryStoreHydrator {
         )
         let preferredSources = try importSessionRepo.preferredTransactionSources(workspaceId: workspaceId)
         let preferredSourcesByTransactionID = Dictionary(uniqueKeysWithValues: preferredSources.map { ($0.transactionId, $0) })
+        let statementProjections = try importSessionRepo.statementFinancialProjections(workspaceId: workspaceId)
         var importedDocumentsByID = try referencedImportedDocuments(from: transactionDTOs)
         for documentID in Set(salaryDTOs.statements.map(\.documentId)) where importedDocumentsByID[documentID] == nil {
             if let document = try importSessionRepo.importedDocument(id: documentID) {
@@ -358,14 +360,20 @@ final class RepositoryStoreHydrator {
                 importedDocumentsByID[documentID] = document
             }
         }
+        for documentID in Set(cardDTOs.statements.map(\.documentId) + zeroActivityControls.map(\.documentId) + statementProjections.map(\.documentID)) where importedDocumentsByID[documentID] == nil {
+            if let document = try importSessionRepo.importedDocument(id: documentID) {
+                importedDocumentsByID[documentID] = document
+            }
+        }
         let importAttempts = try importSessionRepo.importAttempts(workspaceId: workspaceId).map(RepositoryImportAttempt.init)
-        let statementProjections = try importSessionRepo.statementFinancialProjections(workspaceId: workspaceId)
         let statementGroups = try importSessionRepo.statementEquivalenceGroups(workspaceId: workspaceId)
         let statementMembers = try importSessionRepo.statementEquivalenceMembers(workspaceId: workspaceId)
         let importSessions = try referencedImportSessions(
             from: transactionDTOs,
             statementProjections: statementProjections,
-            salaryStatements: salaryDTOs.statements
+            salaryStatements: salaryDTOs.statements,
+            zeroActivityControls: zeroActivityControls,
+            cardStatements: cardDTOs.statements
         )
         try Self.validatePartialAttemptConsistency(
             sessions: importSessions,
@@ -377,7 +385,15 @@ final class RepositoryStoreHydrator {
             members: statementMembers,
             accounts: accountDTOs,
             transactions: transactionDTOs,
-            attempts: importAttempts
+            attempts: importAttempts,
+            documentsByID: importedDocumentsByID
+        )
+        try validateZeroActivityConsistency(
+            controls: zeroActivityControls,
+            accounts: accountDTOs,
+            documentsByID: importedDocumentsByID,
+            sessions: importSessions,
+            transactions: transactionDTOs
         )
         let cardEvidenceByTransactionID = Dictionary(uniqueKeysWithValues: cardDTOs.transactionEvidence.map { ($0.transactionId, $0) })
         let transactions = try transactionDTOs.map {
@@ -394,7 +410,8 @@ final class RepositoryStoreHydrator {
             from: cardDTOs,
             accounts: accountDTOs,
             transactions: transactionDTOs,
-            workspaceID: workspaceId
+            workspaceID: workspaceId,
+            zeroActivityControls: zeroActivityControls
         )
         let accounts = try Self.accounts(
             from: accountDTOs,
@@ -782,7 +799,8 @@ final class RepositoryStoreHydrator {
         members: [StatementEquivalenceMemberDTO],
         accounts: [AccountDTO],
         transactions: [TransactionDTO],
-        attempts: [RepositoryImportAttempt]
+        attempts: [RepositoryImportAttempt],
+        documentsByID: [String: ImportedDocumentDTO]
     ) throws {
         guard Set(projections.map(\.projection.id)).count == projections.count,
               Set(groups.map(\.id)).count == groups.count,
@@ -798,7 +816,7 @@ final class RepositoryStoreHydrator {
                   record.projection.isValid(),
                   let session = try importSessionRepo.importSession(id: record.importSessionID),
                   session.workspaceId == workspaceId,
-                  let document = try importSessionRepo.importedDocument(id: record.documentID),
+                  let document = documentsByID[record.documentID],
                   document.workspaceId == workspaceId,
                   document.importSessionId == record.importSessionID else {
                 throw RepositoryStoreHydrationError.invalidStatementEquivalence("projection relationship")
@@ -806,10 +824,19 @@ final class RepositoryStoreHydrator {
         }
         for group in groups {
             let groupMembers = members.filter { $0.groupID == group.id }
+            let maximumFormatCount: Int
+            switch (group.projectionAlgorithm, group.institutionCode, group.statementFamilyCode) {
+            case (StatementFinancialProjectionDTO.algorithm, "hdfc", "hdfc.bank-account"):
+                maximumFormatCount = 2
+            case (StatementFinancialProjectionDTO.axisAlgorithm, "axis", "axis.bank-account"):
+                maximumFormatCount = 3
+            default:
+                throw RepositoryStoreHydrationError.invalidStatementEquivalence("unsupported projection family")
+            }
             guard group.workspaceID == workspaceId,
                   accountIDs.contains(group.accountID),
                   groupMembers.count >= 1,
-                  groupMembers.count <= 2,
+                  groupMembers.count <= maximumFormatCount,
                   Set(groupMembers.map(\.sourceFormatCode)).count == groupMembers.count,
                   groupMembers.filter({ $0.role == .authoritative }).count == 1,
                   let authoritative = projectionByID[group.authoritativeProjectionID],
@@ -859,10 +886,59 @@ final class RepositoryStoreHydrator {
         }
     }
 
+    private func validateZeroActivityConsistency(
+        controls: [StatementZeroActivityControlDTO],
+        accounts: [AccountDTO],
+        documentsByID: [String: ImportedDocumentDTO],
+        sessions: [RepositoryImportSession],
+        transactions: [TransactionDTO]
+    ) throws {
+        guard Set(controls.map(\.id)).count == controls.count else {
+            throw RepositoryStoreHydrationError.invalidStatementEquivalence("zero-control duplicate identity")
+        }
+        let accountByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
+        let sessionByID = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+        for control in controls {
+            let durableAuthority = try importSessionRepo.priorImportedStatement(
+                algorithm: control.sourceFingerprintAlgorithm,
+                fingerprint: control.sourceFingerprintDigest
+            )
+            guard control.isValid(),
+                  let account = accountByID[control.accountId],
+                  control.matchesAccount(account),
+                  let document = documentsByID[control.documentId],
+                  document.workspaceId == workspaceId,
+                  document.importSessionId == control.importSessionId,
+                  let session = sessionByID[control.importSessionId],
+                  session.workspaceId == workspaceId,
+                  durableAuthority?.importSessionId == control.importSessionId,
+                  transactions.allSatisfy({ transaction in
+                      transaction.documentId != control.documentId &&
+                      transaction.importSessionId != control.importSessionId
+                  }) else {
+                throw RepositoryStoreHydrationError.invalidStatementEquivalence("zero-control relationship")
+            }
+        }
+        let grouped = Dictionary(grouping: controls) { control in
+            [control.workspaceId, control.accountId, control.institutionCode,
+             control.statementFamilyCode, control.semanticCycleKey, control.nativeCurrency]
+                .joined(separator: "|")
+        }
+        for group in grouped.values {
+            let authorities = group.filter { $0.authorityRole == "authoritative" }
+            guard authorities.count == 1,
+                  group.allSatisfy({ $0.semanticDigest == authorities[0].semanticDigest }) else {
+                throw RepositoryStoreHydrationError.invalidStatementEquivalence("zero-control authority")
+            }
+        }
+    }
+
     private func referencedImportSessions(
         from transactions: [TransactionDTO],
         statementProjections: [StatementFinancialProjectionRecordDTO],
-        salaryStatements: [SalaryStatementDTO]
+        salaryStatements: [SalaryStatementDTO],
+        zeroActivityControls: [StatementZeroActivityControlDTO] = [],
+        cardStatements: [CardStatementDTO] = []
     ) throws -> [RepositoryImportSession] {
         var referencedSessionIDs = Set(
             transactions.compactMap { transaction -> String? in
@@ -874,6 +950,8 @@ final class RepositoryStoreHydrator {
         )
         referencedSessionIDs.formUnion(statementProjections.map(\.importSessionID))
         referencedSessionIDs.formUnion(salaryStatements.map(\.importSessionId))
+        referencedSessionIDs.formUnion(zeroActivityControls.map(\.importSessionId))
+        referencedSessionIDs.formUnion(cardStatements.map(\.importSessionId))
 
         let transactionsByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
         return try referencedSessionIDs.sorted().compactMap { sessionID in
@@ -1022,7 +1100,8 @@ final class RepositoryStoreHydrator {
         from snapshot: CardRepositorySnapshotDTO,
         accounts: [AccountDTO],
         transactions: [TransactionDTO],
-        workspaceID: String
+        workspaceID: String,
+        zeroActivityControls: [StatementZeroActivityControlDTO] = []
     ) throws -> CardStoreSnapshot {
         let accountByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
         let transactionByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
@@ -1039,6 +1118,21 @@ final class RepositoryStoreHydrator {
               Set(snapshot.semanticGroups.map(\.id)).count == snapshot.semanticGroups.count,
               Set(snapshot.semanticMembers.map(\.id)).count == snapshot.semanticMembers.count else {
             throw RepositoryStoreHydrationError.invalidCardState("duplicate durable identity")
+        }
+
+        for zero in zeroActivityControls where zero.statementFamilyCode == "axis.credit-card" {
+            let matchingStatements = snapshot.statements.filter {
+                $0.workspaceId == zero.workspaceId &&
+                $0.liabilityAccountId == zero.accountId &&
+                $0.documentId == zero.documentId &&
+                $0.importSessionId == zero.importSessionId &&
+                $0.normalizedDocumentId == zero.normalizedDocumentId &&
+                $0.parserProfileId == zero.parserProfileId &&
+                $0.parserProfileVersion == zero.parserProfileVersion
+            }
+            guard matchingStatements.count == 1 else {
+                throw RepositoryStoreHydrationError.invalidCardState("zero-control missing card statement")
+            }
         }
 
         let instrumentByID = Dictionary(uniqueKeysWithValues: snapshot.instruments.map { ($0.id, $0) })
@@ -1140,6 +1234,19 @@ final class RepositoryStoreHydrator {
         var runtimeStatements = [CardStatement]()
         var runtimeEvidence = [DurableCardTransactionEvidence]()
         for statement in snapshot.statements {
+            let matchingZeroActivityControls = zeroActivityControls.filter {
+                $0.workspaceId == workspaceID &&
+                $0.accountId == statement.liabilityAccountId &&
+                $0.documentId == statement.documentId &&
+                $0.importSessionId == statement.importSessionId &&
+                $0.normalizedDocumentId == statement.normalizedDocumentId &&
+                $0.parserProfileId == statement.parserProfileId &&
+                $0.parserProfileVersion == statement.parserProfileVersion
+            }
+            guard matchingZeroActivityControls.count <= 1 else {
+                throw RepositoryStoreHydrationError.invalidCardState("zero-control duplicate statement binding")
+            }
+            let hasZeroActivityControl = !matchingZeroActivityControls.isEmpty
             guard let contract = CardStatementProfileContract(
                     reconciliationRuleIdentifier: statement.reconciliationRuleCode
                   ),
@@ -1150,7 +1257,7 @@ final class RepositoryStoreHydrator {
                   contract.accepts(profileID: statement.parserProfileId),
                   statement.parserProfileVersion == contract.profileVersion,
                   statement.statementCurrency == (contract == .axis ? "INR" : "QAR"),
-                  statement.sourceRowCount > 0 else {
+                  statement.sourceRowCount > 0 || hasZeroActivityControl else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement relationship")
             }
             let statementComponents = snapshot.summaryComponents.filter { $0.cardStatementId == statement.id }
@@ -1158,12 +1265,31 @@ final class RepositoryStoreHydrator {
             let summaryCodes = Set(statementComponents.map(\.componentCode))
             let summaryCoverageIsValid = contract == .axis
                 ? summaryCodes.isSubset(of: contract.allowedSummaryCodes)
-                : summaryCodes == contract.requiredSummaryCodes(
+                : summaryCodes == contract.hydrationRequiredSummaryCodes(
                     reconciliationRuleIdentifier: statement.reconciliationRuleCode,
                     sourceFormatCode: sourceFormat
                 )
             guard summaryCoverageIsValid, summaryCodes.count == statementComponents.count else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement summary coverage")
+            }
+            if contract == .axis, let zero = matchingZeroActivityControls.first {
+                let summaries = Dictionary(uniqueKeysWithValues: statementComponents.map { ($0.componentCode, $0) })
+                let previous = summaries["previous_balance"]
+                let paymentDue = summaries["axis_total_payment_due"]
+                guard statement.sourceRowCount == 0,
+                      summaryCodes == Set(["previous_balance", "axis_total_payment_due", "due_date"]),
+                      zero.statementDateISO == statement.statementDateISO,
+                      zero.statementStartDateISO == statement.statementStartDateISO,
+                      zero.statementEndDateISO == statement.statementEndDateISO,
+                      zero.selectedStatementMonthISO == statement.selectedStatementMonthISO,
+                      zero.nativeCurrency == statement.statementCurrency,
+                      zero.cardPreviousBalanceMinor == previous?.moneyMinor,
+                      zero.cardPreviousBalanceDecimal == previous?.moneyDecimal,
+                      zero.cardTotalPaymentDueMinor == paymentDue?.moneyMinor,
+                      zero.cardTotalPaymentDueDecimal == paymentDue?.moneyDecimal,
+                      zero.cardPaymentDueDateISO == summaries["due_date"]?.dateISO else {
+                    throw RepositoryStoreHydrationError.invalidCardState("zero-control card semantics")
+                }
             }
             let components: [CardStatementSummaryComponent] = try statementComponents.map { component in
                 if component.componentCode == "due_date" {
@@ -1193,6 +1319,7 @@ final class RepositoryStoreHydrator {
                 case "billed_installment": return .billedInstallment(decimalMoney)
                 case "fees_charges": return .feesCharges(decimalMoney)
                 case "new_balance": return .newBalance(decimalMoney)
+                case "minimum_amount_due": return .minimumAmountDue(decimalMoney)
                 case "instrument_net_total": return .instrumentNetTotal(decimalMoney)
                 case "source_section_net_total": return .sourceSectionNetTotal(decimalMoney)
                 case "axis_total_payment_due": return .axisTotalPaymentDue(decimalMoney)
@@ -1207,7 +1334,11 @@ final class RepositoryStoreHydrator {
             }
             let durableSections = snapshot.sections.filter { $0.cardStatementId == statement.id }
                 .sorted { $0.sourceOrdinal < $1.sourceOrdinal }
-            guard (contract == .axis ? durableSections.isEmpty : !durableSections.isEmpty),
+            let permitsAccountOnlyAmexZero = contract == .amex &&
+                statement.sourceRowCount == 0 && hasZeroActivityControl
+            guard (contract == .axis
+                    ? durableSections.isEmpty
+                    : (permitsAccountOnlyAmexZero || !durableSections.isEmpty)),
                   durableSections.map(\.sourceOrdinal) == durableSections.indices.map({ $0 + 1 }),
                   Set(durableSections.map(\.documentScopedSectionId)).count == durableSections.count else {
                 throw RepositoryStoreHydrationError.invalidCardState("statement section coverage")
@@ -1558,6 +1689,17 @@ final class RepositoryStoreHydrator {
             let isCardDirection = CardLiabilityEffect(rawValue: transaction.direction) != nil
             return isCardDirection == evidencedTransactionIDs.contains(transaction.id)
         }) else { throw RepositoryStoreHydrationError.invalidCardState("transaction evidence coverage") }
+        let runtimeAccountObservations = try snapshot.sourceObservations.compactMap { observation -> CardSourceIdentityObservation? in
+            guard observation.subjectKind == CardSourceIdentitySubject.liabilityAccount.rawValue else { return nil }
+            guard let kind = CardSourceIdentityObservationKind(rawValue: observation.observationKind) else {
+                throw RepositoryStoreHydrationError.invalidCardState("observation account kind")
+            }
+            return try CardSourceIdentityObservation(
+                kind: kind,
+                subject: .liabilityAccount,
+                value: observation.sourceValue
+            )
+        }
         let sortedStatements = runtimeStatements.sorted { lhs, rhs in
             let lhsMonth = lhs.selectedStatementMonth?.canonical ?? lhs.statementDate.map { String(format: "%04d-%02d", $0.year, $0.month) } ?? lhs.period.map { String(format: "%04d-%02d", $0.end.year, $0.end.month) } ?? ""
             let rhsMonth = rhs.selectedStatementMonth?.canonical ?? rhs.statementDate.map { String(format: "%04d-%02d", $0.year, $0.month) } ?? rhs.period.map { String(format: "%04d-%02d", $0.end.year, $0.end.month) } ?? ""
@@ -1569,6 +1711,7 @@ final class RepositoryStoreHydrator {
         }
         return CardStoreSnapshot(
             instruments: runtimeInstruments,
+            sourceObservations: runtimeAccountObservations,
             relationships: runtimeRelationships.sorted { $0.id < $1.id },
             statements: sortedStatements,
             transactionEvidence: runtimeEvidence.sorted { ($0.statementID, $0.transactionID) < ($1.statementID, $1.transactionID) }

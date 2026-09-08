@@ -136,6 +136,10 @@ struct ImportPersistencePayload {
     let normalizedRows: [NormalizedRowDTO]
     let transactions: [TransactionDTO]
     let transactionEventIdentities: [TransactionEventIdentityDTO]
+    /// Parser-proven controls for a zero-row source.  This is nil for a
+    /// normal transaction-bearing import and is built only after the source
+    /// fingerprint authority and durable IDs are known.
+    let zeroActivityControl: StatementZeroActivityControlDTO?
 }
 
 struct ImportPersistenceMapper {
@@ -251,9 +255,7 @@ struct ImportPersistenceMapper {
         }
 
         let normalizedDocumentID = "normalized-document-\(importSession.id.uuidString.lowercased())"
-        let parserProfile = try requiredParserProfile(
-            from: financialDocument.transactions
-        )
+        let parserProfile = try requiredParserProfile(from: financialDocument)
         let normalizedRows = try financialDocument.transactions.flatMap(\.sourceProvenance).map { provenance in
             guard provenance.sourceOrdinal > 0, !provenance.normalizedRecordDigest.isEmpty else {
                 throw ImportPersistenceError.missingTransactionProvenance
@@ -276,6 +278,26 @@ struct ImportPersistenceMapper {
                 normalizedDocumentID: normalizedDocumentID,
                 importSessionID: importSession.id.uuidString
             )
+        }
+        guard financialDocument.zeroActivityEvidence == nil || financialDocument.transactions.isEmpty else {
+            throw ImportPersistenceError.validationFailed
+        }
+        let zeroActivityControl: StatementZeroActivityControlDTO?
+        if let evidence = financialDocument.zeroActivityEvidence {
+            zeroActivityControl = try StatementZeroActivityControlDTO.make(
+                evidence: evidence,
+                id: "zero-activity-control-\(importSession.id.uuidString.lowercased())",
+                workspaceId: workspaceId,
+                accountId: accountId,
+                documentId: documentId,
+                importSessionId: importSessionId,
+                normalizedDocumentId: normalizedDocumentID,
+                sourceFingerprintAlgorithm: duplicateAuthority.algorithm,
+                sourceFingerprintDigest: duplicateAuthority.digest,
+                createdAtISO: importedAtISO
+            )
+        } else {
+            zeroActivityControl = nil
         }
         return ImportPersistencePayload(
             workspace: workspace(createdAt: importSession.importedAt),
@@ -303,7 +325,8 @@ struct ImportPersistenceMapper {
             ),
             normalizedRows: normalizedRows,
             transactions: transactions,
-            transactionEventIdentities: []
+            transactionEventIdentities: [],
+            zeroActivityControl: zeroActivityControl
         )
     }
 
@@ -506,7 +529,8 @@ struct ImportPersistenceMapper {
             },
             cbqSourceRows: cbqRows,
             cbqStatementSourceEvidence: cbqStatementEvidence,
-            cardImportPlan: cardPlan
+            cardImportPlan: cardPlan,
+            zeroActivityControl: payload.zeroActivityControl
         )
     }
 
@@ -548,9 +572,16 @@ struct ImportPersistenceMapper {
               ["user_confirmed", "prior_user_confirmed_mapping", "parser_strong_evidence"].contains(associationAuthority) else {
             throw ImportPersistenceError.conflictingTransactionProvenance
         }
+        let isAccountOnlyAmexZero = isAmex &&
+            payload.zeroActivityControl != nil &&
+            payload.transactions.isEmpty &&
+            evidence.transactionAnnotations.isEmpty &&
+            evidence.instrumentSections.isEmpty &&
+            evidence.accountSourceIdentityObservations.count == 1
         guard isAxis
             ? evidence.instrumentSections.isEmpty && evidence.accountSourceIdentityObservations.isEmpty
-            : !evidence.instrumentSections.isEmpty && evidence.accountSourceIdentityObservations.count == 1 else {
+            : (isAccountOnlyAmexZero ||
+               (!evidence.instrumentSections.isEmpty && evidence.accountSourceIdentityObservations.count == 1)) else {
             throw ImportPersistenceError.conflictingTransactionProvenance
         }
         let statementID = "card-statement-\(payload.importSession.id.lowercased())"
@@ -864,20 +895,33 @@ struct ImportPersistenceMapper {
         normalizedDocument: NormalizedDocumentDTO,
         importSessionID: String
     ) throws -> StatementFinancialProjectionDTO? {
-        guard financialDocument.metadata.institution == .hdfc,
-              financialDocument.metadata.documentType == .bankAccount,
-              [.pdf, .xls].contains(financialDocument.metadata.fileFormat) else {
+        let isHDFC = financialDocument.metadata.institution == .hdfc &&
+            financialDocument.metadata.documentType == .bankAccount &&
+            [.pdf, .xls].contains(financialDocument.metadata.fileFormat)
+        let isAxis = financialDocument.metadata.institution == .axis &&
+            financialDocument.metadata.documentType == .bankAccount &&
+            [.csv, .pdf, .xls].contains(financialDocument.metadata.fileFormat)
+        guard (isHDFC || isAxis), !financialDocument.transactions.isEmpty else {
             return nil
         }
+        guard normalizedDocument.profileId == financialDocument.parserProfileID,
+              normalizedDocument.profileVersion == financialDocument.parserProfileVersion else {
+            throw ImportPersistenceError.conflictingTransactionProvenance
+        }
         let projection = try StatementFinancialProjection.make(from: financialDocument)
-        let sourceFormatCode = financialDocument.metadata.fileFormat == .pdf ? "pdf" : "xls"
+        let sourceFormatCode: String = switch financialDocument.metadata.fileFormat {
+        case .csv: "csv"
+        case .pdf: "pdf"
+        case .xls: "xls"
+        default: throw ImportPersistenceError.conflictingTransactionProvenance
+        }
         let projectionID = "statement-projection-\(importSessionID.lowercased())"
         let events = try projection.events.map { event in
             StatementFinancialProjectionEventDTO(
                 id: "\(projectionID)-event-\(event.ordinal)",
                 ordinal: event.ordinal,
                 statementDateISO: event.statementDate.canonical,
-                valueDateISO: event.valueDate.canonical,
+                valueDateISO: event.valueDate?.canonical,
                 direction: event.direction.rawValue,
                 signedAmountMinor: try event.signedAmount.minorUnits(),
                 signedAmountDecimal: try event.signedAmount.canonicalDecimalString(),
@@ -888,6 +932,7 @@ struct ImportPersistenceMapper {
         }
         let dto = StatementFinancialProjectionDTO(
             id: projectionID,
+            algorithmIdentifier: projection.algorithmIdentifier,
             digest: projection.digest,
             institutionCode: projection.institutionCode,
             statementFamilyCode: projection.statementFamilyCode,
@@ -1064,6 +1109,32 @@ struct ImportPersistenceMapper {
                 )
             }
         )
+    }
+
+    private func requiredParserProfile(
+        from financialDocument: FinancialDocument
+    ) throws -> (id: String, version: String) {
+        if financialDocument.transactions.isEmpty {
+            guard let id = financialDocument.parserProfileID,
+                  let version = financialDocument.parserProfileVersion,
+                  !id.isEmpty, !version.isEmpty,
+                  id == id.trimmingCharacters(in: .whitespacesAndNewlines),
+                  version == version.trimmingCharacters(in: .whitespacesAndNewlines),
+                  let evidence = financialDocument.zeroActivityEvidence,
+                  evidence.profileID == id,
+                  evidence.profileVersion == version else {
+                throw ImportPersistenceError.missingParserProfileProvenance
+            }
+            return (id, version)
+        }
+        let profile = try requiredParserProfile(from: financialDocument.transactions)
+        if let id = financialDocument.parserProfileID, id != profile.id {
+            throw ImportPersistenceError.conflictingParserProfileProvenance
+        }
+        if let version = financialDocument.parserProfileVersion, version != profile.version {
+            throw ImportPersistenceError.conflictingParserProfileProvenance
+        }
+        return profile
     }
 
     private func requiredParserProfile(

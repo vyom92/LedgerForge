@@ -32,7 +32,8 @@ For every LedgerForge planning, implementation, review, recovery or documentatio
 6. Read the relevant current sections of `Project documents/PROJECT_STATE.md`.
 7. Read `Project documents/FUTURE_WORK.MD` when selecting, comparing, deferring or reconciling unscheduled work.
 8. Read relevant accepted entries in `Project documents/ADR.md` before changing architecture, persistence, identity, import semantics, credential ownership or domain ownership.
-9. Inspect production code, tests, private-source evidence or local build/runtime evidence only where the documents are insufficient.
+9. For any task touching a reader, detector, classifier, parser, normalizer, import validation, duplicate/equivalence semantics or source-support acceptance, read ADR-046, the Standing Execution Harness **Parser / Authentic-Corpus Acceptance Policy**, and the current `PROJECT_STATE.md` parser-reliability alignment before treating support as established.
+10. Inspect production code, tests, private-source evidence or local build/runtime evidence only where the documents are insufficient.
 
 Do not infer current sprint status, accepted support, migration version, architecture or local Git state from memory or an older report.
 
@@ -153,11 +154,32 @@ A dirty worktree is not automatically a failure. An unexplained dirty worktree i
 
 ---
 
+## Current parser / import authority — 2026-09-01
+
+ADR-046 is the current parser/source-support authority. For every supported financial source family:
+
+- no synthetic, generated, recreated, sanitized, reconstructed, representative, reduced, mutated, hand-authored or model-created financial statement may be created or used at any stage, including development, debugging, tests, oracles, persistence, batch acceptance, developer UI or adversarial review; remove statement fixture factories/catalogs and do not replace them with hand-built statement/domain/DTO graphs; <!-- user-specified -->
+- only authentic corpus statements may exercise statement-dependent behaviour. Exact working copies, necessary decrypted copies and actual extracted attachment bytes are permitted; original bytes remain provenance/fingerprint authority. Pure source-independent nonfinancial values/files may test isolated mechanics, but must not impersonate financial statements. Missing authentic cases remain source-uncertified, not manufactured; <!-- user-specified -->
+- the **complete registered authentic corpus** supplied by the user is the cumulative parser regression authority; sampling or a representative month is insufficient;
+- each newly supplied recurring authentic statement extends that corpus unless the user explicitly excludes or archives it;
+- generic readers extract and preserve source evidence; institution/source-family financial interpretation belongs downstream;
+- parsers must be tolerant about inert packaging and strict about financial meaning: page count, transaction count, absolute row/line positions, harmless whitespace/typography, benign page breaks and nonfinancial pages do not define support;
+- zero-transaction statements and variable page counts are valid when coherent source controls establish them; technical resource limits must not masquerade as financial-profile rules;
+- one adaptive deterministic runtime parser should own one recurring financial source family unless a materially different source/financial semantic contract justifies a separate profile; deterministic means reproducible and explainable, not hard-coded physical coordinates;
+- financial meaning is established from coherent source evidence such as semantic labels, column roles, data shapes, dates, Money, direction, balance transitions, statement/section controls, continuity, ordering and surrounding structure; fail closed when financial meaning is ambiguous, contradictory, malformed or unsupported, not merely because inert presentation changed;
+- any shared ingestion change that can affect source interpretation must rerun the complete authentic corpus of every affected supported family; a green unit suite or full TestPlan alone does not certify parser reliability;
+- historical sprint/profile acceptance remains historical fact, but it is distinct from **current authentic-corpus production reliability certification**; personal-v1 parser reliability remains uncertified until the complete-corpus gate is satisfied; and
+- independent source oracles record source facts. Acceptance compares authentic source truth through an explicit architecture-aware semantic projection with ordinary production output; raw Oracle JSON need not equal raw production JSON when the representations intentionally differ.
+
+Private authentic originals remain outside Git and read-only. AI/model interpretation is not required for ordinary recurring structured parsing and is never financial authority unless separately approved.
+
+---
+
 ## Financial truth
 
 For financial imports, persistence, identity, balances, cards, salary, investments or valuation:
 
-- authentic source semantics outrank fixtures and generated expected data;
+- complete authentic source semantics and independently derived source oracles outrank generated expected data;
 - production parser output must not be its own sole oracle;
 - preserve native currency, scale, liability/direction semantics, date meaning, source order, balances, identifiers, multiplicity and provenance;
 - fail closed on malformed, ambiguous, conflicting or unsupported evidence;
@@ -167,7 +189,7 @@ For financial imports, persistence, identity, balances, cards, salary, investmen
 - never infer institution, format, layout, account identity or credential family from structural similarity alone;
 - never invent dates, ordering, identifiers, balances or provenance;
 - keep private originals isolated and read-only;
-- keep only sanitized, source-faithful fixtures in Git.
+- do not place private originals in Git; the all-stages authentic-input rule above applies to every statement-dependent operation.
 
 A green suite proves only the boundary and oracle it exercised.
 

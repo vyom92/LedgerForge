@@ -23,6 +23,58 @@ tests is failed evidence. `test-full` invokes the complete canonical `TestPlan`.
 `cycle-close` uses separate fresh Debug, Release and test artifact roots, then
 runs one complete `TestPlan` after both builds pass.
 
+App-hosted tests do not reliably inherit arbitrary variables exported only in
+the invoking shell. When authentic tests require private paths, temporary
+passwords or other external configuration, create a JSON dictionary outside
+the repository whose keys and values are strings, then point the validation
+command to it:
+
+```bash
+LEDGERFORGE_TEST_ENVIRONMENT_FILE=/absolute/external/test-environment.json \
+  ./script/validate.sh test-focused 'LedgerForgeTests/SomeSuite/someTest()'
+```
+
+For `test-focused`, `test-full` and the test phase of `cycle-close`, this option
+first builds the canonical project, scheme and test plan for testing. It then
+merges the supplied dictionary into every generated test target's existing
+`EnvironmentVariables` and runs that exact generated `.xctestrun` with
+`test-without-building`. Existing Xcode variables and test-run metadata are
+preserved. Without the option, validation retains its existing one-step
+`xcodebuild test` behavior.
+
+Keep the JSON file outside the repository and restrict it like any other
+private credential material. Its values are copied into the task-owned
+`.xctestrun`, so that artifact root is also private until it is recoverably
+removed. Do not commit passwords, authentic-source paths, source oracles or the
+environment file. Merely exporting the underlying variables in the shell is
+not evidence that an app-hosted test received them.
+
+The global authentic-corpus gate requires `LEDGERFORGE_GLOBAL_AUTHENTIC_RESULT_FILE`
+to name a writable test-host destination. Forwarding a path does not grant sandbox
+write access: use a task-owned directory inside the app's container, then copy the
+completed result to the external evidence archive after the run. A source-independent
+atomic-write/readback/remove preflight runs before the corpus and can also be selected
+alone as `LedgerForgeTests/GlobalAuthenticCorpusAcceptanceTests/configuredEvidenceDestinationSupportsAtomicWrites()`.
+The final report write remains mandatory and any write failure fails the gate.
+
+A missing authentic corpus, password or oracle is a failed test environment,
+not a passing result and never a reason to disable or skip a test. The script
+continues to require a readable nonzero test-result summary after execution.
+
+The test plan keeps timeouts enabled and permits a maximum allowance of 1,200
+seconds. The complete six-order authentic-corpus test explicitly requests a
+20-minute limit because its ordinary import/replay/reopen campaign exceeds the
+default 600-second allowance. Other tests retain the default allowance; no
+corpus source or assertion is skipped to shorten the campaign.
+
+The LedgerForgeTests target explicitly disables runner-level parallelization in
+the test plan. The complete corpus gate and other runtime-state tests share an
+in-process isolation gate; scheduling them concurrently would spend their
+600-second execution allowance waiting for the long corpus test. Serial runner
+scheduling starts each budget with its own test, while concurrency deliberately
+created inside a test remains exercised. Generated native test metadata must
+retain `InProcessParallelizationEnabled=false` and the unchanged timeout limits.
+
 Each command resolves the repository root from its own location and uses only
 `LedgerForge.xcodeproj`, scheme `LedgerForge`, destination `platform=macOS` and
 test plan `TestPlan`. A nonzero `xcodebuild` status is returned unchanged.

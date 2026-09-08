@@ -363,7 +363,7 @@ struct OOXMLDocumentReaderTests {
         ] + additionalEntries)
     }
 
-    private static let defaultRowsXML = """
+    nonisolated private static let defaultRowsXML = """
     <row r="1">
       <c r="A1" t="s"><v>0</v></c>
       <c r="B1" t="inlineStr"><is><t>Widget</t></is></c>
@@ -376,7 +376,7 @@ struct OOXMLDocumentReaderTests {
     <row r="3"><c r="A3" t="str"><v>Footer</v></c></row>
     """
 
-    private static let defaultMergeXML = """
+    nonisolated private static let defaultMergeXML = """
     <mergeCells count="1"><mergeCell ref="A3:B3"/></mergeCells>
     """
 }

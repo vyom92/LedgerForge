@@ -26,7 +26,7 @@ struct DevelopmentDatabaseLifecycleTests {
             return
         }
         #expect(persistentActivation.profile.kind == .persistentDebug)
-        #expect(persistentActivation.profile.verifiedCurrentSchemaVersion == 16)
+        #expect(persistentActivation.profile.verifiedCurrentSchemaVersion == allMigrations.count)
         #expect(setup.coordinator.activeProfile == persistentActivation.profile)
         #expect(setup.coordinator.currentDatabaseURL == setup.identity.persistentDebugURL)
         #expect(DatabaseProvider.shared.generationToken != currentToken)
@@ -72,8 +72,8 @@ struct DevelopmentDatabaseLifecycleTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func successfulActivationPublishesOnlyOneCompleteNewRuntimeStateToSynchronousObservers() throws {
-        let setup = try makeDistinctiveRuntimeCoordinator(named: "ObserverAtomicSuccess")
+    func successfulActivationPublishesOnlyOneCompleteNewRuntimeStateToSynchronousObservers() async throws {
+        let setup = try await makeDistinctiveRuntimeCoordinator(named: "ObserverAtomicSuccess")
         defer { try? FileManager.default.removeItem(at: setup.root) }
         defer { setup.coordinator.closeOwnedProvider() }
 
@@ -86,7 +86,7 @@ struct DevelopmentDatabaseLifecycleTests {
             generation: oldGeneration,
             epoch: oldEpoch,
             profileKind: .current,
-            suffix: "old"
+            seed: setup.currentSeed
         )
         let recorder = RuntimePublicationRecorder(coordinator: setup.coordinator)
         let subscriptions = runtimePublicationSubscriptions(
@@ -106,7 +106,7 @@ struct DevelopmentDatabaseLifecycleTests {
             generation: newProvider.generationToken,
             epoch: oldEpoch + 1,
             profileKind: .persistentDebug,
-            suffix: "new"
+            seed: setup.persistentSeed
         )
         let captured = recorder.observations
 
@@ -120,8 +120,8 @@ struct DevelopmentDatabaseLifecycleTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func failedStagedHydrationEmitsNoRuntimePublicationCallback() throws {
-        let setup = try makeDistinctiveRuntimeCoordinator(
+    func failedStagedHydrationEmitsNoRuntimePublicationCallback() async throws {
+        let setup = try await makeDistinctiveRuntimeCoordinator(
             named: "ObserverAtomicHydrationFailure",
             failures: [.hydration]
         )
@@ -141,8 +141,8 @@ struct DevelopmentDatabaseLifecycleTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func postCommitCleanupFailureCallbacksStillObserveCompleteNewRuntimeState() throws {
-        let setup = try makeDistinctiveRuntimeCoordinator(
+    func postCommitCleanupFailureCallbacksStillObserveCompleteNewRuntimeState() async throws {
+        let setup = try await makeDistinctiveRuntimeCoordinator(
             named: "ObserverAtomicCleanupFailure",
             failures: [.priorCleanup]
         )
@@ -166,7 +166,7 @@ struct DevelopmentDatabaseLifecycleTests {
             generation: newProvider.generationToken,
             epoch: oldEpoch + 1,
             profileKind: .persistentDebug,
-            suffix: "new"
+            seed: setup.persistentSeed
         )
 
         #expect(activation.profile.kind == .persistentDebug)
@@ -302,7 +302,7 @@ struct DevelopmentDatabaseLifecycleTests {
 
         let preparationTask = Task {
             try await engine.prepareImport(
-                from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+                from: try AuthenticSourceTestSupport.axisBankCSV()
             )
         }
         await suspension.waitUntilArrived()
@@ -345,7 +345,7 @@ struct DevelopmentDatabaseLifecycleTests {
         defer { try? FileManager.default.removeItem(at: setup.root) }
         defer { setup.coordinator.closeOwnedProvider() }
         let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: try AuthenticSourceTestSupport.axisBankCSV()
         )
         let suspension = AsyncOverlapGate()
         DevelopmentDatabaseActivityGate.shared.setTransitionObserverForTesting { activity in
@@ -398,7 +398,7 @@ struct DevelopmentDatabaseLifecycleTests {
         defer { try? FileManager.default.removeItem(at: setup.root) }
         defer { setup.coordinator.closeOwnedProvider() }
         let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: try AuthenticSourceTestSupport.axisBankCSV()
         )
         #expect(try prepared.sourceSnapshot.withBytes { !$0.isEmpty })
 
@@ -586,7 +586,7 @@ struct DevelopmentDatabaseLifecycleTests {
             return
         }
         #expect(first.profile.migrationSourceVersion == 3)
-        #expect(first.profile.verifiedCurrentSchemaVersion == 16)
+        #expect(first.profile.verifiedCurrentSchemaVersion == allMigrations.count)
 
         guard case .activated(let replacement) = setup.coordinator.resetActiveProfile(),
               let replacementURL = setup.coordinator.currentDatabaseURL else {
@@ -594,7 +594,7 @@ struct DevelopmentDatabaseLifecycleTests {
             return
         }
         #expect(replacement.profile.migrationSourceVersion == 3)
-        #expect(replacement.profile.verifiedCurrentSchemaVersion == 16)
+        #expect(replacement.profile.verifiedCurrentSchemaVersion == allMigrations.count)
         #expect(replacementURL != firstURL)
         for member in setup.identity.databaseSet(at: firstURL) {
             #expect(!FileManager.default.fileExists(atPath: member.path))
@@ -602,7 +602,7 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(try DatabaseProvider.shared.accountRepo.accounts(workspaceId: "default-workspace").isEmpty)
     }
 
-    @Test(.globalRuntimeStateIsolation, arguments: Array(1...15))
+    @Test(.globalRuntimeStateIsolation, arguments: Array(1..<(allMigrations.count)))
     func migrationSandboxVerifiesExactHistoricalPrefixBeforeOpeningCurrentRuntime(
         _ sourceVersion: Int
     ) throws {
@@ -637,18 +637,18 @@ struct DevelopmentDatabaseLifecycleTests {
         #expect(observedPrefix == Array(1...sourceVersion))
         #expect(globalTokenDuringPrefix == installedCurrentToken)
         #expect(activation.profile.migrationSourceVersion == sourceVersion)
-        #expect(activation.profile.verifiedCurrentSchemaVersion == 16)
+        #expect(activation.profile.verifiedCurrentSchemaVersion == allMigrations.count)
         #expect(try DatabaseProvider.shared.accountRepo.accounts(workspaceId: "default-workspace").isEmpty)
         guard let sandboxURL = coordinator.currentDatabaseURL else {
             Issue.record("Missing active sandbox URL")
             return
         }
         let inspection = try SQLiteRepositoryProvider(path: sandboxURL.path)
-        #expect(try inspection.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == 16)
+        #expect(try inspection.database.queryInt("SELECT MAX(version) FROM schema_migrations;") == allMigrations.count)
         #expect(try inspection.database.validatedMigrationHistory(
             against: allMigrations,
             requiresCompleteChain: true
-        ).compactMap(\.version) == Array(1...16))
+        ).compactMap(\.version) == Array(1...allMigrations.count))
         try inspection.database.checkpointAndClose()
     }
 
@@ -679,13 +679,24 @@ struct DevelopmentDatabaseLifecycleTests {
         }
     }
 
+    private struct DistinctiveRuntimeSeed {
+        let accountIDs: [String]
+        let transactionIDs: [String]
+        let importSessionIDs: [String]
+        let importAttemptIDs: [String]
+        let categoryIDs: [String]
+        let categoryAssignments: [String: String]
+    }
+
     private func makeDistinctiveRuntimeCoordinator(
         named name: String,
         failures: Set<DevelopmentDatabaseLifecycleFailurePoint> = []
-    ) throws -> (
+    ) async throws -> (
         root: URL,
         identity: DevelopmentDatabaseIdentity,
-        coordinator: DevelopmentDatabaseLifecycleCoordinator
+        coordinator: DevelopmentDatabaseLifecycleCoordinator,
+        currentSeed: DistinctiveRuntimeSeed,
+        persistentSeed: DistinctiveRuntimeSeed
     ) {
         let root = try temporaryDirectory(named: name)
         let identity = DevelopmentDatabaseIdentity(applicationSupportDirectory: root)
@@ -700,188 +711,63 @@ struct DevelopmentDatabaseLifecycleTests {
         )
 
         let current = try SQLiteRepositoryProvider(path: identity.canonicalDevelopmentURL.path)
-        try seedDistinctiveRuntime(in: current, suffix: "old")
+        let currentSeed = try await seedDistinctiveRuntime(
+            in: current,
+            alternatePeriod: false,
+            categoryID: "category-current",
+            categoryName: "Current Category"
+        )
         _ = try coordinator.installInitialProvider(current)
 
         let persistent = try SQLiteRepositoryProvider(path: identity.persistentDebugURL.path)
-        try seedDistinctiveRuntime(in: persistent, suffix: "new")
+        let persistentSeed = try await seedDistinctiveRuntime(
+            in: persistent,
+            alternatePeriod: true,
+            categoryID: "category-persistent",
+            categoryName: "Persistent Category"
+        )
         try persistent.database.checkpointAndClose()
-        return (root, identity, coordinator)
+        return (root, identity, coordinator, currentSeed, persistentSeed)
     }
 
     private func seedDistinctiveRuntime(
         in provider: SQLiteRepositoryProvider,
-        suffix: String
-    ) throws {
-        let plan = distinctiveConfirmedImportPlan(
-            generation: provider.generationToken,
-            suffix: suffix
+        alternatePeriod: Bool,
+        categoryID: String,
+        categoryName: String
+    ) async throws -> DistinctiveRuntimeSeed {
+        let plan = try await confirmedImportPlan(
+            generationToken: provider.generationToken,
+            alternatePeriod: alternatePeriod
         )
         guard case .committed = provider.confirmedImportRepo.commitConfirmedImport(plan) else {
             throw DevelopmentDatabaseLifecycleTestError.seedCommitFailed
         }
-
-        let categoryID = "category-\(suffix)"
+        let transactionID = try #require(plan.transactionTemplates.first?.transaction.id)
+        let validatedName = try CategoryName.validated(categoryName)
         _ = try provider.categoryRepo.createCategory(
             CategoryDTO(
                 id: categoryID,
-                workspaceId: "default-workspace",
-                name: "\(suffix.capitalized) Category",
-                normalizedName: "\(suffix) category",
-                createdAtISO: "2026-07-29T00:00:00Z"
+                workspaceId: plan.workspace.id,
+                name: validatedName.display,
+                normalizedName: validatedName.normalized,
+                createdAtISO: plan.historyTemplate.completedAtISO
             )
         )
         _ = try provider.categoryRepo.setCategory(
             categoryId: categoryID,
-            transactionId: distinctiveTransactionID(for: suffix),
-            workspaceId: "default-workspace"
+            transactionId: transactionID,
+            workspaceId: plan.workspace.id
         )
-    }
 
-    private func distinctiveConfirmedImportPlan(
-        generation: ProviderGenerationToken,
-        suffix: String
-    ) -> ConfirmedImportPlanDTO {
-        let timestamp = "2026-07-29T00:00:00Z"
-        let workspace = WorkspaceDTO(
-            id: "default-workspace",
-            name: "Observer Workspace",
-            createdAtISO: timestamp
+        return DistinctiveRuntimeSeed(
+            accountIDs: [plan.proposedAccount.id],
+            transactionIDs: plan.transactionTemplates.map(\.transaction.id).sorted(),
+            importSessionIDs: [plan.historyTemplate.importSession.id],
+            importAttemptIDs: [plan.historyTemplate.successfulAttempt.id],
+            categoryIDs: [categoryID],
+            categoryAssignments: [transactionID: categoryID]
         )
-        let account = AccountDTO(
-            id: "account-\(suffix)",
-            workspaceId: workspace.id,
-            name: "\(suffix.capitalized) Account",
-            institutionId: "Fixture Institution",
-            accountType: "bank",
-            nativeCurrency: "INR",
-            createdAtISO: timestamp
-        )
-        let session = ImportSessionDTO(
-            id: "session-\(suffix)",
-            workspaceId: workspace.id,
-            userVisibleName: "\(suffix.capitalized) Import",
-            startedAtISO: timestamp,
-            validationStatus: "passed",
-            parserVersion: "fixture.profile@1"
-        )
-        let fingerprint = confirmedImportFixtureDigest(seed: "observer-atomic-\(suffix)")
-        let document = ImportedDocumentDTO(
-            id: "document-\(suffix)",
-            workspaceId: workspace.id,
-            importSessionId: session.id,
-            filename: "\(suffix)-fixture.csv",
-            mimeType: "text/csv",
-            sizeBytes: 1,
-            sha256: fingerprint,
-            createdAtISO: timestamp
-        )
-        let fingerprintDTO = DocumentFingerprintDTO(
-            id: "fingerprint-\(suffix)",
-            documentId: document.id,
-            importSessionId: session.id,
-            algorithm: DocumentFingerprintDTO.rawTextSHA256Algorithm,
-            fingerprint: fingerprint,
-            fingerprintData: nil,
-            isDuplicateAuthority: true,
-            createdAtISO: timestamp
-        )
-        let attempt = ImportAttemptDTO(
-            id: "attempt-\(suffix)",
-            workspaceId: workspace.id,
-            createdAtISO: timestamp,
-            outcomeCode: ImportAttemptOutcome.successfulImport.rawValue,
-            coverageCode: ImportAttemptCoverage.evaluatedSupportedOnly.rawValue,
-            accountDecisionCode: ImportAttemptAccountDecision.createdNew.rawValue,
-            guidanceCode: ImportAttemptGuidance.importCompleted.rawValue,
-            persistenceCode: ImportAttemptPersistence.committed.rawValue,
-            transactionCount: 1,
-            accountId: account.id,
-            importSessionId: session.id,
-            documentId: document.id
-        )
-        let normalizedDocument = NormalizedDocumentDTO(
-            id: "normalized-document-\(suffix)",
-            importSessionId: session.id,
-            documentId: document.id,
-            profileId: "fixture.profile",
-            profileVersion: "1"
-        )
-        let normalizedRow = NormalizedRowDTO(
-            id: "normalized-row-\(suffix)",
-            normalizedDocumentId: normalizedDocument.id,
-            sourceOrdinal: 1,
-            digest: String.normalizedRecordDigest(values: ["observer", suffix])
-        )
-        let rawRow = TransactionRawRowDTO(
-            id: "raw-row-\(suffix)",
-            normalizedRowId: normalizedRow.id,
-            contributionType: "transaction",
-            sourceOrdinal: 1,
-            normalizedRecordDigest: normalizedRow.digest,
-            normalizedDocumentId: normalizedDocument.id
-        )
-        let amountMinor: Int64 = suffix == "old" ? 100 : 200
-        let transaction = TransactionDTO(
-            id: distinctiveTransactionID(for: suffix),
-            workspaceId: workspace.id,
-            postedDateISO: "2026-07-29",
-            financialDateRole: FinancialDateRole.transactionDate.rawValue,
-            statementTimezoneEvidence: "iana:Asia/Kolkata",
-            description: "\(suffix.capitalized) Transaction",
-            nativeCurrency: "INR",
-            amountMinor: amountMinor,
-            amountDecimal: suffix == "old" ? "1.00" : "2.00",
-            direction: "credit",
-            runningBalanceMinor: suffix == "old" ? 10_100 : 20_200,
-            isTrusted: true,
-            trustedAtISO: timestamp,
-            createdAtISO: timestamp,
-            rawRows: [rawRow]
-        )
-        let eventReference = suffix == "old" ? "111111111111" : "222222222222"
-
-        return ConfirmedImportPlanDTO(
-            providerGeneration: generation,
-            workspace: workspace,
-            proposedAccount: account,
-            accountChoice: .createProposedAccount,
-            advisoryIdentity: .noMatch,
-            identifiers: [
-                ConfirmedImportIdentifierCandidateDTO(
-                    scheme: "institution-account",
-                    normalizedValue: "OBSERVER-\(suffix.uppercased())-001",
-                    provenanceCode: "fixture"
-                )
-            ],
-            historyTemplate: ConfirmedImportHistoryTemplateDTO(
-                document: document,
-                fingerprint: fingerprintDTO,
-                importSession: session,
-                completedAtISO: timestamp,
-                successfulAttempt: attempt,
-                normalizedDocument: normalizedDocument,
-                normalizedRows: [normalizedRow]
-            ),
-            transactionTemplates: [
-                ConfirmedImportTransactionTemplateDTO(
-                    transaction: transaction,
-                    eventEvidence: .axisUPI(
-                        ConfirmedImportAxisUPIEventEvidenceDTO(
-                            operation: .p2a,
-                            reference: eventReference,
-                            subtype: .posting
-                        )
-                    )
-                )
-            ]
-        )
-    }
-
-    private func distinctiveTransactionID(for suffix: String) -> String {
-        suffix == "old"
-            ? "11111111-1111-1111-1111-111111111111"
-            : "22222222-2222-2222-2222-222222222222"
     }
 
     private func expectedRuntimeObservation(
@@ -890,9 +776,8 @@ struct DevelopmentDatabaseLifecycleTests {
         generation: ProviderGenerationToken,
         epoch: UInt64,
         profileKind: DevelopmentDatabaseProfileKind,
-        suffix: String
+        seed: DistinctiveRuntimeSeed
     ) -> RuntimePublicationObservation {
-        let transactionID = distinctiveTransactionID(for: suffix)
         return RuntimePublicationObservation(
             providerIdentity: ObjectIdentifier(provider),
             providerGeneration: generation,
@@ -903,20 +788,20 @@ struct DevelopmentDatabaseLifecycleTests {
             committedProfileKind: profileKind,
             migrationSourceVersion: nil,
             committedMigrationSourceVersion: nil,
-            verifiedCurrentSchemaVersion: 16,
-            committedVerifiedCurrentSchemaVersion: 16,
-            accountIDs: ["account-\(suffix)"],
-            transactionIDs: [transactionID],
-            importSessionIDs: ["session-\(suffix)"],
-            importAttemptIDs: ["attempt-\(suffix)"],
-            categoryIDs: ["category-\(suffix)"],
-            categoryAssignments: [transactionID: "category-\(suffix)"],
-            committedAccountIDs: ["account-\(suffix)"],
-            committedTransactionIDs: [transactionID],
-            committedImportSessionIDs: ["session-\(suffix)"],
-            committedImportAttemptIDs: ["attempt-\(suffix)"],
-            committedCategoryIDs: ["category-\(suffix)"],
-            committedCategoryAssignments: [transactionID: "category-\(suffix)"],
+            verifiedCurrentSchemaVersion: allMigrations.count,
+            committedVerifiedCurrentSchemaVersion: allMigrations.count,
+            accountIDs: seed.accountIDs,
+            transactionIDs: seed.transactionIDs,
+            importSessionIDs: seed.importSessionIDs,
+            importAttemptIDs: seed.importAttemptIDs,
+            categoryIDs: seed.categoryIDs,
+            categoryAssignments: seed.categoryAssignments,
+            committedAccountIDs: seed.accountIDs,
+            committedTransactionIDs: seed.transactionIDs,
+            committedImportSessionIDs: seed.importSessionIDs,
+            committedImportAttemptIDs: seed.importAttemptIDs,
+            committedCategoryIDs: seed.categoryIDs,
+            committedCategoryAssignments: seed.categoryAssignments,
             lastValidationIsNil: true
         )
     }
@@ -992,7 +877,7 @@ struct DevelopmentDatabaseLifecycleTests {
         AccountDTO(
             id: "account-lifecycle",
             workspaceId: "default-workspace",
-            name: "Sanitized Test Account",
+            name: "Lifecycle Test Account",
             institutionId: nil,
             accountType: "bank",
             nativeCurrency: "USD",

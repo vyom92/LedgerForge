@@ -45,7 +45,7 @@ struct ImportOutcomePresentationTests {
 
     @Test func salaryImportRoutesToSalaryHistoryWithoutClaimingTransactions() {
         let presentation = ImportOutcomePresentation(result: ImportEngineResult(
-            fileName: "sanitized-salary.pdf", transactionCount: 0, validationPassed: true,
+            fileName: "salary.pdf", transactionCount: 0, validationPassed: true,
             persisted: true, errorMessage: nil, isSalaryImport: true))
         #expect(presentation.isSalaryImport)
         #expect(!presentation.allowsViewingTransactions)
@@ -187,12 +187,15 @@ struct ImportOutcomePresentationTests {
         #expect(presentation.subtitle == "Persisted 3 transaction(s)")
     }
 
-    @Test func importActivityCoversPreviewValidationCommitCancellationAndFailureWithoutSuccessInference() throws {
-        let ready = try activityPreparedImport(fileName: "ready.csv", validationPassed: true)
-        let invalid = try activityPreparedImport(fileName: "invalid.csv", validationPassed: false)
+    @MainActor
+    @Test(.globalRuntimeStateIsolation)
+    func importActivityCoversPreviewValidationCommitCancellationAndFailureWithoutSuccessInference() async throws {
+        let readyOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
+        defer { readyOwner.cancel() }
+        let ready = readyOwner.preparedImport
 
         #expect(ImportActivityPresentation(importState: .previewReady(ready), latestDurableAttempt: nil).status == "Ready to Import")
-        #expect(ImportActivityPresentation(importState: .validationFailed(invalid), latestDurableAttempt: nil).status == "Validation Failed")
+        #expect(ImportActivityPresentation(importState: .validationFailed(ready), latestDurableAttempt: nil).status == "Validation Failed")
         #expect(ImportActivityPresentation(importState: .committing(ready), latestDurableAttempt: nil).status == "Persisting")
         #expect(ImportActivityPresentation(importState: .cancelled(fileName: "cancelled.csv"), latestDurableAttempt: nil).status == "Cancelled")
         #expect(ImportActivityPresentation(
@@ -628,56 +631,6 @@ struct ImportOutcomePresentationTests {
         #expect(!eventBlock.label.localizedCaseInsensitiveContains("identity"))
         #expect(unknown.label != persistenceFailure.label)
     }
-}
-
-private func activityPreparedImport(fileName: String, validationPassed: Bool) throws -> PreparedImport {
-    let currency = try CurrencyCode("QAR")
-    let transaction = Transaction(
-        statementDate: try! StatementDate(canonical: "2023-11-14"),
-        description: "Activity transaction",
-        debit: nil,
-        credit: 1,
-        amount: 1,
-        balance: 1,
-        currency: currency.code,
-        account: "CBQ",
-        sourceBank: "CBQ",
-        sourceFile: fileName
-    )
-    let document = FinancialDocument(
-        sourceDocument: Document(
-            filename: fileName,
-            url: URL(fileURLWithPath: "/tmp/\(fileName)"),
-            fileType: "CSV",
-            importedAt: Date(timeIntervalSince1970: 1_700_000_000)
-        ),
-        metadata: DocumentMetadata(institution: .axis, documentType: .bankAccount, fileFormat: .csv, confidence: 1),
-        parserName: "Activity Test Parser",
-        bookedCurrency: currency,
-        transactions: [transaction]
-    )
-    let validation = ImportValidationResult(
-        rowsRead: 1,
-        transactionsParsed: 1,
-        statementCurrency: currency,
-        debitTotalMoney: nil,
-        creditTotalMoney: try Money(amount: 1, currency: currency),
-        openingBalanceMoney: nil,
-        closingBalanceMoney: nil,
-        passed: validationPassed,
-        issues: []
-    )
-    return PreparedImport(
-        sourceURL: document.sourceDocument.url,
-        rawContents: "date,amount",
-        fileName: fileName,
-        detectedInstitution: .axis,
-        detectedDocumentType: .bankAccount,
-        parserName: document.parserName,
-        financialDocument: document,
-        validation: validation,
-        importSession: ImportSession(fileName: fileName, parserName: document.parserName, transactionCount: 1, validation: validation)
-    )
 }
 
 private func durableAttempt(outcome: ImportAttemptOutcome, transactionCount: Int) -> RepositoryImportAttempt {

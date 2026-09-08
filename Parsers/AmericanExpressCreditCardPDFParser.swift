@@ -35,8 +35,7 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
         guard canParse(document: document.document, metadata: document.metadata) else {
             throw AmericanExpressCreditCardPDFParserError.unsupportedDocument
         }
-        guard document.header?.values == AmericanExpressCreditCardPDFNormalizer.logicalHeader,
-              !document.rows.isEmpty else {
+        guard document.header?.values == AmericanExpressCreditCardPDFNormalizer.logicalHeader else {
             throw AmericanExpressCreditCardPDFParserError.changedHeader
         }
         let parsedFragments = document.sourceContext.preTransactionFragments.compactMap { fragment -> [String]? in
@@ -60,8 +59,7 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
               let creditsText = fragments["NEW_CREDITS"],
               let debitsText = fragments["NEW_DEBITS"],
               let newBalanceText = fragments["NEW_BALANCE"],
-              let dueDateText = fragments["DUE_DATE"],
-              !sectionFragments.isEmpty else {
+              let dueDateText = fragments["DUE_DATE"] else {
             throw AmericanExpressCreditCardPDFParserError.malformedSourceEvidence
         }
         do {
@@ -104,6 +102,10 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
             var annotations: [CardTransactionAnnotation] = []
             for row in document.rows {
                 guard row.values.count == AmericanExpressCreditCardPDFNormalizer.logicalHeader.count,
+                      row.values.indices.contains(10),
+                      let sourcePage = row.sourcePage, sourcePage > 0,
+                      let encodedSourcePage = Int(row.values[10]),
+                      encodedSourcePage == sourcePage,
                       let effect = CardLiabilityEffect(rawValue: row.values[7]) else {
                     throw AmericanExpressCreditCardPDFParserError.malformedRow(sourceOrdinal: row.rowNumber)
                 }
@@ -145,7 +147,7 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
                 let transaction = Transaction(
                     statementDate: postingDate,
                     description: row.values[2],
-                    reference: row.values[3],
+                    reference: row.values[3].isEmpty ? nil : row.values[3],
                     debitMoney: nil,
                     creditMoney: nil,
                     money: signedPosted,
@@ -160,6 +162,7 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
                         normalizedDocumentID: document.document.id.uuidString,
                         normalizedRowID: row.id.uuidString,
                         sourceOrdinal: row.rowNumber,
+                        sourcePage: sourcePage,
                         normalizedRecordDigest: String.normalizedRecordDigest(values: row.values),
                         parserProfileID: Self.profileID,
                         parserProfileVersion: Self.profileVersion,
@@ -190,20 +193,38 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
                     .newDebits(try Self.money(debitsText, currency: currency)),
                     .newBalance(try Self.money(newBalanceText, currency: currency)),
                     .dueDate(try Self.shortDate(dueDateText)),
-                    .instrumentNetTotal(try Money.aggregate(instrumentSections.map(\.signedNetTotal)))
+                    .instrumentNetTotal(instrumentSections.isEmpty
+                        ? try Money(amount: .zero, currency: currency)
+                        : try Money.aggregate(instrumentSections.map(\.signedNetTotal)))
                 ],
                 reconciliationRuleIdentifier: CardStatementEvidence.amexQARReconciliationRule
             )
+            // Only explicit, coherent printed controls can establish an empty
+            // Amex statement. Empty parser output alone is never sufficient.
+            let zeroEvidence: ZeroActivityStatementEvidence? = transactions.isEmpty
+                ? try ZeroActivityStatementEvidence(
+                    profileID: Self.profileID, profileVersion: Self.profileVersion,
+                    sourceFormatCode: "pdf", evidenceKind: .printedControls,
+                    statementDate: statementDate, statementPeriod: period,
+                    nativeCurrency: currency,
+                    openingBalance: Self.money(previousText, currency: currency),
+                    closingBalance: Self.money(newBalanceText, currency: currency),
+                    debitTotal: Self.money(debitsText, currency: currency),
+                    creditTotal: Self.money(creditsText, currency: currency)
+                ) : nil
             return FinancialDocument(
                 sourceDocument: document.document,
                 metadata: document.metadata,
                 parserName: name,
+                parserProfileID: Self.profileID,
+                parserProfileVersion: Self.profileVersion,
                 bookedCurrency: currency,
                 declaredStatementPeriod: period,
                 transactions: transactions,
                 financialIdentifiers: [],
                 sourceStatementEvidence: nil,
-                cardStatementEvidence: evidence
+                cardStatementEvidence: evidence,
+                zeroActivityEvidence: zeroEvidence
             )
         } catch let error as AmericanExpressCreditCardPDFParserError {
             throw error
@@ -217,7 +238,8 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
     }
 
     private static func money(_ value: String, currency: CurrencyCode) throws -> Money {
-        guard let decimal = Decimal(string: value.replacingOccurrences(of: ",", with: ""), locale: Locale(identifier: "en_US_POSIX")) else {
+        guard value.range(of: #"^[0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?$"#, options: .regularExpression) != nil,
+              let decimal = Decimal(string: value.replacingOccurrences(of: ",", with: ""), locale: Locale(identifier: "en_US_POSIX")) else {
             throw AmericanExpressCreditCardPDFParserError.malformedSourceEvidence
         }
         return try Money(amount: decimal, currency: currency)
@@ -242,7 +264,8 @@ final class AmericanExpressCreditCardPDFParser: StatementParser {
         return try StatementDate(year: year, month: month + 1, day: day)
     }
 
-    private static func referenceDigest(_ value: String) -> String {
-        SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
+    private static func referenceDigest(_ value: String) -> String? {
+        guard !value.isEmpty else { return nil }
+        return SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

@@ -15,14 +15,11 @@ struct DeveloperConsoleView: View {
     @ObservedObject private var transactionStore = TransactionStore.shared
 #if DEBUG
     @ObservedObject private var profileViewModel: DeveloperDatabaseProfileViewModel
-    private let onLaunchFixture: (DebugApprovedFixture) -> Void
 
     init(
-        profileViewModel: DeveloperDatabaseProfileViewModel,
-        onLaunchFixture: @escaping (DebugApprovedFixture) -> Void = { _ in }
+        profileViewModel: DeveloperDatabaseProfileViewModel
     ) {
         self.profileViewModel = profileViewModel
-        self.onLaunchFixture = onLaunchFixture
     }
 #endif
 
@@ -70,9 +67,6 @@ struct DeveloperConsoleView: View {
                 .frame(width: 330)
             }
 
-#if DEBUG
-            DebugImportVerificationWorkspaceView(onLaunch: onLaunchFixture)
-#endif
         }
         .padding(28)
         .background(LFTheme.backgroundGradient)

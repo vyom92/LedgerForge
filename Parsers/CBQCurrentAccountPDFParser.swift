@@ -37,13 +37,18 @@ final class CBQCurrentAccountPDFParser: StatementParser {
         guard canParse(document: document.document, metadata: document.metadata) else {
             throw CBQCurrentAccountPDFParserError.unsupportedDocumentFormat
         }
-        guard document.header?.values == CBQCurrentAccountPDFNormalizer.logicalHeader,
-              !document.rows.isEmpty else { throw CBQCurrentAccountPDFParserError.changedHeader }
-        let fragments = Dictionary(uniqueKeysWithValues: document.sourceContext.preTransactionFragments.compactMap { fragment -> (String, String)? in
+        guard document.header?.values == CBQCurrentAccountPDFNormalizer.logicalHeader else {
+            throw CBQCurrentAccountPDFParserError.changedHeader
+        }
+        let pairs = document.sourceContext.preTransactionFragments.compactMap { fragment -> (String, String)? in
             let fields = fragment.text.split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false)
             guard fields.count == 2 else { return nil }
             return (String(fields[0]), String(fields[1]))
-        })
+        }
+        guard Set(pairs.map(\.0)).count == pairs.count else {
+            throw CBQCurrentAccountPDFParserError.malformedSourceEvidence
+        }
+        let fragments = Dictionary(uniqueKeysWithValues: pairs)
         let family: CBQCurrentAccountPDFFamily
         if fragments["ACCOUNT"] != nil { family = .history }
         else if fragments["MASKED_ACCOUNT"] != nil { family = .monthly }
@@ -91,6 +96,7 @@ final class CBQCurrentAccountPDFParser: StatementParser {
         let profileID = family.profileID
         var transactions: [Transaction] = []
         var previousDate: StatementDate?
+        var previousBalance = statementEvidence?.openingBalance?.amount
         for row in document.rows {
             guard row.values.count == CBQCurrentAccountPDFNormalizer.logicalHeader.count,
                   !row.values[1].isEmpty else { throw CBQCurrentAccountPDFParserError.malformedRow(sourceOrdinal: row.rowNumber) }
@@ -99,11 +105,20 @@ final class CBQCurrentAccountPDFParser: StatementParser {
                 if family == .history, let previousDate, postingDate > previousDate {
                     throw CBQCurrentAccountPDFParserError.ascendingHistory(sourceOrdinal: row.rowNumber)
                 }
+                if family == .monthly, let previousDate, postingDate < previousDate {
+                    throw CBQCurrentAccountPDFParserError.malformedRow(sourceOrdinal: row.rowNumber)
+                }
                 previousDate = postingDate
                 let sourceTransactionDate = row.values[2].isEmpty ? nil : try Self.monthlyDate(row.values[2])
                 let signedAmount = try Self.decimal(row.values[3])
                 guard signedAmount != .zero else { throw CBQCurrentAccountPDFParserError.malformedRow(sourceOrdinal: row.rowNumber) }
                 let balance = try Self.decimal(row.values[4])
+                if family == .monthly {
+                    guard let prior = previousBalance, prior + signedAmount == balance else {
+                        throw CBQCurrentAccountPDFParserError.balanceMismatch(sourceOrdinal: row.rowNumber)
+                    }
+                    previousBalance = balance
+                }
                 let debit = signedAmount < .zero ? -signedAmount : nil
                 let credit = signedAmount > .zero ? signedAmount : nil
                 let structuredDigest = Self.structuredReferenceDigest(in: row.values[1])
@@ -125,6 +140,7 @@ final class CBQCurrentAccountPDFParser: StatementParser {
                         normalizedDocumentID: document.document.id.uuidString,
                         normalizedRowID: row.id.uuidString,
                         sourceOrdinal: row.rowNumber,
+                        sourcePage: row.sourcePage,
                         normalizedRecordDigest: String.normalizedRecordDigest(values: row.values),
                         parserProfileID: profileID,
                         parserProfileVersion: Self.profileVersion,
@@ -135,7 +151,35 @@ final class CBQCurrentAccountPDFParser: StatementParser {
             } catch let error as CBQCurrentAccountPDFParserError { throw error }
             catch { throw CBQCurrentAccountPDFParserError.malformedRow(sourceOrdinal: row.rowNumber) }
         }
-        if family == .monthly, let expected = statementEvidence?.closingBalance,
+        let zeroEvidence: ZeroActivityStatementEvidence?
+        if transactions.isEmpty {
+            guard family == .monthly, let statementEvidence,
+                  let period = statementEvidence.period,
+                  let opening = statementEvidence.openingBalance,
+                  let closing = statementEvidence.closingBalance,
+                  let regionStart = fragments["FINANCIAL_REGION_START"].flatMap(Int.init),
+                  let regionEnd = fragments["FINANCIAL_REGION_END"].flatMap(Int.init),
+                  let signature = fragments["FINANCIAL_REGION_SIGNATURE"] else {
+                throw CBQCurrentAccountPDFParserError.malformedSourceEvidence
+            }
+            // CBQ prints balances, not debit/credit total controls. The
+            // normalizer must exhaust the header-to-closing financial region;
+            // do not label invented zero totals as printed source evidence.
+            zeroEvidence = try ZeroActivityStatementEvidence(
+                profileID: profileID, profileVersion: Self.profileVersion,
+                sourceFormatCode: "pdf", evidenceKind: .exhaustedFinancialRegion,
+                financialRegionDescriptor: "Monthly account table through closing balance",
+                financialRegionStartOrdinal: regionStart,
+                financialRegionEndOrdinal: regionEnd,
+                financialRegionSignature: signature,
+                statementDate: statementEvidence.statementBoundaryDate,
+                statementPeriod: period, nativeCurrency: currency,
+                openingBalance: opening, closingBalance: closing
+            )
+        } else {
+            zeroEvidence = nil
+        }
+        if !transactions.isEmpty, family == .monthly, let expected = statementEvidence?.closingBalance,
            transactions.last?.runningBalanceMoney != expected {
             throw CBQCurrentAccountPDFParserError.balanceMismatch(sourceOrdinal: document.rows.last?.rowNumber ?? 0)
         }
@@ -143,16 +187,22 @@ final class CBQCurrentAccountPDFParser: StatementParser {
             sourceDocument: document.document,
             metadata: document.metadata,
             parserName: family == .history ? "CBQ Current Account History PDF" : "CBQ Current Account Monthly PDF",
+            parserProfileID: profileID,
+            parserProfileVersion: Self.profileVersion,
             bookedCurrency: currency,
             declaredStatementPeriod: statementEvidence?.period,
             transactions: transactions,
             financialIdentifiers: identifiers,
             cbqSourceIdentityObservations: partialIdentities,
-            sourceStatementEvidence: statementEvidence
+            sourceStatementEvidence: statementEvidence,
+            zeroActivityEvidence: zeroEvidence
         )
     }
 
     private static func decimal(_ source: String) throws -> Decimal {
+        guard source.range(of: #"^-?[0-9]+(?:,[0-9]{3})*\.[0-9]{2}$"#, options: .regularExpression) != nil else {
+            throw CBQCurrentAccountPDFParserError.malformedSourceEvidence
+        }
         let normalized = source.replacingOccurrences(of: ",", with: "")
         guard let value = Decimal(string: normalized, locale: Locale(identifier: "en_US_POSIX")) else {
             throw CBQCurrentAccountPDFParserError.malformedSourceEvidence

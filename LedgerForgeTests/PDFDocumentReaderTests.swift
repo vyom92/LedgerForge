@@ -20,7 +20,7 @@ struct PDFDocumentReaderTests {
 
     @Test func readerRejectsUnsupportedFileTypes() async throws {
         let reader = PDFDocumentReader()
-        let request = ImportRequest(fileURL: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv"))
+        let request = ImportRequest(fileURL: URL(fileURLWithPath: "/tmp/nonfinancial-reader-input.csv"))
 
         do {
             _ = try await reader.read(request: request, password: nil)
@@ -79,119 +79,106 @@ struct PDFDocumentReaderTests {
         #expect(fragments[2].y < fragments[0].y)
     }
 
-    @Test func approvedAxisPDFFixtureExists() async throws {
-        let fixtureURL = approvedAxisPDFFixtureURL()
-
-        #expect(FixtureLocator.fileExists(at: fixtureURL))
-    }
-
-    @Test func readerExtractsTextFromApprovedAxisPDFFixture() async throws {
-        let fixtureURL = approvedAxisPDFFixtureURL()
-        try #require(FixtureLocator.fileExists(at: fixtureURL))
-
-        let rawDocument = try await readApprovedAxisPDF()
-
-        #expect(rawDocument.sourceURL == fixtureURL)
-        #expect(rawDocument.fileName == fixtureURL.lastPathComponent)
-        #expect(rawDocument.fileExtension == "pdf")
-
-        let text = try rawText(from: rawDocument)
-        #expect(!PDFTextExpectation(text).normalized.isEmpty)
-    }
-
-    @Test func approvedAxisPDFTextContainsExpectedStatementIdentifiersAndPeriod() async throws {
-        let baseline = try AxisBaselineExpectation.axisBankNREBaseline()
-        let rawDocument = try await readApprovedAxisPDF()
-        let text = PDFTextExpectation(try rawText(from: rawDocument))
-
-        #expect(text.containsWords(from: baseline.institution))
-        #expect(text.containsWords(from: baseline.accountType))
-        #expect(text.containsWords(from: baseline.currency))
-        #expect(text.contains(baseline.firstTransactionDate))
-        #expect(text.contains(baseline.lastTransactionDate))
-    }
-
-    @Test func approvedAxisPDFTextContainsExpectedBalancesAndTotals() async throws {
-        let baseline = try AxisBaselineExpectation.axisBankNREBaseline()
-        let rawDocument = try await readApprovedAxisPDF()
-        let text = PDFTextExpectation(try rawText(from: rawDocument))
-
-        #expect(text.containsLabeledAmount(label: "OPENING BALANCE", amount: baseline.openingBalance))
-        #expect(text.containsTransactionTotals(debit: baseline.debitTotal, credit: baseline.creditTotal))
-        #expect(text.containsLabeledAmount(label: "CLOSING BALANCE", amount: baseline.closingBalance))
-    }
-
-    @Test func readerReportsPasswordRequiredWhenApprovedEncryptedFixtureExists() async throws {
-        let fixtureURL = FixtureLocator.axisPDF("axis_bank_nre_account_statement_encrypted.pdf")
-
-        guard FixtureLocator.fileExists(at: fixtureURL) else {
-            return
-        }
-
-        let reader = PDFDocumentReader()
-        let request = ImportRequest(fileURL: fixtureURL)
-
-        do {
-            _ = try await reader.read(request: request, password: nil)
-            Issue.record("Expected encrypted PDF fixture to require a password.")
-        } catch let error as ImportError {
-            #expect(error == .passwordRequired)
-        } catch {
-            Issue.record("Expected ImportError.passwordRequired, got \(error).")
-        }
-    }
-
-    @Test func readerReportsIncorrectPasswordWhenApprovedEncryptedFixtureExists() async throws {
-        let fixtureURL = FixtureLocator.axisPDF("axis_bank_nre_account_statement_encrypted.pdf")
-
-        guard FixtureLocator.fileExists(at: fixtureURL) else {
-            return
-        }
-
-        let reader = PDFDocumentReader()
-        let request = ImportRequest(fileURL: fixtureURL)
-
-        do {
-            _ = try await reader.read(request: request, password: "incorrect-password")
-            Issue.record("Expected encrypted PDF fixture to reject an incorrect password.")
-        } catch let error as ImportError {
-            #expect(error == .incorrectPassword)
-        } catch {
-            Issue.record("Expected ImportError.incorrectPassword, got \(error).")
-        }
-    }
-
-    @Test func amexSyntheticEncryptedFixtureRequiresIncorrectAndCorrectPasswords() async throws {
-        let fixtureURL = FixtureLocator.americanExpressSyntheticPDF(
-            "amex_credit_card_pdf_v1_synthetic_encrypted.pdf"
+    @Test func readerRetainsPageResourceEvidenceWhenPositionedExtractionFallsBack() async throws {
+        let fileURL = try temporaryFileURL(
+            extension: "pdf",
+            contents: try selectablePDFData(lines: ["resource fallback"])
         )
-        try #require(FixtureLocator.fileExists(at: fixtureURL))
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
 
-        let sourceBytes = try Data(contentsOf: fixtureURL)
+        // Simulate the production positioned extractor's fail-closed geometry
+        // result. Resource metadata is an independent page-level contract and
+        // must still be retained for downstream content classification.
+        let reader = PDFDocumentReader(positionedEvidenceExtractor: { _ in nil })
+        let raw = try await reader.read(
+            request: ImportRequest(fileURL: fileURL),
+            password: nil
+        )
+
+        #expect(raw.pdfPageEvidence == nil)
+        let resources = try #require(raw.pdfPageResourceEvidence)
+        #expect(resources.count == 1)
+        #expect(resources.first?.imageResourceCount ?? -1 >= 0)
+        #expect(resources.first?.largestImageWidth ?? -1 >= 0)
+        #expect(resources.first?.largestImageHeight ?? -1 >= 0)
+    }
+
+    @Test func readerPreservesTextlessPhysicalPagesInSourceOrder() async throws {
+        let fileURL = try temporaryFileURL(
+            extension: "pdf",
+            contents: try selectablePDFData(pages: [["generic text"], []])
+        )
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+
+        let raw = try await PDFDocumentReader().read(
+            request: ImportRequest(fileURL: fileURL),
+            password: nil
+        )
+
+        let pageTexts = try #require(raw.pdfPageTexts)
+        #expect(pageTexts.count == 2)
+        #expect(pageTexts[0].contains("generic text"))
+        #expect(pageTexts[1].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+        let pageEvidence = try #require(raw.pdfPageEvidence)
+        #expect(pageEvidence.count == 2)
+        #expect(!pageEvidence[0].fragments.isEmpty)
+        #expect(pageEvidence[1].fragments.isEmpty)
+
+        let resources = try #require(raw.pdfPageResourceEvidence)
+        #expect(resources.count == 2)
+    }
+
+    @Test func readerPreservesGenericTextAndSourceMetadata() async throws {
+        let fixtureURL = try temporaryFileURL(
+            extension: "pdf", contents: try selectablePDFData(lines: ["Alpha", "Beta"])
+        )
+        defer { try? FileManager.default.removeItem(at: fixtureURL.deletingLastPathComponent()) }
+        let raw = try await PDFDocumentReader().read(request: ImportRequest(fileURL: fixtureURL), password: nil)
+        #expect(raw.sourceURL == fixtureURL)
+        #expect(raw.fileName == fixtureURL.lastPathComponent)
+        #expect(raw.fileExtension == "pdf")
+        guard case .text(let text) = raw.content else {
+            Issue.record("Expected generic native PDF text.")
+            return
+        }
+        #expect(text.split(whereSeparator: \.isWhitespace).map(String.init) == ["Alpha", "Beta"])
+    }
+
+    @Test func genericEncryptedPDFRequiresPasswordRejectsWrongPasswordAndPreservesPages() async throws {
+        // This is a source-agnostic transport/encryption test, not a financial
+        // statement or evidence of any institution parser's support.
+        let pdf = try #require(PDFDocument(data: selectablePDFData(pages: [["Alpha"], [], ["Beta"]])))
+        let options: [PDFDocumentWriteOption: Any] = [
+            .userPasswordOption: "reader-test-password",
+            .ownerPasswordOption: "reader-test-owner"
+        ]
+        let sourceBytes = try #require(pdf.dataRepresentation(options: options))
+        let fixtureURL = try temporaryFileURL(extension: "pdf", contents: sourceBytes)
+        defer { try? FileManager.default.removeItem(at: fixtureURL.deletingLastPathComponent()) }
         let snapshot = SourceContentSnapshot(bytes: sourceBytes)
+        defer { snapshot.invalidate() }
         let request = ImportRequest(fileURL: fixtureURL)
         let reader = PDFDocumentReader()
-
         await #expect(throws: ImportError.passwordRequired) {
             try await reader.read(request: request, snapshot: snapshot, password: nil)
         }
         await #expect(throws: ImportError.incorrectPassword) {
-            try await reader.read(request: request, snapshot: snapshot, password: "fictional-wrong-password")
+            try await reader.read(request: request, snapshot: snapshot, password: "wrong-password")
         }
-
         let unlocked = try await reader.read(
-            request: request,
-            snapshot: snapshot,
-            password: "ledgerforge-fixture-only"
+            request: request, snapshot: snapshot, password: "reader-test-password"
         )
         guard case .text(let text) = unlocked.content else {
-            Issue.record("Expected the unlocked synthetic Amex PDF to produce text.")
+            Issue.record("Expected unlocked generic PDF text.")
             return
         }
-        #expect(text.localizedCaseInsensitiveContains("Statement of Account"))
-        let pageTexts = try #require(unlocked.pdfPageTexts)
-        #expect(pageTexts.count == 5)
-        #expect(pageTexts.joined(separator: "\n") == text)
+        let pages = try #require(unlocked.pdfPageTexts)
+        #expect(pages.count == 3)
+        #expect(pages[0].contains("Alpha"))
+        #expect(pages[1].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        #expect(pages[2].contains("Beta"))
+        #expect(pages.joined(separator: "\n") == text)
     }
 
     @Test func rawDocumentTaggedEvidenceIsOptionalGenericAndEquatable() {
@@ -225,28 +212,6 @@ struct PDFDocumentReaderTests {
         #expect(table == tagged.pdfTaggedTables?.first)
     }
 
-    private func approvedAxisPDFFixtureURL() -> URL {
-        FixtureLocator.axisPDF("axis_bank_nre_account_statement_baseline.pdf")
-    }
-
-    private func readApprovedAxisPDF() async throws -> RawDocument {
-        let fixtureURL = approvedAxisPDFFixtureURL()
-        try #require(FixtureLocator.fileExists(at: fixtureURL))
-
-        let reader = PDFDocumentReader()
-        let request = ImportRequest(fileURL: fixtureURL)
-        return try await reader.read(request: request, password: nil)
-    }
-
-    private func rawText(from rawDocument: RawDocument) throws -> String {
-        guard case .text(let text) = rawDocument.content else {
-            Issue.record("Expected PDF reader to produce text RawDocument content.")
-            return ""
-        }
-
-        return text
-    }
-
     private func temporaryFileURL(extension fileExtension: String, contents: Data) throws -> URL {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -258,6 +223,10 @@ struct PDFDocumentReaderTests {
     }
 
     private func selectablePDFData(lines: [String]) throws -> Data {
+        try selectablePDFData(pages: [lines])
+    }
+
+    private func selectablePDFData(pages: [[String]]) throws -> Data {
         let buffer = NSMutableData()
         guard let consumer = CGDataConsumer(data: buffer as CFMutableData) else {
             throw PDFReaderFixtureError.creationFailed
@@ -266,18 +235,20 @@ struct PDFDocumentReaderTests {
         guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else {
             throw PDFReaderFixtureError.creationFailed
         }
-        context.beginPDFPage(nil)
-        context.textMatrix = .identity
         let font = CTFontCreateWithName("Courier" as CFString, 12, nil)
         let attributes = [kCTFontAttributeName: font] as CFDictionary
-        for (offset, line) in lines.enumerated() {
-            guard let attributed = CFAttributedStringCreate(nil, line as CFString, attributes) else {
-                throw PDFReaderFixtureError.creationFailed
+        for lines in pages {
+            context.beginPDFPage(nil)
+            context.textMatrix = .identity
+            for (offset, line) in lines.enumerated() {
+                guard let attributed = CFAttributedStringCreate(nil, line as CFString, attributes) else {
+                    throw PDFReaderFixtureError.creationFailed
+                }
+                context.textPosition = CGPoint(x: 20, y: 150 - CGFloat(offset * 24))
+                CTLineDraw(CTLineCreateWithAttributedString(attributed), context)
             }
-            context.textPosition = CGPoint(x: 20, y: 150 - CGFloat(offset * 24))
-            CTLineDraw(CTLineCreateWithAttributedString(attributed), context)
+            context.endPDFPage()
         }
-        context.endPDFPage()
         context.closePDF()
         return buffer as Data
     }
@@ -285,53 +256,4 @@ struct PDFDocumentReaderTests {
 
 private enum PDFReaderFixtureError: Error {
     case creationFailed
-}
-
-private struct PDFTextExpectation {
-    let normalized: String
-    private let amountComparable: String
-
-    init(_ text: String) {
-        normalized = text
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        amountComparable = normalized.replacingOccurrences(of: ",", with: "")
-    }
-
-    func contains(_ value: String) -> Bool {
-        normalized.localizedCaseInsensitiveContains(value)
-    }
-
-    func containsWords(from phrase: String) -> Bool {
-        phrase
-            .split(separator: " ")
-            .allSatisfy { normalized.localizedCaseInsensitiveContains(String($0)) }
-    }
-
-    func containsLabeledAmount(label: String, amount: String) -> Bool {
-        normalized.localizedCaseInsensitiveContains(label)
-            && containsAmount(amount)
-    }
-
-    func containsTransactionTotals(debit: String, credit: String) -> Bool {
-        normalized.localizedCaseInsensitiveContains("TRANSACTION TOTAL")
-            && containsAmount(debit)
-            && containsAmount(credit)
-    }
-
-    private func containsAmount(_ amount: String) -> Bool {
-        amountVariants(for: amount).contains { variant in
-            amountComparable.localizedCaseInsensitiveContains(variant)
-        }
-    }
-
-    private func amountVariants(for amount: String) -> [String] {
-        var variants = [amount]
-
-        if amount.hasPrefix("0.") {
-            variants.append(String(amount.dropFirst()))
-        }
-
-        return variants
-    }
 }

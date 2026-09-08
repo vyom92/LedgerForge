@@ -25,8 +25,10 @@ enum CardStatementProfileContract: Equatable, Sendable {
     init?(reconciliationRuleIdentifier rule: String) {
         switch rule {
         case "amex.qar.previous-minus-credits-plus-debits.v1": self = .amex
-        case "cbq.qar.v1.previous-plus-billed-minus-payment.v1": self = .cbqV1
-        case "cbq.qar.v2.previous-minus-payment-minus-credit-plus-components.v1": self = .cbqV2
+        case "cbq.qar.v1.previous-plus-billed-minus-payment.v1",
+             "cbq.qar.v1.previous-plus-billed-minus-payment.v2": self = .cbqV1
+        case "cbq.qar.v2.previous-minus-payment-minus-credit-plus-components.v1",
+             "cbq.qar.v2.previous-minus-payment-minus-credit-plus-components.v2": self = .cbqV2
         case "axis.inr.previous-plus-row-ledger-equals-total-due.v1",
              "axis.inr.app.previous-plus-row-ledger-equals-total-due.v1": self = .axis
         default: return nil
@@ -88,9 +90,9 @@ enum CardStatementProfileContract: Equatable, Sendable {
         case .amex:
             return ["previous_balance", "new_credits", "new_debits", "new_balance", "due_date", "instrument_net_total"]
         case .cbqV1:
-            return ["previous_balance", "amount_billed", "payment_received", "new_balance", "due_date", "source_section_net_total"]
+            return ["previous_balance", "amount_billed", "payment_received", "new_balance", "minimum_amount_due", "due_date", "source_section_net_total"]
         case .cbqV2:
-            return ["previous_balance", "total_payment", "credit_reversal", "purchases", "billed_installment", "fees_charges", "new_balance", "due_date", "source_section_net_total"]
+            return ["previous_balance", "total_payment", "credit_reversal", "purchases", "billed_installment", "fees_charges", "new_balance", "minimum_amount_due", "due_date", "source_section_net_total"]
         case .axis:
             return []
         }
@@ -112,6 +114,39 @@ enum CardStatementProfileContract: Equatable, Sendable {
     func requiredSummaryCodes(reconciliationRuleIdentifier rule: String, sourceFormatCode: String) -> Set<String> {
         return requiredSummaryCodes(sourceFormatCode: sourceFormatCode)
     }
+
+    /// V16 could not persist minimum_amount_due. Its exact historical rule
+    /// remains readable, but may never authorize a new import under V17.
+    private func isHistoricalCBQReconciliationRule(_ rule: String) -> Bool {
+        switch (self, rule) {
+        case (.cbqV1, "cbq.qar.v1.previous-plus-billed-minus-payment.v1"),
+             (.cbqV2, "cbq.qar.v2.previous-minus-payment-minus-credit-plus-components.v1"):
+            return true
+        default:
+            return false
+        }
+    }
+
+    func acceptsCurrentReconciliationRule(_ rule: String) -> Bool {
+        Self(reconciliationRuleIdentifier: rule) == self &&
+            !isHistoricalCBQReconciliationRule(rule)
+    }
+
+    /// Read compatibility only. New writes use the strict current coverage
+    /// above; migration neither invents nor backfills a missing source value.
+    func hydrationRequiredSummaryCodes(
+        reconciliationRuleIdentifier rule: String,
+        sourceFormatCode: String
+    ) -> Set<String> {
+        let codes = requiredSummaryCodes(
+            reconciliationRuleIdentifier: rule,
+            sourceFormatCode: sourceFormatCode
+        )
+        return isHistoricalCBQReconciliationRule(rule)
+            ? codes.subtracting(["minimum_amount_due"])
+            : codes
+    }
+
     var accountLevelMemberships: Set<CardTransactionSummaryMembership> {
         switch self {
         case .amex: return []
@@ -780,6 +815,363 @@ public struct DocumentFingerprintDTO: nonisolated Equatable, Sendable {
         self.fingerprintData = fingerprintData
         self.isDuplicateAuthority = isDuplicateAuthority
         self.createdAtISO = createdAtISO
+    }
+}
+
+/// Durable, privacy-safe projection of parser-owned zero-activity evidence.
+///
+/// This DTO carries only semantic controls and digest provenance.  It never
+/// carries source bytes, extracted text, file URLs, or a user-entered
+/// explanation.  The provider uses `isValid()` before writing and the
+/// hydrator recomputes the semantic digest after reopening the database.
+public struct StatementZeroActivityControlDTO: nonisolated Equatable, Sendable {
+    public static let semanticDigestAlgorithm = ZeroActivityStatementEvidence.semanticDigestAlgorithm
+
+    public let id: String
+    public let workspaceId: String
+    public let accountId: String
+    public let documentId: String
+    public let importSessionId: String
+    public let normalizedDocumentId: String
+    public let parserProfileId: String
+    public let parserProfileVersion: String
+    public let sourceFormatCode: String
+    public let institutionCode: String
+    public let statementFamilyCode: String
+    public let statementDateISO: String?
+    public let statementStartDateISO: String?
+    public let statementEndDateISO: String?
+    public let selectedStatementMonthISO: String?
+    public let semanticCycleKey: String
+    public let nativeCurrency: String
+    public let openingBalanceMinor: Int64?
+    public let openingBalanceDecimal: String?
+    public let closingBalanceMinor: Int64?
+    public let closingBalanceDecimal: String?
+    public let debitTotalMinor: Int64?
+    public let debitTotalDecimal: String?
+    public let creditTotalMinor: Int64?
+    public let creditTotalDecimal: String?
+    public let cardPreviousBalanceMinor: Int64?
+    public let cardPreviousBalanceDecimal: String?
+    public let cardTotalPaymentDueMinor: Int64?
+    public let cardTotalPaymentDueDecimal: String?
+    public let cardPaymentDueDateISO: String?
+    public let evidenceKind: String
+    public let financialRegionDescriptor: String?
+    public let financialRegionSourceUnit: String?
+    public let financialRegionStartOrdinal: Int?
+    public let financialRegionEndOrdinal: Int?
+    public let financialRegionSignature: String?
+    public let semanticDigestAlgorithm: String
+    public let semanticDigest: String
+    public let sourceFingerprintAlgorithm: String
+    public let sourceFingerprintDigest: String
+    public let authorityRole: String
+    public let createdAtISO: String
+
+    public init(
+        id: String,
+        workspaceId: String,
+        accountId: String,
+        documentId: String,
+        importSessionId: String,
+        normalizedDocumentId: String,
+        parserProfileId: String,
+        parserProfileVersion: String,
+        sourceFormatCode: String,
+        institutionCode: String,
+        statementFamilyCode: String,
+        statementDateISO: String? = nil,
+        statementStartDateISO: String? = nil,
+        statementEndDateISO: String? = nil,
+        selectedStatementMonthISO: String? = nil,
+        semanticCycleKey: String,
+        nativeCurrency: String,
+        openingBalanceMinor: Int64? = nil,
+        openingBalanceDecimal: String? = nil,
+        closingBalanceMinor: Int64? = nil,
+        closingBalanceDecimal: String? = nil,
+        debitTotalMinor: Int64? = nil,
+        debitTotalDecimal: String? = nil,
+        creditTotalMinor: Int64? = nil,
+        creditTotalDecimal: String? = nil,
+        cardPreviousBalanceMinor: Int64? = nil,
+        cardPreviousBalanceDecimal: String? = nil,
+        cardTotalPaymentDueMinor: Int64? = nil,
+        cardTotalPaymentDueDecimal: String? = nil,
+        cardPaymentDueDateISO: String? = nil,
+        evidenceKind: String,
+        financialRegionDescriptor: String? = nil,
+        financialRegionSourceUnit: String? = nil,
+        financialRegionStartOrdinal: Int? = nil,
+        financialRegionEndOrdinal: Int? = nil,
+        financialRegionSignature: String? = nil,
+        semanticDigestAlgorithm: String = StatementZeroActivityControlDTO.semanticDigestAlgorithm,
+        semanticDigest: String,
+        sourceFingerprintAlgorithm: String,
+        sourceFingerprintDigest: String,
+        authorityRole: String = "authoritative",
+        createdAtISO: String
+    ) {
+        self.id = id
+        self.workspaceId = workspaceId
+        self.accountId = accountId
+        self.documentId = documentId
+        self.importSessionId = importSessionId
+        self.normalizedDocumentId = normalizedDocumentId
+        self.parserProfileId = parserProfileId
+        self.parserProfileVersion = parserProfileVersion
+        self.sourceFormatCode = sourceFormatCode
+        self.institutionCode = institutionCode
+        self.statementFamilyCode = statementFamilyCode
+        self.statementDateISO = statementDateISO
+        self.statementStartDateISO = statementStartDateISO
+        self.statementEndDateISO = statementEndDateISO
+        self.selectedStatementMonthISO = selectedStatementMonthISO
+        self.semanticCycleKey = semanticCycleKey
+        self.nativeCurrency = nativeCurrency
+        self.openingBalanceMinor = openingBalanceMinor
+        self.openingBalanceDecimal = openingBalanceDecimal
+        self.closingBalanceMinor = closingBalanceMinor
+        self.closingBalanceDecimal = closingBalanceDecimal
+        self.debitTotalMinor = debitTotalMinor
+        self.debitTotalDecimal = debitTotalDecimal
+        self.creditTotalMinor = creditTotalMinor
+        self.creditTotalDecimal = creditTotalDecimal
+        self.cardPreviousBalanceMinor = cardPreviousBalanceMinor
+        self.cardPreviousBalanceDecimal = cardPreviousBalanceDecimal
+        self.cardTotalPaymentDueMinor = cardTotalPaymentDueMinor
+        self.cardTotalPaymentDueDecimal = cardTotalPaymentDueDecimal
+        self.cardPaymentDueDateISO = cardPaymentDueDateISO
+        self.evidenceKind = evidenceKind
+        self.financialRegionDescriptor = financialRegionDescriptor
+        self.financialRegionSourceUnit = financialRegionSourceUnit
+        self.financialRegionStartOrdinal = financialRegionStartOrdinal
+        self.financialRegionEndOrdinal = financialRegionEndOrdinal
+        self.financialRegionSignature = financialRegionSignature
+        self.semanticDigestAlgorithm = semanticDigestAlgorithm
+        self.semanticDigest = semanticDigest
+        self.sourceFingerprintAlgorithm = sourceFingerprintAlgorithm
+        self.sourceFingerprintDigest = sourceFingerprintDigest
+        self.authorityRole = authorityRole
+        self.createdAtISO = createdAtISO
+    }
+
+    /// Validates the value-semantic part of the control. Relationship checks
+    /// against documents, accounts, sessions, and fingerprints belong to the
+    /// provider because only it can observe durable state atomically.
+    func isValid() -> Bool {
+        guard !id.isEmpty, !workspaceId.isEmpty, !accountId.isEmpty,
+              !documentId.isEmpty, !importSessionId.isEmpty,
+              !normalizedDocumentId.isEmpty, !sourceFingerprintAlgorithm.isEmpty,
+              sourceFingerprintDigest.count == 64,
+              sourceFingerprintDigest.unicodeScalars.allSatisfy({ "0123456789abcdef".unicodeScalars.contains($0) }),
+              authorityRole == "authoritative" || authorityRole == "supporting",
+              semanticDigestAlgorithm == Self.semanticDigestAlgorithm,
+              semanticDigest.count == 64,
+              semanticDigest.unicodeScalars.allSatisfy({ "0123456789abcdef".unicodeScalars.contains($0) }),
+              financialRegionSourceUnit == nil ||
+                FinancialRegionSourceUnit(rawValue: financialRegionSourceUnit!) != nil,
+              let rebuilt = try? evidence(), rebuilt.semanticDigest == semanticDigest,
+              institutionCode == rebuilt.institutionCode,
+              statementFamilyCode == rebuilt.statementFamilyCode,
+              semanticCycleKey == rebuilt.semanticCycleKey else {
+            return false
+        }
+        return true
+    }
+
+    /// The selected durable account is part of the zero-activity authority.
+    /// Structural similarity or a caller-supplied account choice must never
+    /// override the exact registered institution, family type, or currency.
+    func matchesAccount(_ account: AccountDTO) -> Bool {
+        guard isValid(),
+              let binding = ZeroActivityProfileBinding.resolve(
+                  profileID: parserProfileId,
+                  profileVersion: parserProfileVersion,
+                  sourceFormatCode: sourceFormatCode
+              ) else { return false }
+        return account.id == accountId &&
+            account.workspaceId == workspaceId &&
+            account.institutionId == binding.institutionPersistenceID &&
+            account.accountType == binding.accountTypeCode &&
+            account.nativeCurrency == nativeCurrency
+    }
+
+    /// Rehydrates the model-level source evidence and is intentionally kept
+    /// internal; the DTO is the public provider boundary.
+    func evidence() throws -> ZeroActivityStatementEvidence {
+        guard let kind = ZeroActivityEvidenceKind(rawValue: evidenceKind),
+              let currency = try? CurrencyCode(nativeCurrency) else {
+            throw ZeroActivityStatementEvidenceError.invalidDigest
+        }
+        let statementDate = try statementDateISO.map { try StatementDate(canonical: $0) }
+        let selectedStatementMonth = try selectedStatementMonthISO.map {
+            try SelectedStatementMonth(canonical: $0)
+        }
+        let cardPaymentDueDate = try cardPaymentDueDateISO.map {
+            try StatementDate(canonical: $0)
+        }
+        let period: DeclaredStatementPeriod?
+        if let startISO = statementStartDateISO, let endISO = statementEndDateISO {
+            period = try DeclaredStatementPeriod(
+                start: StatementDate(canonical: startISO),
+                end: StatementDate(canonical: endISO)
+            )
+        } else {
+            guard statementStartDateISO == nil, statementEndDateISO == nil else {
+                throw ZeroActivityStatementEvidenceError.reversedPeriod
+            }
+            period = nil
+        }
+        func money(minor: Int64?, decimal: String?) throws -> Money? {
+            guard let minor, let decimal else {
+                guard minor == nil, decimal == nil else { throw ZeroActivityStatementEvidenceError.currencyMismatch }
+                return nil
+            }
+            let byDecimal = try Money(canonicalDecimal: decimal, currency: nativeCurrency)
+            let byMinor = try Money.fromMinorUnits(minor, currency: nativeCurrency)
+            guard byDecimal == byMinor else { throw ZeroActivityStatementEvidenceError.currencyMismatch }
+            return byDecimal
+        }
+        return try ZeroActivityStatementEvidence(
+            profileID: parserProfileId,
+            profileVersion: parserProfileVersion,
+            sourceFormatCode: sourceFormatCode,
+            evidenceKind: kind,
+            financialRegionDescriptor: financialRegionDescriptor,
+            financialRegionSourceUnit: financialRegionSourceUnit.flatMap(
+                FinancialRegionSourceUnit.init(rawValue:)
+            ),
+            financialRegionStartOrdinal: financialRegionStartOrdinal,
+            financialRegionEndOrdinal: financialRegionEndOrdinal,
+            financialRegionSignature: financialRegionSignature,
+            statementDate: statementDate,
+            statementPeriod: period,
+            selectedStatementMonth: selectedStatementMonth,
+            nativeCurrency: currency,
+            openingBalance: try money(minor: openingBalanceMinor, decimal: openingBalanceDecimal),
+            closingBalance: try money(minor: closingBalanceMinor, decimal: closingBalanceDecimal),
+            debitTotal: try money(minor: debitTotalMinor, decimal: debitTotalDecimal),
+            creditTotal: try money(minor: creditTotalMinor, decimal: creditTotalDecimal),
+            cardPreviousBalance: try money(
+                minor: cardPreviousBalanceMinor,
+                decimal: cardPreviousBalanceDecimal
+            ),
+            cardTotalPaymentDue: try money(
+                minor: cardTotalPaymentDueMinor,
+                decimal: cardTotalPaymentDueDecimal
+            ),
+            cardPaymentDueDate: cardPaymentDueDate,
+            semanticDigest: semanticDigest
+        )
+    }
+
+    static func make(
+        evidence: ZeroActivityStatementEvidence,
+        id: String,
+        workspaceId: String,
+        accountId: String,
+        documentId: String,
+        importSessionId: String,
+        normalizedDocumentId: String,
+        sourceFingerprintAlgorithm: String,
+        sourceFingerprintDigest: String,
+        authorityRole: String = "authoritative",
+        createdAtISO: String
+    ) throws -> Self {
+        Self(
+            id: id,
+            workspaceId: workspaceId,
+            accountId: accountId,
+            documentId: documentId,
+            importSessionId: importSessionId,
+            normalizedDocumentId: normalizedDocumentId,
+            parserProfileId: evidence.profileID,
+            parserProfileVersion: evidence.profileVersion,
+            sourceFormatCode: evidence.sourceFormatCode,
+            institutionCode: evidence.institutionCode,
+            statementFamilyCode: evidence.statementFamilyCode,
+            statementDateISO: evidence.statementDate?.canonical,
+            statementStartDateISO: evidence.statementPeriod?.start.canonical,
+            statementEndDateISO: evidence.statementPeriod?.end.canonical,
+            selectedStatementMonthISO: evidence.selectedStatementMonth?.canonical,
+            semanticCycleKey: evidence.semanticCycleKey,
+            nativeCurrency: evidence.nativeCurrency.code,
+            openingBalanceMinor: try evidence.openingBalance.map { try $0.minorUnits() },
+            openingBalanceDecimal: try evidence.openingBalance.map { try $0.canonicalDecimalString() },
+            closingBalanceMinor: try evidence.closingBalance.map { try $0.minorUnits() },
+            closingBalanceDecimal: try evidence.closingBalance.map { try $0.canonicalDecimalString() },
+            debitTotalMinor: try evidence.debitTotal.map { try $0.minorUnits() },
+            debitTotalDecimal: try evidence.debitTotal.map { try $0.canonicalDecimalString() },
+            creditTotalMinor: try evidence.creditTotal.map { try $0.minorUnits() },
+            creditTotalDecimal: try evidence.creditTotal.map { try $0.canonicalDecimalString() },
+            cardPreviousBalanceMinor: try evidence.cardPreviousBalance.map { try $0.minorUnits() },
+            cardPreviousBalanceDecimal: try evidence.cardPreviousBalance.map { try $0.canonicalDecimalString() },
+            cardTotalPaymentDueMinor: try evidence.cardTotalPaymentDue.map { try $0.minorUnits() },
+            cardTotalPaymentDueDecimal: try evidence.cardTotalPaymentDue.map { try $0.canonicalDecimalString() },
+            cardPaymentDueDateISO: evidence.cardPaymentDueDate?.canonical,
+            evidenceKind: evidence.evidenceKind.rawValue,
+            financialRegionDescriptor: evidence.financialRegionDescriptor,
+            financialRegionSourceUnit: evidence.financialRegionSourceUnit?.rawValue,
+            financialRegionStartOrdinal: evidence.financialRegionStartOrdinal,
+            financialRegionEndOrdinal: evidence.financialRegionEndOrdinal,
+            financialRegionSignature: evidence.financialRegionSignature,
+            semanticDigestAlgorithm: Self.semanticDigestAlgorithm,
+            semanticDigest: evidence.semanticDigest,
+            sourceFingerprintAlgorithm: sourceFingerprintAlgorithm,
+            sourceFingerprintDigest: sourceFingerprintDigest,
+            authorityRole: authorityRole,
+            createdAtISO: createdAtISO
+        )
+    }
+
+    func withAuthorityRole(_ role: String) -> Self {
+        Self(
+            id: id,
+            workspaceId: workspaceId,
+            accountId: accountId,
+            documentId: documentId,
+            importSessionId: importSessionId,
+            normalizedDocumentId: normalizedDocumentId,
+            parserProfileId: parserProfileId,
+            parserProfileVersion: parserProfileVersion,
+            sourceFormatCode: sourceFormatCode,
+            institutionCode: institutionCode,
+            statementFamilyCode: statementFamilyCode,
+            statementDateISO: statementDateISO,
+            statementStartDateISO: statementStartDateISO,
+            statementEndDateISO: statementEndDateISO,
+            selectedStatementMonthISO: selectedStatementMonthISO,
+            semanticCycleKey: semanticCycleKey,
+            nativeCurrency: nativeCurrency,
+            openingBalanceMinor: openingBalanceMinor,
+            openingBalanceDecimal: openingBalanceDecimal,
+            closingBalanceMinor: closingBalanceMinor,
+            closingBalanceDecimal: closingBalanceDecimal,
+            debitTotalMinor: debitTotalMinor,
+            debitTotalDecimal: debitTotalDecimal,
+            creditTotalMinor: creditTotalMinor,
+            creditTotalDecimal: creditTotalDecimal,
+            cardPreviousBalanceMinor: cardPreviousBalanceMinor,
+            cardPreviousBalanceDecimal: cardPreviousBalanceDecimal,
+            cardTotalPaymentDueMinor: cardTotalPaymentDueMinor,
+            cardTotalPaymentDueDecimal: cardTotalPaymentDueDecimal,
+            cardPaymentDueDateISO: cardPaymentDueDateISO,
+            evidenceKind: evidenceKind,
+            financialRegionDescriptor: financialRegionDescriptor,
+            financialRegionSourceUnit: financialRegionSourceUnit,
+            financialRegionStartOrdinal: financialRegionStartOrdinal,
+            financialRegionEndOrdinal: financialRegionEndOrdinal,
+            financialRegionSignature: financialRegionSignature,
+            semanticDigestAlgorithm: semanticDigestAlgorithm,
+            semanticDigest: semanticDigest,
+            sourceFingerprintAlgorithm: sourceFingerprintAlgorithm,
+            sourceFingerprintDigest: sourceFingerprintDigest,
+            authorityRole: role,
+            createdAtISO: createdAtISO
+        )
     }
 }
 

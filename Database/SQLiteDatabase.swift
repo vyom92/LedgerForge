@@ -226,6 +226,15 @@ public final class SQLiteDatabase {
         try execute(sql: "CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, version INTEGER NOT NULL, name TEXT, applied_at DATETIME NOT NULL, checksum TEXT);")
 
         for migration in migrations.dropFirst(persistedRecords.count) {
+            // Some schema rebuilds must temporarily opt into SQLite's legacy
+            // ALTER TABLE behavior. PRAGMA state is connection-scoped rather
+            // than transactional, so a failed multi-statement migration can
+            // otherwise leak that temporary mode after ROLLBACK. Preserve the
+            // caller's entry state on failure; a successful migration retains
+            // responsibility for its declared final connection state.
+            let legacyAlterTableWasEnabled = try querySingleInt(
+                sql: "PRAGMA legacy_alter_table;"
+            ) != 0
             if migration.requiresForeignKeysDisabled {
                 try execute(sql: "PRAGMA foreign_keys = OFF;")
             }
@@ -260,6 +269,9 @@ public final class SQLiteDatabase {
                 if migration.requiresForeignKeysDisabled {
                     try? execute(sql: "PRAGMA foreign_keys = ON;")
                 }
+                try? execute(sql: legacyAlterTableWasEnabled
+                    ? "PRAGMA legacy_alter_table = ON;"
+                    : "PRAGMA legacy_alter_table = OFF;")
                 throw error
             }
         }

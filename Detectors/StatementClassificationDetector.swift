@@ -37,6 +37,53 @@ struct StatementClassificationDetector: ImportFramework.StatementClassifier {
         }
         let normalizedText = Self.normalized(document.searchableText)
 
+        // CBQ PDFs must enter exactly one retained statement family before the
+        // generic classifier rules are considered. Institution context is a
+        // useful supporting signal for other issuers, but it must not combine
+        // with a stray marketing phrase (for example, "CREDIT CARD") to route
+        // an exact CBQ current-account statement into the card parser.
+        if institution?.institutionCode == Institution.cbq.rawValue,
+           document.fileExtension == "pdf" {
+            let exactFamilies = [
+                InstitutionDetectionRule.cbqCreditCardPDF,
+                .cbqCurrentAccountHistoryPDF,
+                .cbqCurrentAccountMonthlyPDF
+            ].compactMap { $0.detect(in: normalizedText) }
+
+            guard exactFamilies.count == 1, let family = exactFamilies.first else {
+                return StatementClassification(
+                    documentType: .unknown,
+                    confidence: 0.0,
+                    reasons: [
+                        exactFamilies.isEmpty
+                            ? "No exact CBQ PDF statement family matched."
+                            : "Multiple exact CBQ PDF statement families matched."
+                    ]
+                )
+            }
+
+            switch family.metadata.documentType {
+            case .bankAccount:
+                return StatementClassification(
+                    documentType: .bankStatement,
+                    confidence: 0.95,
+                    reasons: family.reasons
+                )
+            case .creditCard:
+                return StatementClassification(
+                    documentType: .creditCardStatement,
+                    confidence: 0.90,
+                    reasons: family.reasons
+                )
+            default:
+                return StatementClassification(
+                    documentType: .unknown,
+                    confidence: 0.0,
+                    reasons: ["The exact CBQ PDF family mapped to an unsupported document type."]
+                )
+            }
+        }
+
         for rule in rules {
             if let classification = rule.classify(
                 normalizedText: normalizedText,

@@ -38,7 +38,6 @@ struct PersistenceAvailabilityTests {
             persistenceCode: "audit_write_unavailable",
             transactionCount: 0
         )
-        let history = makeAtomicHistory(workspaceID: workspace.id, session: session, attempt: attempt)
 
         #expect(provider.persistenceState == .unavailable(.migrationIntegrityFailed))
         expectUnavailable { try provider.workspaceRepo.upsertWorkspace(workspace) }
@@ -60,7 +59,6 @@ struct PersistenceAvailabilityTests {
         expectUnavailable { try provider.importSessionRepo.transactionEventOwners(keys: []) }
         expectUnavailable { try provider.importSessionRepo.recordImportAttempt(attempt) }
         expectUnavailable { try provider.importSessionRepo.importAttempts(workspaceId: workspace.id) }
-        expectUnavailable { try provider.importSessionRepo.commitImportHistory(history) }
     }
 
     @Test func explicitTestAndDebugMemoryProvidersRemainUsableAndTruthful() throws {
@@ -204,7 +202,8 @@ struct PersistenceAvailabilityTests {
         }
     }
 
-    @Test func importPreparationRejectsBeforeAttemptingToReadTheSource() async {
+    @Test(.globalRuntimeStateIsolation)
+    func importPreparationRejectsBeforeAttemptingToReadTheSource() async {
         var sourceAcquisitionCount = 0
         let engine = ImportEngine(
             sourceSnapshotAcquirer: { _ in
@@ -221,14 +220,17 @@ struct PersistenceAvailabilityTests {
         #expect(sourceAcquisitionCount == 0)
     }
 
-    @Test func preparedImportConfirmationRechecksAvailabilityBeforePersistence() async {
+    @Test(.globalRuntimeStateIsolation)
+    func preparedImportConfirmationRechecksAvailabilityBeforePersistence() async throws {
+        var availability: PersistenceState = .intentionalNonDurable(.testMemory)
         let persistence = AvailabilityCountingPersistenceCoordinator()
         let engine = ImportEngine(
             importPersistenceCoordinator: persistence,
-            persistenceStateProvider: { .unavailable(.migrationIntegrityFailed) }
+            persistenceStateProvider: { availability }
         )
 
-        let prepared = makePreparedImport()
+        let prepared = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
+        availability = .unavailable(.migrationIntegrityFailed)
         let result = await engine.commitPreparedImport(prepared)
 
         #expect(!result.persisted)
@@ -241,7 +243,8 @@ struct PersistenceAvailabilityTests {
         }
     }
 
-    @Test func unavailableLikeLocalizedErrorCannotGainFreshPreparationEligibility() async {
+    @Test(.globalRuntimeStateIsolation)
+    func unavailableLikeLocalizedErrorCannotGainFreshPreparationEligibility() async throws {
         let message = ImportPersistenceCoordinationError.persistenceUnavailable.localizedDescription
         let persistence = HostileAvailabilityPersistenceCoordinator(message: message)
         let engine = ImportEngine(
@@ -249,7 +252,7 @@ struct PersistenceAvailabilityTests {
             developerConsole: DeveloperConsole(),
             persistenceStateProvider: { .intentionalNonDurable(.testMemory) }
         )
-        let prepared = makePreparedImport()
+        let prepared = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
 
         let result = await engine.commitPreparedImport(prepared)
 
@@ -263,7 +266,8 @@ struct PersistenceAvailabilityTests {
         }
     }
 
-    @Test func retryableContentionRecordsPrepareAgainWithoutAcceptedWrites() async throws {
+    @Test(.globalRuntimeStateIsolation)
+    func retryableContentionRecordsPrepareAgainWithoutAcceptedWrites() async throws {
         let memory = InMemoryRepositoryProvider()
         let confirmedRepository = RetryableContentionConfirmedImportRepository()
         let provider = DatabaseProvider(
@@ -293,9 +297,9 @@ struct PersistenceAvailabilityTests {
             providerGenerationProvider: { provider.generationToken },
             rejectedAttemptHydration: {}
         )
-        let prepared = makePreparedImport(providerGeneration: provider.generationToken)
+        let prepared = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
 
-        let result = await engine.commitPreparedImport(prepared)
+        let result = await engine.commitPreparedImport(prepared, accountChoice: .createNewAccount)
         let attempts = try provider.importSessionRepo.importAttempts(workspaceId: workspaceID)
         let attempt = try #require(attempts.first)
 
@@ -314,51 +318,83 @@ struct PersistenceAvailabilityTests {
         }
     }
 
-    @Test func unavailableHydrationPreservesEveryExistingRuntimeStore() {
-        let provider = DatabaseProvider.unavailable(reason: .migrationFailed)
+    @Test(.globalRuntimeStateIsolation)
+    func unavailableHydrationPreservesEveryExistingRuntimeStore() async throws {
+        let authenticProvider = DatabaseProvider(inMemory: true)
+        let plan = try await confirmedImportPlan(generationToken: authenticProvider.generationToken)
+        guard case .committed = authenticProvider.confirmedImportRepo.commitConfirmedImport(plan) else {
+            Issue.record("Authentic confirmed import did not commit before hydration availability check.")
+            return
+        }
         let accountStore = AccountStore()
         let transactionStore = TransactionStore()
         let importSessionStore = ImportSessionStore()
         let importAttemptStore = ImportAttemptStore()
-        let existingAccount = Account(
-            institution: "Existing",
-            name: "Existing Account",
-            type: .bank,
-            currencyCode: "INR",
-            currentBalance: 10
-        )
-        let existingTransaction = Transaction(
-            statementDate: try! StatementDate(canonical: "2027-03-13"),
-            description: "Existing transaction",
-            debit: nil,
-            credit: 10,
-            amount: 10,
-            balance: 10,
-            currency: "INR",
-            account: "Existing Account",
-            sourceBank: "Existing",
-            sourceFile: "existing.csv"
-        )
-        accountStore.replaceAccounts([existingAccount])
-        transactionStore.replaceTransactions([existingTransaction])
-        let hydrator = RepositoryStoreHydrator(
-            databaseProvider: provider,
+        let categoryStore = CategoryStore()
+        let cardStore = CardStore()
+        let salaryStore = SalaryStore()
+        let fundingPlanStore = FundingPlanStore()
+        let authenticHydrator = RepositoryStoreHydrator(
+            accountRepo: authenticProvider.accountRepo,
+            importSessionRepo: authenticProvider.importSessionRepo,
+            transactionRepo: authenticProvider.transactionRepo,
+            categoryRepo: authenticProvider.categoryRepo,
+            cardRepo: authenticProvider.cardRepo,
+            salaryRepo: authenticProvider.salaryRepo,
+            fundingPlanRepo: authenticProvider.fundingPlanRepo,
             accountStore: accountStore,
             transactionStore: transactionStore,
+            categoryStore: categoryStore,
+            cardStore: cardStore,
+            salaryStore: salaryStore,
+            fundingPlanStore: fundingPlanStore,
             importSessionStore: importSessionStore,
-            importAttemptStore: importAttemptStore
+            importAttemptStore: importAttemptStore,
+            workspaceId: plan.workspace.id,
+            persistenceState: authenticProvider.persistenceState,
+            providerGeneration: authenticProvider.generationToken,
+            participatesInLifecycleGate: false
+        )
+        _ = try authenticHydrator.hydrateIfNeeded()
+        let accountIDsBefore = accountStore.accounts.map(\.id)
+        let transactionIDsBefore = transactionStore.transactions.map(\.id)
+        let sessionsBefore = importSessionStore.importSessions
+        let attemptsBefore = importAttemptStore.attempts
+
+        let unavailable = DatabaseProvider.unavailable(reason: .migrationFailed)
+        let unavailableHydrator = RepositoryStoreHydrator(
+            accountRepo: unavailable.accountRepo,
+            importSessionRepo: unavailable.importSessionRepo,
+            transactionRepo: unavailable.transactionRepo,
+            categoryRepo: unavailable.categoryRepo,
+            cardRepo: unavailable.cardRepo,
+            salaryRepo: unavailable.salaryRepo,
+            fundingPlanRepo: unavailable.fundingPlanRepo,
+            accountStore: accountStore,
+            transactionStore: transactionStore,
+            categoryStore: categoryStore,
+            cardStore: cardStore,
+            salaryStore: salaryStore,
+            fundingPlanStore: fundingPlanStore,
+            importSessionStore: importSessionStore,
+            importAttemptStore: importAttemptStore,
+            workspaceId: plan.workspace.id,
+            persistenceState: unavailable.persistenceState,
+            providerGeneration: unavailable.generationToken,
+            participatesInLifecycleGate: false
         )
 
         #expect(throws: RepositoryStoreHydrationError.persistenceUnavailable) {
-            try hydrator.hydrateIfNeeded(forceRefresh: true)
+            try unavailableHydrator.hydrateIfNeeded(forceRefresh: true)
         }
-        #expect(accountStore.accounts.map(\.id) == [existingAccount.id])
-        #expect(transactionStore.transactions.map(\.id) == [existingTransaction.id])
-        #expect(importSessionStore.importSessions.isEmpty)
-        #expect(importAttemptStore.attempts.isEmpty)
+        #expect(accountStore.accounts.map(\.id) == accountIDsBefore)
+        #expect(transactionStore.transactions.map(\.id) == transactionIDsBefore)
+        #expect(importSessionStore.importSessions == sessionsBefore)
+        #expect(importAttemptStore.attempts == attemptsBefore)
     }
 
-    @Test func accountMetadataMutationReportsPersistenceUnavailableWithoutMutation() {
+    @Test(.globalRuntimeStateIsolation)
+    func accountMetadataMutationReportsPersistenceUnavailableWithoutMutation() {
         let provider = DatabaseProvider.unavailable(reason: .migrationIntegrityFailed)
         let coordinator = AccountMetadataCoordinator(databaseProvider: provider, developerConsole: nil)
 
@@ -385,39 +421,6 @@ struct PersistenceAvailabilityTests {
         }
     }
 
-    private func makeAtomicHistory(
-        workspaceID: String,
-        session: ImportSessionDTO,
-        attempt: ImportAttemptDTO
-    ) -> AtomicImportHistoryDTO {
-        let document = ImportedDocumentDTO(
-            id: "document-unavailable",
-            workspaceId: workspaceID,
-            importSessionId: session.id,
-            filename: "sanitized.csv",
-            mimeType: "text/csv",
-            sizeBytes: 0,
-            sha256: "test",
-            createdAtISO: "2026-07-20T00:00:00Z"
-        )
-        return AtomicImportHistoryDTO(
-            document: document,
-            fingerprint: DocumentFingerprintDTO(
-                id: "fingerprint-unavailable",
-                documentId: document.id,
-                importSessionId: session.id,
-                algorithm: "test",
-                fingerprint: "test",
-                fingerprintData: nil,
-                createdAtISO: "2026-07-20T00:00:00Z"
-            ),
-            importSession: session,
-            completedAtISO: "2026-07-20T00:00:00Z",
-            transactions: [],
-            successfulAttempt: attempt
-        )
-    }
-
     private func temporaryFolder(named name: String) throws -> URL {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("LedgerForge-PersistenceAvailabilityTests", isDirectory: true)
@@ -434,77 +437,15 @@ struct PersistenceAvailabilityTests {
         #expect(!text.localizedCaseInsensitiveContains("unable to open database"))
     }
 
-    private func makePreparedImport(
-        providerGeneration suppliedProviderGeneration: ProviderGenerationToken? = nil
-    ) -> PreparedImport {
-        let transaction = Transaction(
-            statementDate: try! StatementDate(canonical: "2027-03-13"),
-            description: "Prepared credit",
-            debit: nil,
-            credit: 10,
-            amount: 10,
-            balance: 10,
-            currency: "INR",
-            account: "Prepared Account",
-            sourceBank: "Axis Bank",
-            sourceFile: "prepared.csv",
-            statementTimezoneEvidence: .iana("Asia/Kolkata"),
-            sourceProvenance: [
-                TransactionSourceProvenance(
-                    normalizedDocumentID: "availability-normalized-document",
-                    normalizedRowID: "availability-normalized-row-1",
-                    sourceOrdinal: 1,
-                    normalizedRecordDigest: String.normalizedRecordDigest(values: ["availability", "1"]),
-                    parserProfileID: AxisBankAccountParser.profileID,
-                    parserProfileVersion: AxisBankAccountParser.profileVersion
-                )
-            ]
-        )
-        let document = FinancialDocument(
-            sourceDocument: Document(
-                filename: "prepared.csv",
-                url: URL(fileURLWithPath: "/tmp/prepared.csv"),
-                fileType: "CSV",
-                importedAt: Date(timeIntervalSince1970: 1_804_896_000)
-            ),
-            metadata: DocumentMetadata(
-                institution: .axis,
-                documentType: .bankAccount,
-                fileFormat: .csv,
-                confidence: 1
-            ),
-            parserName: "Availability Test Parser",
-            bookedCurrency: try! CurrencyCode("INR"),
-            transactions: [transaction],
-            selectionReasons: ["Availability test"],
-            createdAt: Date(timeIntervalSince1970: 1_804_896_000)
-        )
-        let validation = ImportValidator.validate(financialDocument: document)
-        return PreparedImport(
-            sourceURL: document.sourceDocument.url,
-            rawContents: "date,description,amount",
-            fileName: document.sourceDocument.filename,
-            detectedInstitution: document.metadata.institution,
-            detectedDocumentType: document.metadata.documentType,
-            parserName: document.parserName,
-            financialDocument: document,
-            validation: validation,
-            importSession: ImportSession(
-                importedAt: Date(timeIntervalSince1970: 1_804_896_000),
-                fileName: document.sourceDocument.filename,
-                institution: document.metadata.institution,
-                documentType: document.metadata.documentType,
-                parserName: document.parserName,
-                transactionCount: document.transactions.count,
-                validation: validation
-            ),
-            providerGeneration: suppliedProviderGeneration ?? DatabaseProvider.shared.generationToken
-        )
-    }
+
 }
 
 private final class AvailabilityCountingPersistenceCoordinator: ImportPersistenceCoordinating {
     private(set) var persistCallCount = 0
+
+    func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
+        nil
+    }
 
     func persistValidatedImport(
         financialDocument: FinancialDocument,
@@ -526,6 +467,10 @@ private final class HostileAvailabilityPersistenceCoordinator: ImportPersistence
 
     init(message: String) {
         self.message = message
+    }
+
+    func priorImportedStatement(fingerprint: ExactStatementFingerprint) throws -> PreviouslyImportedStatement? {
+        nil
     }
 
     func persistValidatedImport(

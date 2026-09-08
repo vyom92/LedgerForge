@@ -4,6 +4,7 @@
 // Version: 0.2.0
 //
 
+import CryptoKit
 import Foundation
 
 enum AxisBankCSVColumnRole: String, CaseIterable, Hashable {
@@ -127,6 +128,29 @@ enum AxisBankAccountCSVProfileV2 {
     }
 }
 
+/// The source-faithful physical-column contract for `axis.bank-account.csv@3`.
+///
+/// The authentic Axis CSV account corpus uses the physical `DR` column for
+/// account increases and the physical `CR` column for account decreases.  The
+/// canonical model intentionally keeps debit/credit terminology independent of
+/// those physical source labels, so the two source columns are reversed when
+/// resolving direction.  This profile is CSV-only; the Axis XLS parser keeps
+/// using `AxisBankAccountCSVProfileV2` for its conventionally labelled sheet.
+enum AxisBankAccountCSVProfileV3 {
+    static func resolve(
+        sourceDR: Decimal?,
+        sourceCR: Decimal?
+    ) throws -> DirectionResult {
+        try DirectionResolver.resolve(
+            strategy: .debitCreditColumns,
+            debit: sourceCR,
+            credit: sourceDR,
+            amount: nil,
+            direction: nil
+        )
+    }
+}
+
 enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
     case missingHeader
     case malformedTransactionRow(rowNumber: Int)
@@ -134,12 +158,17 @@ enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
     case invalidMonetaryValue(role: AxisBankCSVColumnRole, rowNumber: Int)
     case missingDirection(rowNumber: Int)
     case ambiguousDirection(rowNumber: Int)
+    case nonPositiveAmount(rowNumber: Int)
+    case missingBalance(rowNumber: Int)
+    case unresolvedFinancialDirectionMapping
+    case malformedReference(rowNumber: Int)
     case malformedAccountIdentifierEvidence(sourceOrdinal: Int)
     case invalidAccountIdentifier(sourceOrdinal: Int)
     case conflictingAccountIdentifiers
     case missingDeclaredStatementPeriod
     case malformedDeclaredStatementPeriod(sourceOrdinal: Int)
     case conflictingDeclaredStatementPeriods
+    case missingFinancialRegionEvidence
 
     var errorDescription: String? {
         switch self {
@@ -155,6 +184,14 @@ enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
             return "Axis CSV transaction row \(rowNumber) contains neither debit nor credit evidence."
         case .ambiguousDirection(let rowNumber):
             return "Axis CSV transaction row \(rowNumber) contains both debit and credit evidence."
+        case .nonPositiveAmount(let rowNumber):
+            return "Axis CSV transaction row \(rowNumber) contains a non-positive movement."
+        case .missingBalance(let rowNumber):
+            return "Axis CSV transaction row \(rowNumber) has no running balance."
+        case .unresolvedFinancialDirectionMapping:
+            return "Axis CSV debit and credit column meaning is not uniquely established by the statement balance transitions."
+        case .malformedReference(let rowNumber):
+            return "Axis CSV transaction row \(rowNumber) contains a malformed cheque/reference value."
         case .malformedAccountIdentifierEvidence(let sourceOrdinal):
             return "Axis account identifier evidence on source row \(sourceOrdinal) is malformed."
         case .invalidAccountIdentifier(let sourceOrdinal):
@@ -167,14 +204,31 @@ enum AxisBankAccountParserError: Error, Equatable, LocalizedError {
             return "Axis declared statement-period evidence on source row \(sourceOrdinal) is malformed."
         case .conflictingDeclaredStatementPeriods:
             return "Axis declared statement-period evidence is duplicated or conflicting."
+        case .missingFinancialRegionEvidence:
+            return "The Axis CSV parser did not receive a completely scanned source table."
         }
     }
 }
 
 final class AxisBankAccountParser: StatementParser {
 
+    private enum FinancialDirectionMapping: CaseIterable {
+        case conventional
+        case reversed
+    }
+
+    private struct ParsedSourceRow {
+        let row: NormalizedRow
+        let date: StatementDate
+        let description: String
+        let reference: (value: String?, digest: String?)
+        let sourceDR: Decimal?
+        let sourceCR: Decimal?
+        let balance: Decimal
+    }
+
     static let profileID = "axis.bank-account.csv"
-    static let profileVersion = "2"
+    static let profileVersion = "3"
 
     var name: String {
         "Axis Bank Account"
@@ -209,23 +263,53 @@ final class AxisBankAccountParser: StatementParser {
         let mapping = try AxisBankCSVColumnMapping.resolve(
             headerCells: header.values
         )
+        let declaredStatementPeriod = try Self.declaredStatementPeriod(
+            from: document.sourceContext.preTransactionFragments
+        )
+        guard let region = document.sourceContext.exhaustedFinancialRegion,
+              region.sourceUnit == .line,
+              region.matches(normalizedFinancialRowCount: document.rows.count),
+              document.sourceContext.printedBankStatementControls == nil else {
+            throw AxisBankAccountParserError.missingFinancialRegionEvidence
+        }
+        let sourceStatementEvidence = SourceStatementEvidence(
+            sourceFormatCode: "csv",
+            statementBoundaryDate: nil,
+            period: declaredStatementPeriod,
+            openingBalance: nil,
+            closingBalance: nil
+        )
 
         guard !document.rows.isEmpty else {
-            let declaredStatementPeriod = try Self.declaredStatementPeriod(
-                from: document.sourceContext.preTransactionFragments
+            let zeroEvidence = try ZeroActivityStatementEvidence(
+                profileID: Self.profileID,
+                profileVersion: Self.profileVersion,
+                sourceFormatCode: "csv",
+                evidenceKind: .exhaustedFinancialRegion,
+                financialRegionDescriptor: region.descriptor,
+                financialRegionSourceUnit: region.sourceUnit,
+                financialRegionStartOrdinal: region.startOrdinal,
+                financialRegionEndOrdinal: region.endOrdinal,
+                financialRegionSignature: region.signature,
+                statementPeriod: declaredStatementPeriod,
+                nativeCurrency: currency
             )
             return FinancialDocument(
                 sourceDocument: document.document,
                 metadata: document.metadata,
                 parserName: name,
+                parserProfileID: Self.profileID,
+                parserProfileVersion: Self.profileVersion,
                 bookedCurrency: currency,
                 declaredStatementPeriod: declaredStatementPeriod,
                 transactions: [],
-                financialIdentifiers: financialIdentifiers
+                financialIdentifiers: financialIdentifiers,
+                sourceStatementEvidence: sourceStatementEvidence,
+                zeroActivityEvidence: zeroEvidence
             )
         }
 
-        var transactions: [Transaction] = []
+        var parsedRows: [ParsedSourceRow] = []
 
         for row in document.rows {
             let parsedDate: StatementDate? = row.values.indices.contains(mapping.date)
@@ -244,6 +328,11 @@ final class AxisBankAccountParser: StatementParser {
                     rowNumber: row.rowNumber
                 )
             }
+            guard row.hasConsistentRawValues else {
+                throw AxisBankAccountParserError.malformedTransactionRow(
+                    rowNumber: row.rowNumber
+                )
+            }
             guard let parsedDate else {
                 throw AxisBankAccountParserError.invalidDate(
                     rowNumber: row.rowNumber
@@ -251,6 +340,10 @@ final class AxisBankAccountParser: StatementParser {
             }
 
             let description = row.values[mapping.description]
+            let reference = try Self.referenceEvidence(
+                in: row,
+                index: mapping.chequeReference
+            )
             let sourceDR = try Self.decimal(
                 row.values[mapping.sourceDR],
                 role: .sourceDR,
@@ -261,24 +354,59 @@ final class AxisBankAccountParser: StatementParser {
                 role: .sourceCR,
                 rowNumber: row.rowNumber
             )
-            let balance = try Self.decimal(
+            guard let balance = try Self.decimal(
                 row.values[mapping.balance],
                 role: .balance,
                 rowNumber: row.rowNumber
+            ) else {
+                throw AxisBankAccountParserError.missingBalance(rowNumber: row.rowNumber)
+            }
+            _ = try Self.sourceAmount(
+                sourceDR: sourceDR,
+                sourceCR: sourceCR,
+                rowNumber: row.rowNumber
             )
+            parsedRows.append(
+                ParsedSourceRow(
+                    row: row,
+                    date: parsedDate,
+                    description: description,
+                    reference: reference,
+                    sourceDR: sourceDR,
+                    sourceCR: sourceCR,
+                    balance: balance
+                )
+            )
+        }
+
+        let financialDirectionMapping = try Self.financialDirectionMapping(
+            for: parsedRows
+        )
+        var transactions: [Transaction] = []
+        transactions.reserveCapacity(parsedRows.count)
+
+        for parsed in parsedRows {
             let direction: DirectionResult
             do {
-                direction = try AxisBankAccountCSVProfileV2.resolve(
-                    sourceDR: sourceDR,
-                    sourceCR: sourceCR
-                )
+                switch financialDirectionMapping {
+                case .conventional:
+                    direction = try AxisBankAccountCSVProfileV2.resolve(
+                        sourceDR: parsed.sourceDR,
+                        sourceCR: parsed.sourceCR
+                    )
+                case .reversed:
+                    direction = try AxisBankAccountCSVProfileV3.resolve(
+                        sourceDR: parsed.sourceDR,
+                        sourceCR: parsed.sourceCR
+                    )
+                }
             } catch DirectionResolutionError.missingDebitAndCredit {
                 throw AxisBankAccountParserError.missingDirection(
-                    rowNumber: row.rowNumber
+                    rowNumber: parsed.row.rowNumber
                 )
             } catch DirectionResolutionError.populatedDebitAndCredit {
                 throw AxisBankAccountParserError.ambiguousDirection(
-                    rowNumber: row.rowNumber
+                    rowNumber: parsed.row.rowNumber
                 )
             }
 
@@ -288,12 +416,13 @@ final class AxisBankAccountParser: StatementParser {
 
             let postedMoney = try Money(amount: amount, currency: currency)
             let transaction = Transaction(
-                statementDate: parsedDate,
-                description: description,
+                statementDate: parsed.date,
+                description: parsed.description,
+                reference: parsed.reference.value,
                 debitMoney: try direction.debit.map { try Money(amount: $0, currency: currency) },
                 creditMoney: try direction.credit.map { try Money(amount: $0, currency: currency) },
                 money: postedMoney,
-                runningBalanceMoney: try balance.map { try Money(amount: $0, currency: currency) },
+                runningBalanceMoney: try Money(amount: parsed.balance, currency: currency),
                 account: document.metadata.institution.rawValue,
                 sourceBank: "Axis Bank",
                 sourceFile: document.document.filename,
@@ -302,16 +431,17 @@ final class AxisBankAccountParser: StatementParser {
                 sourceProvenance: [
                     TransactionSourceProvenance(
                         normalizedDocumentID: document.document.id.uuidString,
-                        normalizedRowID: row.id.uuidString,
-                        sourceOrdinal: row.rowNumber,
-                        normalizedRecordDigest: String.normalizedRecordDigest(values: row.values),
+                        normalizedRowID: parsed.row.id.uuidString,
+                        sourceOrdinal: parsed.row.rowNumber,
+                        normalizedRecordDigest: String.normalizedRecordDigest(values: parsed.row.values),
                         parserProfileID: Self.profileID,
-                        parserProfileVersion: Self.profileVersion
+                        parserProfileVersion: Self.profileVersion,
+                        structuredReferenceDigest: parsed.reference.digest
                     )
                 ],
                 verifiedAxisUPIEventEvidence:
                     AxisBankAccountSourceEvidence.transactionEventEvidence(
-                    narration: description,
+                    narration: parsed.description,
                     direction: direction.transactionType
                 )
             )
@@ -319,18 +449,17 @@ final class AxisBankAccountParser: StatementParser {
             transactions.append(transaction)
         }
 
-        let declaredStatementPeriod = try Self.declaredStatementPeriod(
-            from: document.sourceContext.preTransactionFragments
-        )
-
         return FinancialDocument(
             sourceDocument: document.document,
             metadata: document.metadata,
             parserName: name,
+            parserProfileID: Self.profileID,
+            parserProfileVersion: Self.profileVersion,
             bookedCurrency: currency,
             declaredStatementPeriod: declaredStatementPeriod,
             transactions: transactions,
-            financialIdentifiers: financialIdentifiers
+            financialIdentifiers: financialIdentifiers,
+            sourceStatementEvidence: sourceStatementEvidence
         )
     }
 
@@ -341,16 +470,101 @@ final class AxisBankAccountParser: StatementParser {
     ) throws -> Decimal? {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        guard let decimal = Decimal(
-            string: trimmed,
-            locale: Locale(identifier: "en_US_POSIX")
-        ) else {
+        // Decimal(string:) accepts a valid numeric prefix (for example,
+        // "100.00X" becomes 100).  Validate the entire source token before
+        // parsing so malformed Money cannot be silently truncated.  Grouped
+        // commas are accepted only in standard three-digit groups and are
+        // removed before Foundation Decimal conversion.
+        guard Self.looksLikeStrictDecimal(trimmed),
+              let decimal = Decimal(
+                  string: trimmed.replacingOccurrences(of: ",", with: ""),
+                  locale: Locale(identifier: "en_US_POSIX")
+              ) else {
             throw AxisBankAccountParserError.invalidMonetaryValue(
                 role: role,
                 rowNumber: rowNumber
             )
         }
         return decimal
+    }
+
+    private static func referenceEvidence(
+        in row: NormalizedRow,
+        index: Int
+    ) throws -> (value: String?, digest: String?) {
+        guard row.values.indices.contains(index) else {
+            throw AxisBankAccountParserError.malformedTransactionRow(
+                rowNumber: row.rowNumber
+            )
+        }
+
+        let source = row.rawValues.flatMap { rawValues in
+            rawValues.indices.contains(index) ? rawValues[index] : nil
+        } ?? row.values[index]
+        do {
+            return try AxisBankAccountSourceEvidence.numericReference(source)
+        } catch {
+            throw AxisBankAccountParserError.malformedReference(
+                rowNumber: row.rowNumber
+            )
+        }
+    }
+
+    private static func sourceAmount(
+        sourceDR: Decimal?,
+        sourceCR: Decimal?,
+        rowNumber: Int
+    ) throws -> (role: AxisBankCSVColumnRole, amount: Decimal) {
+        switch (sourceDR, sourceCR) {
+        case (.some(let amount), nil):
+            guard amount > 0 else {
+                throw AxisBankAccountParserError.nonPositiveAmount(rowNumber: rowNumber)
+            }
+            return (.sourceDR, amount)
+        case (nil, .some(let amount)):
+            guard amount > 0 else {
+                throw AxisBankAccountParserError.nonPositiveAmount(rowNumber: rowNumber)
+            }
+            return (.sourceCR, amount)
+        case (nil, nil):
+            throw AxisBankAccountParserError.missingDirection(rowNumber: rowNumber)
+        case (.some, .some):
+            throw AxisBankAccountParserError.ambiguousDirection(rowNumber: rowNumber)
+        }
+    }
+
+    /// Resolves the physical DR/CR meaning from the statement itself. The
+    /// first row cannot establish an opening transition, so every subsequent
+    /// exact running-balance transition is evaluated under both possible
+    /// interpretations and exactly one interpretation must survive.
+    private static func financialDirectionMapping(
+        for rows: [ParsedSourceRow]
+    ) throws -> FinancialDirectionMapping {
+        var candidates = FinancialDirectionMapping.allCases
+        for (previous, current) in zip(rows, rows.dropFirst()) {
+            let source = try sourceAmount(
+                sourceDR: current.sourceDR,
+                sourceCR: current.sourceCR,
+                rowNumber: current.row.rowNumber
+            )
+            let delta = current.balance - previous.balance
+            candidates.removeAll { mapping in
+                let signedAmount: Decimal
+                switch (mapping, source.role) {
+                case (.conventional, .sourceDR), (.reversed, .sourceCR):
+                    signedAmount = -source.amount
+                case (.conventional, .sourceCR), (.reversed, .sourceDR):
+                    signedAmount = source.amount
+                default:
+                    return true
+                }
+                return delta != signedAmount
+            }
+        }
+        guard candidates.count == 1, let resolved = candidates.first else {
+            throw AxisBankAccountParserError.unresolvedFinancialDirectionMapping
+        }
+        return resolved
     }
 
     private static func containsTransactionEvidence(
@@ -362,16 +576,103 @@ final class AxisBankAccountParser: StatementParser {
             return true
         }
 
-        guard row.values.count == mapping.maximumIndex + 1 else {
+        // Keep nonfinancial footer/preamble fragments ignorable, but do not
+        // silently discard a row that carries date-shaped or monetary
+        // transaction evidence merely because its column count is malformed.
+        // The caller will then produce the typed malformed-row/invalid-date
+        // error instead of accepting a partial record.
+        let rawDate = row.values.indices.contains(mapping.date)
+            ? row.values[mapping.date]
+            : ""
+        let hasNonemptyDateCell = !rawDate.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).isEmpty
+        let hasDateEvidence = Self.looksLikeDateEvidence(rawDate)
+        // A balance-only footer/control line is not transaction evidence.
+        // Direction-bearing DR/CR cells are: if either is amount-shaped, the
+        // row must reach the parser and fail closed when its date/layout is
+        // malformed.
+        let hasMonetaryEvidence = [
+            mapping.sourceDR,
+            mapping.sourceCR
+        ].contains { index in
+            guard row.values.indices.contains(index) else { return false }
+            return Self.looksLikeMonetaryEvidence(row.values[index])
+        }
+        let hasBalanceEvidence = row.values.indices.contains(mapping.balance) &&
+            Self.looksLikeMonetaryEvidence(row.values[mapping.balance])
+
+        return hasDateEvidence ||
+            hasMonetaryEvidence ||
+            (hasNonemptyDateCell && hasBalanceEvidence)
+    }
+
+    private static func looksLikeDateEvidence(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+
+        // Axis account CSV dates are day-month-year.  Keep this lexical gate
+        // deliberately broad enough to route malformed date tokens to the
+        // parser's typed invalid-date error, while excluding prose such as
+        // footer text from transaction evidence.
+        let pattern = #"^\d{1,4}[-/]\d{1,2}[-/]\d{1,4}$"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else {
+            return false
+        }
+        let range = NSRange(trimmed.startIndex..., in: trimmed)
+        return expression.firstMatch(in: trimmed, range: range) != nil
+    }
+
+    private static func looksLikeMonetaryEvidence(_ value: String) -> Bool {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+
+        // A source monetary cell is amount-shaped when it starts with an
+        // optional sign followed by a digit/decimal punctuation, contains at
+        // least one ASCII digit, and has no whitespace.  The lexical check is
+        // intentionally independent of Decimal parsing: malformed numeric
+        // forms (for example, "12.3.4" or "100.00X") still route through the
+        // parser's fail-closed monetary validation, while prose fragments such
+        // as comma-split footer text remain ignorable.
+        let scalars = Array(trimmed.unicodeScalars)
+        var bodyStart = 0
+        if let first = scalars.first, first == "+" || first == "-" {
+            bodyStart = 1
+        }
+        guard bodyStart < scalars.count else { return false }
+
+        let body = scalars[bodyStart...]
+        guard let firstBodyScalar = body.first,
+              Self.isAmountLeadingScalar(firstBodyScalar),
+              body.contains(where: Self.isASCIIDigit),
+              body.allSatisfy(Self.isAmountScalar) else {
             return false
         }
 
-        return [mapping.sourceDR, mapping.sourceCR].contains { index in
-            guard row.values.indices.contains(index) else { return false }
-            return !row.values[index]
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .isEmpty
+        return true
+    }
+
+    private static func looksLikeStrictDecimal(_ value: String) -> Bool {
+        let pattern = #"^[+-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?|\.\d+)$"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else {
+            return false
         }
+        let range = NSRange(value.startIndex..., in: value)
+        return expression.firstMatch(in: value, range: range) != nil
+    }
+
+    private nonisolated static func isASCIIDigit(_ scalar: Unicode.Scalar) -> Bool {
+        scalar.value >= 48 && scalar.value <= 57
+    }
+
+    private nonisolated static func isAmountLeadingScalar(_ scalar: Unicode.Scalar) -> Bool {
+        isASCIIDigit(scalar) || scalar == "." || scalar == ","
+    }
+
+    private nonisolated static func isAmountScalar(_ scalar: Unicode.Scalar) -> Bool {
+        isASCIIDigit(scalar) || scalar == "." || scalar == "," ||
+            (scalar.value >= 65 && scalar.value <= 90) ||
+            (scalar.value >= 97 && scalar.value <= 122)
     }
 
     private static func financialIdentifiers(

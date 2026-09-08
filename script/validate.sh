@@ -10,6 +10,8 @@ readonly TEST_PLAN="TestPlan"
 ARTIFACT_ROOT=""
 DERIVED_DATA=""
 RESULT_BUNDLE=""
+TEST_ENVIRONMENT_FILE=""
+XCTESTRUN_PATH=""
 
 usage() {
     cat <<'USAGE'
@@ -22,6 +24,8 @@ Usage:
   ./script/validate.sh --help
 
 Each build and test command uses an isolated task-owned DerivedData directory.
+Set LEDGERFORGE_TEST_ENVIRONMENT_FILE to an external JSON dictionary when
+app-hosted tests require explicitly forwarded environment variables.
 USAGE
 }
 
@@ -79,6 +83,28 @@ prepare_child_artifacts() {
     RESULT_BUNDLE="$ARTIFACT_ROOT/TestResults.xcresult"
 }
 
+prepare_test_environment_file() {
+    local configured_file="${LEDGERFORGE_TEST_ENVIRONMENT_FILE:-}"
+    local resolved_file
+
+    TEST_ENVIRONMENT_FILE=""
+    [[ -n "$configured_file" ]] || return 0
+    [[ -f "$configured_file" && -r "$configured_file" ]] || fail "LEDGERFORGE_TEST_ENVIRONMENT_FILE must name a readable regular file" 64
+
+    resolved_file="$(canonical_path "$configured_file")" || fail "unable to resolve LEDGERFORGE_TEST_ENVIRONMENT_FILE" 70
+    case "$resolved_file" in
+        "$ROOT_DIR"|"$ROOT_DIR"/*) fail "LEDGERFORGE_TEST_ENVIRONMENT_FILE must remain outside the repository" 64 ;;
+    esac
+
+    /usr/bin/jq -s -e '
+        length == 1
+        and (.[0] | type == "object")
+        and (.[0] | all(to_entries[]; (.key | length) > 0 and (.value | type) == "string"))
+    ' "$resolved_file" >/dev/null || fail "LEDGERFORGE_TEST_ENVIRONMENT_FILE must contain one JSON dictionary with nonempty keys and string values" 64
+
+    TEST_ENVIRONMENT_FILE="$resolved_file"
+}
+
 print_context() {
     local operation="$1"
     printf 'Operation: %s\n' "$operation"
@@ -113,6 +139,97 @@ run_build() {
         build
 }
 
+derive_generated_xctestrun() {
+    local products_directory="$DERIVED_DATA/Build/Products"
+    local generated_file
+    local -a generated_files=()
+
+    [[ -d "$products_directory" ]] || fail "build-for-testing did not create a Build/Products directory" 65
+    while IFS= read -r generated_file; do
+        generated_files+=("$generated_file")
+    done < <(/usr/bin/find "$products_directory" -maxdepth 1 -type f -name '*.xctestrun' -print | /usr/bin/sort)
+
+    [[ "${#generated_files[@]}" -eq 1 ]] || fail "build-for-testing must produce exactly one generated xctestrun file" 65
+    XCTESTRUN_PATH="${generated_files[0]}"
+}
+
+merge_test_environment_into_xctestrun() {
+    local configured_xctestrun
+
+    [[ -n "$TEST_ENVIRONMENT_FILE" ]] || fail "internal test-environment forwarding state is missing" 70
+    [[ -f "$XCTESTRUN_PATH" ]] || fail "generated xctestrun file is missing" 65
+    configured_xctestrun="$(/usr/bin/mktemp "$ARTIFACT_ROOT/.configured-xctestrun.XXXXXX")" || fail "unable to create a private configured xctestrun" 70
+
+    if ! /usr/bin/plutil -convert json -o - "$XCTESTRUN_PATH" \
+        | /usr/bin/jq --slurpfile supplied_environment "$TEST_ENVIRONMENT_FILE" '
+            if (.TestConfigurations | type) != "array" then
+                error("generated xctestrun has no TestConfigurations array")
+            elif ([.TestConfigurations[].TestTargets | type] | all(. == "array") | not) then
+                error("generated xctestrun has an invalid TestTargets value")
+            elif ([.TestConfigurations[].TestTargets[]] | length) == 0 then
+                error("generated xctestrun has no test targets")
+            else
+                .TestConfigurations |= map(
+                    .TestTargets |= map(
+                        if ((.EnvironmentVariables // {}) | type) != "object" then
+                            error("generated test target has invalid EnvironmentVariables")
+                        else
+                            .EnvironmentVariables = ((.EnvironmentVariables // {}) + $supplied_environment[0])
+                        end
+                    )
+                )
+            end
+        ' \
+        | /usr/bin/plutil -convert xml1 -o "$configured_xctestrun" -; then
+        [[ ! -e "$configured_xctestrun" ]] || /bin/rm "$configured_xctestrun"
+        fail "unable to merge the external test environment into the generated xctestrun" 65
+    fi
+
+    /usr/bin/plutil -lint "$configured_xctestrun" >/dev/null || {
+        /bin/rm "$configured_xctestrun"
+        fail "configured xctestrun is not a valid property list" 65
+    }
+    /usr/bin/plutil -convert json -o - "$configured_xctestrun" \
+        | /usr/bin/jq --slurpfile supplied_environment "$TEST_ENVIRONMENT_FILE" -e '
+            [
+                .TestConfigurations[].TestTargets[].EnvironmentVariables as $actual
+                | ($supplied_environment[0] | to_entries | all(.[]; $actual[.key] == .value))
+            ] as $matches
+            | ($matches | length) > 0 and ($matches | all(.[]; . == true))
+        ' >/dev/null || {
+            /bin/rm "$configured_xctestrun"
+            fail "configured xctestrun did not retain the supplied test environment" 65
+        }
+
+    /bin/mv "$configured_xctestrun" "$XCTESTRUN_PATH" || fail "unable to install the configured xctestrun" 70
+}
+
+run_test_with_external_environment() {
+    local operation="$1"
+    shift
+    local status
+
+    run_xcodebuild "$operation build-for-testing" \
+        -project "$PROJECT_PATH" \
+        -scheme "$SCHEME" \
+        -destination "$DESTINATION" \
+        -derivedDataPath "$DERIVED_DATA" \
+        -testPlan "$TEST_PLAN" \
+        build-for-testing
+    status=$?
+    [[ "$status" -eq 0 ]] || return "$status"
+
+    derive_generated_xctestrun
+    merge_test_environment_into_xctestrun
+
+    run_xcodebuild "$operation" \
+        -xctestrun "$XCTESTRUN_PATH" \
+        -destination "$DESTINATION" \
+        -resultBundlePath "$RESULT_BUNDLE" \
+        "$@" \
+        test-without-building
+}
+
 verify_result_contains_tests() {
     local operation="$1"
     local summary
@@ -140,15 +257,19 @@ run_focused_test() {
         only_testing_arguments+=("-only-testing:$selector")
     done
 
-    run_xcodebuild "test-focused" \
-        -project "$PROJECT_PATH" \
-        -scheme "$SCHEME" \
-        -destination "$DESTINATION" \
-        -derivedDataPath "$DERIVED_DATA" \
-        -resultBundlePath "$RESULT_BUNDLE" \
-        -testPlan "$TEST_PLAN" \
-        "${only_testing_arguments[@]}" \
-        test
+    if [[ -n "$TEST_ENVIRONMENT_FILE" ]]; then
+        run_test_with_external_environment "test-focused" "${only_testing_arguments[@]}"
+    else
+        run_xcodebuild "test-focused" \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -derivedDataPath "$DERIVED_DATA" \
+            -resultBundlePath "$RESULT_BUNDLE" \
+            -testPlan "$TEST_PLAN" \
+            "${only_testing_arguments[@]}" \
+            test
+    fi
     status=$?
     [[ "$status" -eq 0 ]] || return "$status"
     verify_result_contains_tests "test-focused"
@@ -157,14 +278,18 @@ run_focused_test() {
 run_full_test() {
     local status
 
-    run_xcodebuild "test-full" \
-        -project "$PROJECT_PATH" \
-        -scheme "$SCHEME" \
-        -destination "$DESTINATION" \
-        -derivedDataPath "$DERIVED_DATA" \
-        -resultBundlePath "$RESULT_BUNDLE" \
-        -testPlan "$TEST_PLAN" \
-        test
+    if [[ -n "$TEST_ENVIRONMENT_FILE" ]]; then
+        run_test_with_external_environment "test-full"
+    else
+        run_xcodebuild "test-full" \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            -destination "$DESTINATION" \
+            -derivedDataPath "$DERIVED_DATA" \
+            -resultBundlePath "$RESULT_BUNDLE" \
+            -testPlan "$TEST_PLAN" \
+            test
+    fi
     status=$?
     [[ "$status" -eq 0 ]] || return "$status"
     verify_result_contains_tests "test-full"
@@ -204,6 +329,7 @@ case "$command_name" in
     test-focused)
         [[ "$#" -ge 2 ]] || fail "test-focused requires at least one selector"
         prepare_artifact_root
+        prepare_test_environment_file
         shift
         run_focused_test "$@"
         exit $?
@@ -211,12 +337,14 @@ case "$command_name" in
     test-full)
         [[ "$#" -eq 1 ]] || fail "test-full does not accept additional arguments"
         prepare_artifact_root
+        prepare_test_environment_file
         run_full_test
         exit $?
         ;;
     cycle-close)
         [[ "$#" -eq 1 ]] || fail "cycle-close does not accept additional arguments"
         prepare_artifact_root
+        prepare_test_environment_file
         run_cycle_close
         exit $?
         ;;

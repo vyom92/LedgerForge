@@ -35,7 +35,7 @@ struct ImportFrameworkTests {
             sourceURL: request.fileURL,
             fileName: request.fileName,
             fileExtension: request.fileExtension,
-            content: .text("raw statement text")
+            content: .text("Generic reader payload")
         )
         let coordinator = DefaultImportCoordinator(
             readerRegistry: SingleReaderRegistry(reader: PasswordCheckingReader(expectedPassword: "secret", rawDocument: rawDocument)),

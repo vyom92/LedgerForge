@@ -764,7 +764,7 @@ private actor SuccessfulPasswordReader: ImportFramework.DocumentReader {
         guard password == expectedPassword else {
             throw password == nil ? ImportError.passwordRequired : ImportError.incorrectPassword
         }
-        return RawDocument(
+        return await RawDocument(
             sourceURL: request.fileURL,
             fileName: request.fileName,
             fileExtension: request.fileExtension,
@@ -801,7 +801,8 @@ private actor RecordingPasswordCredentialStore: StatementPasswordCredentialStore
     }
 
     func password(institutionCode: String) async throws -> String? {
-        records[institutionCode]?.first?.value
+        let credential = records[institutionCode]?.first
+        return await credential?.value
     }
 
     func save(_ password: String, institutionCode: String) async throws {
@@ -826,7 +827,8 @@ private actor RecordingPasswordCredentialStore: StatementPasswordCredentialStore
         writes.map(\.scope)
     }
 
-    func storedValue(institutionCode: String) -> String? {
-        records[institutionCode]?.first?.value
+    func storedValue(institutionCode: String) async -> String? {
+        let credential = records[institutionCode]?.first
+        return await credential?.value
     }
 }

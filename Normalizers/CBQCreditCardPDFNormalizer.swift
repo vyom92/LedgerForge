@@ -1,5 +1,4 @@
 import Foundation
-import PDFKit
 
 enum CBQCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedNativeText
@@ -15,7 +14,7 @@ enum CBQCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .unsupportedNativeText: return "The CBQ credit-card PDF must contain three pages of native selectable text."
+        case .unsupportedNativeText: return "The CBQ credit-card PDF must contain at least one native selectable-text page."
         case .unsupportedFamily: return "The PDF is not the exact CBQ credit-card statement family."
         case .changedHeader: return "The CBQ credit-card statement header changed."
         case .malformedPreamble: return "The CBQ credit-card statement preamble is malformed."
@@ -23,7 +22,7 @@ enum CBQCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
         case .malformedTransaction(let ordinal): return "CBQ credit-card row " + String(ordinal) + " is malformed."
         case .malformedInstrumentSection: return "A CBQ credit-card instrument section is malformed."
         case .unconsumedFinancialPage(let page): return "CBQ credit-card page " + String(page) + " contains unconsumed financial evidence."
-        case .malformedNonFinancialPage(let page): return "CBQ credit-card page " + String(page) + " does not match its exact non-financial signature."
+        case .malformedNonFinancialPage(let page): return "CBQ credit-card page " + String(page) + " contains unsupported post-statement evidence."
         case .missingTermination: return "The CBQ credit-card statement has no exact End of Statement marker."
         }
     }
@@ -70,25 +69,9 @@ final class CBQCreditCardPDFNormalizer {
 
     init(now: @escaping () -> Date = Date.init) { self.now = now }
 
-    func normalize(text: String, sourceBytes: Data, fileURL: URL) throws -> CBQCreditCardPDFNormalizationResult {
-        guard let pdf = PDFDocument(data: sourceBytes), pdf.pageCount == 3, !pdf.isLocked else {
-            throw CBQCreditCardPDFNormalizationError.unsupportedNativeText
-        }
-        let pages = try (0..<pdf.pageCount).map { index -> String in
-            guard let pageText = pdf.page(at: index)?.string,
-                  !pageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                throw CBQCreditCardPDFNormalizationError.unsupportedNativeText
-            }
-            return pageText
-        }
-        return try normalize(text: text, pageTexts: pages, fileURL: fileURL)
-    }
-
-    /// This overload is intentionally useful for deterministic tests and for
-    /// the reader handoff, which already owns page extraction.
     func normalize(text: String, pageTexts pages: [String], fileURL: URL) throws -> CBQCreditCardPDFNormalizationResult {
-        guard pages.count == 3,
-              pages.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+        guard !pages.isEmpty,
+              pages.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
             throw CBQCreditCardPDFNormalizationError.unsupportedNativeText
         }
         let joined = pages.joined(separator: "\n")
@@ -135,15 +118,19 @@ final class CBQCreditCardPDFNormalizer {
         let summary = try Self.summaryFragments(version: version, in: joined)
 
         let sections = try Self.parseSections(pages: pages)
-        guard sections.count == 2,
-              Set(sections.map(\.label)) == Set(["Diners Club", "Mastercard Platinum"]) else {
+        guard !sections.isEmpty,
+              Set(sections.map(\.id)).count == sections.count,
+              Set(sections.map(\.card)).count == sections.count,
+              sections.enumerated().allSatisfy({ offset, section in
+                  section.id == "instrument-section-\(offset + 1)"
+              }) else {
             throw CBQCreditCardPDFNormalizationError.malformedInstrumentSection
         }
 
         var rows: [NormalizedRow] = []
         var currentSectionID: String?
         var sawTermination = false
-        var postTerminationLines: [String] = []
+        var terminationPageIndex: Int?
         var sourceOrdinal = 0
         for (pageIndex, page) in pages.enumerated() {
             let lines = page.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -153,14 +140,16 @@ final class CBQCreditCardPDFNormalizer {
                 let line = lines[index]
                 if line.isEmpty { index += 1; continue }
                 if sawTermination {
-                    postTerminationLines.append(line)
                     index += 1
                     continue
                 }
                 if Self.isEndOfStatement(line) {
                     guard currentSectionID == nil else { throw CBQCreditCardPDFNormalizationError.malformedInstrumentSection }
+                    guard !sawTermination else {
+                        throw CBQCreditCardPDFNormalizationError.malformedNonFinancialPage(page: pageIndex + 1)
+                    }
                     sawTermination = true
-                    postTerminationLines.append(line)
+                    terminationPageIndex = pageIndex
                     index += 1
                     continue
                 }
@@ -171,8 +160,9 @@ final class CBQCreditCardPDFNormalizer {
                     continue
                 }
                 if let opening = Self.sectionDescriptor(line: line) {
-                    guard let expected = sections.first(where: { $0.label == opening.label }),
-                          expected.card == opening.card else {
+                    guard let expected = sections.first(where: { $0.card == opening.card }),
+                          expected.label == opening.label,
+                          expected.holder == opening.holder else {
                         throw CBQCreditCardPDFNormalizationError.malformedInstrumentSection
                     }
                     if let currentSectionID {
@@ -293,10 +283,15 @@ final class CBQCreditCardPDFNormalizer {
                 throw CBQCreditCardPDFNormalizationError.malformedInstrumentSection
             }
         }
-        guard sawTermination, currentSectionID == nil, !rows.isEmpty else {
+        guard sawTermination, currentSectionID == nil else {
             throw CBQCreditCardPDFNormalizationError.missingTermination
         }
-        guard Self.matchesPostTerminationTail(postTerminationLines, version: version) else {
+        guard let terminationPageIndex,
+              Self.matchesPostTerminationLayout(
+                  pages: pages,
+                  terminationPageIndex: terminationPageIndex,
+                  version: version
+              ) else {
             throw CBQCreditCardPDFNormalizationError.malformedNonFinancialPage(page: pages.count)
         }
 
@@ -336,14 +331,20 @@ final class CBQCreditCardPDFNormalizer {
             }
         }
         for (index, line) in lines.enumerated() {
-            guard let opening = sectionDescriptor(line: line),
-                  !result.contains(where: { $0.label == opening.label }) else { continue }
+            guard let opening = sectionDescriptor(line: line) else { continue }
+            if let existing = result.first(where: { $0.card == opening.card }) {
+                guard existing.label == opening.label,
+                      existing.holder == opening.holder else {
+                    throw CBQCreditCardPDFNormalizationError.malformedInstrumentSection
+                }
+                continue
+            }
             var parsedSubtotal: (amount: String, isCredit: Bool)?
             var cursor = index + 1
             while cursor < lines.count {
                 let candidate = lines[cursor]
                 if let nextOpening = sectionDescriptor(line: candidate),
-                   nextOpening.label != opening.label {
+                   nextOpening.card != opening.card {
                     break
                 }
                 if let total = subtotal(line: candidate) {
@@ -450,7 +451,7 @@ final class CBQCreditCardPDFNormalizer {
         line == "Post Date Purchase Date Description & Referance Foreign Currency Amount in QAR"
     }
 
-    private static func isEndOfStatement(_ line: String) -> Bool {
+    nonisolated private static func isEndOfStatement(_ line: String) -> Bool {
         line.range(
             of: #"^(?:X+|\*+|<+|>+|-+|=+|\s+)*End of Statement(?:X+|\*+|<+|>+|-+|=+|\s+)*$"#,
             options: [.regularExpression, .caseInsensitive]
@@ -462,26 +463,105 @@ final class CBQCreditCardPDFNormalizer {
     }
 
     private static func looksFinancial(_ line: String) -> Bool {
-        line.range(of: #"\d{2}/\d{2}/\d{2}.*[0-9]+(?:,[0-9]{3})*\.[0-9]{2}"#, options: .regularExpression) != nil
+        line.range(
+            of: #"\b\d{2}/\d{2}/(?:\d{2}|\d{4})\b.*(?:CR\s+)?[0-9]+(?:,[0-9]{3})*\.[0-9]{1,2}\b"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
     }
 
-    private static func matchesPostTerminationTail(_ lines: [String], version _: InternalVersion) -> Bool {
-        guard let first = lines.first, isEndOfStatement(first) else { return false }
-        for line in lines.dropFirst() {
-            if isEndOfStatement(line) || line == "Continued on next page..." || hasFinancialEvidence(line) {
-                return false
+    /// Validate the source-owned tail after the single End of Statement marker.
+    ///
+    /// The marker closes the financial region.  Every line after it, including
+    /// lines on later physical pages, must therefore be inert: it may contain
+    /// arbitrary localized/legal/marketing text and harmless pagination, but
+    /// it may not contain a second marker, a row-like amount, a section/control
+    /// header, or another financial control.  This deliberately keeps page
+    /// count, footer wording, and offers-page layout out of the source-family
+    /// grammar.
+    private static func matchesPostTerminationLayout(
+        pages: [String],
+        terminationPageIndex: Int,
+        version _: InternalVersion
+    ) -> Bool {
+        guard terminationPageIndex >= 0, terminationPageIndex < pages.count else { return false }
+
+        var markerCount = 0
+        var markerLineIndex: Int?
+        for (pageIndex, page) in pages.enumerated() {
+            let lines = normalizedLines(page)
+            for (lineIndex, line) in lines.enumerated() where isEndOfStatement(line) {
+                markerCount += 1
+                if pageIndex == terminationPageIndex {
+                    markerLineIndex = lineIndex
+                }
+            }
+        }
+        guard markerCount == 1, let markerLineIndex else { return false }
+
+        for (pageIndex, page) in pages.enumerated()
+        where pageIndex >= terminationPageIndex {
+            let lines = normalizedLines(page)
+            let start = pageIndex == terminationPageIndex ? markerLineIndex + 1 : 0
+            guard start <= lines.count else { return false }
+            for line in lines.dropFirst(start) {
+                // A continuation marker after End of Statement is not a
+                // harmless page break: it indicates that the financial region
+                // was not actually closed.
+                guard line != "Continued on next page...",
+                      !hasFinancialEvidence(line) else { return false }
             }
         }
         return true
     }
 
+    nonisolated private static func normalizedLines(_ page: String) -> [String] {
+        page.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
     private static func hasFinancialEvidence(_ line: String) -> Bool {
-        if isEndOfStatement(line) { return true }
+        // A valid tail line may not hide a second statement terminator in an
+        // otherwise-accepted prefix/Arabic line.  The anchored matcher is
+        // still used by the parser for the real marker; this substring check
+        // is intentionally stricter for non-financial tail validation.
+        if containsEndOfStatementMarker(line) { return true }
         if rowStart(line).flatMap({ moneyTail($0.description) }) != nil || looksFinancial(line) { return true }
+        let hasPrintedDate = line.range(
+            of: #"\b\d{2}/\d{2}/(?:\d{2}|\d{4})\b"#,
+            options: .regularExpression
+        ) != nil
+        if hasPrintedDate {
+            let hasCreditMarker = line.range(of: #"\bCR\b"#, options: [.regularExpression, .caseInsensitive]) != nil
+            let hasForeignCurrency = line.range(of: #"\b[A-Z]{3}\b"#, options: .regularExpression) != nil
+            if hasCreditMarker || hasForeignCurrency { return true }
+        }
         if sectionDescriptor(line: line) != nil || subtotal(line: line) != nil { return true }
         if isStructuralHeader(line) || line.contains("Card Account Reference") { return true }
+        let lower = boundedWhitespace(line).lowercased()
+        let controlLabels = [
+            "previous outstanding balance", "amount billed", "payment received",
+            "current outstanding balance", "purchases", "billed installment",
+            "fees and charges", "total payment", "credit reversal",
+            "total statement balance", "minimum amount due", "late payment fee",
+            "remaining balance service charges", "credit shield insurance fee"
+        ]
+        if controlLabels.contains(where: { lower.contains($0) }),
+           lower.range(
+               of: #"\b[0-9]+(?:,[0-9]{3})*\.[0-9]{1,2}\b(?!\s*%)"#,
+               options: .regularExpression
+           ) != nil {
+            return true
+        }
         let compact = boundedWhitespace(line)
         return compact.contains("=") && compact.filter({ $0 == "+" }).count == 3 && compact.filter({ $0 == "-" }).count == 2
+    }
+
+    private static func containsEndOfStatementMarker(_ line: String) -> Bool {
+        line.range(
+            of: #"\bend\s+of\s+statement\b"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
     }
 
     private static func requiredValue(labels: [String], in text: String, error: CBQCreditCardPDFNormalizationError) throws -> String {
@@ -623,11 +703,38 @@ final class CBQCreditCardPDFNormalizer {
         return candidates[0]
     }
 
+    /// The source-owned minimum-due field is a QAR preamble control.  The v1
+    /// carrier places the payment-due date on the same physical line, while
+    /// v2 emits only the amount.  Keep the amount isolated from that adjacent
+    /// date and preserve the source's CR sign for downstream Money decoding.
+    private static func requiredMinimumAmountDueToken(in text: String) throws -> String {
+        let money = #"[0-9]+(?:,[0-9]{3})*\.[0-9]{1,2}"#
+        let pattern = #"^Minimum Amount Due\s+QAR\s+(CR\s+)?("# + money + #")(?:\s+Payment Due Date\b.*)?$"#
+        let candidates = text.components(separatedBy: .newlines).compactMap { rawLine -> String? in
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let values = captures(pattern, in: line), values.count == 2,
+                  isSummaryMoney(values[1]) else { return nil }
+            return values[0].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? values[1]
+                : "CR " + values[1]
+        }
+        guard candidates.count == 1 else {
+            throw CBQCreditCardPDFNormalizationError.malformedSummary
+        }
+        return candidates[0]
+    }
+
     private static func summaryFragments(version: InternalVersion, in text: String) throws -> [(String, String)] {
-        let summarySource = text.components(separatedBy: "Diners Club").first ?? text
+        let summarySource = text.components(separatedBy: .newlines)
+            .prefix { line in
+                sectionDescriptor(line: line.trimmingCharacters(in: .whitespacesAndNewlines)) == nil
+            }
+            .joined(separator: "\n")
+        let minimumAmountDue = try requiredMinimumAmountDueToken(in: summarySource)
         switch version {
         case .v1:
             return [
+                ("MINIMUM_AMOUNT_DUE", minimumAmountDue),
                 ("PREVIOUS_BALANCE", try requiredMoneyToken(label: "Previous Outstanding Balance", in: summarySource)),
                 ("AMOUNT_BILLED", try requiredMoneyToken(label: "Amount Billed", in: summarySource)),
                 ("PAYMENT_RECEIVED", try requiredMoneyToken(label: "Payment Received", in: summarySource)),
@@ -647,6 +754,7 @@ final class CBQCreditCardPDFNormalizer {
                 throw CBQCreditCardPDFNormalizationError.malformedSummary
             }
             return [
+                ("MINIMUM_AMOUNT_DUE", minimumAmountDue),
                 ("PURCHASES", equationValues[3]),
                 ("BILLED_INSTALLMENT", equationValues[2]),
                 ("FEES_CHARGES", equationValues[1]),

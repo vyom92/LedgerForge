@@ -162,10 +162,12 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               plan.historyTemplate.successfulAttempt.workspaceId == plan.workspace.id,
               plan.historyTemplate.normalizedDocument != nil,
               Set(plan.transactionTemplates.map { $0.transaction.id }).count == plan.transactionTemplates.count,
-              !plan.historyTemplate.normalizedRows.isEmpty,
+              (plan.zeroActivityControl != nil || !plan.historyTemplate.normalizedRows.isEmpty),
               Set(plan.historyTemplate.normalizedRows.map(\.sourceOrdinal)).count == plan.historyTemplate.normalizedRows.count,
               plan.historyTemplate.normalizedRows.allSatisfy({ $0.sourceOrdinal > 0 && !$0.digest.isEmpty }),
-              plan.transactionTemplates.allSatisfy({ !$0.transaction.rawRows.isEmpty }),
+              (plan.zeroActivityControl != nil
+                ? (plan.transactionTemplates.isEmpty && plan.historyTemplate.normalizedRows.isEmpty)
+                : plan.transactionTemplates.allSatisfy({ !$0.transaction.rawRows.isEmpty })),
               hasValidTrustedProvenance(plan),
               !hasDuplicateIdentifierCandidates(plan.identifiers) else {
             return .repositoryIntegrityConflict
@@ -234,11 +236,11 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             account = existing
         }
 
-        let equivalenceReview = try reviewStatementEquivalenceInsideTransaction(
+        var equivalenceReview = try reviewStatementEquivalenceInsideTransaction(
             plan,
             resolvedAccountID: account.id
         )
-        let isSupportingSource: Bool
+        var isSupportingSource: Bool
         switch equivalenceReview {
         case .notApplicable, .firstAcceptedSource:
             isSupportingSource = false
@@ -250,6 +252,66 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             return .statementEquivalenceEvidenceUnavailable
         case .formatAlreadyRecorded:
             return .equivalentFormatAlreadyRecorded
+        }
+
+        var zeroActivityControlToInsert: StatementZeroActivityControlDTO?
+        if let incomingZero = plan.zeroActivityControl {
+            guard incomingZero.isValid(),
+                  incomingZero.matchesAccount(account),
+                  incomingZero.authorityRole == "authoritative",
+                  incomingZero.workspaceId == plan.workspace.id,
+                  incomingZero.accountId == account.id,
+                  incomingZero.documentId == plan.historyTemplate.document.id,
+                  incomingZero.importSessionId == plan.historyTemplate.importSession.id,
+                  incomingZero.normalizedDocumentId == plan.historyTemplate.normalizedDocument?.id,
+                  incomingZero.parserProfileId == plan.historyTemplate.normalizedDocument?.profileId,
+                  incomingZero.parserProfileVersion == plan.historyTemplate.normalizedDocument?.profileVersion,
+                  incomingZero.sourceFingerprintAlgorithm == authority.algorithm,
+                  incomingZero.sourceFingerprintDigest == authority.fingerprint,
+                  plan.transactionTemplates.isEmpty,
+                  plan.historyTemplate.normalizedRows.isEmpty,
+                  try count("SELECT COUNT(*) FROM statement_zero_activity_controls WHERE id = ?;", [incomingZero.id]) == 0 else {
+                return .repositoryIntegrityConflict
+            }
+            let sameSemantic = try db.query(
+                sql: "SELECT semantic_digest, authority_role, import_session_id FROM statement_zero_activity_controls WHERE workspace_id = ? AND account_id = ? AND institution_code = ? AND statement_family_code = ? AND semantic_cycle_key = ? AND native_currency = ?;",
+                params: [incomingZero.workspaceId, account.id, incomingZero.institutionCode, incomingZero.statementFamilyCode, incomingZero.semanticCycleKey, incomingZero.nativeCurrency]
+            ) { row in
+                (digest: row.string(at: 0) ?? "", role: row.string(at: 1) ?? "", importSessionID: row.string(at: 2) ?? "")
+            }
+            guard sameSemantic.allSatisfy({ $0.digest == incomingZero.semanticDigest }) else {
+                return .statementEquivalenceConflict
+            }
+            let authorities = sameSemantic.filter { $0.role == "authoritative" }
+            guard authorities.count <= 1 else { return .repositoryIntegrityConflict }
+            if let authoritative = authorities.first {
+                guard case .useExistingAccount = plan.accountChoice else {
+                    return .statementEquivalenceEvidenceUnavailable
+                }
+                if plan.cardImportPlan?.semanticProjection == nil {
+                    isSupportingSource = true
+                    if case .notApplicable = equivalenceReview {
+                        equivalenceReview = .equivalent(
+                            authoritativeImportSessionID: authoritative.importSessionID
+                        )
+                    }
+                }
+                zeroActivityControlToInsert = incomingZero.withAuthorityRole("supporting")
+            } else {
+                // Supporting rows without exactly one authority are not a
+                // recoverable state.  Do not create a second authority for a
+                // semantic cycle that already has rows.
+                guard sameSemantic.isEmpty, !isSupportingSource else {
+                    return .statementEquivalenceEvidenceUnavailable
+                }
+                zeroActivityControlToInsert = incomingZero.withAuthorityRole("authoritative")
+            }
+        } else if isSupportingSource {
+            // Supporting imports with no typed control are valid for the
+            // historical transaction-bearing semantic paths only.
+            guard !plan.transactionTemplates.isEmpty else {
+                return .statementEquivalenceEvidenceUnavailable
+            }
         }
 
         var observations = [(String, ConfirmedImportIdentifierCandidateDTO)]()
@@ -304,7 +366,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             equivalenceReview: equivalenceReview,
             workspaceID: plan.workspace.id,
             accountID: account.id,
-            supportingEventCount: plan.cardImportPlan?.semanticProjection?.events.count
+            supportingEventCount: plan.cardImportPlan?.semanticProjection?.events.count,
+            zeroActivityControl: zeroActivityControlToInsert
         )
         if let cardPlan = plan.cardImportPlan {
             if let result = try insertCardGraph(
@@ -357,7 +420,9 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     ) throws -> ConfirmedImportRepositoryResult? {
         guard let contract = CardStatementProfileContract(
             reconciliationRuleIdentifier: card.statement.reconciliationRuleCode
-        ) else { return .repositoryIntegrityConflict }
+        ), contract.acceptsCurrentReconciliationRule(card.statement.reconciliationRuleCode) else {
+            return .repositoryIntegrityConflict
+        }
         if contract.supportsSemanticSourceGrouping, card.semanticProjection != nil {
             return try insertV13CardGraph(
                 card, plan: plan, account: account, transactions: transactions,
@@ -675,23 +740,38 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
 
         guard card.instrumentIdentifiers.isEmpty,
               Set(card.relationships.map(\.id)) == Set(decisions.flatMap(\.relationships).map(\.id)),
-              card.sourceObservations.count == 1,
+              (card.sectionDecisions.count == 1
+                ? (1...2).contains(card.sourceObservations.count)
+                : card.sourceObservations.count == 1),
               Set(card.sourceObservations.map(\.id)).count == card.sourceObservations.count else {
             return .repositoryIntegrityConflict
         }
         for observation in card.sourceObservations {
+            let subjectValid =
+                (observation.subjectKind == "liability_account" && observation.subjectId == account.id) ||
+                (card.sectionDecisions.count == 1 && observation.subjectKind == "instrument" && selectedInstrumentIDs.contains(observation.subjectId))
+            let kindValid =
+                (observation.subjectKind == "liability_account" && observation.observationKind == contract.accountObservationKindCode) ||
+                (observation.subjectKind == "instrument" && observation.observationKind == contract.instrumentObservationKindCode)
+            let valueShapeValid: Bool
+            if observation.subjectKind == "liability_account" {
+                valueShapeValid = observation.sourceValue.range(of: #"^[0-9]+$"#, options: .regularExpression) != nil
+            } else {
+                valueShapeValid = observation.sourceValue.range(of: #"^[0-9X]+$"#, options: .regularExpression) != nil &&
+                    observation.sourceValue.contains("X") &&
+                    observation.sourceValue.contains(where: \.isNumber)
+            }
             guard observation.workspaceId == plan.workspace.id,
                   observation.documentId == history.document.id,
                   observation.importSessionId == history.importSession.id,
                   observation.normalizedDocumentId == history.normalizedDocument?.id,
                   observation.parserProfileId == contract.profileID,
                   observation.parserProfileVersion == contract.profileVersion,
-                  observation.subjectKind == "liability_account",
-                  observation.subjectId == account.id,
-                  observation.observationKind == contract.accountObservationKindCode,
+                  subjectValid,
+                  kindValid,
                   !observation.sourceValue.isEmpty,
                   allowedAuthorities.contains(observation.associationAuthority),
-                  observation.sourceValue.range(of: #"^[0-9]+$"#, options: .regularExpression) != nil else {
+                  valueShapeValid else {
                 return .repositoryIntegrityConflict
             }
             if observation.associationAuthority == "prior_user_confirmed_mapping" {
@@ -883,7 +963,17 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     ) throws -> ConfirmedImportRepositoryResult? {
         let history = plan.historyTemplate
         guard let contract = CardStatementProfileContract(reconciliationRuleIdentifier: card.statement.reconciliationRuleCode),
-              let projection = card.semanticProjection,
+              let projection = card.semanticProjection else {
+            return .repositoryIntegrityConflict
+        }
+        let isAccountOnlyAmexZero = contract == .amex &&
+            plan.zeroActivityControl != nil &&
+            plan.transactionTemplates.isEmpty &&
+            card.transactionEvidence.isEmpty &&
+            card.sectionDecisions.isEmpty &&
+            projection.events.isEmpty &&
+            projection.sections.isEmpty
+        guard
               projection.isValid(),
               card.liabilityAccountId == account.id,
               cardAccountIsCompatible(account: account, plan: plan),
@@ -924,12 +1014,13 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
               Set(decisions.flatMap(\.sourceObservations).map(\.id)).count == decisions.flatMap(\.sourceObservations).count,
               (contract == .axis
                 ? decisions.isEmpty && projectionSections.isEmpty
-                : !decisions.isEmpty && decisions.allSatisfy({ !$0.sourceObservations.isEmpty })),
+                : (isAccountOnlyAmexZero ||
+                   (!decisions.isEmpty && decisions.allSatisfy({ !$0.sourceObservations.isEmpty })))),
               decisions.allSatisfy({ $0.section.cardStatementId == card.statement.id }),
               Set(card.sourceObservations.map(\.id)).count == card.sourceObservations.count else {
             return .repositoryIntegrityConflict
         }
-        if contract == .axis {
+        if contract == .axis || isAccountOnlyAmexZero {
             guard card.instrumentChoice == .unspecified,
                   card.proposedInstrument == nil,
                   card.instrumentIdentifiers.isEmpty,
@@ -1069,6 +1160,25 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         let balance = summary[contract == .axis ? "axis_total_payment_due" : "new_balance"]
         let previousMinor = previous?.moneyMinor
         let balanceMinor = balance?.moneyMinor
+        if contract == .axis, let zero = plan.zeroActivityControl {
+            guard projection.events.isEmpty,
+                  card.transactionEvidence.isEmpty,
+                  summaryCodes == Set(["previous_balance", "axis_total_payment_due", "due_date"]),
+                  zero.parserProfileId == card.statement.parserProfileId,
+                  zero.parserProfileVersion == card.statement.parserProfileVersion,
+                  zero.statementDateISO == card.statement.statementDateISO,
+                  zero.statementStartDateISO == card.statement.statementStartDateISO,
+                  zero.statementEndDateISO == card.statement.statementEndDateISO,
+                  zero.selectedStatementMonthISO == card.statement.selectedStatementMonthISO,
+                  zero.nativeCurrency == card.statement.statementCurrency,
+                  zero.cardPreviousBalanceMinor == previous?.moneyMinor,
+                  zero.cardPreviousBalanceDecimal == previous?.moneyDecimal,
+                  zero.cardTotalPaymentDueMinor == balance?.moneyMinor,
+                  zero.cardTotalPaymentDueDecimal == balance?.moneyDecimal,
+                  zero.cardPaymentDueDateISO == summary["due_date"]?.dateISO else {
+                return .repositoryIntegrityConflict
+            }
+        }
         guard contract == .axis ||
                 (previous?.moneyCurrency == card.statement.statementCurrency &&
                  balance?.moneyCurrency == card.statement.statementCurrency &&
@@ -1374,7 +1484,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
             closingBalanceMinor: plan.closingBalanceMinor, closingBalanceDecimal: plan.closingBalanceDecimal,
             statementFinancialProjection: plan.statementFinancialProjection,
             cbqSourceIdentityPatterns: plan.cbqSourceIdentityPatterns, cbqSourceRows: plan.cbqSourceRows,
-            cbqStatementSourceEvidence: plan.cbqStatementSourceEvidence
+            cbqStatementSourceEvidence: plan.cbqStatementSourceEvidence,
+            zeroActivityControl: plan.zeroActivityControl
         )
     }
 
@@ -1469,7 +1580,8 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         equivalenceReview: StatementEquivalenceReviewResult,
         workspaceID: String,
         accountID: String,
-        supportingEventCount: Int? = nil
+        supportingEventCount: Int? = nil,
+        zeroActivityControl: StatementZeroActivityControlDTO? = nil
     ) throws {
         let document = history.document
         try db.executePrepared(sql: "INSERT INTO import_sessions (id, workspace_id, user_visible_name, started_at, validation_status, created_at, reader_version, parser_version, layout_version) VALUES (?,?,?,?,?,?,?,?,?);", params: [history.importSession.id, history.importSession.workspaceId, history.importSession.userVisibleName ?? NSNull(), history.importSession.startedAtISO, history.importSession.validationStatus, history.importSession.startedAtISO, history.importSession.readerVersion ?? NSNull(), history.importSession.parserVersion ?? NSNull(), history.importSession.layoutVersion ?? NSNull()])
@@ -1481,6 +1593,22 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         try db.executePrepared(sql: "INSERT INTO normalized_documents (id, import_session_id, document_id, normalized_json, schema_version, created_at, profile_id, profile_version) VALUES (?,?,?,?,?,?,?,?);", params: [normalized.id, normalized.importSessionId, normalized.documentId, "{\"profile\":\"\(normalized.profileId)\",\"version\":\"\(normalized.profileVersion)\"}", "trusted-source-v1", history.completedAtISO, normalized.profileId, normalized.profileVersion])
         for row in history.normalizedRows {
             try db.executePrepared(sql: "INSERT INTO normalized_rows (id, normalized_document_id, row_index, row_original, extracted_text, created_at, record_digest) VALUES (?,?,?,?,?,?,?);", params: [row.id, row.normalizedDocumentId, row.sourceOrdinal, "{\"digest\":\"\(row.digest)\"}", NSNull(), history.completedAtISO, row.digest])
+        }
+        if let zeroActivityControl {
+            guard zeroActivityControl.isValid(),
+                  zeroActivityControl.workspaceId == workspaceID,
+                  zeroActivityControl.accountId == accountID,
+                  zeroActivityControl.documentId == document.id,
+                  zeroActivityControl.importSessionId == history.importSession.id,
+                  zeroActivityControl.normalizedDocumentId == normalized.id,
+                  history.normalizedRows.isEmpty,
+                  transactions.isEmpty else {
+                throw RepositoryError.relationshipViolation("Zero-activity control relationship is invalid.")
+            }
+            try db.executePrepared(
+                sql: "INSERT INTO statement_zero_activity_controls (id, workspace_id, account_id, document_id, import_session_id, normalized_document_id, parser_profile_id, parser_profile_version, source_format_code, institution_code, statement_family_code, statement_date, statement_start_date, statement_end_date, selected_statement_month, semantic_cycle_key, native_currency, opening_balance_minor, opening_balance_decimal, closing_balance_minor, closing_balance_decimal, debit_total_minor, debit_total_decimal, credit_total_minor, credit_total_decimal, card_previous_balance_minor, card_previous_balance_decimal, card_total_payment_due_minor, card_total_payment_due_decimal, card_payment_due_date, evidence_kind, financial_region_descriptor, financial_region_source_unit, financial_region_start_ordinal, financial_region_end_ordinal, financial_region_signature, semantic_digest_algorithm, semantic_digest, source_fingerprint_algorithm, source_fingerprint_digest, authority_role, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);",
+                params: [zeroActivityControl.id, zeroActivityControl.workspaceId, zeroActivityControl.accountId, zeroActivityControl.documentId, zeroActivityControl.importSessionId, zeroActivityControl.normalizedDocumentId, zeroActivityControl.parserProfileId, zeroActivityControl.parserProfileVersion, zeroActivityControl.sourceFormatCode, zeroActivityControl.institutionCode, zeroActivityControl.statementFamilyCode, zeroActivityControl.statementDateISO ?? NSNull(), zeroActivityControl.statementStartDateISO ?? NSNull(), zeroActivityControl.statementEndDateISO ?? NSNull(), zeroActivityControl.selectedStatementMonthISO ?? NSNull(), zeroActivityControl.semanticCycleKey, zeroActivityControl.nativeCurrency, zeroActivityControl.openingBalanceMinor ?? NSNull(), zeroActivityControl.openingBalanceDecimal ?? NSNull(), zeroActivityControl.closingBalanceMinor ?? NSNull(), zeroActivityControl.closingBalanceDecimal ?? NSNull(), zeroActivityControl.debitTotalMinor ?? NSNull(), zeroActivityControl.debitTotalDecimal ?? NSNull(), zeroActivityControl.creditTotalMinor ?? NSNull(), zeroActivityControl.creditTotalDecimal ?? NSNull(), zeroActivityControl.cardPreviousBalanceMinor ?? NSNull(), zeroActivityControl.cardPreviousBalanceDecimal ?? NSNull(), zeroActivityControl.cardTotalPaymentDueMinor ?? NSNull(), zeroActivityControl.cardTotalPaymentDueDecimal ?? NSNull(), zeroActivityControl.cardPaymentDueDateISO ?? NSNull(), zeroActivityControl.evidenceKind, zeroActivityControl.financialRegionDescriptor ?? NSNull(), zeroActivityControl.financialRegionSourceUnit ?? NSNull(), zeroActivityControl.financialRegionStartOrdinal ?? NSNull(), zeroActivityControl.financialRegionEndOrdinal ?? NSNull(), zeroActivityControl.financialRegionSignature ?? NSNull(), zeroActivityControl.semanticDigestAlgorithm, zeroActivityControl.semanticDigest, zeroActivityControl.sourceFingerprintAlgorithm, zeroActivityControl.sourceFingerprintDigest, zeroActivityControl.authorityRole, zeroActivityControl.createdAtISO]
+            )
         }
         for transaction in transactions {
             try db.executePrepared(sql: "INSERT INTO transactions (id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at, financial_date_role, statement_timezone_evidence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);", params: [transaction.id, transaction.workspaceId, transaction.accountId ?? NSNull(), transaction.importSessionId ?? NSNull(), transaction.documentId ?? NSNull(), transaction.rawRows.first?.normalizedRowId ?? NSNull(), transaction.postedDateISO, transaction.valueDateISO ?? NSNull(), transaction.description ?? NSNull(), transaction.payee ?? NSNull(), transaction.reference ?? NSNull(), transaction.nativeCurrency, transaction.amountMinor, transaction.amountDecimal, transaction.direction, transaction.runningBalanceMinor ?? NSNull(), transaction.isReconciled ? 1 : 0, transaction.isTrusted ? 1 : 0, transaction.trustedAtISO ?? NSNull(), transaction.createdAtISO, transaction.updatedAtISO ?? NSNull(), transaction.financialDateRole, transaction.statementTimezoneEvidence])
@@ -1710,7 +1838,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
                 id: row.string(at: 0) ?? "",
                 ordinal: Int(row.int64(at: 1) ?? 0),
                 statementDateISO: row.string(at: 2) ?? "",
-                valueDateISO: row.string(at: 3) ?? "",
+                valueDateISO: row.string(at: 3),
                 direction: row.string(at: 4) ?? "",
                 signedAmountMinor: row.int64(at: 5) ?? 0,
                 signedAmountDecimal: row.string(at: 6) ?? "",
@@ -1746,16 +1874,26 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         _ projection: StatementFinancialProjectionDTO,
         accountID: String
     ) throws -> Bool {
+        let profileIDs: [String]
+        switch projection.algorithmIdentifier {
+        case StatementFinancialProjectionDTO.algorithm:
+            profileIDs = ["hdfc.bank-account.pdf", "hdfc.bank-account.xls"]
+        case StatementFinancialProjectionDTO.axisAlgorithm:
+            profileIDs = ["axis.bank-account.csv", "axis.bank-account.pdf", "axis.bank-account.xls"]
+        default:
+            return false
+        }
+        let placeholders = Array(repeating: "?", count: profileIDs.count).joined(separator: ",")
         let sessionIDs = try db.query(
-            sql: "SELECT DISTINCT t.import_session_id FROM transactions t JOIN normalized_documents n ON n.import_session_id = t.import_session_id LEFT JOIN statement_financial_projections p ON p.import_session_id = t.import_session_id WHERE t.account_id = ? AND n.profile_id IN ('hdfc.bank-account.pdf','hdfc.bank-account.xls') AND p.id IS NULL;",
-            params: [accountID]
+            sql: "SELECT DISTINCT t.import_session_id FROM transactions t JOIN normalized_documents n ON n.import_session_id = t.import_session_id LEFT JOIN statement_financial_projections p ON p.import_session_id = t.import_session_id WHERE t.account_id = ? AND n.profile_id IN (\(placeholders)) AND p.id IS NULL;",
+            params: [accountID] + profileIDs
         ) { $0.string(at: 0) ?? "" }
         for sessionID in sessionIDs where !sessionID.isEmpty {
             let existingEvents = try db.query(
                 sql: "SELECT t.posted_date, t.value_date, t.direction, t.amount_minor, t.amount_decimal, t.running_balance_minor, t.reference FROM transactions t LEFT JOIN normalized_rows r ON r.id = t.original_row_id WHERE t.account_id = ? AND t.import_session_id = ? ORDER BY COALESCE(r.row_index, 2147483647), t.id;",
                 params: [accountID, sessionID]
             ) { row in
-                (row.string(at: 0) ?? "", row.string(at: 1) ?? "", row.string(at: 2) ?? "", row.int64(at: 3) ?? 0, row.string(at: 4) ?? "", row.int64(at: 5) ?? 0, row.string(at: 6))
+                (row.string(at: 0) ?? "", row.string(at: 1), row.string(at: 2) ?? "", row.int64(at: 3) ?? 0, row.string(at: 4) ?? "", row.int64(at: 5) ?? 0, row.string(at: 6))
             }
             guard existingEvents.count == projection.events.count else { continue }
             var matches = true
@@ -1825,7 +1963,7 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
         for event in projection.events {
             try db.executePrepared(
                 sql: "INSERT INTO statement_financial_projection_events (id, projection_id, event_ordinal, statement_date, value_date, direction, signed_amount_minor, signed_amount_decimal, running_balance_minor, running_balance_decimal, reference, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);",
-                params: [event.id, projection.id, event.ordinal, event.statementDateISO, event.valueDateISO, event.direction, event.signedAmountMinor, event.signedAmountDecimal, event.runningBalanceMinor, event.runningBalanceDecimal, event.reference ?? NSNull(), createdAtISO]
+                params: [event.id, projection.id, event.ordinal, event.statementDateISO, event.valueDateISO ?? NSNull(), event.direction, event.signedAmountMinor, event.signedAmountDecimal, event.runningBalanceMinor, event.runningBalanceDecimal, event.reference ?? NSNull(), createdAtISO]
             )
         }
     }

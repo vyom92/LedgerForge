@@ -135,20 +135,9 @@ struct MoneyTests {
         }
     }
 
-    @Test func transactionPreviewPresentationUsesTransactionNativeMoneyAndDirection() throws {
-        let transaction = Transaction(
-            statementDate: nil,
-            description: "Kuwaiti debit",
-            debit: Decimal(string: "4.125")!,
-            credit: nil,
-            amount: Decimal(string: "-4.125")!,
-            balance: nil,
-            currency: "KWD",
-            account: "Account",
-            sourceBank: "Bank",
-            sourceFile: "Preview"
-        )
+    @Test func signedPresentationUsesNativeMoneyAndDirection() throws {
+        let money = try Money(amount: Decimal(string: "-4.125")!, currency: "KWD")
 
-        #expect(transaction.signedAmountDisplay == "-KWD 4.125")
+        #expect(MoneyFormatting.signedDisplay(money, isCredit: false) == "-KWD 4.125")
     }
 }

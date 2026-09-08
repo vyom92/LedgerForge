@@ -12,6 +12,7 @@ enum AxisBankAccountXLSParserError: Error, Equatable, LocalizedError {
     case malformedDate(sourceOrdinal: Int)
     case dateOutsideDeclaredPeriod(sourceOrdinal: Int)
     case malformedMonetaryValue(sourceOrdinal: Int)
+    case malformedReference(sourceOrdinal: Int)
     case missingDirection(sourceOrdinal: Int)
     case ambiguousDirection(sourceOrdinal: Int)
     case missingBalance(sourceOrdinal: Int)
@@ -41,6 +42,8 @@ enum AxisBankAccountXLSParserError: Error, Equatable, LocalizedError {
             return "Axis XLS transaction row \(sourceOrdinal) is outside the declared period."
         case .malformedMonetaryValue(let sourceOrdinal):
             return "Axis XLS transaction row \(sourceOrdinal) contains an invalid monetary value."
+        case .malformedReference(let sourceOrdinal):
+            return "Axis XLS transaction row \(sourceOrdinal) contains a malformed cheque/reference value."
         case .missingDirection(let sourceOrdinal):
             return "Axis XLS transaction row \(sourceOrdinal) has no debit or credit evidence."
         case .ambiguousDirection(let sourceOrdinal):
@@ -79,10 +82,6 @@ final class AxisBankAccountXLSParser: StatementParser {
         guard header.values == AxisBankAccountXLSNormalizer.logicalHeader else {
             throw AxisBankAccountXLSParserError.changedHeader
         }
-        guard !document.rows.isEmpty else {
-            throw AxisBankAccountXLSParserError.noTransactions
-        }
-
         let title = try titleEvidence(in: document.sourceContext.preTransactionFragments)
         let identifier: FinancialIdentifier
         let period: DeclaredStatementPeriod
@@ -101,10 +100,56 @@ final class AxisBankAccountXLSParser: StatementParser {
         }
 
         let currency = try CurrencyCode("INR")
+        guard let region = document.sourceContext.exhaustedFinancialRegion,
+              region.sourceUnit == .row,
+              region.matches(normalizedFinancialRowCount: document.rows.count),
+              document.sourceContext.printedBankStatementControls == nil else {
+            throw AxisBankAccountXLSParserError.changedHeader
+        }
+        let sourceStatementEvidence = SourceStatementEvidence(
+            sourceFormatCode: "xls",
+            statementBoundaryDate: nil,
+            period: period,
+            openingBalance: nil,
+            closingBalance: nil
+        )
+        if document.rows.isEmpty {
+            let zeroEvidence = try ZeroActivityStatementEvidence(
+                profileID: Self.profileID,
+                profileVersion: Self.profileVersion,
+                sourceFormatCode: "xls",
+                evidenceKind: .exhaustedFinancialRegion,
+                financialRegionDescriptor: region.descriptor,
+                financialRegionSourceUnit: region.sourceUnit,
+                financialRegionStartOrdinal: region.startOrdinal,
+                financialRegionEndOrdinal: region.endOrdinal,
+                financialRegionSignature: region.signature,
+                statementPeriod: period,
+                nativeCurrency: currency
+            )
+            return FinancialDocument(
+                sourceDocument: document.document,
+                metadata: document.metadata,
+                parserName: name,
+                parserProfileID: Self.profileID,
+                parserProfileVersion: Self.profileVersion,
+                bookedCurrency: currency,
+                declaredStatementPeriod: period,
+                transactions: [],
+                financialIdentifiers: [identifier],
+                sourceStatementEvidence: sourceStatementEvidence,
+                zeroActivityEvidence: zeroEvidence
+            )
+        }
         var transactions: [Transaction] = []
         transactions.reserveCapacity(document.rows.count)
         for row in document.rows {
             guard row.values.count == 7 else {
+                throw AxisBankAccountXLSParserError.malformedRow(
+                    sourceOrdinal: row.rowNumber
+                )
+            }
+            guard row.hasConsistentRawValues else {
                 throw AxisBankAccountXLSParserError.malformedRow(
                     sourceOrdinal: row.rowNumber
                 )
@@ -143,6 +188,11 @@ final class AxisBankAccountXLSParser: StatementParser {
                 )
             }
 
+            let reference = try Self.referenceEvidence(
+                in: row,
+                index: 1
+            )
+
             let direction: DirectionResult
             do {
                 direction = try AxisBankAccountCSVProfileV2.resolve(
@@ -166,6 +216,7 @@ final class AxisBankAccountXLSParser: StatementParser {
                 Transaction(
                     statementDate: statementDate,
                     description: description,
+                    reference: reference.value,
                     debitMoney: try direction.debit.map {
                         try Money(amount: $0, currency: currency)
                     },
@@ -188,7 +239,8 @@ final class AxisBankAccountXLSParser: StatementParser {
                                 values: row.values
                             ),
                             parserProfileID: Self.profileID,
-                            parserProfileVersion: Self.profileVersion
+                            parserProfileVersion: Self.profileVersion,
+                            structuredReferenceDigest: reference.digest
                         )
                     ],
                     verifiedAxisUPIEventEvidence:
@@ -204,17 +256,47 @@ final class AxisBankAccountXLSParser: StatementParser {
             sourceDocument: document.document,
             metadata: document.metadata,
             parserName: name,
+            parserProfileID: Self.profileID,
+            parserProfileVersion: Self.profileVersion,
             bookedCurrency: currency,
             declaredStatementPeriod: period,
             transactions: transactions,
-            financialIdentifiers: [identifier]
+            financialIdentifiers: [identifier],
+            sourceStatementEvidence: sourceStatementEvidence
         )
     }
 
+    private static func referenceEvidence(
+        in row: NormalizedRow,
+        index: Int
+    ) throws -> (value: String?, digest: String?) {
+        guard row.values.indices.contains(index) else {
+            throw AxisBankAccountXLSParserError.malformedRow(
+                sourceOrdinal: row.rowNumber
+            )
+        }
+
+        let source = row.rawValues.flatMap { rawValues in
+            rawValues.indices.contains(index) ? rawValues[index] : nil
+        } ?? row.values[index]
+        do {
+            return try AxisBankAccountSourceEvidence.numericReference(source)
+        } catch {
+            throw AxisBankAccountXLSParserError.malformedReference(
+                sourceOrdinal: row.rowNumber
+            )
+        }
+    }
+
     private func decimal(_ text: String, sourceOrdinal: Int) throws -> Decimal? {
-        guard !text.isEmpty else { return nil }
-        guard let value = Decimal(
-            string: text,
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard trimmed.range(
+            of: #"^[+-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?|\.\d+)$"#,
+            options: .regularExpression
+        ) != nil,
+        let value = Decimal(
+            string: trimmed.replacingOccurrences(of: ",", with: ""),
             locale: Locale(identifier: "en_US_POSIX")
         ) else {
             throw AxisBankAccountXLSParserError.malformedMonetaryValue(

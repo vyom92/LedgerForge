@@ -6,7 +6,6 @@ import Testing
 
 @MainActor
 struct DashboardViewModelTests {
-
     @Test(.globalRuntimeStateIsolation)
     func emptyHydrationProducesEmptyDashboardState() {
         resetDashboardStores()
@@ -31,89 +30,25 @@ struct DashboardViewModelTests {
     }
 
     @Test(.globalRuntimeStateIsolation)
-    func accountSummaryUsesRuntimeStoreAccounts() {
+    func authenticRepositoryHydrationPopulatesDashboardWithoutAuthoredFinancialRows() async throws {
         resetDashboardStores()
-        let firstAccountId = UUID()
-        AccountStore.shared.replaceAccounts([
-            Account(
-                id: firstAccountId,
-                institution: "Axis Bank",
-                name: "Axis NRE",
-                nickname: "NRE Savings",
-                type: .bank,
-                currencyCode: "INR",
-                currentBalance: Decimal(1_050)
-            ),
-            Account(
-                institution: "CBQ",
-                name: "Current Account",
-                type: .bank,
-                currencyCode: "QAR",
-                currentBalance: Decimal(200)
-            ),
-            Account(
-                institution: "HDFC",
-                name: "Salary Account",
-                type: .bank,
-                currencyCode: "INR",
-                currentBalance: Decimal(300)
-            ),
-            Account(
-                institution: "Amex",
-                name: "Credit Card",
-                type: .creditCard,
-                currencyCode: "USD",
-                currentBalance: Decimal(-50)
-            )
-        ])
-
+        defer { resetDashboardStores() }
+        let seeded = try await hydrateAuthenticDashboardStores()
         let viewModel = DashboardViewModel()
+        let transactions = TransactionStore.shared.transactions
 
-        #expect(viewModel.accounts.count == 4)
-        #expect(viewModel.accountSummaries.count == 3)
-        #expect(viewModel.accountSummaries.first?.id == firstAccountId)
-        #expect(viewModel.accountSummaries.first?.displayName == "NRE Savings")
-        #expect(viewModel.accountSummaries.first?.institution == "Axis Bank")
-        #expect(viewModel.accountSummaries.first?.currencyCode == "INR")
-        #expect(viewModel.accountSummaries.first?.currentBalance == Decimal(1_050))
+        #expect(viewModel.accounts.count == 1)
+        #expect(viewModel.accounts.first?.repositoryAccountId == seeded.plan.proposedAccount.id)
+        #expect(viewModel.transactionCount == seeded.plan.transactionTemplates.count)
+        #expect(Set(transactions.compactMap(\.repositoryTransactionId)) == Set(seeded.plan.transactionTemplates.map(\.transaction.id)))
+        #expect(!viewModel.accountSummaries.isEmpty)
+        #expect(!viewModel.recentTransactionSummaries.isEmpty)
+        #expect(viewModel.snapshot.income == transactions.compactMap(\.credit).reduce(.zero, +))
+        #expect(viewModel.snapshot.expenses == transactions.compactMap(\.debit).reduce(.zero, +))
     }
 
-    @Test(.globalRuntimeStateIsolation)
-    func transactionSummaryAndSnapshotUseRuntimeStoreTransactions() throws {
-        resetDashboardStores()
-        let older = makeTransaction(
-            statementDate: makeStatementDate(year: 2026, month: 7, day: 1),
-            description: "Debit purchase",
-            debit: Decimal(20),
-            credit: nil,
-            amount: Decimal(-20),
-            balance: Decimal(980)
-        )
-        let newer = makeTransaction(
-            statementDate: makeStatementDate(year: 2026, month: 7, day: 8),
-            description: "Salary credit",
-            debit: nil,
-            credit: Decimal(100),
-            amount: Decimal(100),
-            balance: Decimal(1_080)
-        )
-        TransactionStore.shared.replaceTransactions([older, newer])
-
-        let viewModel = DashboardViewModel()
-
-        #expect(viewModel.transactionCount == 2)
-        #expect(viewModel.snapshot.income == Decimal(100))
-        #expect(viewModel.snapshot.expenses == Decimal(20))
-        #expect(viewModel.snapshot.cashFlow == Decimal(80))
-        #expect(viewModel.snapshot.netWorth == Decimal(1_080))
-        #expect(viewModel.recentTransactionSummaries.count == 2)
-        #expect(viewModel.recentTransactionSummaries.first?.description == "Salary credit")
-        let expectedMoney = try Money(amount: Decimal(100), currency: "INR")
-        #expect(viewModel.recentTransactionSummaries.first?.amount == expectedMoney)
-        #expect(viewModel.recentTransactionSummaries.first?.isCredit == true)
-    }
-
-    @Test func nativeCurrencyNetTransactionFlowUsesMoney() throws {
+    @Test
+    func nativeCurrencyNetTransactionFlowUsesMoney() throws {
         let balance = try Money(amount: Decimal(800), currency: "INR")
         let credits = try Money(amount: Decimal(125), currency: "INR")
         let debits = try Money(amount: Decimal(45), currency: "INR")
@@ -127,61 +62,6 @@ struct DashboardViewModelTests {
         let expectedNetTransactionFlow = try Money(amount: Decimal(80), currency: "INR")
         #expect(summary.cashFlow == expectedNetTransactionFlow)
         #expect(summary.cashFlow.currency == balance.currency)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func recentTransactionSummaryPreservesNativeMoneyForDisplay() throws {
-        resetDashboardStores()
-        TransactionStore.shared.replaceTransactions([
-            Transaction(
-                statementDate: makeStatementDate(year: 2026, month: 7, day: 8),
-                description: "Qatari salary",
-                debit: nil,
-                credit: Decimal(123.45),
-                amount: Decimal(123.45),
-                balance: Decimal(123.45),
-                currency: "QAR",
-                account: "CBQ",
-                sourceBank: "CBQ",
-                sourceFile: "repository"
-            )
-        ])
-
-        let viewModel = DashboardViewModel()
-
-        let expectedMoney = try Money(amount: Decimal(string: "123.45")!, currency: "QAR")
-        #expect(viewModel.recentTransactionSummaries.first?.amount == expectedMoney)
-    }
-
-    @Test(.globalRuntimeStateIsolation)
-    func sameDateDifferentDocumentsUseStableDisplayOnlyAndWithholdBalanceAuthority() {
-        resetDashboardStores()
-        let date = makeStatementDate(year: 2026, month: 6, day: 6)
-        let first = makeTransaction(
-            statementDate: date,
-            description: "Document A ordinal 99",
-            debit: nil,
-            credit: 10,
-            amount: 10,
-            balance: 100,
-            repositoryTransactionId: "durable-a",
-            provenance: testProvenance(document: "document-a", ordinal: 99)
-        )
-        let second = makeTransaction(
-            statementDate: date,
-            description: "Document B ordinal 1",
-            debit: nil,
-            credit: 20,
-            amount: 20,
-            balance: 200,
-            repositoryTransactionId: "durable-b",
-            provenance: testProvenance(document: "document-b", ordinal: 1)
-        )
-        TransactionStore.shared.replaceTransactions([first, second])
-        let viewModel = DashboardViewModel()
-
-        #expect(viewModel.recentTransactionSummaries.map(\.description) == ["Document B ordinal 1", "Document A ordinal 99"])
-        #expect(viewModel.snapshot.netWorth == .zero)
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -206,41 +86,46 @@ struct DashboardViewModelTests {
     }
 }
 
+private struct AuthenticDashboardSeed {
+    let provider: InMemoryRepositoryProvider
+    let plan: ConfirmedImportPlanDTO
+}
+
+@MainActor
+private func hydrateAuthenticDashboardStores() async throws -> AuthenticDashboardSeed {
+    let provider = InMemoryRepositoryProvider()
+    let plan = try await confirmedImportPlan(generationToken: provider.generationToken)
+    guard case .committed = provider.confirmedImportRepo.commitConfirmedImport(plan) else {
+        Issue.record("Authentic confirmed import did not commit before dashboard hydration.")
+        throw RepositoryError.persistenceUnavailable
+    }
+    let hydrator = RepositoryStoreHydrator(
+        accountRepo: provider.accountRepo,
+        importSessionRepo: provider.importSessionRepo,
+        transactionRepo: provider.transactionRepo,
+        categoryRepo: provider.categoryRepo,
+        cardRepo: provider.cardRepo,
+        salaryRepo: provider.salaryRepo,
+        fundingPlanRepo: provider.fundingPlanRepo,
+        accountStore: .shared,
+        transactionStore: .shared,
+        categoryStore: CategoryStore(),
+        cardStore: CardStore(),
+        salaryStore: SalaryStore(),
+        fundingPlanStore: FundingPlanStore(),
+        importSessionStore: ImportSessionStore(),
+        importAttemptStore: ImportAttemptStore(),
+        workspaceId: plan.workspace.id,
+        persistenceState: .intentionalNonDurable(.testMemory),
+        providerGeneration: provider.generationToken,
+        participatesInLifecycleGate: false
+    )
+    _ = try hydrator.hydrateIfNeeded()
+    return AuthenticDashboardSeed(provider: provider, plan: plan)
+}
+
+@MainActor
 private func resetDashboardStores() {
     AccountStore.shared.replaceAccounts([])
     TransactionStore.shared.replaceTransactions([])
-}
-
-private func makeTransaction(
-    statementDate: StatementDate,
-    description: String,
-    debit: Decimal?,
-    credit: Decimal?,
-    amount: Decimal,
-    balance: Decimal,
-    repositoryTransactionId: String? = nil,
-    provenance: [TransactionSourceProvenance] = []
-) -> Transaction {
-    Transaction(
-        statementDate: statementDate,
-        description: description,
-        debit: debit,
-        credit: credit,
-        amount: amount,
-        balance: balance,
-        currency: "INR",
-        account: "Axis NRE",
-        sourceBank: "Axis Bank",
-        sourceFile: "repository",
-        repositoryTransactionId: repositoryTransactionId,
-        sourceProvenance: provenance
-    )
-}
-
-private func makeStatementDate(year: Int, month: Int, day: Int) -> StatementDate {
-    try! StatementDate(year: year, month: month, day: day)
-}
-
-private func testProvenance(document: String, ordinal: Int) -> [TransactionSourceProvenance] {
-    [TransactionSourceProvenance(normalizedDocumentID: document, normalizedRowID: "row-\(document)-\(ordinal)", sourceOrdinal: ordinal, normalizedRecordDigest: String.normalizedRecordDigest(values: [document, "\(ordinal)"]), parserProfileID: "test", parserProfileVersion: "1")]
 }

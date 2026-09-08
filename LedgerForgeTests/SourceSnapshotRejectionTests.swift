@@ -50,7 +50,7 @@ struct SourceSnapshotRejectionTests {
             rejectedAttemptHydration: {}
         )
         let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: try AuthenticSourceTestSupport.axisBankCSV()
         )
         prepared.sourceSnapshot.invalidate()
 
@@ -77,7 +77,7 @@ struct SourceSnapshotRejectionTests {
             rejectedAttemptHydration: {}
         )
         let prepared = try await engine.prepareImport(
-            from: FixtureLocator.axisCSV("axis_bank_nre_account_statement_baseline.csv")
+            from: try AuthenticSourceTestSupport.axisBankCSV()
         )
         engine.cancelPreparedImport(prepared)
 

@@ -4,95 +4,166 @@ import PDFKit
 import Testing
 @testable import LedgerForge
 
-/// Opt-in production-path acceptance for the established private Axis corpus.
-/// Set LEDGERFORGE_AXIS_CARD_PRIVATE_DIRECTORY to run it; credentials come
-/// only from the production Keychain scope. The suite never writes a private
-/// answer key and reports aggregate outcomes only.
-@Suite(
-    .enabled(
-        if: ProcessInfo.processInfo.environment[
-            "LEDGERFORGE_AXIS_CARD_PRIVATE_DIRECTORY"
-        ]?.isEmpty == false,
-        "Requires the private Axis credit-card corpus"
-    )
-)
+/// Required production-path acceptance for the complete registered authentic
+/// Axis credit-card corpus. Private paths, credentials, filenames, source
+/// narrations, and reference values never cross the test-report boundary.
+@Suite(.serialized)
 @MainActor
 struct AxisCreditCardAuthenticAcceptanceTests {
     private static let rootKey = "LEDGERFORGE_AXIS_CARD_PRIVATE_DIRECTORY"
+    private static let oracleKey = "LEDGERFORGE_AXIS_CARD_SOURCE_ORACLE"
+    private static let appPasswordKey = "LEDGERFORGE_AXIS_CARD_APP_PASSWORD"
+    private static let traditionalPasswordKey = "LEDGERFORGE_AXIS_CARD_TRADITIONAL_PASSWORD"
     private static let privateResultFileKey = "LEDGERFORGE_PRIVATE_RESULT_FILE"
 
-    @MainActor
-    private static var completedPrivateResultPhases: Set<String> = []
-    @MainActor
-    private static var completedCorpus: LogicalCorpus?
+    @MainActor private static var completedPhases = Set<String>()
+    @MainActor private static var completedCorpus: LogicalCorpus?
 
-    private enum SourceFormat: String, CaseIterable, Hashable {
-        case appPDF = "app-pdf"
+    private enum SourceFormat: String, CaseIterable, Codable, Hashable {
+        case appPDF = "app_pdf"
         case xlsx
-        case traditionalPDF = "traditional-pdf"
+        case traditionalPDF = "traditional_pdf"
+
+        @MainActor var parserProfileID: String {
+            switch self {
+            case .xlsx: AxisCreditCardXLSXParser.profileID
+            case .appPDF, .traditionalPDF: AxisCreditCardPDFParser.profileID
+            }
+        }
+
+        var parserProfileVersion: String { "1" }
+    }
+
+    private struct SourceOracle: Decodable {
+        let schema: String
+        let authority: String
+        let sourceInventorySHA256: String
+        let corpus: OracleCorpus
+        let records: [OracleRecord]
+
+        enum CodingKeys: String, CodingKey {
+            case schema, authority, corpus, records
+            case sourceInventorySHA256 = "source_inventory_sha256"
+        }
+    }
+
+    private struct OracleCorpus: Decodable {
+        let carrierCount: Int
+        let logicalStatementCount: Int
+        let transactionRowCount: Int
+        let formatCounts: [String: Int]
+        let cycles: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case cycles
+            case carrierCount = "carrier_count"
+            case logicalStatementCount = "logical_statement_count"
+            case transactionRowCount = "transaction_row_count"
+            case formatCounts = "format_counts"
+        }
+    }
+
+    private struct OracleRecord: Decodable {
+        let sourceSHA256: String
+        let format: SourceFormat
+        let cycle: String
+        let rowCount: Int
+        let rows: [OracleRow]
+        let controls: [String: String]
+
+        enum CodingKeys: String, CodingKey {
+            case format, cycle, rows, controls
+            case sourceSHA256 = "source_sha256"
+            case rowCount = "row_count"
+        }
+    }
+
+    private struct OracleRow: Decodable {
+        let date: String
+        let amount: String
+        let effect: String
+        let reference: String?
+        let narration: String
+        let originalMerchantMoney: OracleMoney?
+
+        enum CodingKeys: String, CodingKey {
+            case date, amount, effect, reference, narration
+            case originalMerchantMoney = "original_merchant_money"
+        }
+    }
+
+    private struct OracleMoney: Decodable {
+        let currency: String
+        let amount: String
     }
 
     private struct FinancialKey: Hashable {
         let date: String
         let effect: String
         let currency: String
-        let minor: Int64
+        let amountMagnitude: String
     }
 
-    private typealias FinancialMultiset = [FinancialKey: Int]
-
     private struct PhysicalSource {
+        let url: URL
         let document: FinancialDocument
-        let bytes: Data
         let format: SourceFormat
         let isLocked: Bool
         let cycle: String
-        let selectedStatementMonth: String?
         let rawDigest: String
-        let inventoryOrdinal: Int
+        let oracle: OracleRecord
     }
 
     private struct LogicalCorpus {
+        let oracle: SourceOracle
+        let oracleFileDigest: String
+        let sources: [PhysicalSource]
         let byCycle: [String: [SourceFormat: PhysicalSource]]
-        let physicalSources: [PhysicalSource]
     }
 
-    private struct AuthenticRepresentation {
-        let document: FinancialDocument
-        let bytes: Data
-        let format: SourceFormat
-        let cycle: String
+    private struct PrivateRuntime {
+        let provider: DatabaseProvider
+        let engine: ImportEngine
+        let challengeProbe: ChallengeInvocationProbe
+        let sqlite: SQLiteRepositoryProvider?
+        let databaseURL: URL?
+        let cleanup: () -> Void
     }
 
     private actor ChallengeInvocationProbe {
         private var invocationCount = 0
-
-        func recordInvocation() {
-            invocationCount += 1
-        }
-
-        func count() -> Int {
-            invocationCount
-        }
+        func recordInvocation() { invocationCount += 1 }
+        func count() -> Int { invocationCount }
     }
 
     private enum AuthenticAcceptanceError: Error {
-        case appCredentialUnavailable
-        case traditionalCredentialUnavailable
         case sourceDirectoryUnreadable
         case sourceUnreadable
+        case oracleUnavailable
+        case oracleMismatch
+        case appCredentialUnavailable
+        case traditionalCredentialUnavailable
         case unexpectedPasswordChallenge
-        case missingAppChronology
-        case missingXLSXChronology
-        case missingTraditionalChronology
-        case unexpectedCycle
         case unexpectedCorpusShape
-        case inconsistentDuplicateCopies
         case financialOutputMismatch
+        case missingProductionCycle(format: String, oracleCycle: String)
+        case validationMismatch(format: String, cycle: String, issueKinds: [String])
+        case sourceProjectionMismatch(format: String, cycle: String, row: Int, field: String)
         case campaignInvariant
     }
 
     private static let expectedMonthlyCounts: [String: Int] = [
+        "2025-02": 44,
+        "2025-03": 33,
+        "2025-04": 29,
+        "2025-05": 47,
+        "2025-06": 37,
+        "2025-07": 36,
+        "2025-08": 35,
+        "2025-09": 81,
+        "2025-10": 47,
+        "2025-11": 71,
+        "2025-12": 121,
         "2026-01": 89,
         "2026-02": 95,
         "2026-03": 56,
@@ -102,346 +173,88 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         "2026-07": 81
     ]
 
-    private static let expectedPhysicalCounts: [SourceFormat: Int] = [
-        .appPDF: 14,
+    private static let expectedFormatCounts: [SourceFormat: Int] = [
+        .appPDF: 18,
         .xlsx: 7,
-        .traditionalPDF: 14
+        .traditionalPDF: 7
     ]
 
-    @Test
-    func authenticJanJulProductionSourcesMatchEstablishedAggregateControls() async throws {
-        guard let rootPath = ProcessInfo.processInfo.environment[Self.rootKey],
-              !rootPath.isEmpty else {
-            throw AuthenticAcceptanceError.sourceDirectoryUnreadable
-        }
-
-        let corpus = try await Self.authenticCorpus(
-            root: URL(fileURLWithPath: rootPath, isDirectory: true)
-        )
-        try Self.assertLogicalSourceTruth(corpus)
-        try Self.recordPrivateResultPhase("corpus", corpus: corpus)
+    private static var expectedCycles: [String] { expectedMonthlyCounts.keys.sorted() }
+    private static var expectedCanonicalTransactionCount: Int {
+        expectedMonthlyCounts.values.reduce(0, +)
     }
 
-    @Test
-    func authenticRepresentativeImportOrdersPersistWithProviderParityAndReopen() async throws {
-        guard let rootPath = ProcessInfo.processInfo.environment[Self.rootKey],
-              !rootPath.isEmpty else {
-            throw AuthenticAcceptanceError.sourceDirectoryUnreadable
-        }
-
-        let representations = try await Self.activeRepresentations(
-            root: URL(fileURLWithPath: rootPath, isDirectory: true),
-            cycle: "2026-05"
-        )
-        let hasThreeRepresentations = representations.count == 3
-        #expect(hasThreeRepresentations, "representative month has three logical formats")
-        guard hasThreeRepresentations else { throw AuthenticAcceptanceError.unexpectedCorpusShape }
-
-        let formats = representations.map(\.format)
-        let expectedFormats: [SourceFormat] = [.appPDF, .xlsx, .traditionalPDF]
-        let formatOrderIsStable = formats == expectedFormats
-        #expect(formatOrderIsStable, "representative format order is deterministic")
-        guard formatOrderIsStable else { throw AuthenticAcceptanceError.unexpectedCorpusShape }
-
-        try await Self.runAuthenticCampaign(
-            representations: representations,
-            order: [0, 1, 2],
-            inMemory: true
-        )
-        try await Self.runAuthenticCampaign(
-            representations: representations,
-            order: [1, 0, 2],
-            inMemory: true
-        )
-        try await Self.runAuthenticCampaign(
-            representations: representations,
-            order: [0, 1, 2],
-            inMemory: false
-        )
-        try await Self.runAuthenticCampaign(
-            representations: representations,
-            order: [1, 0, 2],
-            inMemory: false
-        )
-        try Self.recordPrivateResultPhase("persistence")
+    @Test(.globalRuntimeStateIsolation)
+    func completeAuthenticCorpusMatchesIndependentSourceOracle() async throws {
+        let corpus = try await Self.requireCorpus()
+        try Self.assertCompleteSourceTruth(corpus)
+        try Self.recordCompletedPhase("corpus", corpus: corpus)
     }
 
-    @MainActor
-    private static func recordPrivateResultPhase(
-        _ phase: String,
-        corpus: LogicalCorpus? = nil
-    ) throws {
-        if let corpus {
-            completedCorpus = corpus
-        }
-        completedPrivateResultPhases.insert(phase)
-        guard completedPrivateResultPhases == Set(["corpus", "persistence"]) else {
-            return
-        }
-        guard let resultPath = ProcessInfo.processInfo.environment[privateResultFileKey],
-              !resultPath.isEmpty else {
-            return
-        }
-        guard let corpus = completedCorpus else {
-            throw AuthenticAcceptanceError.campaignInvariant
-        }
+    @Test(.globalRuntimeStateIsolation)
+    func completeAuthenticCorpusPersistsThroughOrdinaryConfirmationWithParityReplayAndReopen() async throws {
+        let corpus = try await Self.requireCorpus()
+        let appFirst = Self.orderedSources(
+            corpus,
+            formatPriority: [.appPDF, .xlsx, .traditionalPDF]
+        )
+        let xlsxFirstReverse = Self.orderedSources(
+            corpus,
+            cycles: Self.expectedCycles.reversed(),
+            formatPriority: [.xlsx, .traditionalPDF, .appPDF]
+        )
 
-        let productionSourceResult = try Self.canonicalProductionSourceResult(corpus)
-        let rowsProcessed = Self.expectedCycles.reduce(0) { partial, cycle in
-            partial + (corpus.byCycle[cycle] ?? [:]).values.reduce(0) {
-                $0 + $1.document.transactions.count
-            }
-        }
-
-        // This payload summarizes assertions that have already completed. It is
-        // evidence export only, never an independent oracle or a source of test
-        // expectations. No credential values, private paths, filenames, raw rows,
-        // descriptions, or account identifiers cross this boundary.
-        let payload: [String: Any] = [
-            "contract": "ledgerforge-axis-credit-card-authentic-acceptance-v1",
-            "tests": [
-                "corpus": true,
-                "persistence": true
-            ],
-            "non_vacuity": [
-                "requested_private_context": "axis-card",
-                "selected_physical_source_count": corpus.physicalSources.count,
-                "logical_representation_count": corpus.byCycle.values.reduce(0) { $0 + $1.count },
-                "cycles_exercised": Self.expectedCycles,
-                "production_tests_executed": 2,
-                "selected_private_tests_skipped": 0,
-                "rows_processed": rowsProcessed,
-                "sqlite_campaign_execution": true,
-                "in_memory_campaign_execution": true,
-                "checkpoint_close_reopen_execution": true,
-                "hydration_execution": true
-            ],
-            "corpus": [
-                "physical_sources": 35,
-                "logical_representations": 21,
-                "cycles": expectedCycles.count,
-                "rows_per_representation_family": expectedMonthlyCounts.values.reduce(0, +),
-                "monthly_rows": expectedMonthlyCounts,
-                "app_xlsx_order_and_narration_verified": true,
-                "locked_unlocked_pairs_verified": true,
-                "march_duplicate_neutral_key_multiplicity": 2,
-                "june_duplicate_neutral_key_multiplicity": 2,
-                "selected_statement_month_verified_for_app_and_xlsx": true
-            ],
-            "persistence": [
-                "representative_cycle": "2026-05",
-                "campaigns": 4,
-                "in_memory_campaigns": 2,
-                "sqlite_campaigns": 2,
-                "canonical_transactions": 143,
-                "liability_accounts": 1,
-                "axis_card_instruments": 0,
-                "statement_sections": 0,
-                "section_observations": 0,
-                "accepted_statements": 3,
-                "transaction_evidence": 143,
-                "semantic_projections": 3,
-                "semantic_groups": 1,
-                "semantic_members": 3,
-                "supporting_members": 2,
-                "sqlite_inmemory_parity_verified": true,
-                "sqlite_checkpoint_reopen_verified": true,
-                "canonical_hydration_verified": true
-            ],
-            "production_source_result": productionSourceResult
-        ]
-        let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
-        try data.write(to: URL(fileURLWithPath: resultPath), options: [.atomic])
-    }
-
-    private static func canonicalProductionSourceResult(
-        _ corpus: LogicalCorpus
-    ) throws -> [String: Any] {
-        let physicalDigests = corpus.physicalSources.map(\.rawDigest)
-        let formatCounts = SourceFormat.allCases.reduce(into: [String: Int]()) { counts, format in
-            counts[Self.canonicalFormatCode(format)] = corpus.physicalSources.filter {
-                $0.format == format
-            }.count
-        }
-
-        var logicalRecords: [[String: Any]] = []
-        logicalRecords.reserveCapacity(corpus.byCycle.values.reduce(0) { $0 + $1.count })
-        for cycle in Self.expectedCycles {
-            guard let logical = corpus.byCycle[cycle] else {
-                throw AuthenticAcceptanceError.unexpectedCorpusShape
-            }
-            for format in SourceFormat.allCases {
-                guard let source = logical[format] else {
-                    throw AuthenticAcceptanceError.unexpectedCorpusShape
-                }
-                let tuples = try Self.canonicalFinancialTuples(source.document.transactions)
-                let record: [String: Any] = [
-                    "representation": Self.canonicalFormatCode(format),
-                    "source_sha256": source.rawDigest,
-                    "cycle_or_period": Self.sourceCycleOrPeriod(source),
-                    "financial_row_count": tuples.count,
-                    "neutral_financial_multiset_sha256": Self.digest(
-                        prefix: "ledgerforge.axis.financial-multiset.v1",
-                        values: tuples,
-                        sortByRawUTF8: true
-                    ),
-                    "ordered_financial_sequence_sha256": Self.digest(
-                        prefix: "ledgerforge.axis.financial-order.v1",
-                        values: tuples
-                    ),
-                    "narration_sequence_sha256": Self.digest(
-                        prefix: "ledgerforge.axis.narration-order.v1",
-                        values: Self.descriptions(source.document.transactions)
-                    ),
-                    "duplicate_multiplicity_summary": Self.duplicateSummary(tuples)
-                ]
-                logicalRecords.append(record)
-            }
-        }
-
-        let march = corpus.byCycle["2026-03"]?[.appPDF]?.document.transactions ?? []
-        let june = corpus.byCycle["2026-06"]?[.appPDF]?.document.transactions ?? []
-        return [
-            "schema": "ledgerforge.axis.blind-source.v1",
-            "serialization": [
-                "version": "lf-length-prefixed-v1",
-                "text": "UTF-8",
-                "field": "name=<decimal UTF-8 byte length>:<UTF-8 value>",
-                "tuple_field_order": ["date", "effect", "currency", "money"],
-                "tuple_separator": "|",
-                "card_effect_values": ["card_increase_owed", "card_decrease_owed"],
-                "money": "canonical fixed-scale native decimal"
-            ],
-            "corpus": [
-                "selected_physical_count": corpus.physicalSources.count,
-                "physical_representation_counts": formatCounts,
-                "locked_physical_count": corpus.physicalSources.filter(\.isLocked).count,
-                "unlocked_physical_count": corpus.physicalSources.filter { !$0.isLocked }.count,
-                "source_set_sha256": Self.digest(
-                    prefix: "ledgerforge.axis.source-set.v1",
-                    values: physicalDigests,
-                    sortByRawUTF8: true
+        let mixedCycles = Self.expectedCycles.enumerated()
+            .sorted { ($0.offset % 3, $0.offset) < ($1.offset % 3, $1.offset) }
+            .map(\.element)
+        let traditionalFirstMixed = Self.orderedSources(
+            corpus, cycles: mixedCycles,
+            formatPriority: [.traditionalPDF, .appPDF, .xlsx]
+        )
+        for inMemory in [true, false] {
+            for sources in [appFirst, xlsxFirstReverse, traditionalFirstMixed] {
+                try await Self.runAuthenticCampaign(
+                    corpus: corpus, orderedSources: sources, inMemory: inMemory
                 )
-            ],
-            "logical_sources": logicalRecords,
-            "source_controls": [
-                "march_duplicate_multiplicity_summary": Self.duplicateSummary(
-                    try Self.canonicalFinancialTuples(march)
-                ),
-                "june_duplicate_multiplicity_summary": Self.duplicateSummary(
-                    try Self.canonicalFinancialTuples(june)
-                ),
-                "active_loans_excluded_from_transactions": true,
-                "active_loans_exclusion_evidence": [
-                    "app_pdf_explicit_boundary",
-                    "traditional_pdf_emi_boundary",
-                    "xlsx_no_loans_section"
-                ]
-            ]
-        ]
+            }
+        }
+        try Self.recordCompletedPhase("corpus", corpus: corpus)
+        try Self.recordCompletedPhase("persistence", corpus: corpus)
     }
 
-    private static func sourceCycleOrPeriod(_ source: PhysicalSource) -> String {
-        guard source.format == .traditionalPDF,
-              let period = source.document.cardStatementEvidence?.declaredStatementPeriod
-                ?? source.document.declaredStatementPeriod else {
-            return source.cycle
+    private static func requireCorpus() async throws -> LogicalCorpus {
+        if let completedCorpus { return completedCorpus }
+        guard let rootPath = ProcessInfo.processInfo.environment[rootKey], !rootPath.isEmpty,
+              let oraclePath = ProcessInfo.processInfo.environment[oracleKey], !oraclePath.isEmpty else {
+            throw AuthenticAcceptanceError.oracleUnavailable
         }
-        return String(
-            format: "%02d/%02d/%04d - %02d/%02d/%04d",
-            period.start.day,
-            period.start.month,
-            period.start.year,
-            period.end.day,
-            period.end.month,
-            period.end.year
+        let corpus = try await authenticCorpus(
+            root: URL(fileURLWithPath: rootPath, isDirectory: true),
+            oracleURL: URL(fileURLWithPath: oraclePath)
         )
+        completedCorpus = corpus
+        return corpus
     }
 
-    private static func canonicalFormatCode(_ format: SourceFormat) -> String {
-        switch format {
-        case .appPDF: return "app_pdf"
-        case .xlsx: return "xlsx"
-        case .traditionalPDF: return "traditional_pdf"
+    private static func authenticCorpus(root: URL, oracleURL: URL) async throws -> LogicalCorpus {
+        let oracleBytes: Data
+        let oracle: SourceOracle
+        do {
+            oracleBytes = try Data(contentsOf: oracleURL, options: [.mappedIfSafe])
+            oracle = try JSONDecoder().decode(SourceOracle.self, from: oracleBytes)
+        } catch {
+            throw AuthenticAcceptanceError.oracleUnavailable
         }
-    }
+        try validateOracleContract(oracle)
 
-    private static func canonicalField(_ name: String, _ value: String) -> String {
-        "\(name)=\(value.utf8.count):\(value)"
-    }
+        let recordDigests = oracle.records.map(\.sourceSHA256)
+        try require(Set(recordDigests).count == recordDigests.count, error: .oracleMismatch)
+        let recordsByDigest = Dictionary(uniqueKeysWithValues: oracle.records.map {
+            ($0.sourceSHA256, $0)
+        })
 
-    private static func canonicalFinancialTuples(
-        _ transactions: [Transaction]
-    ) throws -> [String] {
-        try transactions.map { transaction in
-            guard let effect = transaction.cardLiabilityEffect,
-                  let date = transaction.statementDate else {
-                throw AuthenticAcceptanceError.financialOutputMismatch
-            }
-            // The independent source authority records the printed card amount
-            // as a non-negative native-money magnitude and carries direction in
-            // CardLiabilityEffect.  Production Transaction deliberately keeps
-            // its signed Money presentation for downstream semantics, so this
-            // acceptance-only projection removes that presentation sign while
-            // retaining the independent effect field above.
-            let productionMoney = try transaction.money.canonicalDecimalString()
-            let sourceMoneyMagnitude = productionMoney.hasPrefix("-")
-                ? String(productionMoney.dropFirst())
-                : productionMoney
-            return [
-                Self.canonicalField("date", date.canonical),
-                Self.canonicalField("effect", effect.rawValue),
-                Self.canonicalField("currency", transaction.money.currency.code),
-                Self.canonicalField("money", sourceMoneyMagnitude)
-            ].joined(separator: "|")
-        }
-    }
-
-    private static func duplicateSummary(_ values: [String]) -> [String: Any] {
-        let counts = values.reduce(into: [String: Int]()) { counts, value in
-            counts[value, default: 0] += 1
-        }
-        let duplicateMultiplicities = counts.values.filter { $0 > 1 }.sorted()
-        return [
-            "multiplicities_gt1": duplicateMultiplicities,
-            "duplicate_bucket_count": duplicateMultiplicities.count,
-            "maximum_multiplicity": counts.values.max() ?? 0
-        ]
-    }
-
-    private static func digest(
-        prefix: String,
-        values: [String],
-        sortByRawUTF8: Bool = false
-    ) -> String {
-        let ordered = sortByRawUTF8
-            ? values.sorted {
-                Data($0.utf8).lexicographicallyPrecedes(Data($1.utf8))
-            }
-            : values
-        var payload = Data((prefix + "\n").utf8)
-        for value in ordered {
-            payload.append(contentsOf: value.utf8)
-            payload.append(0x0A)
-        }
-        return Self.sha256Hex(payload)
-    }
-
-    private static func sha256Hex(_ data: Data) -> String {
-        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-    }
-
-    private static func authenticCorpus(root: URL) async throws -> LogicalCorpus {
         let challengeProbe = ChallengeInvocationProbe()
-        let passwordProvider = DefaultPasswordProvider(
-            supportedInstitutionCodes: [Institution.axis.statementPasswordCredentialScope],
-            challenge: { _ in
-                await challengeProbe.recordInvocation()
-                throw AuthenticAcceptanceError.unexpectedPasswordChallenge
-            }
-        )
-        try await Self.requireCanonicalCredentialScopes(passwordProvider)
-
+        let passwordProvider = try makePasswordProvider(challengeProbe: challengeProbe)
         let preparationProvider = DatabaseProvider(inMemory: true)
         let preparationCoordinator = DefaultImportPersistenceCoordinator(
             databaseProvider: preparationProvider,
@@ -456,412 +269,874 @@ struct AxisCreditCardAuthenticAcceptanceTests {
                 passwordProvider: passwordProvider
             ),
             importPersistenceCoordinator: preparationCoordinator,
+            developerConsole: DeveloperConsole(),
             persistenceStateProvider: { preparationProvider.persistenceState },
             providerGenerationProvider: { preparationProvider.generationToken },
             forcedHydration: {
-                RepositoryStoreHydrationResult(
-                    didHydrate: true,
-                    accountCount: 0,
-                    transactionCount: 0
-                )
+                RepositoryStoreHydrationResult(didHydrate: true, accountCount: 0, transactionCount: 0)
             },
-            rejectedAttemptHydration: {}
+            rejectedAttemptHydration: {},
+            developmentProfileAcknowledgementGate: DevelopmentProfileAcknowledgementGate(
+                stateProvider: { nil }
+            )
         )
 
-        let files = try regularFiles(under: root)
-        var sources: [PhysicalSource] = []
-        var inventoryOrdinal = 0
+        let files = try regularFinancialFiles(under: root)
+        try require(files.count == 32, error: .unexpectedCorpusShape)
+        var sources = [PhysicalSource]()
+        sources.reserveCapacity(files.count)
         for url in files {
-            let extensionName = url.pathExtension.lowercased()
-            guard extensionName == "pdf" || extensionName == "xlsx" else { continue }
-
             let bytes: Data
-            do {
-                bytes = try Data(contentsOf: url, options: [.mappedIfSafe])
-            } catch {
-                throw AuthenticAcceptanceError.sourceUnreadable
+            do { bytes = try Data(contentsOf: url, options: [.mappedIfSafe]) }
+            catch { throw AuthenticAcceptanceError.sourceUnreadable }
+            let digest = sha256Hex(bytes)
+            guard let oracleRecord = recordsByDigest[digest] else {
+                throw AuthenticAcceptanceError.oracleMismatch
             }
 
             let isLocked: Bool
-            if extensionName == "pdf" {
+            if url.pathExtension.caseInsensitiveCompare("pdf") == .orderedSame {
                 guard let pdf = PDFDocument(data: bytes) else {
                     throw AuthenticAcceptanceError.sourceUnreadable
                 }
-                // This is generic PDF encryption evidence captured before the
-                // production reader receives a candidate; it is never inferred
-                // from a filename or path.
                 isLocked = pdf.isLocked
             } else {
                 isLocked = false
             }
 
             let prepared: PreparedImport
-            do {
-                prepared = try await engine.prepareImport(from: url)
-            } catch let error as AuthenticAcceptanceError {
-                throw error
-            } catch {
-                throw AuthenticAcceptanceError.sourceUnreadable
-            }
-            let document = prepared.financialDocument
+            do { prepared = try await engine.prepareImport(from: url) }
+            catch let error as AuthenticAcceptanceError { throw error }
+            catch { throw AuthenticAcceptanceError.sourceUnreadable }
+            defer { engine.cancelPreparedImport(prepared) }
+
             let format: SourceFormat
-            switch extensionName {
-            case "pdf":
-                // Consume the exact transient structural presentation selected
-                // by the production Axis normalizer. The private gate must not
-                // maintain a second text parser for App vs traditional PDF.
+            if url.pathExtension.caseInsensitiveCompare("xlsx") == .orderedSame {
+                format = .xlsx
+            } else {
                 guard let presentation = prepared.axisCreditCardPDFPresentation else {
-                    engine.cancelPreparedImport(prepared)
                     throw AuthenticAcceptanceError.unexpectedCorpusShape
                 }
                 format = presentation == .appPDF ? .appPDF : .traditionalPDF
-            case "xlsx":
-                format = .xlsx
-            default:
-                engine.cancelPreparedImport(prepared)
-                throw AuthenticAcceptanceError.sourceUnreadable
             }
-            engine.cancelPreparedImport(prepared)
-
+            let cycle = try sourceCycle(
+                prepared.financialDocument,
+                format: format,
+                oracleCycleForDiagnostics: oracleRecord.cycle
+            )
             guard prepared.validation.passed else {
-                throw AuthenticAcceptanceError.sourceUnreadable
+                throw AuthenticAcceptanceError.validationMismatch(
+                    format: format.rawValue,
+                    cycle: cycle,
+                    issueKinds: prepared.validation.issues.map(\.message)
+                )
             }
-            let cycle = try Self.cycle(document, format: format)
-            guard Self.isActiveCycle(cycle) else {
-                throw AuthenticAcceptanceError.unexpectedCycle
-            }
-            _ = try Self.financialKeys(document.transactions)
-            let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+            try require(format == oracleRecord.format, error: .oracleMismatch)
+            try require(cycle == oracleRecord.cycle, error: .oracleMismatch)
+            try assertProduction(prepared.financialDocument, matches: oracleRecord)
             sources.append(PhysicalSource(
-                document: document,
-                bytes: bytes,
+                url: url,
+                document: prepared.financialDocument,
                 format: format,
                 isLocked: isLocked,
                 cycle: cycle,
-                selectedStatementMonth: document.cardStatementEvidence?.selectedStatementMonth?.canonical,
                 rawDigest: digest,
-                inventoryOrdinal: inventoryOrdinal
+                oracle: oracleRecord
             ))
-            inventoryOrdinal += 1
         }
 
+        try require(Set(sources.map(\.rawDigest)) == Set(recordDigests), error: .oracleMismatch)
+        try assertPhysicalCorpus(sources)
         guard await challengeProbe.count() == 0 else {
             throw AuthenticAcceptanceError.unexpectedPasswordChallenge
         }
 
-        try Self.assertPhysicalCorpus(sources)
-
-        var byCycle: [String: [SourceFormat: PhysicalSource]] = [:]
-        for cycle in Self.expectedCycles {
-            let cycleSources = sources.filter { $0.cycle == cycle }
-            var logical: [SourceFormat: PhysicalSource] = [:]
-            for format in SourceFormat.allCases {
-                let copies = cycleSources.filter { $0.format == format }
-                let expectedCopies = format == .xlsx ? 1 : 2
-                try Self.require(
-                    copies.count == expectedCopies,
-                    error: .unexpectedCorpusShape
-                )
-
-                if format != .xlsx {
-                    let lockEvidence = copies.filter(\.isLocked)
-                    let unlockEvidence = copies.filter { !$0.isLocked }
-                    try Self.require(
-                        lockEvidence.count == 1 && unlockEvidence.count == 1,
-                        error: .unexpectedCorpusShape
-                    )
-                    try Self.require(
-                        Set(copies.map(\.rawDigest)).count == 2,
-                        error: .unexpectedCorpusShape
-                    )
-                    let equivalent = try Self.productionOutputEquivalent(copies[0], copies[1])
-                    #expect(equivalent, "physical duplicate copies have equivalent production output")
-                    guard equivalent else {
-                        throw AuthenticAcceptanceError.inconsistentDuplicateCopies
-                    }
-                }
-
-                guard let representative = copies.sorted(by: Self.representativeOrdering).first else {
-                    throw AuthenticAcceptanceError.unexpectedCorpusShape
-                }
-                logical[format] = representative
-            }
-            byCycle[cycle] = logical
+        var byCycle = [String: [SourceFormat: PhysicalSource]]()
+        for source in sources {
+            try require(byCycle[source.cycle]?[source.format] == nil, error: .unexpectedCorpusShape)
+            byCycle[source.cycle, default: [:]][source.format] = source
         }
-
-        let corpus = LogicalCorpus(byCycle: byCycle, physicalSources: sources)
-        try Self.assertLogicalSourceTruth(corpus)
+        let corpus = LogicalCorpus(
+            oracle: oracle,
+            oracleFileDigest: sha256Hex(oracleBytes),
+            sources: sources,
+            byCycle: byCycle
+        )
+        try assertCompleteSourceTruth(corpus)
         return corpus
     }
 
-    private static var expectedCycles: [String] {
-        expectedMonthlyCounts.keys.sorted()
+    private static func validateOracleContract(_ oracle: SourceOracle) throws {
+        try require(oracle.schema == "ledgerforge.axis.source-oracle.v4", error: .oracleMismatch)
+        try require(
+            oracle.authority == "raw-authentic-source-text-independent-projection",
+            error: .oracleMismatch
+        )
+        try require(oracle.sourceInventorySHA256.count == 64, error: .oracleMismatch)
+        try require(oracle.corpus.carrierCount == 32, error: .oracleMismatch)
+        try require(oracle.corpus.logicalStatementCount == 18, error: .oracleMismatch)
+        try require(
+            oracle.corpus.transactionRowCount == expectedCanonicalTransactionCount,
+            error: .oracleMismatch
+        )
+        try require(oracle.corpus.cycles == expectedCycles, error: .oracleMismatch)
+        for format in SourceFormat.allCases {
+            try require(
+                oracle.corpus.formatCounts[format.rawValue] == expectedFormatCounts[format],
+                error: .oracleMismatch
+            )
+        }
+        try require(oracle.records.count == 32, error: .oracleMismatch)
+        try require(
+            oracle.records.allSatisfy { $0.rowCount == $0.rows.count },
+            error: .oracleMismatch
+        )
+        try require(
+            oracle.records.filter { $0.format == .appPDF }.reduce(0) { $0 + $1.rowCount }
+                == expectedCanonicalTransactionCount,
+            error: .oracleMismatch
+        )
+        try require(
+            oracle.records.flatMap(\.rows).compactMap(\.reference).count == 164,
+            error: .oracleMismatch
+        )
+        try require(
+            oracle.records.filter { $0.format == .appPDF }
+                .flatMap(\.rows).compactMap(\.reference).count == 66,
+            error: .oracleMismatch
+        )
+    }
+
+    private static func assertProduction(
+        _ document: FinancialDocument,
+        matches oracle: OracleRecord
+    ) throws {
+        func requireRow(_ condition: Bool, row: Int, field: String) throws {
+            #expect(condition, "authentic source projection invariant")
+            guard condition else {
+                throw AuthenticAcceptanceError.sourceProjectionMismatch(
+                    format: oracle.format.rawValue,
+                    cycle: oracle.cycle,
+                    row: row,
+                    field: field
+                )
+            }
+        }
+        try requireRow(
+            document.transactions.count == oracle.rowCount,
+            row: 0,
+            field: "row-count"
+        )
+        let evidence = try #require(document.cardStatementEvidence)
+        try assertControls(
+            controls(
+                period: evidence.declaredStatementPeriod,
+                month: evidence.selectedStatementMonth,
+                summary: evidence.summaryComponents
+            ),
+            matches: oracle
+        )
+        let expectedProfileID = oracle.format.parserProfileID
+        var normalizedDocumentID: String?
+        var sourceOrdinals = Set<Int>()
+        for (offset, pair) in zip(document.transactions, oracle.rows).enumerated() {
+            let (transaction, row) = pair
+            let rowNumber = offset + 1
+            guard let date = transaction.statementDate,
+                  let effect = transaction.cardLiabilityEffect,
+                  let provenance = transaction.sourceProvenance.only else {
+                throw AuthenticAcceptanceError.sourceProjectionMismatch(
+                    format: oracle.format.rawValue,
+                    cycle: oracle.cycle,
+                    row: rowNumber,
+                    field: "required-semantics"
+                )
+            }
+            let money = try transaction.money.canonicalDecimalString()
+            let magnitude = money.hasPrefix("-") ? String(money.dropFirst()) : money
+            try requireRow(date.canonical == row.date, row: rowNumber, field: "date")
+            try requireRow(effect.rawValue == row.effect, row: rowNumber, field: "effect")
+            try requireRow(transaction.money.currency.code == "INR", row: rowNumber, field: "currency")
+            try requireRow(magnitude == row.amount, row: rowNumber, field: "amount")
+            try requireRow(transaction.reference == row.reference, row: rowNumber, field: "reference")
+            try requireRow(sourceNarrationGlyphs(transaction.description) == sourceNarrationGlyphs(row.narration),
+                           row: rowNumber, field: "complete-narration")
+            let annotation = try #require(evidence.transactionAnnotations.only {
+                $0.parserTransactionID == transaction.id
+            })
+            let original = annotation.originalMerchantMoney
+            let signedOriginal = try original?.canonicalDecimalString()
+            let expectedOriginal = row.originalMerchantMoney.map {
+                row.effect == CardLiabilityEffect.decreasesAmountOwed.rawValue
+                    ? "-" + $0.amount : $0.amount
+            }
+            try requireRow(original?.currency.code == row.originalMerchantMoney?.currency,
+                           row: rowNumber, field: "original-merchant-currency")
+            try requireRow(signedOriginal == expectedOriginal,
+                           row: rowNumber, field: "original-merchant-money")
+            try requireRow(provenance.parserProfileID == expectedProfileID,
+                           row: rowNumber, field: "profile-id")
+            try requireRow(
+                provenance.parserProfileVersion == oracle.format.parserProfileVersion,
+                row: rowNumber,
+                field: "profile-version"
+            )
+            try requireRow(provenance.sourceOrdinal > 0, row: rowNumber, field: "source-ordinal")
+            try requireRow(sourceOrdinals.insert(provenance.sourceOrdinal).inserted,
+                           row: rowNumber, field: "source-ordinal-unique")
+            if let normalizedDocumentID {
+                try requireRow(
+                    provenance.normalizedDocumentID == normalizedDocumentID,
+                    row: rowNumber,
+                    field: "normalized-document-id"
+                )
+            } else {
+                normalizedDocumentID = provenance.normalizedDocumentID
+            }
+            let expectedReferenceDigest = row.reference.map { sha256Hex(Data($0.utf8)) }
+            try requireRow(
+                provenance.structuredReferenceDigest == expectedReferenceDigest,
+                row: rowNumber,
+                field: "reference-digest"
+            )
+            let descriptionReferences = AxisCreditCardPDFNormalizer.sourceReferences(
+                in: transaction.description
+            )
+            try requireRow(
+                descriptionReferences == row.reference.map { [$0] } ?? [],
+                row: rowNumber,
+                field: "narration-reference"
+            )
+        }
     }
 
     private static func assertPhysicalCorpus(_ sources: [PhysicalSource]) throws {
-        let totalIsCorrect = sources.count == 35
-        #expect(totalIsCorrect, "active physical source count is 35")
-        try Self.require(totalIsCorrect, error: .unexpectedCorpusShape)
-
+        try require(sources.count == 32, error: .unexpectedCorpusShape)
+        try require(Set(sources.map(\.rawDigest)).count == 32, error: .unexpectedCorpusShape)
         for format in SourceFormat.allCases {
-            let actual = sources.filter { $0.format == format }.count
-            let expected = expectedPhysicalCounts[format] ?? -1
-            try Self.require(actual == expected, error: .unexpectedCorpusShape)
+            try require(
+                sources.filter { $0.format == format }.count == expectedFormatCounts[format],
+                error: .unexpectedCorpusShape
+            )
         }
-
-        for cycle in Self.expectedCycles {
-            let cycleSources = sources.filter { $0.cycle == cycle }
-            for format in SourceFormat.allCases {
-                let expectedCopies = format == .xlsx ? 1 : 2
-                let count = cycleSources.filter { $0.format == format }.count
-                try Self.require(count == expectedCopies, error: .unexpectedCorpusShape)
-                if format != .xlsx {
-                    let copies = cycleSources.filter { $0.format == format }
-                    try Self.require(
-                        copies.filter(\.isLocked).count == 1 &&
-                            copies.filter { !$0.isLocked }.count == 1,
-                        error: .unexpectedCorpusShape
-                    )
-                }
-            }
-        }
+        try require(
+            sources.filter { $0.format != .xlsx }.allSatisfy(\.isLocked),
+            error: .unexpectedCorpusShape
+        )
+        try require(
+            sources.filter { $0.format == .xlsx }.allSatisfy { !$0.isLocked },
+            error: .unexpectedCorpusShape
+        )
     }
 
-    private static func assertLogicalSourceTruth(_ corpus: LogicalCorpus) throws {
-        for cycle in Self.expectedCycles {
-            guard let logical = corpus.byCycle[cycle],
-                  let app = logical[.appPDF],
-                  let xlsx = logical[.xlsx],
-                  let traditional = logical[.traditionalPDF] else {
+    private static func assertCompleteSourceTruth(_ corpus: LogicalCorpus) throws {
+        try validateOracleContract(corpus.oracle)
+        try assertPhysicalCorpus(corpus.sources)
+        try require(Set(corpus.byCycle.keys) == Set(expectedCycles), error: .unexpectedCorpusShape)
+
+        for cycle in expectedCycles {
+            guard let representations = corpus.byCycle[cycle],
+                  let app = representations[.appPDF],
+                  let expectedCount = expectedMonthlyCounts[cycle] else {
                 throw AuthenticAcceptanceError.unexpectedCorpusShape
             }
+            let expectedFormats: Set<SourceFormat> = cycle.hasPrefix("2025-")
+                ? [.appPDF]
+                : Set(SourceFormat.allCases)
+            try require(Set(representations.keys) == expectedFormats, error: .unexpectedCorpusShape)
+            try require(app.document.transactions.count == expectedCount,
+                        error: .financialOutputMismatch)
+            try require(
+                app.document.cardStatementEvidence?.selectedStatementMonth?.canonical == cycle,
+                error: .financialOutputMismatch
+            )
 
-            let appKeys = try Self.financialKeys(app.document.transactions)
-            let xlsxKeys = try Self.financialKeys(xlsx.document.transactions)
-            let traditionalKeys = try Self.financialKeys(traditional.document.transactions)
-            let expectedCount = Self.expectedMonthlyCounts[cycle] ?? -1
-
-            try Self.require(appKeys.count == expectedCount, error: .financialOutputMismatch)
-            try Self.require(xlsxKeys.count == expectedCount, error: .financialOutputMismatch)
-            try Self.require(traditionalKeys.count == expectedCount, error: .financialOutputMismatch)
-            try Self.require(Self.multiset(appKeys) == Self.multiset(xlsxKeys), error: .financialOutputMismatch)
-            try Self.require(Self.multiset(appKeys) == Self.multiset(traditionalKeys), error: .financialOutputMismatch)
-            try Self.require(Self.multiset(xlsxKeys) == Self.multiset(traditionalKeys), error: .financialOutputMismatch)
-
-            let appXLSXOrderMatches = appKeys == xlsxKeys
-            #expect(appXLSXOrderMatches, "App PDF and XLSX financial source order matches")
-            try Self.require(appXLSXOrderMatches, error: .financialOutputMismatch)
-
-            let narrationMatches = Self.descriptions(app.document.transactions) ==
-                Self.descriptions(xlsx.document.transactions)
-            #expect(narrationMatches, "App PDF and XLSX normalized narration order matches")
-            try Self.require(narrationMatches, error: .financialOutputMismatch)
-
-            try Self.assertDuplicateShape(appKeys, cycle: cycle)
-            try Self.assertDuplicateShape(xlsxKeys, cycle: cycle)
-            try Self.assertDuplicateShape(traditionalKeys, cycle: cycle)
-
-            let appMonthMatches = app.selectedStatementMonth == cycle && app.cycle == cycle
-            let xlsxMonthMatches = xlsx.selectedStatementMonth == cycle && xlsx.cycle == cycle
-            #expect(appMonthMatches, "App PDF cycle comes from selected statement month")
-            #expect(xlsxMonthMatches, "XLSX cycle comes from selected statement month")
-            try Self.require(appMonthMatches, error: .financialOutputMismatch)
-            try Self.require(xlsxMonthMatches, error: .financialOutputMismatch)
-            if let traditionalMonth = traditional.selectedStatementMonth {
-                try Self.require(traditionalMonth == cycle, error: .financialOutputMismatch)
+            guard cycle.hasPrefix("2026-") else { continue }
+            guard let xlsx = representations[.xlsx],
+                  let traditional = representations[.traditionalPDF] else {
+                throw AuthenticAcceptanceError.unexpectedCorpusShape
             }
+            let appKeys = try financialKeys(app.document.transactions)
+            let xlsxKeys = try financialKeys(xlsx.document.transactions)
+            let traditionalKeys = try financialKeys(traditional.document.transactions)
+            try require(appKeys == xlsxKeys, error: .financialOutputMismatch)
+            try require(multiset(appKeys) == multiset(traditionalKeys),
+                        error: .financialOutputMismatch)
+            try require(
+                normalizedDescriptions(app.document.transactions)
+                    == normalizedDescriptions(xlsx.document.transactions),
+                error: .financialOutputMismatch
+            )
+            try require(
+                xlsx.document.cardStatementEvidence?.selectedStatementMonth?.canonical == cycle,
+                error: .financialOutputMismatch
+            )
+            try require(
+                try sourceCycle(traditional.document, format: .traditionalPDF) == cycle,
+                error: .financialOutputMismatch
+            )
         }
 
-        for format in SourceFormat.allCases {
-            let total = Self.expectedCycles.reduce(0) { partial, cycle in
-                partial + (corpus.byCycle[cycle]?[format]?.document.transactions.count ?? 0)
-            }
-            try Self.require(total == 796, error: .financialOutputMismatch)
-        }
-    }
-
-    private static func assertDuplicateShape(
-        _ keys: [FinancialKey],
-        cycle: String
-    ) throws {
-        let counts = Self.multiset(keys)
-        let duplicateMultiplicities = counts.values.filter { $0 > 1 }.sorted()
-        switch cycle {
-        case "2026-03":
-            let shapeMatches = keys.count == 56 && counts.count == 55 &&
-                duplicateMultiplicities == [2] && counts.values.allSatisfy { $0 <= 2 }
-            #expect(shapeMatches, "March has exactly one duplicated neutral key")
-            try Self.require(shapeMatches, error: .financialOutputMismatch)
-        case "2026-06":
-            let shapeMatches = keys.count == 154 && counts.count == 153 &&
-                duplicateMultiplicities == [2] && counts.values.allSatisfy { $0 <= 2 }
-            #expect(shapeMatches, "June has exactly one duplicated neutral key")
-            try Self.require(shapeMatches, error: .financialOutputMismatch)
-        default:
-            let shapeMatches = counts.count == keys.count && duplicateMultiplicities.isEmpty
-            #expect(shapeMatches, "non-duplicate months have unique neutral keys")
-            try Self.require(shapeMatches, error: .financialOutputMismatch)
-        }
-    }
-
-    private static func representativeOrdering(
-        _ lhs: PhysicalSource,
-        _ rhs: PhysicalSource
-    ) -> Bool {
-        if lhs.isLocked != rhs.isLocked {
-            // Logical representations are always sourced from the unlocked
-            // copy; locked counterparts remain physical/equivalence evidence.
-            return !lhs.isLocked
-        }
-        if lhs.rawDigest != rhs.rawDigest {
-            return lhs.rawDigest < rhs.rawDigest
-        }
-        return lhs.inventoryOrdinal < rhs.inventoryOrdinal
-    }
-
-    private static func productionOutputEquivalent(
-        _ lhs: PhysicalSource,
-        _ rhs: PhysicalSource
-    ) throws -> Bool {
-        guard lhs.format == rhs.format,
-              lhs.cycle == rhs.cycle,
-              lhs.selectedStatementMonth == rhs.selectedStatementMonth else {
-            return false
-        }
-        return try Self.financialKeys(lhs.document.transactions) ==
-            Self.financialKeys(rhs.document.transactions) &&
-            Self.descriptions(lhs.document.transactions) == Self.descriptions(rhs.document.transactions)
-    }
-
-    private static func regularFiles(under root: URL) throws -> [URL] {
-        guard let enumerator = FileManager.default.enumerator(
-            at: root,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            throw AuthenticAcceptanceError.sourceDirectoryUnreadable
-        }
-
-        var files: [URL] = []
-        for case let url as URL in enumerator {
-            let values: URLResourceValues
-            do {
-                values = try url.resourceValues(forKeys: [.isRegularFileKey])
-            } catch {
-                throw AuthenticAcceptanceError.sourceDirectoryUnreadable
-            }
-            guard values.isRegularFile == true else { continue }
-            let directoryComponents = url.deletingLastPathComponent().pathComponents
-            guard !directoryComponents.contains(where: Self.isExcludedArchiveComponent) else {
-                continue
-            }
-            files.append(url)
-        }
-        return files.sorted { $0.path < $1.path }
-    }
-
-    private static func isExcludedArchiveComponent(_ component: String) -> Bool {
-        let normalized = component
-            .precomposedStringWithCanonicalMapping
-            .lowercased()
-        let compact = normalized.filter { $0.isLetter || $0.isNumber }
-        return compact.contains("archive") || compact.contains("ignore")
-    }
-
-    private static func requireCanonicalCredentialScopes(
-        _ provider: DefaultPasswordProvider
-    ) async throws {
-        let probeRequest = ImportRequest(
-            fileURL: URL(fileURLWithPath: "/axis-authentic-credential-probe.pdf")
+        try require(
+            corpus.sources.filter { $0.format == .appPDF }
+                .reduce(0) { $0 + $1.document.transactions.count }
+                == expectedCanonicalTransactionCount,
+            error: .financialOutputMismatch
         )
-        // The provider is the only credential boundary used here. Inspect
-        // candidate origins, never candidate values, so no secret can enter
-        // test output or an independent credential path.
-        let candidates = try await provider.rememberedPasswordCandidates(for: probeRequest)
-        func containsCanonicalScope(_ scope: String) -> Bool {
-            candidates.contains { candidate in
-                candidate.origins.contains { origin in
-                    guard case .canonical(let candidateScope) = origin else { return false }
-                    return candidateScope == scope
+        for format in [SourceFormat.xlsx, .traditionalPDF] {
+            try require(
+                corpus.sources.filter { $0.format == format }
+                    .reduce(0) { $0 + $1.document.transactions.count } == 796,
+                error: .financialOutputMismatch
+            )
+        }
+    }
+
+    /// The frozen oracle retains all printed controls. Statement Generation
+    /// Date is source provenance, not a substitute for a financial statement
+    /// day/period in the accepted Axis domain; do not invent that mapping.
+    private static func assertControls(
+        _ actual: [String: String], matches oracle: OracleRecord
+    ) throws {
+        let knownKeys: Set<String> = [
+            "selected_statement_month", "statement_period_start",
+            "statement_period_end", "opening_balance", "total_payment_due",
+            "payment_due_date", "statement_generation_date"
+        ]
+        try require(Set(oracle.controls.keys).isSubset(of: knownKeys), error: .oracleMismatch)
+        let expected = oracle.controls.filter { $0.key != "statement_generation_date" }
+        #expect(actual == expected, "Complete authentic Axis summary-control projection")
+        guard actual == expected else {
+            throw AuthenticAcceptanceError.sourceProjectionMismatch(
+                format: oracle.format.rawValue, cycle: oracle.cycle,
+                row: 0, field: "summary-controls"
+            )
+        }
+    }
+
+    private static func controls(
+        period: DeclaredStatementPeriod?,
+        month: SelectedStatementMonth?,
+        summary: [CardStatementSummaryComponent]
+    ) throws -> [String: String] {
+        var result: [String: String] = [:]
+        result["statement_period_start"] = period?.start.canonical
+        result["statement_period_end"] = period?.end.canonical
+        result["selected_statement_month"] = month?.canonical
+        for (code, key) in [
+            ("previous_balance", "opening_balance"),
+            ("axis_total_payment_due", "total_payment_due")
+        ] {
+            if let money = summary.first(where: { $0.persistenceCode == code })?.money {
+                try require(money.currency.code == "INR", error: .financialOutputMismatch)
+                result[key] = try money.canonicalDecimalString()
+            }
+        }
+        result["payment_due_date"] = summary.first { $0.persistenceCode == "due_date" }?.date?.canonical
+        return result
+    }
+
+    private static func orderedSources(
+        _ corpus: LogicalCorpus,
+        formatPriority: [SourceFormat]
+    ) -> [PhysicalSource] {
+        orderedSources(
+            corpus,
+            cycles: expectedCycles,
+            formatPriority: formatPriority
+        )
+    }
+
+    private static func orderedSources<S: Sequence>(
+        _ corpus: LogicalCorpus,
+        cycles: S,
+        formatPriority: [SourceFormat]
+    ) -> [PhysicalSource] where S.Element == String {
+        cycles.flatMap { cycle in
+            formatPriority.compactMap { corpus.byCycle[cycle]?[$0] }
+        }
+    }
+
+    private static func runAuthenticCampaign(
+        corpus: LogicalCorpus,
+        orderedSources: [PhysicalSource],
+        inMemory: Bool
+    ) async throws {
+        try require(orderedSources.count == 32, error: .campaignInvariant)
+        try require(Set(orderedSources.map(\.rawDigest)).count == 32, error: .campaignInvariant)
+        let workspaceID = "axis-authentic-\(UUID().uuidString)"
+        let runtime = try makeRuntime(workspaceID: workspaceID, inMemory: inMemory)
+        defer { runtime.cleanup() }
+
+        var accountID: String?
+        var seenCycles = Set<String>()
+        var insertedTransactionCount = 0
+        for source in orderedSources {
+            let prepared = try await runtime.engine.prepareImport(from: source.url)
+            try require(prepared.validation.passed, error: .campaignInvariant)
+            try assertProduction(prepared.financialDocument, matches: source.oracle)
+
+            let isSupporting = seenCycles.contains(source.cycle)
+            let choice: ImportAccountChoice = accountID.map {
+                .useExistingAccount(accountId: $0)
+            } ?? .createNewAccount
+            let result = await runtime.engine.commitPreparedImport(
+                prepared,
+                accountChoice: choice
+            )
+            let expectedDelta = isSupporting ? 0 : source.oracle.rowCount
+            try require(result.succeeded, error: .campaignInvariant)
+            try require(result.isEquivalentSupportingSource == isSupporting,
+                        error: .campaignInvariant)
+            try require(result.transactionCount == expectedDelta, error: .campaignInvariant)
+            try require(result.hydrationOutcome == .committedAndHydrated,
+                        error: .campaignInvariant)
+            guard let persistedAccountID = result.accountId else {
+                throw AuthenticAcceptanceError.campaignInvariant
+            }
+            if let accountID {
+                try require(persistedAccountID == accountID, error: .campaignInvariant)
+            } else {
+                accountID = persistedAccountID
+            }
+            if seenCycles.insert(source.cycle).inserted {
+                insertedTransactionCount += source.oracle.rowCount
+            }
+            try require(
+                try runtime.provider.transactionRepo.trustedTransactions(workspaceId: workspaceID).count
+                    == insertedTransactionCount,
+                error: .campaignInvariant
+            )
+        }
+        try require(seenCycles == Set(expectedCycles), error: .campaignInvariant)
+        try require(insertedTransactionCount == expectedCanonicalTransactionCount,
+                    error: .campaignInvariant)
+
+        let canonicalTransactions = try runtime.provider.transactionRepo.trustedTransactions(
+            workspaceId: workspaceID
+        )
+        let canonicalIDs = Set(canonicalTransactions.map(\.id))
+        let finalOwnership = transactionOwnership(canonicalTransactions)
+        try verify(
+            runtime.provider,
+            workspaceID: workspaceID,
+            canonicalIDs: canonicalIDs,
+            expectedOwnership: finalOwnership,
+            corpus: corpus
+        )
+
+        // Every accepted carrier is prepared and confirmed again through the
+        // ordinary engine. Exact-byte replay must reject without accepted
+        // financial residue or identity drift.
+        for source in orderedSources {
+            let replay = try await runtime.engine.prepareImport(from: source.url)
+            try require(replay.advisoryPreviousImport != nil, error: .campaignInvariant)
+            let result = await runtime.engine.commitPreparedImport(replay, accountChoice: nil)
+            try require(!result.persisted, error: .campaignInvariant)
+            try require(result.previousImport != nil, error: .campaignInvariant)
+            try require(
+                result.recoveryRoute == .reviewRequired(.exactStatementDuplicate),
+                error: .campaignInvariant
+            )
+        }
+        try verify(
+            runtime.provider,
+            workspaceID: workspaceID,
+            canonicalIDs: canonicalIDs,
+            expectedOwnership: finalOwnership,
+            corpus: corpus
+        )
+        guard await runtime.challengeProbe.count() == 0 else {
+            throw AuthenticAcceptanceError.unexpectedPasswordChallenge
+        }
+
+        if let sqlite = runtime.sqlite, let databaseURL = runtime.databaseURL {
+            try sqlite.database.checkpointAndClose()
+            let reopened = try SQLiteRepositoryProvider(path: databaseURL.path)
+            let reopenedProvider = DatabaseProvider.verifiedSQLite(reopened, protectsGeneration: false)
+            try verify(
+                reopenedProvider,
+                workspaceID: workspaceID,
+                canonicalIDs: canonicalIDs,
+                expectedOwnership: finalOwnership,
+                corpus: corpus
+            )
+            reopened.database.close()
+        }
+    }
+
+    private static func makeRuntime(
+        workspaceID: String,
+        inMemory: Bool
+    ) throws -> PrivateRuntime {
+        let provider: DatabaseProvider
+        let sqlite: SQLiteRepositoryProvider?
+        let databaseURL: URL?
+        let folder: URL?
+        if inMemory {
+            provider = DatabaseProvider(inMemory: true)
+            sqlite = nil
+            databaseURL = nil
+            folder = nil
+        } else {
+            let createdFolder = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "LedgerForge-AxisAuthentic-\(UUID().uuidString)",
+                isDirectory: true
+            )
+            try FileManager.default.createDirectory(at: createdFolder, withIntermediateDirectories: true)
+            let createdDatabaseURL = createdFolder.appendingPathComponent("authentic.sqlite")
+            let opened = try SQLiteRepositoryProvider(path: createdDatabaseURL.path)
+            provider = DatabaseProvider.verifiedSQLite(opened, protectsGeneration: false)
+            sqlite = opened
+            databaseURL = createdDatabaseURL
+            folder = createdFolder
+        }
+
+        let challengeProbe = ChallengeInvocationProbe()
+        let passwordProvider = try makePasswordProvider(challengeProbe: challengeProbe)
+        let coordinator = DefaultImportPersistenceCoordinator(
+            databaseProvider: provider,
+            mapper: ImportPersistenceMapper(
+                workspaceId: workspaceID,
+                workspaceName: "Axis authentic acceptance"
+            )
+        )
+        let hydrator = RepositoryStoreHydrator(
+            accountRepo: provider.accountRepo,
+            importSessionRepo: provider.importSessionRepo,
+            transactionRepo: provider.transactionRepo,
+            categoryRepo: provider.categoryRepo,
+            cardRepo: provider.cardRepo,
+            salaryRepo: provider.salaryRepo,
+            fundingPlanRepo: provider.fundingPlanRepo,
+            accountStore: AccountStore(),
+            transactionStore: TransactionStore(),
+            categoryStore: CategoryStore(),
+            cardStore: CardStore(),
+            salaryStore: SalaryStore(),
+            fundingPlanStore: FundingPlanStore(),
+            importSessionStore: ImportSessionStore(),
+            importAttemptStore: ImportAttemptStore(),
+            workspaceId: workspaceID,
+            persistenceState: provider.persistenceState,
+            providerGeneration: provider.generationToken,
+            participatesInLifecycleGate: false
+        )
+        let engine = ImportEngine(
+            importCoordinator: DefaultImportCoordinator(
+                readerRegistry: DefaultReaderRegistry(),
+                passwordProvider: passwordProvider
+            ),
+            importPersistenceCoordinator: coordinator,
+            developerConsole: DeveloperConsole(),
+            persistenceStateProvider: { provider.persistenceState },
+            providerGenerationProvider: { provider.generationToken },
+            forcedHydration: { try hydrator.hydrateIfNeeded(forceRefresh: true) },
+            rejectedAttemptHydration: { _ = try hydrator.stageHydration() },
+            developmentProfileAcknowledgementGate: DevelopmentProfileAcknowledgementGate(
+                stateProvider: { nil }
+            )
+        )
+        return PrivateRuntime(
+            provider: provider,
+            engine: engine,
+            challengeProbe: challengeProbe,
+            sqlite: sqlite,
+            databaseURL: databaseURL,
+            cleanup: {
+                sqlite?.database.close()
+                if let folder { try? FileManager.default.removeItem(at: folder) }
+            }
+        )
+    }
+
+    private static func verify(
+        _ provider: DatabaseProvider,
+        workspaceID: String,
+        canonicalIDs: Set<String>,
+        expectedOwnership: [String],
+        corpus: LogicalCorpus
+    ) throws {
+        let transactions = try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID)
+        try require(transactions.count == expectedCanonicalTransactionCount,
+                    error: .campaignInvariant)
+        try require(Set(transactions.map(\.id)) == canonicalIDs, error: .campaignInvariant)
+        try require(transactionOwnership(transactions) == expectedOwnership,
+                    error: .campaignInvariant)
+        try require(transactions.allSatisfy { $0.rawRows.count == 1 }, error: .campaignInvariant)
+        try require(transactions.compactMap(\.reference).count == 66, error: .campaignInvariant)
+        try require(try provider.accountRepo.accounts(workspaceId: workspaceID).count == 1,
+                    error: .campaignInvariant)
+
+        let card = try provider.cardRepo.snapshot(workspaceId: workspaceID)
+        try require(card.instruments.isEmpty, error: .campaignInvariant)
+        try require(card.sections.isEmpty, error: .campaignInvariant)
+        try require(card.sectionObservations.isEmpty, error: .campaignInvariant)
+        try require(card.statements.count == 32, error: .campaignInvariant)
+        try require(card.transactionEvidence.count == expectedCanonicalTransactionCount,
+                    error: .campaignInvariant)
+        try require(Set(card.transactionEvidence.map(\.transactionId)) == canonicalIDs,
+                    error: .campaignInvariant)
+        try require(card.semanticProjections.count == 32, error: .campaignInvariant)
+        try require(card.semanticGroups.count == 18, error: .campaignInvariant)
+        try require(card.semanticMembers.count == 32, error: .campaignInvariant)
+        try require(card.semanticMembers.filter { $0.role == .supporting }.count == 14,
+                    error: .campaignInvariant)
+        try require(card.semanticProjections.reduce(0) { $0 + $1.eventCount } == 2_969,
+                    error: .campaignInvariant)
+        try require(
+            card.semanticProjections.flatMap(\.events).compactMap(\.sourceReference).count == 164,
+            error: .campaignInvariant
+        )
+
+        let transactionsByID = Dictionary(uniqueKeysWithValues: transactions.map { ($0.id, $0) })
+        let projectionsByID = Dictionary(uniqueKeysWithValues: card.semanticProjections.map { ($0.id, $0) })
+        let membersByGroup = Dictionary(grouping: card.semanticMembers, by: \.groupId)
+        var authoritativeCanonicalIDs = Set<String>()
+        var authoritativeReferenceCount = 0
+        for group in card.semanticGroups {
+            guard let members = membersByGroup[group.id],
+                  let authoritativeMember = members.only(where: { $0.role == .authoritative }),
+                  authoritativeMember.projectionId == group.authoritativeProjectionId,
+                  let projection = projectionsByID[authoritativeMember.projectionId] else {
+                throw AuthenticAcceptanceError.campaignInvariant
+            }
+            try require(projection.parserProfileVersion == "1", error: .campaignInvariant)
+            try require(
+                [AxisCreditCardPDFParser.profileID, AxisCreditCardXLSXParser.profileID]
+                    .contains(projection.parserProfileId),
+                error: .campaignInvariant
+            )
+            try require(projection.events.count == projection.eventCount,
+                        error: .campaignInvariant)
+            for event in projection.events {
+                guard let canonicalID = event.canonicalTransactionId,
+                      let transaction = transactionsByID[canonicalID],
+                      let raw = transaction.rawRows.only else {
+                    throw AuthenticAcceptanceError.campaignInvariant
+                }
+                try require(authoritativeCanonicalIDs.insert(canonicalID).inserted,
+                            error: .campaignInvariant)
+                try require(transaction.reference == event.sourceReference,
+                            error: .campaignInvariant)
+                try require(raw.normalizedRowId == event.normalizedRowId,
+                            error: .campaignInvariant)
+                try require(raw.sourceOrdinal == event.sourceOrdinal, error: .campaignInvariant)
+                try require(raw.parserProfileId == projection.parserProfileId,
+                            error: .campaignInvariant)
+                try require(raw.parserProfileVersion == projection.parserProfileVersion,
+                            error: .campaignInvariant)
+                if event.sourceReference != nil { authoritativeReferenceCount += 1 }
+            }
+        }
+        try require(authoritativeCanonicalIDs == canonicalIDs, error: .campaignInvariant)
+        try require(authoritativeReferenceCount == 66, error: .campaignInvariant)
+
+        let hydrated = try RepositoryStoreHydrator(
+            accountRepo: provider.accountRepo,
+            importSessionRepo: provider.importSessionRepo,
+            transactionRepo: provider.transactionRepo,
+            categoryRepo: provider.categoryRepo,
+            cardRepo: provider.cardRepo,
+            salaryRepo: provider.salaryRepo,
+            fundingPlanRepo: provider.fundingPlanRepo,
+            accountStore: AccountStore(),
+            transactionStore: TransactionStore(),
+            categoryStore: CategoryStore(),
+            cardStore: CardStore(),
+            salaryStore: SalaryStore(),
+            fundingPlanStore: FundingPlanStore(),
+            importSessionStore: ImportSessionStore(),
+            importAttemptStore: ImportAttemptStore(),
+            workspaceId: workspaceID,
+            persistenceState: provider.persistenceState,
+            providerGeneration: provider.generationToken,
+            participatesInLifecycleGate: false
+        ).stageHydration()
+        try require(hydrated.transactions.count == expectedCanonicalTransactionCount,
+                    error: .campaignInvariant)
+        try require(hydrated.cardSnapshot.statements.count == 32, error: .campaignInvariant)
+        try require(hydrated.cardSnapshot.transactionEvidence.count == expectedCanonicalTransactionCount,
+                    error: .campaignInvariant)
+        let hydratedByID = Dictionary(uniqueKeysWithValues: hydrated.transactions.compactMap { transaction in
+            transaction.repositoryTransactionId.map { ($0, transaction) }
+        })
+        for source in corpus.sources {
+            let priorResult = try provider.importSessionRepo.priorImportedStatement(
+                algorithm: DocumentFingerprintDTO.sourceBytesSHA256Algorithm,
+                fingerprint: source.oracle.sourceSHA256
+            )
+            let prior = try #require(priorResult)
+            let persisted = try #require(card.statements.only {
+                $0.importSessionId == prior.importSessionId
+            })
+            let projection = try #require(card.semanticProjections.only {
+                $0.cardStatementId == persisted.id
+            })
+            let sourceMember = try #require(card.semanticMembers.only {
+                $0.projectionId == projection.id
+            })
+            let events = projection.events.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
+            try require(events.count == source.oracle.rows.count, error: .campaignInvariant)
+            for (event, row) in zip(events, source.oracle.rows) {
+                let expectedOriginal = row.originalMerchantMoney.map {
+                    row.effect == CardLiabilityEffect.decreasesAmountOwed.rawValue
+                        ? "-" + $0.amount : $0.amount
+                }
+                try require(event.originalCurrency == row.originalMerchantMoney?.currency,
+                            error: .campaignInvariant)
+                try require(event.originalAmountDecimal == expectedOriginal,
+                            error: .campaignInvariant)
+                try require(event.financialDateISO == row.date && event.sourceReference == row.reference,
+                            error: .campaignInvariant)
+                let signedPosted = row.effect == CardLiabilityEffect.decreasesAmountOwed.rawValue
+                    ? "-" + row.amount : row.amount
+                try require(event.postedCurrency == "INR" && event.postedAmountDecimal == signedPosted
+                            && event.liabilityEffectCode == row.effect, error: .campaignInvariant)
+                // Supporting carriers retain their own source projection, but
+                // do not replace the authoritative carrier's narration or FX.
+                if sourceMember.role == .authoritative,
+                   let canonicalID = event.canonicalTransactionId {
+                    let transaction = try #require(transactionsByID[canonicalID])
+                    let visibleTransaction = try #require(hydratedByID[canonicalID])
+                    try require(sourceNarrationGlyphs(transaction.description ?? "") == sourceNarrationGlyphs(row.narration),
+                                error: .campaignInvariant)
+                    try require(sourceNarrationGlyphs(visibleTransaction.description) == sourceNarrationGlyphs(row.narration),
+                                error: .campaignInvariant)
+                    let durableEvidence = try #require(card.transactionEvidence.only {
+                        $0.transactionId == canonicalID
+                    })
+                    let visibleEvidence = try #require(hydrated.cardSnapshot.transactionEvidence.only {
+                        $0.transactionID == canonicalID
+                    })
+                    try require(durableEvidence.originalCurrency == row.originalMerchantMoney?.currency
+                                && durableEvidence.originalAmountDecimal == expectedOriginal,
+                                error: .campaignInvariant)
+                    let visibleOriginal = try visibleEvidence.originalMerchantMoney?.canonicalDecimalString()
+                    try require(visibleEvidence.originalMerchantMoney?.currency.code == row.originalMerchantMoney?.currency
+                                && visibleOriginal == expectedOriginal, error: .campaignInvariant)
                 }
             }
+            let summary = card.summaryComponents.filter { $0.cardStatementId == persisted.id }
+            var persistedControls: [String: String] = [:]
+            persistedControls["statement_period_start"] = persisted.statementStartDateISO
+            persistedControls["statement_period_end"] = persisted.statementEndDateISO
+            persistedControls["selected_statement_month"] = persisted.selectedStatementMonthISO
+            for (code, key) in [
+                ("previous_balance", "opening_balance"),
+                ("axis_total_payment_due", "total_payment_due")
+            ] {
+                if let component = summary.first(where: { $0.componentCode == code }) {
+                    try require(component.moneyCurrency == "INR", error: .campaignInvariant)
+                    persistedControls[key] = component.moneyDecimal
+                }
+            }
+            persistedControls["payment_due_date"] = summary.first { $0.componentCode == "due_date" }?.dateISO
+            try assertControls(persistedControls, matches: source.oracle)
+            let visible = try #require(hydrated.cardSnapshot.statements.only {
+                $0.importSessionID == prior.importSessionId
+            })
+            try assertControls(
+                controls(period: visible.period, month: visible.selectedStatementMonth,
+                         summary: visible.summaryComponents),
+                matches: source.oracle
+            )
+        }
+        for transaction in hydrated.transactions {
+            guard let repositoryID = transaction.repositoryTransactionId,
+                  let persisted = transactionsByID[repositoryID],
+                  let persistedRaw = persisted.rawRows.only,
+                  let provenance = transaction.sourceProvenance.only else {
+                throw AuthenticAcceptanceError.campaignInvariant
+            }
+            try require(transaction.reference == persisted.reference, error: .campaignInvariant)
+            try require(transaction.repositoryPreferredStructuredReferenceDigest == nil,
+                        error: .campaignInvariant)
+            try require(provenance.normalizedRowID == persistedRaw.normalizedRowId,
+                        error: .campaignInvariant)
+            try require(provenance.sourceOrdinal == persistedRaw.sourceOrdinal,
+                        error: .campaignInvariant)
+            try require(provenance.parserProfileID == persistedRaw.parserProfileId,
+                        error: .campaignInvariant)
+            try require(provenance.parserProfileVersion == persistedRaw.parserProfileVersion,
+                        error: .campaignInvariant)
         }
 
-        guard containsCanonicalScope(KeychainStatementPasswordCredentialStore.axisAppPDFScope) else {
+        // Bind the durable aggregate counts back to the independent corpus
+        // authority without treating repository output as its own oracle.
+        try require(
+            corpus.oracle.records.reduce(0) { $0 + $1.rowCount } == 2_969,
+            error: .campaignInvariant
+        )
+    }
+
+    private static func makePasswordProvider(
+        challengeProbe: ChallengeInvocationProbe
+    ) throws -> DefaultPasswordProvider {
+        guard let appPassword = ProcessInfo.processInfo.environment[appPasswordKey],
+              !appPassword.isEmpty else {
             throw AuthenticAcceptanceError.appCredentialUnavailable
         }
-        guard containsCanonicalScope(KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope) else {
+        guard let traditionalPassword = ProcessInfo.processInfo.environment[traditionalPasswordKey],
+              !traditionalPassword.isEmpty else {
             throw AuthenticAcceptanceError.traditionalCredentialUnavailable
         }
+        let store = InMemoryStatementPasswordCredentialStore(passwords: [
+            KeychainStatementPasswordCredentialStore.axisAppPDFScope: appPassword,
+            KeychainStatementPasswordCredentialStore.axisTraditionalPDFScope: traditionalPassword
+        ])
+        return DefaultPasswordProvider(
+            credentialStore: store,
+            supportedInstitutionCodes: [Institution.axis.statementPasswordCredentialScope],
+            challenge: { _ in
+                await challengeProbe.recordInvocation()
+                throw AuthenticAcceptanceError.unexpectedPasswordChallenge
+            }
+        )
     }
 
-    private static func cycle(
+    private static func sourceCycle(
         _ document: FinancialDocument,
-        format: SourceFormat
+        format: SourceFormat,
+        oracleCycleForDiagnostics: String = "unavailable"
     ) throws -> String {
-        switch format {
-        case .appPDF:
-            guard let month = document.cardStatementEvidence?.selectedStatementMonth else {
-                throw AuthenticAcceptanceError.missingAppChronology
-            }
+        if let month = document.cardStatementEvidence?.selectedStatementMonth {
             return month.canonical
-        case .xlsx:
-            guard let month = document.cardStatementEvidence?.selectedStatementMonth else {
-                throw AuthenticAcceptanceError.missingXLSXChronology
-            }
-            return month.canonical
-        case .traditionalPDF:
-            if let month = document.cardStatementEvidence?.selectedStatementMonth {
-                return month.canonical
-            }
-            if let end = document.cardStatementEvidence?.declaredStatementPeriod?.end {
-                return String(format: "%04d-%02d", end.year, end.month)
-            }
-            if let date = document.cardStatementEvidence?.statementDate {
-                return String(format: "%04d-%02d", date.year, date.month)
-            }
-            throw AuthenticAcceptanceError.missingTraditionalChronology
         }
+        if format == .traditionalPDF,
+           let end = document.cardStatementEvidence?.declaredStatementPeriod?.end
+            ?? document.declaredStatementPeriod?.end {
+            return String(format: "%04d-%02d", end.year, end.month)
+        }
+        throw AuthenticAcceptanceError.missingProductionCycle(
+            format: format.rawValue,
+            oracleCycle: oracleCycleForDiagnostics
+        )
     }
 
-    private static func isActiveCycle(_ cycle: String) -> Bool {
-        expectedMonthlyCounts[cycle] != nil
-    }
-
-    private static func financialKeys(
-        _ transactions: [Transaction]
-    ) throws -> [FinancialKey] {
-        var keys: [FinancialKey] = []
-        keys.reserveCapacity(transactions.count)
-        for transaction in transactions {
-            guard let effect = transaction.cardLiabilityEffect,
-                  let date = transaction.statementDate,
-                  let minor = try? transaction.money.minorUnits() else {
+    private static func financialKeys(_ transactions: [Transaction]) throws -> [FinancialKey] {
+        try transactions.map { transaction in
+            guard let date = transaction.statementDate,
+                  let effect = transaction.cardLiabilityEffect else {
                 throw AuthenticAcceptanceError.financialOutputMismatch
             }
-            keys.append(FinancialKey(
+            let money = try transaction.money.canonicalDecimalString()
+            return FinancialKey(
                 date: date.canonical,
                 effect: effect.rawValue,
                 currency: transaction.money.currency.code,
-                minor: minor
-            ))
-        }
-        guard keys.count == transactions.count else {
-            throw AuthenticAcceptanceError.financialOutputMismatch
-        }
-        return keys
-    }
-
-    private static func multiset(_ keys: [FinancialKey]) -> FinancialMultiset {
-        keys.reduce(into: FinancialMultiset()) { counts, key in
-            counts[key, default: 0] += 1
+                amountMagnitude: money.hasPrefix("-") ? String(money.dropFirst()) : money
+            )
         }
     }
 
-    private static func descriptions(_ transactions: [Transaction]) -> [String] {
-        transactions.map { transaction in
-            transaction.description
-                .precomposedStringWithCanonicalMapping
+    private static func multiset(_ keys: [FinancialKey]) -> [FinancialKey: Int] {
+        keys.reduce(into: [:]) { $0[$1, default: 0] += 1 }
+    }
+
+    private static func normalizedDescriptions(_ transactions: [Transaction]) -> [String] {
+        transactions.map {
+            $0.description.precomposedStringWithCanonicalMapping
                 .replacingOccurrences(of: "\u{00A0}", with: " ")
                 .replacingOccurrences(of: "\u{2018}", with: "'")
                 .replacingOccurrences(of: "\u{2019}", with: "'")
@@ -870,228 +1145,41 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         }
     }
 
-    private static func activeRepresentations(
-        root: URL,
-        cycle wantedCycle: String
-    ) async throws -> [AuthenticRepresentation] {
-        let corpus = try await Self.authenticCorpus(root: root)
-        guard let logical = corpus.byCycle[wantedCycle] else {
-            throw AuthenticAcceptanceError.unexpectedCorpusShape
-        }
-        return try SourceFormat.allCases.map { format in
-            guard let source = logical[format] else {
-                throw AuthenticAcceptanceError.unexpectedCorpusShape
-            }
-            return AuthenticRepresentation(
-                document: source.document,
-                bytes: source.bytes,
-                format: source.format,
-                cycle: source.cycle
-            )
-        }
+    /// PDF extractors introduce spaces within words and around punctuation.
+    /// Compare every visible narration glyph, in order; never accept a prefix
+    /// or a narration derived from the production parser as its own oracle.
+    private static func sourceNarrationGlyphs(_ text: String) -> String {
+        text.precomposedStringWithCanonicalMapping
+            .replacingOccurrences(of: "\u{2018}", with: "'")
+            .replacingOccurrences(of: "\u{2019}", with: "'")
+            .filter { !$0.isWhitespace }
     }
 
-    private static func runAuthenticCampaign(
-        representations: [AuthenticRepresentation],
-        order: [Int],
-        inMemory: Bool
-    ) async throws {
-        let workspaceID = "axis-authentic-\(UUID().uuidString)"
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "LedgerForge-AxisAuthentic-\(UUID().uuidString)",
-            isDirectory: true
-        )
-        let databaseURL = folder.appendingPathComponent("authentic.sqlite")
-        let sqlite: SQLiteRepositoryProvider?
-        let provider: DatabaseProvider
-        if inMemory {
-            sqlite = nil
-            provider = DatabaseProvider(inMemory: true)
-        } else {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            let opened = try SQLiteRepositoryProvider(path: databaseURL.path)
-            sqlite = opened
-            provider = DatabaseProvider.verifiedSQLite(opened, protectsGeneration: false)
+    private static func regularFinancialFiles(under root: URL) throws -> [URL] {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { throw AuthenticAcceptanceError.sourceDirectoryUnreadable }
+        var files = [URL]()
+        for case let url as URL in enumerator {
+            let values: URLResourceValues
+            do { values = try url.resourceValues(forKeys: [.isRegularFileKey]) }
+            catch { throw AuthenticAcceptanceError.sourceDirectoryUnreadable }
+            guard values.isRegularFile == true else { continue }
+            let ext = url.pathExtension.lowercased()
+            guard ext == "pdf" || ext == "xlsx" else { continue }
+            let directories = url.deletingLastPathComponent().pathComponents
+            guard !directories.contains(where: isExcludedArchiveComponent) else { continue }
+            files.append(url)
         }
-        defer {
-            sqlite?.database.close()
-            if inMemory { try? FileManager.default.removeItem(at: folder) }
-        }
-
-        let coordinator = DefaultImportPersistenceCoordinator(
-            databaseProvider: provider,
-            mapper: ImportPersistenceMapper(workspaceId: workspaceID)
-        )
-        var accountID: String?
-        var canonicalIDs: Set<String>?
-        var firstOwnership: [String]?
-        for index in order {
-            guard representations.indices.contains(index) else {
-                throw AuthenticAcceptanceError.campaignInvariant
-            }
-            let representation = representations[index]
-            let validation = ImportValidator.validate(financialDocument: representation.document)
-            #expect(validation.passed, "authentic representation passes import validation")
-            guard validation.passed else { throw AuthenticAcceptanceError.campaignInvariant }
-
-            let session = ImportSession(
-                fileName: representation.document.sourceDocument.filename,
-                institution: .axis,
-                documentType: .creditCard,
-                parserName: representation.document.parserName,
-                transactionCount: representation.document.transactions.count,
-                validation: validation
-            )
-            let choice: ImportAccountChoice = accountID == nil
-                ? .createNewAccount
-                : .useExistingAccount(accountId: accountID!)
-            let result = try coordinator.persistValidatedImport(
-                financialDocument: representation.document,
-                importSession: session,
-                validation: validation,
-                fingerprintSet: fingerprintSet(representation),
-                accountChoice: choice,
-                providerGeneration: provider.generationToken
-            )
-
-            let isSupporting = canonicalIDs != nil
-            #expect(result.persisted, "authentic campaign persistence committed")
-            #expect(result.isEquivalentSupportingSource == isSupporting, "supporting-source classification is exact")
-            #expect(result.transactionCount == (isSupporting ? 0 : 143), "authentic campaign transaction delta is exact")
-            guard result.persisted,
-                  result.accountId != nil,
-                  result.isEquivalentSupportingSource == isSupporting,
-                  result.transactionCount == (isSupporting ? 0 : 143) else {
-                throw AuthenticAcceptanceError.campaignInvariant
-            }
-            accountID = accountID ?? result.accountId
-
-            let transactions = try provider.transactionRepo.trustedTransactions(workspaceId: workspaceID)
-            let ids = Set(transactions.map(\.id))
-            if let canonicalIDs {
-                try Self.require(ids == canonicalIDs, error: .campaignInvariant)
-            } else {
-                try Self.require(transactions.count == 143, error: .campaignInvariant)
-                canonicalIDs = ids
-                firstOwnership = Self.transactionOwnership(transactions)
-            }
-        }
-
-        guard let canonicalIDs, let firstOwnership else {
-            throw AuthenticAcceptanceError.campaignInvariant
-        }
-        try Self.verify(
-            provider,
-            workspaceID: workspaceID,
-            canonicalIDs: canonicalIDs,
-            firstOwnership: firstOwnership
-        )
-
-        if let sqlite {
-            try sqlite.database.checkpointAndClose()
-            let reopened = try SQLiteRepositoryProvider(path: databaseURL.path)
-            let reopenedProvider = DatabaseProvider.verifiedSQLite(reopened, protectsGeneration: false)
-            try Self.verify(
-                reopenedProvider,
-                workspaceID: workspaceID,
-                canonicalIDs: canonicalIDs,
-                firstOwnership: firstOwnership
-            )
-            reopened.database.close()
-            try? FileManager.default.removeItem(at: folder)
-        }
+        return files.sorted { $0.path < $1.path }
     }
 
-    private static func verify(
-        _ target: DatabaseProvider,
-        workspaceID: String,
-        canonicalIDs: Set<String>,
-        firstOwnership: [String]
-    ) throws {
-        let transactions = try target.transactionRepo.trustedTransactions(workspaceId: workspaceID)
-        try Self.require(transactions.count == 143, error: .campaignInvariant)
-        try Self.require(Set(transactions.map(\.id)) == canonicalIDs, error: .campaignInvariant)
-        try Self.require(Self.transactionOwnership(transactions) == firstOwnership, error: .campaignInvariant)
-
-        let card = try target.cardRepo.snapshot(workspaceId: workspaceID)
-        try Self.require(try target.accountRepo.accounts(workspaceId: workspaceID).count == 1, error: .campaignInvariant)
-        try Self.require(card.instruments.isEmpty, error: .campaignInvariant)
-        try Self.require(card.sections.isEmpty, error: .campaignInvariant)
-        try Self.require(card.sectionObservations.isEmpty, error: .campaignInvariant)
-        try Self.require(card.statements.count == 3, error: .campaignInvariant)
-        try Self.require(card.transactionEvidence.count == 143, error: .campaignInvariant)
-        try Self.require(Set(card.transactionEvidence.map(\.transactionId)) == canonicalIDs, error: .campaignInvariant)
-        try Self.require(card.semanticProjections.count == 3, error: .campaignInvariant)
-        try Self.require(card.semanticGroups.count == 1, error: .campaignInvariant)
-        try Self.require(card.semanticMembers.count == 3, error: .campaignInvariant)
-        try Self.require(card.semanticMembers.filter { $0.role == .supporting }.count == 2, error: .campaignInvariant)
-
-        let authoritativeMember = card.semanticMembers.first { $0.role == .authoritative }
-        let supportingMembers = card.semanticMembers.filter { $0.role == .supporting }
-        guard let authoritativeMember,
-              let authoritativeProjection = card.semanticProjections.first(where: {
-                  $0.id == authoritativeMember.projectionId
-              }) else {
-            throw AuthenticAcceptanceError.campaignInvariant
-        }
-        try Self.require(
-            card.semanticGroups.first?.authoritativeProjectionId == authoritativeProjection.id,
-            error: .campaignInvariant
-        )
-        try Self.require(
-            authoritativeProjection.events.allSatisfy { $0.canonicalTransactionId != nil },
-            error: .campaignInvariant
-        )
-        try Self.require(
-            Set(authoritativeProjection.events.compactMap(\.canonicalTransactionId)) == canonicalIDs,
-            error: .campaignInvariant
-        )
-
-        for member in supportingMembers {
-            guard let projection = card.semanticProjections.first(where: { $0.id == member.projectionId }) else {
-                throw AuthenticAcceptanceError.campaignInvariant
-            }
-            let buckets = Dictionary(grouping: projection.events, by: Self.axisProjectionKey)
-            for bucket in buckets.values {
-                if bucket.count > 1 {
-                    try Self.require(
-                        bucket.allSatisfy { $0.canonicalTransactionId == nil },
-                        error: .campaignInvariant
-                    )
-                } else if let event = bucket.first {
-                    try Self.require(
-                        event.canonicalTransactionId.map(canonicalIDs.contains) == true,
-                        error: .campaignInvariant
-                    )
-                }
-            }
-        }
-
-        let hydrated = try RepositoryStoreHydrator(
-            accountRepo: target.accountRepo,
-            importSessionRepo: target.importSessionRepo,
-            transactionRepo: target.transactionRepo,
-            categoryRepo: target.categoryRepo,
-            cardRepo: target.cardRepo,
-            workspaceId: workspaceID,
-            persistenceState: target.persistenceState,
-            providerGeneration: target.generationToken,
-            participatesInLifecycleGate: false
-        ).stageHydration()
-        try Self.require(hydrated.transactions.count == 143, error: .campaignInvariant)
-        try Self.require(hydrated.cardSnapshot.statements.count == 3, error: .campaignInvariant)
-        try Self.require(hydrated.cardSnapshot.transactionEvidence.count == 143, error: .campaignInvariant)
-    }
-
-    private static func axisProjectionKey(
-        _ event: CardStatementSemanticProjectionEventDTO
-    ) -> FinancialKey {
-        FinancialKey(
-            date: event.financialDateISO,
-            effect: event.liabilityEffectCode,
-            currency: event.postedCurrency,
-            minor: event.postedAmountMinor
-        )
+    private static func isExcludedArchiveComponent(_ component: String) -> Bool {
+        let compact = component.precomposedStringWithCanonicalMapping.lowercased()
+            .filter { $0.isLetter || $0.isNumber }
+        return compact.contains("archive") || compact.contains("ignore")
     }
 
     private static func transactionOwnership(_ transactions: [TransactionDTO]) -> [String] {
@@ -1100,31 +1188,93 @@ struct AxisCreditCardAuthenticAcceptanceTests {
         }.sorted()
     }
 
-    private static func require(
-        _ condition: Bool,
-        error: AuthenticAcceptanceError
+    @MainActor
+    private static func recordCompletedPhase(
+        _ phase: String,
+        corpus: LogicalCorpus
     ) throws {
-        #expect(condition, "authentic acceptance invariant")
-        guard condition else { throw error }
+        completedCorpus = corpus
+        completedPhases.insert(phase)
+        guard completedPhases == Set(["corpus", "persistence"]),
+              let resultPath = ProcessInfo.processInfo.environment[privateResultFileKey],
+              !resultPath.isEmpty else { return }
+
+        let physicalRows = corpus.oracle.records.reduce(0) { $0 + $1.rowCount }
+        let payload: [String: Any] = [
+            "contract": "ledgerforge-axis-credit-card-authentic-acceptance-v4",
+            "tests": ["corpus": true, "persistence": true],
+            "non_vacuity": [
+                "selected_physical_source_count": corpus.sources.count,
+                "logical_statement_count": expectedCycles.count,
+                "cycles_exercised": expectedCycles,
+                "production_tests_executed": 2,
+                "selected_private_tests_skipped": 0,
+                "rows_processed": physicalRows,
+                "ordinary_prepare_validate_confirm": true,
+                "exact_byte_replay_all_sources": true,
+                "sqlite_campaign_execution": true,
+                "in_memory_campaign_execution": true,
+                "checkpoint_close_reopen_execution": true,
+                "hydration_execution": true
+            ],
+            "source_oracle": [
+                "schema": corpus.oracle.schema,
+                "authority": corpus.oracle.authority,
+                "oracle_file_sha256": corpus.oracleFileDigest,
+                "source_inventory_sha256": corpus.oracle.sourceInventorySHA256,
+                "carrier_count": 32,
+                "format_counts": ["app_pdf": 18, "xlsx": 7, "traditional_pdf": 7],
+                "canonical_transaction_rows": expectedCanonicalTransactionCount,
+                "physical_financial_rows": physicalRows,
+                "physical_structured_references": 164,
+                "canonical_structured_references": 66
+            ],
+            "persistence": [
+                "campaigns": 6,
+                "in_memory_campaigns": 3,
+                "sqlite_campaigns": 3,
+                "canonical_transactions": expectedCanonicalTransactionCount,
+                "liability_accounts": 1,
+                "accepted_statements": 32,
+                "transaction_evidence": expectedCanonicalTransactionCount,
+                "semantic_projections": 32,
+                "semantic_groups": 18,
+                "semantic_members": 32,
+                "supporting_members": 14,
+                "hydrated_reference_and_parser_provenance_verified": true,
+                "axis_repository_preferred_cbq_digest_is_nil": true,
+                "sqlite_inmemory_parity_verified": true,
+                "sqlite_checkpoint_reopen_verified": true
+            ]
+        ]
+        let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+        try data.write(to: URL(fileURLWithPath: resultPath), options: [.atomic])
     }
 
-    private static func fingerprintSet(
-        _ representation: AuthenticRepresentation
-    ) -> PreparedDocumentFingerprintSet {
-        let digest = SHA256.hash(data: representation.bytes).map { String(format: "%02x", $0) }.joined()
-        return PreparedDocumentFingerprintSet(fingerprints: [
-            VersionedDocumentFingerprint(
-                algorithm: DocumentFingerprintDTO.rawTextSHA256Algorithm,
-                digest: digest,
-                byteCount: Int64(representation.bytes.count),
-                isDuplicateAuthority: false
-            ),
-            VersionedDocumentFingerprint(
-                algorithm: DocumentFingerprintDTO.sourceBytesSHA256Algorithm,
-                digest: digest,
-                byteCount: Int64(representation.bytes.count),
-                isDuplicateAuthority: true
-            )
-        ])
+    private static func sha256Hex(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func require(
+        _ condition: Bool,
+        error: AuthenticAcceptanceError,
+        function: String = #function,
+        line: Int = #line
+    ) throws {
+        #expect(condition, "authentic acceptance invariant at \(function):\(line)")
+        guard condition else { throw error }
+    }
+}
+
+private extension Collection {
+    var only: Element? { count == 1 ? first : nil }
+
+    func only(where predicate: (Element) throws -> Bool) rethrows -> Element? {
+        var match: Element?
+        for element in self where try predicate(element) {
+            guard match == nil else { return nil }
+            match = element
+        }
+        return match
     }
 }

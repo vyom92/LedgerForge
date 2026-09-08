@@ -1,5 +1,4 @@
 import Foundation
-import PDFKit
 
 enum AxisCreditCardPDFNormalizationError: Error, Equatable, LocalizedError {
     case unsupportedNativeText
@@ -58,20 +57,6 @@ final class AxisCreditCardPDFNormalizer {
 
     init(now: @escaping () -> Date = Date.init) { self.now = now }
 
-    func normalize(text: String, sourceBytes: Data, fileURL: URL) throws -> AxisCreditCardPDFNormalizationResult {
-        guard let pdf = PDFDocument(data: sourceBytes), pdf.pageCount > 0 else {
-            throw AxisCreditCardPDFNormalizationError.unsupportedNativeText
-        }
-        let pages = try (0..<pdf.pageCount).map { index -> String in
-            guard let value = pdf.page(at: index)?.string,
-                  !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                throw AxisCreditCardPDFNormalizationError.unsupportedNativeText
-            }
-            return value
-        }
-        return try normalize(text: text, pageTexts: pages, fileURL: fileURL)
-    }
-
     func normalize(
         text: String,
         pageTexts: [String],
@@ -80,7 +65,7 @@ final class AxisCreditCardPDFNormalizer {
         fileURL: URL
     ) throws -> AxisCreditCardPDFNormalizationResult {
         guard !pageTexts.isEmpty,
-              pageTexts.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+              pageTexts.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
             throw AxisCreditCardPDFNormalizationError.unsupportedNativeText
         }
         let joined = pageTexts.joined(separator: "\n")
@@ -117,12 +102,15 @@ final class AxisCreditCardPDFNormalizer {
         }
 
         let rows: [NormalizedRow]
+        let financialRegion: NormalizedDocument.ExhaustedFinancialRegionEvidence
         if isAppLayout {
-            rows = try Self.appTaggedRows(from: taggedTables)
+            let tagged = try Self.appTaggedRows(from: taggedTables)
+            rows = tagged.rows
+            financialRegion = tagged.financialRegion
         } else {
             let transactionPages = positionedPages ?? pageTexts
             var traditionalRows: [NormalizedRow] = []
-            var sawFinancialCandidate = false
+            var unresolvedFinancialCandidateCount = 0
             for page in transactionPages {
                 let lines: [String]
                 if positionedPages != nil {
@@ -134,7 +122,6 @@ final class AxisCreditCardPDFNormalizer {
                 while index < lines.count {
                     let line = lines[index]
                     guard !line.isEmpty else { index += 1; continue }
-                    if Self.looksLikeFinancialLine(line) { sawFinancialCandidate = true }
                     var candidate = line
                     var fields = Self.rowFields(candidate)
                     if fields == nil && Self.looksLikeFinancialLine(line) {
@@ -151,9 +138,16 @@ final class AxisCreditCardPDFNormalizer {
                         }
                     }
                     guard let fields else {
-                        if Self.looksLikeFinancialLine(line),
-                           line.range(of: #"(?:INR|₹|Debit|Credit|\bDr\b|\bCr\b)"#, options: [.regularExpression, .caseInsensitive]) != nil {
-                            throw AxisCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: traditionalRows.count + 1)
+                        if Self.looksLikeFinancialLine(line) {
+                            unresolvedFinancialCandidateCount += 1
+                            if line.range(
+                                of: #"(?:INR|₹|Debit|Credit|\bDr\b|\bCr\b)"#,
+                                options: [.regularExpression, .caseInsensitive]
+                            ) != nil {
+                                throw AxisCreditCardPDFNormalizationError.malformedTransaction(
+                                    sourceOrdinal: traditionalRows.count + 1
+                                )
+                            }
                         }
                         index += 1
                         continue
@@ -172,9 +166,22 @@ final class AxisCreditCardPDFNormalizer {
                     index += 1
                 }
             }
-            guard !traditionalRows.isEmpty else { throw AxisCreditCardPDFNormalizationError.noTransactions }
-            guard sawFinancialCandidate else { throw AxisCreditCardPDFNormalizationError.unconsumedFinancialEvidence }
+            // A zero-row statement is admissible only when the complete
+            // source region contains no unresolved date-leading financial
+            // candidate. Absence of a currency/direction token is not proof
+            // that such a candidate is nonfinancial.
+            guard !traditionalRows.isEmpty || unresolvedFinancialCandidateCount == 0 else {
+                throw AxisCreditCardPDFNormalizationError.unconsumedFinancialEvidence
+            }
             rows = traditionalRows
+            financialRegion = try .init(
+                descriptor: "Axis traditional PDF transaction pages after exact header recognition",
+                sourceUnit: .page,
+                startOrdinal: 1,
+                endOrdinal: pageTexts.count,
+                recognizedFinancialRowCount: traditionalRows.count,
+                sourceRecords: pageTexts
+            )
         }
 
         var document = Document(filename: fileURL.lastPathComponent, url: fileURL,
@@ -190,6 +197,20 @@ final class AxisCreditCardPDFNormalizer {
             sourceEvidenceText += "\n" + positionedPages.joined(separator: "\n")
         }
         var fragments = Self.sourceFragments(from: sourceEvidenceText)
+        if isAppLayout {
+            guard let pageEvidence, pageEvidence.count == pageTexts.count else {
+                throw AxisCreditCardPDFNormalizationError.malformedSummary
+            }
+            let geometryOwnedKeys: Set<String> = [
+                "SELECTED_STATEMENT_MONTH", "OPENING_BALANCE",
+                "TOTAL_PAYMENT_DUE", "PAYMENT_DUE_DATE"
+            ]
+            fragments.removeAll { fragment in
+                guard let key = fragment.text.split(separator: "\t", maxSplits: 1).first else { return false }
+                return geometryOwnedKeys.contains(String(key))
+            }
+            fragments.append(contentsOf: try Self.appSummaryFragments(from: pageEvidence))
+        }
         if !isAppLayout, let pageEvidence, pageEvidence.count == pageTexts.count {
             let geometryOwnedKeys: Set<String> = [
                 "OPENING_BALANCE", "TOTAL_PAYMENT_DUE", "PERIOD",
@@ -199,7 +220,7 @@ final class AxisCreditCardPDFNormalizer {
                 guard let key = fragment.text.split(separator: "\t", maxSplits: 1).first else { return false }
                 return geometryOwnedKeys.contains(String(key))
             }
-            fragments.append(contentsOf: (try? Self.traditionalSummaryFragments(from: pageEvidence)) ?? [])
+            fragments.append(contentsOf: try Self.traditionalSummaryFragments(from: pageEvidence))
         }
         let activeSourceKeys: Set<String> = [
             "STATEMENT_DATE", "PERIOD", "SELECTED_STATEMENT_MONTH",
@@ -216,7 +237,10 @@ final class AxisCreditCardPDFNormalizer {
             document: document,
             rows: rows,
             header: NormalizedRow(rowNumber: 1, values: Self.logicalHeader),
-            sourceContext: .init(preTransactionFragments: fragments),
+            sourceContext: .init(
+                preTransactionFragments: fragments,
+                exhaustedFinancialRegion: financialRegion
+            ),
             presentation: isAppLayout ? .appPDF : .traditionalPDF
         )
     }
@@ -240,9 +264,14 @@ final class AxisCreditCardPDFNormalizer {
         }
     }
 
+    private struct AppTaggedNormalization {
+        let rows: [NormalizedRow]
+        let financialRegion: NormalizedDocument.ExhaustedFinancialRegionEvidence
+    }
+
     private static func appTaggedRows(
         from taggedTables: [RawPDFTaggedTableEvidence]?
-    ) throws -> [NormalizedRow] {
+    ) throws -> AppTaggedNormalization {
         guard let taggedTables, !taggedTables.isEmpty else {
             throw AxisCreditCardPDFNormalizationError.malformedTaggedTable
         }
@@ -250,10 +279,6 @@ final class AxisCreditCardPDFNormalizer {
         guard candidates.count == 1, let transactionTable = candidates.first else {
             throw AxisCreditCardPDFNormalizationError.malformedTaggedTable
         }
-        guard transactionTable.rows.count > 1 else {
-            throw AxisCreditCardPDFNormalizationError.noTransactions
-        }
-
         var taggedRows: [AppTaggedRow] = []
         taggedRows.reserveCapacity(transactionTable.rows.count - 1)
         for (offset, row) in transactionTable.rows.dropFirst().enumerated() {
@@ -280,21 +305,68 @@ final class AxisCreditCardPDFNormalizer {
             guard !details.isEmpty else {
                 throw AxisCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: ordinal)
             }
-            taggedRows.append(.init(date: date, amount: amount, effect: effect, details: details))
+            let references = Self.sourceReferences(in: details)
+            guard references.count <= 1 else {
+                throw AxisCreditCardPDFNormalizationError.malformedTransaction(sourceOrdinal: ordinal)
+            }
+            taggedRows.append(.init(
+                date: date,
+                amount: amount,
+                effect: effect,
+                details: details,
+                reference: references.first
+            ))
         }
 
         // The tagged logical table owns App financial rows, narration, and
         // source order. Visual geometry is not a competing parser or a
         // rejection condition for this representation.
-        return taggedRows.enumerated().map { offset, row in
+        let rows = taggedRows.enumerated().map { offset, row in
             NormalizedRow(
                 rowNumber: offset + 1,
                 values: [
                     row.date, row.details, row.amount, row.effect,
-                    "account_level", "", "", "", ""
+                    "account_level", "", row.reference ?? "", "", ""
                 ]
             )
         }
+        let financialRegion = try NormalizedDocument.ExhaustedFinancialRegionEvidence(
+            descriptor: "Axis App PDF tagged transaction table",
+            sourceUnit: .taggedTableRow,
+            startOrdinal: 1,
+            endOrdinal: transactionTable.rows.count,
+            recognizedFinancialRowCount: rows.count,
+            sourceRecords: transactionTable.rows.map(Self.taggedSourceRecord)
+        )
+        return AppTaggedNormalization(rows: rows, financialRegion: financialRegion)
+    }
+
+    nonisolated private static func taggedSourceRecord(_ row: RawPDFTaggedRowEvidence) -> String {
+        row.cells.map { cell in
+            let children = cell.children.map { child -> String in
+                switch child {
+                case .markedContent(let evidence):
+                    return taggedMarkedContentRecord(evidence, prefix: "M")
+                case .structure(let evidence):
+                    let descendants = evidence.markedContent.map {
+                        taggedMarkedContentRecord($0, prefix: "S")
+                    }
+                    return (["S", evidence.role] + descendants)
+                        .map { "\($0.utf8.count):\($0)" }.joined()
+                }
+            }
+            return ([cell.role.rawValue] + children)
+                .map { "\($0.utf8.count):\($0)" }.joined()
+        }.map { "\($0.utf8.count):\($0)" }.joined()
+    }
+
+    nonisolated private static func taggedMarkedContentRecord(
+        _ evidence: RawPDFTaggedMarkedContentEvidence,
+        prefix: String
+    ) -> String {
+        ([prefix, String(evidence.pageNumber), String(evidence.mcid),
+          String(evidence.rectangleCount)] + evidence.textBlocks)
+            .map { "\($0.utf8.count):\($0)" }.joined()
     }
 
     nonisolated private static func appTaggedCellText(_ cell: RawPDFTaggedCellEvidence) -> String? {
@@ -365,7 +437,8 @@ final class AxisCreditCardPDFNormalizer {
             .replacingOccurrences(of: "INR", with: "", options: [.caseInsensitive])
             .replacingOccurrences(of: "₹", with: "")
             .replacingOccurrences(of: ",", with: "")
-        guard let amount = Decimal(string: numeric, locale: Locale(identifier: "en_US_POSIX")),
+        guard numeric.range(of: #"^[0-9]+(?:\.[0-9]+)?$"#, options: .regularExpression) != nil,
+              let amount = Decimal(string: numeric, locale: Locale(identifier: "en_US_POSIX")),
               amount > .zero,
               let money = try? Money(amount: amount, currency: "INR"),
               (try? money.minorUnits()) != nil else { return nil }
@@ -404,6 +477,7 @@ final class AxisCreditCardPDFNormalizer {
         let amount: String
         let effect: String
         let details: String
+        let reference: String?
     }
 
     nonisolated private static func positionedFragmentRows(from evidence: RawPDFPageEvidence) -> [[RawPDFTextFragment]] {
@@ -438,7 +512,7 @@ final class AxisCreditCardPDFNormalizer {
 
     nonisolated private static func traditionalPositionedPages(from pageEvidence: [RawPDFPageEvidence]) throws -> [String] {
         let rowPages = pageEvidence.map(positionedFragmentRows)
-        guard let globalBounds = traditionalDescriptionBounds(in: rowPages.flatMap { $0 }) else {
+        guard let globalBounds = rowPages.compactMap({ traditionalDescriptionBounds(in: $0) }).first else {
             throw AxisCreditCardPDFNormalizationError.changedHeader
         }
         var activeLoansBoundaryReached = false
@@ -501,7 +575,15 @@ final class AxisCreditCardPDFNormalizer {
                         sourceOrdinal: transactionOrdinal + 1
                     )
                 }
-                let details = sourceVisibleText(detailsFragments.map(\.text).joined(separator: " "))
+                // Preserve the entire source narration between the dated
+                // transaction start and its terminal billed Money. The
+                // centered Merchant Category heading is not the left edge of
+                // its values; using that heading as a clipping boundary cut
+                // off long category text from otherwise valid source rows.
+                let completeDetails = ordered.prefix(amount.startIndex).filter {
+                    $0.x >= bounds.start
+                }
+                let details = sourceVisibleText(completeDetails.map(\.text).joined(separator: " "))
                 guard !details.isEmpty else {
                     throw AxisCreditCardPDFNormalizationError.malformedTransaction(
                         sourceOrdinal: transactionOrdinal + 1
@@ -628,6 +710,7 @@ final class AxisCreditCardPDFNormalizer {
 
     private struct TraditionalDirectedAmountCandidate {
         let text: String
+        let startIndex: Int
         let terminalIndex: Int
     }
 
@@ -640,6 +723,7 @@ final class AxisCreditCardPDFNormalizer {
             if traditionalDirectedAmountFragment(ordered[index].text) {
                 result.append(.init(
                     text: sourceVisibleText(ordered[index].text),
+                    startIndex: index,
                     terminalIndex: index
                 ))
                 continue
@@ -651,6 +735,7 @@ final class AxisCreditCardPDFNormalizer {
                   traditionalAmountFragment(ordered[amountIndex].text) else { continue }
             result.append(.init(
                 text: sourceVisibleText("\(ordered[amountIndex].text) \(ordered[index].text)"),
+                startIndex: amountIndex,
                 terminalIndex: index
             ))
         }
@@ -1016,6 +1101,77 @@ final class AxisCreditCardPDFNormalizer {
         }
     }
 
+    /// The App PDF's summary labels and their values have reliable reader-owned
+    /// rectangles even when PDFKit returns individual glyphs out of text order.
+    /// Column ownership comes from each semantic label group, never fixed x/y
+    /// coordinates or a global flattened-string search.
+    private static func appSummaryFragments(
+        from pages: [RawPDFPageEvidence]
+    ) throws -> [NormalizedDocument.SourceFragment] {
+        let paymentLabels = ["Total Payment Due", "Minimum Payment Due", "Payment Due Date"]
+        let accountLabels = ["Selected Statement Month", "Credit Limit", "Opening Balance"]
+        let allLabels = paymentLabels + accountLabels
+        func values(for labels: [String]) throws -> [String: String] {
+            guard let header = uniqueRectangularHeaderOccurrence(labels: labels, in: pages) else {
+                throw AxisCreditCardPDFNormalizationError.malformedSummary
+            }
+            var owned: [String: [String]] = [:]
+            for row in header.rows.dropFirst(header.rowIndex + 1) {
+                let compact = compactSourceLabel(row.map(\.text).joined())
+                let nextHeader = allLabels.contains {
+                    !(rectangularLabelSpans(for: $0, in: row) ?? []).isEmpty
+                } || compact.contains("transactionsummary")
+                    || compact.contains("datetransactiondetails")
+                if nextHeader { break }
+                for label in labels {
+                    if let text = rectangularOwnedText(
+                        label: label, orderedLabels: labels,
+                        columns: header.columns, in: row
+                    ) {
+                        owned[label, default: []].append(text)
+                    }
+                }
+            }
+            var result: [String: String] = [:]
+            for label in labels {
+                guard let parts = owned[label], !parts.isEmpty else {
+                    throw AxisCreditCardPDFNormalizationError.malformedSummary
+                }
+                result[label] = compactWhitespace(parts.joined(separator: " "))
+            }
+            return result
+        }
+        let payment = try values(for: paymentLabels)
+        let account = try values(for: accountLabels)
+        guard let due = payment["Total Payment Due"].flatMap({ summaryMoney($0) }),
+              let minimum = payment["Minimum Payment Due"].flatMap({ summaryMoney($0) }),
+              let dueDate = payment["Payment Due Date"].flatMap({ appTaggedDate($0) }),
+              let opening = account["Opening Balance"].flatMap({ summaryMoney($0) }),
+              let creditLimit = account["Credit Limit"].flatMap({ summaryMoney($0) }),
+              let monthToken = account["Selected Statement Month"],
+              let month = canonicalSelectedStatementMonth(
+                monthToken.replacingOccurrences(
+                    of: #"(?<=[A-Za-z])(?=[0-9]{4}$)"#,
+                    with: " ", options: .regularExpression
+                )
+              ) else {
+            throw AxisCreditCardPDFNormalizationError.malformedSummary
+        }
+        // These adjacent source fields bound and validate their columns; they
+        // are not promoted into unsupported persisted Axis summary families.
+        guard minimum.direction != "cr", creditLimit.direction != "cr" else {
+            throw AxisCreditCardPDFNormalizationError.malformedSummary
+        }
+        let signedOpening = opening.direction == "cr" ? "-" + opening.magnitude : opening.magnitude
+        let signedDue = due.direction == "cr" ? "-" + due.magnitude : due.magnitude
+        return [
+            .init(sourceOrdinal: 0, text: "OPENING_BALANCE\t\(signedOpening)"),
+            .init(sourceOrdinal: 0, text: "TOTAL_PAYMENT_DUE\t\(signedDue)"),
+            .init(sourceOrdinal: 0, text: "PAYMENT_DUE_DATE\t\(dueDate)"),
+            .init(sourceOrdinal: 0, text: "SELECTED_STATEMENT_MONTH\t\(month)")
+        ]
+    }
+
     nonisolated fileprivate static func traditionalSummaryFragments(
         from pageEvidence: [RawPDFPageEvidence]
     ) throws -> [NormalizedDocument.SourceFragment] {
@@ -1157,7 +1313,67 @@ final class AxisCreditCardPDFNormalizer {
         let effect = (direction == "credit" || direction == "cr")
             ? CardLiabilityEffect.decreasesAmountOwed.rawValue
             : CardLiabilityEffect.increasesAmountOwed.rawValue
-        return RowFields(date: String(line[dateRange]), details: String(line[detailsRange]).trimmingCharacters(in: .whitespaces), amount: rawAmount, effect: effect, reference: nil, originalAmount: nil, originalCurrency: nil)
+        let details = String(line[detailsRange]).trimmingCharacters(in: .whitespaces)
+        let references = sourceReferences(in: details)
+        guard references.count <= 1 else { return nil }
+        // The source places original merchant Money in a parenthesized
+        // currency/amount control inside Transaction Details. Preserve the
+        // narration and separately retain that explicit control; never infer
+        // an original currency or convert the billed INR amount.
+        guard let originalPattern = try? NSRegularExpression(
+            pattern: #"\(\s*([A-Z]{3})\s+([0-9][0-9,]*\.[0-9]+)\s*\)"#
+        ), let currencyMarker = try? NSRegularExpression(
+            pattern: #"\(\s*[A-Z]{3}\s+[0-9]"#
+        ) else { return nil }
+        let detailsNSRange = NSRange(details.startIndex..., in: details)
+        let originals = originalPattern.matches(in: details, range: detailsNSRange)
+        let markers = currencyMarker.matches(in: details, range: detailsNSRange)
+        guard originals.count <= 1, markers.count == originals.count else { return nil }
+        var originalCurrency: String?
+        var originalAmount: String?
+        if let original = originals.first,
+           let currencyRange = Range(original.range(at: 1), in: details),
+           let amountRange = Range(original.range(at: 2), in: details) {
+            originalCurrency = String(details[currencyRange])
+            originalAmount = String(details[amountRange]).replacingOccurrences(of: ",", with: "")
+        }
+        return RowFields(
+            date: String(line[dateRange]),
+            details: details,
+            amount: rawAmount,
+            effect: effect,
+            reference: references.first,
+            originalAmount: originalAmount,
+            originalCurrency: originalCurrency
+        )
+    }
+
+    /// Extracts only the two source-owned reference grammars established by
+    /// the complete authentic Axis card corpus. The reference is copied into
+    /// structured transaction evidence while the original narration remains
+    /// byte-for-byte present in the normalized description.
+    nonisolated static func sourceReferences(in narration: String) -> [String] {
+        let source = sourceVisibleText(narration)
+        let grammars: [(pattern: String, prefix: String)] = [
+            (#"\bPAYMENT\s*#\s*([A-Z0-9]{14})\b"#, "PAYMENT #"),
+            (#"\bREF\s*#\s*([0-9]{8})\b"#, "Ref# ")
+        ]
+        var matches: [(location: Int, value: String)] = []
+        for grammar in grammars {
+            guard let regex = try? NSRegularExpression(
+                pattern: grammar.pattern,
+                options: [.caseInsensitive]
+            ) else { continue }
+            let range = NSRange(source.startIndex..., in: source)
+            for match in regex.matches(in: source, range: range) {
+                guard let tokenRange = Range(match.range(at: 1), in: source) else { continue }
+                matches.append((
+                    location: match.range.location,
+                    value: grammar.prefix + source[tokenRange].uppercased()
+                ))
+            }
+        }
+        return matches.sorted { $0.location < $1.location }.map(\.value)
     }
 
     nonisolated fileprivate static func looksLikeFinancialLine(_ line: String) -> Bool {
@@ -1177,7 +1393,8 @@ final class AxisCreditCardPDFNormalizer {
             add("STATEMENT_DATE", value)
         }
         if let value = capturePeriod(in: all) { add("PERIOD", value) }
-        if let value = selectedStatementMonth(in: all) {
+        if let value = selectedStatementMonth(in: lines)
+            ?? selectedStatementMonth(in: all) {
             add("SELECTED_STATEMENT_MONTH", value)
         }
         if let value = captureMoney(after: "Opening Balance", in: all)
@@ -1215,6 +1432,54 @@ final class AxisCreditCardPDFNormalizer {
             return nil
         }
         return canonicalSelectedStatementMonth(raw, allowDisplacedLetter: true)
+    }
+
+    /// PDF text extraction may split the exact source label and its three-letter
+    /// month across adjacent lines. It may also place the two `a` glyphs from
+    /// `Statement` and Jan/May after their surrounding runs. Reassemble only
+    /// those exact, observed source-label shapes and require one unambiguous
+    /// month value in the label's bounded value region. Chronology is never
+    /// inferred from transaction rows, filenames, or unrelated dates.
+    nonisolated private static func selectedStatementMonth(in lines: [String]) -> String? {
+        let exactLabels: Set<String> = [
+            "selectedstatementmonth",
+            "selectedsttementmontha"
+        ]
+        var labelEndIndices: [Int] = []
+        for start in lines.indices {
+            var joined = ""
+            for end in start..<min(lines.endIndex, start + 3) {
+                joined += compactSourceLabel(lines[end])
+                if exactLabels.contains(joined) {
+                    labelEndIndices.append(end)
+                }
+            }
+        }
+
+        guard labelEndIndices.count == 1, let labelEnd = labelEndIndices.first else { return nil }
+        let valueStart = labelEnd + 1
+        let valueEnd = min(lines.endIndex, valueStart + 8)
+        guard valueStart < valueEnd else { return nil }
+
+        var candidates: Set<String> = []
+        for index in valueStart..<valueEnd {
+            if let canonical = canonicalSelectedStatementMonth(
+                lines[index],
+                allowDisplacedLetter: true
+            ) {
+                candidates.insert(canonical)
+            }
+            let next = index + 1
+            if next < valueEnd,
+               let canonical = canonicalSelectedStatementMonth(
+                   lines[index] + " " + lines[next],
+                   allowDisplacedLetter: true
+               ) {
+                candidates.insert(canonical)
+            }
+        }
+        guard candidates.count == 1 else { return nil }
+        return candidates.first
     }
 
     nonisolated fileprivate static func canonicalSelectedStatementMonth(

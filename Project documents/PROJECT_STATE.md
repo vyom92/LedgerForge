@@ -1,14 +1,56 @@
 # Repository State
 
-## Current Alignment — 2026-08-28
+## Accepted Authentic-Parser Reliability Reset — 2026-09-09
 
-This section is the current alignment layer. Historical sections below are preserved for traceability; this alignment supersedes earlier support, migration and planning limits where they conflict.
+The **P0 Authentic-Corpus Parser / Import Reliability Reset** is an unnumbered implementation campaign technically accepted by Chat on 2026-09-09. It is not a numbered sprint. The accepted implementation repairs ordinary source routing and family interpretation, extends format-neutral Axis bank projection support, carries source controls through persistence/hydration, and removes financial statement factories and their dependent tests under the all-stages authentic-input rule. Exact private originals and independently derived source oracles remain outside Git.
+
+- **Accepted schema/current migration:** additive V17, including Axis bank projection compatibility and zero-activity/card-summary schema support. V17 is the current accepted migration; historical V1–V16 migration source bytes remain unchanged and immutable. No V18 is authorized.
+- **Registered acceptance boundary:** 127 authentic financial carriers across Axis bank, Axis card, HDFC bank, CBQ bank, CBQ card, American Express and Qatar Airways salary: 103 logical statements, 5,286 representation transaction rows and 3,165 canonical bank/card transactions. The 20 salary statements are included in the statement counts; their 258 components are not bank transactions. The CBQ EML is inventory/container provenance; only its actual attached PDF enters the ordinary PDF path, with no general email ingestion feature.
+- **Evidence status:** the final canonical complete TestPlan passed on the integrated source freeze: 443 tests in 72 suites, 500 parameter-expanded executions, zero failures/skips/expected failures and zero Swift source diagnostics. Result identity: `LedgerForge-validation.2Vzm4a/TestResults.xcresult`, 2026-09-08. All seven complete-family gates and the six provider/order global campaigns passed. HDFC/Amex populated migration inputs were imported by the current engine; the separate historical CBQ gate uses a genuine V16 database produced by unchanged preserved production from all 19 authentic sources. Exact durable and hydrated values survive V17 and reopen. Fresh Debug/test and optimized Release builds passed without Swift diagnostics; final Release bytes and local signature were independently verified and retained. Subsequent corrections changed tests/TestPlan/documentation only, so no replacement Release build is claimed or needed.
+- **Unobserved cases:** genuine zero-activity statements and currently absent source formats, including CBQ transaction-history XLS, are not certified by these corpus results. No financial statement may be invented or mutated to fill that gap. Historical implementation remains distinct from current source certification.
+- **Late independent review:** historical V16 CBQ card summaries lacked minimum due, so requiring the new component under the unchanged durable reconciliation contract would break migrated hydration. The integrated repair distinguishes exact historical-read and current-write rule revisions without changing parser profile identity, editing V1–V16 or inventing a missing value. Both its complete current 19-source/six-campaign CBQ gate and genuine historical upgrade/hydration gate passed; historical missing minimum due remains absent. Axis bank/card zero-activity producer, validation, persistence and hydration repairs are integrated and independently reviewed, preserving actual selected-month versus exact-period authority and rejecting unresolved financial candidates. No authentic zero-activity source exists, so that source case remains uncertified.
+- **Global gate:** ordinary per-carrier prepare/validate/confirm, exact renamed replay, source ownership, SQLite checkpoint/close/reopen and canonical hydration passed for In-Memory and SQLite in chronological, reverse and deterministic-mixed orders. All six format-neutral semantic digests match, every source is separately compared with independent source authority, and final source-byte hashes equal the starting freeze. Mandatory result artifact SHA-256: `7b2456e683b0a11e7eef35a34dd44f3289c986986853c47f819cc8df1ce23ed4`. Earlier comparison, mechanics, scheduling and output-export failures remain failed/interrupted history; they are not retroactively counted as passes. This serial acceptance queue does not implement multi-file UI, a Unified Import Centre or batch-wide atomicity.
+- **Fixture retirement:** 89 prohibited financial-source artifacts and 34 dependent test/helper/debug paths were removed from the active worktree. Five nonfinancial LegacyXLS resources and their README remain. Historical recovery bytes are outside the product repository and are not executable test authority; committed history is unchanged.
+- **Delivery state:** parent-owned integration into the existing unstaged `main` worktree followed exact starting-WIP comparison. Independent result review verified the complete plan, source-bound export and all 122 final-run frozen paths, followed by dependency review of four additional tested inputs. Chat technically accepted the complete 249-path candidate. Publication is recorded by Git history rather than asserted by this state record. Native authentic preparation, preview, cancellation and explicit account-choice gating are verified. Manual final confirmation clicking remains unverified but is not a blocker under the coordinator's explicit decision. Personal-v1 adoption remains undeclared.
+
+See the current [cycle roadmap](LedgerForge_Roadmap_Sprints_80-89_Current.md) for campaign status and ADR-046 for source authority. This section records the technically accepted unnumbered implementation; personal-v1 certification remains separate and undeclared.
+
+## Current Alignment — 2026-09-09
+
+### Parser Reliability / Import Architecture Reset
+
+This is the current parser/source-support alignment layer. It supersedes conflicting **current-support, fixture-authority and incidental-layout** wording below while preserving historical sprint/ADR records as historical facts.
+
+- **Latest historically accepted numbered implementation:** Sprint 79 — Qatar Airways Salary Domain and Current-Month Funding Planner. Historical Sprint 70–79 implementation/acceptance records remain intact.
+- **Accepted migration:** additive V17 is current; V1–V16 remain immutable historical migrations.
+- **Architecture:** ADR-045 remains the historical accepted architecture through Sprint 79. ADR-046 — Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation — is accepted by explicit user decision on 2026-09-01 as the current parser/import authority.
+- **Historical acceptance versus reliability:** historical parser/profile implementation acceptance alone is not current authentic-corpus production reliability certification. The accepted reset separately established current reliability for the complete registered corpus through ordinary production, persistence, reopen and hydration paths; a synthetic fixture campaign or partial authentic sample remains insufficient.
+- **Personal-v1 parser reliability:** the complete registered 127-carrier corpus was recertified through ordinary production by the accepted unnumbered reset; personal-v1 remains **UNDECLARED / NOT CERTIFIED** and requires a separate adoption gate.
+- **All-stages authentic-input rule:** no synthetic, generated, recreated, sanitized, reconstructed, representative, reduced, mutated, hand-authored or model-created financial statement may be created or used at any stage, including development/debugging, tests, source oracles/expected outputs, migration/persistence, batch acceptance, developer UI and adversarial review. Statement factories/catalogs/resources and hand-built statement/domain/DTO substitutes must be removed or rewritten around authentic inputs. Exact working/decrypted copies and actual attachments are permitted with original-byte provenance authority. Pure nonfinancial mechanics remain allowed; absent authentic cases remain source-uncertified. This user-settled rule remains binding after technical acceptance and does not authorize fabricated financial inputs or personal-v1 adoption. <!-- user-specified -->
+- **Regression authority:** the complete registered authentic corpus supplied by the user is cumulative authority for each supported family. Every newly supplied recurring statement joins that corpus unless explicitly excluded or archived. No representative month or sample substitutes for the complete affected corpus.
+- **Current recertification:** the complete registered 127-carrier corpus passed the ordinary production and provider/order acceptance gate recorded above and was technically accepted on 2026-09-09. This certifies only the registered exact corpus/profile boundary; genuine zero-activity statements and CBQ transaction-history XLS remain uncertified.
+- **Why the reset was required:** authentic defects encountered across Axis, HDFC and CBQ demonstrated that the older fixture-/layout-bounded acceptance method could report green while recurring authentic statements still failed ordinary production. The accepted reset closes those registered-corpus defects without erasing historical implementation acceptance or authorizing reliance on that history alone.
+- **Smart family parsers:** current direction is one adaptive deterministic runtime parser per recurring financial source family unless materially different financial/source semantics justify another profile. Page count, transaction count, absolute row/line positions, harmless whitespace/typographic changes, benign page breaks, extra nonfinancial pages and statement length are not financial identity. Zero-transaction and variable-page statements must be accepted when coherent source evidence proves their semantics.
+- **Reader boundary:** generic readers extract and preserve source evidence, including physical PDF page boundaries even when a page has no extractable text. Downstream family interpretation decides whether a page is financial, nonfinancial, requires another extraction mode or is genuinely ambiguous.
+- **Strict money, flexible packaging:** semantic labels, column roles, data shapes, source dates, Money, direction, balances, statement/section controls, continuity, multiplicity, source order and surrounding structure jointly establish financial meaning. Fail closed on financial ambiguity, contradiction, malformation or unsupported semantics, not inert presentation variation.
+- **Shared ingestion changes:** a change to a generic reader, unlock/password orchestration, source snapshot, detection, classification, routing, normalizer infrastructure, Money, common validation, duplicate/equivalence semantics or persistence mapping requires the complete authentic regression corpus of every affected supported family.
+- **Oracle comparison:** independent source oracles record what sources say. Acceptance compares source truth through an explicit architecture-aware semantic projection with ordinary production output. Raw oracle JSON equality with raw production JSON is not itself an acceptance rule where representations intentionally differ.
+- **Canonical import direction:** batch intake (queue length one for single import) -> unlock as required -> generic extraction -> identify/segregate -> route -> source-family semantic parser -> source-owned financial events -> normalize -> validate/reconcile -> duplicate/equivalence -> explicit review/confirmation where required -> atomic persistence -> one canonical database -> canonical financial rows -> query/extraction/presentation/viewer layers. Institution parsers are ingestion modules, not analytical silos.
+
+The accepted reset certifies the complete registered corpus supplied through 2026-09-08 under ADR-046. Newly supplied recurring sources extend that corpus, and absent authentic cases remain uncertified until genuine sources exist.
+
+---
+
+## Historical Alignment — 2026-08-28 (superseded by the 2026-09-09 V17 acceptance)
+
+This section preserves the 2026-08-28 alignment snapshot for traceability. The 2026-09-09 alignment above supersedes it wherever current support, migration or planning status differs.
 
 ### Accepted production baseline
 
 - **Primary branch:** `main`.
 - **Accepted implementation:** Sprint 79 on `main` at implementation commit `9489f6b21c9d585d2d90f2ba4798a931590057f7`; the documentation-reconciliation commit is recorded by Git history.
 - **Latest accepted numbered sprint:** Sprint 79.
+- **Latest accepted discovery outcome:** Sprint 80 — Swift 6 and macOS readiness closure (`SWIFT6_READINESS_COMPLETE`); no production implementation or migration was performed.
 - **Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner; implemented with Sprint 79. ADR-044 remains the accepted card-domain authority.
 - **Accepted migration:** V16.
 - **Accepted card profiles:** exact `amex.credit-card.pdf@1`, exact `cbq.credit-card.pdf@1`, and the exact Axis `axis.credit-card.pdf@1` / `axis.credit-card.xlsx@1` families accepted by Sprint 78B. No generic card/PDF/XLSX support is implied.
@@ -50,6 +92,143 @@ ADR-045 is the accepted and implemented architecture authority for the Sprint 79
 Sprint 79 acceptance evidence on the final privacy-safe candidate includes a 9/9 Salary parser/planner suite with the complete 20-source authentic oracle gate, plus the authoritative complete TestPlan at 819 total / 814 passed / 5 intentionally skipped / 0 failed. The published implementation commit is `9489f6b21c9d585d2d90f2ba4798a931590057f7`.
 
 The authentic July 2026 CBQ credit-card compatibility defect was separately classified `PRE_EXISTING_OR_EXTERNAL` relative to Sprint 79. It remains future work and does not alter Sprint 79 acceptance.
+
+### Sprint 80 accepted discovery — Swift 6 and macOS readiness
+
+Sprint 80 is accepted as `SWIFT6_READINESS_COMPLETE` on 2026-08-28. This is a
+discovery and documentation outcome, not a production implementation. The
+current production implementation remains Sprint 79, the current migration is
+V16, ADR-045 remains the latest accepted architecture, and personal-v1 remains
+undeclared.
+
+#### Toolchain and current configuration
+
+The accepted readiness evidence was gathered with:
+
+- Xcode 26.6, build 17F113;
+- Apple Swift 6.3.3; and
+- the macOS 26.5 SDK.
+
+All current native targets remain in Swift 5 mode. The current app concurrency
+configuration has approachable concurrency enabled, default MainActor
+isolation on the application, and member-import visibility enabled. The
+project does not set an explicit `SWIFT_STRICT_CONCURRENCY` value.
+
+#### Strict-readiness evidence
+
+The compiler was reached successfully. Readiness is materially non-clean and
+is no longer an infrastructure-only unknown. The accepted evidence is recorded
+at cluster level rather than as raw compiler-log output:
+
+- production/app diagnostics include ZIPFoundation dependency errors,
+  `SQLiteDatabase` teardown-isolation errors,
+  `RepositoryStoreHydrator` staging/domain-isolation errors, runtime-store
+  closure/publication warnings, one DEBUG provider-conformance error, one
+  Salary-view closure warning and redundant upcoming-feature-configuration
+  warnings;
+- shared helper/database diagnostics include `DatabaseProvider.shared`
+  ownership, migration-registry/global ownership, migration-closure/SQLite
+  ownership and helper-global-state issues;
+- the authoritative unit-test strict probe found 45 distinct error locations,
+  with substantial actor/async/sendability migration work and a large warning
+  surface concentrated in test fixtures and support code; and
+- the direct UI-test strict probe found zero source errors and zero source
+  warnings, with three redundant configuration warnings.
+
+Raw compiler-log noise is not itself governance evidence and is not persisted
+here.
+
+#### Accepted migration strategy
+
+The accepted sequence is:
+
+1. do not switch the project to Swift 6 immediately;
+2. make behavior-preserving prerequisite ownership corrections under Swift 5;
+3. implement the first Unified Import Centre in Swift 5, serially and with
+   explicit ownership;
+4. do not introduce bounded-parallel preparation until transferable ownership
+   and dependency thread-safety are proven;
+5. complete the remaining prerequisite corrections after the queue foundation;
+6. perform a coordinated Swift-6 strict migration; and
+7. complete Swift-6 readiness before personal-v1 adoption.
+
+Full Swift-6 migration is not a prerequisite to begin the serial Unified
+Import Centre, but it is required before personal-v1 certification.
+
+#### Bounded prerequisite families
+
+Sprint 80 records four future correction families without implementing any of
+them:
+
+- **PR-1 — staging/publication ownership seam:**
+  `RepositoryStoreHydrator`, `AccountStore`, `CardStore`, `CategoryStore`,
+  `TransactionStore`, `ImportSessionStore` and `DeveloperConsole`. The seam
+  must preserve synchronous pure staging, explicitly MainActor-owned runtime
+  publication, complete-snapshot installation, observer ordering, provider
+  generation authority and SQLite/In-Memory parity. PR-1 is the only
+  Swift-6-derived prerequisite required before the serial Unified Import
+  Centre.
+- **PR-2 — SQLite/provider/migration ownership:**
+  `SQLiteDatabase` teardown, `DatabaseProvider` ownership, migration
+  registry/global ownership and helper/database shared-source ownership. PR-2
+  is required before coordinated Swift-6 migration.
+- **PR-3 — dependency boundary:** the ZIPFoundation Swift-6
+  correction/upgrade decision and the LegacyXLS/libxls concurrency policy. PR-3
+  is required before coordinated Swift-6 migration.
+- **TEST-PR — unit-test strict-concurrency correction:** actor-aware fixture
+  construction, async-safe test synchronization, subprocess Sendable
+  ownership and actor-aware assertions/macros. TEST-PR is required before the
+  unit-test target can participate honestly in coordinated strict migration.
+
+#### Unified Import Centre concurrency boundary
+
+The first Unified Import Centre implementation may remain in Swift 5 only when
+it preserves all of the following:
+
+- serial preparation;
+- explicit MainActor task ownership;
+- deterministic queue ordering;
+- per-file state ownership;
+- security-scoped source lifetime;
+- `SourceContentSnapshot` lifetime;
+- cancellation before confirmation;
+- explicit per-statement confirmation;
+- synchronous provider-owned persistence transaction;
+- canonical `RepositoryStoreHydrator` publication; and
+- no concurrent transfer of `PreparedImport`.
+
+Parallel preparation remains an open architecture decision. It is not approved
+by Sprint 80.
+
+#### macOS and target findings
+
+The current product artifact is a macOS-native application using the macOS
+26.5 SDK, App Sandbox and selected-file import. The readiness discovery also
+found stale/project metadata that remains future work: the app, tests and UI
+advertise non-macOS platforms; irrelevant device-family/deployment metadata
+remains; the generated macOS plist contains iOS-oriented keys; the Release
+bundle contains governance/development residue such as `AGENTS.md`; and an
+empty debug-fixture resource container is present.
+
+The following remain deliberate architecture/product decisions for future
+work, not Sprint 80 decisions: minimum macOS version; read-only versus
+read-write selected-file entitlement; network entitlement ownership; broad
+folder access; Bluetooth; Calendars; app groups; app hardened runtime; signed
+Release/distribution scope; and UI-test policy.
+
+#### CBQ separation and next gates
+
+The accepted `cbq.credit-card.pdf@1` profile remains separate from Sprint 80.
+The authentic July 2026 source reaches CBQ normalization and terminates at
+`CBQCreditCardPDFNormalizationError.malformedPreamble` at the
+statement-period/preamble boundary. Baseline comparison classifies this as
+`PRE_EXISTING_OR_EXTERNAL` relative to Sprint 79. Sprint 80 did not fix or
+investigate its source grammar; a deliberate corrective disposition remains
+required before personal-v1 certification.
+
+The immediate dependency ordering is: Sprint 80 documentation sync; accepted-
+profile CBQ corrective closure; PR-1; Unified Import Centre; PR-2, PR-3 and
+TEST-PR; coordinated Swift-6 migration; then personal-v1 certification.
 
 ### Accepted Sprint 78B source authority
 
@@ -169,7 +348,7 @@ Final accepted validation completed the focused shared boundary, authentic 35-fi
 
 - Repository bootstrap: `AGENTS.md`.
 - Human routing guide: `Project documents/Project_Guide.md`.
-- Current cycle roadmap: `Project documents/LedgerForge_Roadmap_Sprints_70-79_Current.md`.
+- Current cycle roadmap: `Project documents/LedgerForge_Roadmap_Sprints_80-89_Current.md`; the prior `Project documents/LedgerForge_Roadmap_Sprints_70-79_Current.md` is retained as the historical prior-cycle roadmap.
 - Standing execution method: `Project documents/LedgerForge_Standing_Execution_Harness_Guide.md`.
 - Accepted state: this file.
 - Unscheduled queue: `Project documents/FUTURE_WORK.MD`.
@@ -183,20 +362,20 @@ ChatGPT Chat owns sprint/architecture/prompt/acceptance decisions. MCP executor 
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current repository implementation baseline:** Sprint 78B exact Axis credit-card PDF/XLSX support and equivalence over the shared card domain; the closure commit is recorded by Git history
-- **Documentation alignment:** Reconciled for the Sprint 78B implementation and acceptance boundary
-- **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration and Sprint 65's clean-room PDF fixture replacement are included in the accepted baseline; no historical financial data was altered
-- **Latest chronologically accepted production implementation:** Sprint 78B exact Axis credit-card PDF/XLSX support and equivalence
+- **Current repository implementation baseline:** the technically accepted unnumbered Authentic-Corpus Parser / Import Reliability Reset with additive V17; Sprint 79 remains the highest-numbered accepted implementation and its commit `9489f6b21c9d585d2d90f2ba4798a931590057f7` remains in Git history
+- **Documentation alignment:** Reconciled for the accepted unnumbered reset, additive V17, the Sprint 79 implementation and the accepted Sprint 80 readiness-discovery boundary
+- **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration remains historical accepted work. Sprint 65's clean-room/sanitized fixture work is retained only as historical mechanics evidence under ADR-046 and is not current parser regression or acceptance authority; no historical financial data was altered
+- **Latest chronologically accepted production implementation:** the unnumbered Authentic-Corpus Parser / Import Reliability Reset; Sprint 79 remains the latest accepted numbered implementation
 - **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
   - `7ee20a909038d1088f830a6ea588311625f415e5` — planning reconciliation and tracked Xcode user-data removal
   - `de238d8abf5ee7dc7d1eb9cd13fab72803f2be28` — roadmap update after the discovery campaign
   - `a64c2d8d67e93631d8b0c32620ded72f389f252f`, `98b1fef111087d3b8c2b26f8c354c2147c6b2412` and `f50127ccb7ddf05641df1af7a14a93be2ea8b42e` — subsequent roadmap updates
-- **Latest verified completed numbered increment:** Sprint 78B — Exact Axis Credit-Card PDF/XLSX Support and Equivalence
+- **Latest verified completed numbered increment:** Sprint 79 — Qatar Airways Salary Domain and Current-Month Funding Planner
 - **Accepted Sprint 63 implementation ref:** `7e1345e3817d3c3e91c24f881b962a48279fd73b`
-- **Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner; implementation pending
-- **Current migration:** V15
+- **Latest accepted ADR:** ADR-046 — Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation; the accepted reset implements its complete registered-corpus reliability boundary
+- **Current migration:** V17; V1–V16 remain immutable
 - **DBP-01 classification:** Accepted DEBUG-only developer tooling and development-database lifecycle implementation; it is not a production financial capability, production database-profile feature, numbered sprint, Sprint 65, schema migration or personal-v1 adoption
 - **Sprint 55A:** Axis Bank Source-Truth Restoration, ending at `f3154dbd13a340714179da7f972a6accdd3aca54`; parallel shared-runtime-store isolation remains Sprint 55 acceptance/test infrastructure
 - **Sprint 57A:** Category Reconciliation Closure, complete at `251a547cb44712a789a9ad7b23a4eabca742900b`; no migration was added
@@ -335,6 +514,28 @@ Personal-v1 adoption remains undeclared. LedgerForge is not currently an active 
 
 ## Current Production Capability
 
+The exact Sprint 79 `qatar-airways.salary.pdf@1` salary-actual import and the
+dedicated Salary/current-month funding planner are also accepted production
+capabilities under ADR-045 and Migration V16. The narrower bank-account and
+card summaries below are retained historical sub-summaries; the Current
+Alignment section above is authoritative where those summaries predate Sprint
+79 or Sprint 78B.
+
+### Salary actuals and current-month planning
+
+- Salary support is limited to the exact source-proven
+  `qatar-airways.salary.pdf@1` family; imported salary actuals remain distinct
+  from bank transactions and use source-owned periods, kinds, ordered
+  earnings/deductions and native QAR Money.
+- The dedicated Salary destination owns Salary History and This Month
+  planning. Checked account balances are explicit planning snapshots, and
+  missing evidence makes affected outputs incomplete rather than zero.
+- The editable planner uses user-entered expected salary, native QAR/INR
+  commitments, plan-local dated INR-per-QAR FX, explicit transfer-fee
+  semantics, upward QAR minor-unit funding rounding and derived investment
+  capacity. No automatic salary-bank matching, transfer execution, global FX
+  activation or investment execution is supported.
+
 ### Supported import family
 
 Production import support is limited to the exact Axis, HDFC and CBQ
@@ -471,7 +672,7 @@ Production publishes a SQLite repository only after:
 - pending migrations execute successfully;
 - the final migration chain revalidates.
 
-The active chain ends at V14. Migration V7 adds explicit partial-attempt counts, durable partial-import summaries and one typed incoming-row disposition per normalized source row for ADR-040. Additive Migration V8 adds workspace-owned categories and a separate restrictive current transaction-category assignment relationship without changing imported financial rows or provenance. Migration V9 adds versioned document-fingerprint authority and the source-byte fingerprint relationship without storing source bytes. Additive Migration V10 adds exact statement projections, ordered projection events, equivalence groups and authoritative/supporting members without backfilling existing history. Additive Migration V11 adds typed CBQ masked source-identity observations, statement-source observations and one transaction-source observation for every accepted CBQ financial row. Additive Migration V12 adds durable card instruments, strong instrument identifiers, source observations, explicit instrument relationships, statements, typed summaries and one-to-one card transaction evidence. Additive Migration V13 adds ordered card-statement sections, section-owned observations and exact card semantic projections/groups/members while deterministically migrating readable V12 single-section graphs. Additive Migration V14 transactionally generalizes the four constrained card evidence tables for exact CBQ observations, family summary components, printed-summary membership and account-level physical section membership while preserving V13 Amex rows unchanged. V11 and V12 perform no historical backfill; V13 and V14 perform no speculative financial or lifecycle inference.
+The active chain ends at V17. Migration V7 adds explicit partial-attempt counts, durable partial-import summaries and one typed incoming-row disposition per normalized source row for ADR-040. Additive Migration V8 adds workspace-owned categories and a separate restrictive current transaction-category assignment relationship without changing imported financial rows or provenance. Migration V9 adds versioned document-fingerprint authority and the source-byte fingerprint relationship without storing source bytes. Additive Migration V10 adds exact statement projections, ordered projection events, equivalence groups and authoritative/supporting members without backfilling existing history. Additive Migration V11 adds typed CBQ masked source-identity observations, statement-source observations and one transaction-source observation for every accepted CBQ financial row. Additive Migration V12 adds durable card instruments, strong instrument identifiers, source observations, explicit instrument relationships, statements, typed summaries and one-to-one card transaction evidence. Additive Migration V13 adds ordered card-statement sections, section-owned observations and exact card semantic projections/groups/members while deterministically migrating readable V12 single-section graphs. Additive Migration V14 transactionally generalizes the four constrained card evidence tables for exact CBQ observations, family summary components, printed-summary membership and account-level physical section membership while preserving V13 Amex rows unchanged. Additive Migration V15 adds the accepted Axis card semantic/equivalence state. Additive Migration V16 adds the accepted Qatar Airways salary-actual and current-month funding-plan state. Additive Migration V17 adds Axis bank-projection compatibility and zero-activity/card-summary schema support without changing V1–V16; schema capacity does not certify an absent genuine zero-activity source. V1–V16 remain immutable and no financial backfill is invented.
 
 Open, initialization, migration-integrity or migration-execution failure installs centrally rejecting unavailable repositories rather than silently substituting an in-memory repository.
 
@@ -700,27 +901,33 @@ Shared Xcode configuration remains distinct from personal IDE state.
 
 ## Current Verified Limitations
 
+The limitation summaries below retain older domain-specific wording for
+traceability. The Current Alignment and Current Production Capability
+sections above supersede any pre-Sprint-79 statement about the accepted Axis
+card family, Migration V16, or the exact Qatar Airways salary/planning slice.
+
 ### Production format and institution limits
 
-- Production parser support is limited to the exact documented Axis, HDFC and CBQ bank-account profiles plus the exact Amex and CBQ credit-card profiles; no generic institution or layout claim exists.
+- Production parser support is limited to the exact documented Axis, HDFC and CBQ bank-account profiles, the exact Amex, CBQ and Axis credit-card profiles, and the exact Qatar Airways salary profile; no generic institution, payroll or layout claim exists.
 - General Axis NRO coverage and additional Axis layouts remain unsupported.
-- Other Axis PDF layouts, OCR, arbitrary password-protected PDFs and generic PDF statement support remain unsupported. Encrypted production support is limited to exact `amex.credit-card.pdf@1` and `cbq.credit-card.pdf@1`.
-- XLSX, TXT and OCR are not production-supported. XLS is supported only for the exact documented Axis, HDFC and CBQ profiles.
-- HDFC and CBQ bank-account support is limited to their exact documented profiles. Card support is limited separately to exact `amex.credit-card.pdf@1` and `cbq.credit-card.pdf@1`; no other American Express/CBQ layout or issuer card family is supported.
-- Production secure password entry and institution-scoped Keychain reuse exist for exact encrypted `amex.credit-card.pdf@1` and `cbq.credit-card.pdf@1`; this does not establish arbitrary encrypted-PDF or generic credential-profile support.
-- QAR production import exists only for the exact three-profile CBQ current-account family under ADR-043 and the exact Amex/CBQ card profiles under ADR-044.
+- Other Axis PDF layouts, OCR, arbitrary password-protected PDFs and generic PDF statement support remain unsupported. Encrypted production support is limited to exact `amex.credit-card.pdf@1`, `cbq.credit-card.pdf@1` and the accepted encrypted Axis credit-card PDF families.
+- Generic XLSX/OOXML, TXT and OCR are not production-supported. The exact `axis.credit-card.xlsx@1` profile is accepted separately; XLS remains supported only for the exact documented Axis, HDFC and CBQ profiles.
+- HDFC and CBQ bank-account support is limited to their exact documented profiles. Card support is limited separately to exact `amex.credit-card.pdf@1`, `cbq.credit-card.pdf@1`, `axis.credit-card.pdf@1` and `axis.credit-card.xlsx@1`; no other American Express/CBQ/Axis layout or issuer card family is supported.
+- Production secure password entry and institution-scoped Keychain reuse exist for exact encrypted `amex.credit-card.pdf@1`, `cbq.credit-card.pdf@1` and the accepted Axis credit-card PDF families; this does not establish arbitrary encrypted-PDF or generic credential-profile support.
+- QAR production import exists only for the exact three-profile CBQ current-account family under ADR-043, the exact Amex/CBQ card profiles under ADR-044, and the exact Qatar Airways salary profile under ADR-045.
 
 ### Card limits
 
 ADR-034's document-scoped evidence boundary is implemented and refined by
-ADR-044 for the shared Sprint 77 foundation and exact
-`amex.credit-card.pdf@1` and `cbq.credit-card.pdf@1` profiles. Durable liability accounts, card instruments,
+ADR-044 for the shared card foundation and exact
+`amex.credit-card.pdf@1`, `cbq.credit-card.pdf@1`, `axis.credit-card.pdf@1`
+and `axis.credit-card.xlsx@1` profiles. Durable liability accounts, card instruments,
 source observations, explicit relationships, statement sections and summaries,
-transaction evidence, Migration V14, SQLite/In-Memory parity, hydration and
+transaction evidence, Migration V14/V15, SQLite/In-Memory parity, hydration and
 bounded presentation are operational for those profiles.
 
-The following remain unimplemented: Axis and HDFC card parsers; additional Amex
-or CBQ layouts; generic card profiles or masked identity; rewards persistence or
+The following remain unimplemented: HDFC card parsers; additional Amex, CBQ or
+Axis layouts; generic card profiles or masked identity; rewards persistence or
 valuation; payment allocation; bank-card payment matching; refund/reversal
 matching; installments/loans; calculated FX; invented fees, markup or tax;
 manual merge/split; historical repair/backfill; OCR and arbitrary encrypted-PDF workflows.
@@ -741,7 +948,8 @@ Sprint 44 itself introduced no migration. The repository later advanced to V6 th
 
 The following remain unimplemented:
 
-- exchange-rate storage;
+- global exchange-rate storage beyond the Sprint 79 plan-local, user-entered
+  dated FX quote;
 - historical conversion;
 - selectable reporting currency;
 - converted or consolidated mixed-currency totals.
@@ -782,19 +990,19 @@ Axis bank-account imports accepted with `axis.bank-account.csv@1` from Sprint 55
 
 ---
 
-## Approved Fixture Evidence
+## Historical Fixture / Mechanics Evidence — Not Parser Acceptance Authority
 
-Fixture integration supplies discovery and regression evidence. It does not by itself establish production support.
+**Current alignment — 2026-09-08:** the material below is retained only to explain historical test mechanics and earlier acceptance campaigns. Under ADR-046 and the all-stages user rule, fabricated financial-statement artifacts may not execute even as mechanics. Those artifacts have been retired from the active source/test tree. Only authentic corpus statements may exercise statement-dependent behavior; source-independent mechanics use nonfinancial values/files.
 
-Approved direction evidence now consists of the verified NRO clean-room transaction rows and a privacy-safe, non-reversible NRE semantic derivative. Independent exact-decimal oracles derive direction from physical column occupancy plus running-balance deltas and an independently supplied opening balance. They verify physical DR as debit, physical CR as credit, exact amount/delta agreement, source order, totals and complete reconciliation without consulting production parser output.
+At the time of this historical campaign, direction evidence consisted of NRO clean-room transaction rows and a privacy-safe, non-reversible NRE semantic derivative. Independent exact-decimal oracles derived direction from physical column occupancy plus running-balance deltas and an independently supplied opening balance. They verified physical DR as debit, physical CR as credit, exact amount/delta agreement, source order, totals and complete reconciliation without consulting production parser output. This describes the former method, not current executable source authority.
 
-The original private statements remain outside Git and are read-only evidence. The available two NRE and two NRO private CSV families independently provide 94 and 35 observable row-to-row balance deltas respectively, all conventional. The legacy 81-row/31-row NRE fixtures and the synthetic partial-overlap pair remain privacy-safe structural fixtures but are explicitly ineligible to establish source truth because their immutable transformation lineage is unavailable.
+The original private statements remain outside Git and are read-only evidence. The then-available two NRE and two NRO private CSV families independently provided 94 and 35 observable row-to-row balance deltas respectively, all conventional. The legacy 81-row/31-row NRE fixtures and synthetic partial-overlap pair lacked immutable transformation lineage and were not source truth; they are now retired and may not execute as mechanics or financial-source inputs.
 
 ### Axis bank-account evidence
 
 Approved evidence includes:
 
-- a privacy-safe source-derived Axis NRE CSV semantic regression;
+- a historical privacy-safe source-derived Axis NRE CSV mechanics artifact, no longer parser regression authority under ADR-046;
 - legacy Axis NRE CSV/PDF structural evidence quarantined from financial-truth acceptance pending source lineage;
 - verified clean-room Axis NRO CSV transaction rows;
 - Axis NRO PDF and XLS evidence across two overlapping ranges.
@@ -845,12 +1053,11 @@ unsupported.
 
 ### CBQ bank-account evidence
 
-Invented, self-contained mechanics fixtures cover the exact history PDF,
-monthly PDF, byte-distinct monthly variant and legacy-XLS profiles. The PDFs
-retain selectable text and exercise exact pagination, repeated/retained table
-geometry, multiline rows, brought-forward handling and non-financial
-promotional-page exclusion. They are regression mechanics, not private-source
-financial oracles.
+Historically, invented self-contained mechanics fixtures covered the history PDF,
+monthly PDF, byte-distinct monthly variant and legacy-XLS profiles. Those artifacts
+may still exercise isolated mechanics, but ADR-046 prohibits using them as
+reader/parser/source regression or acceptance evidence. Current reliability must
+come from the complete authentic CBQ corpus through ordinary production.
 
 Private acceptance independently established a 60-event history set with zero
 PDF/XLS ordered or set mismatches and two monthly subsets of 9 and 8 events.
@@ -980,8 +1187,10 @@ Sprint 65 promotes one exact account-neutral Axis bank-account PDF grammar throu
 
 #### Source and fixture authority
 
+**Current alignment — 2026-09-08:** this subsection records Sprint 65 historical evidence. The formerly committed sanitized PDFs have been removed from the active source/test tree. Historical recovery is not permission to execute them at any stage, including mechanics. Complete authentic originals are the current authority under ADR-046.
+
 - The two committed sanitized NRO PDFs were regenerated clean-room from the supplied read-only originals. Their independent expected JSON remained byte-identical; PDFKit, geometry, pagination, selectable-text, unlocked, privacy and `qpdf --check` gates passed; all four rendered pages were visually inspected.
-- The original PDFs are the hard source-truth authority. The regenerated sanitized PDFs remain Git fixtures for deterministic grammar and privacy tests but are explicitly non-authoritative and unusable as original-source identity, as recorded in both manifests.
+- The original PDFs remain historical source evidence for that Sprint 65 campaign. The regenerated sanitized PDFs were used for historical mechanics/privacy checks but are now retired from the active tree and may not execute; they never supplied original-source identity.
 - Original NRO PDF persistence matched the independent row-level baselines: 16 and 20 ordered rows, with exact dates, debit/credit side, amount magnitudes, running balances, totals and closing balances. No production parser output was used to create either expected baseline.
 
 #### Persistence authority matrix
@@ -1251,7 +1460,7 @@ RepositoryStoreHydrator reconstructs partial summaries, attempt counts, disposit
 
 The Import Wizard, Dashboard activity, Import History, account history and Completed Imports presentation distinguish partial sessions. Review surfaces show only privacy-safe period, account, counts, balance evidence, unique impact and row dispositions.
 
-The approved sanitized Sprint 55 fixture pair remains the independent oracle: Source A has four unique supported events; Source B has three recognized events plus one later-only event. Acceptance verifies five total transactions, two documents/sessions, four B dispositions, unchanged recognized transactions with new source relationships and exact-B duplicate resolution.
+Historical Sprint 56 acceptance used the sanitized Sprint 55 fixture pair as an independent oracle for its then-bounded campaign. Under the 2026-09-01 ADR-046 alignment that fixture pair is not a current independent source oracle or parser reliability authority; the historical transaction/document/disposition results remain recorded as implementation history only.
 
 No canonical app launch or ordinary Debug/Release container access is part of Sprint 56 acceptance. The protected V5 Debug database remains unresolved local-only recovery evidence.
 
@@ -1402,27 +1611,28 @@ The active repository also includes:
 - Sprint 47 fail-closed startup and migration-chain verification;
 - Sprint 48 truthful Settings cleanup;
 - the completed `FW-P0-23` financial-presentation and provenance repair boundary;
-- ADR-044 durable card-liability/instrument architecture and exact Amex/CBQ PDF support.
+- ADR-044 durable card-liability/instrument architecture and exact Amex/CBQ/Axis card support.
 
 Detailed implementation history remains in Git and accepted ADRs.
 
 ---
 
-## Current Planning State — 2026-08-28
+## Historical Planning State — 2026-08-28
 
 - Sprint 79 is the highest-numbered **accepted** implementation, with ADR-045 and Migration V16 as the current accepted architecture/migration baseline.
 - Sprint 78 and Sprint 78A failed; Sprint 78B completed the Sprint 78 outcome and no Sprint 78C exists.
-- The exact accepted Axis source, ownership, credential, V15 and acceptance boundaries are recorded in the `Current Alignment — 2026-08-27` section above and in `LedgerForge_Roadmap_Sprints_70-79_Current.md`.
+- The exact accepted Axis source, ownership, credential, V15 and acceptance boundaries are recorded in the current alignment section above and in the historical `LedgerForge_Roadmap_Sprints_70-79_Current.md`.
 - Exact Axis card PDF/XLSX production support is accepted only for the Sprint 78B profiles and source-proven boundaries; broader Axis/card/XLSX claims remain unsupported.
-- Sprint 79 is accepted and published; Sprint 80 remains the reserved next gate for Swift 6 migration-readiness analysis before investment implementation.
+- Sprint 79 is accepted and published; Sprint 80 is accepted as the `SWIFT6_READINESS_COMPLETE` discovery outcome. No Swift-6 migration or readiness implementation has been performed.
+- Sprint 80's accepted sequencing is: documentation sync; accepted-profile CBQ corrective closure; PR-1 ownership seam; serial Unified Import Centre; PR-2 / PR-3 / TEST-PR; coordinated Swift-6 migration; then personal-v1 certification. Parallel preparation remains an open architecture decision.
 - `FUTURE_WORK.MD` remains the canonical queue for work that is not currently selected for execution. It is not the active-sprint authority.
 
 ---
 
 ## Planning Boundary
 
-- `PROJECT_STATE.md` records accepted repository reality plus explicitly labelled active unaccepted WIP.
-- `LedgerForge_Roadmap_Sprints_70-79_Current.md` is the repository planning authority for the current cycle's sprint numbering, corrective suffixes, status and next gates.
+- `PROJECT_STATE.md` records accepted repository reality plus explicitly labelled active unaccepted WIP when present.
+- `LedgerForge_Roadmap_Sprints_80-89_Current.md` is the repository planning authority for the current cycle's sprint numbering, corrective suffixes, status and next gates. `LedgerForge_Roadmap_Sprints_70-79_Current.md` is retained as the historical prior-cycle roadmap.
 - `LedgerForge_Standing_Execution_Harness_Guide.md` is the repository standing execution/review-method authority.
 - `FUTURE_WORK.MD` is the canonical unscheduled planning queue.
 - Accepted ADRs govern accepted architecture; ADR-045 governs the implemented Sprint 79 salary/planning boundary, while the Sprint 78B ADR-015 and ADR-044 amendments remain accepted implemented state for their domains.

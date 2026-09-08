@@ -54,13 +54,13 @@ struct SourceContentSnapshotTests {
                 return bytes
             }
         }
-        readEntered.wait()
+        await awaitSignal(readEntered)
 
         let invalidationTask = Task.detached {
             invalidationStarted.signal()
             snapshot.invalidate()
         }
-        invalidationStarted.wait()
+        await awaitSignal(invalidationStarted)
         releaseRead.signal()
 
         #expect(try await readTask.value == expected)
@@ -84,6 +84,15 @@ struct SourceContentSnapshotTests {
             #expect(!description.contains(sourceText))
             #expect(!description.contains(digest))
             #expect(error as? SourceContentSnapshotError == .invalidated)
+        }
+    }
+
+    private func awaitSignal(_ semaphore: DispatchSemaphore) async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                semaphore.wait()
+                continuation.resume()
+            }
         }
     }
 }
