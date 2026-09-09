@@ -8,7 +8,7 @@
 
 - **Planning authority:** This file is the repository authority for Sprint 80 and any later 80–89 numbering, corrective suffixes, cycle status and next gates.
 - **Execution authority:** None. A complete Chat-approved prompt authorizes each task.
-- **Accepted production baseline:** Sprint 79 remains the highest-numbered accepted implementation. The unnumbered Authentic-Corpus Parser / Import Reliability Reset and the startup reliability/monthly-planner package are technically accepted; V17 remains current and publication is recorded separately by Git history.
+- **Accepted production baseline:** Sprint 79 remains the highest-numbered accepted implementation. The unnumbered Authentic-Corpus Parser / Import Reliability Reset and startup reliability/monthly-planner package are technically accepted and published; current pushed `main` is `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194`, V17 remains current, and the later obsolete-plugin-artifact cleanup changed no product behavior.
 - **Latest accepted numbered sprint:** Sprint 79 — Qatar Airways Salary Domain and Current-Month Funding Planner.
 - **Latest accepted discovery outcome:** Sprint 80 — Swift 6 and macOS readiness closure, `SWIFT6_READINESS_COMPLETE`.
 - **Current migration baseline:** additive V17 accepted with the unnumbered reliability reset; V1–V16 remain immutable.
@@ -25,7 +25,7 @@ accepted production support.
 
 Chat accepted the complete reviewed 35-path candidate, including the non-negative-transfer-fee correction, on 2026-09-09. The accepted startup, diagnostics, planner, recurrence-prevention and validation boundaries are recorded in [PROJECT_STATE.md](PROJECT_STATE.md). The final canonical TestPlan passed 465 definitions / 75 suites / 523 expanded executions, with zero failures/skips/expected failures; the earlier parser reset retains its separate historical result below. V17 definitions and financial formulas remain unchanged.
 
-Implementation review is closed for that exact candidate. This package allocates no sprint number or corrective suffix, introduces no migration or architecture decision, and does not complete PR-1, the Unified Import Centre, Swift-6 migration or personal-v1 adoption. The dependency ordering below remains unchanged; the earlier parser reset remains closed. Git history and the publication receipt identify delivery separately from this acceptance record.
+Implementation review is closed for that exact candidate. Publication completed at implementation/package commit `6455f662dd0ea8896d19af3e67be51546badb3ae`; the later user-authorized obsolete-plugin-artifact cleanup advanced `main` to `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` without changing the accepted product boundary. This package allocates no sprint number or corrective suffix, introduces no migration or architecture decision, and does not complete PR-1, the Unified Import Centre, Swift-6 migration or personal-v1 adoption.
 
 ## Accepted unnumbered parser reliability reset
 
@@ -73,6 +73,26 @@ inference.
 No ordinary Sprint 81–89 feature sequence is assigned by this documentation
 sync. Future work remains in `FUTURE_WORK.MD` until Chat selects a bounded
 outcome and supplies a complete execution prompt.
+
+## Recorded planning inputs / candidate readiness
+
+This table is a view of the canonical `FUTURE_WORK.MD` queue. It is **not** sprint allocation, priority promotion or implementation authorization. Before any roadmap assignment, included work must already have a durable queue/authority trace.
+
+| Canonical queue ID | Outcome | Current status | Dependency | Personal-v1 relevance | Notes / unresolved decision |
+|---|---|---|---|---|---|
+| `FW-P2-72` | PR-1 staging/publication ownership seam | Candidate | Sprint 80 readiness; current store/hydrator contracts | Required sequencing prerequisite | Swift-5 ownership correction; no parallel-preparation or Swift-6 switch |
+| `FW-P1-19` | Serial LedgerForge Import Centre | Candidate | PR-1; existing confirmation-gated Import Wizard | High | Single file = queue length one; future multi-file uses same intake/review/result model |
+| `FW-P1-20` | Batch-import boundary | Blocked | Duplicate handling, cancellation, failure isolation, PR-1 | High | Serial-first boundary retained; bounded parallel preparation remains unresolved |
+| `FW-P2-03` | Transactions filtering/search | Ready for planning | Stable transaction fields | Medium/high usability proof | R1-approved direction; screenshot colour observation remains an evidence gap, not a verified defect |
+| `FW-P2-53` | Contextual filtering/sorting/table controls | Ready for planning | Stable date semantics/searchable domains | Medium/high usability proof | Currency-safe sorting, resizable columns, collapsible inspector; source order never rewritten |
+| `FW-P2-52` | User/appearance preferences | Ready for discovery | Existing settings + `WorkspaceSettings` direction | Medium | R1 visual direction approved; preference storage/ownership unresolved |
+| `FW-P2-55` | Adaptive appearance design direction | Idea | Approved design review/spec/assets | Medium | R1 approves System/Light/Dark + optional Indigo, but design approval does not select implementation |
+| `FW-P2-77` | Source-tree/documentation organization discovery | Ready for discovery | None | Maintenance, not an adoption gate | Discovery required before moves; no target folder tree is accepted architecture |
+| `FW-P3-36` | Verified backup/restore/disaster recovery | Ready for discovery | User-facing backup/restore contract | Serious adoption-gate candidate | Must be considered explicitly before personal-v1 certification; no priority promotion implied |
+
+`LF-UI-2026-09-R1` is approved design authority once this documentation sync is published. UI design approval does not select a sprint; future UI implementation must be selected from the canonical queue. **Transactions is Designer-1's strongest representative proof surface recommendation, but this is a planning input, not Sprint 81 selection.** Appearance storage architecture remains unresolved, and repository organization requires discovery before any physical moves.
+
+No Sprint 81–89 feature assignment follows from this matrix.
 
 ## Sprint 80 — Swift 6 and macOS readiness closure
 

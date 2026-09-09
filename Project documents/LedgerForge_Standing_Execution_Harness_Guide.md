@@ -51,6 +51,33 @@ Memory and old reports may guide a search but never override current authorities
 
 ---
 
+## Material Finding / Requirement Intake Rule
+
+Every material proposed change, requirement, defect, workflow issue, design finding, architecture issue, maintenance need or product idea from any project contributor must receive a durable disposition. A material finding existing only in chat, memory, a task report, screenshot review, ignored output or temporary handoff is not queued project work.
+
+1. `FUTURE_WORK.MD` is the default home for unscheduled work.
+2. Accepted design requirements belong in the UI/design authority.
+3. Accepted architecture belongs in ADR.
+4. Implemented verified state belongs in `PROJECT_STATE.md`.
+5. The current roadmap selects from already-recorded work; it must not become a second backlog.
+6. A report/task may not close with a material out-of-scope suggestion stranded only in report or chat text.
+7. Implementation prompts may include only work traceable to a durable queue entry, accepted subject authority or explicit corrective defect.
+8. New discoveries during execution that materially change scope must be recorded and returned to Chat before implementation expands.
+9. Recording a proposal does not approve it, design approval does not imply implementation acceptance, and roadmap presence does not authorize execution.
+
+Required report-close disposition vocabulary:
+
+- `EXISTING_ENTRY_UPDATED`
+- `NEW_CANDIDATE_RECORDED`
+- `ALREADY_COMPLETED`
+- `DUPLICATE`
+- `DEFERRED_WITH_REASON`
+- `REJECTED_WITH_REASON`
+
+Prospective queue metadata may include Origin, Evidence / authority, Disposition date, Owning specification / ADR and Personal-v1 relevance where useful; do not mechanically retrofit every historical candidate.
+
+---
+
 ## 3. Execution environments and model tiers
 
 ### Chat
@@ -338,6 +365,8 @@ Only Chat assigns or accepts corrective numbering.
 
 ## 13. Documentation synchronization
 
+Documentation synchronization applies both at technical acceptance and when execution/discovery surfaces a material out-of-scope finding.
+
 At technical acceptance:
 
 - update `PROJECT_STATE.md`;
@@ -345,6 +374,13 @@ At technical acceptance:
 - publish required ADR alignment/amendment;
 - reconcile `FUTURE_WORK.MD`;
 - update AGENTS/Project Guide/Harness only when reusable process changed.
+
+When a material out-of-scope finding is discovered:
+
+- link it to an existing queue item or owning authority, record a new candidate, or classify it as already completed, duplicate, deferred with reason or rejected with reason;
+- do not widen current implementation merely because the finding is useful;
+- return decision-changing discoveries to Chat before implementation scope expands;
+- ensure the report closes with one of the required intake dispositions rather than leaving the finding only in narrative text.
 
 If acceptance is not complete, record the work as **active unaccepted WIP**, not production support.
 

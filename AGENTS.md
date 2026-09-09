@@ -37,6 +37,10 @@ For every LedgerForge planning, implementation, review, recovery or documentatio
 
 Do not infer current sprint status, accepted support, migration version, architecture or local Git state from memory or an older report.
 
+### Material finding intake
+
+A material new finding, requirement, defect, workflow issue, design finding, architecture issue, maintenance need or product idea may not remain only in memory, chat or a report. Before sprint selection or implementation, route it to `FUTURE_WORK.MD` or its owning subject authority and give it a durable disposition. Recording a proposal does not approve it, and implementation work must trace to durable authority or an explicitly authorized corrective defect.
+
 The complete Chat-approved prompt is the execution contract for the current task. Repository documents provide durable context and constraints; they do not independently authorize implementation.
 
 ---

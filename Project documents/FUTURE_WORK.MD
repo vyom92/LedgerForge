@@ -956,39 +956,15 @@ OCR output remains untrusted until deterministic parsing and validation succeed.
 **Status:** Candidate
 **Depends on:** Existing confirmation-gated Import Wizard foundation; PR-1 staging/publication ownership seam
 
-**Sprint 80 readiness boundary:** The first bounded implementation may remain
-Swift 5 and serial, provided it has explicit MainActor task ownership,
-deterministic queue ordering, per-file state ownership, security-scoped source
-and `SourceContentSnapshot` lifetimes, cancellation before confirmation,
-explicit per-statement confirmation, synchronous provider-owned persistence and
-canonical `RepositoryStoreHydrator` publication. PR-1 (the staging/publication
-ownership seam) is the only Swift-6-derived prerequisite before that serial
-increment. This readiness result does not mark the Import Centre complete or
-authorize implementation.
+**Sprint 80 readiness boundary:** The first bounded implementation may remain Swift 5 and serial, provided it has explicit MainActor task ownership, deterministic queue ordering, per-file state ownership, security-scoped source and `SourceContentSnapshot` lifetimes, cancellation before confirmation, explicit per-statement confirmation, synchronous provider-owned persistence and canonical `RepositoryStoreHydrator` publication. PR-1 (the staging/publication ownership seam) is the only Swift-6-derived prerequisite before that serial increment. This readiness result does not mark the Import Centre complete or authorize implementation.
 
-Complete the Import Wizard as the LedgerForge Import Centre for preparing, reviewing, confirming and understanding imports.
+Complete the Import Wizard as the LedgerForge Import Centre for preparing, reviewing, confirming and understanding imports. LedgerForge owns the queue, per-file state, preparation, validation, account choice, duplicate outcomes, confirmation, retry, cancellation and result navigation. macOS owns authorization for arbitrary file and folder access; LedgerForge must not claim unrestricted filesystem access.
 
-LedgerForge owns the queue, per-file state, preparation, validation, account choice, duplicate outcomes, confirmation, retry, cancellation and result navigation. macOS owns authorization for arbitrary file and folder access; LedgerForge must not claim unrestricted filesystem access.
+**LF-UI-2026-09-R1 alignment:** single-file import is queue length one. Future multi-file intake must use the same intake → preparation → sequential review/confirmation → result model rather than a separate workflow. This design direction does **not** claim that batch UI currently exists. The PR-1 prerequisite and serial-first implementation boundary remain unchanged.
 
-The complete workflow may incorporate selected candidates from this section, including:
+The complete workflow may incorporate selected candidates from this section, including batch import, multi-file drag and drop, editable preview, correction and revalidation, account-match review, duplicate review, progress/cancellation/retry, actionable validation guidance and completed import outcome/history navigation.
 
-- batch import;
-- multi-file drag and drop;
-- editable preview;
-- correction and revalidation;
-- account-match review;
-- duplicate review;
-- progress, cancellation and retry;
-- actionable validation guidance;
-- completed import outcome and history navigation.
-
-This is an umbrella product outcome, not permission to combine every listed capability into one sprint.
-
-Repository discovery must determine which related candidates form each bounded implementation increment.
-
-This candidate provides the bounded foundation for the longer-term Import Studio direction without turning importing into the application’s primary experience.
-
----
+This is an umbrella product outcome, not permission to combine every listed capability into one sprint. Repository discovery must determine which related candidates form each bounded implementation increment. This candidate provides the bounded foundation for the longer-term Import Studio direction without turning importing into the application’s primary experience.
 
 ## FW-P1-20 — Batch Import
 
@@ -1298,9 +1274,20 @@ Only source-document reopening, browsing or library behavior remains here. It re
 **Status:** Ready for planning
 **Depends on:** Stable transaction fields
 
-Expand future global Transactions filters for institution, account, bank/card family, currency, date and financial direction. Preserve one global repository-backed Transactions store and experience; do not claim these filters are currently implemented.
+**Owning design authority:** `UI_UX_v1.0_Frozen.md` and `UI Assets/Approved/LF-UI-2026-09-R1/DESIGN_HANDOFF.md`.
 
----
+Expand the global repository-backed Transactions experience with bounded search/filtering over supported displayed fields and authoritative transaction semantics:
+
+- account, institution, bank/card family, currency, period/date, financial-effect/direction and category filters;
+- amount/institution filtering only where the displayed authoritative fields support it;
+- AND across filter groups and OR within a multi-select group;
+- visible active scope, clear-filters behavior and deterministic no-match presentation;
+- immutable account identity and no fuzzy financial inference;
+- search only over supported displayed/searchable fields rather than hidden identifiers or source fragments.
+
+The global Transactions store remains the authority; filtering is presentation scope, not a new transaction repository.
+
+**Designer-1 observation / evidence gap — 2026-09-09:** one reviewed screenshot appeared to show internally inconsistent INR inflow/outflow/net colouring. Classification: **OBSERVATION / EVIDENCE GAP, NOT VERIFIED FINANCIAL DEFECT**. Before any calculation or financial-colour semantic change, run targeted source/runtime verification. Do not infer stored-data corruption or create a P0 defect without proof.
 
 ## FW-P2-04 — Saved Transaction Filters
 
@@ -1560,16 +1547,16 @@ Sprint 68A removes an inert star only; it does not implement favourites or chang
 **Status:** Candidate
 **Depends on:** None
 
-Sprint 68A supplies one neutral idle Validation Review state only; broader empty-state and import guidance remain candidate work.
+Accepted UI work has already removed or contextualized several developer/repository-oriented terms where they were misleading, including the standalone Salary **Truth classes** panel in favor of contextual provenance. Sprint 68A also supplies a neutral idle Validation Review state.
 
----
+Only genuinely remaining user-facing internal terminology is still queued here. `LF-UI-2026-09-R1` reinforces plain financial/workflow language and does not authorize removing diagnostics or provenance that are still truthful and useful.
 
 ## FW-P2-41 — Consistent Toolbar Composition
 
 **Status:** Candidate
 **Depends on:** None
 
----
+Cross-link `LF-UI-2026-09-R1` contextual-toolbar direction: destination toolbars should expose only functional controls relevant to the active page, with visible scope and consistent hierarchy. Do **not** require one dominant Import button on every destination merely for visual uniformity.
 
 ## FW-P2-43 — Better Account Icons
 
@@ -1620,28 +1607,47 @@ Future charts must preserve native-currency safety, provenance, deterministic ca
 **Status:** Candidate
 **Depends on:** None
 
----
+Under `LF-UI-2026-09-R1`, presentation must distinguish loading, genuinely empty, unavailable, failed and no-match/no-filter-result states. A completed import should resolve to a coherent completed/result state rather than appearing stuck in unfinished preparation. Guidance should not duplicate navigation actions unnecessarily or imply unsupported recovery.
 
 ## FW-P2-48 — Hover, Spacing and Visual Polish
 
 **Status:** Candidate
 **Depends on:** Stable primary layouts
 
----
+Bounded shared visual follow-up under `LF-UI-2026-09-R1` includes:
+
+- responsive native-currency summaries with readable full amounts;
+- clearer account disambiguation without exposing identifiers;
+- responsive/collapsible inspectors;
+- settings hierarchy and density polish;
+- bounded later Salary compactness/rate wording refinement; and
+- Developer Console clarity between the active database and any selected target.
+
+**User decision:** further Salary visual refinement is lower priority. Do not reopen the accepted natural-input, Save/Command-S, fee-validation or persistence fixes as a redesign task.
 
 ## FW-P2-49 — Accessibility Review
 
 **Status:** Candidate
 **Depends on:** Stable primary workflows
 
----
+`LF-UI-2026-09-R1` requires native/runtime verification of:
+
+- complete keyboard paths for primary interactions;
+- meaningful VoiceOver labels/grouping;
+- visible focus independent of selection;
+- status meaning that does not depend on colour;
+- a 4.5:1 text contrast target and 3:1 meaningful-boundary/non-text target where applicable;
+- reduced-motion and reduced-transparency behavior; and
+- readable fallback when user appearance choices would otherwise reduce legibility.
+
+Static design approval is not native accessibility acceptance.
 
 ## FW-P2-50 — Keyboard Navigation and Shortcuts
 
 **Status:** Candidate
 **Depends on:** Stable primary workflows
 
----
+Cross-link the R1 Transactions/table requirements: keyboard reachability for search, period/filter controls, sortable headings, table selection, column/inspector interactions and collapse/expand behavior; focus must remain visible and distinct from selection. Shortcuts must not bypass confirmation or mutation safety.
 
 ## FW-P2-51 — Startup, Runtime and Import Performance Optimization
 
@@ -1668,42 +1674,40 @@ Do not optimize without benchmarks.
 **Status:** Ready for discovery
 **Depends on:** Existing settings presentation and `WorkspaceSettings` domain direction
 
-Define durable, privacy-safe preferences for:
+Define durable, privacy-safe preferences for existing regional/display behavior and the **user-approved `LF-UI-2026-09-R1` appearance direction**:
 
-- date and time formatting;
-- regional number formatting;
-- base and secondary display currencies;
-- default import behaviour;
-- dashboard presentation choices;
-- account and transaction display preferences;
-- developer-mode separation from ordinary user settings.
+- Follow System / Light / Dark;
+- System Neutral / optional Deep Indigo preset concept;
+- accent;
+- app-wide text size;
+- a small supported font-style set;
+- comfortable/compact density;
+- bounded foreground/background customization;
+- bounded eligible-surface translucency;
+- Preview / Apply / Cancel / Restore defaults;
+- automatic readable fallback; and
+- reduced-transparency compliance.
 
-Preference changes must not rewrite imported financial truth.
+Also retain candidate scope for date/time formatting, regional number formatting, base/secondary display currencies, default import behavior, dashboard/account/transaction presentation and developer-mode separation.
 
-Sprint 68A removes a static dropdown implication only; it does not implement user profiles, workspace switching or durable preferences.
-
-Normal regional formatting may be discovered independently. Reporting-currency preferences depend on `FW-P3-33`.
-
----
+**Unresolved architecture:** preference persistence/storage ownership remains discovery work. R1 approval does not choose UserDefaults, SQLite or another store. Preference mutation must never rewrite imported financial truth. Reporting-currency preferences remain dependent on `FW-P3-33`.
 
 ## FW-P2-53 — Contextual Date-Range and Filter Controls
 
 **Status:** Ready for planning
 **Depends on:** Stable date semantics and searchable presentation domains
 
-Implement the frozen contextual-toolbar direction for date range, filters and other page-specific controls.
+Implement the approved `LF-UI-2026-09-R1` contextual Transactions/table direction:
 
-Sprint 68A leaves sorting and contextual filters unavailable; readiness is unchanged.
+- period controls and visible active filter/sort scope;
+- sortable supported Date, Description, Account, Category and Amount columns;
+- repeated heading action reverses direction;
+- currency-safe amount sorting with deterministic/stable tie-breaking;
+- resizable columns;
+- collapsible inspector with stable selection; and
+- contextual controls that remain keyboard accessible and affect only the active presentation domain.
 
-The controls must:
-
-- affect only the active presentation domain;
-- make their scope visible;
-- preserve deterministic results;
-- remain keyboard accessible;
-- avoid implying unsupported analytics or repository mutations.
-
----
+Presentation sorting must never rewrite source order, running-balance semantics or durable transaction ordering. Mixed-currency values must not be silently converted merely to sort or total them.
 
 ## FW-P2-54 — Document Library and Source-Document Browsing
 
@@ -1737,11 +1741,9 @@ The library must not expose raw source content by default and must not treat a d
 **Status:** Idea
 **Depends on:** Approved design review, updated frozen UI specification and revised UI assets
 
-Investigate a complete Light Mode visual system without weakening the current Deep Indigo dark-mode baseline.
+The adaptive appearance direction is now **user-approved design** through `LF-UI-2026-09-R1`: Follow System is the default target, Light and Dark are explicit choices, and Deep Indigo becomes an optional preset rather than a mandatory theme for covered scope.
 
-Implementation may begin only after design tokens, contrast requirements, approved assets and acceptance criteria are updated.
-
----
+Implementation remains uncompleted. This item's existing status/readiness is intentionally unchanged by design approval. Storage ownership, native implementation and runtime/accessibility acceptance remain separate decisions.
 
 ## FW-P2-56 — Development Performance Profiling
 
@@ -2055,6 +2057,54 @@ personal-v1 certification. Swift-6 migration is not complete or approved by
 Sprint 80; the readiness discovery only establishes that the compiler can be
 reached and that the remaining work is materially known.
 
+## FW-P2-77 — Source Tree and Documentation Organization Consolidation
+
+**Status:** Ready for discovery
+**Type:** Maintenance
+**Depends on:** None
+**Origin:** User / documentation synchronization, 2026-09-09
+**Evidence / authority:** Current repository structure at `main@d8124ef5a1f38a1e7547f4f8905c91f25b2f1194`
+**Disposition date:** 2026-09-09
+**Owning specification / ADR:** Repository organization discovery; no accepted target layout yet
+**Personal-v1 relevance:** Maintenance/readability; not itself an adoption gate
+
+**Purpose:** Establish one understandable repository organization and naming model while preserving behavior, Git history, Xcode membership and project authority.
+
+Current verified structural signals:
+
+- root `Analyzers` / `Detectors` / `Normalizers` / `Parsers` / `Readers` coexist with feature-local `Import/Readers` and `Import/Models`;
+- `Core` mixes runtime stores, diagnostics, planner input and UI-adjacent components;
+- `ContentView.swift` is structurally oversized and mixes shell/workflow concerns;
+- `Project documents` uses mixed naming conventions; and
+- the superseded 70–79 roadmap retains `_Current` in its filename although its content is historical.
+
+Discovery scope:
+
+- feature-oriented versus layer-oriented placement;
+- root directory ownership;
+- Import/Ingestion consolidation possibilities;
+- Core ownership/naming;
+- Views/ViewModels organization;
+- test-tree correspondence;
+- Project documents naming and historical-roadmap archival conventions;
+- Xcode file references, resources and target membership;
+- script/path assumptions; and
+- Git-history impact of moves.
+
+Explicit boundaries:
+
+- no financial behavior change merely for neatness;
+- no parser consolidation solely because folders look similar;
+- no Swift package/framework split without separate architecture approval;
+- no mass move mixed with behavioral refactor;
+- no private-original/evidence relocation;
+- no migration; and
+- no implementation in the documentation-sync task that recorded this candidate.
+
+Cross-links: `FW-P2-67` owns App Shell / workflow decomposition behavior; `FW-P2-71` owns Xcode/user-metadata hygiene; `FW-P2-77` owns repository organization/naming discovery.
+
+Do not create a speculative target folder tree as accepted architecture. Any proposed physical layout remains a discovery output.
+
 # P3 — Identity Enhancements
 
 ## FW-P3-01 — Identifier Confidence Scoring
@@ -2146,24 +2196,11 @@ Internal transfers must never be presented as new income or expense.
 **Status:** Partially completed; the remaining broader workspace is future work
 **Depends on:** Future transaction/account relationships, recurring-obligation detection and separately approved planning expansions
 
-Sprint 79 completed the bounded Qatar Airways Salary History / This Month planner slice under ADR-045 and Migration V16. That accepted implementation is recorded in `PROJECT_STATE.md` and ADR-045 and is no longer queued here.
+Sprint 79 completed the bounded Qatar Airways Salary History / This Month planner slice under ADR-045 and Migration V16. The later accepted unnumbered startup/monthly-planner package completed the bounded coherent editor, natural amount entry, one Save/Command-S action, contextual provenance, compact layout and non-negative configured-fee validation. Those accepted slices are recorded in `PROJECT_STATE.md` and are no longer queued.
 
-Remaining future work includes:
+Remaining future work includes generic salary/employer support beyond exact `qatar-airways.salary.pdf@1`, recurring-obligation detection and broader cash-flow planning, automated/executable transfer planning, automatic card-payment reconciliation, generic budgeting/allocation, savings/investment execution, historical planner analytics/variance explanation and separately approved global-FX/reporting-currency integration.
 
-- generic salary/employer support beyond exact `qatar-airways.salary.pdf@1`;
-- recurring-obligation detection and broader cash-flow planning;
-- automated or executable transfer planning;
-- automatic card-payment reconciliation;
-- generic budgeting/allocation;
-- savings/investment execution;
-- historical planner analytics and variance explanation after actual bank transactions arrive;
-- any broader global-FX/reporting-currency integration, only under separate architecture and source authority.
-
-The Chat-accepted unnumbered startup/monthly-planner package on 2026-09-09 completed the bounded coherent editor, natural amount entry, one Save/Command-S action, contextual provenance, compact layout and non-negative configured-fee validation. These accepted slices are recorded in [PROJECT_STATE.md](PROJECT_STATE.md) and are no longer queued. Broader analytics and planning extensions above remain deferred; this umbrella item is only partially completed.
-
-The accepted dedicated Salary destination and bounded Dashboard summaries remain Sprint 79 production state; this future-work item does not authorize expansion of that boundary.
-
----
+**User decision — 2026-09-09:** further Salary presentation refinement is lower priority and remains bounded future polish, not a new redesign. Do not reopen accepted editing/persistence fixes. The accepted dedicated Salary destination and bounded Dashboard summaries remain production state.
 
 ## FW-P3-09 — Upcoming Obligations and Cash-Flow Planning
 
@@ -2488,23 +2525,11 @@ Provide a machine-readable export of supported LedgerForge domain data. User-fac
 **Shared prerequisites:** The canonical database lifecycle, checked close, coordinated SQLite/WAL/SHM handling, verified lifecycle backup, migration-chain integrity and fail-closed recovery foundations exist.  
 **Implementation dependency:** Approval of the user-facing backup contents, integrity, restore-target, compatibility and confirmation contract.
 
-Provide:
+**Coordinator planning note — 2026-09-09:** backup/restore has been identified as a serious personal-v1 adoption-gate candidate. This is a recorded planning proposal, **not** automatic priority promotion, implementation authorization or a claim that backup/restore is complete. It must be considered explicitly before personal-v1 certification.
 
-- explicit local backup creation;
-- backup integrity verification;
-- documented contents and exclusions;
-- restore preview and confirmation;
-- tested restoration into a safe target;
-- version and schema compatibility checks;
-- failure-safe recovery;
-- disaster-recovery guidance;
-- clear separation from optional synchronization.
+Provide explicit local backup creation, integrity verification, documented contents/exclusions, restore preview/confirmation, safe-target restoration, version/schema compatibility checks, failure-safe recovery, disaster-recovery guidance and clear separation from optional synchronization.
 
-Targeted discovery must distinguish the existing DEBUG lifecycle backup from a production user-owned backup product, define sandbox/file-access behavior and ensure restore cannot overwrite unique or newer data without explicit review.
-
-A backup is not trustworthy merely because a file was copied.
-
----
+Targeted discovery must distinguish the existing DEBUG lifecycle backup from a production user-owned backup product, define sandbox/file-access behavior and ensure restore cannot overwrite unique or newer data without explicit review. A backup is not trustworthy merely because a file was copied.
 
 ## FW-P3-37 — Optional Encrypted Sync
 

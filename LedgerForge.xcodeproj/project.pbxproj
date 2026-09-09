@@ -356,6 +356,23 @@
 		F63000010000000000000001 /* SourceContentSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceContentSnapshot.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A90900013090000000000001 /* Exceptions for "UI Assets" folder in "LedgerForge" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Approved/LedgerForge_UI_Handoff_LF-UI-2026-09-R1.zip",
+				"Approved/LF-UI-2026-09-R1/ACCEPTANCE.md",
+				"Approved/LF-UI-2026-09-R1/ASSET_MANIFEST.json",
+				"Approved/LF-UI-2026-09-R1/DESIGN_HANDOFF.md",
+				"Approved/LF-UI-2026-09-R1/DESIGN_TOKENS.json",
+				"Approved/LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png",
+				"Approved/LF-UI-2026-09-R1/README.md",
+				"Approved/LF-UI-2026-09-R1/SOURCES.md",
+			);
+			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		283E97932FFE3A470034CA98 /* Branding */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -374,6 +391,9 @@
 		};
 		28A3A4C22FFE1E3900DD5727 /* UI Assets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A90900013090000000000001 /* Exceptions for "UI Assets" folder in "LedgerForge" target */,
+			);
 			path = "UI Assets";
 			sourceTree = "<group>";
 		};

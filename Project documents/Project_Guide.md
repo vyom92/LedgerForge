@@ -62,6 +62,8 @@ Read an authority only when the selected playbook requires it.
 
 Memory, old conversations, uploads and reports are context, not repository authority. Reports are claims until independently verified.
 
+**Material-finding routing:** A material new finding or requirement must be durably dispositioned in its owning subject authority or `FUTURE_WORK.MD` before sprint selection or implementation. A recorded proposal remains a proposal until separately accepted.
+
 The user-settled all-stages authentic-input rule in ADR-046 and the Standing Harness applies before development or debugging as well as during acceptance: no generated, reconstructed, sanitized, representative, reduced, mutated or hand-authored financial statement may be created or used. Only authentic corpus inputs (including operational exact/decrypted copies or actual attachments) may exercise statement-dependent behaviour. Nonfinancial mechanics remain permitted; absent authentic cases remain source-uncertified. <!-- user-specified -->
 
 ---
@@ -182,7 +184,7 @@ Use the least invasive proving source: GitHub for pushed truth; MCP/direct local
 Read-only parallel Luna High agents are allowed only for independent causal boundaries. No parallel writers.
 
 ## Required end state: `DISCOVERY_RESOLVED`
-The unknown is resolved sufficiently for Chat to decide, or one named blocker and its required evidence are established. No opportunistic implementation.
+The unknown is resolved sufficiently for Chat to decide, or one named blocker and its required evidence are established. No opportunistic implementation. Any material out-of-scope finding is durably dispositioned before close as an existing entry update, new candidate, completed/duplicate item, explicit deferral or explicit rejection.
 
 **END PG-20**
 
@@ -208,6 +210,7 @@ Narrow work: Luna High parent, High reasoning, no subagents or bounded read-only
 6. Test falsification paths, not only success paths.
 7. Leave the candidate unstaged unless publication is explicitly included.
 8. Return exact MCP candidate-state evidence.
+9. Durably disposition every material out-of-scope finding before task close; do not leave it only in the implementation report or chat.
 
 ## Required end state: `IMPLEMENTATION_CANDIDATE`
 A bounded local candidate appears to satisfy acceptance. It remains pending Chat acceptance.
@@ -252,6 +255,8 @@ Chat / Coordinator. Default reasoning: **Sol High**.
 Verify candidate identity, branch/worktree handling, changed files, scope/exclusions, architecture/migration impact, independent-oracle boundary, test boundary, source truth where relevant, provider parity where relevant, persistence/hydration/relaunch/presentation where relevant, privacy/residue, falsification evidence, and final local state. For reader/parser/source-support claims, ADR-046 requires the complete affected authentic corpus through the ordinary production path; synthetic financial-source fixtures, partial authentic sampling and a green TestPlan alone cannot authorize support.
 
 Treat execution reports as claims. Classify material claims as verified, reported only, contradicted, or missing.
+
+Before acceptance closes, every material out-of-scope finding in the reviewed report must have a durable disposition in the owning authority or `FUTURE_WORK.MD`; acceptance does not turn a proposal into approved scope.
 
 Optional Luna High subagents are read-only evidence audits. No writers.
 
@@ -300,11 +305,12 @@ Chat semantic reasoning
 7. Luna Max does not integration-edit after subagents finish.
 8. Chat rereads the actual resulting files through MCP and performs semantic acceptance.
 9. Documentation-only work does not trigger application-wide tests unless executable material changed.
-10. Private planning/harness material remains outside Git unless separately authorized.
+10. The current repository-owned roadmap and Standing Execution Harness are durable Git authorities. Older private dated copies remain historical/context only and do not override the repository-owned current copies.
 11. When parser/source-support documentation changes, reconcile it against ADR-046, the Standing Harness parser/authentic-corpus policy and the current `PROJECT_STATE.md` parser-reliability alignment; preserve historical records but remove contradictory current authority.
+12. A documentation sync may not close with a material out-of-scope finding stranded only in chat/report text; give it one durable disposition in the owning authority or canonical queue.
 
 ## Required end state: `DOCS_RECONCILED`
-Current authorities agree; obsolete current-state claims are removed or narrowed; historical claims remain historically accurate; policy has one durable home where practical; routing points to subject authorities instead of duplicating them; no private material leaked into Git; final diff is ready for publication review.
+Current authorities agree; obsolete current-state claims are removed or narrowed; historical claims remain historically accurate; policy has one durable home where practical; routing points to subject authorities instead of duplicating them; all material findings have durable dispositions; no private material leaked into Git; final diff is ready for publication review.
 
 **END PG-50**
 

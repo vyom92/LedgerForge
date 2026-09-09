@@ -26,7 +26,7 @@ When reading this file:
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
 **Status alignment date:** 2026-09-09
-**Repository implementation ref reviewed:** `main@ab17d4b8dacd35f428b54fc7bb28ffb26df0829e` — base of the Chat-accepted 35-path startup reliability/monthly-planner candidate; publication is recorded separately by Git history
+**Repository implementation ref reviewed:** `main@d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` — current pushed main after publication of the accepted startup reliability/monthly-planner package (`6455f662dd0ea8896d19af3e67be51546badb3ae`) and the user-authorized obsolete-plugin-artifact cleanup (`d8124ef5a1f38a1e7547f4f8905c91f25b2f1194`)
 **Latest technically accepted production implementation:** unnumbered startup reliability and monthly-planner package, including non-negative configured-fee validation; the earlier authentic-parser reset remains closed and Sprint 79 remains the latest accepted numbered implementation
 **Latest verified Debug development-tooling implementation:** accepted startup recurrence-prevention tooling; DBP-01 remains the developer-profile architecture
 **Latest completed numbered implementation outcome:** Sprint 79
@@ -61,7 +61,7 @@ No alignment note authorizes implementation.
 | ADR-020 | Deterministic Institution Detection | Accepted and implemented in Sprint 12C. | Institution detection is a deterministic pipeline stage. |
 | ADR-021 | Deterministic Statement Classification | Accepted and implemented in Sprint 13. | Statement classification is a deterministic pipeline stage. |
 | ADR-022 | Preview Compatibility During Test Builds | Accepted and implemented as a toolchain-compatibility decision. | Historical Sprint 18 build compatibility evidence remains valid for that toolchain. |
-| ADR-023 | Frozen UI/UX Architecture | Accepted and implemented. | The frozen UI/UX hierarchy remains authoritative. |
+| ADR-023 | Frozen UI/UX Architecture | Accepted; current design alignment is LF-UI-2026-09-R1 for its bounded scope. | Frozen hierarchy remains authoritative; R1 design approval is not native implementation acceptance. |
 | ADR-024 | Repository Hydration Boundary | Accepted and implemented. | RepositoryStoreHydrator is the sole persistence-to-runtime boundary. |
 | ADR-025 | Stable Financial Entity Identity | Accepted and implemented, then extended by ADR-027, ADR-029, ADR-038, ADR-039, ADR-043 and ADR-044. | Strong parser-owned identifiers remain ownership authority; bounded masked/source observations never become strong identifiers. |
 | ADR-026 | Structured Developer Diagnostics | Accepted and implemented in Sprint 31. | Structured diagnostics remain in-memory, bounded and privacy-safe. |
@@ -933,6 +933,15 @@ Using `PreviewProvider` preserves Xcode preview functionality while avoiding the
 ---
 
 # ADR-023 — Frozen UI/UX Architecture
+
+## Current Alignment — 2026-09-09 — LF-UI-2026-09-R1
+
+- **Explicit user decision:** `LF-UI-2026-09-R1` is approved as the current design revision for its defined scope.
+- **Design/implementation separation:** approval of the handoff and master board is independent from SwiftUI implementation and native acceptance. R1 does not claim the product already matches the design.
+- **Scoped supersession:** `DESIGN_HANDOFF.md` and `MasterBoard_LF-UI-2026-09-R1.png` supersede the former master/written direction only for scope they define. Legacy approved assets remain byte-identical historical/inherited references for untouched details where consistent with newer authority and accepted behavior.
+- **Appearance:** fixed Deep Indigo is no longer mandatory for R1-covered scope; Follow System / Light / Dark with optional Indigo and bounded appearance controls are the approved design direction.
+- **No financial/architecture reinterpretation:** this alignment changes no Money semantics, native currency authority, FX rule, debit/credit meaning, persistence contract, migration, source authority or import financial semantics.
+- **Architecture record:** no new ADR number is required because this is a dated design alignment under the existing frozen UI/UX architecture decision.
 
 ## Current Alignment — 2026-07-24
 

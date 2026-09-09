@@ -1,0 +1,215 @@
+{
+  "revision": "LF-UI-2026-09-R1",
+  "status": "Designer-specified implementation targets under the approved visual direction; not measured pixel values or native-app acceptance evidence.",
+  "units": {
+    "layout": "macOS logical points",
+    "font": "points at text_scale 1",
+    "colors": "sRGB hex, opaque unless otherwise specified"
+  },
+  "appearance": {
+    "default_mode": "system",
+    "modes": [
+      "system",
+      "light",
+      "dark"
+    ],
+    "default_preset": "system-neutral",
+    "presets": [
+      "system-neutral",
+      "deep-indigo"
+    ],
+    "default_accent": "system",
+    "custom_accent": true,
+    "custom_background": true,
+    "foreground_modes": [
+      "automatic",
+      "custom"
+    ],
+    "foreground_default": "automatic",
+    "translucency": {
+      "default_percent": 0,
+      "min_percent": 0,
+      "max_percent": 30,
+      "step_percent": 1,
+      "applies_to": [
+        "sidebar",
+        "toolbar",
+        "eligible panel surface"
+      ],
+      "never_applies_to": [
+        "text",
+        "icons",
+        "financial values",
+        "whole window"
+      ],
+      "reduce_transparency_override_percent": 0
+    },
+    "font_styles": [
+      "system",
+      "rounded",
+      "serif"
+    ],
+    "default_font_style": "system",
+    "font_fallback": "system",
+    "money_tabular_digits": "mandatory",
+    "density_default": "comfortable",
+    "preview_then_apply": true,
+    "restore_defaults_scope": "appearance only",
+    "custom_light_dark_values": "retain separately; no inferred inversion of user-picked colors"
+  },
+  "typography": {
+    "body": 16,
+    "secondary": 13,
+    "caption": 12,
+    "title": 28,
+    "section": 20,
+    "metric": 28,
+    "weight": {
+      "body": "regular",
+      "title": "semibold",
+      "section": "semibold",
+      "metric": "semibold"
+    },
+    "text_scale": {
+      "min": 0.875,
+      "max": 1.375,
+      "step": 0.0625,
+      "default": 1.0
+    },
+    "minimum_caption_size": 12,
+    "money_line_limit": 1,
+    "money_truncation": "forbidden",
+    "money_shrink_to_fit": "forbidden; reflow or scroll the containing layout"
+  },
+  "spacing": {
+    "micro": 4,
+    "small": 8,
+    "control_gap": 12,
+    "section_gap": 16,
+    "panel_padding": 16,
+    "page_padding": 24,
+    "large_gap": 32
+  },
+  "radius": {
+    "control": 6,
+    "panel": 10,
+    "popover": 12
+  },
+  "control": {
+    "minimum_height": 32,
+    "focus_ring_width": 2,
+    "focus_ring_offset": 2
+  },
+  "table": {
+    "row_min_height": {
+      "comfortable": 44,
+      "compact": 36
+    },
+    "row_height_policy": "minimum only; grow for font size and wrapped descriptions",
+    "header_min_height": 32,
+    "numeric_alignment": "trailing",
+    "description_max_lines": 2,
+    "columns": {
+      "date": {
+        "ideal": 112,
+        "min": 96
+      },
+      "description": {
+        "ideal": 360,
+        "min": 220
+      },
+      "account": {
+        "ideal": 176,
+        "min": 136
+      },
+      "category": {
+        "ideal": 144,
+        "min": 120
+      },
+      "amount": {
+        "ideal": 176,
+        "min": 160,
+        "must_measure_formatted_value": true
+      }
+    },
+    "horizontal_scroll": "available when full column set cannot fit; amount must not wrap"
+  },
+  "layout": {
+    "sidebar": {
+      "ideal_width": 208,
+      "min_width": 184,
+      "max_width": 264,
+      "collapsible": true
+    },
+    "inspector": {
+      "ideal_width": 320,
+      "min_width": 280,
+      "max_width": 384,
+      "collapsible": true
+    },
+    "reference_windows": {
+      "standard": [
+        1440,
+        900
+      ],
+      "narrow": [
+        1024,
+        768
+      ]
+    },
+    "reference_sizes_are_not_deployment_minima": true,
+    "responsive_policy": "content-fit; collapse inspector first, then sidebar; keep all controls discoverable",
+    "dashboard_currency_columns_max": 2
+  },
+  "palette": {
+    "light": {
+      "background": "#F5F7FA",
+      "surface": "#FFFFFF",
+      "surface_raised": "#EDF1F7",
+      "text_primary": "#172033",
+      "text_secondary": "#4B5870",
+      "border_control": "#7A879B",
+      "separator": "#CBD5E1",
+      "accent_indigo": "#5B36D1",
+      "on_accent": "#FFFFFF",
+      "focus": "#5B36D1",
+      "selection": "#ECE8FF",
+      "on_selection": "#372279",
+      "positive_text": "#166534",
+      "negative_text": "#B91C1C",
+      "warning_text": "#92400E",
+      "info_text": "#1D4ED8"
+    },
+    "dark": {
+      "background": "#0B0F19",
+      "surface": "#111827",
+      "surface_raised": "#1A2233",
+      "text_primary": "#F3F6FF",
+      "text_secondary": "#ABB7C9",
+      "border_control": "#77869C",
+      "separator": "#38445A",
+      "accent_indigo": "#7C4DFF",
+      "on_accent": "#FFFFFF",
+      "focus": "#B2A3FF",
+      "selection": "#292344",
+      "on_selection": "#EDE9FE",
+      "positive_text": "#86EFAC",
+      "negative_text": "#FCA5A5",
+      "warning_text": "#FCD34D",
+      "info_text": "#93C5FD"
+    }
+  },
+  "contrast_targets": {
+    "ordinary_text": 4.5,
+    "control_boundaries_and_focus": 3.0,
+    "note": "Product acceptance targets. Static opaque pairs are checked in package validation. Native translucent/custom/system colors require separate runtime checks."
+  },
+  "state_rules": {
+    "selected": "tint plus selection semantics; distinct from keyboard focus",
+    "disabled": "unavailable action remains identifiable; give a reason when consequential",
+    "loading": "neutral placeholder; never fabricated financial values",
+    "error": "specific cause and allowed next action; saved versus not saved remains explicit",
+    "missing": "em dash or specific missing-input explanation, not zero",
+    "semantic_color": "derived from authoritative financial meaning, never solely from sign or text parsing"
+  }
+}

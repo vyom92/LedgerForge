@@ -2,9 +2,9 @@
 
 **Version:** 1.0  
 **Status:** FROZEN  
-**Status alignment reviewed:** 2026-07-26
-**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb`
-**Latest verified production implementation:** Sprint 58 — Deterministic Import Verification Workspace; Sprint 59 ADR-041 architecture-only
+**Status alignment reviewed:** 2026-09-09
+**Repository ref reviewed:** `main@d8124ef5a1f38a1e7547f4f8905c91f25b2f1194`
+**Current implementation context:** Sprint 79 remains the latest numbered implementation; later accepted unnumbered reliability/startup-planner packages are recorded in `PROJECT_STATE.md`. `LF-UI-2026-09-R1` is approved design authority for its bounded scope and is not implemented merely by this documentation alignment.
 
 ## Purpose
 
@@ -26,9 +26,64 @@ Implementation sprints translate this specification and its approved assets into
 
 ---
 
+## Current design alignment — LF-UI-2026-09-R1 — 2026-09-09
+
+The user explicitly approved `LF-UI-2026-09-R1`. For its defined scope, [`UI Assets/Approved/LF-UI-2026-09-R1/DESIGN_HANDOFF.md`](UI%20Assets/Approved/LF-UI-2026-09-R1/DESIGN_HANDOFF.md) is the current written presentation/interaction authority and [`MasterBoard_LF-UI-2026-09-R1.png`](UI%20Assets/Approved/LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png) is the current visual authority. `DESIGN_TOKENS.json` and `ACCEPTANCE.md` define the shared-system and acceptance detail. The artwork label “LedgerForge v2.0” is design-board text, not an application version.
+
+Design approval is independent from native implementation acceptance. SwiftUI implementation remains separate and incomplete. Details of untouched screens inherit legacy approved references only where they remain consistent with this handoff, accepted product behavior, current financial semantics and accessibility requirements.
+
+### Shared appearance and design-system direction
+
+For covered scope, R1 supersedes the former fixed-theme requirement:
+
+- **Follow System** is the default target; **Light** and **Dark** are explicit choices.
+- **System Neutral** and **Deep Indigo** are preset concepts; Deep Indigo is optional, not mandatory.
+- Shared semantic colour roles replace theme-specific semantic assumptions. Colour never establishes financial meaning by itself.
+- Bounded foreground/background customization and bounded translucency apply only to eligible surfaces and must retain automatic readable fallback.
+- App-wide text size, a small supported font-style set and comfortable/compact density are approved directions.
+- Appearance changes require safe Preview / Apply / Cancel / Restore defaults behavior and compliance with reduced-transparency accessibility settings.
+- Preference persistence/storage ownership is not chosen by this design approval.
+- The overall shell remains sidebar + contextual toolbar + primary content, while R1 responsive hierarchy supersedes any fixed 20/80 proportion as a hard requirement; narrow layouts may close the inspector first and collapse the sidebar while preserving accessible navigation.
+
+### Transactions direction
+
+R1 approves a global Transactions proof surface with:
+
+- period, account, currency, category, bank/card family, authoritative financial-effect/direction and bounded institution/amount filtering;
+- AND across filter groups and OR within a multi-select group;
+- visible active scope, clear-filters and truthful no-match states;
+- sortable supported columns with repeated-heading reversal, deterministic stable ties and currency-safe amount sorting;
+- resizable columns, stable selection and a collapsible inspector;
+- scoped **native-currency** totals only, with no implicit mixed-currency conversion; and
+- readable descriptions and responsive narrower-window behavior.
+
+Presentation filtering/sorting never changes durable source order or balance semantics. **Debit is not automatically “spending” and credit is not automatically “income”** without supporting financial semantics.
+
+### Dashboard direction
+
+- Summaries remain grouped by native currency unless a separately approved conversion authority exists.
+- Full amounts must remain readable and must not be broken into misleading wrapped fragments.
+- Responsive grouping may adapt to available width without inventing consolidation.
+- Bank balance and card liability remain distinct financial concepts.
+- No fake trends, charts, percentages or unsupported analytics may appear as user truth.
+- Repository hydration/startup events must not masquerade as import activity.
+- Period/as-of context is shown where authoritative evidence exists.
+
+### Appearance settings direction
+
+The approved settings surface includes Follow System / Light / Dark, System Neutral / Deep Indigo presets, accent, text size, font style and density. An Advanced area may expose bounded foreground/background/translucency controls with Preview, Apply, Cancel and Restore defaults. Unsafe combinations require automatic readable fallback; reduced-transparency settings must be respected.
+
+### Explicit exclusions retained
+
+Do not reintroduce a static **Vyom / Personal** profile block, permanent **Truth classes** panel, inactive “Soon” navigation, fake Add Transaction, unsupported Export, illustrative analytics presented as data, raw identifiers, or generic clearing/reconciliation states without accepted financial semantics. Contextual provenance remains required even though the permanent Truth-classes panel is not.
+
+R1 changes presentation authority only. It creates no Money rule, FX authority, spending/income inference, transfer matching, persistence semantic, migration or source authority.
+
+---
+
 ## Status Alignment
 
-The frozen visual baseline remains active.
+The historical frozen visual baseline remains inherited only where it is not superseded by the 2026-09-09 R1 alignment or later accepted product behavior.
 
 Verified implementation through Sprint 53 adds or clarifies the following behavior within the existing v1 shell:
 
@@ -59,7 +114,7 @@ The UI must not display:
 - raw persistence codes, file paths, SQL errors or unredacted identifiers;
 - future modules merely to make the interface appear more complete.
 
-## Current Alignment — Sprint 59
+## Historical Alignment — Sprint 59 (superseded by later current alignments)
 
 Sprint 54's durable import-outcome presentation remains operational. Sprint 57 and Sprint 57A provide durable manual categories, current transaction assignments and category-reconciliation-safe Settings and transaction-detail interactions through Migration V8. Sprint 58's import-verification workspace is DEBUG-only and follows the ordinary import preparation and confirmation path. The former ordinary Axis partial-import family is suspended, no production PDF workflow exists, automatic categorization remains unavailable, and unsupported analytics or reports must not be presented as financial truth.
 
@@ -82,23 +137,13 @@ Repository implementation is not design authority.
 
 The UI specification is governed by this hierarchy:
 
-1. `Project documents/UI_UX_v1.0_Frozen.md`
-2. `Project documents/UI Assets/Approved/DesignBoard_v2.0.png`
-3. Remaining approved UI assets
-4. SwiftUI implementation
+1. `Project documents/UI_UX_v1.0_Frozen.md`, including its current R1 alignment and accepted financial/workflow semantics;
+2. `Project documents/UI Assets/Approved/LF-UI-2026-09-R1/DESIGN_HANDOFF.md` for the scope it defines;
+3. `Project documents/UI Assets/Approved/LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png` as the current visual authority for that covered scope, with its tokens/acceptance files;
+4. legacy approved screen/design assets for untouched details only where consistent with newer authority and accepted product behavior;
+5. SwiftUI implementation.
 
-When sources conflict, the higher authority controls unless a newer approved frozen revision explicitly supersedes it.
-
-`DesignBoard_v2.0.png` is the master visual reference.
-
-Individual screen assets inherit its:
-
-- application shell;
-- visual language;
-- spacing;
-- navigation;
-- information hierarchy;
-- component relationships.
+When sources conflict, the newer/higher applicable authority controls. `DesignBoard_v2.0.png` remains byte-identical historical/inherited reference material but is superseded as master visual authority for scope covered by R1.
 
 ---
 
@@ -140,9 +185,9 @@ Examples:
 
 # Approved Visual Direction
 
-LedgerForge uses a Deep Indigo desktop design language.
+Historically, LedgerForge used a Deep Indigo desktop design language. For scope covered by `LF-UI-2026-09-R1`, the Current design alignment above supersedes fixed Deep Indigo with adaptive System/Light/Dark appearance and optional Indigo.
 
-Visual characteristics:
+The following Deep-Indigo characteristics are legacy/historical references for inherited scope; R1-covered scope uses the adaptive design-system authority above:
 
 - dark-mode-first;
 - deep indigo gradient workspace;
@@ -165,7 +210,7 @@ Semantic colors must reinforce meaning but never carry meaning alone.
 
 Debit, credit, income, expense, transfer and liability meaning must come from authoritative financial semantics, not color convention.
 
-All future screens inherit these visual tokens unless a newer frozen specification supersedes them.
+Uncovered legacy details may inherit these tokens where consistent; R1-covered scope uses the newer shared tokens and appearance contract.
 
 Visual changes require design authority updates before implementation.
 
@@ -186,11 +231,7 @@ Visual changes require design authority updates before implementation.
 └──────────────────┴───────────────────────────────────────────┘
 ```
 
-The sidebar occupies approximately 20% of the default window width.
-
-Main content occupies approximately 80%.
-
-The exact divider position may respond to approved native resizing behavior, but the structural relationship remains frozen.
+The historical default used an approximate 20/80 sidebar/content split. Under R1 this is a reference composition, not a fixed ratio: the responsive hierarchy adapts to content fit, text size and narrower-window behavior while preserving the sidebar/toolbar/content relationship.
 
 Future modules extend this shell rather than replace it.
 
@@ -202,12 +243,13 @@ No feature should introduce a separate institution-specific application shell.
 
 The sidebar is persistent in the primary application window and contains navigation only.
 
-## v1 navigation
+## Current primary navigation
 
 - Dashboard
 - Accounts
 - Transactions
 - Imports
+- Salary
 - Settings
 
 ## Developer access
@@ -300,9 +342,7 @@ Every screen must derive visible financial and workflow state from its authorita
 
 # Dashboard
 
-`Project documents/UI Assets/Approved/DesignBoard_v2.0.png` is the master visual reference.
-
-`Dashboard_v1.0.png` defines the approved dashboard target within that system.
+For Dashboard scope, `LF-UI-2026-09-R1` is the current master/written design authority. `Dashboard_v1.0.png` remains a byte-identical historical/inherited reference only where consistent with R1 and accepted product behavior.
 
 ## Primary question
 
@@ -372,7 +412,7 @@ Future extensions must preserve immutable account identity and financial history
 
 # Transactions
 
-`Transactions_v1.0.png` defines the approved Transactions target.
+For Transactions scope, `LF-UI-2026-09-R1` is the current written/visual authority. `Transactions_v1.0.png` remains historical/inherited reference material only where consistent with R1.
 
 ## Primary question
 
@@ -516,7 +556,7 @@ After completion, the user returns to an appropriate financial or import-history
 
 # Settings
 
-`Settings_v1.0.png` defines the approved Settings target.
+For Appearance settings, `LF-UI-2026-09-R1` supersedes the legacy Settings visual direction. `Settings_v1.0.png` remains historical/inherited reference material for untouched Settings details where consistent with current behavior.
 
 ## Primary question
 
@@ -597,7 +637,7 @@ Approved fixtures enter the ordinary production URL-driven preparation seam.
 
 # Design System
 
-`Project documents/UI Assets/Approved/DesignSystem_v1.0.png` defines reusable visual tokens.
+`LF-UI-2026-09-R1/DESIGN_TOKENS.json` and `DESIGN_HANDOFF.md` define reusable shared tokens/components for R1-covered scope. `DesignSystem_v1.0.png` remains historical/inherited reference material for compatible untouched details.
 
 ## Foundations
 
@@ -605,7 +645,7 @@ Approved fixtures enter the ordinary production URL-driven preparation seam.
 - SF Pro typography;
 - SF Symbols-style iconography;
 - glass-like slate surfaces;
-- Deep Indigo theme;
+- Deep Indigo theme (legacy reference and optional R1 preset, not a mandatory appearance);
 - consistent elevation;
 - native macOS controls;
 - thin separators;
@@ -630,13 +670,13 @@ Motion must not obscure changes in financial truth or workflow state.
 
 No component introduces a new visual language independently.
 
-New reusable components require alignment with the master Design Board and Design System.
+New reusable components require alignment with the applicable R1 handoff/tokens and compatible inherited design references.
 
 ---
 
 # Component Library
 
-`ComponentLibrary_v1.0.png` defines the approved component direction.
+For components covered by R1, the R1 shared component/state contract is current. `ComponentLibrary_v1.0.png` remains historical/inherited component direction where compatible.
 
 ## Navigation
 
@@ -714,9 +754,7 @@ Accessibility is a release requirement.
 - tabular figures without harming spoken accessibility;
 - predictable traversal order.
 
-Dark Mode is the current primary target.
-
-Light Mode requires a separately approved design revision and updated assets.
+Follow System is the current default design target for R1-covered scope, with explicit Light and Dark choices. Native implementation and runtime accessibility verification remain required before this direction is considered implemented.
 
 ---
 
@@ -762,9 +800,15 @@ The approved assets are located under:
 Project documents/UI Assets/Approved/
 ```
 
-The specification includes:
+The current approved R1 package is:
 
-- `DesignBoard_v2.0.png` — master reference
+- `LF-UI-2026-09-R1/DESIGN_HANDOFF.md` — current written authority for its covered scope;
+- `LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png` — current master visual reference for its covered scope;
+- `LF-UI-2026-09-R1/DESIGN_TOKENS.json`, `ACCEPTANCE.md`, `SOURCES.md`, `ASSET_MANIFEST.json` and `README.md` — supporting design/acceptance evidence.
+
+Legacy assets are retained byte-identically as historical/inherited references, including:
+
+- `DesignBoard_v2.0.png`;
 - `Dashboard_v1.0.png`
 - `Accounts_v1.0.png`
 - `Transactions_v1.0.png`
@@ -776,9 +820,7 @@ The specification includes:
 - `ComponentLibrary_v1.0.png`
 - `AppIcon_v1.0.png` — approved application-icon reference
 
-The master Design Board controls overall structure and visual language.
-
-Screen assets define approved screen detail within that system.
+For scope covered by R1, the R1 handoff/master board control presentation direction. Legacy screen assets define inherited detail only where consistent with that newer authority and accepted product behavior.
 
 Implementation must not infer business logic, persistence semantics or financial authority from visual assets alone.
 
@@ -798,10 +840,10 @@ A UI implementation increment is acceptable only when its bounded scope satisfie
 
 ## Visual fidelity
 
-- The screen matches its approved asset.
-- It remains consistent with `DesignBoard_v2.0.png`.
+- The screen matches the applicable approved authority.
+- R1-covered scope remains consistent with `LF-UI-2026-09-R1`; untouched details may inherit legacy assets only where consistent.
 - It introduces no unapproved visual language.
-- Components use the approved design system.
+- Components use the applicable approved design system.
 
 ## Financial truth
 
@@ -833,7 +875,7 @@ A UI implementation increment is acceptable only when its bounded scope satisfie
 ## Asset authority
 
 - Applicable approved assets exist.
-- The master Design Board remains the visual authority.
+- `LF-UI-2026-09-R1` is the master visual authority for its covered scope; legacy master assets remain historical/inherited references.
 - Any intentional visual change is approved before implementation.
 
 A green test suite alone does not prove visual, semantic or accessibility acceptance.
