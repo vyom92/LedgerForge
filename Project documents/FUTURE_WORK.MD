@@ -1,15 +1,10 @@
 # LedgerForge Future Work
 
-##Recovery Executor Mode, approved 20 August 2026
+## Process authority
 
-When Codex is unavailable because its included usage allowance is exhausted, or when I explicitly choose the recovery path, a standalone ChatGPT session may execute a complete LedgerForge implementation prompt approved by this LedgerForge Chat through the authenticated LedgerForge Recovery Executor.
-Planning, sprint selection, architecture decisions, prompt approval, scope changes, corrective-sprint classification, and final implementation acceptance remain owned by this LedgerForge Chat.
-Recovery execution must obey the same repository authority, financial-truth, privacy, migration/ADR, testing, Git/worktree, source-oracle, and stop-condition rules that apply to Codex.
-The Recovery Executor may not widen scope, infer authorization, overwrite unexplained work, or continue after a required HEAD/SHA/worktree/source-truth guard fails.
-Recovery execution reports are claims requiring verification here before acceptance.
-Git publication remains separately gated. Commit/push is not authorized merely by enabling Recovery Executor Mode.
-Before the first real LedgerForge write, the executor capabilities required by that approved sprint must themselves have been qualified non-destructively.
-Codex remains the normal executor when its included usage is available. Recovery Executor Mode is an authorized fallback, not a different architecture or weaker correctness standard.
+Execution, recovery, Git/worktree safety, evidence handling and material-finding intake are governed by `AGENTS.md`, `Project_Guide.md` and `LedgerForge_Standing_Execution_Harness_Guide.md`.
+
+`FUTURE_WORK.MD` owns the canonical unscheduled queue. It does not duplicate executor mechanics and it does not authorize implementation.
 
 ## Purpose
 
@@ -59,73 +54,45 @@ It does not mean that the item:
 
 No future sprint number may be assigned in this document.
 
-A work item becomes executable only when Chat supplies one complete approved prompt directly to Codex.
+A work item becomes executable only when Chat supplies one complete approved prompt to the explicitly authorized execution surface for that task.
 
 ---
 
 ## Full Candidate Verification Audit
 
-**Audit date:** 2026-08-01
-**Current pushed ref:** Git-authoritative Sprint 65 acceptance commit; the exact ref is recorded by Git history rather than embedded here
-**Latest chronologically accepted production implementation:** Sprint 65 — Shared Axis Bank-Account PDF Production Path
-**Latest completed numbered outcome:** Sprint 66 (highest numbered; Sprint 65 is chronologically newest accepted)
-**Latest repository maintenance:** `a0ceb0c0cea5d09e7c2baecc93d9c8c0d984125c` safe disposable development-database reset
-**Candidate entries reviewed:** 155  
-**Fresh build/test/runtime evidence:** Sprint 65 focused, complete-TestPlan, build, Release-containment and signed-app private-pair evidence is recorded in `PROJECT_STATE.md`.
+**Audit date:** 2026-09-09
+**Review baseline:** `main@a560312db5900645779a499016e13f0c87e81435`
+**Active candidate count after reconciliation:** 155
+**Current migration:** V17
+**Current source/reliability architecture:** ADR-046 complete-authentic-corpus authority
+**Current design authority:** `LF-UI-2026-09-R1` for its bounded scope
+**Latest accepted numbered implementation:** Sprint 79
+**Latest accepted numbered discovery:** Sprint 80 — `SWIFT6_READINESS_COMPLETE`
+**Personal-v1:** UNDECLARED / NOT CERTIFIED
 
-**Historical alignment — 2026-08-17:** The 2026-08-01 155-candidate audit above is retained as historical and was not rerun. At that time Sprint 77 was the current production implementation; the exact ref is recorded by Git history. Sprint 73A was test-only; amended ADR-044 and Migration V14 were current at that historical point.
+This audit mechanically enumerated every active `FW-*` heading before reconciliation: 153 candidates, 153 unique IDs, no duplicate IDs and no malformed candidate headings. Every candidate was reconciled against `PROJECT_STATE.md`, the current 80–89 roadmap, the Standing Harness, relevant accepted ADRs, Product Vision, R1 design authority and current repository evidence where documentation was insufficient.
 
-**Current alignment — Axis source-truth restoration:** the Git-authoritative repository state is newer than this audit baseline. `PROJECT_STATE.md` records the active `axis.bank-account.csv@2` conventional direction contract and the suspension of provenance-less mixed partial overlap.
+Reconciliation outcomes:
 
-Every numbered candidate in this document was reviewed against the current pushed repository state, `PROJECT_STATE.md`, accepted ADRs, completed-sprint evidence, current fixture inventory and recent repository history.
+- `FW-P0-25` is removed from the active queue because the unnumbered 127-carrier authentic-corpus reset is technically accepted and complete; newly supplied recurring sources remain governed cumulatively by ADR-046.
+- Compound historical statuses are normalized to the defined planning vocabulary. Completed slices remain concise body notes while titles and statuses describe only remaining unscheduled work.
+- Exact source-family support remains exact. HDFC whole-statement PDF/XLS equivalence, Axis-card PDF/XLSX equivalence and CBQ current-account source lineage are separate accepted contracts; none is generalized to another institution, financial family or format.
+- The accepted reset establishes engineering format-neutral semantic parity for the registered Axis-bank carriers. It does not establish a durable Axis-bank cross-format duplicate/equivalence or supporting-source suppression contract.
+- The accepted 127-carrier campaign supplies the current engineering authentic-corpus regression matrix. `FW-P2-61` therefore retains only matrix maintenance/user-facing durability work rather than claiming that the matrix is absent.
+- R1 design approval is settled, while native Transactions, Dashboard, appearance and cross-screen conformance remain implementation work.
+- `FW-P0-26`, `FW-P2-78` and `FW-P2-79` were mechanically proven unused before being added.
 
-The audit changes only material status, dependency or completed-slice drift. Unchanged candidates retain their existing status because no current evidence establishes a different readiness boundary. Under ADR-046 and the user's all-stages campaign rule, financial-statement behavior may use only authentic corpus statements. Historical synthetic/sanitized/reconstructed financial-source fixtures may not be executed even for mechanics; source-independent mechanics must use nonfinancial values or files that do not impersonate statements.
+The former 2026-08-01 audit is historical context only. Its Sprint-65-era counts, fixture assumptions and support snapshots are not current planning authority.
 
-Material corrections in this revision include:
+### Current statement-dependent acceptance rule
 
-- repair and reversal candidates whose shared ADR-037 and post-Sprint-45 prerequisites are complete;
-- HDFC, CBQ and card-family candidates whose clean-room fixture evidence exists but whose production format or domain contracts remain unresolved;
-- spreadsheet and PDF candidates whose discovery/architecture state changed;
-- transfer matching after Sprint 53 established verified multi-account identity;
-- source-document browsing after durable document/import provenance became available;
-- dashboard chart work that remains blocked by absent analytical truth;
-- repository-hygiene work narrowed after tracked Xcode user data was removed;
-- backup/restore promoted to targeted discovery after the database lifecycle and migration-integrity foundations matured;
-- Sprint 57A category reconciliation closure and Sprint 58 deterministic DEBUG-only import verification completion;
-- Sprint 63 implementation and acceptance of the ADR-041 source-byte foundation;
-- Sprint 65 acceptance of the exact selected Axis bank-account PDF grammar, with broader PDF layouts, OCR, password workflow and cross-format equivalence still excluded;
-- the Axis direction-audit subfamily narrowed because no retained affected historical database is currently identified.
+For statement-dependent financial behavior, the complete registered authentic corpus is authority. No synthetic, generated, sanitized, reconstructed, representative, reduced, mutated or hand-authored financial statement may be used at any stage. Production parser output is never its own sole oracle. Private gates fail closed when required evidence is unavailable. A material source/parser/persistence/financial-semantic correction invalidates prior green evidence for the affected candidate boundary, which must be frozen and retested. Exact support never generalizes by institution name, file format, transaction count, page count or layout similarity.
 
-This audit does not authorize execution, assign sprint numbers or supersede the roadmap.
+### Roadmap relationship
 
-**Historical alignment — 2026-08-28 (superseded by the 2026-09-09 V17 acceptance):** The then-current production implementation was
-Sprint 79 at implementation commit
-`9489f6b21c9d585d2d90f2ba4798a931590057f7`; Migration V16 and ADR-045 are the
-accepted migration and architecture baselines for that historical state. Sprint 80 is accepted
-as the `SWIFT6_READINESS_COMPLETE` discovery outcome, with the compiler
-reachable but readiness materially non-clean. All current native targets remain
-in Swift 5 mode, and the strict-readiness clusters, macOS metadata findings,
-and migration strategy are recorded in `PROJECT_STATE.md` rather than as raw
-compiler logs.
-
-The queue consequences are bounded and do not authorize implementation:
-
-- the exact `qatar-airways.salary.pdf@1` slice is complete; generic salary and
-  broader planning remain future work;
-- the accepted `cbq.credit-card.pdf@1` July-2026 `malformedPreamble` defect was
-  `PRE_EXISTING_OR_EXTERNAL` relative to Sprint 79 and was later corrected for
-  the registered corpus by the accepted unnumbered reset;
-- PR-1 is the only Swift-6-derived prerequisite before a serial Unified Import
-  Centre; PR-2, PR-3 and TEST-PR remain separate correction families;
-- the first Import Centre may be serial and Swift 5 with explicit ownership;
-  bounded parallel preparation remains an open architecture decision; and
-- the successor roadmap `LedgerForge_Roadmap_Sprints_80-89_Current.md` records
-  Sprint 80 and the immediate dependency ordering without inventing an 80–89
-  feature sequence.
+`FUTURE_WORK.MD` remains the canonical queue. The current and prepared roadmaps may assign non-executable planning positions to recorded queue IDs, but roadmap placement does not remove the candidate, authorize implementation or override P0 → P1 → P2 → P3 triage. A candidate leaves this queue only when a Chat-approved execution selection consumes it or when accepted evidence proves its active boundary fully complete.
 
 ---
-
-**Current parser/import authority — 2026-09-09, tightened by the user's all-stages campaign rule:** ADR-046 supersedes fixture-based parser readiness and partial-sample support assumptions. The complete registered authentic corpus is the regression and reliability authority for every affected supported source family. No synthetic, generated, reconstructed, sanitized, representative, reduced, mutated or hand-authored financial statement may be created or used at any stage, including development, debugging, tests, oracles, persistence, import flow, developer UI or adversarial review. Exact working/decrypted copies and actual extracted statement attachments are permitted authentic carriers; original bytes retain provenance/fingerprint authority where applicable. Absent authentic edge cases remain source-uncertified rather than being manufactured. Historical fixture work remains a historical record only, not permission to execute those artifacts. The registered 127-carrier reliability gate was technically accepted through the unnumbered reset; personal-v1 remains undeclared/not certified, and genuine zero-activity statements and the absent CBQ transaction-history XLS remain source-uncertified.
 
 ## Planning Principles
 
@@ -247,7 +214,7 @@ After a completed increment is verified and accepted:
 
 10. Create or update an ADR when the selected work requires a new architectural decision.
 
-11. Chat supplies one complete execution prompt directly to Codex.
+11. Chat supplies one complete execution prompt to the explicitly authorized execution surface for that task.
 
 12. Remove promoted work from this document.
 
@@ -261,8 +228,8 @@ When reporting future work:
 
 - identify the latest verified state from `PROJECT_STATE.md`;
 - describe future work only using candidates recorded here;
-- distinguish Ready for discovery, Candidate, Blocked, Bug, Maintenance, Research and Idea;
-- do not assign future sprint numbers;
+- distinguish Ready for discovery, Candidate, Blocked, Ready for planning, Bug, Maintenance, Research and Idea;
+- do not assign sprint numbers inside this queue; planning positions belong only to the applicable roadmap and remain non-executable;
 - do not describe a candidate as approved implementation;
 - clearly label any new suggestion that has not yet been added to this document.
 
@@ -274,38 +241,11 @@ An invalid statement is:
 
 > The next sprint will implement `<candidate>`.
 
-The second statement becomes valid only after Chat supplies a complete execution prompt directly to Codex.
+A roadmap may forecast a sprint planning position, but the second statement becomes executable only after Chat reruns priority/dependency triage and supplies a complete execution prompt.
 
 ---
 
 # P0 — Financial Integrity and Persistence Safety
-
-## FW-P0-25 — Authentic-Corpus Parser Reliability Reset and Smart Import Completion
-
-**Status:** Completed by the unnumbered 2026-09-08 reset; technical acceptance granted 2026-09-09
-**Depends on:** ADR-046; complete read-only authentic source inventories for every supported recurring family; current shared import architecture.
-
-**Planning state:** Removed from the unscheduled queue as a completed boundary. Personal-v1 adoption remains a separate undeclared gate; newly supplied recurring sources continue to extend the ADR-046 corpus.
-
-**Accepted closure — 2026-09-09:** Chat technically accepted the unnumbered parser reset for the registered 127-carrier corpus, including the complete TestPlan and all six provider/order campaigns. Additive V17 is the current accepted migration; V1–V16 remain immutable. This completed queue scope is closed without selecting new work. Personal-v1 adoption remains separate and undeclared; absent authentic zero-activity cases and the absent CBQ transaction-history XLS remain source-uncertified.
-
-The completed boundary re-established parser/source reliability under the 2026-09-01 authentic-corpus-only authority without treating historical profile acceptance as current personal-v1 support certification.
-
-Completed outcome, without assigning a sprint:
-
-- inventory every currently supplied authentic statement in every supported recurring source family and define explicit active/excluded/archive boundaries;
-- eliminate synthetic, sanitized, reconstructed, representative or generated financial-source fixtures from parser/reader/normalizer/detector/classifier/validator regression and acceptance authority;
-- replace rigid incidental-layout assumptions such as page count, transaction count and absolute physical row/line coordinates with deterministic semantic financial-region analysis;
-- correct shared reader, unlock, snapshot, detection, classification and routing behaviour where authentic evidence proves defects;
-- establish one cumulative private authentic regression harness whose corpus grows with newly supplied recurring statements unless explicitly excluded;
-- after any shared ingestion change, rerun the complete authentic corpus for every affected supported family;
-- certify every authentic source through ordinary production before claiming current parser reliability, then verify validation/reconciliation, duplicate/equivalence semantics, atomic persistence, reopen/hydration and presentation on the source-correct output;
-- review source-oracle/product-comparison methodology so independent source facts are projected explicitly into LedgerForge semantics rather than requiring raw schema equality; and
-- keep investments and unrelated product expansion behind verified financial/parser correctness unless the user explicitly overrides that priority.
-
-Historical sprint/profile acceptance remains historical fact. This acceptance does not revoke history, assign a sprint number or certify personal-v1. Additive V17 is accepted; V1–V16 remain immutable.
-
----
 
 ## FW-P0-02 — Historical Duplicate Review and Repair
 
@@ -400,7 +340,7 @@ The following work remains open and separately gated:
 - historical backfill;
 - repair of contradictory existing ownership.
 
-`FW-P0-05` and this confirmed-import slice were combined only because they share one atomic confirmation boundary. Identifier-management workflows outside successful confirmed import do not become part of that operation and remain independently governed.
+The completed confirmed-import concurrency slice and this enrichment slice were combined only because they share one atomic confirmation boundary. Identifier-management workflows outside successful confirmed import do not become part of that operation and remain independently governed.
 
 ---
 
@@ -570,25 +510,16 @@ No schema change is authorized until workspace identity, isolation and migration
 
 ---
 
-## FW-P0-19 — Cross-Format Statement Duplicate Identity
+## FW-P0-19 — Remaining Cross-Format Statement Duplicate Identity
 
-**Status:** Partially completed through exact bounded HDFC and CBQ decisions
-**Completed boundary:** ADR-042 distinguishes exact source bytes from exact whole-statement HDFC PDF/XLS equivalence. ADR-043 separately retains exact CBQ source identity while mapping exact reviewed history-XLS, history-PDF and monthly-PDF rows to one canonical transaction set with complete per-source observations.
-**Remaining boundary:** Generic duplicate/equivalence identity, Axis relationships, cards, same-format byte-distinct semantic identity, source replacement and every unapproved institution/profile relationship remain blocked on their own source truth and architecture.
+**Status:** Blocked
+**Depends on:** an independently source-proven representation pair and an accepted family-specific identity/equivalence contract beyond the completed HDFC, Axis-card and CBQ-lineage boundaries
 
-Determine when equivalent CSV, PDF, XLS, XLSX or TXT representations describe the same statement even though their exact source bytes differ.
+**Completed boundary:** ADR-042 establishes exact whole-statement HDFC PDF/XLS equivalence. ADR-044 establishes exact Axis credit-card representation-neutral financial equivalence for the accepted PDF/XLSX family. ADR-043 separately establishes exact reviewed CBQ current-account source lineage; it is not generic equivalence.
 
-The solution must distinguish:
+**Remaining boundary:** The accepted 127-carrier reset proves format-neutral Axis-bank semantic parity as engineering regression evidence, but no accepted ADR establishes durable Axis-bank cross-format duplicate identity, equivalent-supporting-source suppression or authoritative-source replacement. Axis-bank relationship semantics, additional institution/format pairs, same-format byte-distinct semantic identity, source replacement and unapproved partial-overlap families remain separately source-gated.
 
-- exact-content duplicates;
-- cross-format representations of one statement;
-- genuinely revised statements;
-- overlapping statements;
-- coincidentally equivalent transaction sets.
-
-Cross-format identity must remain deterministic, explainable and backed by complete relevant authentic-source evidence plus an independent architecture-aware semantic oracle. Synthetic/sanitized/reconstructed source fixtures cannot establish that identity.
-
-It must not rely on filename similarity or silently discard an import because two transaction collections merely look alike.
+Any future relationship must distinguish exact-content duplicates, multiple representations of one statement, revised statements, overlapping statements and coincidentally similar transaction sets. It must use complete relevant authentic-source evidence and an independent architecture-aware source oracle. Filename, count, page or layout similarity is never authority.
 
 ---
 
@@ -610,118 +541,97 @@ Each family may require a separate ADR and implementation increment. No family m
 
 ---
 
+## FW-P0-26 — Personal-v1 Adoption Certification Gate
+
+**Status:** Blocked
+**Depends on:** completion or explicit Chat deferral of every product boundary classified as pre-v1, including the adopted import, recoverability, export and support-documentation boundaries
+
+Personal-v1 may not be declared merely because current automated tests are green. Certification fails closed and must freeze the exact adopted product candidate.
+
+Applicable evidence must include at minimum:
+
+- current complete authentic-source corpus certification;
+- exact supported-source documentation;
+- Release build and canonical TestPlan;
+- import workflow/manual acceptance;
+- password/credential-path acceptance where relevant;
+- single-file and batch intake as actually adopted;
+- duplicate and rejection semantics;
+- durable persistence and migration integrity;
+- SQLite/In-Memory parity where applicable;
+- close/reopen/relaunch/hydration;
+- user-owned backup creation, integrity verification and restore drill;
+- privacy/residue review;
+- structured/user data export;
+- supported institution/source matrix;
+- manual period/account reconciliation;
+- defined parallel comparison against the existing Budget Analysis workbook or its agreed successor oracle for the applicable planning/analytics boundary;
+- documented limitations and source-uncertified cases.
+
+Absent authentic cases remain uncertified and must not be manufactured. Certification does not require every Product Vision feature; it requires every feature Chat explicitly classifies as pre-v1 before the certification attempt. Personal-v1 remains undeclared until Chat explicitly accepts this gate.
+
+---
+
 # P1 — Institution and Parser Expansion
 
-## FW-P1-01 — Axis Bank Parser Family Expansion
+## FW-P1-01 — Additional Axis Bank-Account Parser Families
 
 **Status:** Candidate
-**Depends on:** Complete registered authentic Axis corpora for each materially distinct financial/source semantic contract
+**Depends on:** complete registered authentic Axis corpora for each materially distinct new or changed bank-account source-family semantic contract
 
-**Supplied shared-layout Axis NRO CSV slice completed 2026-07-23; source truth restored 2026-07-26; bounded PDF and XLS slices subsequently completed:** supported NRE and NRO bank-account CSV imports use `axis.bank-account.csv` version `2`; the selected account-neutral PDF grammar uses `axis.bank-account.pdf@1`; and the exact Axis NRO XLS grammar uses `axis.bank-account.xls@1`. Physical DR is debit and physical CR is credit. Two distinct full institution account identifiers preserve separate durable accounts. CSV version `1` is historical-only provenance and may require separate integrity detection. Sprint 78B separately completed the exact Axis credit-card PDF/XLSX family; this bank-account expansion item therefore retains only broader or changed bank-account layouts.
+**Completed boundary:** Current accepted Axis bank-account support already covers the source-proven CSV, PDF and legacy-XLS families recorded in `PROJECT_STATE.md`, with the accepted 127-carrier reset providing current ADR-046 reliability certification for the registered corpus. Sprint 78B separately owns the exact Axis credit-card PDF/XLSX family.
 
-Expand deterministic Axis coverage in dependency and authentic-source-readiness order:
+**Remaining boundary:** Only additional or materially changed Axis bank-account families remain here, including new historical layouts, account products or source contracts not already covered by current accepted profiles. No new family inherits support from existing Axis profiles.
 
-1. additional NRE layouts;
-2. additional NRO account layouts beyond the supplied shared CSV grammar;
-3. savings and current-account layouts;
-4. broader bank-account layouts;
-5. historical or changed bank-account layouts.
-
-Each supported recurring source family/semantic contract requires:
-
-- the complete registered authentic corpus supplied for that family;
-- independently derived source truth and an explicit architecture-aware semantic projection;
-- deterministic institution and parser-selection evidence;
-- verified identifier evidence where available;
-- complete-corpus ordinary-production regression protection.
-
-Current ADR-046 evidence gap: future Axis support or expansion must inventory the complete authentic corpus, establish independent source truth without importing production assumptions, and compare that truth through an explicit semantic projection to ordinary production output. Historical sanitized/regression financial-statement fixtures must be removed or rewritten around authentic statements; they may not remain executable mechanics artifacts.
-
-Do not generalize the existing parser without complete authentic-corpus evidence for the affected recurring family and semantic contract.
+Each future family requires complete authentic-corpus inventory, independently derived source truth, explicit semantic projection, deterministic routing/profile selection and complete affected-corpus regression. The prohibited synthetic/sanitized financial-fixture retirement is already complete and is not future work.
 
 ---
 
-## FW-P1-02 — HDFC Parser Family
+## FW-P1-02 — Additional HDFC Parser Families
 
-**Status:** Partially completed through the exact PDF/XLS bank-account pair
-**Completed boundary:** Sprint 72 supports the exact retained shared HDFC NRE/NRO OLE2/BIFF8 grammar as `hdfc.bank-account.xls@1`. Sprint 73 adds the independently approved native-text `hdfc.bank-account.pdf@1` grammar and exact whole-statement PDF/XLS equivalence under ADR-042. Exact source bytes remain each source's duplicate authority; the first accepted format owns transactions and provenance, while the later exact-equivalent format is retained as supporting evidence with zero transactions.
-**Remaining boundary:** HDFC CSV, XLSX, credit cards, generic or changed HDFC layouts, same-format semantic duplicates, partial overlap and any additional cross-format pair remain unsupported.
+**Status:** Candidate
+**Depends on:** complete authentic HDFC evidence for one selected new or changed source-family contract
 
-Near-term HDFC direction is bank-account statements only through the unified import pipeline. Card support remains separate future work.
+**Completed boundary:** Exact `hdfc.bank-account.xls@1` and `hdfc.bank-account.pdf@1` bank-account support is accepted, including ADR-042 whole-statement PDF/XLS equivalence and current complete-corpus reliability certification under ADR-046.
 
-The Sprint 73 implementation historically targeted native selectable text, the retained seven-column statement grammar, INR and verified full account identity. Under ADR-046 that historical exact-layout boundary is not current reliability certification: benign recurring presentation variation must be interpreted semantically, while genuinely ambiguous/unsupported financial meaning still fails closed. The complete authentic HDFC corpus is the current regression authority; mechanics fixtures are not parser acceptance evidence.
+**Remaining boundary:** HDFC CSV, XLSX, credit-card families, changed bank layouts and any additional source-format relationship remain unsupported until independently source-proven. Existing HDFC PDF/XLS support does not generalize by institution name or structural similarity.
 
 ---
 
-## FW-P1-03 — CBQ Parser Family
+## FW-P1-03 — Additional CBQ Parser Families
 
-**Status:** Exact three-profile current-account family and exact credit-card PDF v1/v2 family completed; broader-layout work remains
-**Historical mechanics state:** Prior CBQ campaigns used synthetic financial-statement artifacts. The user's all-stages rule withdraws permission to use them for any purpose; remaining executable artifacts must be removed or rewritten around authentic statements. The complete registered authentic CBQ corpora are the current reliability authority.
-**Completed boundary:** Sprint 74 added `cbq.current-account.xls@1`. Sprint 75 added `cbq.current-account.history.pdf@1` and `cbq.current-account.monthly.pdf@1` plus ADR-043 exact reviewed multi-source lineage. Sprint 77 separately adds `cbq.credit-card.pdf@1` with deterministic v1/v2 layout provenance, encrypted-source unlock, typed card observations, family reconciliation, Migration V14, shared-card provider parity and hydration. Bank and card families remain independent.
-**Remaining boundary:** Generic or changed CBQ bank/card layouts, XLSX, OCR, image-only PDFs, generic masked identity, generic partial matching, card semantic equivalence and any additional CBQ source family remain unsupported.
+**Status:** Candidate
+**Depends on:** complete authentic CBQ evidence for one selected new or changed bank/card source-family contract
 
-Keep independent CBQ families:
+**Completed boundary:** The exact current-account XLS/history-PDF/monthly-PDF family is accepted under ADR-043 source lineage, and exact `cbq.credit-card.pdf@1` v1/v2 is accepted as a separate card family. The accepted unnumbered reset recertified the complete registered CBQ corpora and closed the July compatibility defect for that corpus.
 
-- CBQ bank-account statements;
-- CBQ credit-card statements.
+**Remaining boundary:** Only new or materially changed CBQ bank/card layouts, formats or financial families remain. Bank and card domains stay independent. XLSX, OCR/image-only sources and any unapproved card equivalence or identity behavior require their own source and architecture authority.
 
-Targeted discovery must not combine them merely because the institution is shared. It must determine:
-
-- the smallest first family;
-- the approved source format and reader dependency;
-- QAR native-currency truth and presentation acceptance;
-- deterministic institution, statement-family and parser/profile selection;
-- bank-account identity evidence;
-- card-specific validation/persistence dependencies where applicable;
-- independent financial and source-provenance oracles.
-
-Authentic-source availability makes remaining families discoverable. The historical Sprint 74/75 current-account and Sprint 77 card implementation boundaries remain recorded. The accepted unnumbered reset recertified the complete registered current corpora; newly supplied statements, material shared-ingestion changes or broader layouts still require the complete affected authentic-corpus gate under ADR-046.
+The prohibited historical synthetic financial-source artifacts were retired by the accepted reset and are not remaining work.
 
 ---
 
 ## FW-P1-04 — Additional Credit-Card Parser Families
 
-**Status:** Partially completed through Sprint 78B; remaining families are ready for discovery
-**Historical mechanics state:** Prior American Express, CBQ and Axis card campaigns integrated clean-room financial-statement artifacts. The user's all-stages rule withdraws permission to use them for any purpose; remaining executable artifacts must be removed or rewritten around authentic statements.
-**Completed boundary:** Sprint 76A accepts exact native-text `amex.credit-card.pdf@1` under ADR-044, including ordered multi-instrument sections, encrypted-source unlock and institution-scoped Keychain reuse, exact byte-distinct semantic-source grouping, card-aware validation, Migration V13, provider parity, hydration/relaunch and bounded presentation. Sprint 77 adds exact encrypted `cbq.credit-card.pdf@1` v1/v2 through the same shared card domain with Migration V14 and source-byte duplicate authority. Sprint 78B adds exact `axis.credit-card.pdf@1` and `axis.credit-card.xlsx@1`, dual canonical PDF credential scopes, one explicit liability-account decision, zero fabricated Axis instruments/sections, representation-neutral exact financial multiset equivalence, App-PDF/XLSX ordered narration equivalence and Migration V15.
-**Remaining boundary:** HDFC card, other American Express/CBQ/Axis layouts and every other issuer/layout require separate source truth, exact profile, parser and acceptance authority. The shared domain does not make them production-supported.
+**Status:** Ready for discovery
+**Depends on:** a selected remaining authentic card source family plus its exact liability, identity, reconciliation and source-format contract
 
-Future discovery should compare the strongest remaining authentic-source-backed options and their financial semantic contracts rather than select by issuer label alone.
+**Completed boundary:** Exact Amex PDF, CBQ encrypted PDF v1/v2 and Axis PDF/XLSX families are accepted over the shared card-liability architecture, with current complete-corpus reliability certification under ADR-046. The shared domain does not create generic issuer support.
 
-Each remaining family requires:
+**Remaining boundary:** HDFC card, materially changed Amex/CBQ/Axis card layouts and every other issuer/layout remain separate source-family work. Discovery may compare authentic-source-backed candidates, but each requires independent posted-amount/currency/order/summary/identity truth, deterministic account-versus-instrument semantics, persistence/relaunch evidence and exact exclusions.
 
-- one approved source format and reader path;
-- independent posted-amount, currency, order, statement-summary and identity evidence;
-- parser-owned card-statement evidence consistent with ADR-034;
-- concrete validation and persistence semantics;
-- deterministic account-versus-instrument treatment;
-- provider parity, migration and relaunch acceptance;
-- explicit exclusion of unsupported universal card assumptions.
-
-No additional parser family may claim production support from historical fixtures, classification, schema capacity or the shared card domain. Current reliability requires the complete authentic corpus through the ordinary production path.
+The accepted reset completed retirement of prohibited synthetic financial-source artifacts; no fixture-retirement task remains here.
 
 ---
 
-## FW-P1-05 — Brokerage, Mutual-Fund, Salary, Insurance, Tax and Government Document Families
+## FW-P1-05 — Additional Salary, Brokerage, Fund, Insurance, Tax and Government Document Families
 
-**Status:** Partially scheduled through Sprint 79; all other families remain research
-**Depends on:** Domain-model and product-scope decisions
+**Status:** Research
+**Depends on:** domain-model and product-scope decisions plus authentic source evidence for the selected financial family
 
-Sprint 79 selects one exact salary slice: `qatar-airways.salary.pdf@1` over the complete approved private salary corpus. ADR-045 requires a dedicated salary-actual domain inside the unified import/provenance pipeline rather than forcing payroll lines into bank transactions. The exact Sprint 79 boundary includes source-owned pay period/kind, ordered earnings/deductions, exact native QAR Money, printed totals/payment evidence, durable source provenance, provider parity, hydration and dedicated Salary presentation.
+**Completed boundary:** Sprint 79 accepted exact `qatar-airways.salary.pdf@1` salary actuals and the dedicated salary/funding-planner domain under ADR-045. That accepted employer/profile is no longer future work.
 
-Remaining research includes:
-
-- other employers/payroll layouts and generic salary support;
-- brokerage statements;
-- mutual-fund statements and consolidated account statements;
-- insurance documents;
-- tax documents;
-- AIS and Form 16;
-- other government financial records.
-
-Every remaining family still requires its own source truth and a decision on whether it fits an existing domain or needs a dedicated one. No profile may claim support from structural similarity to the Qatar Airways salary family.
-
-Do not force materially different financial documents into the bank-statement model merely to avoid designing the correct one.
+**Remaining boundary:** Other employers/payroll layouts, brokerage statements, mutual-fund statements, insurance documents, tax documents and government financial records remain separate research/source domains. No family may inherit support from the Qatar Airways salary profile or be forced into the bank/card transaction model merely for implementation convenience.
 
 ---
 
@@ -797,111 +707,77 @@ The original source structure and every user-approved mapping must remain inspec
 
 ---
 
-## FW-P1-09 — Credit-Card Financial Semantics Foundation
+## FW-P1-09 — Remaining Credit-Card Financial Semantics
 
-**Status:** Partially completed through Sprint 78B; remaining semantics are future work
-**Discovery:** Shared cross-family semantic discovery is complete.  
-**Architecture:** ADR-034 is implemented/refined by accepted ADR-044 for the completed boundary.
-**Completed boundary:** Shared liability-account/card-instrument separation, independent financial scope and physical source-section membership, card-specific liability effects, typed source observations without weak-evidence promotion, explicit instrument relationships/lifecycle authority, exact family reconciliation, provider-owned atomic commit, SQLite/In-Memory parity, hydration/relaunch and bounded presentation are implemented for exact `amex.credit-card.pdf@1`, `cbq.credit-card.pdf@1`, `axis.credit-card.pdf@1` and `axis.credit-card.xlsx@1`. Sprint 78B adds representation-neutral Axis semantic-source equivalence, source-owned selected-month chronology, explicit liability-only review with zero fabricated Axis instruments, and Migration V15. Exact ordered semantic-source grouping remains Amex-only.
+**Status:** Candidate
+**Depends on:** exact authentic source evidence and accepted architecture for the selected additional card semantic
 
-The production card foundation is complete for the exact Sprint 76A Amex,
-Sprint 77 CBQ and Sprint 78B Axis profiles. It preserves:
+**Completed boundary:** The accepted Amex, CBQ and Axis card profiles already preserve card-liability effects, account/instrument boundaries where source-proven, exact source observations, family reconciliation, provider-owned persistence and hydration. The July CBQ compatibility defect is closed for the registered corpus by the accepted reset. Axis representation equivalence remains governed by ADR-044.
 
-- authoritative posted statement amount and currency;
-- source-proven effect on amount owed without bank debit/credit reuse;
-- account-level versus instrument-level financial scope;
-- independent document-scoped physical section membership;
-- optional original merchant amount and currency;
-- exact account/instrument source observations and durable user-confirmed mappings;
-- source-specific statement-summary and reconciliation components.
+**Remaining boundary:** Rewards, payment allocation, bank-card payment matching, refund/reversal matching, installments/loans, calculated FX, fee/markup/tax contracts, manual merge/split and any new card semantic remain separate future work. Axis Active-Loans/EMI metadata remains excluded from historical card transactions unless later authentic evidence and architecture prove a dedicated model.
 
-Remaining future semantics include rewards persistence/valuation, payment
-allocation, bank-card payment matching, refund/reversal matching, installments
-or loans, calculated FX, fee/markup/tax contracts, manual merge/split,
-historical repair/backfill and any generic card profile or masked-identity
-framework. The Axis Active Loans Summary / EMI metadata remains explicitly
-excluded from historical transaction persistence and is future work; no loan
-history, installment relationship or card ownership is inferred from it. Each
-future semantic requires its own approved authority; absence is not inferred.
-
-Sprint 75's completed CBQ current-account source-lineage work remains separate
-from Sprint 77 card semantics and does not generalize ADR-043 to CBQ cards. Sprint 73's
-exact whole-statement HDFC contract also does not authorize card overlap.
-
-**Verified compatibility defect — 2026-08-28; accepted closure 2026-09-09:** the authentic encrypted July 2026 CBQ credit-card source unlocked through the production credential path and reached the accepted CBQ credit-card normalization boundary, then failed with `CBQCreditCardPDFNormalizationError.malformedPreamble`. Baseline comparison classified this `PRE_EXISTING_OR_EXTERNAL` relative to Sprint 79, not a Sprint 79 regression. Sprint 80 did not fix or investigate the source grammar. The technically accepted unnumbered parser reset now passes the complete registered CBQ corpus and historical/current persistence contracts; see `PROJECT_STATE.md`. Historical missing minimum due remains absent without invented backfill, while current CBQ imports enforce the authentic minimum-due contract. This does not broaden or revoke historical Sprint 77 acceptance or independently declare personal-v1 adoption.
-
-Card-liability effects remain separate from bank-account debit/credit semantics.
-Missing rates, fees, taxes, aggregates or other evidence must not be invented.
-Payment allocation, rewards accounting, reversal matching and universal card
-taxonomy remain excluded from the completed boundary.
-
-Do not claim card support beyond exact `amex.credit-card.pdf@1`,
-`cbq.credit-card.pdf@1`, `axis.credit-card.pdf@1` and
-`axis.credit-card.xlsx@1` from fixture integration, schema capacity,
-classification or parser candidates.
+Card-liability effects remain distinct from bank debit/credit semantics. Missing rates, taxes, fees or ownership evidence remain missing rather than inferred.
 
 ---
 
 # P1 — Import Format Expansion
 
-## FW-P1-10 — Production PDF Statement Support
+## FW-P1-10 — Additional Native-Text PDF Statement Families
 
-**Status:** Completed in Sprint 65 for the selected exact account-neutral Axis bank-account PDF grammar.
-**Discovery:** Sprint 64 complete; its lineage and independent-oracle blockers were closed only for the selected unlocked/selectable-text NRE/NRO family.
-**Planning state:** Removed from the unscheduled queue. The accepted production profile is `axis.bank-account.pdf@1` through the ordinary shared import path, with source-byte duplicate authority and no PDF-only persistence path.
+**Status:** Candidate
+**Depends on:** complete authentic evidence for one selected new or changed native-text PDF financial source family
 
-Sprint 65 historically verified the ordinary picker-through-relaunch path for its selected sources. Its two regenerated sanitized PDFs were used in that historical campaign and have now been removed from the active source/test tree. They may not execute as mechanics or acceptance inputs; recovery outside the product repository is not executable authority. The complete authentic Axis corpus is the current reliability authority under ADR-046.
+**Completed boundary:** Existing accepted PDF profiles across current Axis, HDFC, CBQ, Amex and Qatar salary families are recorded in `PROJECT_STATE.md` and currently certified against their registered authentic corpora under ADR-046.
 
-Retain future work for other Axis PDF layouts, OCR, password-protected PDFs, generic PDF support, broader institution coverage and any cross-format equivalence policy. Matching PDF/CSV financial projections in Sprint 65 do not authorize cross-format duplicate suppression or an equivalence architecture.
+**Remaining boundary:** Only new or materially changed native-text PDF families not already covered by accepted source contracts remain here. Encrypted credential policy remains under `FW-P1-11` through `FW-P1-13`; OCR/image-only sources remain under `FW-P1-17`; cross-format identity/equivalence remains under `FW-P0-19` and `FW-P1-16`.
 
----
-
-## FW-P1-11 — Password-Protected PDF Support
-
-**Status:** Partially completed through Sprint 78B for exact encrypted Amex, CBQ and Axis credit-card PDF families
-**Completed boundary:** The shared coordinator retries bounded remembered candidates and secure user input against the same immutable source snapshot. The PDF reader owns only unlock/native-text extraction and hands exact page boundaries to approved Amex, CBQ and Axis normalization in memory without creating decrypted PDF files or reconstructed source bytes. Axis App and traditional PDFs use separate canonical credential scopes.
-**Remaining boundary:** Other institutions, other Amex/CBQ/Axis layouts, HDFC/CBQ-bank and investment password proof, arbitrary encrypted PDFs, owner-password/permissions variants, OCR and generic encrypted-document support require separate exact source and acceptance authority.
-
-Readers must not access UI prompts, Keychain or institution-specific password policy directly.
+No generic PDF support claim is authorized.
 
 ---
 
-## FW-P1-12 — Secure Institution Password Storage
+## FW-P1-11 — Additional Password-Protected PDF Families
 
-**Status:** Completed through Sprint 78B for the accepted exact encrypted-PDF credential boundary
-**Completed boundary:** A namespaced macOS generic-password item stores one current statement password per proven institution/profile family. Exact Amex, CBQ and the two Axis credit-card PDF families are proven production consumers. Persistence occurs only after successful unlock and authoritative supported-profile parsing/validation. Production passwords do not enter SQLite, source evidence or diagnostics; deterministic tests use injected/in-memory stores and bounded real-Keychain smoke tests remove their unique fictional items.
-**Remaining boundary:** Generic credential profiles, cloud synchronization, password-pattern derivation and broader encrypted-document support are not authorized.
+**Status:** Candidate
+**Depends on:** an authentic encrypted source family whose credential scope and supported profile can be proven exactly
 
-Store institution-specific credentials using macOS Keychain.
+**Completed boundary:** The shared immutable-snapshot unlock flow is accepted for the exact encrypted Amex, CBQ and Axis credit-card PDF families, including separate Axis App/traditional credential scopes.
 
-The completed boundary preserves:
+**Remaining boundary:** Other institutions or materially changed encrypted layouts require separate exact source, credential-family and parser acceptance. Arbitrary encrypted PDFs, owner-password/permissions variants, OCR and generic encrypted-document support are not implied.
 
-- offline-first operation;
-- no passwords in SQLite;
-- no passwords in diagnostics;
-- explicit user control;
-- secure update and deletion;
-- privacy-focused tests.
+Readers remain credential-policy agnostic and must not own UI, Keychain or institution semantics.
 
 ---
 
-## FW-P1-13 — Per-File Password Override and Entry
+## FW-P1-12 — Additional Credential Profile and Password-Storage Capabilities
 
-**Status:** Partially completed through Sprint 78B
-**Completed boundary:** When no remembered candidate unlocks an exact supported PDF, the existing-style secure challenge accepts a replacement credential. The replacement overwrites the proven institution/profile-family item only after successful unlock and authoritative supported-profile parsing/validation; cancellation, failed candidates and unsupported unlocked content are discarded. Exact Amex, CBQ and Axis card PDF profiles are proven consumers, with Axis App/traditional family rotation kept independent.
-**Remaining boundary:** A separate use-once preference, arbitrary per-file credential profiles and generic override policy are not implemented. The accepted personal-v1 product decision remembers the successfully proven institution password without a preference maze.
+**Status:** Research
+**Depends on:** an approved product need beyond the accepted exact Keychain credential-family boundary
 
-Readers and institution parsers remain unaware of the UI and storage policy.
+**Completed boundary:** Namespaced macOS Keychain storage is accepted for the proven Amex, CBQ and separate Axis credit-card credential families, with persistence only after supported-profile unlock/parse/validation and no password material in SQLite, source evidence or diagnostics.
+
+**Remaining boundary:** Generic credential-profile lifecycle, password-pattern derivation or any broader credential product is not currently approved. Optional cloud/sync behavior, if ever selected, remains separately governed by the later encryption/sync architecture rather than being implied by current Keychain support.
 
 ---
 
-## FW-P1-14 — XLS and XLSX Support
+## FW-P1-13 — Additional Per-File Credential Override Policy
 
-**Status:** Partially completed by Sprints 71, 72, 74 and 78B for four exact spreadsheet profiles
-**Completed boundary:** The native static OLE2/BIFF8 reader supports the exact `axis.bank-account.xls@1` Axis NRO grammar, exact shared `hdfc.bank-account.xls@1` HDFC NRE/NRO grammar and exact `cbq.current-account.xls@1` CBQ transaction-history grammar through the ordinary import pipeline. Sprint 78B additionally supports exact `axis.credit-card.xlsx@1` through a bounded deterministic OOXML reader with pinned/vendored ZIPFoundation. Exact source bytes are duplicate authority. Unsupported encryption, multiple or hidden worksheets, formulas, boolean/error cells and malformed financial values fail closed before accepted writes. Benign physical layout variation within a supported recurring family is governed by ADR-046 semantic interpretation rather than exact-layout matching.
-**Remaining boundary:** Generic XLSX/OOXML mapping, other HDFC/CBQ XLS layouts, other institution/layout support, formula-result handling, macros, password workflow, multi-sheet/hidden-sheet support, user-authored mappings and cross-format behavior beyond the exact accepted HDFC, CBQ and Axis contracts remain unsupported and require separate approved discovery or implementation increments.
+**Status:** Candidate
+**Depends on:** an explicit user/product decision for a non-persistent or per-file override beyond the accepted remembered-family challenge flow
 
-The accepted libxls reader authority is limited to version 1.6.3 at commit `c199d132494833da696b58aa4acf3fc5a36d930b`, statically vendored under its BSD 2-clause license and linked only to system `iconv`. It does not authorize a generic XLS support claim or a generic XLSX reader; the exact Axis card XLSX profile is separately bounded by Sprint 78B. Spreadsheet readers continue to feed the universal import pipeline. Authentic-source availability outside the exact completed Axis NRO, HDFC NRE/NRO, CBQ current-account transaction-history and Axis card XLSX families may support discovery. Synthetic fixture availability does not establish parser readiness or support.
+**Completed boundary:** Exact supported encrypted PDF families already provide secure user challenge and safe replacement of the proven credential-family item only after successful unlock, supported parsing and validation.
+
+**Remaining boundary:** A use-once/non-persistent credential choice and any genuinely different per-file override semantics remain unimplemented. Cancellation, failed candidates and unsupported unlocked content must never persist a credential.
+
+---
+
+## FW-P1-14 — Additional XLS/XLSX Source Families and Spreadsheet Capabilities
+
+**Status:** Candidate
+**Depends on:** complete authentic evidence for one selected additional spreadsheet family or an independently approved broader spreadsheet capability
+
+**Completed boundary:** Accepted spreadsheet support already covers the exact Axis bank XLS, HDFC bank XLS, CBQ current-account XLS and Axis-card XLSX source contracts through the ordinary import path. The accepted 127-carrier reset recertified the registered families under ADR-046.
+
+**Remaining boundary:** Other spreadsheet source families, new HDFC/CBQ/Axis layouts, generic OOXML mapping, formulas, macros, password workflows, unsupported worksheet structures and user-authored mappings remain separate work. Existing readers do not imply generic XLS or XLSX support.
 
 ---
 
@@ -914,25 +790,16 @@ Support deterministic text statements through the existing pipeline.
 
 ---
 
-## FW-P1-16 — Cross-Format Financial Equivalence
+## FW-P1-16 — Additional Cross-Format Financial Relationships
 
-**Status:** Partially completed for exact HDFC equivalence, exact Axis card equivalence and a separate exact CBQ lineage family
-**Completed boundary:** Sprint 73 implements exact ordered whole-statement equivalence only between `hdfc.bank-account.pdf@1` and `hdfc.bank-account.xls@1` under ADR-042. Sprint 75 separately implements exact reviewed transaction-level lineage among `cbq.current-account.xls@1`, `cbq.current-account.history.pdf@1` and `cbq.current-account.monthly.pdf@1` under ADR-043. Sprint 78B adds exact Axis credit-card PDF/XLSX financial multiset equivalence and App-PDF/XLSX source-order/narration equivalence under ADR-044; this is not generic whole-statement equivalence.
-**Remaining boundary:** Axis bank-account cross-format behavior, additional card/format families, same-format equivalence, generic partial overlap, other CBQ/HDFC profiles and every other institution or format relationship require separate source approval and bounded implementation.
+**Status:** Blocked
+**Depends on:** one exact unimplemented representation relationship with complete authentic source truth and an accepted family-specific equivalence/lineage contract
 
-Verify equivalent statements produce equivalent:
+**Completed boundary:** ADR-042 owns exact HDFC whole-statement PDF/XLS equivalence. ADR-043 owns the separate exact CBQ current-account lineage model. ADR-044 owns exact Axis credit-card PDF/XLSX representation equivalence. The accepted reset additionally establishes format-neutral semantic parity across the registered Axis-bank carriers as engineering evidence.
 
-- institution;
-- account identity;
-- transactions;
-- transaction ordering;
-- debit and credit totals;
-- balances;
-- validation outcomes.
+**Remaining boundary:** Axis-bank durable cross-format duplicate/equivalence behavior is not accepted merely because semantic parity tests pass. Additional card/format families, same-format equivalence, generic partial overlap, source replacement and every other representation relationship require separate source and architecture approval.
 
-Extraction differences must not change financial truth. The completed HDFC and
-CBQ slices do not authorize fuzzy matching, generic equivalence, historical
-backfill, source replacement or authoritative-source switching.
+This item concerns source-family financial relationships, while `FW-P0-19` owns durable duplicate-identity consequences. Neither authorizes fuzzy matching.
 
 ---
 
@@ -954,40 +821,34 @@ OCR output remains untrusted until deterministic parsing and validation succeed.
 ## FW-P1-19 — LedgerForge Import Centre
 
 **Status:** Candidate
-**Depends on:** Existing confirmation-gated Import Wizard foundation; PR-1 staging/publication ownership seam
+**Depends on:** existing confirmation-gated Import Wizard foundation and `FW-P2-72` PR-1 staging/runtime-publication ownership seam
 
-**Sprint 80 readiness boundary:** The first bounded implementation may remain Swift 5 and serial, provided it has explicit MainActor task ownership, deterministic queue ordering, per-file state ownership, security-scoped source and `SourceContentSnapshot` lifetimes, cancellation before confirmation, explicit per-statement confirmation, synchronous provider-owned persistence and canonical `RepositoryStoreHydrator` publication. PR-1 (the staging/publication ownership seam) is the only Swift-6-derived prerequisite before that serial increment. This readiness result does not mark the Import Centre complete or authorize implementation.
+**Sprint 80 readiness boundary:** The first implementation remains Swift 5 and serial. It requires explicit MainActor task ownership, deterministic queue ordering, per-file state ownership, security-scoped source and `SourceContentSnapshot` lifetimes, cancellation before confirmation, explicit per-statement confirmation, synchronous provider-owned persistence and canonical `RepositoryStoreHydrator` publication.
 
-Complete the Import Wizard as the LedgerForge Import Centre for preparing, reviewing, confirming and understanding imports. LedgerForge owns the queue, per-file state, preparation, validation, account choice, duplicate outcomes, confirmation, retry, cancellation and result navigation. macOS owns authorization for arbitrary file and folder access; LedgerForge must not claim unrestricted filesystem access.
+Single-file import is **queue length one**. Future multi-file intake must use the same intake → preparation → sequential review/confirmation → result orchestration rather than a separate workflow. Each file retains an independent validation, account choice, duplicate/rejection, confirmation, persistence and result boundary.
 
-**LF-UI-2026-09-R1 alignment:** single-file import is queue length one. Future multi-file intake must use the same intake → preparation → sequential review/confirmation → result model rather than a separate workflow. This design direction does **not** claim that batch UI currently exists. The PR-1 prerequisite and serial-first implementation boundary remain unchanged.
+Bounded parallel preparation is unresolved and not authorized. PR-1 is the only Swift-6-derived prerequisite before this serial foundation. Roadmap placement does not authorize implementation.
 
-The complete workflow may incorporate selected candidates from this section, including batch import, multi-file drag and drop, editable preview, correction and revalidation, account-match review, duplicate review, progress/cancellation/retry, actionable validation guidance and completed import outcome/history navigation.
-
-This is an umbrella product outcome, not permission to combine every listed capability into one sprint. Repository discovery must determine which related candidates form each bounded implementation increment. This candidate provides the bounded foundation for the longer-term Import Studio direction without turning importing into the application’s primary experience.
+---
 
 ## FW-P1-20 — Batch Import
 
 **Status:** Blocked
-**Depends on:** Mature duplicate handling, cancellation boundaries, failure isolation and the PR-1 staging/publication ownership seam
+**Depends on:** accepted serial Import Centre ownership, mature duplicate handling, cancellation boundaries, failure isolation and the PR-1 staging/runtime-publication seam
 
-Sprint 80 establishes a serial-first queue boundary for the initial batch
-workflow. A first implementation may process files serially with deterministic
-per-file outcomes and no concurrent transfer of `PreparedImport`. Bounded
-parallel preparation remains an open architecture decision and is not approved
-by the discovery. This item remains blocked until the named prerequisites and a
-bounded acceptance contract are complete.
+Extend the same Import Centre queue from length one to multiple independent files. The first adopted batch model is serial unless a later architecture separately accepts bounded parallel preparation.
 
-Import multiple files as independent jobs while preserving independent:
+Required boundaries:
 
-- validation;
-- confirmation;
-- account choice;
-- duplicate outcome;
-- persistence result;
-- provenance.
+- deterministic queue order;
+- explicit per-statement review and confirmation;
+- independent account choice and duplicate/rejection outcome;
+- independent provider-owned persistence result;
+- cancellation that cannot transfer stale `PreparedImport` ownership;
+- one failed/rejected file must not contaminate unrelated files;
+- no batch-wide atomicity requirement or implication.
 
-A failure in one file must not silently affect another. Authoritative shared-state rechecks are required; serial versus bounded parallel execution remains unresolved.
+Parallel preparation remains unresolved. This candidate cannot implement until the Sprint 82 foundation proves the named ownership, cancellation, duplicate and failure-isolation prerequisites.
 
 ---
 
@@ -996,7 +857,7 @@ A failure in one file must not silently affect another. Authoritative shared-sta
 **Status:** Blocked
 **Depends on:** `FW-P1-20`
 
-Provide drag-and-drop queue visibility, per-file progress and outcomes, and result navigation for multiple files.
+Add authorized multi-file drag-and-drop intake, queue visibility, per-file progress/outcomes and result navigation to the same orchestration model. Drag-and-drop must not create a second batch engine, weaken macOS file authorization or imply batch-wide atomic persistence.
 
 ---
 
@@ -1380,7 +1241,7 @@ Retain future work for speculative duplicate-transaction candidates, unsupported
 **Status:** Ready for discovery
 **Depends on:** Sprint 57 durable category foundation — complete
 
-Sprint 57 completed `FW-P2-20` with additive Migration V8, durable user-created categories, manual single-transaction classification, SQLite/In-Memory parity, canonical hydration and bounded Settings/transaction UI. It did not implement automatic classification or any rule behavior.
+Sprint 57 completed the manual category foundation with additive Migration V8, durable user-created categories, manual single-transaction classification, SQLite/In-Memory parity, canonical hydration and bounded Settings/transaction UI. It did not implement automatic classification or any rule behavior.
 
 Discovery for this candidate must preserve imported transaction immutability, manual assignments, explicit user control and explainability. It must not infer implementation authority from the completed category foundation.
 
@@ -1542,21 +1403,25 @@ Sprint 68A removes an inert star only; it does not implement favourites or chang
 
 # P2 — User Experience
 
-## FW-P2-40 — Replace Developer Terminology in User-Facing Screens
+## FW-P2-40 — Remaining User-Facing Terminology Cleanup
 
 **Status:** Candidate
-**Depends on:** None
+**Depends on:** stable affected R1 screens
 
-Accepted UI work has already removed or contextualized several developer/repository-oriented terms where they were misleading, including the standalone Salary **Truth classes** panel in favor of contextual provenance. Sprint 68A also supplies a neutral idle Validation Review state.
+**Completed boundary:** Accepted UI work removed/contextualized several misleading internal terms, including replacing the standalone Salary Truth-classes panel with contextual provenance.
 
-Only genuinely remaining user-facing internal terminology is still queued here. `LF-UI-2026-09-R1` reinforces plain financial/workflow language and does not authorize removing diagnostics or provenance that are still truthful and useful.
+**Remaining boundary:** Only genuinely remaining developer/repository terminology on R1-covered ordinary user screens remains. Diagnostics and provenance that are truthful and useful must not be removed merely to simplify wording.
 
-## FW-P2-41 — Consistent Toolbar Composition
+---
+
+## FW-P2-41 — R1 Contextual Toolbar Conformance
 
 **Status:** Candidate
-**Depends on:** None
+**Depends on:** stable destination workflows and the accepted R1 shell direction
 
-Cross-link `LF-UI-2026-09-R1` contextual-toolbar direction: destination toolbars should expose only functional controls relevant to the active page, with visible scope and consistent hierarchy. Do **not** require one dominant Import button on every destination merely for visual uniformity.
+Conform remaining destination toolbars to functional, page-specific controls with visible scope and consistent hierarchy. Do not force one dominant Import button onto every destination merely for visual uniformity, and do not add inert controls.
+
+---
 
 ## FW-P2-43 — Better Account Icons
 
@@ -1602,52 +1467,47 @@ Future charts must preserve native-currency safety, provenance, deterministic ca
 
 ---
 
-## FW-P2-47 — Better Empty States and Import Guidance
+## FW-P2-47 — R1 Empty, Loading, Failure and Import Guidance States
 
 **Status:** Candidate
-**Depends on:** None
+**Depends on:** stable affected workflows
 
-Under `LF-UI-2026-09-R1`, presentation must distinguish loading, genuinely empty, unavailable, failed and no-match/no-filter-result states. A completed import should resolve to a coherent completed/result state rather than appearing stuck in unfinished preparation. Guidance should not duplicate navigation actions unnecessarily or imply unsupported recovery.
+Complete R1 state treatment that distinguishes loading, genuinely empty, unavailable, failed and no-match states. Completed imports must resolve to coherent result/completion presentation. Guidance must not duplicate navigation unnecessarily, fabricate zero financial values or imply unsupported recovery.
 
-## FW-P2-48 — Hover, Spacing and Visual Polish
+---
 
-**Status:** Candidate
-**Depends on:** Stable primary layouts
-
-Bounded shared visual follow-up under `LF-UI-2026-09-R1` includes:
-
-- responsive native-currency summaries with readable full amounts;
-- clearer account disambiguation without exposing identifiers;
-- responsive/collapsible inspectors;
-- settings hierarchy and density polish;
-- bounded later Salary compactness/rate wording refinement; and
-- Developer Console clarity between the active database and any selected target.
-
-**User decision:** further Salary visual refinement is lower priority. Do not reopen the accepted natural-input, Save/Command-S, fee-validation or persistence fixes as a redesign task.
-
-## FW-P2-49 — Accessibility Review
+## FW-P2-48 — R1 Cross-Screen Visual Polish
 
 **Status:** Candidate
-**Depends on:** Stable primary workflows
+**Depends on:** stable primary layouts and the applicable R1 implementation slices
 
-`LF-UI-2026-09-R1` requires native/runtime verification of:
+Remaining shared polish includes readable full native-currency summaries, safe account disambiguation, responsive/collapsible inspectors, settings hierarchy/density and Developer Console clarity between the active database and a selected target.
 
-- complete keyboard paths for primary interactions;
-- meaningful VoiceOver labels/grouping;
-- visible focus independent of selection;
-- status meaning that does not depend on colour;
-- a 4.5:1 text contrast target and 3:1 meaningful-boundary/non-text target where applicable;
-- reduced-motion and reduced-transparency behavior; and
-- readable fallback when user appearance choices would otherwise reduce legibility.
+The Transactions portions may be consumed only as needed by Sprint 89; broader cross-screen polish remains for the later shared conformance boundary. Further Salary visual refinement remains lower priority and must not reopen accepted natural input, Save/Command-S, fee validation or persistence behavior.
 
-Static design approval is not native accessibility acceptance.
+---
 
-## FW-P2-50 — Keyboard Navigation and Shortcuts
+## FW-P2-49 — R1 Native Accessibility Closure
 
 **Status:** Candidate
-**Depends on:** Stable primary workflows
+**Depends on:** stable R1 implementation surfaces
 
-Cross-link the R1 Transactions/table requirements: keyboard reachability for search, period/filter controls, sortable headings, table selection, column/inspector interactions and collapse/expand behavior; focus must remain visible and distinct from selection. Shortcuts must not bypass confirmation or mutation safety.
+Native/runtime acceptance must cover complete keyboard paths, useful VoiceOver grouping, visible focus distinct from selection, non-colour status meaning, applicable 4.5:1 text and 3:1 meaningful-boundary targets, reduced motion/transparency and readable fallback for user appearance choices.
+
+Static design approval is not accessibility acceptance. The bounded Transactions portion may be exercised with Sprint 89; cross-screen closure remains later.
+
+---
+
+## FW-P2-50 — R1 Keyboard Navigation and Shortcuts
+
+**Status:** Candidate
+**Depends on:** stable R1 primary workflows
+
+Complete keyboard reachability for search, filters, sortable headings, table/row selection, inspector interactions, collapse/expand behavior and other R1 primary actions. Focus remains visible and distinct from selection, and shortcuts never bypass confirmation or mutation safety.
+
+The bounded Transactions portion may be included in Sprint 89; cross-screen closure remains later.
+
+---
 
 ## FW-P2-51 — Startup, Runtime and Import Performance Optimization
 
@@ -1736,14 +1596,16 @@ The library must not expose raw source content by default and must not treat a d
 
 ---
 
-## FW-P2-55 — Light Mode Design Revision
+## FW-P2-55 — Adaptive Appearance Native Implementation
 
-**Status:** Idea
-**Depends on:** Approved design review, updated frozen UI specification and revised UI assets
+**Status:** Blocked
+**Depends on:** accepted `LF-UI-2026-09-R1` design authority and the bounded preference-storage/ownership decision under `FW-P2-52`
 
-The adaptive appearance direction is now **user-approved design** through `LF-UI-2026-09-R1`: Follow System is the default target, Light and Dark are explicit choices, and Deep Indigo becomes an optional preset rather than a mandatory theme for covered scope.
+**Completed boundary:** The design revision itself is complete. R1 approves Follow System as default, explicit Light/Dark choices and optional Deep Indigo/System Neutral preset direction.
 
-Implementation remains uncompleted. This item's existing status/readiness is intentionally unchanged by design approval. Storage ownership, native implementation and runtime/accessibility acceptance remain separate decisions.
+**Remaining boundary:** Native adaptive rendering and runtime/accessibility acceptance remain unimplemented. This candidate owns implementation of the accepted appearance behavior, not another design campaign. Preference persistence ownership stays under `FW-P2-52`; implementation must not mutate financial data.
+
+---
 
 ## FW-P2-56 — Development Performance Profiling
 
@@ -1766,26 +1628,27 @@ Profiling output must remain separate from financial truth and must not retain s
 
 # P2 — Engineering Quality
 
-## FW-P2-61 — Institution, Layout and Format Regression Matrix
+## FW-P2-61 — Authentic-Corpus Regression Matrix Maintenance
 
-**Status:** Ready for discovery
-**Dependency now satisfied by:** Exact Axis CSV/PDF/XLS, exact HDFC PDF/XLS, exact CBQ current-account XLS/history-PDF/monthly-PDF and exact Amex/CBQ card PDF production families.
+**Status:** Maintenance
+**Depends on:** ADR-046 and the current supported-source/profile registry
 
-Create a systematic regression matrix over the complete registered authentic corpora for every supported institution/source family and format, distinguishing historical implementation acceptance from current ADR-046 reliability certification.
+**Completed boundary:** The accepted unnumbered reset established the engineering complete-authentic-corpus regression matrix across the registered 127 carriers, including provider/order campaigns and current native-currency regression across INR and QAR families.
 
-Historical HDFC, Axis and card mechanics artifacts may inform non-source test mechanics only; they cannot establish current parser support. The complete registered authentic corpora and architecture-aware semantic projections are the reliability authority for each family.
+**Remaining boundary:** Maintain the cumulative matrix as recurring authentic sources or shared ingestion semantics change, preserve explicit certified/uncertified family boundaries and keep engineering matrix output aligned with user/engineering support documentation under `FW-P2-79`.
 
-INR and QAR now provide two exact production currency paths. Include their
-native-currency regression boundary in this matrix; do not create a separate
-mixed-currency regression candidate or infer converted/consolidated totals.
+This item must not describe LedgerForge as lacking an engineering corpus matrix, and it must never substitute historical implementation acceptance or fixture presence for current ADR-046 certification.
 
 ---
 
-## FW-P2-63 — Cross-Format Authentic-Source Semantic-Parity Tests
+## FW-P2-63 — Additional Cross-Format Authentic-Source Semantic-Parity Tests
 
-**Status:** Partially completed for exact HDFC PDF/XLS v1 and exact CBQ three-source lineage
-**Completed boundary:** Exact format-neutral projection and parity coverage exists for the approved HDFC bank-account PDF/XLS pair. Exact account/posting-date/signed-QAR/balance lineage, all-new/mixed/fully-represented provider parity and source-summary coverage exist for the approved CBQ current-account XLS/history-PDF/monthly-PDF family.
-**Remaining boundary:** Axis and card cross-format parity, additional HDFC/CBQ formats, same-format equivalence and generic partial-overlap behavior remain future work.
+**Status:** Candidate
+**Depends on:** a newly selected exact source relationship or materially changed recurring carrier family with complete authentic evidence
+
+**Completed boundary:** HDFC PDF/XLS semantic parity is accepted under ADR-042; CBQ current-account multi-source lineage/parity is covered under ADR-043; Axis-card PDF/XLSX parity is accepted under ADR-044; and the accepted 127-carrier reset establishes format-neutral semantic-parity regression for the registered Axis-bank carriers.
+
+**Remaining boundary:** Only future/new carrier pairs, materially changed recurring families, same-format semantic relationships or newly approved partial-overlap semantics remain. Axis-bank engineering semantic parity does **not** by itself establish durable cross-format duplicate/equivalence/suppression semantics; those remain governed separately by `FW-P0-19` and `FW-P1-16`.
 
 ---
 
@@ -1854,118 +1717,29 @@ The exact file names, scene hierarchy and coordinator types require implementati
 
 ---
 
-## FW-P2-69 — macOS Build, CI and UI Smoke Validation
+## FW-P2-69 — Remaining macOS CI and UI Smoke Validation
 
 **Status:** Maintenance
-**Depends on:** None
+**Depends on:** an approved CI/UI-smoke or distribution objective
 
-**Sprint 80 readiness cross-link:** The Xcode/Swift readiness discovery reached
-the compiler and confirmed that the repository's canonical build/TestPlan
-interfaces are not an infrastructure-only unknown, but it did not rerun the
-compiler probes or application TestPlan and did not change executable tooling.
-The existing canonical `./script/validate.sh`, `./script/build_and_run.sh` and
-`TestPlan.xctestplan` boundaries remain the source of build/test truth. Strict
-concurrency corrections and generic UI-test policy remain separately tracked.
+**Completed boundary:** Repository-owned local build/test entry points, exact-singleton build/run verification, deterministic local cycle-close validation, Debug/Release build foundations and current local runtime/build-identity mechanics are accepted and must not be reopened by this candidate.
 
-Establish one reproducible macOS validation workflow for local development, ChatGPT execution environments and continuous integration.
+**Remaining boundary:** CI-provider setup, commit-status protection, generic UI smoke automation or an approved replacement/enabling of UI-test coverage, plus later distribution/notarization/deployment work where separately selected.
 
-Candidate outcomes include:
-
-- one repository-owned canonical build and test entry point;
-- one repository-owned singleton kill/build/run entry point that gracefully terminates every exact-name LedgerForge process, escalates only against remaining exact-name matches, proves the zero-instance precondition, launches one resolved freshly built bundle, and verifies its PID and executable path before UI attachment;
-- deterministic Debug and Release builds;
-- focused and full test execution;
-- a configured run or verification action for supported ChatGPT development environments;
-- privacy-safe access to relevant build and runtime logs;
-- minimal macOS UI smoke coverage for:
-  - application launch;
-  - persistence-unavailable gating;
-  - import confirmation;
-  - import cancellation;
-  - truthful import-result presentation;
-  - transaction currency rendering;
-  - transaction-status rendering;
-  - sidebar and primary-window navigation;
-  - Settings truthfulness;
-- continuous-integration checks for the approved build and test matrix;
-- commit-status protection where repository policy supports it.
-
-The exact script names, CI provider and command interface require discovery. This candidate must not create an alternate build configuration that diverges from Xcode project truth.
-
-Sprint 53 runtime verification required this singleton process-isolation sequence to prevent attachment to stale binaries from other DerivedData roots. No authorized repository launch script existed during that sprint; Sprint 69 owns the completed local boundary below.
-
-### Sprint 69 completed boundary
-
-Completed:
-
-- canonical local build and test entry point;
-- exact-singleton local Run entry point;
-- Codex Run action;
-- deterministic local cycle-close validation: fresh Debug and Release builds
-  passed, and the canonical complete TestPlan recorded 628 executed tests with
-  zero failures and zero skips;
-- final local Run evidence: `build_and_run.sh --verify` built a fresh Debug
-  bundle, verified one PID against that bundle's executable, used the explicit
-  non-durable `LEDGERFORGE_RUN_HOST=1` marker, and found no open SQLite, WAL or
-  SHM database files; `--stop` then proved zero exact-name LedgerForge
-  processes and no task-owned `xcodebuild` process;
-- Sprint 68B was a test-only correction to the bounded persistence-error
-  contract: the generic public wrapper message remains, while typed identity
-  outcomes and durable-attempt authority remain preserved;
-- DBP-01 maintenance correction: every successful prepared import in the
-  bounded tests has explicit cancellation ownership, affected tests use
-  target-wide runtime-state isolation, and the scheduler-interference coverage
-  was created and passed. No production lifecycle behaviour, migration or ADR
-  changed.
-
-Still open:
-
-- CI provider setup;
-- commit-status protection;
-- generic UI smoke automation;
-- enabling or replacing the disabled UI-test target;
-- distribution, notarization or deployment.
-
-Sprint 69 does not close this broader candidate or authorize those remaining outcomes.
+No alternate build configuration may diverge from Xcode project truth.
 
 ---
 
-## FW-P2-70 — macOS Target, Bundle and Runtime-Metadata Hardening
+## FW-P2-70 — Remaining macOS Target and Distribution Metadata Hardening
 
 **Status:** Maintenance
-**Depends on:** A stable application target
+**Depends on:** an approved macOS target/distribution metadata decision for each remaining surface
 
-**Sprint 80 discovery findings:** The current artifact is a macOS-native
-application using the macOS 26.5 SDK, App Sandbox and selected-file import.
-Stale/project metadata remains open: app/tests/UI advertise non-macOS
-platforms, irrelevant device-family/deployment metadata remains, the generated
-macOS plist contains iOS-oriented keys, the Release bundle contains governance
-or development residue such as `AGENTS.md`, and an empty debug-fixture resource
-container is present.
+**Completed boundary:** Bundle-derived version/build presentation, local startup/build identity and R1 resource-containment verification are accepted and are not future work here.
 
-The discovery intentionally makes no decision on minimum macOS version,
-read-only versus read-write selected-file entitlement, network entitlement
-ownership, broad folders, Bluetooth, Calendars, app groups, hardened runtime,
-signed Release/distribution scope or UI-test policy. Those are future
-architecture/product decisions.
+**Remaining boundary:** stale non-macOS platform/device metadata, irrelevant generated plist keys, unexpected governance/development resources in built products, minimum-version and entitlement/capability decisions, hardened-runtime/distribution policy and eventual Developer ID/notarization/packaging if external distribution is approved.
 
-**Version/build presentation slice completed 2026-07-20:** Settings now derives `CFBundleShortVersionString` and `CFBundleVersion` from the application bundle, presents them as `version (build)`, and falls back deterministically when metadata is unavailable. Debug and Release built bundles both expose `1.0 (1)`. All other target and bundle hardening remains open.
-
-Harden the macOS application target and built bundle without expanding product scope.
-
-Candidate outcomes include:
-
-- supported-platform settings restricted to platforms LedgerForge genuinely supports;
-- application resources audited against actual target build phases;
-- internal governance or development documents excluded from the product bundle unless explicitly required;
-- version and build values derived from application bundle metadata rather than duplicated UI constants;
-- App Sandbox and selected-file entitlements validated against production import behaviour;
-- Debug and Release configuration parity where required;
-- Release build inspection for unexpected resources or configuration residue.
-
-Final Developer ID distribution, notarization, Gatekeeper acceptance, DMG packaging and release-channel design remain deferred until external distribution becomes an approved product objective.
-
-No bundle-inclusion defect may be claimed solely from Xcode navigator visibility. Target build phases or an inspected built application must provide the evidence.
+No bundle-inclusion defect may be inferred from navigator visibility; target/build-phase or inspected-product evidence is required.
 
 ---
 
@@ -2063,33 +1837,16 @@ reached and that the remaining work is materially known.
 **Type:** Maintenance
 **Depends on:** None
 **Origin:** User / documentation synchronization, 2026-09-09
-**Evidence / authority:** Current repository structure at `main@d8124ef5a1f38a1e7547f4f8905c91f25b2f1194`
+**Evidence / authority:** Repository structure reviewed during the 2026-09-09 planning reconciliation at `main@a560312db5900645779a499016e13f0c87e81435`
 **Disposition date:** 2026-09-09
 **Owning specification / ADR:** Repository organization discovery; no accepted target layout yet
 **Personal-v1 relevance:** Maintenance/readability; not itself an adoption gate
 
 **Purpose:** Establish one understandable repository organization and naming model while preserving behavior, Git history, Xcode membership and project authority.
 
-Current verified structural signals:
+Verified structural signals include root analyzer/detector/normalizer/parser/reader areas coexisting with feature-local import folders, mixed responsibilities in `Core`, an oversized `ContentView.swift`, mixed Project-doc naming and historical roadmap naming residue.
 
-- root `Analyzers` / `Detectors` / `Normalizers` / `Parsers` / `Readers` coexist with feature-local `Import/Readers` and `Import/Models`;
-- `Core` mixes runtime stores, diagnostics, planner input and UI-adjacent components;
-- `ContentView.swift` is structurally oversized and mixes shell/workflow concerns;
-- `Project documents` uses mixed naming conventions; and
-- the superseded 70–79 roadmap retains `_Current` in its filename although its content is historical.
-
-Discovery scope:
-
-- feature-oriented versus layer-oriented placement;
-- root directory ownership;
-- Import/Ingestion consolidation possibilities;
-- Core ownership/naming;
-- Views/ViewModels organization;
-- test-tree correspondence;
-- Project documents naming and historical-roadmap archival conventions;
-- Xcode file references, resources and target membership;
-- script/path assumptions; and
-- Git-history impact of moves.
+Discovery must cover feature-oriented versus layer-oriented placement, root ownership, Import/Ingestion boundaries, Core ownership, Views/ViewModels, test-tree correspondence, Project-doc archival naming, Xcode references/resources, script/path assumptions and Git-history impact.
 
 Explicit boundaries:
 
@@ -2098,12 +1855,42 @@ Explicit boundaries:
 - no Swift package/framework split without separate architecture approval;
 - no mass move mixed with behavioral refactor;
 - no private-original/evidence relocation;
-- no migration; and
-- no implementation in the documentation-sync task that recorded this candidate.
+- no migration;
+- no speculative target tree accepted before discovery.
 
-Cross-links: `FW-P2-67` owns App Shell / workflow decomposition behavior; `FW-P2-71` owns Xcode/user-metadata hygiene; `FW-P2-77` owns repository organization/naming discovery.
+Cross-links: `FW-P2-67` owns app-shell/workflow decomposition; `FW-P2-71` owns Xcode/user-metadata hygiene; `FW-P2-77` owns repository organization/naming discovery.
 
-Do not create a speculative target folder tree as accepted architecture. Any proposed physical layout remains a discovery output.
+---
+
+## FW-P2-78 — LF-UI-2026-09-R1 Dashboard Implementation
+
+**Status:** Ready for planning
+**Depends on:** accepted R1 design authority and existing repository-backed Dashboard/account/card/salary summaries
+
+Implement the bounded R1 Dashboard hierarchy using native-currency groups, bank balances distinct from card liabilities, readable full amounts, authoritative as-of/period context where available, and the accepted Salary/current-funding summary without formula changes.
+
+Required exclusions:
+
+- no hidden FX conversion;
+- no invented net worth;
+- no new analytics, trends or percentages;
+- no repository hydration masquerading as Import Activity;
+- no source-financial or persistence-semantic changes.
+
+The layout must adapt responsively without losing currency or liability meaning.
+
+---
+
+## FW-P2-79 — Supported Institution / Source Coverage Documentation
+
+**Status:** Ready for planning
+**Depends on:** current accepted source/profile registry and ADR-046 current certification boundary
+
+Maintain a user-readable and engineering-readable support matrix that distinguishes institution, financial family, source format, profile/parser identity/version where appropriate, credential requirement, active authentic-corpus certification status, known exclusions, historical implementation acceptance, current ADR-046 reliability certification and source-uncertified cases.
+
+Support must never be inferred from institution name, fixture presence, filename, format or structural similarity. The matrix is a required input to `FW-P0-26` personal-v1 certification but does not itself certify personal-v1.
+
+---
 
 # P3 — Identity Enhancements
 
@@ -2191,16 +1978,36 @@ Internal transfers must never be presented as new income or expense.
 
 ---
 
-## FW-P3-08 — Salary and Planning Workspace
+## FW-P3-08 — Broader Salary and Planning Expansion
 
-**Status:** Partially completed; the remaining broader workspace is future work
-**Depends on:** Future transaction/account relationships, recurring-obligation detection and separately approved planning expansions
+**Status:** Blocked
+**Depends on:** the specific transaction/reconciliation, recurring-obligation, analytics, investment or FX foundations required by the selected broader planning outcome; a future explicit ADR-045 alignment or successor architecture before external remittance-reference evidence can affect Salary calculations
 
-Sprint 79 completed the bounded Qatar Airways Salary History / This Month planner slice under ADR-045 and Migration V16. The later accepted unnumbered startup/monthly-planner package completed the bounded coherent editor, natural amount entry, one Save/Command-S action, contextual provenance, compact layout and non-negative configured-fee validation. Those accepted slices are recorded in `PROJECT_STATE.md` and are no longer queued.
+**Completed boundary:** Sprint 79 and the later accepted startup/monthly-planner package completed exact Qatar Airways salary actuals, Salary History/This Month, coherent natural-input editing, Save/Command-S, contextual provenance, compact layout and configured-fee validation. Those slices are not future work.
 
-Remaining future work includes generic salary/employer support beyond exact `qatar-airways.salary.pdf@1`, recurring-obligation detection and broader cash-flow planning, automated/executable transfer planning, automatic card-payment reconciliation, generic budgeting/allocation, savings/investment execution, historical planner analytics/variance explanation and separately approved global-FX/reporting-currency integration.
+**Remaining boundary:** Broader cross-employer planning integration, historical planner analytics/variance explanation and other planning outcomes that genuinely extend the accepted current-month workspace. Generic employer source support stays under `FW-P1-05`; recurring obligations under `FW-P3-09`; transfer/reconciliation under `FW-P2-10`/`FW-P2-11`/`FW-P3-19`; investments and general reporting FX remain in their dedicated candidates.
 
-**User decision — 2026-09-09:** further Salary presentation refinement is lower priority and remains bounded future polish, not a new redesign. Do not reopen accepted editing/persistence fixes. The accepted dedicated Salary destination and bounded Dashboard summaries remain production state.
+**User-settled future India-remittance reference direction — 2026-09-09:** Al Dar Exchange is prospective evidence only for **Salary / This Month / India-remittance planning**. It is not general FX, investment FX, ISP FX, net-worth FX or reporting-currency authority. Read-only public-calculator discovery established amount-sensitive forward QAR-send quoting through the provider's public calculator path and also established that the reverse INR-target result is not reciprocal enough to prove sufficient funding. The reverse endpoint may inform later implementation investigation but is not financial authority.
+
+The selected future planner method is:
+
+```text
+provisional QAR requirement
+→ fetch an amount-specific forward Al Dar QAR→INR quote for that QAR send amount
+→ recalculate the planner QAR requirement using the fetched rate
+```
+
+This remains a planning approximation/reference, not a guaranteed executable settlement or exact receive amount. Do not silently iterate toward an invented convergence rule, infer Al Dar's proprietary tier schedule, or treat a 1-QAR/table quote as universal. A materially changed funding amount may invalidate the usefulness of an earlier amount-bound quote even when it is recent. The existing ADR-045 upward rounding of the final derived QAR principal to the next QAR minor unit remains the underfunding guard.
+
+Current production remains the explicit dated **user-entered** planning FX contract. A future external quote must retain distinct provider/source/amount/direction/fetch provenance and must never be mislabeled `user_entered`. Manual user-entered FX remains a supported fallback/override. External Al Dar use requires a future explicit ADR-045 alignment or successor architecture before it can affect Salary calculations.
+
+The transfer fee remains a separate editable user/planning input. Public calculator discovery did not establish a universal applicable fee, so LedgerForge must not auto-fetch or auto-change the configured fee without separate evidence. The current accepted configurable-fee behavior remains unchanged.
+
+Historical Budget Analysis percentage haircuts against generic market/reference FX were spreadsheet-specific workarounds for provider spread/commission uncertainty. They are explicitly retired as LedgerForge architecture: do not persist a fixed haircut, create a generic spread multiplier or silently reduce a fetched reference rate.
+
+Further Salary visual polish remains lower priority and must not reopen accepted editor or persistence behavior.
+
+---
 
 ## FW-P3-09 — Upcoming Obligations and Cash-Flow Planning
 
@@ -2298,22 +2105,16 @@ Provide user-facing exports of reports and selected financial views. Full machin
 
 ---
 
-## FW-P3-19 — Salary-Slip Verification Against Imported Transactions
+## FW-P3-19 — Salary Actuals to Bank-Transaction Reconciliation
 
 **Status:** Blocked
-**Depends on:** Salary-slip document support, reliable account identity and transaction reconciliation semantics
+**Depends on:** accepted salary actuals (complete for exact Qatar Airways), reliable account identity and approved transaction/transfer reconciliation semantics under `FW-P2-10` and `FW-P2-11`
 
-Use imported salary-slip data to help verify corresponding bank transactions.
+Use immutable imported salary actuals to help verify corresponding bank transactions without collapsing payroll evidence into bank-transaction truth.
 
-Candidate outcomes include:
+The remaining blocker is matching/reconciliation semantics, not generic salary-slip support. Candidate outcomes include explainable likely salary-credit relationships, supported gross/net/deduction comparisons, mismatch explanation and explicit review for ambiguity.
 
-- identifying likely salary-credit transactions;
-- comparing gross, net and deduction information where supported;
-- explaining date or amount mismatches;
-- preserving the original statement and salary-slip records independently;
-- requiring explicit review for ambiguous matches.
-
-A salary slip must not silently create, modify or replace a bank transaction.
+A salary source must never silently create, modify or replace a bank transaction.
 
 ---
 
@@ -2343,7 +2144,21 @@ Financial-health conclusions must show the underlying deterministic calculation 
 ## FW-P3-20 — Mutual-Fund Holdings
 
 **Status:** Research
-**Depends on:** Investment domain model and approved non-source holdings test data and/or authentic investment sources where ingestion support is in scope
+**Depends on:** accepted investment/holding identity and valuation provenance; source/user-owned position and cost evidence; authentic investment sources where ingestion support is selected
+
+The user's current Indian mutual-fund domain is owned here, not by manual-valuation fallback merely because the historical workbook was manually maintained.
+
+**User-settled plan identity boundary — 2026-09-09:** the selected Indian mutual-fund holdings are **Direct plans**. Recurring identity must use an explicitly qualified configuration such as exact AMFI scheme code + ISIN + plan/option metadata. Display-name similarity, approximate NAV and fuzzy recurring matching are not identity authority. A Regular plan must never substitute for a configured Direct plan.
+
+Holding ownership, units, contributions/cost basis and correction history remain source/user-owned investment evidence. A fetched NAV never establishes those facts. External AMFI NAV retrieval/freshness belongs under `FW-P3-27`; manual/custom valuation fallback belongs under `FW-P3-28` only when required.
+
+Ordinary valuation remains:
+
+```text
+holding units × native-currency NAV = derived native-currency market value
+```
+
+Any later reporting conversion is a separate provenance-bearing derived layer and never overwrites the native holding value or imported/source evidence.
 
 ---
 
@@ -2392,18 +2207,62 @@ Financial-health conclusions must show the underlying deterministic calculation 
 ## FW-P3-27 — Optional Market-Data Refresh
 
 **Status:** Research
-**Depends on:** Investment model and offline-first cache policy
+**Depends on:** verified/user-owned holding identity and units; provider-specific access/terms and retrieval-contract qualification; offline-first cache/freshness policy
 
-Support optional market-data refresh while preserving:
+This candidate owns **external price/NAV retrieval and freshness**, not holding ownership.
 
-- offline access to existing portfolio history;
-- versioned and dated valuation evidence;
-- explicit failure and staleness states;
-- user control over providers and refresh;
-- manual price fallback for unsupported or unresolved holdings;
-- custom-fund price entry where no automatic source is suitable.
+### Zurich Qatar Airways ISP price reference
 
-Online market data remains optional. Core portfolio history must remain usable offline.
+**Reported technical discovery — 2026-09-09:** bounded read-only discovery captured and anonymously replayed the productive public FE request:
+
+```text
+GET https://digitalfundservice.feprecisionplus.com/FundDataService.svc/GetRowIdList
+```
+
+The prospective Qatar Airways ISP lookup identities are exact Zurich Fund Code + expected **USD** currency:
+
+- `N0USD`
+- `USDL3`
+- `3UUSD`
+- `B0280`
+
+The productive response resolved exactly one row for each configured code. Relevant discovered fields include `Common.FundCode_Customtable`, `Common.Name`, `Price.Bid.Amount`, `Price.Bid.Currency`, `Price.Currency_UnitLevel` and `Price.Change_`. Raw provider price values may carry more precision than rendered page text; preserve exact Decimal source values rather than round-tripping through display formatting.
+
+For the selected funds, provider `PriceDate`, `NAVDate` and `Time` were not established as populated source dates. Durable semantics therefore remain **`PRICE_DATE_NOT_ESTABLISHED`** unless later provider evidence proves otherwise. Fetch/observation time is provenance, not a valuation date, and any global performance date is not silently reused as the price date. The exact period represented by the provider's Change-% field is also `NOT_ESTABLISHED` until source documentation proves it.
+
+Technical retrieval is proven as reported discovery, but the current provider wording does **not** establish permission for automated persistent cached use. Provider terms/access and the exact durable-cache boundary remain implementation gates. Do not claim provider permission beyond evidence.
+
+Zurich price is external valuation evidence only. It never establishes ISP units, contributions, account/policy ownership, policy balance, asset allocation, vesting or transaction history. Those remain under `FW-P3-29`.
+
+### AMFI Indian mutual-fund NAV reference
+
+**Reported technical discovery — 2026-09-09:** AMFI's current publication candidate is:
+
+```text
+GET https://portal.amfiindia.com/spages/NAVAll.txt
+```
+
+The prospective adapter must target the current eight-field publication contract rather than the retiring legacy `Original_NAVAll.txt` format. Exact configured scheme code + ISIN + Direct-plan/option metadata owns recurring lookup; Regular-plan fallback is prohibited. AMFI supplies NAV and NAV date. Expected INR is a separately qualified/configured contract and must not be falsely described as an AMFI response currency field.
+
+AMFI terms evidence supports personal/noncommercial download, while the exact automated small-cache boundary remains an implementation qualification. Do not claim broader permission than the evidence establishes. Holdings/units/cost basis remain `FW-P3-20` authority, not NAV-feed facts.
+
+### Provider-specific freshness and offline behavior
+
+There is **no fixed once-per-Qatar-day refresh architecture**. Each approved provider adapter must define its own freshness policy based on provider/source semantics and product use.
+
+Shared direction, without creating a generic framework merely for abstraction:
+
+- hydrate/use the last successful cached observation first;
+- refresh asynchronously when the relevant view/workflow opens and the observation is stale under that provider's accepted policy;
+- an explicit user Refresh may be supported;
+- failed refresh retains the previous success as `STALE` and never turns it into zero;
+- no prior success plus unavailable source is `UNAVAILABLE`, not Money zero;
+- network failure must not become app-startup or repository-hydration failure;
+- no background polling requirement;
+- provenance retains provider/source identity, exact source value, source timestamp/date where actually supplied, fetch timestamp separately, parser/adapter-contract version and source-response digest;
+- provider-specific TTL/refresh numbers remain implementation-policy candidates until accepted, not architecture frozen by this planning document.
+
+If multiple implemented adapters later demonstrably need the same launch/view refresh mechanics, a bounded shared coordinator may own only those proven common mechanics. Do not create a new future-work item merely to invent abstraction.
 
 ---
 
@@ -2412,101 +2271,122 @@ Online market data remains optional. Core portfolio history must remain usable o
 **Status:** Research
 **Depends on:** Investment domain model, valuation provenance and reversible editing
 
-Support holdings that cannot be fully reconstructed from imported brokerage documents or market-data providers.
+Support holdings or valuation evidence that cannot be fully reconstructed from approved source/user evidence or a qualified external provider.
 
 Candidate outcomes include:
 
-- manual holding creation;
-- units and contribution entries;
-- dated manual valuations;
-- custom fund or security definitions;
+- manual holding creation where the product explicitly allows it;
+- manual units/contribution/cost evidence with clear provenance;
+- dated manual valuations or prices;
+- custom fund/security definitions;
 - correction history;
 - clear separation between imported, fetched and user-entered evidence;
 - explicit valuation staleness.
 
-Manual entries must never overwrite imported source records.
+This is a **fallback/manual** boundary. It is not the primary owner of the user's Indian mutual-fund domain, which remains `FW-P3-20`; AMFI NAV retrieval remains `FW-P3-27`. Manual entries must never overwrite imported/source-owned records or masquerade as provider observations.
 
 ---
 
 ## FW-P3-29 — Retirement and ISP Tracking
 
 **Status:** Research
-**Depends on:** Investment, contribution, employer-benefit and planning-domain models
+**Depends on:** accepted investment/holding identity, contribution/employer-benefit and planning-domain models; source/user-owned evidence for units, ownership and contribution classes
 
-Support retirement and employer-sponsored investment plans, including ISP-style arrangements.
+Support retirement and employer-sponsored investment plans, including the user's Qatar Airways ISP boundary, without using an external price table as ownership evidence.
 
-Candidate outcomes include:
+Candidate ISP evidence includes:
 
-- employee contributions;
-- employer contributions;
-- voluntary contributions;
-- multiple plan portfolios;
-- allocation history;
-- contribution and vesting rules where supported;
-- current value and performance;
-- links to salary and planning workflows.
+- source/user-owned policy/account identity;
+- mandatory units;
+- AVC units;
+- future separately evidenced contribution classes;
+- total position derived from the accepted unit classes;
+- employee/employer/voluntary contribution and cost evidence where available;
+- multiple plan portfolios/allocation history where source/user evidence establishes them;
+- links to Salary/planning workflows;
+- derived current valuation only after independently owned units exist.
 
-Rules must be explainable and configurable rather than inferred from institution labels alone.
+**Zurich price separation:** the prospective external price lookup codes are `N0USD`, `USDL3`, `3UUSD` and `B0280`, all with expected USD price currency. Zurich pricing belongs to `FW-P3-27`. A price row does **not** establish units owned, contribution history, policy/account ownership, policy balance, asset allocation, vesting or transactions. Fund name alone is not identity authority.
+
+The historical Budget Analysis `0.75` Conventional Blend factor represented a temporary vesting/availability workaround. By explicit user decision it is **retired from future LedgerForge requirements**: do not implement a permanent 75% multiplier, apply it to `B0280`, or infer any replacement vesting schedule. Future vesting semantics require new explicit/source evidence if they later matter.
+
+Ordinary ISP valuation remains:
+
+```text
+verified/user-owned units × native USD fund price = derived native USD market value
+```
+
+Any later reporting conversion is separately derived with its own FX provenance.
 
 ---
 
 # P3 — Multi-Currency and Ecosystem
 
-## FW-P3-30 — Multi-Currency Account and Transaction Presentation
+## FW-P3-30 — Locale-Aware and Derived Multi-Currency Presentation
 
 **Status:** Blocked
-**Depends on:** Sprint 44 Money boundary and a separately approved display or conversion scope
+**Depends on:** the accepted native `Money` boundary plus an approved general rate/reporting-currency scope for any converted or secondary-display value
 
-Present native and derived monetary values using locale-aware formatting, including:
+**Completed boundary:** Production QAR and INR support already exists. Native amounts retain their currency/scale and current summaries remain grouped by native currency without hidden conversion.
 
-- correct currency symbols and codes;
-- regional decimal and grouping rules;
-- Indian digit grouping where appropriate;
-- international grouping where appropriate;
-- simultaneous base and secondary display currencies where approved;
-- visible distinction between native and converted amounts.
-
-Before QAR production support, every row must retain native currency, summaries and Dashboard balances must be grouped by currency, and no combined amount may appear without an approved conversion.
-
-Sprint 44 supplies the minimum safe grouped native-currency presentation. Converted, base-currency, reporting-currency and secondary-display totals remain outside this increment.
+**Remaining boundary:** locale-aware formatting refinements, regional/Indian grouping where applicable, and any derived base/secondary/reporting-currency presentation. Native values remain primary and derived conversions must visibly retain provider/source/freshness/algorithm context. Missing or stale conversion evidence remains explicit rather than becoming zero. Salary-remittance Al Dar evidence is outside this general reporting path and remains owned by `FW-P3-08`.
 
 ---
 
-## FW-P3-31 — Exchange-Rate Storage
+## FW-P3-31 — General Reference-Rate Storage and Provenance
 
 **Status:** Research
-**Depends on:** Approved rate-source and offline-cache policy
+**Depends on:** an accepted general derived-FX architecture, provider/attribution decision, provider-specific freshness/fallback policy and provenance-bearing derived-value contract
 
-Rates must be versioned and immutable, carry provider provenance and validity time, support offline cache and expose stale or missing states.
+This candidate owns **general valuation/reporting reference-rate persistence and provenance**, not Salary-remittance quoting.
 
-The presence of an `exchange_rates` table in the database design does not activate production exchange-rate storage. This candidate remains separate from the Money increment and requires an approved source, provenance, validity, offline-cache, stale-state and missing-rate contract before any production write or conversion path is enabled.
+**User-selected conversion route — 2026-09-09:** future general reporting/valuation prefers:
+
+```text
+INR → QAR → USD
+```
+
+using one general QAR→INR reference leg and one fetched general QAR→USD reference leg. For one accepted source snapshot:
+
+```text
+QAR = INR / (QAR→INR)
+USD = QAR × (QAR→USD)
+```
+
+Preserve both raw source legs, their units/orientation, provider/source timestamp, fetch timestamp separately, provider/source identity, source-response digest and derivation algorithm/version. Native `Money` remains authoritative and is never overwritten by conversion.
+
+**Technically qualified provider candidate, not selected architecture:** `ExchangeRate-API` via `https://open.er-api.com/v6/latest/QAR` can provide QAR-based INR and USD legs in one dated snapshot and documents end-use caching with attribution. The user selected the **conversion route**, not a permanent provider. Future implementation discovery/ADR must still approve provider choice, attribution, freshness, fallback and durable-storage policy. ExchangeRate-API is neither the unique allowed provider nor already implemented architecture.
+
+General refresh follows provider-specific freshness policy: use cached success first, optionally refresh asynchronously when a relevant reporting/valuation view opens and the observation is stale, allow explicit Refresh where approved, retain stale success after failure, never turn missing data into zero and do not require background polling. Provisional discovery TTL values are not frozen architecture.
+
+**Al Dar exclusion:** amount-sensitive Al Dar remittance evidence belongs only to Salary/This Month/India-remittance planning under `FW-P3-08` and future ADR-045 alignment. It must not become the provider or rate authority for investment valuation, net worth or reporting currency merely because it publishes exchange information.
 
 ---
 
 ## FW-P3-32 — Historical FX Conversion
 
 **Status:** Blocked
-**Depends on:** `FW-P3-31`
+**Depends on:** `FW-P3-31` plus an accepted historical/effective-time general rate authority and derivation policy
 
-Provide derived historical conversion without overwriting native values.
+Provide provenance-bearing derived historical conversion without overwriting native values. A current/observed general-rate snapshot does not establish rates for dates it did not cover. Salary-remittance Al Dar quotes are not historical/reporting FX authority.
 
 ---
 
 ## FW-P3-33 — User-Selectable Reporting Currency
 
 **Status:** Blocked
-**Depends on:** `FW-P3-31` and `FW-P3-32`
+**Depends on:** `FW-P3-31` and `FW-P3-32`, plus an accepted reporting-currency semantics contract
 
-Provide selectable reporting currency while preserving native imported amounts.
+Provide selectable reporting currency from provenance-bearing derived values while preserving native imported/holding Money. The selected INR→QAR→USD route is a planning direction for derived reporting, not permission to overwrite native values or use Salary-remittance Al Dar evidence as global FX.
 
 ---
 
 ## FW-P3-34 — Currency-Aware Analytics and Net Worth
 
 **Status:** Blocked
-**Depends on:** Analytics and reporting-currency foundations
+**Depends on:** reliable investment/holding values, analytics foundations, and accepted general reporting-currency conversion under `FW-P3-31` through `FW-P3-33`
 
-Provide current valuation conversion and consolidated reporting only from auditable derived values; native values remain authoritative.
+Provide consolidated analytics/net-worth presentation only from auditable derived values. Preserve each native position/transaction amount, each external price/NAV observation and both raw FX legs independently. Missing/stale valuation or FX evidence yields incomplete/stale derived reporting, never fabricated zero or silently substituted rates.
 
 ---
 
@@ -2521,15 +2401,17 @@ Provide a machine-readable export of supported LedgerForge domain data. User-fac
 
 ## FW-P3-36 — Verified Backup, Restore and Disaster Recovery
 
-**Status:** Ready for discovery  
-**Shared prerequisites:** The canonical database lifecycle, checked close, coordinated SQLite/WAL/SHM handling, verified lifecycle backup, migration-chain integrity and fail-closed recovery foundations exist.  
+**Status:** Ready for discovery
+**Shared prerequisites:** Canonical database lifecycle, checked close, coordinated SQLite/WAL/SHM handling, DEBUG lifecycle backup, migration-chain integrity and fail-closed recovery foundations exist.
 **Implementation dependency:** Approval of the user-facing backup contents, integrity, restore-target, compatibility and confirmation contract.
 
-**Coordinator planning note — 2026-09-09:** backup/restore has been identified as a serious personal-v1 adoption-gate candidate. This is a recorded planning proposal, **not** automatic priority promotion, implementation authorization or a claim that backup/restore is complete. It must be considered explicitly before personal-v1 certification.
+This is a serious required recoverability input to `FW-P0-26` personal-v1 certification, but importance does not itself promote implementation priority.
 
-Provide explicit local backup creation, integrity verification, documented contents/exclusions, restore preview/confirmation, safe-target restoration, version/schema compatibility checks, failure-safe recovery, disaster-recovery guidance and clear separation from optional synchronization.
+Provide explicit user-owned local backup creation, integrity verification, documented contents/exclusions, restore preview/confirmation, safe-target restoration, version/schema compatibility checks, failure-safe recovery and disaster-recovery guidance.
 
-Targeted discovery must distinguish the existing DEBUG lifecycle backup from a production user-owned backup product, define sandbox/file-access behavior and ensure restore cannot overwrite unique or newer data without explicit review. A backup is not trustworthy merely because a file was copied.
+Discovery must distinguish the existing DEBUG lifecycle backup from a production user-owned backup product and ensure restore cannot overwrite unique/newer data without explicit review. A copied file alone is not a trustworthy backup or restore drill.
+
+---
 
 ## FW-P3-37 — Optional Encrypted Sync
 

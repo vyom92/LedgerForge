@@ -26,7 +26,7 @@ When reading this file:
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
 **Status alignment date:** 2026-09-09
-**Repository implementation ref reviewed:** `main@d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` — current pushed main after publication of the accepted startup reliability/monthly-planner package (`6455f662dd0ea8896d19af3e67be51546badb3ae`) and the user-authorized obsolete-plugin-artifact cleanup (`d8124ef5a1f38a1e7547f4f8905c91f25b2f1194`)
+**Repository/planning alignment reviewed through:** `main@a560312db5900645779a499016e13f0c87e81435` — R1 documentation/planning publication. The accepted startup/monthly-planner product implementation/package remains `6455f662dd0ea8896d19af3e67be51546badb3ae`; `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` is subsequent non-product cleanup.
 **Latest technically accepted production implementation:** unnumbered startup reliability and monthly-planner package, including non-negative configured-fee validation; the earlier authentic-parser reset remains closed and Sprint 79 remains the latest accepted numbered implementation
 **Latest verified Debug development-tooling implementation:** accepted startup recurrence-prevention tooling; DBP-01 remains the developer-profile architecture
 **Latest completed numbered implementation outcome:** Sprint 79
@@ -5685,6 +5685,28 @@ Chat accepted the unnumbered startup reliability and monthly-planner usability p
 **Status:** Accepted and implemented in Sprint 79
 **Date:** 2026-08-27  
 **Decision owner:** Chat / user-approved Sprint 79 planning
+
+## Future Product Direction Note — 2026-09-09
+
+This note records a **future product direction only**. It does not alter the accepted historical Sprint-79 decision below, does not implement external FX, and does not itself approve the architecture required for implementation.
+
+Current production remains the explicit dated **user-entered** plan-local FX contract in this ADR. Manual user-entered FX remains a supported future fallback/override.
+
+For future **Salary / This Month / India-remittance planning only**, the user selected a prospective amount-specific Al Dar flow:
+
+```text
+provisional QAR requirement
+→ obtain an amount-specific forward Al Dar QAR→INR quote for that send amount
+→ recalculate the planner QAR requirement using that fetched rate
+```
+
+The external quote is planning/reference evidence, not a guaranteed executable settlement or exact receive amount. Do not silently iterate toward an invented convergence condition, infer a proprietary tier schedule, treat a 1-QAR/table quote as universal, or use the reverse INR-target endpoint as sufficient-funding authority. The existing rule that the final derived QAR principal rounds upward to the next QAR minor unit remains unchanged.
+
+External quote provenance must remain distinct from `user_entered` and retain its provider/source/amount/direction/fetch context. Al Dar is not general/reporting/investment/ISP/net-worth FX authority. A future explicit ADR-045 alignment or successor architecture is required before external Al Dar evidence may affect Salary calculations.
+
+The transfer fee remains a separate editable planning input. No automatic Al Dar fee source or universal provider fee has been established, so this future direction does not auto-fetch or auto-change the configured fee. Current accepted fee behavior remains unchanged.
+
+No migration is authorized by this planning note.
 
 ## Current Alignment — 2026-08-28
 

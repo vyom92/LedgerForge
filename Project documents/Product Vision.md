@@ -13,14 +13,28 @@ It does not define:
 - repository status;
 - active execution scope.
 
-Those belong respectively to:
+Current authority instead comes from:
 
-- `Project documents/PROJECT_STATE.md`;
-- `Project documents/FUTURE_WORK.MD`;
-- accepted entries in `Project documents/ADR.md`;
-- the complete Chat-approved execution prompt.
+- `Project documents/PROJECT_STATE.md` for accepted product/migration reality;
+- the current cycle roadmap for sprint order and numbering;
+- `Project documents/FUTURE_WORK.MD` for unscheduled work and readiness;
+- accepted entries in `Project documents/ADR.md` for architecture;
+- Git plus guarded local evidence for repository state; and
+- the complete Chat-approved execution prompt for active scope.
 
 The Product Vision may remain ambitious, but it must not imply that planned capabilities already exist.
+
+## Current alignment — 2026-09-09
+
+This document remains product direction, not a current-support registry. Current implementation and exact source reliability belong to `PROJECT_STATE.md`, accepted ADRs and the canonical queue.
+
+Current planning priority is: financial correctness; durable persistence; deterministic behavior; explicit user control; privacy; recoverability; explainability; maintainability; delivery speed.
+
+For R1-covered UI scope, `LF-UI-2026-09-R1` is the approved design authority. Follow System/Light/Dark with optional Deep Indigo replaces any reading of Deep Indigo as a mandatory current theme. Design approval remains separate from native implementation.
+
+For statement-dependent financial behavior, ADR-046 and the complete registered authentic corpus supersede synthetic/sanitized/reconstructed/representative fixture authority. Production parser output is never its own sole oracle, fixture presence never establishes support and exact support cannot be inferred from institution name or structural similarity. Historical passages that once described “only Axis CSV” production support are no longer current authority.
+
+Current supported-source coverage is intentionally not enumerated in Product Vision; use `PROJECT_STATE.md` and the maintained support-matrix candidate `FW-P2-79`.
 
 ---
 
@@ -39,7 +53,10 @@ LedgerForge is designed for private personal use. It prioritizes:
 3. deterministic behavior;
 4. explicit user control;
 5. privacy;
-6. delivery speed.
+6. recoverability;
+7. explainability;
+8. maintainability;
+9. delivery speed.
 
 LedgerForge is multi-currency by design. Every monetary value retains its native currency. Conversion, reporting currency and consolidated views are derived presentation concerns that must remain transparent and auditable.
 
@@ -139,7 +156,7 @@ LedgerForge must not sacrifice accuracy for convenience.
 ### Determinism
 
 - The same approved evidence should produce the same observable result.
-- Approved fixtures and independent oracles define expected financial truth.
+- Complete registered authentic financial corpora and independent source oracles define statement-dependent financial truth; source-independent mechanics may use nonfinancial test data.
 - Production parser output must not be the sole authority for its own correctness.
 - Similar layouts do not imply support.
 - Filename or display similarity does not imply institution, account or duplicate identity.
@@ -172,7 +189,7 @@ Transfer relationships must remain deterministic, explainable and correctable.
 
 LedgerForge should feel like a financial operating system rather than an import utility.
 
-### Current foundational experiences
+### Foundational product experiences
 
 The current product foundation centers on:
 
@@ -180,6 +197,7 @@ The current product foundation centers on:
 - Accounts;
 - Transactions;
 - Imports;
+- Salary;
 - Settings.
 
 These experiences are repository-backed and must present only authoritative persisted and hydrated state.
@@ -241,16 +259,9 @@ All supported bank and card transactions belong to one global repository-backed 
 
 LedgerForge should feel like a native macOS financial application.
 
-The current visual and interaction authority is:
+For R1-covered scope, current visual and interaction authority is `UI_UX_v1.0_Frozen.md` plus the approved `LF-UI-2026-09-R1` handoff/master board. Legacy assets remain inherited only where consistent with that newer authority and accepted product behavior. Follow System is the default R1 target, with explicit Light/Dark and optional Deep Indigo.
 
-1. `Project documents/UI_UX_v1.0_Frozen.md`;
-2. `Project documents/UI Assets/Approved/DesignBoard_v2.0.png`;
-3. remaining approved UI assets;
-4. SwiftUI implementation.
-
-The approved visual baseline is Deep Indigo and dark-mode-first.
-
-Implementation translates approved design authority. It must not silently redesign the product.
+Implementation translates approved design authority. It must not silently redesign the product, and design approval does not claim native implementation.
 
 The experience should emphasize:
 
@@ -265,7 +276,7 @@ The experience should emphasize:
 - privacy-safe presentation;
 - temporary import workflows that return the user to financial understanding.
 
-A future Light Mode or visual-system revision requires an approved design update rather than ad hoc implementation drift.
+The R1 Light/Dark/System direction is already approved; future visual revisions still require design authority rather than ad hoc implementation drift.
 
 ---
 
@@ -328,7 +339,7 @@ Initial institution and family priorities include:
 - HDFC bank-account statement families;
 - CBQ bank-account and credit-card statement families;
 - American Express credit-card statement families;
-- fixture-backed Axis card families.
+- source-proven Axis card families.
 
 Every institution, document family, layout and source format is approved independently.
 
@@ -354,33 +365,11 @@ Target source formats include:
 
 This is product direction, not current production coverage.
 
-### Current support boundary
+### Current support authority
 
-Verified production parsing currently supports the approved shared Axis bank-account CSV grammar represented by the approved NRE and supplied shared-layout NRO evidence.
+Current production/source support is intentionally not enumerated in Product Vision because it changes independently of long-term direction. `PROJECT_STATE.md`, accepted profile/source architecture and ADR-046 complete-authentic-corpus certification define current support. `FW-P2-79` owns the maintained user/engineering coverage matrix.
 
-New supported imports use the neutral forward profile:
-
-```text
-axis.bank-account.csv
-version 1
-```
-
-Historical `axis.nre.csv` version `1` provenance remains readable.
-
-The repository contains additional approved fixture evidence for Axis, HDFC, CBQ and American Express families across PDF and spreadsheet formats. Fixture availability enables discovery and regression work. It does not establish production support.
-
-Production support does not currently include:
-
-- broader Axis layouts;
-- PDF statement import;
-- XLS or XLSX import;
-- TXT import;
-- OCR;
-- production password workflows;
-- HDFC parsing;
-- CBQ parsing;
-- American Express parsing;
-- production card parsing.
+The former “only Axis CSV is production supported” snapshot is historical and superseded. Repository fixture presence, reader capability, file extension or structural similarity never establishes a supported institution/family/layout. Every recurring source family remains exact to its proven semantic contract and current complete authentic corpus.
 
 ### Deterministic import pipeline
 

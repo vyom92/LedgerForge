@@ -2,97 +2,56 @@
 
 **Status:** Current repository cycle roadmap
 **Refreshed:** 2026-09-09
-**Supersedes:** `Project documents/LedgerForge_Roadmap_Sprints_70-79_Current.md` as the current-cycle authority; that file remains historical prior-cycle record
+**Planning review baseline:** `main@a560312db5900645779a499016e13f0c87e81435`
+**Supersedes:** `Project documents/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
 
 ## Control
 
-- **Planning authority:** This file is the repository authority for Sprint 80 and any later 80–89 numbering, corrective suffixes, cycle status and next gates.
-- **Execution authority:** None. A complete Chat-approved prompt authorizes each task.
-- **Accepted production baseline:** Sprint 79 remains the highest-numbered accepted implementation. The unnumbered Authentic-Corpus Parser / Import Reliability Reset and startup reliability/monthly-planner package are technically accepted and published; current pushed `main` is `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194`, V17 remains current, and the later obsolete-plugin-artifact cleanup changed no product behavior.
-- **Latest accepted numbered sprint:** Sprint 79 — Qatar Airways Salary Domain and Current-Month Funding Planner.
-- **Latest accepted discovery outcome:** Sprint 80 — Swift 6 and macOS readiness closure, `SWIFT6_READINESS_COMPLETE`.
-- **Current migration baseline:** additive V17 accepted with the unnumbered reliability reset; V1–V16 remain immutable.
-- **Latest accepted ADR:** ADR-046 — Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation, accepted by explicit user decision; ADR-045 remains the historical Sprint 79 architecture baseline.
-- **Completed campaign:** the unnumbered P0 Authentic-Corpus Parser / Import Reliability Reset was technically accepted by Chat on 2026-09-09. No sprint number or corrective suffix is assigned.
-- **Standing method:** `LedgerForge_Standing_Execution_Harness_Guide.md`.
-- **Personal-v1 adoption:** undeclared; certification remains a later gate.
+- **Planning authority:** This file owns Sprint 80–89 numbering, corrective suffixes, cycle status and planned positions.
+- **Execution authority:** None. Roadmap assignment is planning, not implementation authorization; each sprint still requires Chat priority/dependency triage and a complete execution prompt.
+- **Latest numbered product implementation:** Sprint 79. The accepted startup/monthly-planner product package is commit `6455f662dd0ea8896d19af3e67be51546badb3ae`; the later `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` cleanup is non-product repository maintenance, and `a560312db5900645779a499016e13f0c87e81435` is the R1 documentation/planning publication reviewed by this reconciliation.
+- **Current migration:** V17; V1–V16 remain immutable.
+- **Current source/reliability authority:** ADR-046 complete-authentic-corpus certification.
+- **Current UI design authority:** `LF-UI-2026-09-R1` for its bounded scope; design approval is not native implementation.
+- **Latest accepted discovery:** Sprint 80 — `SWIFT6_READINESS_COMPLETE`.
+- **Personal-v1:** UNDECLARED / NOT CERTIFIED.
+- **Canonical queue:** `FUTURE_WORK.MD`. This roadmap consumes recorded IDs and must not become a second backlog.
 
-Repository/source evidence overrides stale wording in this roadmap. Explicit
-user decisions remain binding until superseded. Do not treat active WIP as
-accepted production support.
+Repository/source evidence overrides stale wording. Explicit user decisions remain binding until superseded. Active WIP is not accepted product state.
 
-## Accepted unnumbered startup reliability and monthly planner package
+### Corrective numbering and no-cascade rule
 
-Chat accepted the complete reviewed 35-path candidate, including the non-negative-transfer-fee correction, on 2026-09-09. The accepted startup, diagnostics, planner, recurrence-prevention and validation boundaries are recorded in [PROJECT_STATE.md](PROJECT_STATE.md). The final canonical TestPlan passed 465 definitions / 75 suites / 523 expanded executions, with zero failures/skips/expected failures; the earlier parser reset retains its separate historical result below. V17 definitions and financial formulas remain unchanged.
+- `NA` is the first bounded correction attributable to Sprint `N`.
+- `NB` is another separately bounded correction attributable to Sprint `N`.
+- An internal blocker in `NB` does not create `NC`; `NC` exists only if `NB` itself fails the original Sprint-N outcome.
+- Unrelated P0 defects are never disguised as a correction to the preceding feature sprint.
+- Planned later numbers do not silently move when an entry gate blocks. Chat must explicitly revise this roadmap if sequencing changes.
 
-Implementation review is closed for that exact candidate. Publication completed at implementation/package commit `6455f662dd0ea8896d19af3e67be51546badb3ae`; the later user-authorized obsolete-plugin-artifact cleanup advanced `main` to `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` without changing the accepted product boundary. This package allocates no sprint number or corrective suffix, introduces no migration or architecture decision, and does not complete PR-1, the Unified Import Centre, Swift-6 migration or personal-v1 adoption.
+## Financial correctness entry and acceptance rules
 
-## Accepted unnumbered parser reliability reset
+For every statement-dependent sprint, the complete registered authentic corpus is authority. No representative-month/sample shortcut and no synthetic/generated/sanitized/reconstructed/reduced/mutated/hand-authored financial statement is permitted at any stage. Production output is not its own oracle, exact support does not generalize across institution/product/format/layout/credential/currency boundaries, and private gates fail closed when unavailable.
 
-Chat technically accepted the complete cross-institution repair and authentic-corpus recertification on 2026-09-09. Publication is recorded separately by Git history. The strengthened user rule continues to prohibit creating or using synthetic, reconstructed, sanitized, reduced, mutated or hand-authored financial statements at any stage. Only authentic corpus carriers and exact operational copies/actual attachments may exercise statement-dependent behavior; absent real cases remain uncertified.
-
-The accepted implementation retains the authoritative complete TestPlan result from 2026-09-08: 443 tests in 72 suites, 500 parameter-expanded executions, zero failures/skips and zero Swift source diagnostics. All seven complete-family gates and the 127-carrier global gate passed in both providers and all three orders, covering 103 logical statements, 3,165 canonical bank/card transactions and 258 separate salary components, including matching semantic digests, final source-byte integrity and mandatory report export. Authentic populated V16-schema migration, genuine historical-production CBQ V16 upgrade, exact durable/hydrated-value preservation, Debug/Release builds and independent review also passed. Historical CBQ minimum-due absence remains preserved without invented backfill; current CBQ imports enforce the authentic minimum-due contract. The Axis zero-activity producer/validation/hydration findings are repaired, while genuine zero-activity source certification remains unavailable because the corpus contains no such statement. Additive V17 is the current accepted migration and V1–V16 remain immutable. Native authentic preparation, preview, cancellation and account-choice gating are verified; manual final confirmation clicking remains unverified but is explicitly nonblocking. No sprint number, personal-v1 adoption, new multi-file UI or batch-wide atomicity is inferred.
-
-The CBQ email envelope is certification provenance only, not a new email-import feature. A serial acceptance queue exercises ordinary statement intake without claiming that the future Unified Import Centre UI/queue has been implemented. The accepted implementation boundary is recorded once in [PROJECT_STATE.md](PROJECT_STATE.md).
-
-Chat exercised final technical acceptance for this exact unnumbered campaign. Publication remains a separate Git action under Chat authority. Future sprint attribution and publication authority remain with Chat. This campaign does not allocate Sprint 81 or a corrective suffix.
-
-## Authority and anti-drift gate
-
-Before selecting, naming, prompting, reviewing or accepting a sprint:
-
-1. exact current ref/worktree;
-2. this roadmap;
-3. standing execution harness;
-4. `PROJECT_STATE.md`;
-5. `FUTURE_WORK.MD`;
-6. relevant accepted ADRs;
-7. production code/tests where documents are insufficient; and
-8. local/private source evidence where required.
-
-Classify material claims as verified, explicit user decision, reported only or
-inference.
-
-### Corrective numbering
-
-- `NA` = first bounded correction attributable to Sprint `N`;
-- `NB` = another separately bounded correction attributable to Sprint `N`;
-- later numbered sprints do not move;
-- a blocker inside `NB` does not create `NC`;
-- `NC` is justified only if `NB` itself ultimately fails the Sprint `N`
-  outcome; and
-- unrelated P0 defects are not disguised as corrections to the preceding
-  sprint.
+A material source, credential, parser, persistence, orchestration or financial-semantic correction invalidates earlier green evidence for the affected boundary. Freeze and retest the final candidate. Acceptance must identify exactly what was tested. A newly verified financial-correctness defect preempts unrelated lower-priority work unless the user explicitly accepts/defers it.
 
 ## Cycle overview
 
-| Sprint | Outcome | Current status |
-|---|---|---|
-| 80 | Swift 6 and macOS readiness closure | **Accepted / discovery complete** |
+| Sprint | Outcome | Queue | Planning type | Status / entry gate |
+|---|---|---|---|---|
+| 80 | Swift 6 and macOS readiness closure | accepted discovery | Technical discovery | **Accepted / discovery complete** |
+| 81 | PR-1 Staging and Runtime Publication Ownership Seam | `FW-P2-72` | Behavior-preserving implementation gate | Planned position; rerun P0→P3 triage before start |
+| 82 | Serial Unified Import Centre Foundation | `FW-P1-19` | Core product implementation | Planned; single file = queue length one, same orchestration model for future batch |
+| 83 | Serial Batch Import and Multi-File Drag-and-Drop | `FW-P1-20` + `FW-P1-21` | P1 entry-gated product outcome | Blocked unless Sprint 82 proves named cancellation, duplicate, failure-isolation and per-file ownership prerequisites |
+| 84 | PR-2 SQLite / Provider / Migration Ownership | `FW-P2-73` | Swift-6 prerequisite | Planned; the name implies no schema migration |
+| 85 | PR-3 Dependency Concurrency Boundary | `FW-P2-74` | Swift-6 prerequisite | Planned position |
+| 86 | TEST-PR Strict-Concurrency Test Correction | `FW-P2-75` | Swift-6 prerequisite | Planned; never weaken independent assertions merely to silence diagnostics |
+| 87 | Coordinated Swift-6 Migration | `FW-P2-76` | Implementation | Entry gate: Sprint 82 and Sprints 84–86 accepted; no feature work bundled |
+| 88 | App Shell and Workflow Decomposition | `FW-P2-67` | Behavior-preserving maintenance | No financial redesign or broad source-tree move; preserve R1 shell direction |
+| 89 | LF-UI-2026-09-R1 Transactions Reference Implementation | `FW-P2-03` + `FW-P2-53`, bounded `FW-P2-48` + `FW-P2-49` + `FW-P2-50` | User-facing implementation / representative R1 proof surface | Planned position; financial semantics remain source/repository-authoritative |
 
-No ordinary Sprint 81–89 feature sequence is assigned by this documentation
-sync. Future work remains in `FUTURE_WORK.MD` until Chat selects a bounded
-outcome and supplies a complete execution prompt.
+## Sprint entry-gate rule
 
-## Recorded planning inputs / candidate readiness
+Before every planned sprint starts, Chat reruns P0 → P1 → P2 → P3 triage. A verified higher-priority defect preempts lower-priority execution unless the user explicitly defers it. If a dependency remains unsatisfied, do not silently substitute another implementation or shift every later sprint number: record/update the block in `FUTURE_WORK.MD`, return to Chat and revise the roadmap only through an explicit planning decision.
 
-This table is a view of the canonical `FUTURE_WORK.MD` queue. It is **not** sprint allocation, priority promotion or implementation authorization. Before any roadmap assignment, included work must already have a durable queue/authority trace.
-
-| Canonical queue ID | Outcome | Current status | Dependency | Personal-v1 relevance | Notes / unresolved decision |
-|---|---|---|---|---|---|
-| `FW-P2-72` | PR-1 staging/publication ownership seam | Candidate | Sprint 80 readiness; current store/hydrator contracts | Required sequencing prerequisite | Swift-5 ownership correction; no parallel-preparation or Swift-6 switch |
-| `FW-P1-19` | Serial LedgerForge Import Centre | Candidate | PR-1; existing confirmation-gated Import Wizard | High | Single file = queue length one; future multi-file uses same intake/review/result model |
-| `FW-P1-20` | Batch-import boundary | Blocked | Duplicate handling, cancellation, failure isolation, PR-1 | High | Serial-first boundary retained; bounded parallel preparation remains unresolved |
-| `FW-P2-03` | Transactions filtering/search | Ready for planning | Stable transaction fields | Medium/high usability proof | R1-approved direction; screenshot colour observation remains an evidence gap, not a verified defect |
-| `FW-P2-53` | Contextual filtering/sorting/table controls | Ready for planning | Stable date semantics/searchable domains | Medium/high usability proof | Currency-safe sorting, resizable columns, collapsible inspector; source order never rewritten |
-| `FW-P2-52` | User/appearance preferences | Ready for discovery | Existing settings + `WorkspaceSettings` direction | Medium | R1 visual direction approved; preference storage/ownership unresolved |
-| `FW-P2-55` | Adaptive appearance design direction | Idea | Approved design review/spec/assets | Medium | R1 approves System/Light/Dark + optional Indigo, but design approval does not select implementation |
-| `FW-P2-77` | Source-tree/documentation organization discovery | Ready for discovery | None | Maintenance, not an adoption gate | Discovery required before moves; no target folder tree is accepted architecture |
-| `FW-P3-36` | Verified backup/restore/disaster recovery | Ready for discovery | User-facing backup/restore contract | Serious adoption-gate candidate | Must be considered explicitly before personal-v1 certification; no priority promotion implied |
-
-`LF-UI-2026-09-R1` is approved design authority once this documentation sync is published. UI design approval does not select a sprint; future UI implementation must be selected from the canonical queue. **Transactions is Designer-1's strongest representative proof surface recommendation, but this is a planning input, not Sprint 81 selection.** Appearance storage architecture remains unresolved, and repository organization requires discovery before any physical moves.
-
-No Sprint 81–89 feature assignment follows from this matrix.
 
 ## Sprint 80 — Swift 6 and macOS readiness closure
 
@@ -139,30 +98,107 @@ the exact registered CBQ boundary while preserving historical minimum-due
 absence and enforcing the current authentic minimum-due contract. Personal-v1
 adoption remains a separate later gate.
 
-## Post-Sprint-80 dependency ordering
+## Planned Sprints 81–89
 
-The accepted immediate ordering is:
+### Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam
 
-1. Sprint 80 documentation sync and the unnumbered authentic-parser reset / CBQ corrective closure are complete;
-2. PR-1 ownership seam (`FW-P2-72`);
-3. serial Unified Import Centre (`FW-P1-19`, with `FW-P1-20` batch-import
-   boundaries);
-4. PR-2 / PR-3 / TEST-PR (`FW-P2-73`, `FW-P2-74`, `FW-P2-75`);
-5. coordinated Swift-6 migration (`FW-P2-76`); and
-6. personal-v1 certification remains later.
+Queue: `FW-P2-72`.
 
-Parallel preparation is an open architecture decision and is not approved.
+Behavior-preserving Swift-5 correction only. Establish pure synchronous staging and explicit MainActor runtime publication while preserving complete-snapshot installation, provider generations, observer ordering and provider parity. No parallel preparation or Swift-6 switch.
+
+### Sprint 82 — Serial Unified Import Centre Foundation
+
+Queue: `FW-P1-19`.
+
+Single-file import is queue length one. Use deterministic queue order, explicit per-file ownership, safe cancellation before confirmation, explicit per-statement confirmation, provider-owned persistence and canonical hydration. The orchestration shape is the future batch shape; no bounded parallel preparation is accepted here.
+
+### Sprint 83 — Serial Batch Import and Multi-File Drag-and-Drop
+
+Queue: `FW-P1-20` + `FW-P1-21`.
+
+Entry gate: Sprint 82 must have accepted the named cancellation, duplicate, failure-isolation and per-file ownership prerequisites. If the gate is still blocked, Sprint 83 does not implement and returns to Chat. One failed file must not contaminate unrelated files; no batch-wide atomicity is required or implied. Parallel preparation remains unresolved unless separately accepted.
+
+### Sprint 84 — PR-2 SQLite / Provider / Migration Ownership
+
+Queue: `FW-P2-73`.
+
+Correct only the bounded Swift-6 prerequisite ownership surfaces. The sprint title does not authorize schema change or a new migration.
+
+### Sprint 85 — PR-3 Dependency Concurrency Boundary
+
+Queue: `FW-P2-74`.
+
+Resolve the bounded ZIPFoundation decision and LegacyXLS/libxls concurrency policy without inventing generic third-party concurrency architecture.
+
+### Sprint 86 — TEST-PR Strict-Concurrency Test Correction
+
+Queue: `FW-P2-75`.
+
+Make unit-test ownership/synchronization honest for strict migration. Preserve independent source/test oracles and assertions; never weaken tests merely to remove diagnostics.
+
+### Sprint 87 — Coordinated Swift-6 Migration
+
+Queue: `FW-P2-76`.
+
+Entry gate: Sprint 82 plus Sprints 84–86 accepted. Perform the coordinated language/strict-concurrency migration only; no feature work bundled.
+
+### Sprint 88 — App Shell and Workflow Decomposition
+
+Queue: `FW-P2-67`.
+
+Behavior-preserving decomposition only. Preserve financial/repository semantics and R1 shell direction. Do not combine broad source-tree moves (`FW-P2-77`) or financial redesign with this maintenance boundary.
+
+### Sprint 89 — LF-UI-2026-09-R1 Transactions Reference Implementation
+
+Queue: `FW-P2-03` + `FW-P2-53`, with only necessary bounded portions of `FW-P2-48`, `FW-P2-49` and `FW-P2-50`.
+
+Required boundary:
+
+- AND across filter groups and OR within a multi-select group;
+- native-currency presentation and totals only;
+- exact source-date semantics without timezone invention;
+- deterministic sorting with stable tie behavior;
+- stable selection and collapsible inspector;
+- totals over the full matching scope, not merely visible rows;
+- bank cash movement and card-liability effects remain distinct;
+- no hidden FX conversion;
+- no debit = spending or credit = income inference;
+- targeted source/runtime verification of the existing INR colour observation **before** any financial-colour semantic change.
+
+`FW-P2-77` remains explicitly deferred, not forgotten. Its maintenance value does not outrank the P1/P2 user outcomes above, and broad physical moves must not be mixed with app-shell or R1 behavioral work.
+
+
+## Serious candidates not silently selected
+
+The cycle forecast does not erase higher-priority or competing queue work. Before every sprint starts, Chat re-triages the complete queue.
+
+| Priority | Candidate(s) | Current classification / exact reason not scheduled here |
+|---|---|---|
+| P0 | `FW-P0-02` | Ready for discovery, but no one historical duplicate-repair family has been selected with independently provable impact/reversal semantics. |
+| P0 | `FW-P0-08` | Ready for discovery, but no concrete affected repository/family is selected; a broad repair-everything operation remains invalid. |
+| P0 | `FW-P0-11`, `FW-P0-12`, `FW-P0-13`, `FW-P0-14`, `FW-P0-15` | Blocked by linking/unlinking, identifier-detachment, split, duplicate-account and survivor/conflict semantics. |
+| P0 | `FW-P0-16` | Architecture accepted, but executable mutation is gated on selecting one concrete family with exact impact and reversal/irreversibility. |
+| P0 | `FW-P0-18` | Blocked on the future multiple-workspace architecture and fingerprint-scope decision. |
+| P0 | `FW-P0-19` | Blocked until one new exact representation relationship has source truth and family-specific identity/equivalence authority; Axis-bank semantic parity alone is not durable equivalence. |
+| P0 | `FW-P0-20` | Research only; each additional transaction-event family needs authentic overlapping evidence and its own deterministic semantics. |
+| P0 | `FW-P0-26` | Blocked certification gate; adopted pre-v1 import, backup/restore, export, support-matrix and other designated prerequisites remain incomplete or unaccepted. |
+| P1 | parser-family expansion | Existing registered families are certified; no additional exact source family has been selected. `FW-P1-04` is discovery-ready, while other families remain Candidate/Research by their evidence. |
+| P1 | `FW-P1-06` | Ready for planning, but no new parser family requires framework expansion before the ownership/import/Swift sequence; it does not outrank an active financial defect if one appears. |
+| P1 | `FW-P1-25` | Ready for discovery; broader duplicate-management/override/reversible semantics remain unresolved and must be reevaluated before dependent reconciliation/analytics. |
+| P1 | `FW-P1-27` | Ready for discovery, but no exact import-session reversal family/impact contract has been selected. |
+| P1 | `FW-P1-29` | Ready for planning, but accepted immediate recovery guidance already exists; only broader education remains and is not an entry dependency for 81–89. |
+| P1 | `FW-P1-37` | Ready for planning, but broader diagnostics remain nonblocking absent a newly verified diagnostic correctness defect. |
+| P2 | `FW-P2-12` | Ready for discovery; must preempt reconciliation/analytics if current duplicate guarantees prove insufficient, otherwise remains separate. |
+| P2 | account lifecycle (`FW-P2-30`, `FW-P2-31`, `FW-P2-32`, `FW-P2-33`, `FW-P2-34`, `FW-P2-35`, `FW-P2-36`, `FW-P2-37`) | Several are blocked/candidate pending targeted mutation, visibility, closure or asset semantics; none is an entry dependency for the planned cycle. |
+| P2 | `FW-P2-54` | Ready for discovery, but user-facing document browsing still needs an approved privacy-safe metadata/retention/navigation boundary. |
+| P2 | `FW-P2-77` | Ready for discovery and explicitly deferred: broad structural moves must not be mixed with app-shell or R1 behavioral work. |
+| P2 | `FW-P2-79` | Ready for planning and mandatory input to personal-v1 certification, but it is documentation/support-matrix work rather than an 81–89 executable product dependency. |
+| P3 | net worth | Blocked on investment and reporting-currency foundations; no current consolidated net-worth authority exists. |
+| P3 | `FW-P3-36` backup/restore | Ready for discovery, but the user-owned backup contents/integrity/restore-target/compatibility contract is not approved. |
+| P3 | export (`FW-P3-17`, `FW-P3-35`) | Candidate work blocked from adoption by unresolved export schema/privacy decisions. |
+| P3 | `FW-P3-40` multiple workspaces | Research; identity, fingerprint, settings and repository isolation are undecided. |
+| P3 | encryption/sync (`FW-P3-37`, `FW-P3-43`) | Research; depends on backup, key ownership/recovery, conflict and opt-in architecture. |
 
 ## Maintenance
 
-When this roadmap changes:
-
-- preserve accepted sprint numbering and prior-cycle history;
-- distinguish accepted state from active WIP;
-- record corrective suffixes explicitly;
-- remove superseded source assumptions instead of leaving contradictory live
-  claims;
-- link detailed implementation truth to `PROJECT_STATE.md` and ADRs;
-- keep private source filenames, credentials and transaction listings out of
-  roadmap content; and
-- reconcile this file at every sprint or corrective acceptance.
+When this roadmap changes, preserve accepted numbering/history, distinguish plans from execution/acceptance, keep detailed implementation truth in `PROJECT_STATE.md`/ADRs, retain exact source-support boundaries, keep private source/credential/transaction detail out of roadmap prose and update queue dispositions before scheduling new work.
