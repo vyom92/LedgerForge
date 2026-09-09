@@ -1330,6 +1330,8 @@ struct ContentView: View {
     @State private var confirmedImportRecoveryContext: ConfirmedImportRecoveryContext?
     @State private var confirmedImportRecoveryActionRequestID: UUID?
     @State private var confirmedImportRecoveryActionExecutor = ConfirmedImportRecoveryActionExecutor()
+    @ObservedObject private var availability = ApplicationAvailability.shared
+    @StateObject private var salaryViewModel = SalaryWorkspaceViewModel()
     @StateObject private var dashboardViewModel = DashboardViewModel()
     @StateObject private var accountsViewModel = AccountsViewModel()
     @StateObject private var importHistoryViewModel = ImportHistoryViewModel()
@@ -1367,7 +1369,15 @@ struct ContentView: View {
                 }
 #endif
 
-                content
+                if !availability.permitsMutation { availabilityBanner }
+                if selectedSection == .settings || selectedSection == .developer || availability.state == .current || availability.state == .empty || availability.state == .retainedNonCurrent {
+                    content.disabled(!availability.permitsMutation && selectedSection != .settings && selectedSection != .developer)
+                } else {
+                    Spacer()
+                    Text(availability.state == .loading ? "Loading canonical data…" : "Data is unavailable")
+                        .font(.title2).foregroundStyle(LFTheme.textSecondary)
+                    Spacer()
+                }
             }
             .frame(minWidth: 900, maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -1451,28 +1461,6 @@ struct ContentView: View {
             }
             .padding(.bottom, 24)
 
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(LFTheme.primaryGradient)
-                    .frame(width: 42, height: 42)
-                    .overlay {
-                        Text("VF")
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(.white)
-                    }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Vyom")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Personal")
-                        .font(.caption)
-                        .foregroundStyle(LFTheme.textSecondary)
-                }
-
-                Spacer()
-            }
-            .padding(.bottom, 22)
-
             sidebarGroup(AppShellSection.ordinaryNavigation)
 
 #if DEBUG
@@ -1526,6 +1514,7 @@ struct ContentView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.white)
+            .disabled(!availability.permitsMutation)
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 24)
@@ -1544,7 +1533,7 @@ struct ContentView: View {
         case .imports:
             importWizardContent
         case .salary:
-            SalaryView()
+            SalaryView(viewModel: salaryViewModel)
         case .settings:
             settingsContent
         case .developer:
@@ -3627,25 +3616,49 @@ struct ContentView: View {
         }
     }
 
+    private var availabilityBanner: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(availability.state == .retainedNonCurrent ? "Retained data is not current" : availability.state == .loading ? "Loading data" : "Persistence unavailable").font(.headline)
+                if let failure = availability.failure {
+                    Text(failure.summary + ". " + failure.nextAction).font(.caption)
+                }
+            }
+            Spacer()
+            if availability.state != .loading {
+                Button("Diagnostics") { selectedSection = .developer }
+                if DatabaseProvider.shared.persistenceState.isUsable {
+                    Button("Reload data") { hydrateDashboard(force: true) }
+                }
+            }
+        }.padding().background(LFTheme.warning.opacity(0.12))
+    }
+
     private func hydrateDashboardOnce() {
         guard !didStartRepositoryHydration else { return }
         didStartRepositoryHydration = true
-        dashboardViewModel.markHydrationStarted()
+        hydrateDashboard(force: false)
+    }
 
+    private func hydrateDashboard(force: Bool) {
+        dashboardViewModel.markHydrationStarted()
         do {
-            let result = try RepositoryStoreHydrator().hydrateIfNeeded()
+            let result = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: force)
             dashboardViewModel.markHydrationCompleted(result)
+            DurableStartupEvidence.checkpoint()
         } catch {
             dashboardViewModel.markHydrationFailed(error)
-            DeveloperConsole.shared.error(
-                .runtime,
-                "Dashboard hydration failed",
-                metadata: ["outcome": "Unavailable"]
-            )
+            if !DatabaseProvider.shared.persistenceState.isUsable {
+                let root = DatabaseProvider.shared.failureContext
+                let failure = RuntimeDiagnostic.failure(error, operation: "startup hydration", stage: "provider availability", effect: "canonical data not loaded", relatedRoot: root)
+                if root == nil { availability.didFail(failure, generation: nil) }
+                RuntimeDiagnostic.record(failure, category: .runtime)
+            }
         }
     }
 
     private func requestFileSelection() {
+        guard availability.permitsMutation else { return }
         selectedSection = .imports
 #if DEBUG
         requestProtectedImportAction(.presentFileImporter)
@@ -3664,6 +3677,7 @@ struct ContentView: View {
     }
 
     private func requestProtectedImportAction(_ intent: ProtectedImportIntent) {
+        guard availability.permitsMutation else { return }
         developmentActionMessage = nil
         switch DevelopmentProfileAcknowledgementGate.shared.authorization(
             for: intent.protectedAction
@@ -3680,6 +3694,7 @@ struct ContentView: View {
     }
 
     private func executeProtectedImportIntent(_ intent: ProtectedImportIntent) {
+        guard availability.permitsMutation else { return }
         switch intent {
         case .presentFileImporter:
             showingImporter = true
@@ -3876,6 +3891,7 @@ struct ContentView: View {
     }
 
     private func beginPreparation(from url: URL) {
+        guard availability.permitsMutation else { return }
         guard consumePreparedImportBeforeSourceReplacement() else { return }
         confirmedImportRecoveryContext = nil
         selectedImportSourceURL = url
@@ -3983,6 +3999,7 @@ struct ContentView: View {
 
     @MainActor
     private func confirmPreparedImport(_ preparedImport: PreparedImport) async {
+        guard availability.permitsMutation else { return }
         guard case .previewReady(let currentPreparedImport) = importState,
               currentPreparedImport.id == preparedImport.id else {
             return

@@ -171,10 +171,10 @@ struct MigrationChainIntegrityTests {
             appliedAt: "2026-07-20T00:00:00Z"
         )
 
-        #expect(throws: MigrationIntegrityError.persistedNameMismatch(1)) {
+        #expect(throws: MigrationIntegrityError.persistedNameMismatch(1, expected: migrationV1.name, observed: "renamed")) {
             try MigrationChainValidator.validatePersisted([renamed], against: allMigrations, requiresCompleteChain: false)
         }
-        #expect(throws: MigrationIntegrityError.persistedChecksumMismatch(1)) {
+        #expect(throws: MigrationIntegrityError.persistedChecksumMismatch(1, expected: migrationV1.checksum, observed: String(repeating: "0", count: 64))) {
             try MigrationChainValidator.validatePersisted([edited], against: allMigrations, requiresCompleteChain: false)
         }
     }
@@ -226,7 +226,7 @@ struct MigrationChainIntegrityTests {
             sql: migrationV1.sql + "\nSELECT 1;"
         )
 
-        #expect(throws: MigrationIntegrityError.persistedChecksumMismatch(1)) {
+        #expect(throws: MigrationIntegrityError.persistedChecksumMismatch(1, expected: editedV1.checksum, observed: migrationV1.checksum)) {
             try MigrationChainValidator.validatePersisted(
                 [record(for: migrationV1)],
                 against: [editedV1],
@@ -310,7 +310,7 @@ struct MigrationChainIntegrityTests {
                 params: ["renamed", 2]
             )
         } assertReopen: {
-            .persistedNameMismatch(2)
+            .persistedNameMismatch(2, expected: allMigrations[1].name, observed: "renamed")
         }
     }
 
@@ -322,7 +322,7 @@ struct MigrationChainIntegrityTests {
                 params: [String(repeating: "0", count: 64), 3]
             )
         } assertReopen: {
-            .persistedChecksumMismatch(3)
+            .persistedChecksumMismatch(3, expected: allMigrations[2].checksum, observed: String(repeating: "0", count: 64))
         }
     }
 

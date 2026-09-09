@@ -4,6 +4,15 @@
 
 import Foundation
 
+/// Ephemeral, already-projected diagnostic context. No repository reads or repair authority.
+public struct PersistenceFailureContext: Equatable {
+    let reference: String
+    let code: String
+    let summary: String
+    let nextAction: String
+    let metadata: [String: String]
+}
+
 public enum RepositoryError: Error, LocalizedError {
     case providerNotConfigured(String)
     case persistenceUnavailable
@@ -177,8 +186,15 @@ public enum PersistenceState: Equatable {
     }
 
     var recoveryGuidance: String? {
-        guard case .unavailable = self else { return nil }
-        return "Quit and reopen LedgerForge. If persistence remains unavailable, preserve the database and seek support; do not reset or replace it."
+        guard case .unavailable(let reason) = self else { return nil }
+        switch reason {
+        case .migrationIntegrityFailed:
+            return "Open Diagnostics for the exact migration check. Restarting does not repair incompatible migration history. Keep the database for an explicit recovery decision."
+        case .migrationFailed, .databaseInitializationFailed:
+            return "Open Diagnostics before retrying. The durable outcome is not established; do not reset or replace the database."
+        default:
+            return "Open Diagnostics to identify the failed operation and its safe next action."
+        }
     }
 }
 
@@ -296,6 +312,7 @@ public final class DatabaseProvider {
     public static var shared: DatabaseProvider = .unavailable(reason: .notInitialized)
 
     public let persistenceState: PersistenceState
+    let failureContext: PersistenceFailureContext?
     public let workspaceRepo: WorkspaceRepository
     public let transactionRepo: TransactionRepository
     public let categoryRepo: CategoryRepository
@@ -322,9 +339,11 @@ public final class DatabaseProvider {
         fundingPlanRepo: FundingPlanRepository? = nil,
         generationToken: ProviderGenerationToken = ProviderGenerationToken(),
         persistenceState: PersistenceState = .intentionalNonDurable(.testMemory),
-        protectsGeneration: Bool = false
+        protectsGeneration: Bool = false,
+        failureContext: PersistenceFailureContext? = nil
     ) {
         self.persistenceState = persistenceState
+        self.failureContext = failureContext
         self.generationToken = generationToken
         let resolvedCategoryRepo = categoryRepo ?? PlaceholderCategoryRepo()
         let resolvedSalaryRepo = salaryRepo ?? EmptySalaryRepo()
@@ -375,7 +394,7 @@ public final class DatabaseProvider {
         )
     }
 
-    static func unavailable(reason: PersistenceUnavailableReason) -> DatabaseProvider {
+    static func unavailable(reason: PersistenceUnavailableReason, context: PersistenceFailureContext? = nil) -> DatabaseProvider {
         DatabaseProvider(
             workspaceRepo: PlaceholderWorkspaceRepo(),
             transactionRepo: PlaceholderTransactionRepo(),
@@ -386,7 +405,8 @@ public final class DatabaseProvider {
             confirmedImportRepo: PlaceholderConfirmedImportRepo(),
             salaryRepo: PlaceholderSalaryRepo(),
             fundingPlanRepo: PlaceholderFundingPlanRepo(),
-            persistenceState: .unavailable(reason)
+            persistenceState: .unavailable(reason),
+            failureContext: context
         )
     }
 

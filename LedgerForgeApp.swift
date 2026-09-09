@@ -47,20 +47,19 @@ struct LedgerForgeApp: App {
         sqliteProvider?.database.close()
         sqliteProvider = nil
 #endif
+        ApplicationAvailability.shared.begin()
         DatabaseProvider.shared.invalidateGeneration()
         DatabaseProvider.shared = .unavailable(reason: .notInitialized)
         do {
             try installSQLiteProvider(path: path)
-            DeveloperConsole.shared.info(.database, "Persistence bootstrap verified")
+            DeveloperConsole.shared.info(.database, "Persistence bootstrap verified", metadata: ["code": "startup.provider_verified", "stage": "provider activation", "requested_target": RuntimeDiagnostic.logicalTarget(), "build_identity": BuildIdentity.read().label, "provider_kind": "verified SQLite"])
             return true
         } catch {
             let reason = PersistenceFailureClassifier.classify(error)
-            DatabaseProvider.shared = .unavailable(reason: reason)
-            DeveloperConsole.shared.error(
-                .database,
-                "Persistence bootstrap unavailable",
-                metadata: ["reason": reason.rawValue]
-            )
+            let failure = RuntimeDiagnostic.failure(error, operation: "startup", stage: "provider initialization")
+            DatabaseProvider.shared = .unavailable(reason: reason, context: failure)
+            ApplicationAvailability.shared.didFail(failure, generation: nil)
+            RuntimeDiagnostic.record(failure, category: .database)
             return false
         }
     }
@@ -75,6 +74,7 @@ struct LedgerForgeApp: App {
 #else
         sqliteProvider?.database.close()
 #endif
+        ApplicationAvailability.shared.begin()
         DatabaseProvider.shared.invalidateGeneration()
         DatabaseProvider.shared = .intentionalNonDurable(purpose)
 #if !DEBUG

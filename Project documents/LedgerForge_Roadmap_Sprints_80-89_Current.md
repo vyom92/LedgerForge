@@ -8,7 +8,7 @@
 
 - **Planning authority:** This file is the repository authority for Sprint 80 and any later 80–89 numbering, corrective suffixes, cycle status and next gates.
 - **Execution authority:** None. A complete Chat-approved prompt authorizes each task.
-- **Accepted production baseline:** Sprint 79 remains the highest-numbered accepted implementation. The unnumbered Authentic-Corpus Parser / Import Reliability Reset and additive V17 are technically accepted; publication is recorded separately by Git history.
+- **Accepted production baseline:** Sprint 79 remains the highest-numbered accepted implementation. The unnumbered Authentic-Corpus Parser / Import Reliability Reset and the startup reliability/monthly-planner package are technically accepted; V17 remains current and publication is recorded separately by Git history.
 - **Latest accepted numbered sprint:** Sprint 79 — Qatar Airways Salary Domain and Current-Month Funding Planner.
 - **Latest accepted discovery outcome:** Sprint 80 — Swift 6 and macOS readiness closure, `SWIFT6_READINESS_COMPLETE`.
 - **Current migration baseline:** additive V17 accepted with the unnumbered reliability reset; V1–V16 remain immutable.
@@ -20,6 +20,12 @@
 Repository/source evidence overrides stale wording in this roadmap. Explicit
 user decisions remain binding until superseded. Do not treat active WIP as
 accepted production support.
+
+## Accepted unnumbered startup reliability and monthly planner package
+
+Chat accepted the complete reviewed 35-path candidate, including the non-negative-transfer-fee correction, on 2026-09-09. The accepted startup, diagnostics, planner, recurrence-prevention and validation boundaries are recorded in [PROJECT_STATE.md](PROJECT_STATE.md). The final canonical TestPlan passed 465 definitions / 75 suites / 523 expanded executions, with zero failures/skips/expected failures; the earlier parser reset retains its separate historical result below. V17 definitions and financial formulas remain unchanged.
+
+Implementation review is closed for that exact candidate. This package allocates no sprint number or corrective suffix, introduces no migration or architecture decision, and does not complete PR-1, the Unified Import Centre, Swift-6 migration or personal-v1 adoption. The dependency ordering below remains unchanged; the earlier parser reset remains closed. Git history and the publication receipt identify delivery separately from this acceptance record.
 
 ## Accepted unnumbered parser reliability reset
 

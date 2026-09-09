@@ -24,10 +24,12 @@ final class FundingPlanStore: ObservableObject {
 
     let objectWillChange = ObservableObjectPublisher()
     @ObserverAtomicPublished private(set) var plans: [FundingPlan] = []
+    private(set) var generation: ProviderGenerationToken?
 
     init() {}
 
-    func installWithoutObservation(_ value: [FundingPlan]) {
+    func installWithoutObservation(_ value: [FundingPlan], generation: ProviderGenerationToken? = nil) {
+        self.generation = generation
         _plans.installWithoutObservation(value)
     }
 

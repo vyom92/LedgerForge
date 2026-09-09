@@ -216,21 +216,25 @@ struct DeveloperConsoleView: View {
                     categoryBadge(entry.category)
                 }
 
-                Text(entry.message)
+                Text(DiagnosticPrivacy.text(entry.message))
                     .font(.system(.caption, design: .monospaced))
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let metadataText = DeveloperConsole.metadataText(for: entry) {
-                    Text(metadataText)
+                    DisclosureGroup("Details") { Text(metadataText)
                         .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(LFTheme.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                    }
                 }
             }
         }
         .padding(.vertical, 10)
+        .textSelection(.enabled)
+        .accessibilityElement(children: .contain)
     }
 
     private func levelBadge(_ level: DeveloperLogLevel) -> some View {
@@ -458,16 +462,16 @@ struct DeveloperConsoleView: View {
             let result = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
             hydrationStatus = result.didHydrate ? "Forced refresh completed" : "No refresh required"
             latestRefreshResult = "\(result.accountCount) account(s), \(result.transactionCount) transaction(s)"
-            DeveloperConsole.shared.info(.runtime, "Runtime refresh completed", metadata: ["accounts": "\(result.accountCount)", "transactions": "\(result.transactionCount)"])
+            DeveloperConsole.shared.info(.runtime, "Runtime refresh completed", metadata: ["accountCount": "\(result.accountCount)", "transactionCount": "\(result.transactionCount)"])
         } catch {
             hydrationStatus = "Forced refresh failed"
             latestRefreshResult = "Refresh failed"
             actionError = "Runtime refresh is unavailable."
-            DeveloperConsole.shared.error(
-                .runtime,
-                "Runtime refresh failed",
-                metadata: ["outcome": "Unavailable"]
-            )
+            let failure = ApplicationAvailability.shared.failure ?? RuntimeDiagnostic.failure(error, operation: "canonical reload", stage: "snapshot validation")
+            actionError = failure.summary + ". " + failure.nextAction
+            if !DatabaseProvider.shared.persistenceState.isUsable {
+                RuntimeDiagnostic.record(RuntimeDiagnostic.failure(error, operation: "developer forced refresh", stage: "provider availability", effect: "canonical data not loaded", relatedRoot: DatabaseProvider.shared.failureContext), category: .runtime)
+            }
         }
         isRunningRepositoryAction = false
     }
@@ -501,13 +505,17 @@ struct DeveloperConsoleView: View {
 
     private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS 'UTC'"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
         return formatter
     }()
 
     private static let rowTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS 'UTC'"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
         return formatter
     }()
 }

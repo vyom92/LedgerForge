@@ -84,8 +84,8 @@ public final class SQLiteDatabase {
         if db != nil { return }
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
         if sqlite3_open_v2(path, &db, flags, nil) != SQLITE_OK {
-            let msg = String(cString: sqlite3_errmsg(db))
-            throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: msg])
+            let extended = sqlite3_extended_errcode(db)
+            throw SQLiteDatabaseError.execution(SQLiteExecutionError(primaryCode: extended & 0xff, extendedCode: extended, operation: .open))
         }
         // Protect every startup statement from concurrent openers, including
         // the first WAL-mode pragma used by independent providers.

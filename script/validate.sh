@@ -21,9 +21,12 @@ Usage:
   ./script/validate.sh test-focused <selector> [selector...]
   ./script/validate.sh test-full
   ./script/validate.sh cycle-close
+  ./script/validate.sh durable-startup
+  ./script/validate.sh schema-experiment <selector> [selector...]
   ./script/validate.sh --help
 
-Each build and test command uses an isolated task-owned DerivedData directory.
+Build/test commands use isolated task-owned DerivedData, except durable-startup,
+which refreshes and qualifies the ordinary Xcode Run product.
 Set LEDGERFORGE_TEST_ENVIRONMENT_FILE to an external JSON dictionary when
 app-hosted tests require explicitly forwarded environment variables.
 USAGE
@@ -308,8 +311,41 @@ run_cycle_close() {
     run_full_test
 }
 
+
+validate_schema_namespace() {
+    local namespace="${LEDGERFORGE_DEVELOPMENT_DATABASE_NAMESPACE:-}"
+    [[ -n "$namespace" && "${#namespace}" -le 48 && "$namespace" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || fail "schema-experiment requires a valid isolated LEDGERFORGE_DEVELOPMENT_DATABASE_NAMESPACE; ordinary Current Database is forbidden" 64
+}
+
+run_durable_startup() {
+    [[ -z "${LEDGERFORGE_TEST_HOST+x}" && -z "${LEDGERFORGE_RUN_HOST+x}" && -z "${LEDGERFORGE_DEVELOPMENT_DATABASE_NAMESPACE+x}" ]] || fail "durable-startup rejects memory/test/namespace markers" 64
+    # Deliberately build the workspace's ordinary Xcode Run product.
+    run_xcodebuild "ordinary Xcode Debug product" -project "$PROJECT_PATH" -scheme "$SCHEME" -configuration Debug -destination "$DESTINATION" build || return $?
+    local settings="$ARTIFACT_ROOT/build-settings.json"
+    /usr/bin/xcodebuild -project "$PROJECT_PATH" -scheme "$SCHEME" -configuration Debug -showBuildSettings -json > "$settings" || return $?
+    local app
+    app="$(/usr/bin/jq -r '.[] | select(.target == "LedgerForge") | .buildSettings | .TARGET_BUILD_DIR + "/" + .FULL_PRODUCT_NAME' "$settings")"
+    [[ -d "$app" ]] || fail "unable to identify exact Xcode Debug product" 65
+    python3 "$ROOT_DIR/script/durable_startup.py" "$app" "$ARTIFACT_ROOT"
+}
+
 command_name="${1:-}"
 case "$command_name" in
+    durable-startup)
+        [[ "$#" -eq 1 ]] || fail "durable-startup does not accept additional arguments"
+        prepare_artifact_root
+        run_durable_startup
+        exit $?
+        ;;
+    schema-experiment)
+        [[ "$#" -ge 2 ]] || fail "schema-experiment requires focused test selectors"
+        validate_schema_namespace
+        prepare_artifact_root
+        prepare_test_environment_file
+        shift
+        run_focused_test "$@"
+        exit $?
+        ;;
     --help)
         [[ "$#" -eq 1 ]] || fail "--help does not accept additional arguments"
         usage

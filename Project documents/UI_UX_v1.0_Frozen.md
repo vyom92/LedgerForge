@@ -542,6 +542,20 @@ After completion, the user returns to an appropriate financial or import-history
 
 ---
 
+# Startup reliability and monthly planner amendment — 2026-09-09
+
+This bounded amendment records the Chat-accepted unnumbered startup/diagnostics/planner package, including the non-negative-transfer-fee correction. Loading and unavailable data must not look like an empty financial database. Retained values after a failed refresh are explicitly non-current and durable mutations are disabled. A failure banner may navigate directly to Diagnostics even when ordinary Developer Mode navigation is hidden; this is a diagnostic recovery entry, not permission for destructive operations.
+
+Salary offers separate **This Month** and **Salary History** sections while retaining the same draft. Qatar QAR inputs and commitments sit alongside India INR inputs, commitments and dated offline FX when width permits; narrower layouts stack them. Contextual labels identify estimates, copied values, captured balances, payslip actuals and calculated results. Contextual provenance replaces the standalone Truth classes panel, not the underlying provenance requirement. The static personal avatar block is removed. Imported salary remains immutable.
+
+The configured native-QAR transfer fee must be non-negative and permits zero. The existing effective-fee rule remains: the fee applies only when India funding shortfall is positive; otherwise effective fee is zero while the configured value is retained, editable and eligible for rollover.
+
+Every visible edit updates one view-model draft immediately. Whole and fractional amounts retain natural editing text, with exact canonical Money used only at the domain/persistence boundary. One Save and Command-S validate all visible fields, including the focused field. Invalid or partial input remains visible with inline feedback and makes current calculations incomplete. Copy previous month requires a dirty-draft discard choice. An unknown write outcome blocks retry until reopening establishes canonical state. A committed save followed by failed canonical refresh offers reload without replaying the write; provider changes retain and block old drafts until explicit canonical reload.
+
+Diagnostic entries retain at most 1,000 events. Copy All includes the entire retained history in sequence order, independent of filters, with UTC timestamps and sorted multiline safe metadata. Details wrap, are selectable and remain accessible. Typed migration/provider/hydration causes, effect, related failure reference and safe next action are authoritative only to the captured boundary. Raw source values, financial amounts, credentials, paths, SQL and arbitrary error descriptions are excluded; missing evidence stays unavailable. No diagnostic text authorizes automatic repair.
+
+---
+
 # Developer Console
 
 `DeveloperConsole_v1.0.png` defines the visual target for approved developer tooling.

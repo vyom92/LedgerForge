@@ -302,10 +302,10 @@ struct DevelopmentDatabaseIdentity: Equatable {
 #endif
 
 enum SQLiteRepositoryProviderError: Error, Equatable, LocalizedError {
-    case databaseOpenFailed
-    case databaseInitializationFailed
+    case databaseOpenFailed(SQLiteExecutionError? = nil)
+    case databaseInitializationFailed(SQLiteExecutionError? = nil)
     case migrationIntegrityFailed(MigrationIntegrityError)
-    case migrationFailed
+    case migrationFailed(SQLiteExecutionError? = nil)
 
     var errorDescription: String? {
         switch self {
@@ -336,6 +336,11 @@ public final class SQLiteRepositoryProvider {
     public let salaryRepo: SalaryRepository
     public let fundingPlanRepo: FundingPlanRepository
 
+    private static func executionCause(_ error: Error) -> SQLiteExecutionError? {
+        if case SQLiteDatabaseError.execution(let value) = error { return value }
+        return nil
+    }
+
     public convenience init(path: String? = nil) throws {
         try self.init(path: path, migrations: allMigrations)
     }
@@ -358,7 +363,7 @@ public final class SQLiteRepositoryProvider {
             try database.open()
         } catch {
             database.close()
-            throw SQLiteRepositoryProviderError.databaseOpenFailed
+            throw SQLiteRepositoryProviderError.databaseOpenFailed(Self.executionCause(error))
         }
         do {
             try database.runMigrations(migrations)
@@ -367,13 +372,13 @@ public final class SQLiteRepositoryProvider {
             throw SQLiteRepositoryProviderError.migrationIntegrityFailed(error)
         } catch {
             database.close()
-            throw SQLiteRepositoryProviderError.migrationFailed
+            throw SQLiteRepositoryProviderError.migrationFailed(Self.executionCause(error))
         }
         do {
             try database.execute(sql: "PRAGMA foreign_keys = ON;")
         } catch {
             database.close()
-            throw SQLiteRepositoryProviderError.databaseInitializationFailed
+            throw SQLiteRepositoryProviderError.databaseInitializationFailed(Self.executionCause(error))
         }
         let generationToken = ProviderGenerationToken()
         let supportsConfirmedImport = (try? database.query(
@@ -422,7 +427,7 @@ public final class SQLiteRepositoryProvider {
                 withIntermediateDirectories: true
             )
             guard identity.authorizesCurrentDatabaseIdentity(at: identity.canonicalDevelopmentURL) else {
-                throw SQLiteRepositoryProviderError.databaseInitializationFailed
+                throw SQLiteRepositoryProviderError.databaseInitializationFailed()
             }
             return identity.canonicalDevelopmentURL.path
         }

@@ -128,6 +128,9 @@
 		A17000013000000000000002 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
 		A17000023000000000000001 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
+		AB1700020000000000000001 /* RuntimeDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000001 /* RuntimeDiagnostics.swift */; };
+		AB1700020000000000000002 /* PlannerInputCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000002 /* PlannerInputCodec.swift */; };
+		AB1700020000000000000003 /* DurableStartupEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000003 /* DurableStartupEvidence.swift */; };
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
 		B50000053050000000000001 /* SQLiteConfirmedImportRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000043050000000000001 /* SQLiteConfirmedImportRepository.swift */; };
@@ -329,6 +332,9 @@
 		7A79000E307A000000000001 /* SalaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryView.swift; sourceTree = "<group>"; };
 		A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZeroActivityStatementEvidence.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
+		AB1700010000000000000001 /* RuntimeDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnostics.swift; sourceTree = "<group>"; };
+		AB1700010000000000000002 /* PlannerInputCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerInputCodec.swift; sourceTree = "<group>"; };
+		AB1700010000000000000003 /* DurableStartupEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DurableStartupEvidence.swift; sourceTree = "<group>"; };
 		B50000003050000000000001 /* ConfirmedImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImport.swift; sourceTree = "<group>"; };
 		B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentifierOwnershipMigrationV5.swift; sourceTree = "<group>"; };
 		B50000043050000000000001 /* SQLiteConfirmedImportRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteConfirmedImportRepository.swift; sourceTree = "<group>"; };
@@ -568,6 +574,9 @@
 		288EB0DD2FF7A3D000F09BC9 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				AB1700010000000000000003 /* DurableStartupEvidence.swift */,
+				AB1700010000000000000002 /* PlannerInputCodec.swift */,
+				AB1700010000000000000001 /* RuntimeDiagnostics.swift */,
 				7A79000A307A000000000001 /* SalaryStore.swift */,
 				760000143076000000000001 /* CardStore.swift */,
 				D57000023057000000000001 /* CategoryStore.swift */,
@@ -773,6 +782,7 @@
 				288EB0A92FF7955200F09BC9 /* Sources */,
 				288EB0AA2FF7955200F09BC9 /* Frameworks */,
 				288EB0AB2FF7955200F09BC9 /* Resources */,
+				AB1700030000000000000001 /* Embed Build Identity */,
 			);
 			buildRules = (
 			);
@@ -933,6 +943,23 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		AB1700030000000000000001 /* Embed Build Identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(PROJECT_TEMP_DIR)/LedgerForgeBuildIdentity-$(CONFIGURATION).json",
+			);
+			name = "Embed Build Identity";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/LedgerForgeBuildIdentity.json",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "/bin/cp \"$PROJECT_TEMP_DIR/LedgerForgeBuildIdentity-$CONFIGURATION.json\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/LedgerForgeBuildIdentity.json\"";
+		};
 		B60000433050000000000001 /* Re-sign Subprocess Probe */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -959,6 +986,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AB1700020000000000000003 /* DurableStartupEvidence.swift in Sources */,
+				AB1700020000000000000002 /* PlannerInputCodec.swift in Sources */,
+				AB1700020000000000000001 /* RuntimeDiagnostics.swift in Sources */,
 				7A79000F307A000000000001 /* SalaryView.swift in Sources */,
 				7A79000D307A000000000001 /* SalaryWorkspaceViewModel.swift in Sources */,
 				7A79000B307A000000000001 /* SalaryStore.swift in Sources */,

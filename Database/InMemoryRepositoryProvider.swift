@@ -211,7 +211,7 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
     func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO {
         try SalaryPersistenceDTOValidator.validate(plan: plan)
         state.stateLock.lock(); defer { state.stateLock.unlock() }
-        guard state.workspaces[plan.workspaceId] != nil,
+        guard state.workspaces[plan.workspaceId] != nil || plan.workspaceId == "default-workspace",
               state.fundingPlans.values.first(where: { $0.workspaceId == plan.workspaceId && $0.planMonthISO == plan.planMonthISO && $0.id != plan.id }) == nil,
               state.fundingPlans[plan.id].map({ $0.workspaceId == plan.workspaceId && $0.planMonthISO == plan.planMonthISO }) ?? true,
               plan.rolloverSourcePlanId.map({ sourceID in
@@ -227,6 +227,9 @@ private final class InMemoryFundingPlanRepo: FundingPlanRepository {
                   guard let account = state.accounts[accountID] else { return false }
                   return account.workspaceId == plan.workspaceId && account.nativeCurrency == commitment.amountCurrency
               }) else { throw RepositoryError.relationshipViolation("Funding plan relationships are invalid.") }
+        if state.workspaces[plan.workspaceId] == nil {
+            state.workspaces[plan.workspaceId] = WorkspaceDTO(id: plan.workspaceId, name: "Default Workspace", createdAtISO: plan.updatedAtISO)
+        }
         state.fundingPlans[plan.id] = plan
         return plan
     }

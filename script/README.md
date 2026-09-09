@@ -79,6 +79,21 @@ Each command resolves the repository root from its own location and uses only
 `LedgerForge.xcodeproj`, scheme `LedgerForge`, destination `platform=macOS` and
 test plan `TestPlan`. A nonzero `xcodebuild` status is returned unchanged.
 
+## Durable startup and schema experiments
+
+`./script/validate.sh durable-startup` builds the ordinary Xcode Debug product using the workspace’s usual DerivedData location, resolves its exact bundle from Xcode build settings, and runs two complete startup/quit cycles. It requires an already-existing Current Database and rejects test-memory, debug-memory and namespace environment markers before launch. The helper requires a structured signal emitted only after verified SQLite and complete canonical publication, verifies actual product and database identities, and compares migration records and the database hash across relaunch. Missing hydration evidence, unknown build provenance, a live pre-existing app, or a memory provider fails the gate. This command never resets or removes a database. Quit LedgerForge before running it.
+
+The probe environment flag observes startup only; it cannot select a provider. Evidence logs and the JSON result stay in the task-owned artifact directory. Build identity is generated into the signed product by an Xcode build phase, including direct Xcode Run builds. It reports build-time commit, clean/dirty status, configuration and UTC timestamp; runtime never queries Git. A dirty commit label does not uniquely identify uncommitted bytes, so executable and debug-dylib hashes are retained by durable acceptance.
+
+For deliberately requested schema experiments, use:
+
+```bash
+LEDGERFORGE_DEVELOPMENT_DATABASE_NAMESPACE=task-schema-experiment \
+  ./script/validate.sh schema-experiment LedgerForgeTests/MigrationIdentityLockTests
+```
+
+The namespace preflight fails before building when the namespace is missing or invalid. Selected tests must still use task-owned database paths; the namespace does not authorize deleting Current or Persistent Debug Database. No experiment edits accepted migration history or refreshes the literal baseline lock. Adopted-data upgrades require authentic upgrade-copy acceptance. The explicitly authorized disposable Current Database recreation on 2026-09-09 is not a reusable repair policy.
+
 ## Isolated Run commands
 
 ```bash

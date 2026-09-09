@@ -26,9 +26,9 @@ When reading this file:
 5. use `FUTURE_WORK.MD` for unscheduled work.
 
 **Status alignment date:** 2026-09-09
-**Repository implementation ref reviewed:** `main@335b152c631bde5c38d05e728ed6ddd57e91e6fe` — pre-publication baseline for the technically accepted unnumbered reset; publication is recorded separately by Git history
-**Latest technically accepted production implementation:** unnumbered P0 Authentic-Corpus Parser / Import Reliability Reset; Sprint 79 remains the latest accepted numbered implementation
-**Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `main@2d86f91dc46b9e88bcdfea65c88ddf671968b388`
+**Repository implementation ref reviewed:** `main@ab17d4b8dacd35f428b54fc7bb28ffb26df0829e` — base of the Chat-accepted 35-path startup reliability/monthly-planner candidate; publication is recorded separately by Git history
+**Latest technically accepted production implementation:** unnumbered startup reliability and monthly-planner package, including non-negative configured-fee validation; the earlier authentic-parser reset remains closed and Sprint 79 remains the latest accepted numbered implementation
+**Latest verified Debug development-tooling implementation:** accepted startup recurrence-prevention tooling; DBP-01 remains the developer-profile architecture
 **Latest completed numbered implementation outcome:** Sprint 79
 **Latest accepted ADR:** ADR-046 — Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation (architecture authority; no product implementation or migration implied)
 **Current migration:** V17; V1–V16 remain immutable
@@ -1122,6 +1122,10 @@ Stable repository identity and verified identifiers provide a deterministic foun
 ---
 
 # ADR-026 — Structured Developer Diagnostics
+
+## Implementation Alignment — 2026-09-09
+
+Chat accepted the unnumbered startup reliability and monthly-planner package. Typed migration, provider, hydration and save diagnostics retain bounded cause/effect context, related failure references and safe next actions. Diagnostics remain deterministic, privacy-safe, bounded to 1,000 retained entries and ephemeral; Copy All preserves retained chronology and safe metadata independently of filters. No persistent diagnostic history, unrestricted export, automatic repair, migration or new architecture decision is introduced.
 
 ## Current Alignment — 2026-07-24
 
@@ -2508,6 +2512,10 @@ ADR-034 does not implement card evidence models, parsers, persistence, migration
 ---
 
 # ADR-035 — Development Database Lifecycle and Recoverable Reset
+
+## Implementation Alignment — 2026-09-09
+
+The accepted startup package completed one owner-authorized recreation of the disposable Debug Current Database as a one-time maintenance exception. It does not establish automatic recovery, general reset authority or an adopted-database upgrade path. Ordinary startup still selects Current Database. Verification directly launched the resolved Xcode Debug product and established canonical SQLite activation, complete hydration, clean quit and same-database relaunch. The explicit guarded schema-experiment command and independent accepted-migration lock support prevention; they do not change lifecycle authority. V1–V17 definitions remain unchanged, with no migration or new architecture decision.
 
 ## Current Alignment — 2026-07-29
 
@@ -5660,6 +5668,10 @@ accepted Axis representation-neutral equivalence remain exact family contracts,
 not generic card equivalence.
 
 # ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner
+
+## Implementation Alignment — 2026-09-09
+
+Chat accepted the unnumbered startup reliability and monthly-planner usability package, including the non-negative-transfer-fee correction. One immediately updated draft and Save/Command-S action validate visible input, retain invalid text with inline feedback and protect canonical/provider ownership. Contextual provenance replaces the standalone Truth classes panel, not the underlying provenance requirements; imported salary remains immutable. The configured native-QAR transfer fee is non-negative and permits zero, enforced in editing/final Save and shared durable validation. The existing effective-fee rule is unchanged: a positive India funding shortfall activates the fee; otherwise effective fee is zero while the configured value remains retained, editable and eligible for rollover. Signed Money, legitimate negative balances/buffers and calculator formulas are unchanged. No migration or new architecture decision is introduced. See [PROJECT_STATE.md](PROJECT_STATE.md) for accepted evidence and limitations.
 
 **Status:** Accepted and implemented in Sprint 79
 **Date:** 2026-08-27  

@@ -92,7 +92,7 @@ struct SalaryParserAndPlannerTests {
         ])
         let plans = FundingPlanStore()
         let previous = Self.plan(month: try SelectedStatementMonth(year: 2026, month: 7), id: "previous")
-        plans.installWithoutObservation([previous])
+        plans.installWithoutObservation([previous], generation: DatabaseProvider.shared.generationToken)
         let viewModel = SalaryWorkspaceViewModel(month: try SelectedStatementMonth(year: 2026, month: 8), workspaceID: "default-workspace", accountStore: accounts, salaryStore: SalaryStore(), fundingPlanStore: plans)
         #expect(viewModel.eligibleAccounts.compactMap(\.repositoryAccountId) == ["axis-nre", "cbq"])
         #expect(viewModel.plan.balances.isEmpty)

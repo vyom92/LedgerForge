@@ -2743,8 +2743,8 @@ enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case duplicatePersistedVersion(Int)
     case missingPersistedVersion(Int)
     case persistedRecordIncomplete(Int?)
-    case persistedNameMismatch(Int)
-    case persistedChecksumMismatch(Int)
+    case persistedNameMismatch(Int, expected: String, observed: String)
+    case persistedChecksumMismatch(Int, expected: String, observed: String)
     case unsupportedFutureVersion(Int)
 
     var errorDescription: String? {
@@ -2836,10 +2836,10 @@ enum MigrationChainValidator {
 
             let migration = migrations[offset]
             guard record.name == migration.name else {
-                throw MigrationIntegrityError.persistedNameMismatch(record.version)
+                throw MigrationIntegrityError.persistedNameMismatch(record.version, expected: migration.name, observed: record.name)
             }
             guard record.checksum == migration.checksum else {
-                throw MigrationIntegrityError.persistedChecksumMismatch(record.version)
+                throw MigrationIntegrityError.persistedChecksumMismatch(record.version, expected: migration.checksum, observed: record.checksum)
             }
         }
 

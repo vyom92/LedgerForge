@@ -246,6 +246,8 @@ A second full pass requires a material code change or named diagnostic hypothesi
 
 Every selector must discover and execute nonzero tests.
 
+For persistence/startup changes, independently pin accepted migration identities (including name and checksum inputs), keep intentional schema experiments in explicit task-owned namespaces, and finish with the existing runner’s `durable-startup` gate. This requires the actual ordinary Debug product to verify SQLite and canonical hydration, quit cleanly, and relaunch the same database. The safe memory Run helper is insufficient. Test upgrades on copies of adopted databases; an explicitly authorized disposable-database recreation does not establish future compatibility. Runtime build provenance comes from the product’s embedded build identity, with dirty or unavailable state retained. See [local validation guidance](../script/README.md).
+
 ---
 
 ## 9. Source/oracle discipline

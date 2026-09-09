@@ -189,9 +189,14 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
 
     func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO {
         try SalaryPersistenceDTOValidator.validate(plan: plan)
-        try validateRelationships(plan)
         try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
         do {
+            // The first explicit planner save can precede the first import.
+            // Workspace creation and the plan remain in one transaction.
+            if plan.workspaceId == "default-workspace" {
+                try db.executePrepared(sql: "INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING;", params: [plan.workspaceId, "Default Workspace", plan.updatedAtISO])
+            }
+            try validateRelationships(plan)
             try db.executePrepared(sql: """
                 INSERT INTO funding_plans (
                   id, workspace_id, plan_month, rollover_source_plan_id,

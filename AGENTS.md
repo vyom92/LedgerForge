@@ -195,6 +195,10 @@ A green suite proves only the boundary and oracle it exercised.
 
 ---
 
+## Startup and accepted migration prevention
+
+Accepted migration identities are append-only: retain the independent baseline lock in `MigrationIdentityLockTests`; never refresh its expected identities from candidate source merely to make a test pass. Run deliberate schema experiments only on task-owned isolated targets through the namespace-checked `script/validate.sh schema-experiment` path. Ordinary Xcode Run remains Current Database. A memory Run check cannot establish durable startup: use `script/validate.sh durable-startup` for provider verification, canonical hydration, clean quit and same-database relaunch. An adopted database requires upgrade-copy acceptance; recreating the disposable database in the 2026-09-09 continuation was a one-time explicit authorization, not a general recovery rule. See `script/README.md` for the exact commands and evidence boundaries.
+
 ## Validation policy
 
 Start with the smallest validation that can falsify the changed boundary.

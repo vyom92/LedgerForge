@@ -3,11 +3,51 @@ import Foundation
 
 @MainActor
 final class SalaryWorkspaceViewModel: ObservableObject {
-    enum MoneyField { case fixed, variable, deductions, fee, investment }
+    enum MoneyField: String, CaseIterable { case fixed, variable, deductions, fee, investment }
 
     @Published private(set) var plan: FundingPlan
     @Published private(set) var calculation: FundingPlanCalculation
     @Published private(set) var errorMessage: String?
+    @Published private(set) var rawText: [String: String] = [:]
+    @Published private(set) var fieldErrors: [String: String] = [:]
+    @Published private(set) var isDirty = false
+    @Published private(set) var saveState: SaveState = .ready
+    enum SaveState: Equatable { case ready, saving, saved, failed, committedNeedsRefresh, committedToPreviousProvider, providerChanged, canonicalChanged }
+    private let locale: Locale
+    private var baseGeneration: ProviderGenerationToken
+    private var baseCanonical: FundingPlan?
+    private var isRebasing = false
+    private var committedCandidate: FundingPlan?
+    private var baseRawText: [String: String] = [:]
+    private var baseDraftPlan: FundingPlan?
+    private var subscription: AnyCancellable?
+    private let refresh: (DatabaseProvider) throws -> Void
+    private let requiresApplicationAvailability: Bool
+
+    var canEdit: Bool {
+        ![.saving, .failed, .committedNeedsRefresh, .committedToPreviousProvider, .providerChanged, .canonicalChanged].contains(saveState) &&
+        (!requiresApplicationAvailability || ApplicationAvailability.shared.permitsMutation)
+    }
+    var canSave: Bool {
+        provider().persistenceState.isUsable && provider().generationToken == baseGeneration && fundingPlanStore.generation == baseGeneration &&
+        (!requiresApplicationAvailability || ApplicationAvailability.shared.permitsMutation) &&
+        ![.saving, .failed, .committedNeedsRefresh, .committedToPreviousProvider, .providerChanged, .canonicalChanged].contains(saveState) && fieldErrors.isEmpty
+    }
+    var statusText: String {
+        switch saveState {
+        case .saving: return "Saving…"
+        case .saved: return "Saved"
+        case .failed: return "Save outcome unavailable · reopen the app before retrying"
+        case .committedNeedsRefresh: return "Saved · reload required"
+        case .committedToPreviousProvider: return "Saved to the previous database · reload the current database"
+        case .providerChanged: return "Database changed · discard this draft to reload"
+        case .canonicalChanged: return "Saved plan changed · discard this draft to reload"
+        case .ready: return isDirty ? "Unsaved changes" : "Ready"
+        }
+    }
+    var hasValidCalculation: Bool { fieldErrors.isEmpty }
+    var canRollover: Bool { fundingPlanStore.plan(for: month, workspaceID: workspaceID) == nil && fundingPlanStore.plans.contains { $0.workspaceID == workspaceID && $0.month < month } }
+
 
     private let month: SelectedStatementMonth
     private let workspaceID: String
@@ -22,7 +62,9 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         provider: (() -> DatabaseProvider)? = nil,
         accountStore: AccountStore? = nil,
         salaryStore: SalaryStore? = nil,
-        fundingPlanStore: FundingPlanStore? = nil
+        fundingPlanStore: FundingPlanStore? = nil,
+        locale: Locale = .current,
+        refresh: ((DatabaseProvider) throws -> Void)? = nil
     ) {
         let resolvedMonth = month ?? Self.currentMonth()
         let resolvedAccountStore = accountStore ?? .shared
@@ -31,12 +73,22 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         self.month = resolvedMonth
         self.workspaceID = workspaceID
         self.provider = provider ?? { DatabaseProvider.shared }
+        self.requiresApplicationAvailability = provider == nil && fundingPlanStore == nil
+        self.locale = locale
+        self.baseGeneration = (provider?() ?? DatabaseProvider.shared).generationToken
+        self.refresh = refresh ?? { active in _ = try RepositoryStoreHydrator(databaseProvider: active).hydrateIfNeeded(forceRefresh: true) }
         self.accountStore = resolvedAccountStore
         self.salaryStore = resolvedSalaryStore
         self.fundingPlanStore = resolvedFundingPlanStore
-        let initial = resolvedFundingPlanStore.plan(for: resolvedMonth, workspaceID: workspaceID) ?? Self.emptyPlan(month: resolvedMonth, workspaceID: workspaceID)
+        let canonicalIsCurrent = resolvedFundingPlanStore.generation == self.baseGeneration
+        let initial = (canonicalIsCurrent ? resolvedFundingPlanStore.plan(for: resolvedMonth, workspaceID: workspaceID) : nil) ?? Self.emptyPlan(month: resolvedMonth, workspaceID: workspaceID)
+        self.baseCanonical = canonicalIsCurrent ? resolvedFundingPlanStore.plan(for: resolvedMonth, workspaceID: workspaceID) : nil
+        self.saveState = canonicalIsCurrent ? .ready : .providerChanged
         self.plan = initial
         self.calculation = FundingPlanCalculator.calculate(initial)
+        syncDraft()
+        captureDraftBase()
+        self.subscription = resolvedFundingPlanStore.$plans.sink { [weak self] _ in self?.canonicalDidPublish() }
     }
 
     var statements: [SalaryStatement] { salaryStore.statements }
@@ -60,6 +112,7 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     func moneyText(_ field: MoneyField) -> String {
+        if let text = rawText[field.rawValue] { return text }
         let money: Money
         switch field {
         case .fixed: money = plan.expectedFixedEarnings
@@ -73,10 +126,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
 
     @discardableResult
     func updateMoney(_ field: MoneyField, text: String) -> Bool {
-        guard let value = try? Money(canonicalDecimal: text, currency: "QAR") else {
-            errorMessage = "Enter an exact QAR amount with no more than two decimal places."
-            return false
-        }
+        guard canEdit else { return false }
+        rawText[field.rawValue] = text
+        markEdited()
+        guard let value = validatedMoney(field, text: text) else { return false }
         switch field {
         case .fixed: plan.expectedFixedEarnings = value; plan.expectedFixedProvenance = .manual
         case .variable: plan.expectedVariableEarnings = value; plan.expectedVariableProvenance = .manual
@@ -89,23 +142,24 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     func setFX(rateText: String, dateText: String) {
-        if rateText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && dateText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            plan.planningFX = nil
-            recalculate()
-            return
-        }
-        guard let rate = Decimal(string: rateText, locale: Locale(identifier: "en_US_POSIX")),
-              let date = try? StatementDate(canonical: dateText),
-              let fx = try? FundingPlanFX(inrPerQAR: rate, observationDate: date) else {
-            errorMessage = "Enter a positive INR-per-QAR rate and an observation date as YYYY-MM-DD."
-            return
-        }
+        guard canEdit else { return }
+        rawText["fx.rate"] = rateText; rawText["fx.date"] = dateText
+        markEdited()
+        fieldErrors["fx.rate"] = nil; fieldErrors["fx.date"] = nil
+        if rateText.isEmpty && dateText.isEmpty { plan.planningFX = nil; recalculate(); return }
+        let rate = try? PlannerInputCodec.rate(rateText, locale: locale)
+        let date = try? StatementDate(canonical: dateText)
+        if rate == nil { fieldErrors["fx.rate"] = "Enter a complete positive INR-per-QAR rate" }
+        if date == nil { fieldErrors["fx.date"] = "Enter the observation date as YYYY-MM-DD" }
+        guard let rate, let date, let fx = try? FundingPlanFX(inrPerQAR: rate, observationDate: date) else { return }
         plan.planningFX = fx
         recalculate()
     }
 
     func setAccountIncluded(_ account: Account, included: Bool) {
+        guard canEdit else { return }
         guard let id = account.repositoryAccountId else { return }
+        markEdited()
         if let index = plan.balances.firstIndex(where: { $0.accountID == id }) {
             plan.balances[index].included = included
         } else {
@@ -115,7 +169,11 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     func captureAccountBalance(_ account: Account) {
+        guard canEdit else { return }
         guard let id = account.repositoryAccountId else { return }
+        markEdited()
+        rawText["balance.\(id)"] = (try? account.currentBalanceMoney.canonicalDecimalString()).map(localized) ?? ""
+        fieldErrors["balance.\(id)"] = nil
         let capturedAt = ISO8601DateFormatter().string(from: Date())
         if let index = plan.balances.firstIndex(where: { $0.accountID == id }) {
             plan.balances[index].money = account.currentBalanceMoney
@@ -127,11 +185,16 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     func setManualBalance(_ account: Account, text: String) {
-        guard let id = account.repositoryAccountId,
-              let money = try? Money(canonicalDecimal: text, currency: account.nativeCurrency.code) else {
-            errorMessage = "Enter an exact amount in the account's native currency."
+        guard canEdit else { return }
+        guard let id = account.repositoryAccountId else { return }
+        let key = "balance.\(id)"
+        rawText[key] = text
+        markEdited()
+        guard let money = try? PlannerInputCodec.money(text, currency: account.nativeCurrency.code, locale: locale) else {
+            fieldErrors[key] = "Enter an exact \(account.nativeCurrency.code) balance"
             return
         }
+        fieldErrors[key] = nil
         if let index = plan.balances.firstIndex(where: { $0.accountID == id }) {
             plan.balances[index].money = money
             plan.balances[index].provenance = .manual
@@ -142,38 +205,59 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     func addCommitment(region: String) {
+        guard canEdit else { return }
+        markEdited()
         let currency = region == "qatar" ? "QAR" : "INR"
         guard let zero = try? Money(canonicalDecimal: "0.00", currency: currency) else { return }
         let value = FundingPlanCommitment(id: UUID().uuidString, label: "New commitment", money: zero, included: true, fundingAccountID: nil, provenance: .manual)
+        rawText["label.\(value.id)"] = value.label
+        rawText["amount.\(value.id)"] = localized("0.00")
         if region == "qatar" { plan.qatarCommitments.append(value) }
         else { plan.indiaCommitments.append(value) }
         recalculate()
     }
 
     func updateCommitment(region: String, id: String, label: String, amountText: String, included: Bool, fundingAccountID: String?) {
+        guard canEdit else { return }
         let currency = region == "qatar" ? "QAR" : "INR"
-        guard let money = try? Money(canonicalDecimal: amountText, currency: currency) else {
-            errorMessage = "Enter an exact \(currency) commitment amount."
-            return
-        }
+        rawText["label.\(id)"] = label; rawText["amount.\(id)"] = amountText
+        markEdited()
+        fieldErrors["label.\(id)"] = label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || label.count > 240 ? "Enter a label of 1–240 characters" : nil
+        let money = try? PlannerInputCodec.money(amountText, currency: currency, locale: locale)
+        fieldErrors["amount.\(id)"] = money == nil ? "Enter an exact \(currency) amount" : nil
         var values = region == "qatar" ? plan.qatarCommitments : plan.indiaCommitments
         guard let index = values.firstIndex(where: { $0.id == id }) else { return }
-        values[index].label = label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Commitment" : label
-        values[index].money = money
+        let changedValue = values[index].label != label || (money != nil && values[index].money != money)
+        values[index].label = label
+        if let money { values[index].money = money }
         values[index].included = included
         values[index].fundingAccountID = fundingAccountID
-        values[index].provenance = .manual
+        if changedValue { values[index].provenance = .manual }
         if region == "qatar" { plan.qatarCommitments = values } else { plan.indiaCommitments = values }
         recalculate()
     }
 
+    func editCommitment(region: String, id: String, field: String, text: String) {
+        guard let value = (region == "qatar" ? plan.qatarCommitments : plan.indiaCommitments).first(where: { $0.id == id }) else { return }
+        updateCommitment(region: region, id: id,
+            label: field == "label" ? text : rawText["label.\(id)"] ?? value.label,
+            amountText: field == "amount" ? text : rawText["amount.\(id)"] ?? "",
+            included: field == "included" ? text == "true" : value.included,
+            fundingAccountID: field == "account" ? (text.isEmpty ? nil : text) : value.fundingAccountID)
+    }
+
     func removeCommitment(region: String, id: String) {
+        guard canEdit else { return }
+        markEdited()
+        for key in ["label.\(id)", "amount.\(id)"] { rawText[key] = nil; fieldErrors[key] = nil }
         if region == "qatar" { plan.qatarCommitments.removeAll { $0.id == id } }
         else { plan.indiaCommitments.removeAll { $0.id == id } }
         recalculate()
     }
 
-    func rolloverFromPreviousPlan() {
+    func rolloverFromPreviousPlan(discardingDraft: Bool = false) {
+        guard canEdit else { return }
+        guard !isDirty || discardingDraft else { errorMessage = "Choose whether to discard the unsaved draft before copying the previous plan."; return }
         guard fundingPlanStore.plan(for: month, workspaceID: workspaceID) == nil,
               let previous = fundingPlanStore.plans.filter({ $0.workspaceID == workspaceID && $0.month < month }).max(by: { $0.month < $1.month }) else {
             errorMessage = "No earlier editable plan is available to roll forward, or this month already exists."
@@ -201,26 +285,166 @@ final class SalaryWorkspaceViewModel: ObservableObject {
             plannedInvestmentProvenance: .carried(sourcePlanID: source),
             updatedAtISO: ISO8601DateFormatter().string(from: Date())
         )
+        syncDraft()
+        markEdited()
         recalculate()
     }
 
     func save() {
+        canonicalDidPublish()
+        guard canSave else { errorMessage = fieldErrors.isEmpty ? statusText : "Correct the marked fields before saving."; return }
+        // All visible strings are already owned here, including the currently focused field.
+        validateVisibleDraft()
+        guard fieldErrors.isEmpty else { errorMessage = "Correct the marked fields before saving."; return }
+        let active = provider()
+        guard active.generationToken == baseGeneration else { saveState = .providerChanged; return }
+        saveState = .saving
+        plan.updatedAtISO = ISO8601DateFormatter().string(from: Date())
         do {
-            let activeProvider = provider()
-            plan.updatedAtISO = ISO8601DateFormatter().string(from: Date())
-            _ = try activeProvider.fundingPlanRepo.savePlan(try Self.dto(from: plan))
-            _ = try RepositoryStoreHydrator(databaseProvider: activeProvider).hydrateIfNeeded(forceRefresh: true)
-            if let canonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID) { plan = canonical }
-            recalculate()
-            errorMessage = nil
+            _ = try active.fundingPlanRepo.savePlan(try Self.dto(from: plan))
         } catch {
-            errorMessage = error.localizedDescription
+            saveState = .failed
+            let failure = RuntimeDiagnostic.failure(error, operation: "plan save", stage: "repository transaction")
+            errorMessage = failure.summary + ". " + failure.nextAction
+            RuntimeDiagnostic.record(failure, category: .database)
+            return
+        }
+        committedCandidate = plan
+        isDirty = false
+        saveState = .committedNeedsRefresh
+        retryCanonicalRefresh()
+    }
+
+    func retryCanonicalRefresh() {
+        guard saveState == .committedNeedsRefresh else { return }
+        let active = provider()
+        guard active.generationToken == baseGeneration else { saveState = .committedToPreviousProvider; return }
+        do {
+            try refresh(active)
+            guard let canonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID), canonical == committedCandidate, provider().generationToken == baseGeneration, fundingPlanStore.generation == baseGeneration else { throw RepositoryStoreHydrationError.invalidFundingPlanState("saved plan missing") }
+            plan = canonical; baseCanonical = canonical
+            syncDraft(); captureDraftBase(); saveState = .saved; errorMessage = nil
+            DeveloperConsole.shared.info(.database, "Funding plan saved and reloaded", metadata: ["code": "plan.saved", "effect": "committed and canonical data current"])
+        } catch {
+            saveState = .committedNeedsRefresh
+            let failure = RuntimeDiagnostic.failure(error, operation: "plan save", stage: "post-commit canonical reload", effect: "plan committed; runtime data not current")
+            errorMessage = "The plan was saved. Reload canonical data before editing again."
+            RuntimeDiagnostic.record(failure, category: .runtime)
+        }
+    }
+
+    func discardAndReload() {
+        let active = provider()
+        isRebasing = true
+        defer { isRebasing = false }
+        do {
+            try refresh(active)
+            guard provider().generationToken == active.generationToken, fundingPlanStore.generation == active.generationToken else { throw RepositoryError.staleProviderGeneration }
+            rebaseFromPublishedPlan(generation: active.generationToken)
+        } catch {
+            errorMessage = "Canonical data could not be reloaded. Your draft is retained."
+            saveState = .providerChanged
+        }
+    }
+
+    private func rebaseFromPublishedPlan(generation: ProviderGenerationToken) {
+        baseGeneration = generation
+        baseCanonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID)
+        plan = baseCanonical ?? Self.emptyPlan(month: month, workspaceID: workspaceID)
+        isDirty = false; saveState = .ready; errorMessage = nil
+        syncDraft(); captureDraftBase(); recalculate()
+    }
+
+    private func canonicalDidPublish() {
+        guard !isRebasing && saveState != .saving else { return }
+        let changedProvider = provider().generationToken != baseGeneration
+        if saveState == .committedNeedsRefresh {
+            if changedProvider { saveState = .committedToPreviousProvider }
+            else if fundingPlanStore.generation == baseGeneration, fundingPlanStore.plan(for: month, workspaceID: workspaceID) == committedCandidate {
+                plan = committedCandidate!; baseCanonical = plan
+                syncDraft(); captureDraftBase(); saveState = .saved; errorMessage = nil
+            }
+            return
+        }
+        let canonical = fundingPlanStore.plan(for: month, workspaceID: workspaceID)
+        guard changedProvider || canonical != baseCanonical || fundingPlanStore.generation != baseGeneration else { return }
+        if isDirty { saveState = changedProvider ? .providerChanged : .canonicalChanged }
+        else if fundingPlanStore.generation == provider().generationToken {
+            rebaseFromPublishedPlan(generation: provider().generationToken)
+        } else { saveState = .providerChanged }
+    }
+
+    private func captureDraftBase() { baseRawText = rawText; baseDraftPlan = plan; isDirty = false }
+
+    private func markEdited() {
+        isDirty = rawText != baseRawText || plan != baseDraftPlan
+        if [.ready, .saved, .failed].contains(saveState) { saveState = .ready }
+        errorMessage = nil
+    }
+
+    private func localized(_ text: String) -> String {
+        var compact = text
+        if compact.contains(".") { while compact.hasSuffix("0") { compact.removeLast() }; if compact.hasSuffix(".") { compact.removeLast() } }
+        return compact.replacingOccurrences(of: ".", with: locale.decimalSeparator ?? ".")
+    }
+    private func syncDraft() {
+        rawText = [:]; fieldErrors = [:]
+        for field in MoneyField.allCases { rawText[field.rawValue] = localized(moneyText(field)) }
+        rawText["fx.rate"] = plan.planningFX.map { localized(NSDecimalNumber(decimal: $0.inrPerQAR).stringValue) } ?? ""
+        rawText["fx.date"] = plan.planningFX?.observationDate.canonical ?? ""
+        for balance in plan.balances { rawText["balance.\(balance.accountID)"] = (try? balance.money?.canonicalDecimalString()).map(localized) ?? "" }
+        for value in plan.qatarCommitments + plan.indiaCommitments {
+            rawText["label.\(value.id)"] = value.label
+            rawText["amount.\(value.id)"] = (try? value.money.canonicalDecimalString()).map(localized) ?? ""
+        }
+    }
+
+    /// Editing and final Save must apply the same field-specific constraints.
+    private func validatedMoney(_ field: MoneyField, text: String) -> Money? {
+        guard let value = try? PlannerInputCodec.money(text, currency: "QAR", locale: locale) else {
+            fieldErrors[field.rawValue] = "Enter an exact QAR amount with up to two decimals"
+            return nil
+        }
+        guard field != .fee || value.amount >= 0 else {
+            fieldErrors[field.rawValue] = "Transfer fee must be zero or greater"
+            return nil
+        }
+        fieldErrors[field.rawValue] = nil
+        return value
+    }
+
+    private func validateVisibleDraft() {
+        for field in MoneyField.allCases {
+            _ = validatedMoney(field, text: moneyText(field))
+        }
+        // FX has no separate commit state; both fields were parsed together on every edit.
+        for account in eligibleAccounts {
+            if let id = account.repositoryAccountId, let text = rawText["balance.\(id)"], !text.isEmpty {
+                // Validation must not turn a captured or carried balance into a manual value.
+                fieldErrors["balance.\(id)"] = (try? PlannerInputCodec.money(text, currency: account.nativeCurrency.code, locale: locale)) == nil ? "Enter an exact balance" : nil
+            }
+        }
+        for (region, values) in [("qatar", plan.qatarCommitments), ("india", plan.indiaCommitments)] {
+            for value in values {
+                let label = rawText["label.\(value.id)"] ?? ""
+                fieldErrors["label.\(value.id)"] = label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || label.count > 240 ? "Enter a label of 1–240 characters" : nil
+                let amount = rawText["amount.\(value.id)"] ?? ""
+                fieldErrors["amount.\(value.id)"] = (try? PlannerInputCodec.money(amount, currency: region == "qatar" ? "QAR" : "INR", locale: locale)) == nil ? "Enter an exact amount" : nil
+            }
+        }
+    }
+
+    func provenanceText(_ value: FundingPlanValueProvenance) -> String {
+        switch value {
+        case .manual: return "Your estimate"
+        case .capturedAccountBalance(let time): return "Captured from account · \(time)"
+        case .carried(let id): return fundingPlanStore.plans.first(where: { $0.id == id }).map { "Copied from \($0.month.canonical)" } ?? "Copied from an earlier plan"
         }
     }
 
     func dismissError() { errorMessage = nil }
 
-    private func recalculate() { calculation = FundingPlanCalculator.calculate(plan) }
+    private func recalculate() { calculation = FundingPlanCalculator.calculate(plan); if saveState != .committedNeedsRefresh { isDirty = rawText != baseRawText || plan != baseDraftPlan } }
 
     private static func currentMonth(now: Date = Date()) -> SelectedStatementMonth {
         let parts = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: now)

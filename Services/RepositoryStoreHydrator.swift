@@ -189,6 +189,8 @@ enum RepositoryStoreHydrationError: Error, LocalizedError, Equatable {
 
 final class RepositoryStoreHydrator {
 
+    private var installedResult: RepositoryStoreHydrationResult?
+
     private let accountRepo: AccountRepository
     private let importSessionRepo: ImportSessionRepository
     private let transactionRepo: TransactionRepository
@@ -322,9 +324,18 @@ final class RepositoryStoreHydrator {
             )
         }
 
-        let snapshot = try stageHydration()
-        publish(snapshot)
-        return snapshot.hydrationResult
+        do {
+            let snapshot = try stageHydration()
+            publish(snapshot)
+            return snapshot.hydrationResult
+        } catch {
+            if accountStore === AccountStore.shared, providerGeneration == DatabaseProvider.shared.generationToken {
+                let failure = RuntimeDiagnostic.failure(error, operation: "canonical reload", stage: "snapshot validation", effect: "runtime stores not replaced", relatedRoot: DatabaseProvider.shared.failureContext)
+                ApplicationAvailability.shared.didFail(failure, generation: providerGeneration)
+                RuntimeDiagnostic.record(failure, category: .runtime)
+            }
+            throw error
+        }
     }
 
     /// Reads and validates one explicit provider generation without changing any
@@ -453,6 +464,7 @@ final class RepositoryStoreHydrator {
     /// `ObservableObject` or property-publisher notification.
     @MainActor
     func installSnapshotWithoutObservation(_ snapshot: RepositoryRuntimeSnapshot) {
+        installedResult = snapshot.hydrationResult
         accountStore.installAccountsWithoutObservation(snapshot.accounts)
         transactionStore.installTransactionsWithoutObservation(
             snapshot.transactions,
@@ -463,7 +475,7 @@ final class RepositoryStoreHydrator {
         categoryStore.installSnapshotWithoutObservation(snapshot.categorySnapshot)
         cardStore.installSnapshotWithoutObservation(snapshot.cardSnapshot)
         salaryStore.installWithoutObservation(snapshot.salaryStatements)
-        fundingPlanStore.installWithoutObservation(snapshot.fundingPlans)
+        fundingPlanStore.installWithoutObservation(snapshot.fundingPlans, generation: snapshot.providerGeneration)
         if let providerGeneration = snapshot.providerGeneration {
             categoryReconciliationGate?.clearAfterCanonicalHydration(for: providerGeneration)
         }
@@ -476,6 +488,11 @@ final class RepositoryStoreHydrator {
     /// sequentially for compatibility.
     @MainActor
     func notifyObserversOfInstalledSnapshot() {
+        if accountStore === AccountStore.shared,
+           let generation = providerGeneration, generation == DatabaseProvider.shared.generationToken,
+           let result = installedResult {
+            ApplicationAvailability.shared.didHydrate(result, generation: generation)
+        }
         accountStore.notifyAccountsOfInstalledValue()
         transactionStore.notifyTransactionsOfInstalledValues()
         importSessionStore.notifyImportSessionsOfInstalledValue()

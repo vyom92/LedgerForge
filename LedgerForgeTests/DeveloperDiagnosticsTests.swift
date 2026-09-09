@@ -30,7 +30,7 @@ struct DeveloperDiagnosticsTests {
         #expect(first.level == .debug)
         #expect(first.category == .parser)
         #expect(first.message == "Detected delimiter")
-        #expect(first.metadata?["delimiter"] == ",")
+        #expect(first.metadata?["delimiter"] == nil)
         let now = Date()
         #expect(first.timestamp <= now)
     }
@@ -110,15 +110,15 @@ struct DeveloperDiagnosticsTests {
     func searchCaseInsensitive() async throws {
         let console = DeveloperConsole()
 
-        console.info(.`import`, "Import started", metadata: ["file": "Axis.csv"])
-        console.info(.`import`, "Import completed", metadata: ["file": "Axis.csv"])
+        console.info(.`import`, "Import started", metadata: ["code": "import.started"])
+        console.info(.`import`, "Import completed", metadata: ["code": "import.started"])
         console.warning(.validation, "Ignored rows", metadata: ["count": "2"])
 
         var filters = DeveloperConsole.Filters()
         filters.level = .all
         filters.includeDebugInAll = true
         filters.category = .exact(.`import`)
-        filters.searchText = "axis"
+        filters.searchText = "import.started"
 
         let results = DeveloperConsole.filteredEntries(console.entries, using: filters)
         #expect(results.count == 2)
@@ -282,7 +282,7 @@ struct DeveloperDiagnosticsTests {
         #expect(visibleText.contains("reason: committed"))
     }
 
-    @Test("Clear removes all entries and resets sequence numbers")
+    @Test("Clear removes all entries without reusing sequence numbers")
     func clearResets() async throws {
         let console = DeveloperConsole()
 
@@ -296,7 +296,7 @@ struct DeveloperDiagnosticsTests {
         #expect(console.entries.isEmpty)
 
         console.info(.application, "After clear")
-        #expect(console.entries.first?.sequence == 1)
+        #expect(console.entries.first?.sequence == 2)
     }
 
     @Test("Clear removes diagnostics without mutating account metadata", .globalRuntimeStateIsolation)

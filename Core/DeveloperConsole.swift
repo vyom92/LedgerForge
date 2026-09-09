@@ -68,10 +68,11 @@ final class DeveloperConsole: ObservableObject {
                 timestamp: Date(),
                 level: level,
                 category: category,
-                message: message,
-                metadata: metadata
+                message: DiagnosticPrivacy.text(message),
+                metadata: DiagnosticPrivacy.metadata(metadata)
             )
             self.entries.append(entry)
+            if self.entries.count > 1000 { self.entries.removeFirst(self.entries.count - 1000) }
         }
 
         if Thread.isMainThread {
@@ -108,7 +109,6 @@ final class DeveloperConsole: ObservableObject {
     func clear() {
         let clearBlock = {
             self.entries.removeAll()
-            self.nextSequence = 1
         }
         if Thread.isMainThread {
             clearBlock()
@@ -123,21 +123,21 @@ final class DeveloperConsole: ObservableObject {
     }
 
     static func logText(from entries: [DeveloperLogEntry]) -> String {
-        entries.map { formatForCopy($0) }.joined(separator: "\n")
+        entries.sorted { $0.sequence < $1.sequence }.map { formatForCopy($0) }.joined(separator: "\n")
     }
 
     static func formatForCopy(_ entry: DeveloperLogEntry) -> String {
-        "\(timestampFormatter.string(from: entry.timestamp)) [\(entry.level.rawValue)] [\(entry.category.rawValue)] \(entry.message)"
+        "#\(entry.sequence) \(timestampFormatter.string(from: entry.timestamp)) [\(entry.level.rawValue)] [\(entry.category.rawValue)] \(DiagnosticPrivacy.text(entry.message))" + (metadataText(for: entry).map { "\n" + $0 } ?? "")
     }
 
     static func metadataText(for entry: DeveloperLogEntry) -> String? {
-        guard let metadata = entry.metadata, !metadata.isEmpty else {
+        guard let metadata = DiagnosticPrivacy.metadata(entry.metadata), !metadata.isEmpty else {
             return nil
         }
         return metadata
             .sorted { $0.key < $1.key }
             .map { "\($0.key): \($0.value)" }
-            .joined(separator: " | ")
+            .joined(separator: "\n")
     }
 
     // Presentation helpers
@@ -221,7 +221,7 @@ final class DeveloperConsole: ObservableObject {
 
 private let timestampFormatter: DateFormatter = {
     let f = DateFormatter()
-    f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS 'UTC'"
     f.locale = Locale(identifier: "en_US_POSIX")
     f.timeZone = TimeZone(secondsFromGMT: 0)
     return f

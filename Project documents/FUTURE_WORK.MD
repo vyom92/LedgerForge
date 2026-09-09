@@ -1199,6 +1199,8 @@ Source inspection must never expose passwords or unredacted financial identifier
 
 Sprint 58 completed bounded privacy-safe preparation-failure summaries and the Developer Console integration related to the approved fixture workflow. Retain only broader structured diagnostics work not completed by that slice.
 
+The Chat-accepted unnumbered startup/monthly-planner package on 2026-09-09 additionally completed typed migration/provider/hydration/save failure summaries, causal references, safe next actions, bounded chronological Copy All metadata and truthful unavailable/non-current presentation. See [PROJECT_STATE.md](PROJECT_STATE.md). These slices are no longer queued here; broader structured diagnostics remain future work. Persistent diagnostic history and an import timeline are not completed or authorized by this closure.
+
 ---
 
 ## FW-P1-38 — Import Inspector and Validation Timeline
@@ -2156,6 +2158,8 @@ Remaining future work includes:
 - savings/investment execution;
 - historical planner analytics and variance explanation after actual bank transactions arrive;
 - any broader global-FX/reporting-currency integration, only under separate architecture and source authority.
+
+The Chat-accepted unnumbered startup/monthly-planner package on 2026-09-09 completed the bounded coherent editor, natural amount entry, one Save/Command-S action, contextual provenance, compact layout and non-negative configured-fee validation. These accepted slices are recorded in [PROJECT_STATE.md](PROJECT_STATE.md) and are no longer queued. Broader analytics and planning extensions above remain deferred; this umbrella item is only partially completed.
 
 The accepted dedicated Salary destination and bounded Dashboard summaries remain Sprint 79 production state; this future-work item does not authorize expansion of that boundary.
 

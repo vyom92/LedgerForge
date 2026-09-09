@@ -1,168 +1,194 @@
 import SwiftUI
 
 struct SalaryView: View {
-    @StateObject private var viewModel = SalaryWorkspaceViewModel()
+    @ObservedObject var viewModel: SalaryWorkspaceViewModel
     @ObservedObject private var salaryStore: SalaryStore = .shared
-    @ObservedObject private var fundingPlanStore: FundingPlanStore = .shared
-    @State private var fxRate = ""
-    @State private var fxDate = ""
+    @State private var section = "This Month"
+    @State private var confirmingCopy = false
+    @State private var confirmingDiscard = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                truthLegend
-                thisMonth
-                history
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Picker("Salary section", selection: $section) {
+                        Text("This Month").tag("This Month")
+                        Text("Salary History").tag("Salary History")
+                    }.pickerStyle(.segmented).frame(maxWidth: 380)
+                    if section == "This Month" {
+                        header
+                        if let error = viewModel.errorMessage { Text(error).font(.callout).foregroundStyle(LFTheme.warning).textSelection(.enabled) }
+                        if geometry.size.width >= 850 {
+                            HStack(alignment: .top, spacing: 16) {
+                                qatarColumn.disabled(!viewModel.canEdit).frame(maxWidth: .infinity)
+                                indiaColumn.disabled(!viewModel.canEdit).frame(maxWidth: .infinity)
+                            }
+                        } else { qatarColumn.disabled(!viewModel.canEdit); indiaColumn.disabled(!viewModel.canEdit) }
+                        results
+                    } else { history }
+                }.padding(24)
             }
-            .padding(28)
         }
-        .onAppear { syncFX() }
-        .onChange(of: fundingPlanStore.plans) { _, _ in syncFX() }
-        .alert("Salary workspace", isPresented: Binding(
-            get: { viewModel.errorMessage != nil },
-            set: { if !$0 { viewModel.dismissError() } }
-        )) { Button("OK", role: .cancel) { viewModel.dismissError() } } message: {
-            Text(viewModel.errorMessage ?? "")
+        .confirmationDialog("Discard unsaved changes and copy the previous plan?", isPresented: $confirmingCopy, titleVisibility: .visible) {
+            Button("Discard and copy", role: .destructive) { viewModel.rolloverFromPreviousPlan(discardingDraft: true) }
+            Button("Keep editing", role: .cancel) {}
+        }
+        .confirmationDialog("Discard this draft and reload the current database?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
+            Button("Discard and reload", role: .destructive) { viewModel.discardAndReload() }
+            Button("Keep draft", role: .cancel) {}
         }
     }
 
-    private var truthLegend: some View {
-        LFPanel(title: "Truth classes") {
-            HStack(spacing: 12) {
-                truthChip("Imported Source Truth", icon: "doc.text.magnifyingglass")
-                truthChip("Account Snapshot", icon: "camera")
-                truthChip("User / Carried Input", icon: "pencil.and.list.clipboard")
-                truthChip("Derived Result", icon: "function")
-            }
-        }
-    }
-
-    private var thisMonth: some View {
-        VStack(alignment: .leading, spacing: 14) {
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("This Month")
-                        .font(.title2.weight(.semibold))
-                    Text("Current-month funding plan · \(viewModel.plan.month.canonical)")
-                        .foregroundStyle(LFTheme.textSecondary)
+                VStack(alignment: .leading) {
+                    Text("Funding plan · \(viewModel.plan.month.canonical)").font(.title2.weight(.semibold))
+                    Text(viewModel.statusText).font(.caption).foregroundStyle(LFTheme.textSecondary)
                 }
                 Spacer()
-                Button("Roll Over Previous Plan") { viewModel.rolloverFromPreviousPlan(); syncFX() }
-                    .buttonStyle(.bordered)
-                Button("Save Plan") { applyFX(); viewModel.save() }
-                    .buttonStyle(.borderedProminent)
+                Button("Copy previous month") {
+                    if viewModel.isDirty { confirmingCopy = true } else { viewModel.rolloverFromPreviousPlan() }
+                }.disabled(!viewModel.canRollover || !viewModel.canEdit)
+                Button("Save") { viewModel.save() }
+                    .keyboardShortcut("s", modifiers: .command)
+                    .buttonStyle(.borderedProminent).disabled(!viewModel.canEdit)
             }
+            if viewModel.saveState == .committedNeedsRefresh {
+                Button("Reload saved plan") { viewModel.retryCanonicalRefresh() }
+            } else if viewModel.saveState == .providerChanged || viewModel.saveState == .canonicalChanged || viewModel.saveState == .committedToPreviousProvider {
+                Button("Discard draft and reload") { confirmingDiscard = true }
+            }
+        }
+    }
 
-            HStack(alignment: .top, spacing: 14) {
-                salaryInputs
-                results
+    private var qatarColumn: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Qatar · QAR").font(.title3.weight(.semibold))
+            LFPanel(title: "Expected salary") {
+                VStack(spacing: 12) {
+                    moneyInput("Fixed earnings", .fixed, viewModel.plan.expectedFixedProvenance)
+                    moneyInput("Variable earnings", .variable, viewModel.plan.expectedVariableProvenance)
+                    moneyInput("Deductions", .deductions, viewModel.plan.expectedDeductionsProvenance)
+                    Divider()
+                    valueRow("Expected net", viewModel.calculation.expectedNet, truth: "Calculated")
+                    textValueRow("Salary received", viewModel.currentMonthActual.map { MoneyFormatting.display($0) } ?? "No payslip for this month", truth: "Total from payslips")
+                }
             }
-            balances
+            balances(currency: "QAR")
             commitments(title: "Qatar commitments", region: "qatar", values: viewModel.plan.qatarCommitments)
+        }
+    }
+
+    private var indiaColumn: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("India · INR").font(.title3.weight(.semibold))
+            balances(currency: "INR")
             commitments(title: "India commitments", region: "india", values: viewModel.plan.indiaCommitments)
-            fxAndFee
-        }
-    }
-
-    private var salaryInputs: some View {
-        LFPanel(title: "Expected salary · User / Carried Input") {
-            VStack(spacing: 10) {
-                MoneyInputRow(label: "Expected fixed earnings", currency: "QAR", initial: viewModel.moneyText(.fixed)) { _ = viewModel.updateMoney(.fixed, text: $0) }
-                MoneyInputRow(label: "Expected variable earnings", currency: "QAR", initial: viewModel.moneyText(.variable)) { _ = viewModel.updateMoney(.variable, text: $0) }
-                MoneyInputRow(label: "Expected deductions", currency: "QAR", initial: viewModel.moneyText(.deductions)) { _ = viewModel.updateMoney(.deductions, text: $0) }
-                Divider()
-                valueRow("Expected net", viewModel.calculation.expectedNet, truth: "Derived Result")
-                if let actual = viewModel.currentMonthActual {
-                    valueRow("Actual salary this month", actual, truth: "Imported Source Truth · derived monthly aggregate")
-                } else {
-                    textValueRow("Actual salary this month", "No accepted salary actual", truth: "Imported Source Truth")
+            LFPanel(title: "Transfer planning") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("1 QAR = INR per QAR").font(.subheadline)
+                    input("INR per QAR", key: "fx.rate", binding: Binding(get: { viewModel.rawText["fx.rate"] ?? "" }, set: { viewModel.setFX(rateText: $0, dateText: viewModel.rawText["fx.date"] ?? "") }))
+                    input("Observed YYYY-MM-DD", key: "fx.date", binding: Binding(get: { viewModel.rawText["fx.date"] ?? "" }, set: { viewModel.setFX(rateText: viewModel.rawText["fx.rate"] ?? "", dateText: $0) }))
+                    Text("Your planning rate · used only for this month’s transfer").font(.caption).foregroundStyle(LFTheme.textSecondary)
+                    moneyInput("Transfer fee", .fee, viewModel.plan.configuredTransferFeeProvenance)
+                    moneyInput("Planned investment", .investment, viewModel.plan.plannedInvestmentProvenance)
                 }
             }
         }
-        .frame(maxWidth: .infinity)
     }
 
-    private var results: some View {
-        LFPanel(title: "Funding position · Derived Result") {
-            VStack(spacing: 10) {
-                valueRow("Selected QAR liquidity", viewModel.calculation.selectedQARLiquidity, truth: "Account Snapshot")
-                valueRow("Selected INR liquidity", viewModel.calculation.selectedINRLiquidity, truth: "Account Snapshot")
-                valueRow("INR commitments", viewModel.calculation.indiaCommitments, truth: "Derived from included input")
-                valueRow("India funding shortfall", viewModel.calculation.indiaFundingShortfall, truth: "Derived Result")
-                valueRow("Required QAR principal", viewModel.calculation.requiredQARPrincipal, truth: fxContext)
-                valueRow("Effective transfer fee", viewModel.calculation.effectiveTransferFee, truth: "Derived Result")
-                valueRow("Available for investment", viewModel.calculation.availableForInvestment, truth: "Derived Result")
-                valueRow("Final QAR buffer", viewModel.calculation.finalQARBuffer, truth: "Derived Result")
-                if !viewModel.calculation.incompleteReasons.isEmpty {
-                    Text("Incomplete: \(viewModel.calculation.incompleteReasons.map(\.rawValue).sorted().joined(separator: ", "))")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(LFTheme.warning)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+    private func moneyInput(_ label: String, _ field: SalaryWorkspaceViewModel.MoneyField, _ provenance: FundingPlanValueProvenance) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack { Text(label); Spacer(); Text("QAR").foregroundStyle(LFTheme.textSecondary)
+                input(label, key: field.rawValue, binding: Binding(get: { viewModel.moneyText(field) }, set: { _ = viewModel.updateMoney(field, text: $0) })).frame(maxWidth: 150)
             }
+            Text(viewModel.provenanceText(provenance)).font(.caption2).foregroundStyle(LFTheme.textSecondary)
         }
-        .frame(maxWidth: .infinity)
     }
 
-    private var balances: some View {
-        LFPanel(title: "Balances to consider · Account Snapshot") {
-            VStack(spacing: 10) {
-                if viewModel.eligibleAccounts.isEmpty {
-                    Text("No eligible CBQ QAR or Axis/HDFC NRE/NRO INR accounts are available. Accounts are never selected automatically.")
-                        .foregroundStyle(LFTheme.textSecondary)
+    private func input(_ title: String, key: String, binding: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            TextField(title, text: binding).textFieldStyle(.roundedBorder).accessibilityIdentifier("planner." + key)
+            if let error = viewModel.fieldErrors[key] { Text(error).font(.caption).foregroundStyle(LFTheme.warning).fixedSize(horizontal: false, vertical: true) }
+        }
+    }
+
+    private func balances(currency: String) -> some View {
+        LFPanel(title: "Balances to include") {
+            VStack(alignment: .leading, spacing: 12) {
+                let accounts = viewModel.eligibleAccounts.filter { $0.nativeCurrency.code == currency }
+                if accounts.isEmpty { Text("No eligible \(currency) accounts. Select balances explicitly when available.").font(.callout).foregroundStyle(LFTheme.textSecondary) }
+                ForEach(accounts, id: \.id) { account in
+                    let balance = viewModel.plan.balances.first { $0.accountID == account.repositoryAccountId }
+                    let key = "balance.\(account.repositoryAccountId ?? "")"
+                    VStack(alignment: .leading, spacing: 5) {
+                        Toggle(account.nickname ?? account.name, isOn: Binding(get: { balance?.included ?? false }, set: { viewModel.setAccountIncluded(account, included: $0) }))
+                        HStack {
+                            input("Planning balance", key: key, binding: Binding(get: { viewModel.rawText[key] ?? "" }, set: { viewModel.setManualBalance(account, text: $0) }))
+                            Button("Capture current") { viewModel.captureAccountBalance(account) }
+                        }
+                        Text(balance.map { viewModel.provenanceText($0.provenance) } ?? "No planning balance").font(.caption2).foregroundStyle(LFTheme.textSecondary)
+                    }
                 }
-                ForEach(viewModel.eligibleAccounts, id: \.id) { account in
-                    let saved = viewModel.plan.balances.first { $0.accountID == account.repositoryAccountId }
-                    BalancePlanningRow(
-                        account: account,
-                        balance: saved,
-                        onIncluded: { viewModel.setAccountIncluded(account, included: $0) },
-                        onCapture: { viewModel.captureAccountBalance(account) },
-                        onManual: { viewModel.setManualBalance(account, text: $0) }
-                    )
+                ForEach(viewModel.plan.balances.filter { balance in balance.nativeCurrency.code == currency && !accounts.contains(where: { $0.repositoryAccountId == balance.accountID }) }) { balance in
+                    Text("Saved account is no longer eligible · \(balance.included ? "included" : "excluded") · \(balance.money.map { MoneyFormatting.display($0) } ?? "Balance unavailable")")
+                        .font(.caption).foregroundStyle(LFTheme.warning)
                 }
             }
         }
     }
 
     private func commitments(title: String, region: String, values: [FundingPlanCommitment]) -> some View {
-        LFPanel(title: "\(title) · User / Carried Input") {
-            VStack(spacing: 10) {
+        LFPanel(title: title) {
+            VStack(alignment: .leading, spacing: 12) {
                 ForEach(values) { value in
-                    CommitmentPlanningRow(
-                        commitment: value,
-                        currency: region == "qatar" ? "QAR" : "INR",
-                        eligibleAccounts: viewModel.eligibleAccounts.filter { $0.nativeCurrency.code == (region == "qatar" ? "QAR" : "INR") },
-                        onChange: { label, amount, included, account in
-                            viewModel.updateCommitment(region: region, id: value.id, label: label, amountText: amount, included: included, fundingAccountID: account)
-                        },
-                        onDelete: { viewModel.removeCommitment(region: region, id: value.id) }
-                    )
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Toggle("Include", isOn: Binding(get: { value.included }, set: { update(value, region: region, included: $0) })).labelsHidden().accessibilityLabel("Include commitment")
+                            input("Commitment", key: "label.\(value.id)", binding: Binding(get: { viewModel.rawText["label.\(value.id)"] ?? value.label }, set: { update(value, region: region, label: $0) }))
+                            Button(role: .destructive) { viewModel.removeCommitment(region: region, id: value.id) } label: { Image(systemName: "trash") }.buttonStyle(.borderless).accessibilityLabel("Remove commitment")
+                        }
+                        HStack {
+                            Text(region == "qatar" ? "QAR" : "INR")
+                            input("Amount", key: "amount.\(value.id)", binding: Binding(get: { viewModel.rawText["amount.\(value.id)"] ?? "" }, set: { update(value, region: region, amount: $0) }))
+                        }
+                        Picker("Funding account", selection: Binding(get: { value.fundingAccountID ?? "" }, set: { update(value, region: region, account: $0) })) {
+                            Text("Unassigned").tag("")
+                            ForEach(viewModel.eligibleAccounts.filter { $0.nativeCurrency.code == value.money.currency.code }, id: \.id) { Text($0.nickname ?? $0.name).tag($0.repositoryAccountId ?? "") }
+                        }
+                        Text(viewModel.provenanceText(value.provenance)).font(.caption2).foregroundStyle(LFTheme.textSecondary)
+                    }
+                    Divider()
                 }
-                Button { viewModel.addCommitment(region: region) } label: {
-                    Label("Add commitment", systemImage: "plus")
-                }
-                .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Button { viewModel.addCommitment(region: region) } label: { Label("Add commitment", systemImage: "plus") }
             }
         }
     }
 
-    private var fxAndFee: some View {
-        LFPanel(title: "India funding conversion · User Input") {
+    private func update(_ value: FundingPlanCommitment, region: String, label: String? = nil, amount: String? = nil, included: Bool? = nil, account: String? = nil) {
+        let field: String; let text: String
+        if let label { field = "label"; text = label }
+        else if let amount { field = "amount"; text = amount }
+        else if let included { field = "included"; text = String(included) }
+        else if let account { field = "account"; text = account }
+        else { return }
+        viewModel.editCommitment(region: region, id: value.id, field: field, text: text)
+    }
+
+    private var results: some View {
+        LFPanel(title: "Funding position · Calculated") {
             VStack(spacing: 10) {
-                HStack {
-                    Text("1 QAR =")
-                    TextField("INR per QAR", text: $fxRate).textFieldStyle(.roundedBorder)
-                    Text("INR")
-                    TextField("YYYY-MM-DD", text: $fxDate).textFieldStyle(.roundedBorder).frame(width: 130)
-                    Button("Apply FX") { applyFX() }.buttonStyle(.bordered)
-                }
-                Text("Plan-local, user-entered rate. No network or global exchange-rate table is used.")
-                    .font(.caption).foregroundStyle(LFTheme.textSecondary).frame(maxWidth: .infinity, alignment: .leading)
-                MoneyInputRow(label: "Configured transfer fee", currency: "QAR", initial: viewModel.moneyText(.fee)) { _ = viewModel.updateMoney(.fee, text: $0) }
-                valueRow("Effective transfer fee", viewModel.calculation.effectiveTransferFee, truth: "Derived Result · zero when India shortfall is zero")
-                MoneyInputRow(label: "Planned investment", currency: "QAR", initial: viewModel.moneyText(.investment)) { _ = viewModel.updateMoney(.investment, text: $0) }
+                valueRow("Selected QAR liquidity", viewModel.calculation.selectedQARLiquidity, truth: "Included planning balances")
+                valueRow("Selected INR liquidity", viewModel.calculation.selectedINRLiquidity, truth: "Included planning balances")
+                valueRow("India funding shortfall", viewModel.calculation.indiaFundingShortfall, truth: "After included INR liquidity")
+                valueRow("Required QAR principal", viewModel.calculation.requiredQARPrincipal, truth: "Using this plan’s dated FX rate")
+                valueRow("Effective transfer fee", viewModel.calculation.effectiveTransferFee, truth: "Zero when no transfer is required")
+                valueRow("Available for investment", viewModel.calculation.availableForInvestment, truth: "After commitments and transfer")
+                valueRow("Final QAR buffer", viewModel.calculation.finalQARBuffer, truth: "After planned investment")
+                if !viewModel.hasValidCalculation { Text("Correct the marked inputs to calculate this plan.").foregroundStyle(LFTheme.warning) }
+                if viewModel.calculation.incompleteReasons.contains(.missingPlanningFX) { Text("Add a dated FX rate to calculate the India transfer.").foregroundStyle(LFTheme.warning) }
+                if viewModel.calculation.incompleteReasons.contains(.includedQARBalanceMissing) || viewModel.calculation.incompleteReasons.contains(.includedINRBalanceMissing) { Text("An included account needs a planning balance.").foregroundStyle(LFTheme.warning) }
             }
         }
     }
@@ -171,12 +197,12 @@ struct SalaryView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Salary History").font(.title2.weight(.semibold))
             if salaryStore.statements.isEmpty {
-                LFPanel(title: "Imported Source Truth") {
+                LFPanel(title: "From payslip") {
                     Text("No accepted Qatar Airways salary statements.").foregroundStyle(LFTheme.textSecondary)
                 }
             }
             ForEach(viewModel.historyGroups, id: \.month) { group in
-                LFPanel(title: "\(group.month.canonical) · Derived monthly actual \(MoneyFormatting.display(group.actual))") {
+                LFPanel(title: "\(group.month.canonical) · Total from payslips \(MoneyFormatting.display(group.actual))") {
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(group.statements) { statement in
                             DisclosureGroup {
@@ -202,8 +228,8 @@ struct SalaryView: View {
 
     private func salaryStatementDetail(_ statement: SalaryStatement) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Imported Source Truth").font(.caption.weight(.semibold)).foregroundStyle(LFTheme.info)
-            Text("Qatar Airways · \(statement.evidence.profileID)@\(statement.evidence.profileVersion)")
+            Text("From payslip").font(.caption.weight(.semibold)).foregroundStyle(LFTheme.info)
+            Text("Qatar Airways")
                 .font(.caption).foregroundStyle(LFTheme.textSecondary)
             Text("Earnings").font(.subheadline.weight(.semibold))
             ForEach(statement.evidence.earnings, id: \.sourceOrdinal) { component in
@@ -218,118 +244,21 @@ struct SalaryView: View {
                 }
             }
             Divider()
-            valueRow("Printed earnings", statement.evidence.printedEarningsTotal, truth: "Imported Source Truth")
-            if let deductions = statement.evidence.printedDeductionsTotal { valueRow("Printed deductions", deductions, truth: "Imported Source Truth") }
-            valueRow("Printed net", statement.evidence.printedNet, truth: "Imported Source Truth")
-            valueRow("Printed payment total", statement.evidence.printedPaymentTotal, truth: "Imported Source Truth")
+            valueRow("Printed earnings", statement.evidence.printedEarningsTotal, truth: "From payslip")
+            if let deductions = statement.evidence.printedDeductionsTotal { valueRow("Printed deductions", deductions, truth: "From payslip") }
+            valueRow("Printed net", statement.evidence.printedNet, truth: "From payslip")
+            valueRow("Printed payment total", statement.evidence.printedPaymentTotal, truth: "From payslip")
         }.padding(.top, 8)
     }
 
-    private var fxContext: String {
-        guard let fx = viewModel.plan.planningFX else { return "Derived Result · FX unavailable" }
-        return "Derived Result · 1 QAR = \(NSDecimalNumber(decimal: fx.inrPerQAR).stringValue) INR observed \(fx.observationDate.canonical)"
-    }
-
-    private func syncFX() {
-        fxRate = viewModel.plan.planningFX.map { NSDecimalNumber(decimal: $0.inrPerQAR).stringValue } ?? ""
-        fxDate = viewModel.plan.planningFX?.observationDate.canonical ?? ""
-    }
-
-    private func applyFX() { viewModel.setFX(rateText: fxRate, dateText: fxDate) }
-
-    private func truthChip(_ text: String, icon: String) -> some View {
-        Label(text, systemImage: icon).font(.caption.weight(.semibold)).padding(.horizontal, 10).padding(.vertical, 7)
-            .background(LFTheme.surfaceRaised).clipShape(Capsule())
-    }
-
     private func valueRow(_ label: String, _ money: Money?, truth: String) -> some View {
-        textValueRow(label, money.map { MoneyFormatting.display($0) } ?? "Incomplete / unavailable", truth: truth)
+        textValueRow(label, (section == "Salary History" || viewModel.hasValidCalculation) ? money.map { MoneyFormatting.display($0) } ?? "Incomplete" : "Incomplete", truth: truth)
     }
 
     private func textValueRow(_ label: String, _ value: String, truth: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) { Text(label); Text(truth).font(.caption2).foregroundStyle(LFTheme.textSecondary) }
-            Spacer(); Text(value).font(.subheadline.weight(.semibold)).foregroundStyle(value.contains("Incomplete") ? LFTheme.warning : LFTheme.text)
-        }
-    }
-}
-
-private struct MoneyInputRow: View {
-    let label: String
-    let currency: String
-    let initial: String
-    let onCommit: (String) -> Void
-    @State private var text: String
-
-    init(label: String, currency: String, initial: String, onCommit: @escaping (String) -> Void) {
-        self.label = label; self.currency = currency; self.initial = initial; self.onCommit = onCommit
-        _text = State(initialValue: initial)
-    }
-
-    var body: some View {
-        HStack { Text(label); Spacer(); Text(currency).foregroundStyle(LFTheme.textSecondary); TextField("0.00", text: $text).textFieldStyle(.roundedBorder).frame(width: 130).onSubmit { onCommit(text) } }
-    }
-}
-
-private struct BalancePlanningRow: View {
-    let account: Account
-    let balance: FundingPlanBalance?
-    let onIncluded: (Bool) -> Void
-    let onCapture: () -> Void
-    let onManual: (String) -> Void
-    @State private var manual = ""
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Toggle("", isOn: Binding(get: { balance?.included ?? false }, set: onIncluded)).labelsHidden()
-            VStack(alignment: .leading, spacing: 2) {
-                Text(account.nickname ?? account.name).font(.subheadline.weight(.semibold))
-                Text("\(account.institution) · \(account.nativeCurrency.code) · \(provenanceText)").font(.caption).foregroundStyle(LFTheme.textSecondary)
-            }
-            Spacer()
-            Text(balance?.money.map { MoneyFormatting.display($0) } ?? "Balance unavailable").foregroundStyle(balance?.money == nil ? LFTheme.warning : LFTheme.text)
-            TextField("Manual", text: $manual).textFieldStyle(.roundedBorder).frame(width: 110).onSubmit { onManual(manual) }
-            Button("Capture current") { onCapture() }.buttonStyle(.bordered)
-        }
-    }
-
-    private var provenanceText: String {
-        guard let value = balance?.provenance else { return "No planning snapshot" }
-        switch value { case .manual: return "Manual planning balance"; case .carried: return "Carried value"; case .capturedAccountBalance(let time): return "Captured \(time)" }
-    }
-}
-
-private struct CommitmentPlanningRow: View {
-    let commitment: FundingPlanCommitment
-    let currency: String
-    let eligibleAccounts: [Account]
-    let onChange: (String, String, Bool, String?) -> Void
-    let onDelete: () -> Void
-    @State private var label: String
-    @State private var amount: String
-    @State private var included: Bool
-    @State private var accountID: String
-
-    init(commitment: FundingPlanCommitment, currency: String, eligibleAccounts: [Account], onChange: @escaping (String, String, Bool, String?) -> Void, onDelete: @escaping () -> Void) {
-        self.commitment = commitment; self.currency = currency; self.eligibleAccounts = eligibleAccounts; self.onChange = onChange; self.onDelete = onDelete
-        _label = State(initialValue: commitment.label)
-        _amount = State(initialValue: (try? commitment.money.canonicalDecimalString()) ?? "")
-        _included = State(initialValue: commitment.included)
-        _accountID = State(initialValue: commitment.fundingAccountID ?? "")
-    }
-
-    var body: some View {
-        HStack {
-            Toggle("", isOn: $included).labelsHidden()
-            TextField("Commitment", text: $label).textFieldStyle(.roundedBorder)
-            Text(currency).foregroundStyle(LFTheme.textSecondary)
-            TextField("0.00", text: $amount).textFieldStyle(.roundedBorder).frame(width: 110)
-            Picker("Funding", selection: $accountID) {
-                Text("Unassigned").tag("")
-                ForEach(eligibleAccounts, id: \.id) { Text($0.nickname ?? $0.name).tag($0.repositoryAccountId ?? "") }
-            }.frame(width: 180)
-            Button("Apply") { onChange(label, amount, included, accountID.isEmpty ? nil : accountID) }.buttonStyle(.bordered)
-            Button(role: .destructive, action: onDelete) { Image(systemName: "trash") }.buttonStyle(.borderless)
+            Spacer(); Text(value).font(.subheadline.weight(.semibold)).foregroundStyle(value == "Incomplete" ? LFTheme.warning : LFTheme.text)
         }
     }
 }

@@ -180,6 +180,9 @@ nonisolated enum SalaryPersistenceDTOValidator {
             (plan.configuredFeeDecimal, plan.configuredFeeMinor),
             (plan.plannedInvestmentDecimal, plan.plannedInvestmentMinor)
         ] { _ = try money(value.0, value.1, "QAR") }
+        guard plan.configuredFeeMinor >= 0 else {
+            throw RepositoryError.relationshipViolation("Transfer fee must be zero or greater.")
+        }
         let inputProvenances = [plan.expectedFixedProvenance, plan.expectedVariableProvenance,
                                 plan.expectedDeductionsProvenance, plan.configuredFeeProvenance,
                                 plan.plannedInvestmentProvenance]
