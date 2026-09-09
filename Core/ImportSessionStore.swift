@@ -16,22 +16,25 @@ final class ImportSessionStore: ObservableObject {
     init() {}
 
     func replaceImportSessions(_ importSessions: [RepositoryImportSession]) {
-        let update = {
-            self.installImportSessionsWithoutObservation(importSessions)
-            self.notifyImportSessionsOfInstalledValue()
-        }
-
         if Thread.isMainThread {
-            update()
+            MainActor.assumeIsolated {
+                self.installImportSessionsWithoutObservation(importSessions)
+                self.notifyImportSessionsOfInstalledValue()
+            }
         } else {
-            DispatchQueue.main.async(execute: update)
+            DispatchQueue.main.async { @MainActor in
+                self.installImportSessionsWithoutObservation(importSessions)
+                self.notifyImportSessionsOfInstalledValue()
+            }
         }
     }
 
+    @MainActor
     func installImportSessionsWithoutObservation(_ importSessions: [RepositoryImportSession]) {
         _importSessions.installWithoutObservation(importSessions)
     }
 
+    @MainActor
     func notifyImportSessionsOfInstalledValue() {
         objectWillChange.send()
         _importSessions.publishInstalledValue()
@@ -46,16 +49,24 @@ final class ImportAttemptStore: ObservableObject {
     @ObserverAtomicPublished private(set) var attempts: [RepositoryImportAttempt] = []
     init() {}
     func replaceAttempts(_ attempts: [RepositoryImportAttempt]) {
-        let update = {
-            self.installAttemptsWithoutObservation(attempts)
-            self.notifyAttemptsOfInstalledValue()
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                self.installAttemptsWithoutObservation(attempts)
+                self.notifyAttemptsOfInstalledValue()
+            }
+        } else {
+            DispatchQueue.main.async { @MainActor in
+                self.installAttemptsWithoutObservation(attempts)
+                self.notifyAttemptsOfInstalledValue()
+            }
         }
-        if Thread.isMainThread { update() } else { DispatchQueue.main.async(execute: update) }
     }
 
+    @MainActor
     func installAttemptsWithoutObservation(_ attempts: [RepositoryImportAttempt]) {
         _attempts.installWithoutObservation(attempts)
     }
+    @MainActor
     func notifyAttemptsOfInstalledValue() {
         objectWillChange.send()
         _attempts.publishInstalledValue()

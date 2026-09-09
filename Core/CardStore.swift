@@ -11,18 +11,25 @@ final class CardStore: ObservableObject {
     init() {}
 
     func replaceSnapshot(_ snapshot: CardStoreSnapshot) {
-        let update = {
-            self.installSnapshotWithoutObservation(snapshot)
-            self.notifySnapshotOfInstalledValue()
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                self.installSnapshotWithoutObservation(snapshot)
+                self.notifySnapshotOfInstalledValue()
+            }
+        } else {
+            DispatchQueue.main.async { @MainActor in
+                self.installSnapshotWithoutObservation(snapshot)
+                self.notifySnapshotOfInstalledValue()
+            }
         }
-        if Thread.isMainThread { update() }
-        else { DispatchQueue.main.async(execute: update) }
     }
 
+    @MainActor
     func installSnapshotWithoutObservation(_ snapshot: CardStoreSnapshot) {
         _snapshot.installWithoutObservation(snapshot)
     }
 
+    @MainActor
     func notifySnapshotOfInstalledValue() {
         objectWillChange.send()
         _snapshot.publishInstalledValue()

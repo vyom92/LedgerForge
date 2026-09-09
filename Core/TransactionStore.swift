@@ -26,21 +26,26 @@ final class TransactionStore: ObservableObject {
 
     // Replace all transactions after a successful import and store validation result.
     func replaceTransactions(_ transactions: [Transaction], validation: ImportValidationResult? = nil) {
-        let update = {
-            self.installTransactionsWithoutObservation(
-                transactions,
-                validation: validation
-            )
-            self.notifyTransactionsOfInstalledValues()
-        }
-
         if Thread.isMainThread {
-            update()
+            MainActor.assumeIsolated {
+                self.installTransactionsWithoutObservation(
+                    transactions,
+                    validation: validation
+                )
+                self.notifyTransactionsOfInstalledValues()
+            }
         } else {
-            DispatchQueue.main.async(execute: update)
+            DispatchQueue.main.async { @MainActor in
+                self.installTransactionsWithoutObservation(
+                    transactions,
+                    validation: validation
+                )
+                self.notifyTransactionsOfInstalledValues()
+            }
         }
     }
 
+    @MainActor
     func installTransactionsWithoutObservation(
         _ transactions: [Transaction],
         validation: ImportValidationResult?
@@ -49,6 +54,7 @@ final class TransactionStore: ObservableObject {
         _lastValidation.installWithoutObservation(validation)
     }
 
+    @MainActor
     func notifyTransactionsOfInstalledValues() {
         objectWillChange.send()
         _transactions.publishInstalledValue()

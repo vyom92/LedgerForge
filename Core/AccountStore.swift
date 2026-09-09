@@ -20,22 +20,25 @@ final class AccountStore: ObservableObject {
     init() {}
 
     func replaceAccounts(_ accounts: [Account]) {
-        let update = {
-            self.installAccountsWithoutObservation(accounts)
-            self.notifyAccountsOfInstalledValue()
-        }
-
         if Thread.isMainThread {
-            update()
+            MainActor.assumeIsolated {
+                self.installAccountsWithoutObservation(accounts)
+                self.notifyAccountsOfInstalledValue()
+            }
         } else {
-            DispatchQueue.main.async(execute: update)
+            DispatchQueue.main.async { @MainActor in
+                self.installAccountsWithoutObservation(accounts)
+                self.notifyAccountsOfInstalledValue()
+            }
         }
     }
 
+    @MainActor
     func installAccountsWithoutObservation(_ accounts: [Account]) {
         _accounts.installWithoutObservation(accounts)
     }
 
+    @MainActor
     func notifyAccountsOfInstalledValue() {
         objectWillChange.send()
         _accounts.publishInstalledValue()

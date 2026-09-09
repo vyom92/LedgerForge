@@ -282,7 +282,7 @@ struct DeveloperDiagnosticsTests {
         #expect(visibleText.contains("reason: committed"))
     }
 
-    @Test("Clear removes all entries without reusing sequence numbers")
+    @Test("Clear is synchronous and does not reuse sequence numbers")
     func clearResets() async throws {
         let console = DeveloperConsole()
 
@@ -290,13 +290,26 @@ struct DeveloperDiagnosticsTests {
         #expect(console.entries.count == 1)
 
         console.clear()
-        // Allow main-thread bounce
-        try await Task.sleep(nanoseconds: 50_000_000)
-
         #expect(console.entries.isEmpty)
 
         console.info(.application, "After clear")
         #expect(console.entries.first?.sequence == 2)
+    }
+
+    @Test("Retained history is capped at 1,000 chronological entries")
+    func retainedHistoryBound() {
+        let console = DeveloperConsole()
+
+        for index in 1...1_002 {
+            console.info(.application, "Entry \(index)")
+        }
+
+        #expect(console.entries.count == 1_000)
+        #expect(console.entries.first?.sequence == 3)
+        #expect(console.entries.first?.message == "Entry 3")
+        #expect(console.entries.last?.sequence == 1_002)
+        #expect(console.entries.last?.message == "Entry 1002")
+        #expect(console.entries.map(\.sequence) == Array(3...1_002))
     }
 
     @Test("Clear removes diagnostics without mutating account metadata", .globalRuntimeStateIsolation)

@@ -338,8 +338,9 @@ final class RepositoryStoreHydrator {
         }
     }
 
-    /// Reads and validates one explicit provider generation without changing any
-    /// global or injected runtime store.
+    /// Synchronously reads and validates one explicit provider generation without
+    /// changing any global or injected runtime store. Staging deliberately performs
+    /// no actor hop and emits no observer publication.
     func stageHydration() throws -> RepositoryRuntimeSnapshot {
         guard persistenceState.isUsable else {
             throw RepositoryStoreHydrationError.persistenceUnavailable
@@ -452,8 +453,9 @@ final class RepositoryStoreHydrator {
         )
     }
 
-    /// Synchronously publishes a previously validated complete snapshot. This
-    /// method performs no repository work and acquires no lifecycle lease.
+    /// Synchronously publishes a previously validated complete snapshot on the
+    /// MainActor. This method performs no repository work and acquires no lifecycle
+    /// lease.
     @MainActor
     func publish(_ snapshot: RepositoryRuntimeSnapshot) {
         installSnapshotWithoutObservation(snapshot)

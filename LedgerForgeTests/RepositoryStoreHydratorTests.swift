@@ -1,5 +1,6 @@
 // LedgerForgeTests/RepositoryStoreHydratorTests.swift
 
+import Combine
 import Foundation
 import Testing
 @testable import LedgerForge
@@ -41,6 +42,110 @@ struct RepositoryStoreHydratorTests {
         #expect(stores.fundingPlans.plans == snapshot.fundingPlans)
         #expect(snapshot.hydrationResult.accountCount == 1)
         #expect(snapshot.hydrationResult.transactionCount == seeded.plan.transactionTemplates.count)
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func firstPublicationObserverSeesCompleteInstalledSnapshotInCanonicalOrder() async throws {
+        let seeded = try await seededProvider()
+        try seedCategoryMetadata(in: seeded)
+        let stores = RuntimeStores()
+        let reconciliationGate = CategoryReconciliationGate()
+        reconciliationGate.requireReconciliation(for: seeded.provider.generationToken)
+        let hydrator = makeHydrator(
+            seeded: seeded,
+            stores: stores,
+            categoryReconciliationGate: reconciliationGate
+        )
+        let recorder = HydrationPublicationRecorder(
+            stores: stores,
+            reconciliationGate: reconciliationGate,
+            providerGeneration: seeded.provider.generationToken
+        )
+        let subscriptions = hydrationPublicationSubscriptions(stores: stores, recorder: recorder)
+
+        let snapshot = try hydrator.stageHydration()
+
+        #expect(recorder.events.isEmpty)
+        #expect(recorder.firstObservation == nil)
+        #expect(reconciliationGate.isBlocked(for: seeded.provider.generationToken))
+
+        let expected = CompleteHydrationObservation.expected(
+            RuntimeStoresSnapshot(snapshot)
+        )
+        #expect(expected.encodedAccounts != nil)
+
+        hydrator.publish(snapshot)
+
+        #expect(recorder.firstObservation?.matches(expected) == true)
+        #expect(recorder.events == HydrationPublicationEvent.canonicalOrder)
+        #expect(stores.transactions.lastValidation == nil)
+        #expect(stores.fundingPlans.generation == seeded.provider.generationToken)
+        #expect(!reconciliationGate.isBlocked(for: seeded.provider.generationToken))
+        withExtendedLifetime(subscriptions) {}
+    }
+
+    @Test(.globalRuntimeStateIsolation)
+    func sharedCanonicalPublicationSignalsAvailabilityBeforeStoresForMatchingGeneration() throws {
+        let provider = DatabaseProvider(inMemory: true)
+        DatabaseProvider.shared = provider
+        ApplicationAvailability.shared.begin()
+        CategoryReconciliationGate.shared.requireReconciliation(for: provider.generationToken)
+        let stores = RuntimeStores(
+            accounts: .shared,
+            transactions: .shared,
+            importSessions: .shared,
+            importAttempts: .shared,
+            categories: .shared,
+            cards: .shared,
+            salary: .shared,
+            fundingPlans: .shared
+        )
+        defer {
+            CardStore.shared.installSnapshotWithoutObservation(.empty)
+            SalaryStore.shared.installWithoutObservation([])
+            FundingPlanStore.shared.installWithoutObservation([], generation: nil)
+            CategoryReconciliationGate.shared.resetForTesting()
+            ApplicationAvailability.shared.begin()
+        }
+        let hydrator = RepositoryStoreHydrator(
+            databaseProvider: provider,
+            accountStore: .shared,
+            transactionStore: .shared,
+            categoryStore: .shared,
+            importSessionStore: .shared,
+            importAttemptStore: .shared,
+            categoryReconciliationGate: .shared,
+            participatesInLifecycleGate: false
+        )
+        let recorder = HydrationPublicationRecorder(
+            stores: stores,
+            reconciliationGate: .shared,
+            providerGeneration: provider.generationToken
+        )
+        var subscriptions = [
+            ApplicationAvailability.shared.$state.dropFirst().sink { _ in
+                recorder.record(.applicationAvailability)
+            }
+        ]
+        subscriptions.append(contentsOf: hydrationPublicationSubscriptions(stores: stores, recorder: recorder))
+
+        let snapshot = try hydrator.stageHydration()
+
+        #expect(recorder.events.isEmpty)
+        #expect(CategoryReconciliationGate.shared.isBlocked(for: provider.generationToken))
+
+        hydrator.publish(snapshot)
+
+        #expect(
+            recorder.firstObservation?.matches(CompleteHydrationObservation.expected(
+                RuntimeStoresSnapshot(snapshot)
+            )) == true
+        )
+        #expect(recorder.events == HydrationPublicationEvent.canonicalOrderWithAvailability)
+        #expect(ApplicationAvailability.shared.state == .empty)
+        #expect(ApplicationAvailability.shared.generation == provider.generationToken)
+        #expect(!CategoryReconciliationGate.shared.isBlocked(for: provider.generationToken))
+        withExtendedLifetime(subscriptions) {}
     }
 
     @Test(.globalRuntimeStateIsolation)
@@ -159,7 +264,10 @@ struct RepositoryStoreHydratorTests {
         }
 
         #expect(stores.accounts.accounts.map(HydratedAccountObservation.init) == accountsBefore)
-        #expect(stores.transactions.transactions.map(HydratedTransactionObservation.init) == transactionsBefore)
+        #expect(HydratedTransactionObservation.matches(
+            stores.transactions.transactions.map(HydratedTransactionObservation.init),
+            transactionsBefore
+        ))
         #expect(stores.importSessions.importSessions == sessionsBefore)
         #expect(stores.importAttempts.attempts == attemptsBefore)
     }
@@ -171,14 +279,47 @@ private struct SeededHydrationGraph {
 }
 
 private struct RuntimeStores {
-    let accounts = AccountStore()
-    let transactions = TransactionStore()
-    let importSessions = ImportSessionStore()
-    let importAttempts = ImportAttemptStore()
-    let categories = CategoryStore()
-    let cards = CardStore()
-    let salary = SalaryStore()
-    let fundingPlans = FundingPlanStore()
+    let accounts: AccountStore
+    let transactions: TransactionStore
+    let importSessions: ImportSessionStore
+    let importAttempts: ImportAttemptStore
+    let categories: CategoryStore
+    let cards: CardStore
+    let salary: SalaryStore
+    let fundingPlans: FundingPlanStore
+
+    @MainActor
+    init() {
+        accounts = AccountStore()
+        transactions = TransactionStore()
+        importSessions = ImportSessionStore()
+        importAttempts = ImportAttemptStore()
+        categories = CategoryStore()
+        cards = CardStore()
+        salary = SalaryStore()
+        fundingPlans = FundingPlanStore()
+    }
+
+    @MainActor
+    init(
+        accounts: AccountStore,
+        transactions: TransactionStore,
+        importSessions: ImportSessionStore,
+        importAttempts: ImportAttemptStore,
+        categories: CategoryStore,
+        cards: CardStore,
+        salary: SalaryStore,
+        fundingPlans: FundingPlanStore
+    ) {
+        self.accounts = accounts
+        self.transactions = transactions
+        self.importSessions = importSessions
+        self.importAttempts = importAttempts
+        self.categories = categories
+        self.cards = cards
+        self.salary = salary
+        self.fundingPlans = fundingPlans
+    }
 }
 
 @MainActor
@@ -196,7 +337,8 @@ private func seededProvider() async throws -> SeededHydrationGraph {
 private func makeHydrator(
     seeded: SeededHydrationGraph,
     stores: RuntimeStores,
-    importSessionRepo: ImportSessionRepository? = nil
+    importSessionRepo: ImportSessionRepository? = nil,
+    categoryReconciliationGate: CategoryReconciliationGate? = nil
 ) -> RepositoryStoreHydrator {
     RepositoryStoreHydrator(
         accountRepo: seeded.provider.accountRepo,
@@ -217,25 +359,329 @@ private func makeHydrator(
         workspaceId: seeded.plan.workspace.id,
         persistenceState: .intentionalNonDurable(.testMemory),
         providerGeneration: seeded.provider.generationToken,
+        categoryReconciliationGate: categoryReconciliationGate,
         participatesInLifecycleGate: false
     )
 }
 
-private struct HydratedTransactionObservation: Equatable {
+@MainActor
+private func seedCategoryMetadata(in seeded: SeededHydrationGraph) throws {
+    let categoryName = try CategoryName.validated("Observer Test")
+    let category = try seeded.provider.categoryRepo.createCategory(CategoryDTO(
+        id: "category-observer-test",
+        workspaceId: seeded.plan.workspace.id,
+        name: categoryName.display,
+        normalizedName: categoryName.normalized,
+        createdAtISO: "2026-09-10T00:00:00Z"
+    ))
+    let transactionID = try #require(seeded.plan.transactionTemplates.first?.transaction.id)
+    #expect(try seeded.provider.categoryRepo.setCategory(
+        categoryId: category.id,
+        transactionId: transactionID,
+        workspaceId: seeded.plan.workspace.id
+    ))
+}
+
+private enum HydrationPublicationEvent: Equatable {
+    case applicationAvailability
+    case accountObjectWillChange
+    case accounts
+    case transactionObjectWillChange
+    case transactions
+    case transactionValidation
+    case importSessionObjectWillChange
+    case importSessions
+    case importAttemptObjectWillChange
+    case importAttempts
+    case categoryObjectWillChange
+    case categories
+    case cardObjectWillChange
+    case cards
+    case salaryObjectWillChange
+    case salaryStatements
+    case fundingPlanObjectWillChange
+    case fundingPlans
+
+    static let canonicalOrder: [Self] = [
+        .accountObjectWillChange, .accounts,
+        .transactionObjectWillChange, .transactions, .transactionValidation,
+        .importSessionObjectWillChange, .importSessions,
+        .importAttemptObjectWillChange, .importAttempts,
+        .categoryObjectWillChange, .categories,
+        .cardObjectWillChange, .cards,
+        .salaryObjectWillChange, .salaryStatements,
+        .fundingPlanObjectWillChange, .fundingPlans
+    ]
+
+    static let canonicalOrderWithAvailability: [Self] = [
+        .applicationAvailability
+    ] + canonicalOrder
+}
+
+@MainActor
+private final class HydrationPublicationRecorder {
+    private let stores: RuntimeStores
+    private let reconciliationGate: CategoryReconciliationGate
+    private let providerGeneration: ProviderGenerationToken
+    private(set) var events: [HydrationPublicationEvent] = []
+    private(set) var firstObservation: CompleteHydrationObservation?
+
+    init(
+        stores: RuntimeStores,
+        reconciliationGate: CategoryReconciliationGate,
+        providerGeneration: ProviderGenerationToken
+    ) {
+        self.stores = stores
+        self.reconciliationGate = reconciliationGate
+        self.providerGeneration = providerGeneration
+    }
+
+    func record(_ event: HydrationPublicationEvent) {
+        events.append(event)
+        if firstObservation == nil {
+            firstObservation = .capture(
+                stores: RuntimeStoresSnapshot(stores),
+                reconciliationGate: reconciliationGate,
+                providerGeneration: providerGeneration
+            )
+        }
+    }
+}
+
+@MainActor
+private func hydrationPublicationSubscriptions(
+    stores: RuntimeStores,
+    recorder: HydrationPublicationRecorder
+) -> [AnyCancellable] {
+    [
+        stores.accounts.objectWillChange.sink { recorder.record(.accountObjectWillChange) },
+        stores.accounts.$accounts.dropFirst().sink { _ in recorder.record(.accounts) },
+        stores.transactions.objectWillChange.sink { recorder.record(.transactionObjectWillChange) },
+        stores.transactions.$transactions.dropFirst().sink { _ in recorder.record(.transactions) },
+        stores.transactions.$lastValidation.dropFirst().sink { _ in recorder.record(.transactionValidation) },
+        stores.importSessions.objectWillChange.sink { recorder.record(.importSessionObjectWillChange) },
+        stores.importSessions.$importSessions.dropFirst().sink { _ in recorder.record(.importSessions) },
+        stores.importAttempts.objectWillChange.sink { recorder.record(.importAttemptObjectWillChange) },
+        stores.importAttempts.$attempts.dropFirst().sink { _ in recorder.record(.importAttempts) },
+        stores.categories.objectWillChange.sink { recorder.record(.categoryObjectWillChange) },
+        stores.categories.$snapshot.dropFirst().sink { _ in recorder.record(.categories) },
+        stores.cards.objectWillChange.sink { recorder.record(.cardObjectWillChange) },
+        stores.cards.$snapshot.dropFirst().sink { _ in recorder.record(.cards) },
+        stores.salary.objectWillChange.sink { recorder.record(.salaryObjectWillChange) },
+        stores.salary.$statements.dropFirst().sink { _ in recorder.record(.salaryStatements) },
+        stores.fundingPlans.objectWillChange.sink { recorder.record(.fundingPlanObjectWillChange) },
+        stores.fundingPlans.$plans.dropFirst().sink { _ in recorder.record(.fundingPlans) }
+    ]
+}
+
+private struct RuntimeStoresSnapshot {
+    let accounts: [Account]
+    let transactions: [Transaction]
+    let importSessions: [RepositoryImportSession]
+    let importAttempts: [RepositoryImportAttempt]
+    let categorySnapshot: CategorySnapshot
+    let cardSnapshot: CardStoreSnapshot
+    let salaryStatements: [SalaryStatement]
+    let fundingPlans: [FundingPlan]
+    let lastValidation: ImportValidationResult?
+    let fundingPlanGeneration: ProviderGenerationToken?
+
+    @MainActor
+    init(_ stores: RuntimeStores) {
+        accounts = stores.accounts.accounts
+        transactions = stores.transactions.transactions
+        importSessions = stores.importSessions.importSessions
+        importAttempts = stores.importAttempts.attempts
+        categorySnapshot = stores.categories.snapshot
+        cardSnapshot = stores.cards.snapshot
+        salaryStatements = stores.salary.statements
+        fundingPlans = stores.fundingPlans.plans
+        lastValidation = stores.transactions.lastValidation
+        fundingPlanGeneration = stores.fundingPlans.generation
+    }
+
+    init(_ snapshot: RepositoryRuntimeSnapshot) {
+        accounts = snapshot.accounts
+        transactions = snapshot.transactions
+        importSessions = snapshot.importSessions
+        importAttempts = snapshot.importAttempts
+        categorySnapshot = snapshot.categorySnapshot
+        cardSnapshot = snapshot.cardSnapshot
+        salaryStatements = snapshot.salaryStatements
+        fundingPlans = snapshot.fundingPlans
+        lastValidation = nil
+        fundingPlanGeneration = snapshot.providerGeneration
+    }
+}
+
+private struct CompleteHydrationObservation {
+    let encodedAccounts: [Data]?
+    let transactions: [HydratedTransactionObservation]
+    let importSessions: [RepositoryImportSession]
+    let importAttempts: [RepositoryImportAttempt]
+    let categorySnapshot: CategorySnapshot
+    let cardSnapshot: CardStoreSnapshot
+    let salaryStatements: [SalaryStatement]
+    let fundingPlans: [FundingPlan]
+    let lastValidationIsNil: Bool
+    let fundingPlanGeneration: ProviderGenerationToken?
+    let reconciliationIsCleared: Bool
+
+    @MainActor
+    static func capture(
+        stores: RuntimeStoresSnapshot,
+        reconciliationGate: CategoryReconciliationGate,
+        providerGeneration: ProviderGenerationToken
+    ) -> Self {
+        Self(
+            encodedAccounts: encodeAccounts(stores.accounts),
+            transactions: stores.transactions.map(HydratedTransactionObservation.init),
+            importSessions: stores.importSessions,
+            importAttempts: stores.importAttempts,
+            categorySnapshot: stores.categorySnapshot,
+            cardSnapshot: stores.cardSnapshot,
+            salaryStatements: stores.salaryStatements,
+            fundingPlans: stores.fundingPlans,
+            lastValidationIsNil: stores.lastValidation == nil,
+            fundingPlanGeneration: stores.fundingPlanGeneration,
+            reconciliationIsCleared: !reconciliationGate.isBlocked(for: providerGeneration)
+        )
+    }
+
+    @MainActor
+    static func expected(_ stores: RuntimeStoresSnapshot) -> Self {
+        Self(
+            encodedAccounts: encodeAccounts(stores.accounts),
+            transactions: stores.transactions.map(HydratedTransactionObservation.init),
+            importSessions: stores.importSessions,
+            importAttempts: stores.importAttempts,
+            categorySnapshot: stores.categorySnapshot,
+            cardSnapshot: stores.cardSnapshot,
+            salaryStatements: stores.salaryStatements,
+            fundingPlans: stores.fundingPlans,
+            lastValidationIsNil: stores.lastValidation == nil,
+            fundingPlanGeneration: stores.fundingPlanGeneration,
+            reconciliationIsCleared: true
+        )
+    }
+
+    @MainActor
+    private static func encodeAccounts(_ accounts: [Account]) -> [Data]? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return try? accounts.map(encoder.encode)
+    }
+
+    @MainActor
+    func matches(_ other: Self) -> Bool {
+        encodedAccounts == other.encodedAccounts
+            && HydratedTransactionObservation.matches(transactions, other.transactions)
+            && importSessions == other.importSessions
+            && importAttempts == other.importAttempts
+            && categorySnapshot == other.categorySnapshot
+            && cardSnapshot == other.cardSnapshot
+            && salaryStatements == other.salaryStatements
+            && fundingPlans == other.fundingPlans
+            && lastValidationIsNil == other.lastValidationIsNil
+            && fundingPlanGeneration == other.fundingPlanGeneration
+            && reconciliationIsCleared == other.reconciliationIsCleared
+    }
+}
+
+private struct HydratedTransactionObservation {
     let id: UUID
     let repositoryTransactionId: String?
+    let statementDate: StatementDate?
+    let valueDate: StatementDate?
+    let financialDateRole: FinancialDateRole
+    let statementTimezoneEvidence: StatementTimezoneEvidence
+    let sourceProvenance: [TransactionSourceProvenance]
+    let description: String
+    let reference: String?
+    let debitMoney: Money?
+    let creditMoney: Money?
+    let money: Money
+    let runningBalanceMoney: Money?
+    let cardLiabilityEffect: CardLiabilityEffect?
+    let account: String
+    let sourceBank: String
+    let sourceFile: String
     let repositoryAccountId: String?
     let repositoryImportSessionId: String?
     let repositoryDocumentId: String?
     let repositorySourceDocumentName: String?
+    let repositoryPreferredSourceDocumentName: String?
+    let repositoryPreferredSourceFormatCode: String?
+    let repositoryPreferredSourceTransactionDate: StatementDate?
+    let repositoryPreferredStructuredReferenceDigest: String?
+    let verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence?
 
     init(_ transaction: Transaction) {
         id = transaction.id
         repositoryTransactionId = transaction.repositoryTransactionId
+        statementDate = transaction.statementDate
+        valueDate = transaction.valueDate
+        financialDateRole = transaction.financialDateRole
+        statementTimezoneEvidence = transaction.statementTimezoneEvidence
+        sourceProvenance = transaction.sourceProvenance
+        description = transaction.description
+        reference = transaction.reference
+        debitMoney = transaction.debitMoney
+        creditMoney = transaction.creditMoney
+        money = transaction.money
+        runningBalanceMoney = transaction.runningBalanceMoney
+        cardLiabilityEffect = transaction.cardLiabilityEffect
+        account = transaction.account
+        sourceBank = transaction.sourceBank
+        sourceFile = transaction.sourceFile
         repositoryAccountId = transaction.repositoryAccountId
         repositoryImportSessionId = transaction.repositoryImportSessionId
         repositoryDocumentId = transaction.repositoryDocumentId
         repositorySourceDocumentName = transaction.repositorySourceDocumentName
+        repositoryPreferredSourceDocumentName = transaction.repositoryPreferredSourceDocumentName
+        repositoryPreferredSourceFormatCode = transaction.repositoryPreferredSourceFormatCode
+        repositoryPreferredSourceTransactionDate = transaction.repositoryPreferredSourceTransactionDate
+        repositoryPreferredStructuredReferenceDigest = transaction.repositoryPreferredStructuredReferenceDigest
+        verifiedAxisUPIEventEvidence = transaction.verifiedAxisUPIEventEvidence
+    }
+
+    @MainActor
+    func matches(_ other: Self) -> Bool {
+        id == other.id
+            && repositoryTransactionId == other.repositoryTransactionId
+            && statementDate == other.statementDate
+            && valueDate == other.valueDate
+            && financialDateRole == other.financialDateRole
+            && statementTimezoneEvidence == other.statementTimezoneEvidence
+            && sourceProvenance == other.sourceProvenance
+            && description == other.description
+            && reference == other.reference
+            && debitMoney == other.debitMoney
+            && creditMoney == other.creditMoney
+            && money == other.money
+            && runningBalanceMoney == other.runningBalanceMoney
+            && cardLiabilityEffect == other.cardLiabilityEffect
+            && account == other.account
+            && sourceBank == other.sourceBank
+            && sourceFile == other.sourceFile
+            && repositoryAccountId == other.repositoryAccountId
+            && repositoryImportSessionId == other.repositoryImportSessionId
+            && repositoryDocumentId == other.repositoryDocumentId
+            && repositorySourceDocumentName == other.repositorySourceDocumentName
+            && repositoryPreferredSourceDocumentName == other.repositoryPreferredSourceDocumentName
+            && repositoryPreferredSourceFormatCode == other.repositoryPreferredSourceFormatCode
+            && repositoryPreferredSourceTransactionDate == other.repositoryPreferredSourceTransactionDate
+            && repositoryPreferredStructuredReferenceDigest == other.repositoryPreferredStructuredReferenceDigest
+            && verifiedAxisUPIEventEvidence == other.verifiedAxisUPIEventEvidence
+    }
+
+    @MainActor
+    static func matches(_ lhs: [Self], _ rhs: [Self]) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        for (left, right) in zip(lhs, rhs) where !left.matches(right) {
+            return false
+        }
+        return true
     }
 }
 

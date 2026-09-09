@@ -59,27 +59,37 @@ final class DeveloperConsole: ObservableObject {
     // MARK: - Logging API
 
     func log(level: DeveloperLogLevel, category: DeveloperLogCategory, message: String, metadata: [String: String]? = nil) {
-        let makeEntry = {
-            let sequence = self.nextSequence
-            self.nextSequence += 1
-            let entry = DeveloperLogEntry(
-                id: sequence,
-                sequence: sequence,
-                timestamp: Date(),
-                level: level,
-                category: category,
-                message: DiagnosticPrivacy.text(message),
-                metadata: DiagnosticPrivacy.metadata(metadata)
-            )
-            self.entries.append(entry)
-            if self.entries.count > 1000 { self.entries.removeFirst(self.entries.count - 1000) }
-        }
-
         if Thread.isMainThread {
-            makeEntry()
+            MainActor.assumeIsolated {
+                self.appendEntry(level: level, category: category, message: message, metadata: metadata)
+            }
         } else {
-            DispatchQueue.main.async(execute: makeEntry)
+            DispatchQueue.main.async { @MainActor in
+                self.appendEntry(level: level, category: category, message: message, metadata: metadata)
+            }
         }
+    }
+
+    @MainActor
+    private func appendEntry(
+        level: DeveloperLogLevel,
+        category: DeveloperLogCategory,
+        message: String,
+        metadata: [String: String]?
+    ) {
+        let sequence = nextSequence
+        nextSequence += 1
+        let entry = DeveloperLogEntry(
+            id: sequence,
+            sequence: sequence,
+            timestamp: Date(),
+            level: level,
+            category: category,
+            message: DiagnosticPrivacy.text(message),
+            metadata: DiagnosticPrivacy.metadata(metadata)
+        )
+        entries.append(entry)
+        if entries.count > 1000 { entries.removeFirst(entries.count - 1000) }
     }
 
     // Convenience helpers
@@ -107,14 +117,20 @@ final class DeveloperConsole: ObservableObject {
     // MARK: - Utilities
 
     func clear() {
-        let clearBlock = {
-            self.entries.removeAll()
-        }
         if Thread.isMainThread {
-            clearBlock()
+            MainActor.assumeIsolated {
+                self.clearEntries()
+            }
         } else {
-            DispatchQueue.main.async(execute: clearBlock)
+            DispatchQueue.main.async { @MainActor in
+                self.clearEntries()
+            }
         }
+    }
+
+    @MainActor
+    private func clearEntries() {
+        entries.removeAll()
     }
 
     // Copy All – complete chronological history, independent of filters
@@ -215,6 +231,14 @@ final class DeveloperConsole: ObservableObject {
             transactionCount: transactionStore.transactions.count
         )
     }
+
+#if DEBUG
+    @MainActor
+    private func resetForTests() {
+        entries.removeAll()
+        nextSequence = 1
+    }
+#endif
 }
 
 // MARK: - Formatters
@@ -230,9 +254,9 @@ private let timestampFormatter: DateFormatter = {
 #if DEBUG
 extension DeveloperConsole {
     // Testing helper to reset deterministic state within tests
+    @MainActor
     func _resetForTests() {
-        entries.removeAll()
-        nextSequence = 1
+        resetForTests()
     }
 }
 #endif

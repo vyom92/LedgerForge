@@ -23,22 +23,26 @@ final class CategoryStore: ObservableObject {
     }
 
     func replaceSnapshot(_ snapshot: CategorySnapshot) {
-        let update = {
-            self.installSnapshotWithoutObservation(snapshot)
-            self.notifySnapshotOfInstalledValue()
-        }
         if Thread.isMainThread {
-            update()
+            MainActor.assumeIsolated {
+                self.installSnapshotWithoutObservation(snapshot)
+                self.notifySnapshotOfInstalledValue()
+            }
         } else {
-            DispatchQueue.main.async(execute: update)
+            DispatchQueue.main.async { @MainActor in
+                self.installSnapshotWithoutObservation(snapshot)
+                self.notifySnapshotOfInstalledValue()
+            }
         }
     }
 
 
+    @MainActor
     func installSnapshotWithoutObservation(_ snapshot: CategorySnapshot) {
         _snapshot.installWithoutObservation(snapshot)
     }
 
+    @MainActor
     func notifySnapshotOfInstalledValue() {
         objectWillChange.send()
         _snapshot.publishInstalledValue()
