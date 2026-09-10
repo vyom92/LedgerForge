@@ -2,7 +2,7 @@
 
 ## Published discovery index — 2026-09-10
 
-[Read-only discovery register](Discovery/Read_Only_Discovery_Register.md): evidence and proposed boundaries for all 153 entries at research ref `adcf83f52d309ddac18d95f0321d0c0f6120dd29`, reconciled to 151 active entries at publication input `ffddebc6e12405c812a36855ab6212e973cff5ba`. Current FUTURE_WORK owns actionable remainders; roadmaps retain numbering and current/prepared status. This index adds no product, migration, source-support, sprint or personal-v1 acceptance.
+**Discovery reconciliation — 2026-09-10:** both read-only discovery rounds are incorporated in the existing [FUTURE_WORK](FUTURE_WORK.MD#discovery-reconciled-into-existing-subject-authorities--2026-09-10), current/prepared roadmaps and R1 DESIGN_HANDOFF. The redundant standalone register is retired. Findings and decision packets remain proposals unless explicitly identified as settled user scope; this documentation does not accept implementation, migrations, source support, a sprint or personal-v1 certification. The existing accepted-state and current-sprint records below remain authoritative.
 
 ## Accepted Sprint 84 — PR-2 SQLite / Provider / Migration Ownership — 2026-09-10
 

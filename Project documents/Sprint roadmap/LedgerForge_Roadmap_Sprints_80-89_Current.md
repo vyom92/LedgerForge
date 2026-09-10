@@ -178,7 +178,7 @@ Queue: `FW-P2-67`.
 
 Behavior-preserving decomposition only. Preserve financial/repository semantics and R1 shell direction. Do not combine broad source-tree moves (`FW-P2-77`) or financial redesign with this maintenance boundary.
 
-Discovery 2026-09-10: [FW-P2-67](../Discovery/Read_Only_Discovery_Register.md#fw-p2-67) maps shell, hydration/publication and import-presentation ownership. Preserve behavior while extracting established seams; [FW-P2-77](../Discovery/Read_Only_Discovery_Register.md#fw-p2-77) remains a separate path/membership/resource audit before any physical move. Native runtime parity remains future acceptance, not a discovery result.
+Discovery 2026-09-10: [FW-P2-67](../FUTURE_WORK.MD#fw-p2-67) maps shell, hydration/publication and import-presentation ownership. Preserve behavior while extracting established seams; [FW-P2-77](../FUTURE_WORK.MD#fw-p2-77) remains a separate path/membership/resource audit before any physical move. Native runtime parity remains future acceptance, not a discovery result.
 
 ### Sprint 89 — LF-UI-2026-09-R1 Transactions Reference Implementation
 
@@ -197,14 +197,18 @@ Required boundary:
 - no debit = spending or credit = income inference;
 - targeted source/runtime verification of the existing INR colour observation **before** any financial-colour semantic change.
 
-Discovery 2026-09-10: [FW-P2-03](../Discovery/Read_Only_Discovery_Register.md#fw-p2-03), [FW-P2-53](../Discovery/Read_Only_Discovery_Register.md#fw-p2-53) and the linked accessibility cards retain the R1 contract. Current search/presentation evidence does not settle all new filter semantics or the INR colour observation. Require independent matching-scope totals/order and targeted native keyboard, VoiceOver, resize and contrast evidence; no financial-colour change from a screenshot inference.
+Discovery 2026-09-10: [FW-P2-03](../FUTURE_WORK.MD#fw-p2-03), [FW-P2-53](../FUTURE_WORK.MD#fw-p2-53) and the linked accessibility cards retain the R1 contract. Current search/presentation evidence does not settle all new filter semantics or the INR colour observation. Require independent matching-scope totals/order and targeted native keyboard, VoiceOver, resize and contrast evidence; no financial-colour change from a screenshot inference.
 
 `FW-P2-77` remains explicitly deferred, not forgotten. Its maintenance value does not outrank the P1/P2 user outcomes above, and broad physical moves must not be mixed with app-shell or R1 behavioral work.
 
 
+## Second-level entry-gate reconciliation — 2026-09-10
+
+PROPOSED documentation reconciliation at `af2d1949c6e9a73af3bb004422b72882d28195e2`; no sprint selection, acceptance or numbering change. [The proposed appendix](#second-level-sprint-88-and-sprint-89-packets) preserves all first-level evidence and records explicit user decisions. Sprint 88 has a static five-phase shell blueprint (characterization through bounded bootstrap adapter), followed only later by optional source-tree organization; exact accepted post-Sprint-87 ownership is its entry gate. Sprint 89 has an independent filter/search/stable-sort/native-currency-total/selection oracle plus a separate native keyboard/focus/VoiceOver/resize procedure. These procedures do not establish runtime acceptance. No Sprint 84–87 implementation or acceptance section is changed by this campaign.
+
 ## Read-only discovery index — 2026-09-10
 
-[The complete discovery register](../Discovery/Read_Only_Discovery_Register.md) records evidence, proposed boundaries and named blockers without selecting any sprint. Sprints 84–87 remain with their existing campaign owner. Historical repair/reversal still requires an exact source-provable family; backup, export and support documentation remain explicit adoption inputs. The prepared 90–99 entry refinements remain a forecast and do not activate that cycle.
+The actionable queue is [FUTURE_WORK.MD](../FUTURE_WORK.MD); the unaccepted, Sprint-88/89-specific proposals are preserved in the appendix below. Neither record selects a sprint. Sprints 84–87 remain with their existing campaign owner. Historical repair/reversal still requires an exact source-provable family; verified user backup/restore and support documentation remain explicit adoption inputs; complete structured export is optional under UD-02 and is required only if adopted in the frozen Chat scope. The prepared 90–99 entry refinements remain a forecast and do not activate that cycle.
 
 ## Serious candidates not silently selected
 
@@ -219,7 +223,7 @@ The cycle forecast does not erase higher-priority or competing queue work. Befor
 | P0 | `FW-P0-18` | Blocked on the future multiple-workspace architecture and fingerprint-scope decision. |
 | P0 | `FW-P0-19` | Blocked until one new exact representation relationship has source truth and family-specific identity/equivalence authority; Axis-bank semantic parity alone is not durable equivalence. |
 | P0 | `FW-P0-20` | Research only; each additional transaction-event family needs authentic overlapping evidence and its own deterministic semantics. |
-| P0 | `FW-P0-26` | Blocked certification gate; adopted pre-v1 import, backup/restore, export, support-matrix and other designated prerequisites remain incomplete or unaccepted. |
+| P0 | `FW-P0-26` | Blocked certification gate; adopted pre-v1 import, required backup/restore, support matrix and other designated prerequisites remain incomplete or unaccepted; complete export is optional under UD-02 and must be completed only if adopted, or Chat-deferred. |
 | P1 | parser-family expansion | Existing registered families are certified; no additional exact source family has been selected. `FW-P1-04` is discovery-ready, while other families remain Candidate/Research by their evidence. |
 | P1 | `FW-P1-06` | Ready for planning, but no new parser family requires framework expansion before the ownership/import/Swift sequence; it does not outrank an active financial defect if one appears. |
 | P1 | `FW-P1-25` | Ready for discovery; broader duplicate-management/override/reversible semantics remain unresolved and must be reevaluated before dependent reconciliation/analytics. |
@@ -233,10 +237,97 @@ The cycle forecast does not erase higher-priority or competing queue work. Befor
 | P2 | `FW-P2-79` | Ready for planning and mandatory input to personal-v1 certification, but it is documentation/support-matrix work rather than an 81–89 executable product dependency. |
 | P3 | net worth | Blocked on investment and reporting-currency foundations; no current consolidated net-worth authority exists. |
 | P3 | `FW-P3-36` backup/restore | Ready for discovery, but the user-owned backup contents/integrity/restore-target/compatibility contract is not approved. |
-| P3 | export (`FW-P3-17`, `FW-P3-35`) | Candidate work blocked from adoption by unresolved export schema/privacy decisions. |
+| P3 | export (`FW-P3-17`, `FW-P3-35`) | Optional under UD-02; selection of an export feature still requires its schema/privacy contract. Its absence alone does not block personal-v1 certification. |
 | P3 | `FW-P3-40` multiple workspaces | Research; identity, fingerprint, settings and repository isolation are undecided. |
 | P3 | encryption/sync (`FW-P3-37`, `FW-P3-43`) | Research; depends on backup, key ownership/recovery, conflict and opt-in architecture. |
 
 ## Maintenance
 
 When this roadmap changes, preserve accepted numbering/history, distinguish plans from execution/acceptance, keep detailed implementation truth in `PROJECT_STATE.md`/ADRs, retain exact source-support boundaries, keep private source/credential/transaction detail out of roadmap prose and update queue dispositions before scheduling new work.
+
+<a id="second-level-sprint-88-and-sprint-89-packets"></a>
+## Second-level Sprint 88 and Sprint 89 packets — proposed, unaccepted
+
+This appendix consolidates the discovery material that supports the already-numbered positions. It is planning input only: it does not select, authorize, implement, or accept either sprint. References to queue work use durable [FUTURE_WORK.MD](../FUTURE_WORK.MD) anchors.
+
+<a id="packet-shell88-and-sprint89-native-procedure"></a>
+<a id="packet-shell88-blueprint"></a>
+### SHELL88 blueprint
+
+**Scope and invariant.** The proposal is a behavior-preserving decomposition of the existing application shell. It changes neither provider ownership, financial semantics, import coordination, migration, source interpretation, nor Swift language mode. Its evidence pin is that the application root is a `WindowGroup` to `ContentView`, whose current composition is an all-purpose shell. The source pin is stale for SQLite ownership; this appendix performs no PR-2 research.
+
+| Phase | Extract | Preserve | Proposed acceptance surface |
+| --- | --- | --- | --- |
+| 0 | Characterization: section, availability, import phase, profile warning, shortcut and label map | Navigation, enabled state, provider generation, hydration and import cancel/confirm | Static map and later native baseline |
+| 1 | `AppShellView`: split composition, slots, banner and content switch | No workflow or state-owner move | Existing checks plus resize/selection |
+| 2 | `AppShellSidebar` and `AppShellToolbar` with explicit inputs/callbacks | Actions, labels, focus and accessibility; no rendering mutation | Keyboard, VoiceOver and toolbar review |
+| 3 | Feature containers for each destination | Existing view-model and domain behavior | Destination smoke matrix |
+| 4 | Explicit bootstrap adapter around existing setup, hydrator and import | ADR-024, generation, MainActor and cancellation | Focused hydration/import/lifecycle proof |
+| 5 | [FW-P2-77](../FUTURE_WORK.MD#fw-p2-77) naming/groups only after parity | Resource and target membership | Xcode/path-consumer review |
+
+Any phase that touches a provider, activity gate, hydrator, Import Centre or actor publication is **WAIT_POST_SWIFT6** until the exact post-Sprint-87 ownership is read. A pure extraction may proceed only under a later execution prompt. The optional source-tree organization follows parity and remains a separate queue decision.
+
+<a id="packet-sprint89-data-algebra-packet"></a>
+<a id="packet-sprint89-data-algebra"></a>
+### SPRINT89_DATA_ALGEBRA_PACKET
+
+1. **Owning FW IDs:** [FW-P2-03](../FUTURE_WORK.MD#fw-p2-03), [FW-P2-04](../FUTURE_WORK.MD#fw-p2-04) and [FW-P2-38](../FUTURE_WORK.MD#fw-p2-38). Native focus/accessibility is intentionally separated into the procedure below.
+
+2. **User problem:** reproducible transaction search/filter/navigation that does not alter financial truth.
+3. **Verified current state:** current search is presentation-only and narrow; no saved-filter contract exists.
+4. **Accepted authorities:** current FW-P2-03 scope and R1 design authority; canonical transaction provenance remains authoritative.
+5. **Exact missing decision:** none for pure algebra; saved-filter scope is a later preference/privacy decision.
+6. **Evidence acquired:** first-level scope establishes AND across filter groups and OR within a multi-select group.
+7. **Options considered:** repository-side filtering, transient projection, saved-filter persistence.
+8. **Recommended option:** one pure transient filter specification.
+9. **Why competing options are rejected:** repository query authority/persistence expands scope without need.
+10. **Smallest coherent implementation boundary:** given trusted canonical snapshot `R`, return ordered matching rows and segregated native-currency totals.
+11. **Included scope:** account, native currency, direction, inclusive financial-date interval, assigned category and privacy-safe current display text.
+12. **Explicit exclusions:** hidden identifiers/source fragments, import change, category mutation, saved filters, FX and financial-colour semantic change.
+13. **Durable model/persistence requirements:** none.
+14. **Migration impact:** none.
+15. **ADR impact:** none; align existing immutable-evidence authority.
+16. **Privacy/security boundary:** transient folded comparison projection never rewrites description, payee or reference.
+17. **SQLite/In-Memory implications:** input is a hydrated trusted canonical snapshot at one provider generation, not a new repository query contract.
+18. **Hydration/relaunch implications:** none; no filter is durable.
+19. **Independent acceptance oracle:** enumerate `R`; every enabled group passes (AND); selected values within a group match by set membership (OR).
+20. **Failure cases:** missing supported field, unavailable snapshot, unknown filter value or empty match set returns no rows/no totals and performs no write.
+21. **Reversal/correction semantics:** none.
+22. **Source evidence requirement:** authentic source-backed canonical integration input; isolated source-independent query mechanics may use nonfinancial primitive values, never fabricated statement-shaped rows.
+23. **Runtime acceptance requirement:** native focus/keyboard/VoiceOver is the separate procedure below; an INR-colour change requires its own targeted probe.
+24. **Dependencies:** stable displayed fields and native acceptance only.
+25. **Evidence that falsifies the recommendation:** differing output for the same snapshot/spec, hidden-field search or an unsegregated cross-currency total.
+26. **Personal-v1 relevance:** PRE_V1_OPTIONAL.
+27. **Recommended FUTURE_WORK status after Chat review:** FW-P2-03 waits for the predicate and runtime acceptance; FW-P2-04 waits for accepted search/preference policy; FW-P2-38 waits runtime proof.
+28. **Recommended roadmap effect after Chat review:** retain Sprint 89's bounded Transactions slice; no broader cross-screen polish.
+**Additional decision detail:** `F={t in R | all enabled groups pass(t) AND search(t,q)}`; each multi-value group passes by OR/set membership; order uses selected primary key/direction then the exact document/ordinal/identity tie contract; totals partition by native currency and accepted bank/card financial-domain/effect, never a mixed grand total.
+
+#### Exact proposed search, sort and total oracle
+
+At one trusted canonical provider generation, take genuine source-backed rows `R` and separately captured visible labels. Allowed search fields are exactly displayed transaction description, account label, institution label and assigned-category label. Hidden account/transaction IDs, raw source/reference fragments, formatted balances, dates and undrawn fields are excluded. A nil field never matches; an empty field matters only when search is disabled.
+
+`fold-v1` is pinned Unicode 15.1 default case folding, canonical NFD, removal of nonspacing combining marks (`Mn`), each Unicode White_Space run replaced by one ASCII space, then trim. Apply it locale-independently to the query and every allowed field. A folded empty query disables search; otherwise split on normalized spaces. `search(t,q)` is true only when **every** literal contiguous term occurs in at least one non-nil allowed displayed field; terms may occur in different fields. Punctuation is literal. Regex, fuzzy matching, token-OR, hidden-field search and stored-text alteration are excluded.
+
+`F={t in R | AND over enabled filter groups(groupMatches(t)) AND search(t,q)}`. Multi-value groups use OR/set membership. Empty selected sets disable their group. An unknown selected value is an explicit invalid filter specification. Inclusive endpoints use the source-established financial civil date. Nil category matches only the explicit uncategorized choice.
+
+Sort only expressly selected visible keys. Nullable display/category is nil-last in both directions; non-nil values use the same pinned fold and scalar lexical ordering. Date, currency and description use their actual canonical key. Amount sorting first groups by native currency code ascending, then uses exact native amount in the requested direction within that currency; it never compares Money across currencies. Default order is newest source date first. Ties use stable opaque durable document/import identity, independently proven source ordinal within document, then immutable transaction identity. Missing optional date/ordinal is last. No ordinal, chronology or cross-document historical chronology is invented. A new sortable key requires an explicit null/type/order contract.
+
+Compute totals over all `F`, independent of viewport or selection, partitioned by native currency **and** accepted financial domain/effect. Do not combine bank cash movement with card purchase/payment liability effects as a spending/income total. Withhold an aggregate when its effect mapping is unaccepted. Use exact Money arithmetic within an accepted partition. A successful empty `F` has no currency-total rows; unavailable snapshot and invalid filter are distinct states. Selection survives only while its canonical member remains in `F`; otherwise it becomes nil and the inspector clears. Collapsing the inspector mutates neither membership, totals nor selection.
+
+The independent oracle enumerates `R` and the predicate/order directly, never production filtering. Required cases cover empty/whitespace query, literal punctuation, composed/decomposed accents, locale-independent case folds, nil/empty fields, multiple allowed fields, unknown values, combined group/search, equal keys, nil-last both directions, multiple currencies, stale generation and selection removed by filtering. A hidden-field match; regex/token-OR behavior; omitted required term; lost source ordinal; cross-currency amount ordering; locale dependence; wrong null position; or viewport-only totals falsifies the proposal.
+
+<a id="packet-sprint89-native-acceptance-procedure"></a>
+### Sprint 89 independent native acceptance procedure
+
+This procedure is a proposed runtime gate, not evidence of a pass. The data lane supplies the trusted `R` oracle above: AND groups, OR values, transient normalized case/diacritic-folded multi-term search over the frozen display fields, stable source-ordinal/durable-identity order, and native-currency plus accepted bank/card-domain/effect totals without conversion or grand total.
+
+1. Freeze `R`, provider generation, filter specification, expected membership/order/totals and an opaque oracle hash.
+2. Exercise pointer and keyboard date/account/currency/direction/category/search/sort/reverse/inspector/selection/clear; compare visible and accessibility output to the oracle.
+3. Resize, collapse/reopen inspector and change focus. Selection persists only while a member; otherwise it becomes explicit nil and no substitute row is selected.
+4. Check Tab/Shift-Tab, arrows, Space/Return as native-owned, shortcut collisions, and absence of implicit import or financial write.
+5. With VoiceOver and Full Keyboard Access, announce sort, filter scope, count, currency, selection and inspector state.
+6. For empty/loading/unavailable/stale generation, require truthful enabled state and no stale totals/selection or fabricated zero Money.
+7. Use adversarial presentation text only through the oracle: membership may change; source fields never do.
+8. Store only a privacy-safe manifest: build, opaque generation, case/oracle hash, counts and accessibility result/failure; never values, rows, text, IDs, paths or sensitive screenshots.
+
+Focus, VoiceOver, resize, contrast/transparency, multi-window behavior and panel cancellation remain **WAIT_FOR_RUNTIME_ACCEPTANCE**. No discovery text establishes native parity.

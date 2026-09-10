@@ -40,6 +40,18 @@ At larger font sizes, adapt based on measured content fit, not window width alon
 
 The Dashboard uses at most two currency groups side by side and stacks them when content cannot fit. A group may lay out its metrics vertically. Do not repeat four independent cards per currency across one unbounded row.
 
+### DRAFT — Import Preview Responsive Placement (user feedback, 2026-09-10)
+
+This subsection records subjective user feedback and an unaccepted layout proposal. It does not change the approved visual direction, accepted Import workflow, source interpretation or native acceptance status. The user reports heavy scrolling in the left prepared-import region while the right region beneath Validation Review has unused space. The supplied private screenshot supports broad layout geometry only; its financial/source content is neither transcribed nor published.
+
+**Owner:** [FW-P2-48](../../FUTURE_WORK.MD#fw-p2-48), with native acceptance under [FW-P2-49](../../FUTURE_WORK.MD#fw-p2-49). This is an unaccepted discovery proposal, not an implementation or native-acceptance claim. Coordinate with [FW-P2-67](../../FUTURE_WORK.MD#fw-p2-67) only when a selected shell decomposition affects this composition; no sprint is selected here.
+
+**Candidate A, preferred for a sufficiently wide window:** place the existing read-only Transaction Preview beneath Validation Review in one right-column review stack. Keep the queue, prepared statement summary, account/identity and duplicate/equivalence explanation readable at left, with confirmation/cancel/skip controls visibly available. This placement is a suggestion, not a forced rule.
+
+**Candidate B, responsive fallback:** place one full-width/shared Transaction Preview below the summary/review split when the right-side table cannot remain readable or validation content is long. Determine the breakpoint from content fit and text size. Do not duplicate the preview or create nested unbounded scroll owners.
+
+Both candidates preserve source order/multiplicity, prepared status, identity/account review, validation, duplicate/equivalence semantics and explicit confirmation. They introduce no editing, filtering, sorting, source reopening, new selection semantics or financial/color change. Future native acceptance must cover broad/narrow windows, long validation, keyboard/VoiceOver, scroll/focus and existing selection, footer visibility, cancellation/confirmation, and truthful empty states. A zero-transaction statement case requires genuine authentic evidence; if absent it stays untested. No native verification is claimed by this appendix.
+
 ### 1.3 Text and visual density
 
 Use the shared token values rather than local per-view substitutions. Body text defaults to 16 points. Text size adjusts within the defined range, while captions have a 12-point floor. Compact density reduces spacing; it does not reduce text size or omit important fields.
@@ -212,3 +224,10 @@ No migration, parser, Money contract, source identity, provenance, accepted fina
 **Remaining evidence gaps:** local branch/worktree/writer state; exact current native behaviour after the supplied screenshots; preference storage ownership; complete financial mapping for mixed bank/card aggregates; runtime accessibility and resizing; the apparent transaction-summary mismatch noticed in the screenshot. The latter is an observation requiring verification, not a diagnosed defect or an excuse to infer new totals.
 
 Approval of the design is settled. Implementation acceptance is not. Use [ACCEPTANCE.md](ACCEPTANCE.md) for the bounded checks rather than reopening the visual direction at every prompt.
+
+<a id="packet-import-preview-responsive-placement"></a>
+## Consolidated discovery routing — unaccepted import preview placement
+
+The Import Preview proposal in §1.2 is retained as **USER_REPORTED_SUBJECTIVE** and **VERIFIED_USER_IMAGE layout-only** input. It proposes A, a sufficiently-wide right-column stack with Transaction Preview below Validation Review, and B, a content-fit responsive full-width/shared Preview fallback. It does not claim that either composition is current behavior, approved behavior or native acceptance.
+
+The existing owner is [FW-P2-48](../../FUTURE_WORK.MD#fw-p2-48); native keyboard, VoiceOver, broad/narrow window, long-validation, selection/scroll, confirmation/cancel visibility and truthful empty-state acceptance remains [FW-P2-49](../../FUTURE_WORK.MD#fw-p2-49). Preserve preview, identity, validation and confirmation as distinct surfaces; preserve source order and the genuine-source gate for a zero-transaction case. No private image content, financial values or source assertions are reproduced here.
