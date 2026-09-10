@@ -2,14 +2,14 @@
 
 **Status:** Current repository cycle roadmap
 **Refreshed:** 2026-09-10
-**Planning review baseline:** `main@13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`
+**Planning review baseline:** `main@d239f939088b67e5a90c65117f08592891be17bb`
 **Supersedes:** `Project documents/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
 
 ## Control
 
 - **Planning authority:** This file owns Sprint 80–89 numbering, corrective suffixes, cycle status and planned positions.
 - **Execution authority:** None. Roadmap assignment is planning, not implementation authorization; each sprint still requires Chat priority/dependency triage and a complete execution prompt.
-- **Latest numbered product implementation:** Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam, accepted at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`. The accepted startup/monthly-planner product package is commit `6455f662dd0ea8896d19af3e67be51546badb3ae`; the later `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` cleanup is non-product repository maintenance, and `a560312db5900645779a499016e13f0c87e81435` is the R1 documentation/planning publication.
+- **Latest numbered product implementation:** Sprint 82 — Serial Unified Import Centre Foundation, accepted at implementation commit `d239f939088b67e5a90c65117f08592891be17bb`. Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam remains accepted at `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`. The accepted startup/monthly-planner product package is commit `6455f662dd0ea8896d19af3e67be51546badb3ae`; the later `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` cleanup is non-product repository maintenance, and `a560312db5900645779a499016e13f0c87e81435` is the R1 documentation/planning publication.
 - **Current migration:** V17; V1–V16 remain immutable.
 - **Current source/reliability authority:** ADR-046 complete-authentic-corpus certification.
 - **Current UI design authority:** `LF-UI-2026-09-R1` for its bounded scope; design approval is not native implementation.
@@ -39,8 +39,8 @@ A material source, credential, parser, persistence, orchestration or financial-s
 |---|---|---|---|---|
 | 80 | Swift 6 and macOS readiness closure | accepted discovery | Technical discovery | **Accepted / discovery complete** |
 | 81 | PR-1 Staging and Runtime Publication Ownership Seam | historical `FW-P2-72` (removed from active queue) | Behavior-preserving implementation gate | **ACCEPTED** — implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91` |
-| 82 | Serial Unified Import Centre Foundation | `FW-P1-19` | Core product implementation | Planned; single file = queue length one, same orchestration model for future batch |
-| 83 | Serial Batch Import and Multi-File Drag-and-Drop | `FW-P1-20` + `FW-P1-21` | P1 entry-gated product outcome | Blocked unless Sprint 82 proves named cancellation, duplicate, failure-isolation and per-file ownership prerequisites |
+| 82 | Serial Unified Import Centre Foundation | completed `FW-P1-19` (removed from active queue) | Core product implementation | **ACCEPTED** — implementation commit `d239f939088b67e5a90c65117f08592891be17bb`; serial queue length one and the Sprint 83 entry evidence are established |
+| 83 | Serial Batch Import and Multi-File Drag-and-Drop | `FW-P1-20` + `FW-P1-21` | P1 entry-gated product outcome | **Next planned position; not selected** — Sprint 82 establishes serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership and duplicate/recovery preservation; fresh P0 → P1 → P2 → P3 gate and readiness review required; parallel preparation remains unresolved |
 | 84 | PR-2 SQLite / Provider / Migration Ownership | `FW-P2-73` | Swift-6 prerequisite | Planned; the name implies no schema migration |
 | 85 | PR-3 Dependency Concurrency Boundary | `FW-P2-74` | Swift-6 prerequisite | Planned position |
 | 86 | TEST-PR Strict-Concurrency Test Correction | `FW-P2-75` | Swift-6 prerequisite | Planned; never weaken independent assertions merely to silence diagnostics |
@@ -100,7 +100,7 @@ the exact registered CBQ boundary while preserving historical minimum-due
 absence and enforcing the current authentic minimum-due contract. Personal-v1
 adoption remains a separate later gate.
 
-## Accepted Sprint 81 and planned Sprints 82–89
+## Accepted Sprints 81–82 and planned Sprints 83–89
 
 ### Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam
 
@@ -113,17 +113,20 @@ The accepted behavior-preserving Swift-5 correction establishes pure synchronous
 
 ### Sprint 82 — Serial Unified Import Centre Foundation
 
-Queue: `FW-P1-19`.
+Historical queue origin: `FW-P1-19` (removed from the active queue).
 
-**Next planned position.** Sprint 82 remains unselected and unimplemented. It requires a fresh Chat P0 → P1 → P2 → P3 triage, read-only implementation-readiness review and a complete execution prompt if still selected.
+**ACCEPTED on 2026-09-10.** Implementation commit:
+`d239f939088b67e5a90c65117f08592891be17bb`.
 
-Single-file import is queue length one. Use deterministic queue order, explicit per-file ownership, safe cancellation before confirmation, explicit per-statement confirmation, provider-owned persistence and canonical hydration. The orchestration shape is the future batch shape; no bounded parallel preparation is accepted here.
+The accepted Swift-5 implementation establishes one shared @MainActor serial Import Centre coordinator with queue length one, deterministic ordering, per-item identity/state ownership, safe cancellation before confirmation, explicit per-statement confirmation, provider-owned persistence and canonical hydration. It preserves the existing ImportEngine/parser/normalizer, duplicate/equivalence, account/card/partial/recovery and provider contracts; no reader, parser, schema, migration or financial-semantic boundary changed.
+
+Sprint 83 entry evidence is established: serial coordinator; per-item identity/state ownership; cancelled-task draining; explicit confirmation; shared production ownership; duplicate/recovery preservation; and no parallel preparation. The complete focused coordinator validation, canonical TestPlan, complete registered authentic corpus, native preview/cancel/confirm/navigation checks and durable same-database relaunch evidence are recorded in `PROJECT_STATE.md`.
 
 ### Sprint 83 — Serial Batch Import and Multi-File Drag-and-Drop
 
 Queue: `FW-P1-20` + `FW-P1-21`.
 
-Entry gate: Sprint 82 must have accepted the named cancellation, duplicate, failure-isolation and per-file ownership prerequisites. If the gate is still blocked, Sprint 83 does not implement and returns to Chat. One failed file must not contaminate unrelated files; no batch-wide atomicity is required or implied. Parallel preparation remains unresolved unless separately accepted.
+**Next planned position; not selected.** Sprint 82 has accepted the serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership and duplicate/recovery preservation prerequisites. A fresh Chat P0 → P1 → P2 → P3 gate and readiness review are required before Sprint 83 selection or execution. One failed file must not contaminate unrelated files; no batch-wide atomicity is required or implied. Parallel preparation remains unresolved unless separately accepted.
 
 ### Sprint 84 — PR-2 SQLite / Provider / Migration Ownership
 

@@ -63,11 +63,12 @@ A work item becomes executable only when Chat supplies one complete approved pro
 **Audit date:** 2026-09-09
 **Review baseline:** `main@a560312db5900645779a499016e13f0c87e81435`
 **Sprint-81 queue-closure update:** 2026-09-10 at `main@13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`
-**Active candidate count after Sprint-81 acceptance closure:** 154
+**Sprint-82 queue-closure update:** 2026-09-10 at `main@d239f939088b67e5a90c65117f08592891be17bb`
+**Active candidate count after Sprint-82 acceptance closure:** 153
 **Current migration:** V17
 **Current source/reliability architecture:** ADR-046 complete-authentic-corpus authority
 **Current design authority:** `LF-UI-2026-09-R1` for its bounded scope
-**Latest accepted numbered implementation:** Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam
+**Latest accepted numbered implementation:** Sprint 82 — Serial Unified Import Centre Foundation
 **Latest accepted numbered discovery:** Sprint 80 — `SWIFT6_READINESS_COMPLETE`
 **Personal-v1:** UNDECLARED / NOT CERTIFIED
 
@@ -76,6 +77,7 @@ This audit mechanically enumerated every active `FW-*` heading before reconcilia
 Reconciliation outcomes:
 
 - `FW-P2-72` is removed from the active queue because Sprint 81 completed and Chat accepted the PR-1 staging/runtime-publication ownership seam at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`.
+- `FW-P1-19` is removed from the active queue because Sprint 82 completed and Chat accepted the serial Unified Import Centre foundation at implementation commit `d239f939088b67e5a90c65117f08592891be17bb`. Its serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership, duplicate/recovery preservation and no-parallel-preparation evidence are recorded in `PROJECT_STATE.md` and the current roadmap; Sprint 83 remains the next planned position and is not selected.
 - `FW-P0-25` is removed from the active queue because the unnumbered 127-carrier authentic-corpus reset is technically accepted and complete; newly supplied recurring sources remain governed cumulatively by ADR-046.
 - Compound historical statuses are normalized to the defined planning vocabulary. Completed slices remain concise body notes while titles and statuses describe only remaining unscheduled work.
 - Exact source-family support remains exact. HDFC whole-statement PDF/XLS equivalence, Axis-card PDF/XLSX equivalence and CBQ current-account source lineage are separate accepted contracts; none is generalized to another institution, financial family or format.
@@ -820,23 +822,10 @@ OCR output remains untrusted until deterministic parsing and validation succeed.
 
 # P1 — Import Workflow
 
-## FW-P1-19 — LedgerForge Import Centre
-
-**Status:** Candidate
-**Depends on:** existing confirmation-gated Import Wizard foundation and the accepted Sprint-81 PR-1 staging/runtime-publication ownership seam
-
-**Sprint 80 readiness boundary:** The first implementation remains Swift 5 and serial. It requires explicit MainActor task ownership, deterministic queue ordering, per-file state ownership, security-scoped source and `SourceContentSnapshot` lifetimes, cancellation before confirmation, explicit per-statement confirmation, synchronous provider-owned persistence and canonical `RepositoryStoreHydrator` publication.
-
-Single-file import is **queue length one**. Future multi-file intake must use the same intake → preparation → sequential review/confirmation → result orchestration rather than a separate workflow. Each file retains an independent validation, account choice, duplicate/rejection, confirmation, persistence and result boundary.
-
-Bounded parallel preparation is unresolved and not authorized. The accepted Sprint-81 PR-1 seam satisfies the only Swift-6-derived prerequisite before this serial foundation. Roadmap placement does not authorize implementation.
-
----
-
 ## FW-P1-20 — Batch Import
 
-**Status:** Blocked
-**Depends on:** accepted serial Import Centre ownership, mature duplicate handling, cancellation boundaries, failure isolation and the PR-1 staging/runtime-publication seam
+**Status:** Candidate
+**Depends on:** accepted Sprint 82 serial Import Centre foundation at `d239f939088b67e5a90c65117f08592891be17bb`, mature duplicate handling, cancellation boundaries, failure isolation and the PR-1 staging/runtime-publication seam
 
 Extend the same Import Centre queue from length one to multiple independent files. The first adopted batch model is serial unless a later architecture separately accepts bounded parallel preparation.
 
@@ -850,7 +839,7 @@ Required boundaries:
 - one failed/rejected file must not contaminate unrelated files;
 - no batch-wide atomicity requirement or implication.
 
-Parallel preparation remains unresolved. This candidate cannot implement until the Sprint 82 foundation proves the named ownership, cancellation, duplicate and failure-isolation prerequisites.
+Sprint 82 has now established the serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership, duplicate/recovery preservation and failure-isolation prerequisites. This candidate remains unscheduled; Sprint 83 is the next planned position but is not selected. A fresh Chat P0 → P1 → P2 → P3 gate and readiness review are required before execution. Parallel preparation remains unresolved.
 
 ---
 
