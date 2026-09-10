@@ -254,6 +254,100 @@ struct OOXMLDocumentReaderTests {
         await expectUnsupported(unsupportedRelationship)
     }
 
+    @Test func readerRejectsMalformedZIPContainerBeforeWorkbookParsing() async {
+        await expectInvalid(
+            Data([0x50, 0x4B, 0x03, 0x04]),
+            message: "OOXML ZIP container is malformed or unsupported."
+        )
+    }
+
+    @Test func readerRejectsUnsafeZIPEntryPaths() async {
+        let unsafePaths = [
+            "../escape.xml",
+            "/absolute.xml",
+            "\\absolute.xml",
+            #"xl\escape.xml"#,
+            "xl/../escape.xml"
+        ]
+        for path in unsafePaths {
+            await expectInvalid(
+                Self.fictionalWorkbookData(additionalEntries: [(path, Data())]),
+                message: "OOXML ZIP entry path is unsafe."
+            )
+        }
+    }
+
+    @Test func readerRejectsDuplicateZIPEntryPaths() async {
+        await expectInvalid(
+            Self.fictionalWorkbookData(
+                additionalEntries: [("xl/workbook.xml", Data())]
+            ),
+            message: "OOXML ZIP contains duplicate entries."
+        )
+    }
+
+    @Test func readerRejectsSymbolicLinkZIPEntries() async {
+        let linkPath = "xl/theme/link.xml"
+        await expectInvalid(
+            Self.fictionalWorkbookData(
+                additionalEntries: [(linkPath, Data("target".utf8))],
+                symlinkPaths: [linkPath]
+            ),
+            message: "OOXML ZIP symbolic links are unsupported."
+        )
+    }
+
+    @Test func readerRejectsZIPEntryCountBeyondCeiling() async {
+        // The base workbook has seven entries; 26 more reaches 33, one over
+        // the reader's 32-entry ceiling, before package-part validation.
+        let extras = (0..<26).map { index in
+            ("xl/theme/entry-\(index).xml", Data())
+        }
+        await expectInvalid(
+            Self.fictionalWorkbookData(additionalEntries: extras),
+            message: "OOXML ZIP contains too many entries."
+        )
+    }
+
+    @Test func readerRejectsDeclaredZIPPartBeyondCeiling() async {
+        // Keep the payload tiny while making the ZIP's declared uncompressed
+        // size cross the part ceiling; this exercises the pre-extraction gate.
+        let path = "xl/theme/declared-large.xml"
+        await expectInvalid(
+            Self.fictionalWorkbookData(
+                additionalEntries: [(path, Data([0]))],
+                declaredUncompressedSizes: [path: UInt32(4 * 1024 * 1024 + 1)]
+            ),
+            message: "OOXML ZIP entry exceeds supported resource limits."
+        )
+    }
+
+    @Test func readerRejectsAggregateZIPUncompressedSizeBeyondCeiling() async {
+        // Each declared part is below 4 MiB, but three parts exceed the 8 MiB
+        // aggregate ceiling without allocating a multi-megabyte test payload.
+        let paths = (0..<3).map { "xl/theme/aggregate-\($0).xml" }
+        let entries = paths.map { ($0, Data([0])) }
+        let declaredSizes = Dictionary(uniqueKeysWithValues: paths.map {
+            ($0, UInt32(3 * 1024 * 1024))
+        })
+        await expectInvalid(
+            Self.fictionalWorkbookData(
+                additionalEntries: entries,
+                declaredUncompressedSizes: declaredSizes
+            ),
+            message: "OOXML ZIP exceeds supported resource limits."
+        )
+    }
+
+    @Test func readerRejectsSourceBytesBeyondCeiling() async {
+        let path = "xl/theme/source-large.xml"
+        let payload = Data(repeating: 0xA5, count: 4 * 1024 * 1024 + 1)
+        await expectInvalid(
+            Self.fictionalWorkbookData(additionalEntries: [(path, payload)]),
+            message: "OOXML source exceeds supported resource limits."
+        )
+    }
+
     private func read(_ data: Data) async throws -> RawDocument {
         let snapshot = SourceContentSnapshot(bytes: data)
         defer { snapshot.invalidate() }
@@ -278,6 +372,21 @@ struct OOXMLDocumentReaderTests {
         }
     }
 
+    private func expectInvalid(_ data: Data, message: String) async {
+        do {
+            _ = try await read(data)
+            Issue.record("Expected invalid OOXML package evidence to fail closed with the bounded message.")
+        } catch let error as ImportError {
+            guard case .invalidDocument(let actualMessage) = error else {
+                Issue.record("Expected invalidDocument, got \(error).")
+                return
+            }
+            #expect(actualMessage == message)
+        } catch {
+            Issue.record("Expected ImportError.invalidDocument, got \(error).")
+        }
+    }
+
     private func expectUnsupported(_ data: Data) async {
         do {
             _ = try await read(data)
@@ -297,7 +406,9 @@ struct OOXMLDocumentReaderTests {
         mergeXML: String = Self.defaultMergeXML,
         additionalContentTypes: String = "",
         additionalRootRelationships: String = "",
-        additionalEntries: [(String, Data)] = []
+        additionalEntries: [(String, Data)] = [],
+        declaredUncompressedSizes: [String: UInt32] = [:],
+        symlinkPaths: Set<String> = []
     ) -> Data {
         let contentTypes = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -360,7 +471,8 @@ struct OOXMLDocumentReaderTests {
             ("xl/styles.xml", Data(styles.utf8)),
             ("xl/sharedStrings.xml", Data(sharedStrings.utf8)),
             ("xl/worksheets/sheet1.xml", Data(worksheet.utf8))
-        ] + additionalEntries)
+        ] + additionalEntries, declaredUncompressedSizes: declaredUncompressedSizes,
+            symlinkPaths: symlinkPaths)
     }
 
     nonisolated private static let defaultRowsXML = """
@@ -382,7 +494,11 @@ struct OOXMLDocumentReaderTests {
 }
 
 private enum StoredZIP {
-    static func archive(_ entries: [(String, Data)]) -> Data {
+    static func archive(
+        _ entries: [(String, Data)],
+        declaredUncompressedSizes: [String: UInt32] = [:],
+        symlinkPaths: Set<String> = []
+    ) -> Data {
         var output = Data()
         var central = Data()
 
@@ -390,6 +506,12 @@ private enum StoredZIP {
             let nameBytes = Array(name.utf8)
             let crc = crc32(payload)
             let offset = UInt32(output.count)
+            let declaredSize = declaredUncompressedSizes[name] ?? UInt32(payload.count)
+            let isSymlink = symlinkPaths.contains(name)
+            let versionMadeBy = isSymlink ? UInt16(789) : UInt16(20)
+            let externalFileAttributes = isSymlink
+                ? UInt32(0xA000 | 0o644) << 16
+                : UInt32(0)
 
             appendUInt32(0x04034b50, to: &output)
             appendUInt16(20, to: &output)
@@ -399,14 +521,14 @@ private enum StoredZIP {
             appendUInt16(0, to: &output)
             appendUInt32(crc, to: &output)
             appendUInt32(UInt32(payload.count), to: &output)
-            appendUInt32(UInt32(payload.count), to: &output)
+            appendUInt32(declaredSize, to: &output)
             appendUInt16(UInt16(nameBytes.count), to: &output)
             appendUInt16(0, to: &output)
             output.append(contentsOf: nameBytes)
             output.append(payload)
 
             appendUInt32(0x02014b50, to: &central)
-            appendUInt16(20, to: &central)
+            appendUInt16(versionMadeBy, to: &central)
             appendUInt16(20, to: &central)
             appendUInt16(0, to: &central)
             appendUInt16(0, to: &central)
@@ -414,13 +536,13 @@ private enum StoredZIP {
             appendUInt16(0, to: &central)
             appendUInt32(crc, to: &central)
             appendUInt32(UInt32(payload.count), to: &central)
-            appendUInt32(UInt32(payload.count), to: &central)
+            appendUInt32(declaredSize, to: &central)
             appendUInt16(UInt16(nameBytes.count), to: &central)
             appendUInt16(0, to: &central)
             appendUInt16(0, to: &central)
             appendUInt16(0, to: &central)
             appendUInt16(0, to: &central)
-            appendUInt32(0, to: &central)
+            appendUInt32(externalFileAttributes, to: &central)
             appendUInt32(offset, to: &central)
             central.append(contentsOf: nameBytes)
         }
