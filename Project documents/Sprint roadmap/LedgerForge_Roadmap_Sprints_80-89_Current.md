@@ -5,6 +5,8 @@
 **Planning review baseline:** accepted Sprint 85, `main@b4e4e6ffb14deccef238352a6ef834514a2a37c2`
 **Supersedes:** `Project documents/Sprint roadmap/Archived/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
 
+**Forward planning — explicit user decision, 2026-09-10:** LedgerForge 1.0 personal-adoption certification is fixed at Sprint 100 after its required pre-1.0 product boundaries. The prepared [90–99](Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md) and [100–109](Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md) roadmaps own that future sequence; neither is current or implementation-authorized. Active 80–89 numbering, Sprint 86 test-only scope, Sprint 87 entry/qualification and Sprints 88–89 remain unchanged.
+
 ## Control
 
 - **Planning authority:** This file owns Sprint 80–89 numbering, corrective suffixes, cycle status and planned positions.

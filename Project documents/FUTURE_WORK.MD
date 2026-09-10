@@ -60,7 +60,7 @@ A work item becomes executable only when Chat supplies one complete approved pro
 
 ## Discovery reconciled into existing subject authorities — 2026-09-10
 
-Both read-only discovery rounds are incorporated here, in the existing [current roadmap](<Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md>), [prepared roadmap](<Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md>) and [R1 design handoff](<UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md>). The redundant standalone register is retired. First-round research used `adcf83f52d309ddac18d95f0321d0c0f6120dd29`, reconciled at `ffddebc6e12405c812a36855ab6212e973cff5ba` and published at `af2d1949c6e9a73af3bb004422b72882d28195e2`. Second-round research is pinned to `af2d1949c6e9a73af3bb004422b72882d28195e2`; latest production acceptance remains owned by PROJECT_STATE and the current roadmap.
+Both read-only discovery rounds are incorporated here, in the existing [current roadmap](<Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md>), [prepared roadmap](<Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md>), [prepared 1.0 roadmap](<Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md>) and [R1 design handoff](<UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md>). The redundant standalone register is retired. First-round research used `adcf83f52d309ddac18d95f0321d0c0f6120dd29`, reconciled at `ffddebc6e12405c812a36855ab6212e973cff5ba` and published at `af2d1949c6e9a73af3bb004422b72882d28195e2`. Second-round research is pinned to `af2d1949c6e9a73af3bb004422b72882d28195e2`; latest production acceptance remains owned by PROJECT_STATE and the current roadmap.
 
 First-round coverage was 153 baseline entries: 151 then-active entries and two separately completed Sprint-83 entries (FW-P1-20/21). Sprint-84 closure subsequently retires FW-P2-73 independently. This campaign preserves every current queue ID, title, status and priority; a discovery closure is a separate research classification, never a status promotion. The second round targets 145 cards; active Sprint-84–87 ownership, dashboard customization and accepted corpus maintenance were excluded as recorded by their first-round dispositions.
 
@@ -72,9 +72,9 @@ The final publication delta checked 519 combined citations, 357 unique dependenc
 
 ## Explicit user-decision chronology
 
-**Current scope:** current holdings first; verified backup/restore required and complete structured export optional; appearance travels with workspace move/restore; reviewable rule suggestions preserve manual categories and expose every disagreeing match; current Al Dar Salary/budget INR receive estimates allow a manual override; current market net-worth estimates use direct INR→USD and QAR→USD observations. Historical conversions and the 2021 floor are superseded. Reporting output currencies/orientation and provider suitability remain Chat decisions.
+**Current scope:** verified backup/restore; the bounded current Salary/This Month Al Dar outcome with manual current-rate override; bounded current holdings and sufficient current valuation; current market FX/net-worth reporting; and supported-source documentation are required before Sprint 100 certification. Complete structured export remains optional. Historical conversions and the 2021 floor are superseded. Reporting output currencies/orientation and provider suitability remain Chat decisions.
 
-**Personal-v1 adoption decision — 2026-09-10:** the user intentionally defers adoption/certification until **after the bounded current-holdings investment outcome is accepted**. That outcome is `PRE_V1_REQUIRED`; investment history/performance remain separately gated and are not a personal-v1 prerequisite merely because adoption follows investment. Verified backup/restore remains required; complete structured export remains optional; current FX/net-worth reporting is not automatically an adoption prerequisite. The exact bounded holdings architecture and selected components still require their own Chat acceptance; this decision does not promote every broad investment candidate or reorder the prepared roadmap.
+**Personal-v1 adoption decision — 2026-09-10:** the user fixes **Sprint 100 — LedgerForge 1.0 Personal Adoption Validation & Certification** as a certification-only milestone. It freezes the candidate and fails closed on a defect or missing required boundary; corrective attribution returns to Chat and a corrected candidate must be recertified. Required pre-100 outcomes are Swift 6, selected R1 native work, verified backup/restore, accepted Qatar Airways Salary actuals/Salary History/current This Month planning, bounded current Al Dar, bounded current holdings/valuation, current market FX/net worth, supported-source documentation and the final Chat adoption matrix. Complete export remains optional; historical FX/Al Dar FX, investment history/performance, transfer/reconciliation, rules, merchant/recurrence and broad analytics remain unscheduled post-1.0 candidates. None is a prerequisite unless later promoted by explicit user decision or a higher-priority verified correctness dependency. This changes no architecture, ADR, migration, status or execution authority.
 
 | Decision | Exact user direction | Disposition |
 | --- | --- | --- |
@@ -88,6 +88,7 @@ The final publication delta checked 519 combined citations, 357 unique dependenc
 | UD-08 | Use a direct market INR→USD rate | CURRENT, subject to latest UD-09/10 scope |
 | UD-09 | i do not need qar to inr historical. its sole purpose is to estimate how much i will get in inr end of the month based on the monthly salary/budget calculator. if needed i can manually override my own fx rate on live/current rate | CURRENT, subject to latest UD-09/10 scope |
 | UD-10 | same with inr to usd. i just need current estimation of net worth in different currencies. not a basket of historical conversions | CURRENT, subject to latest UD-09/10 scope |
+| UD-11 | Fix Sprint 100 as certification only; require the settled pre-100 outcomes, including bounded current Al Dar, current holdings/valuation and current FX/net worth | CURRENT; planning only, no architecture or implementation accepted |
 
 ## Second-round closure inventory
 
@@ -118,11 +119,12 @@ Total: **145** targets. A whole-card closure can remain blocked after one factua
 **Sprint-82 queue-closure update:** 2026-09-10 at `main@d239f939088b67e5a90c65117f08592891be17bb`
 **Sprint-83 queue-closure update:** 2026-09-10 at `main@ffddebc6e12405c812a36855ab6212e973cff5ba` (accepted implementation `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; implementation parent `057d70b6f39929735401d5211cd180db162c94cc`)
 **Sprint-84 queue-closure update:** 2026-09-10 at accepted implementation `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`
-**Active queue count after Sprint-84 acceptance closure:** 150
+**Sprint-85 queue-closure update:** 2026-09-10 at accepted implementation `b4e4e6ffb14deccef238352a6ef834514a2a37c2`
+**Active queue count after Sprint-85 acceptance closure:** 149
 **Current migration:** V17
 **Current source/reliability architecture:** ADR-046 complete-authentic-corpus authority
 **Current design authority:** `LF-UI-2026-09-R1` for its bounded scope
-**Latest accepted numbered implementation:** Sprint 84 — PR-2 SQLite / Provider / Migration Ownership
+**Latest accepted numbered implementation:** Sprint 85 — PR-3 Dependency Concurrency Boundary
 **Latest accepted numbered discovery:** Sprint 80 — `SWIFT6_READINESS_COMPLETE`
 **Personal-v1:** UNDECLARED / NOT CERTIFIED
 
@@ -1156,9 +1158,9 @@ Each family may require a separate ADR and implementation increment. No family m
 ## FW-P0-26 — Personal-v1 Adoption Certification Gate
 
 **Status:** Blocked
-**Depends on:** acceptance of the bounded current-holdings investment outcome before personal-v1 adoption/certification, plus completion or explicit Chat deferral of every other product boundary classified as pre-v1, including adopted import, required verified backup/restore and support documentation. Complete structured export remains optional; investment history/performance remain separately gated; current FX/net-worth reporting is not automatically an adoption prerequisite.
+**Depends on:** accepted pre-100 boundaries: Swift 6; selected R1 native work; verified backup/restore; accepted Qatar Airways Salary actuals, Salary History and current This Month planning; the bounded current Al Dar Salary/budget outcome with manual current-rate override; bounded current holdings and sufficient current valuation; current market FX/net-worth reporting; supported-source documentation; and the final Chat-frozen adoption matrix. Complete export remains optional; historical FX/Al Dar FX, investment history/performance, transfer/reconciliation, rules, merchant/recurrence and broad analytics remain unscheduled post-1.0 candidates. None is a prerequisite unless later promoted by explicit user decision or a higher-priority verified correctness dependency.
 
-Personal-v1 may not be declared merely because current automated tests are green. Certification fails closed and must freeze the exact adopted product candidate.
+Personal-v1 may not be declared merely because current automated tests are green. Certification fails closed and must freeze the exact adopted product candidate. Sprint 100 plans no feature implementation or defect repair: a product defect or missing required capability fails certification and returns to Chat for corrective attribution/scheduling, followed by recertification of the corrected candidate.
 
 Applicable evidence must include at minimum:
 
@@ -1182,9 +1184,9 @@ Applicable evidence must include at minimum:
 
 Absent authentic cases remain uncertified and must not be manufactured. Certification does not require every Product Vision feature; it requires every feature Chat explicitly classifies as pre-v1 before the certification attempt. Personal-v1 remains undeclared until Chat explicitly accepts this gate.
 
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Accepted bounded current-holdings investment outcome; backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix.
+**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** every named required pre-100 boundary, including backup/restoration ADR and independently accepted restore drill; bounded current Al Dar, holdings/valuation and current-FX/net-worth outcomes; supported-source documentation; and the frozen Chat adoption matrix.
 
-**Smallest proposed boundary:** Certify only the frozen adopted candidate after the bounded current-holdings outcome is accepted; required backup, authentic corpus and manual rows; optional export.
+**Smallest proposed boundary:** Prepared Sprint 100 certifies only the frozen candidate after the named pre-100 boundaries are accepted. It implements no feature. Backup, authentic corpus, supported-source and manual rows are required; complete export is optional.
 
 **Decision record:** [USER_BACKUP_RESTORE_ARCHITECTURE_PACKET](#packet-user-backup-restore-architecture-packet), [PERSONAL_V1_CERTIFICATION_PACKET](#packet-personal-v1-certification-packet).
 
@@ -1203,11 +1205,11 @@ Absent authentic cases remain uncertified and must not be manufactured. Certific
 
 **Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY at research ref: committed PROJECT_STATE and roadmap record accepted Sprint82 and complete-corpus alignment. Native import/hydration and migration tests are foundations, while user-owned backup/restore and domain export remain queue items. Subsequent separately owned Sprint83 acceptance closure at ffddebc6e12405c812a36855ab6212e973cff5ba is incorporated as publication authority, not self-accepted by this campaign. Second-level disposition is the exact decision/dependency/deferral stated here.
 
-**Exact next evidence or decision:** Exact next evidence/decision: Accepted bounded current-holdings investment outcome; backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix. Owning authority: USER_BACKUP_RESTORE_ARCHITECTURE_PACKET, PERSONAL_V1_CERTIFICATION_PACKET.
+**Exact next evidence or decision:** Exact next evidence/decision: the accepted named pre-100 boundaries, including backup/restoration ADR and restore drill; bounded current Al Dar, holdings/valuation and current-FX/net-worth outcomes; supported-source documentation; and the frozen Chat adoption matrix. Owning authority: USER_BACKUP_RESTORE_ARCHITECTURE_PACKET, PERSONAL_V1_CERTIFICATION_PACKET.
 
 **Personal-v1:** PRE_V1_REQUIRED
 
-**Recommendation after Chat:** READY_AFTER_NAMED_DEPENDENCY **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
+**Recommendation after Chat:** READY_AFTER_NAMED_DEPENDENCY **Roadmap:** Prepared Sprint 100 is fixed for certification only; no feature is assigned there.
 
 **Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
 
@@ -1217,8 +1219,8 @@ Absent authentic cases remain uncertified and must not be manufactured. Certific
 
 **Typed dependencies:**
 
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P3-36`: The Verified Backup, Restore and Disaster Recovery boundary must provide: User-owned verified package; isolated restore; nonempty target protection.. This enables Certify only the frozen adopted candidate after the bounded current-holdings outcome is accepted; required backup, authentic corpus and manual rows; optional export. Remaining condition: Accepted bounded current-holdings investment outcome; backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix.
-- `REQUIRES_RUNTIME_ACCEPTANCE` → `FW-P3-36`: The Verified Backup, Restore and Disaster Recovery boundary must provide: User-owned verified package; isolated restore; nonempty target protection.. This enables Certify only the frozen adopted candidate after the bounded current-holdings outcome is accepted; required backup, authentic corpus and manual rows; optional export. Remaining condition: Accepted bounded current-holdings investment outcome; backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix.
+- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P3-36`: The verified backup/restore boundary provides the user-owned package, isolated restore and nonempty-target protection required by Sprint 100. Remaining conditions include every named pre-100 outcome and the frozen Chat matrix.
+- `REQUIRES_RUNTIME_ACCEPTANCE` → `FW-P3-36`: The verified backup/restore drill provides the isolated restore, hydration and relaunch evidence required by Sprint 100. Remaining conditions include every named pre-100 outcome and the frozen Chat matrix.
 - `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-adoption-matrix`: Chat owns this financial/privacy/architecture decision; it is not a technical questionnaire for the user.
 - `REQUIRES_AUTHENTIC_SOURCE` → `source-evidence-fw-p0-26`: The complete registered authentic corpus for every adopted source family, an independently checked adopted workspace snapshot and genuine backup/restore round-trip evidence; no certification from synthetic statements.
 
@@ -1248,8 +1250,8 @@ Absent authentic cases remain uncertified and must not be manufactured. Certific
 | 2 | User problem | A falsifiable adoption declaration rather than a claim derived from green tests. |
 | 3 | Verified current state | Accepted Sprint 83 records corpus/provider/order/build/relaunch evidence and explicitly does not declare personal-v1. |
 | 4 | Accepted authorities | PROJECT_STATE; FUTURE_WORK gate; ADR-024; ADR-046; immutable migration identity lock. |
-| 5 | Exact missing decision | Chat must accept the bounded current-holdings outcome before adoption/certification and the exact candidate/adoption matrix; backup architecture/drill remains unaccepted. |
-| 6 | Evidence acquired | The latest explicit user decision requires accepted bounded current holdings before adoption, retains required backup/restore and optional complete export, and does not automatically require investment history/performance or current FX/net-worth. |
+| 5 | Exact missing decision | Chat must accept the exact pre-100 candidate/adoption matrix and the remaining planned architecture/evidence gates. Already accepted Salary, import, persistence and other foundations remain accepted. |
+| 6 | Evidence acquired | The latest decision makes bounded current Al Dar, holdings/valuation and current FX/net worth pre-100 outcomes; backup/restore remains required and complete export optional. |
 | 7 | Options considered | All vision features; frozen adopted-boundary matrix; green suite only. |
 | 8 | Recommended option | Candidate-frozen adoption matrix with each boundary, independent oracle, evidence, limitation and recertification trigger. |
 | 9 | Why competing options are rejected | Vision-wide is unbounded; a suite cannot prove source, native recovery, export, privacy or relaunch. |
@@ -1267,11 +1269,11 @@ Absent authentic cases remain uncertified and must not be manufactured. Certific
 | 21 | Reversal/correction semantics | Failed certification is not repaired retroactively; freeze new candidate and rerun affected rows. |
 | 22 | Source evidence requirement | Required for every statement-dependent claim; absent cases remain uncertified. |
 | 23 | Runtime acceptance requirement | Required for adopted import/credential/backup and durable UI flows. |
-| 24 | Dependencies | Accepted bounded current-holdings outcome before adoption/certification; accepted backup ADR+drill; exact candidate; corpus; support docs; Chat adoption matrix; workbook-successor decision. History/performance, optional complete export and current FX/net-worth are not automatic prerequisites. |
+| 24 | Dependencies | Accepted Swift 6 and selected R1 work; backup ADR+drill; bounded current Al Dar, holdings/valuation and current FX/net-worth outcomes; exact candidate; corpus; support docs; Chat matrix; workbook-successor decision. History/performance, optional complete export and historical FX are not prerequisites. |
 | 25 | Evidence that falsifies the recommendation | Any missing matrix row, changed candidate/corpus/financial semantics, or claim lacking independent evidence. |
 | 26 | Personal-v1 relevance | PRE_V1_REQUIRED: declaration gate. |
-| 27 | Recommended FUTURE_WORK status after Chat review | READY_AFTER_NAMED_DEPENDENCY: accepted bounded current holdings, backup contract/drill and Chat matrix. |
-| 28 | Recommended roadmap effect after Chat review | Add gate only; do not declare personal-v1 or select sprint. |
+| 27 | Recommended FUTURE_WORK status after Chat review | READY_AFTER_NAMED_DEPENDENCY: all named pre-100 outcomes, backup contract/drill and Chat matrix remain required. |
+| 28 | Recommended roadmap effect after Chat review | Prepared Sprint 100 certification milestone only; do not declare personal-v1 or assign feature work there. |
 
 </details>
 
@@ -4120,7 +4122,7 @@ Weak similarity must never create a transfer relationship automatically.
 
 **Personal-v1:** PRE_V1_OPTIONAL
 
-**Recommendation after Chat:** Ready for discovery **Roadmap:** Sprint 93 entry gate remains unmet
+**Recommendation after Chat:** Ready for discovery **Roadmap:** Unscheduled post-1.0 transfer candidate; no Sprint 101+ assignment.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -4175,7 +4177,7 @@ Weak similarity must never create a transfer relationship automatically.
 25. **Evidence that falsifies the recommendation:** An authentic supposedly eligible pair has ambiguous source ownership/currency/reference, or the relation changes native financial facts or cannot be removed without collateral changes.
 26. **Personal-v1 relevance:** `PRE_V1_OPTIONAL`; no certification dependency has been adopted.
 27. **Recommended FUTURE_WORK status after Chat review:** `FW-P2-10` remains `Ready for discovery` / `BLOCKED_ON_AUTHENTIC_SOURCE`; `FW-P2-11` remains blocked; `FW-P2-12` may become planning-ready only for read-only taxonomy.
-28. **Recommended roadmap effect after Chat review:** Sprint 93 entry gate remains unmet; Sprint 94 remains gated. No date, number, or priority changes.
+28. **Recommended roadmap effect after Chat review:** Unscheduled post-1.0 transfer/reconciliation candidates; no date, number, priority or status changes.
 
 ### Transfer / duplicate taxonomy
 
@@ -4234,7 +4236,7 @@ Weak similarity must never create a transfer relationship automatically.
 
 **Personal-v1:** PRE_V1_OPTIONAL
 
-**Recommendation after Chat:** Blocked **Roadmap:** Sprint 94 remains gated
+**Recommendation after Chat:** Blocked **Roadmap:** Unscheduled post-1.0 reconciliation candidate; no Sprint 101+ assignment.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -4511,7 +4513,7 @@ Every automatic categorization must explain the rule that produced it.
 
 **Personal-v1:** POST_V1
 
-**Recommendation after Chat:** Combine with first engine **Roadmap:** Prepared 95 safety boundary
+**Recommendation after Chat:** Combine with first engine only if later selected; unscheduled post-1.0.
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
@@ -4565,7 +4567,7 @@ Every automatic categorization must explain the rule that produced it.
 
 **Personal-v1:** POST_V1
 
-**Recommendation after Chat:** Ready for Chat architecture decision **Roadmap:** Prepared 95 safety boundary
+**Recommendation after Chat:** Ready for Chat architecture decision **Roadmap:** Unscheduled post-1.0 rules candidate.
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
@@ -4677,7 +4679,7 @@ The original imported transaction description must remain preserved.
 
 **Personal-v1:** POST_V1
 
-**Recommendation after Chat:** Ready after Chat decision **Roadmap:** Prepared 96 gate
+**Recommendation after Chat:** Ready after Chat decision **Roadmap:** Unscheduled post-1.0 merchant-normalization candidate.
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
@@ -4732,7 +4734,7 @@ The original imported transaction description must remain preserved.
 
 **Personal-v1:** POST_V1
 
-**Recommendation after Chat:** Blocked **Roadmap:** Prepared 96 after gates
+**Recommendation after Chat:** Blocked **Roadmap:** Unscheduled post-1.0 recurrence candidate.
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
@@ -7589,7 +7591,7 @@ Support must never be inferred from institution name, fixture presence, filename
 
 **Personal-v1:** PRE_V1_REQUIRED: matrix is an adoption input, not certification.
 
-**Recommendation after Chat:** Ready for documentation planning **Roadmap:** Do not activate as sprint
+**Recommendation after Chat:** Ready for documentation planning **Roadmap:** Required Sprint-100 certification input; no stand-alone sprint is assigned.
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
@@ -8084,9 +8086,9 @@ Further Salary visual polish remains lower priority and must not reopen accepted
 
 **Exact next evidence or decision:** Al Dar current forward-quote automation/cache/age/amount-binding permission and future ADR-045 alignment; manual override is explicitly required. No historical QAR→INR evidence is needed.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_REQUIRED only for the bounded current Salary/This Month Al Dar planning slice; broader Salary/planning expansion remains POST_V1.
 
-**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is BLOCKED_ON_EXTERNAL_PROVIDER_OR_PERMISSION. **Roadmap:** Retain numbering. Current market net-worth estimation is the Sprint99 proposal; Al Dar is current Salary/budget only with manual override. Historical FX is deferred under UD-10.
+**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is BLOCKED_ON_EXTERNAL_PROVIDER_OR_PERMISSION. **Roadmap:** Prepared Sprint 94 owns only the bounded current Salary/This Month Al Dar slice. Current market net-worth is Sprint 99; historical FX is deferred under UD-10.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -8143,9 +8145,9 @@ Further Salary visual polish remains lower priority and must not reopen accepted
 | 23 | Runtime acceptance requirement | Future native explicit fetch/review/cancel/error/fallback, amount-change invalidation, fee preservation, rounding guard and durable relaunch. This campaign runs no planner. |
 | 24 | Dependencies | Chat ADR-045 alignment; provider current-quote permission/freshness contract; exact post-87 lifecycle review. Historical FX is not a dependency. |
 | 25 | Evidence that falsifies the recommendation | Provider denies automation/cache or needs unavailable authentication; no safe amount-binding policy; reverse quote used as authority; or a quote materially underfunds under the accepted planner calculation and review contract. |
-| 26 | Personal-v1 relevance | PRE_V1_OPTIONAL; existing accepted manual planner remains the production boundary. |
+| 26 | Personal-v1 relevance | PRE_V1_REQUIRED only for this bounded current Salary/This Month Al Dar slice; accepted manual planning remains production until explicit ADR-045 alignment or successor architecture. |
 | 27 | Recommended FUTURE_WORK status after Chat review | FW-P3-08 BLOCKED_ON_EXTERNAL_PROVIDER_OR_PERMISSION for the current Al Dar action; explicit manual override requirement is settled. Broader unselected Salary expansion remains deferred. |
-| 28 | Recommended roadmap effect after Chat review | Keep this current Salary/budget reference candidate separate from Sprint 99 market reporting. Remove all historical Al Dar evidence requirements and retain numbering. |
+| 28 | Recommended roadmap effect after Chat review | Prepared Sprint 94 owns this bounded current Salary/budget slice. Keep it separate from Sprint 99 market reporting and exclude historical Al Dar. |
 
 </details>
 
@@ -8199,7 +8201,7 @@ No prediction may be presented as a guaranteed future transaction.
 
 **Personal-v1:** POST_V1
 
-**Recommendation after Chat:** Ready after Chat decision **Roadmap:** Split Sprint 97 current planning from analytics
+**Recommendation after Chat:** Ready after Chat decision **Roadmap:** Unscheduled post-1.0 planning candidate.
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
@@ -8260,7 +8262,7 @@ Includes:
 
 **Personal-v1:** POST_V1
 
-**Recommendation after Chat:** Blocked **Roadmap:** Separate Sprint 97 analytics from planning
+**Recommendation after Chat:** Blocked **Roadmap:** Unscheduled post-1.0 analytics candidate.
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
@@ -8931,9 +8933,9 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 
 **Exact next evidence or decision:** Investment identity/position/revision ADR; exact adopted dated owner positions and AMFI scheme/ISIN/Direct-plan/option mapping. Provider NAV is not ownership.
 
-**Personal-v1:** PRE_V1_OPTIONAL. The bounded current-holdings outcome is required under `FW-P0-26`; only components selected into that outcome become prerequisites, not this entire broad candidate.
+**Personal-v1:** PRE_V1_REQUIRED only for the selected current-holdings/valuation slice. The broad candidate remains optional outside that slice; history, performance and brokerage ingestion are not prerequisites.
 
-**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
+**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Prepared Sprints 95–98 own the selected current-holdings/valuation slices; no broad-card scope is selected.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -8997,9 +8999,9 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 | 23 | Runtime acceptance requirement | Future native manual review/correction, failure/cancel, zero residue, provider parity, canonical hydration and same-database relaunch; external refresh only after provider permission. |
 | 24 | Dependencies | Chat investment ADR; selected genuine position evidence; exact post-87 provider/lifecycle review. FW-P3-27 is optional for a manual dated valuation boundary, not a prerequisite for merely recording positions. Brokerage history and performance are not foundation dependencies. |
 | 25 | Evidence that falsifies the recommendation | An adopted source requires simultaneous multiple snapshots, unsettled units, distributions, ownership restrictions or a materially different identity contract that this bounded family cannot preserve; any cost or units/date inference is a failure. |
-| 26 | Personal-v1 relevance | PRE_V1_REQUIRED for the bounded current-holdings outcome before adoption/certification. The exact selected components and architecture remain separately gated; history/performance is not a personal-v1 prerequisite. Broad unselected investment expansions remain optional. |
+| 26 | Personal-v1 relevance | PRE_V1_REQUIRED only for the selected Sprints 95–98 current-holdings/valuation slices. The exact selected components and architecture remain gated; history/performance and broad unselected investment expansions remain optional. |
 | 27 | Recommended FUTURE_WORK status after Chat review | READY_FOR_CHAT_ARCHITECTURE_DECISION for the foundation; no Ready for planning until architecture, exact chosen evidence and post-87 ownership gates are satisfied. Brokerage ingestion stays source-blocked. |
-| 28 | Recommended roadmap effect after Chat review | Sprint 98 must be replanned into the coherent A/B/C/D slices in ROADMAP_REPLANNING_PACKET_98; retain numbering and no execution authority. |
+| 28 | Recommended roadmap effect after Chat review | Prepared Sprints 95–98 own the coherent current-holdings/valuation slices; retain execution gates and do not widen scope. |
 
 </details>
 
@@ -9037,9 +9039,9 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 
 **Exact next evidence or decision:** Investment identity ADR and chosen genuine current broker/container/instrument/listing/currency evidence; no trades or performance scope is selected.
 
-**Personal-v1:** PRE_V1_OPTIONAL. The bounded current-holdings outcome is required under `FW-P0-26`; only components selected into that outcome become prerequisites, not this entire broad candidate.
+**Personal-v1:** PRE_V1_REQUIRED only for the selected current-holdings/valuation slice; unselected broad scope, history and brokerage ingestion remain optional.
 
-**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
+**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Prepared Sprints 95–98 own selected current-holdings/valuation slices only.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -9102,9 +9104,9 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 
 **Exact next evidence or decision:** No exact authentic brokerage export family, selected account scope or independent trades/fees/positions projection; current manually established positions do not require ingestion.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_OPTIONAL. Brokerage transaction ingestion remains outside the selected current-holdings outcome.
 
-**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is BLOCKED_ON_AUTHENTIC_SOURCE. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
+**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is BLOCKED_ON_AUTHENTIC_SOURCE. **Roadmap:** Unscheduled post-1.0 brokerage-ingestion candidate.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -9167,9 +9169,9 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 
 **Exact next evidence or decision:** Chat must accept container versus instrument versus position ownership, scoped identifiers, collision policy and explicit immutable revision semantics.
 
-**Personal-v1:** PRE_V1_OPTIONAL. The bounded current-holdings outcome is required under `FW-P0-26`; only components selected into that outcome become prerequisites, not this entire broad candidate.
+**Personal-v1:** PRE_V1_REQUIRED only for the selected current-holdings/valuation slice; unselected broad scope, history and brokerage ingestion remain optional.
 
-**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
+**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Prepared Sprints 95–98 own selected current-holdings/valuation slices only.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -9233,7 +9235,7 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 
 **Personal-v1:** POST_V1
 
-**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is DEFERRED_WITH_REASON. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
+**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is DEFERRED_WITH_REASON. **Roadmap:** Unscheduled post-1.0 investment-history candidate.
 
 **Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
 
@@ -9303,7 +9305,7 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 
 **Personal-v1:** PRE_V1_OPTIONAL
 
-**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is BLOCKED_ON_PRODUCT_DECISION. **Roadmap:** Retain numbering. Current market net-worth estimation is the Sprint99 proposal; Al Dar is current Salary/budget only with manual override. Historical FX is deferred under UD-10.
+**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is BLOCKED_ON_PRODUCT_DECISION. **Roadmap:** Unscheduled post-1.0 allocation candidate; current Sprint 99 net worth excludes it.
 
 **Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
 
@@ -9368,9 +9370,9 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 
 **Exact next evidence or decision:** Current holdings/account/liability membership, non-overlap, current valuation dates, reporting basis and completeness remain unaccepted; historical FX/analytics and Al Dar are not current-net-worth dependencies.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_REQUIRED only for the selected current net-worth integration slice; historical analytics remain POST_V1.
 
-**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is READY_AFTER_NAMED_DEPENDENCY. **Roadmap:** Retain numbering. Current market net-worth estimation is the Sprint99 proposal; Al Dar is current Salary/budget only with manual override. Historical FX is deferred under UD-10.
+**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is READY_AFTER_NAMED_DEPENDENCY. **Roadmap:** Prepared Sprint 99 owns the selected current net-worth integration slice. Al Dar is Sprint 94 Salary/budget-only; historical FX is deferred.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -9438,9 +9440,9 @@ UD-09/10 govern the current proposal: Al Dar QAR→INR is solely the current/liv
 
 **Exact next evidence or decision:** FE dates and Change-percent period are now observed; FE/Zurich automated retrieval/persistent cache/feed rights and AMFI selected-row automation/retention remain unqualified. AMFI selected scheme INR and exact Direct mapping require separate evidence.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_REQUIRED only when this provider-qualified current valuation slice is selected; automated refresh remains conditional on permission.
 
-**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is BLOCKED_ON_EXTERNAL_PROVIDER_OR_PERMISSION. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
+**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is BLOCKED_ON_EXTERNAL_PROVIDER_OR_PERMISSION. **Roadmap:** Prepared Sprint 97 owns this provider-qualified valuation slice.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -9621,9 +9623,9 @@ This is a **fallback/manual** boundary. It is not the primary owner of the user'
 
 **Exact next evidence or decision:** Chat must select the bounded manual position/price input and append-only correction family, including effective/recorded date, provenance and precision rules.
 
-**Personal-v1:** PRE_V1_OPTIONAL. The bounded current-holdings outcome is required under `FW-P0-26`; only components selected into that outcome become prerequisites, not this entire broad candidate.
+**Personal-v1:** PRE_V1_REQUIRED only where the selected current evidence contract needs this manual fallback; otherwise this broad candidate remains optional.
 
-**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
+**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Prepared Sprints 95–98 use this fallback only where selected evidence requires it.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -9714,9 +9716,9 @@ Any later reporting conversion is separately derived with its own FX provenance.
 
 **Exact next evidence or decision:** Exact genuine policy/container and dated mandatory/AVC ownership evidence remain to qualify; Chat must accept unit-class/cost/revision architecture. FE price dates do not close ownership.
 
-**Personal-v1:** PRE_V1_OPTIONAL. The bounded current-holdings outcome is required under `FW-P0-26`; only components selected into that outcome become prerequisites, not this entire broad candidate.
+**Personal-v1:** PRE_V1_REQUIRED only for the selected current ISP position/valuation slice; unselected broad scope and history remain optional.
 
-**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
+**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Prepared Sprints 95–98 own selected current-holdings/valuation slices only.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -9783,9 +9785,9 @@ Any later reporting conversion is separately derived with its own FX provenance.
 
 **Exact next evidence or decision:** Separate pure native locale display from current derived estimates; choose locale/accessibility expectations and approved current reporting orientation, without historical scope.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_REQUIRED only for the selected current reporting/net-worth slice; historical FX remains excluded.
 
-**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering. Current market net-worth estimation is the Sprint99 proposal; Al Dar is current Salary/budget only with manual override. Historical FX is deferred under UD-10.
+**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Prepared Sprint 99 owns the selected current reporting slice. Al Dar is Sprint 94 Salary/budget-only; historical FX is deferred.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -9857,9 +9859,9 @@ Al Dar remains only a current monthly planner reference. Quote the calculator’
 
 **Exact next evidence or decision:** Chat must accept current market provider, source/fetch freshness, direct/reporting orientation, rounding and bounded current-cache ownership; no historical entitlement remains.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_REQUIRED only for the selected current reporting/net-worth slice; historical FX remains excluded.
 
-**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering. Current market net-worth estimation is the Sprint99 proposal; Al Dar is current Salary/budget only with manual override. Historical FX is deferred under UD-10.
+**Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Prepared Sprint 99 owns current market FX/net-worth; Al Dar is Sprint 94 Salary/budget-only and historical FX remains deferred.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -9921,9 +9923,9 @@ Al Dar remains only a current monthly planner reference. Quote the calculator’
 | 23 | Runtime acceptance requirement | Future current refresh/review/cancel/error/offline/stale behavior, native invariance, selected reporting orientation, provider parity and durable relaunch; no historical flow. |
 | 24 | Dependencies | Chat current-FX/reporting ADR; adopted current financial membership/valuation; exact post-87 provider/actor review. Historical FX, paid services, Al Dar and appearance implementation are not dependencies. |
 | 25 | Evidence that falsifies the recommendation | The source cannot provide the selected current direction/freshness under permitted cache use, target orientation is unapproved, or eligible current membership/price evidence is incomplete. Keep the estimate incomplete rather than inventing zero or historical evidence. Falsified if the proposed use exceeds the suitability boundary in field 6. |
-| 26 | Personal-v1 relevance | PRE_V1_OPTIONAL unless Chat explicitly adopts current net-worth reporting. No historical FX prerequisite remains. |
+| 26 | Personal-v1 relevance | PRE_V1_REQUIRED only for selected Sprint-99 current reporting/net-worth slices. No historical FX prerequisite remains. |
 | 27 | Recommended FUTURE_WORK status after Chat review | FW-P3-31/33 READY_FOR_CHAT_ARCHITECTURE_DECISION for current estimates; FW-P3-32 DEFERRED_WITH_REASON by UD-10; no automatic implementation-ready claim. |
-| 28 | Recommended roadmap effect after Chat review | Sprint 99 proposes current market net-worth reporting only; remove the historical and 2021/paid-source entry gates. Al Dar remains current Salary/budget-only. Keep numbering and Chat activation authority. |
+| 28 | Recommended roadmap effect after Chat review | Prepared Sprint 99 owns current market net-worth reporting, including FW-P3-26 with FW-P3-30/31/33; historical gates are removed. Al Dar remains Prepared Sprint 94 Salary/budget-only. |
 
 </details>
 
@@ -9936,6 +9938,8 @@ Al Dar remains only a current monthly planner reference. Quote the calculator’
 **Depends on:** a future explicit user request for historical conversions with a concrete period and purpose
 
 **Explicit deferment — UD-10, 2026-09-10:** historical FX is not needed for the selected current net-worth estimate. The earlier combined-current/historical direction and 2021 coverage choice are superseded. This card does not block current market-rate storage, reporting-currency selection, net-worth estimation or the current Al Dar Salary/budget quote. Retain it as unscheduled historical capability only if the user later chooses that outcome.
+
+**Roadmap disposition — 2026-09-10:** Unscheduled post-1.0 candidate, deliberately excluded from the current-only Sprint-99 boundary; no Sprint 101+ assignment.
 
 **Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No current historical-FX product requirement after UD-10. Reopen only if the user later explicitly requests historical conversion and names its required period/purpose.
 
@@ -9966,7 +9970,7 @@ Al Dar remains only a current monthly planner reference. Quote the calculator’
 
 **Personal-v1:** POST_V1
 
-**Recommendation after Chat:** Preserve current queue priority/status and record DEFERRED_WITH_REASON by UD-10; no historical implementation selected. **Roadmap:** Retain numbering. Current market net-worth estimation is the Sprint99 proposal; Al Dar is current Salary/budget only with manual override. Historical FX is deferred under UD-10.
+**Recommendation after Chat:** Preserve current queue priority/status and record DEFERRED_WITH_REASON by UD-10; no historical implementation selected. **Roadmap:** Unscheduled post-1.0 historical-FX candidate; Sprint 99 is current-only.
 
 **Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
 
@@ -10030,9 +10034,9 @@ Provide a current net-worth estimate in the selected reporting currency without 
 
 **Exact next evidence or decision:** Chat must accept current net-worth membership/rounding, selected reporting-currency set and explicit direction/inverse rule over current market observations, plus financial setting ownership.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_REQUIRED only for the selected current reporting/net-worth slice; historical FX remains excluded.
 
-**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering. Current market net-worth estimation is the Sprint99 proposal; Al Dar is current Salary/budget only with manual override. Historical FX is deferred under UD-10.
+**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Prepared Sprint 99 owns the selected current reporting slice; Al Dar is Sprint 94 Salary/budget-only and historical FX remains deferred.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -10102,7 +10106,7 @@ Current net worth must identify each included native component, its current bala
 
 **Personal-v1:** PRE_V1_OPTIONAL
 
-**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is READY_AFTER_NAMED_DEPENDENCY. **Roadmap:** Retain numbering. Current market net-worth estimation is the Sprint99 proposal; Al Dar is current Salary/budget only with manual override. Historical FX is deferred under UD-10.
+**Recommendation after Chat:** Preserve Blocked until the exact evidence/architecture gates are accepted; discovery closure is READY_AFTER_NAMED_DEPENDENCY. **Roadmap:** Unscheduled post-1.0 broad analytics candidate; selected Sprint 99 net-worth integration remains bounded to FW-P3-26/30/31/33.
 
 **Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
 
@@ -10236,6 +10240,8 @@ Provide a machine-readable export of supported LedgerForge domain data. User-fac
 **Status:** Ready for discovery
 **Shared prerequisites:** Canonical database lifecycle, checked close, coordinated SQLite/WAL/SHM handling, DEBUG lifecycle backup, migration-chain integrity and fail-closed recovery foundations exist.
 **Implementation dependency:** Approval of the user-facing backup contents, integrity, restore-target, compatibility and confirmation contract.
+
+**Roadmap disposition — 2026-09-10:** Prepared Sprint 93. This full recoverability boundary is `PRE_V1_REQUIRED`; its status remains `Ready for discovery` until the existing architecture and runtime gates close.
 
 This is a serious required recoverability input to `FW-P0-26` personal-v1 certification, but importance does not itself promote implementation priority.
 
