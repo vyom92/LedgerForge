@@ -28,6 +28,7 @@
 		281BB1902FFC4D6A006E7424 /* StatementClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB18F2FFC4D6A006E7424 /* StatementClassifier.swift */; };
 		281BB1922FFC4D6A006E7424 /* ImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1912FFC4D6A006E7424 /* ImportCoordinator.swift */; };
 		281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */; };
+		B82000023082000000000001 /* ImportCentreCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82000013082000000000001 /* ImportCentreCoordinator.swift */; };
 		286242592FFCE80D00B8AA66 /* DefaultReaderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242542FFCE80D00B8AA66 /* DefaultReaderRegistry.swift */; };
 		2862425F2FFCE80D00B8AA66 /* PDFDocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242552FFCE80D00B8AA66 /* PDFDocumentReader.swift */; };
 		286242612FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */; };
@@ -226,6 +227,7 @@
 		281BB18F2FFC4D6A006E7424 /* StatementClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementClassifier.swift; sourceTree = "<group>"; };
 		281BB1912FFC4D6A006E7424 /* ImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCoordinator.swift; sourceTree = "<group>"; };
 		281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultImportCoordinator.swift; sourceTree = "<group>"; };
+		B82000013082000000000001 /* ImportCentreCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCentreCoordinator.swift; sourceTree = "<group>"; };
 		286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Architecture_v1.0_Frozen.md; sourceTree = "<group>"; };
 		2862424A2FFCE80D00B8AA66 /* DefaultPasswordProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultPasswordProvider.swift; sourceTree = "<group>"; };
 		286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVDocumentReaderAdapter.swift; sourceTree = "<group>"; };
@@ -490,6 +492,7 @@
 			isa = PBXGroup;
 			children = (
 				281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */,
+				B82000013082000000000001 /* ImportCentreCoordinator.swift */,
 			);
 			path = Coordinator;
 			sourceTree = "<group>";
@@ -1091,6 +1094,7 @@
 				F58000010000000000000001 /* ImportFailureSummary.swift in Sources */,
 				286D68FB2FFFF6A60078AAC5 /* LFFilterChip.swift in Sources */,
 				281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */,
+				B82000023082000000000001 /* ImportCentreCoordinator.swift in Sources */,
 				288EB1322FF7E3C600F09BC9 /* ColumnType.swift in Sources */,
 				288EB1302FF7E18D00F09BC9 /* CSVNormalizer.swift in Sources */,
 				288EB0FD2FF7BA1600F09BC9 /* DeveloperConsoleView.swift in Sources */,

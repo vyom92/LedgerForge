@@ -285,7 +285,7 @@ enum ConfirmedImportRecoveryAction: Equatable, Sendable {
         }
     }
 
-    fileprivate var requiresSourceURL: Bool {
+    var requiresSourceURL: Bool {
         switch self {
         case .prepareAgain, .retryCanonicalReconciliationThenPrepareAgain:
             return true
@@ -550,7 +550,7 @@ final class ConfirmedImportRecoveryActionExecutor {
     }
 }
 
-private struct ConfirmedImportRecoveryContext {
+struct ConfirmedImportRecoveryContext {
     let id = UUID()
     let route: ConfirmedImportRecoveryRoute
     let sourceURL: URL?
@@ -1316,20 +1316,11 @@ struct ImportActivityPresentation: Equatable {
 struct ContentView: View {
 
     @State private var showingImporter = false
-    @State private var selectedFile = "No statement imported"
-    @State private var importState: ImportPresentationState = .idle
     @State private var statementPassword = ""
     @StateObject private var statementPasswordChallenges = StatementPasswordChallengeController.shared
-    @State private var preparationOwner = ImportPreparationTaskOwner()
-    @State private var importIdentityReview: ImportIdentityReview = .unavailable
-    @State private var importAccountChoice: ImportAccountChoice?
-    @State private var cardSectionDraftAccountID: String?
-    @State private var cardSectionDraftChoices: [String: ImportCardInstrumentChoice] = [:]
-    @State private var partialImportReview: PartialImportReviewResult = .ordinaryFullImport
-    @State private var selectedImportSourceURL: URL?
-    @State private var confirmedImportRecoveryContext: ConfirmedImportRecoveryContext?
-    @State private var confirmedImportRecoveryActionRequestID: UUID?
+    @ObservedObject private var importCentre = ProductionImportCentre.shared
     @State private var confirmedImportRecoveryActionExecutor = ConfirmedImportRecoveryActionExecutor()
+    @State private var importCentrePresentationOwnerID = UUID()
     @ObservedObject private var availability = ApplicationAvailability.shared
     @StateObject private var salaryViewModel = SalaryWorkspaceViewModel()
     @StateObject private var dashboardViewModel = DashboardViewModel()
@@ -1346,6 +1337,72 @@ struct ContentView: View {
     @State private var developmentAcknowledgementChallenge: DevelopmentProfileAcknowledgementChallenge?
     @State private var developmentActionMessage: String?
 #endif
+
+    private var selectedFile: String {
+        importCentre.currentItem?.displayFileName
+            ?? (importCentre.selectionFailureMessage == nil ? "No statement imported" : "Import failed")
+    }
+
+    private var importState: ImportPresentationState {
+        guard let item = importCentre.currentItem else {
+            if let message = importCentre.selectionFailureMessage {
+                return .failed(fileName: "Import failed", message: message, retrySourceURL: nil)
+            }
+            return .idle
+        }
+        switch item.phase {
+        case .preparing, .awaitingReview:
+            return .preparing(fileName: item.displayFileName, phase: item.progress.phase)
+        case .awaitingConfirmation:
+            guard let preparation = item.preparation else { return .idle }
+            return .previewReady(preparation)
+        case .validationFailed:
+            guard let preparation = item.preparation else { return .idle }
+            return .validationFailed(preparation)
+        case .committing:
+            guard let preparation = item.preparation else { return .idle }
+            return .committing(preparation)
+        case .completed:
+            guard let outcome = item.outcome else { return .idle }
+            return .completed(outcome)
+        case .cancelled:
+            return .cancelled(fileName: item.displayFileName)
+        case .failed:
+            return .failed(
+                fileName: item.displayFileName,
+                message: item.failureMessage ?? "The statement could not be prepared.",
+                retrySourceURL: item.retrySourceURL
+            )
+        }
+    }
+
+    private var importIdentityReview: ImportIdentityReview {
+        importCentre.currentItem?.identityReview ?? .unavailable
+    }
+
+    private var importAccountChoice: ImportAccountChoice? {
+        importCentre.currentItem?.accountChoice
+    }
+
+    private var cardSectionDraftAccountID: String? {
+        importCentre.currentItem?.cardSectionDraftAccountID
+    }
+
+    private var cardSectionDraftChoices: [String: ImportCardInstrumentChoice] {
+        importCentre.currentItem?.cardSectionDraftChoices ?? [:]
+    }
+
+    private var partialImportReview: PartialImportReviewResult {
+        importCentre.currentItem?.partialReview ?? .ordinaryFullImport
+    }
+
+    private var confirmedImportRecoveryContext: ConfirmedImportRecoveryContext? {
+        importCentre.currentItem?.recoveryContext
+    }
+
+    private var confirmedImportRecoveryActionRequestID: UUID? {
+        importCentre.recoveryActionRequestID
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -1398,16 +1455,22 @@ struct ContentView: View {
 #endif
 
             case .failure(let error):
-                let summary = ImportFailureSummary.from(error)
-                selectedImportSourceURL = nil
-                confirmedImportRecoveryContext = nil
-                selectedFile = "Import failed"
-                importState = .failed(fileName: "Import failed", message: summary.displayText, retrySourceURL: nil)
+                importCentre.recordSelectionFailure(error)
                 selectedSection = .imports
             }
         }
         .task {
             hydrateDashboardOnce()
+        }
+        .onAppear {
+            importCentre.attachPresentationOwner(importCentrePresentationOwnerID)
+        }
+        .onDisappear {
+            statementPassword = ""
+            importCentre.detachPresentationOwner(importCentrePresentationOwnerID)
+        }
+        .onChange(of: statementPasswordChallenges.challenge?.id) { _, _ in
+            statementPassword = ""
         }
 #if DEBUG
         .confirmationDialog(
@@ -1514,7 +1577,7 @@ struct ContentView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.white)
-            .disabled(!availability.permitsMutation)
+            .disabled(!availability.permitsMutation || !importCentre.permitsSourceSelection)
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 24)
@@ -2182,21 +2245,11 @@ struct ContentView: View {
     }
 
     private var importSelectionDisabled: Bool {
-        switch importState {
-        case .preparing, .committing:
-            return true
-        default:
-            return false
-        }
+        !importCentre.permitsSourceSelection
     }
 
     private var canCancelPreparation: Bool {
-        switch importState {
-        case .preparing, .previewReady, .validationFailed:
-            return true
-        default:
-            return false
-        }
+        importCentre.permitsCancellation
     }
 
     private var totalAccountBalance: Decimal {
@@ -2533,7 +2586,7 @@ struct ContentView: View {
                                 .foregroundStyle(LFTheme.text)
                                 .disabled(
                                     confirmedImportRecoveryActionRequestID != nil
-                                        || preparationOwner.activeOperationID != nil
+                                        || importCentre.isPreparationDraining
                                 )
                             }
                         }
@@ -2849,8 +2902,7 @@ struct ContentView: View {
                 if case .choiceRequired = importIdentityReview {
                     ForEach(accountsViewModel.accounts.filter { projection.eligibleAccountIDs.contains($0.id) }) { account in
                         Button {
-                            importAccountChoice = .useExistingAccount(accountId: account.id)
-                            refreshPartialImportReview(preparedImport)
+                            importCentre.updateAccountChoice(.useExistingAccount(accountId: account.id))
                         } label: {
                             HStack {
                                 VStack(alignment: .leading) {
@@ -2870,8 +2922,7 @@ struct ContentView: View {
                         .foregroundStyle(LFTheme.text)
                     }
                     Button {
-                        importAccountChoice = .createNewAccount
-                        refreshPartialImportReview(preparedImport)
+                        importCentre.updateAccountChoice(.createNewAccount)
                     } label: {
                         HStack {
                             Text("Create New Account")
@@ -2888,10 +2939,7 @@ struct ContentView: View {
                 if case .liabilityAccountChoiceRequired = importIdentityReview {
                     ForEach(accountsViewModel.accounts.filter { projection.eligibleAccountIDs.contains($0.id) }) { account in
                         Button {
-                            cardSectionDraftAccountID = nil
-                            cardSectionDraftChoices = [:]
-                            importAccountChoice = .useExistingAccount(accountId: account.id)
-                            refreshPartialImportReview(preparedImport)
+                            importCentre.updateAccountChoice(.useExistingAccount(accountId: account.id))
                         } label: {
                             HStack {
                                 VStack(alignment: .leading) {
@@ -2913,10 +2961,7 @@ struct ContentView: View {
                         .foregroundStyle(LFTheme.text)
                     }
                     Button {
-                        cardSectionDraftAccountID = nil
-                        cardSectionDraftChoices = [:]
-                        importAccountChoice = .createNewAccount
-                        refreshPartialImportReview(preparedImport)
+                        importCentre.updateAccountChoice(.createNewAccount)
                     } label: {
                         HStack {
                             Text("Create separate Axis credit-card liability account")
@@ -2996,12 +3041,7 @@ struct ContentView: View {
 
     private func cardChoiceButton(title: String, choice: ImportAccountChoice, preparedImport: PreparedImport) -> some View {
         Button {
-            if case .createNewCardLiabilityAccountAndInstrument = choice {
-                cardSectionDraftAccountID = nil
-                cardSectionDraftChoices = [:]
-            }
-            importAccountChoice = choice
-            refreshPartialImportReview(preparedImport)
+            importCentre.updateAccountChoice(choice)
         } label: {
             HStack {
                 Text(title)
@@ -3078,20 +3118,12 @@ struct ContentView: View {
         preparedImport: PreparedImport
     ) -> some View {
         Button {
-            if cardSectionDraftAccountID != accountID {
-                cardSectionDraftAccountID = accountID
-                cardSectionDraftChoices = [:]
-            }
-            cardSectionDraftChoices[sectionID] = choice
-            if Set(cardSectionDraftChoices.keys) == Set(requiredSectionIDs) {
-                importAccountChoice = .useExistingCardLiabilityAccountSections(
-                    accountId: accountID,
-                    sectionChoices: cardSectionDraftChoices
-                )
-            } else {
-                importAccountChoice = nil
-            }
-            refreshPartialImportReview(preparedImport)
+            importCentre.updateCardSectionChoice(
+                accountID: accountID,
+                sectionID: sectionID,
+                choice: choice,
+                requiredSectionIDs: requiredSectionIDs
+            )
         } label: {
             HStack {
                 Text(title)
@@ -3161,18 +3193,6 @@ struct ContentView: View {
             return true
         case .ordinaryFullImport, .eligible, .unsupportedEvidence:
             return false
-        }
-    }
-
-    @MainActor
-    private func refreshPartialImportReview(_ preparedImport: PreparedImport) {
-        do {
-            partialImportReview = try ImportEngine.shared.reviewPreparedPartialImport(
-                preparedImport,
-                accountChoice: importAccountChoice
-            )
-        } catch {
-            partialImportReview = .unsupportedEvidence
         }
     }
 
@@ -3658,7 +3678,8 @@ struct ContentView: View {
     }
 
     private func requestFileSelection() {
-        guard availability.permitsMutation else { return }
+        guard availability.permitsMutation,
+              importCentre.permitsSourceSelection else { return }
         selectedSection = .imports
 #if DEBUG
         requestProtectedImportAction(.presentFileImporter)
@@ -3734,40 +3755,12 @@ struct ContentView: View {
     }
 
     private func clearStaleImportPresentationAfterProfileChange() {
-        switch importState {
-        case .committing:
-            return
-        case .preparing:
-            preparationOwner.cancel()
-        case .previewReady(let preparedImport), .validationFailed(let preparedImport):
-            ImportEngine.shared.cancelPreparedImport(preparedImport)
-        default:
-            break
-        }
+        guard importCentre.reset() else { return }
+        statementPassword = ""
         pendingProtectedImportIntent = nil
         developmentAcknowledgementChallenge = nil
-        confirmedImportRecoveryActionRequestID = nil
-        confirmedImportRecoveryContext = nil
-        selectedImportSourceURL = nil
-        importState = .idle
-        selectedFile = "No statement imported"
-        importIdentityReview = .unavailable
-        importAccountChoice = nil
-        partialImportReview = .ordinaryFullImport
     }
 #endif
-
-    private func consumePreparedImportBeforeSourceReplacement() -> Bool {
-        switch importState {
-        case .committing:
-            return false
-        case .previewReady(let preparedImport), .validationFailed(let preparedImport):
-            ImportEngine.shared.cancelPreparedImport(preparedImport)
-            return true
-        default:
-            return true
-        }
-    }
 
     private func availableConfirmedImportRecoveryAction(
         for outcome: ImportOutcomePresentation
@@ -3788,7 +3781,7 @@ struct ContentView: View {
         for outcome: ImportOutcomePresentation
     ) {
         guard confirmedImportRecoveryActionRequestID == nil,
-              preparationOwner.activeOperationID == nil,
+              !importCentre.isPreparationDraining,
               case .completed(let currentOutcome) = importState,
               currentOutcome.recoveryRoute == outcome.recoveryRoute,
               currentOutcome.recoveryContextID == outcome.recoveryContextID,
@@ -3805,32 +3798,23 @@ struct ContentView: View {
         }
 #endif
 
-        let requestID = UUID()
-        confirmedImportRecoveryActionRequestID = requestID
+        guard let requestID = importCentre.beginRecoveryAction(contextID: context.id) else { return }
         Task { @MainActor in
             defer {
-                if confirmedImportRecoveryActionRequestID == requestID {
-                    confirmedImportRecoveryActionRequestID = nil
-                }
+                importCentre.finishRecoveryAction(requestID)
             }
 
             let execution = await confirmedImportRecoveryActionExecutor.execute(
                 action,
                 sourceURL: context.sourceURL,
                 retryCanonicalReconciliation: {
-                    guard confirmedImportRecoveryContext?.id == context.id,
-                          case .completed(let currentOutcome) = importState,
-                          currentOutcome.recoveryRoute == context.route,
-                          currentOutcome.recoveryContextID == context.id else {
+                    guard importCentre.isCurrentRecoveryContext(context.id, route: context.route) else {
                         return false
                     }
                     return ImportEngine.shared.retryCanonicalHydration()
                 },
                 requestOrdinaryPreparation: { url in
-                    guard confirmedImportRecoveryContext?.id == context.id,
-                          case .completed(let currentOutcome) = importState,
-                          currentOutcome.recoveryRoute == context.route,
-                          currentOutcome.recoveryContextID == context.id else {
+                    guard importCentre.isCurrentRecoveryContext(context.id, route: context.route) else {
                         return false
                     }
 #if DEBUG
@@ -3860,16 +3844,8 @@ struct ContentView: View {
                 }
             )
 
-            guard execution == .reconciliationSucceeded,
-                  confirmedImportRecoveryContext?.id == context.id,
-                  case .completed(let reconciledOutcome) = importState,
-                  reconciledOutcome.recoveryRoute == .retryCanonicalReconciliation,
-                  reconciledOutcome.recoveryContextID == context.id else {
-                return
-            }
-            confirmedImportRecoveryContext = nil
-            selectedImportSourceURL = nil
-            importState = .completed(reconciledOutcome.markingReconciled())
+            guard execution == .reconciliationSucceeded else { return }
+            importCentre.markCurrentOutcomeReconciled(contextID: context.id)
         }
     }
 
@@ -3879,12 +3855,8 @@ struct ContentView: View {
         route: ConfirmedImportRecoveryRoute
     ) {
         guard let context = confirmedImportRecoveryContext,
-              context.id == contextID,
-              context.route == route,
               context.sourceURL == url,
-              case .completed(let outcome) = importState,
-              outcome.recoveryRoute == route,
-              outcome.recoveryContextID == contextID else {
+              importCentre.isCurrentRecoveryContext(contextID, route: route) else {
             return
         }
         beginPreparation(from: url)
@@ -3892,168 +3864,19 @@ struct ContentView: View {
 
     private func beginPreparation(from url: URL) {
         guard availability.permitsMutation else { return }
-        guard consumePreparedImportBeforeSourceReplacement() else { return }
-        confirmedImportRecoveryContext = nil
-        selectedImportSourceURL = url
-        importAccountChoice = nil
-        importIdentityReview = .unavailable
-        partialImportReview = .ordinaryFullImport
-        selectedFile = url.lastPathComponent
-        importState = .preparing(fileName: url.lastPathComponent, phase: .openingSource)
+        guard importCentre.selectSource(url) else { return }
         selectedSection = .imports
-        _ = preparationOwner.start { operationID in
-            await prepareImport(
-                displayName: url.lastPathComponent,
-                operationID: operationID,
-                retrySourceURL: url
-            ) { progress in
-                try await ImportEngine.shared.prepareImport(
-                    from: url,
-                    requestId: operationID,
-                    progress: progress
-                )
-            }
-        }
-    }
-
-    @MainActor
-    private func prepareImport(
-        displayName: String,
-        operationID: UUID,
-        retrySourceURL: URL?,
-        loader: @escaping (@escaping (ImportProgress) -> Void) async throws -> PreparedImport
-    ) async {
-        do {
-            let preparedImport = try await loader { progress in
-                guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
-                    return
-                }
-                importState = .preparing(fileName: displayName, phase: progress.phase)
-            }
-            guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
-                ImportEngine.shared.cancelPreparedImport(preparedImport)
-                return
-            }
-            let identityReview: ImportIdentityReview
-            let preparedPartialReview: PartialImportReviewResult
-            do {
-                identityReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
-                    ? (try ImportEngine.shared.reviewPreparedImport(preparedImport))
-                    : .unavailable
-                preparedPartialReview = preparedImport.validation.passed && preparedImport.advisoryPreviousImport == nil
-                    ? (try ImportEngine.shared.reviewPreparedPartialImport(preparedImport))
-                    : .ordinaryFullImport
-            } catch {
-                ImportEngine.shared.cancelPreparedImport(preparedImport)
-                throw error
-            }
-            importIdentityReview = identityReview
-            importAccountChoice = ImportAccountConfirmationPolicy.initialChoice(for: identityReview)
-            cardSectionDraftAccountID = nil
-            cardSectionDraftChoices = [:]
-            partialImportReview = preparedPartialReview
-            guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
-                ImportEngine.shared.cancelPreparedImport(preparedImport)
-                return
-            }
-            selectedFile = displayName
-            importState = preparedImport.validation.passed ? .previewReady(preparedImport) : .validationFailed(preparedImport)
-            releasePreparationOperation(operationID)
-        } catch is CancellationError {
-            guard preparationOwner.isCurrent(operationID) else {
-                return
-            }
-            selectedFile = displayName
-            importState = .cancelled(fileName: displayName)
-            releasePreparationOperation(operationID)
-        } catch let error as ImportError where error == .cancelled {
-            guard preparationOwner.isCurrent(operationID) else {
-                return
-            }
-            selectedFile = displayName
-            importState = .cancelled(fileName: displayName)
-            releasePreparationOperation(operationID)
-        } catch {
-            guard preparationOwner.isCurrent(operationID), !Task.isCancelled else {
-                return
-            }
-            let summary = ImportFailureSummary.from(error)
-            selectedFile = displayName
-            importState = .failed(
-                fileName: displayName,
-                message: summary.displayText,
-                retrySourceURL: isRetryablePreparationFailure(error) ? retrySourceURL : nil
-            )
-            let diagnosticMetadata = [
-                "stage": summary.stage.rawValue,
-                "family": summary.family.rawValue
-            ]
-            DeveloperConsole.shared.error(
-                .import,
-                "Import preparation failed",
-                metadata: diagnosticMetadata
-            )
-            releasePreparationOperation(operationID)
-        }
     }
 
     @MainActor
     private func confirmPreparedImport(_ preparedImport: PreparedImport) async {
         guard availability.permitsMutation else { return }
-        guard case .previewReady(let currentPreparedImport) = importState,
-              currentPreparedImport.id == preparedImport.id else {
-            return
-        }
-
-        let displayName = selectedFile
-        importState = .committing(preparedImport)
-        let result = await ImportEngine.shared.commitPreparedImport(
-            preparedImport,
-            accountChoice: importAccountChoice,
-            reviewedPartialPlan: {
-                if case .eligible(let plan) = partialImportReview { return plan }
-                return nil
-            }()
-        )
-
-        var outcome = ImportOutcomePresentation(result: result)
-        outcome.fileName = displayName
-        if let action = outcome.recoveryPresentation?.primaryAction {
-            let context = ConfirmedImportRecoveryContext(
-                route: outcome.recoveryRoute,
-                sourceURL: action.requiresSourceURL ? selectedImportSourceURL : nil
-            )
-            outcome.recoveryContextID = context.id
-            confirmedImportRecoveryContext = context
-        } else {
-            confirmedImportRecoveryContext = nil
-        }
-        selectedImportSourceURL = nil
-        selectedFile = displayName
-        importState = .completed(outcome)
+        await importCentre.confirmCurrent(expectedPreparationID: preparedImport.id)
     }
 
     private func cancelPreparedImport() {
-        let fileName: String
-        switch importState {
-        case .preparing(let currentFileName, _):
-            fileName = currentFileName
-            statementPassword = ""
-            statementPasswordChallenges.cancel()
-            preparationOwner.cancel()
-        case .previewReady(let preparedImport), .validationFailed(let preparedImport):
-            fileName = preparedImport.fileName
-            ImportEngine.shared.cancelPreparedImport(preparedImport)
-        default:
-            return
-        }
-        importAccountChoice = nil
-        importIdentityReview = .unavailable
-        partialImportReview = .ordinaryFullImport
-        selectedImportSourceURL = nil
-        confirmedImportRecoveryContext = nil
-        selectedFile = fileName
-        importState = .cancelled(fileName: fileName)
+        statementPassword = ""
+        importCentre.cancelCurrent()
     }
 
     private func submitStatementPassword(_ challenge: StatementPasswordChallenge) {
@@ -4061,24 +3884,6 @@ struct ContentView: View {
         let password = statementPassword
         statementPassword = ""
         statementPasswordChallenges.submit(password, challengeID: challenge.id)
-    }
-
-    @MainActor
-    private func releasePreparationOperation(_ operationID: UUID) {
-        preparationOwner.finish(operationID)
-    }
-
-    private func isRetryablePreparationFailure(_ error: Error) -> Bool {
-        guard let importError = error as? ImportError else {
-            return false
-        }
-        switch importError {
-        case .readerFailure, .unknown:
-            return true
-        case .unsupportedFile, .passwordRequired, .incorrectPassword, .readerUnavailable,
-                .invalidDocument, .unsupportedStatement, .cancelled:
-            return false
-        }
     }
 
     private func statementPeriodText(_ period: ClosedRange<StatementDate>?) -> String {
