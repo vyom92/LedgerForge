@@ -3,7 +3,7 @@ import Foundation
 
 protocol ImportCentrePreparation: Identifiable where ID == UUID {}
 
-extension PreparedImport: ImportCentrePreparation {}
+extension PreparedImport: @MainActor ImportCentrePreparation {}
 
 struct ImportCentreReviewState {
     let identityReview: ImportIdentityReview

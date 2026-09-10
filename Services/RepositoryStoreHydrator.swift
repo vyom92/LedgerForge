@@ -540,6 +540,7 @@ final class RepositoryStoreHydrator {
                   Set(dto.components.map(\.id)).count == dto.components.count else {
                 throw RepositoryStoreHydrationError.invalidSalaryState("invalid component side or identity")
             }
+            @MainActor
             func component(_ value: SalaryComponentDTO, side: SalaryComponentSide) throws -> SalaryComponent {
                 let money = try persistedMoney(currency: value.amountCurrency, minor: value.amountMinor, decimal: value.amountDecimal)
                 do { return try SalaryComponent(side: side, sourceOrdinal: value.sourceOrdinal, sourceLabel: value.sourceLabel, money: money) }
@@ -658,6 +659,7 @@ final class RepositoryStoreHydrator {
                 }
                 return FundingPlanBalance(id: value.id, accountID: value.accountId, nativeCurrency: nativeCurrency, included: value.included, money: money, provenance: provenance)
             }
+            @MainActor
             func commitments(region: String, currency: String) throws -> [FundingPlanCommitment] {
                 let values = dto.commitments.filter { $0.regionCode == region }.sorted { $0.sourceOrdinal < $1.sourceOrdinal }
                 let expectedOrdinals = values.isEmpty ? [] : Array(1...values.count)

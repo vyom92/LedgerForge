@@ -57,7 +57,7 @@ struct StatementDropRequestGate: Equatable {
 }
 
 struct StatementDropItemProvider {
-    typealias Completion = (Result<URL, StatementDropIntakeError>) -> Void
+    typealias Completion = @Sendable (Result<URL, StatementDropIntakeError>) -> Void
 
     let canLoadFileURL: Bool
     private let load: (@escaping Completion) -> Void
@@ -103,7 +103,7 @@ struct StatementDropIntakeAdapter {
 
     func resolve(
         _ providers: [StatementDropItemProvider],
-        completion: @escaping (Result<[URL], StatementDropIntakeError>) -> Void
+        completion: @escaping @MainActor (Result<[URL], StatementDropIntakeError>) -> Void
     ) {
         guard !providers.isEmpty else {
             completion(.failure(.emptyPayload))
@@ -116,7 +116,7 @@ struct StatementDropIntakeAdapter {
         _ providers: [StatementDropItemProvider],
         index: Int,
         resolvedURLs: [URL],
-        completion: @escaping (Result<[URL], StatementDropIntakeError>) -> Void
+        completion: @escaping @MainActor (Result<[URL], StatementDropIntakeError>) -> Void
     ) {
         guard index < providers.count else {
             completion(.success(resolvedURLs))
