@@ -2,7 +2,7 @@
 
 **Status:** Current repository cycle roadmap
 **Refreshed:** 2026-09-10
-**Planning review baseline:** accepted Sprint 85, `main@b4e4e6ffb14deccef238352a6ef834514a2a37c2`
+**Planning review baseline:** accepted Sprint 86, `main@022d436fc4563be9b0967ac2751e6114a31474c1`
 **Supersedes:** `Project documents/Sprint roadmap/Archived/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
 
 **Forward planning — explicit user decision, 2026-09-10:** LedgerForge 1.0 personal-adoption certification is fixed at Sprint 100 after its required pre-1.0 product boundaries. The prepared [90–99](Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md) and [100–109](Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md) roadmaps own that future sequence; neither is current or implementation-authorized. Active 80–89 numbering, Sprint 86 test-only scope, Sprint 87 entry/qualification and Sprints 88–89 remain unchanged.
@@ -11,7 +11,7 @@
 
 - **Planning authority:** This file owns Sprint 80–89 numbering, corrective suffixes, cycle status and planned positions.
 - **Execution authority:** None. Roadmap assignment is planning, not implementation authorization; each sprint still requires Chat priority/dependency triage and a complete execution prompt.
-- **Latest numbered product implementation:** Sprint 85 — PR-3 Dependency Concurrency Boundary, accepted at implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2` (parent `8d2dafd29de543660300ac8f37f16a152603f1f5`). Sprints 81–84 remain accepted as recorded below and in `PROJECT_STATE.md`; their financial, import and publication contracts remain current.
+- **Latest accepted numbered implementation:** Sprint 86 — TEST-PR Strict-Concurrency Test Correction, accepted at implementation commit `022d436fc4563be9b0967ac2751e6114a31474c1` (parent `dee5968c8268e69f8540aefc73613c28736d01ec`). This was test/support-only; Sprints 81–85 and their financial, import, dependency and publication contracts remain accepted. Native targets remain Swift 5 at this acceptance boundary.
 - **Current migration:** V17; V1–V16 remain immutable.
 - **Current source/reliability authority:** ADR-046 complete-authentic-corpus certification.
 - **Current UI design authority:** `LF-UI-2026-09-R1` for its bounded scope; design approval is not native implementation.
@@ -45,8 +45,8 @@ A material source, credential, parser, persistence, orchestration or financial-s
 | 83 | Serial Batch Import and Multi-File Drag-and-Drop | completed `FW-P1-20` + `FW-P1-21` (removed from active queue) | Core product implementation | **ACCEPTED** — implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; ordered serial queue length N, multi-file picker/drop, independent per-item review/confirmation and outcomes |
 | 84 | PR-2 SQLite / Provider / Migration Ownership | historical `FW-P2-73` (removed from active queue) | Swift-6 prerequisite | **ACCEPTED** — implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`; no schema migration |
 | 85 | PR-3 Dependency Concurrency Boundary | historical `FW-P2-74` (removed from active queue) | Swift-6 prerequisite | **ACCEPTED** — implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2`; local ZIPFoundation correction and process-local libxls serialization |
-| 86 | TEST-PR Strict-Concurrency Test Correction | `FW-P2-75` | Swift-6 prerequisite | **CURRENT / CHAT-AUTHORIZED** — test/support-only, production bytes frozen; stop if production/runtime changes are required; return for Chat acceptance before Sprint 87 |
-| 87 | Coordinated Swift-6 Migration | `FW-P2-76` | Implementation | Entry gate: serial Unified Import Centre through Sprints 82–83 and PR-2 through Sprint 84 accepted; PR-3 through Sprint 85 accepted; Sprint 86 acceptance still required; no feature work bundled |
+| 86 | TEST-PR Strict-Concurrency Test Correction | historical `FW-P2-75` (removed from active queue) | Swift-6 prerequisite | **ACCEPTED** — implementation commit `022d436fc4563be9b0967ac2751e6114a31474c1`; test/support-only, production bytes frozen |
+| 87 | Coordinated Swift-6 Migration | `FW-P2-76` | Implementation | **CURRENT / CHAT-AUTHORIZED** — serial Import Centre and PR-1/PR-2/PR-3/TEST-PR prerequisites accepted; coordinated migration only; comprehensive qualification; return for Chat acceptance before Sprint 88 |
 | 88 | App Shell and Workflow Decomposition | `FW-P2-67` | Behavior-preserving maintenance | No financial redesign or broad source-tree move; preserve R1 shell direction |
 | 89 | LF-UI-2026-09-R1 Transactions Reference Implementation | `FW-P2-03` + `FW-P2-53`, bounded `FW-P2-48` + `FW-P2-49` + `FW-P2-50` | User-facing implementation / representative R1 proof surface | Planned position; financial semantics remain source/repository-authoritative |
 
@@ -102,7 +102,7 @@ the exact registered CBQ boundary while preserving historical minimum-due
 absence and enforcing the current authentic minimum-due contract. Personal-v1
 adoption remains a separate later gate.
 
-## Accepted Sprints 81–85, current Sprint 86 and planned Sprints 87–89
+## Accepted Sprints 81–86, current Sprint 87 and planned Sprints 88–89
 
 ### Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam
 
@@ -162,9 +162,9 @@ Chat has accepted that implementation candidate and authorized Sprint 86. The ca
 
 ### Sprint 86 — TEST-PR Strict-Concurrency Test Correction
 
-Queue: `FW-P2-75`.
+Historical queue origin: `FW-P2-75` (removed from the active queue).
 
-**CURRENT / CHAT-AUTHORIZED on 2026-09-10** by `ACCEPT_SPRINT_85_AND_CONTINUE_TO_86`. Reproduce the current diagnostic set; the historical Sprint-80 count is not an expected count. Publish one implementation candidate and **STOP for Chat acceptance before Sprint 87**.
+**ACCEPTED on 2026-09-10.** Implementation commit `022d436fc4563be9b0967ac2751e6114a31474c1`. The test/support-only correction and its proportional qualification are recorded in `PROJECT_STATE.md`; production bytes and native Swift-5 settings remained frozen. The accepted validation contract below is retained as history.
 
 Make unit-test ownership/synchronization honest for strict migration. Preserve independent source/test oracles and assertions; never weaken tests merely to remove diagnostics.
 
@@ -174,7 +174,7 @@ Treat validation as test/support-only: freeze production-source bytes; reproduce
 
 Queue: `FW-P2-76`.
 
-Entry gate: the serial Unified Import Centre through Sprints 82–83 and PR-2 through Sprint 84 are accepted; PR-3 through Sprint 85 is also accepted; Sprint 86 must be accepted before Swift-6 migration. Perform the coordinated language/strict-concurrency migration only; no feature work bundled.
+**CURRENT / CHAT-AUTHORIZED on 2026-09-10** by `ACCEPT_SPRINT_86_AND_CONTINUE_TO_87`. The serial Unified Import Centre through Sprints 82–83, PR-2 through Sprint 84, PR-3 through Sprint 85 and TEST-PR through Sprint 86 are accepted. Perform the coordinated language/strict-concurrency migration only; no feature work bundled. Publish one implementation candidate and **STOP for Chat acceptance before Sprint 88**.
 
 Retain comprehensive integrated qualification: all native Swift targets in Swift 6; strict compiler closure; focused ownership/dependency/test checks; one complete TestPlan; complete registered authentic corpus and provider/order campaigns; Debug and optimized Release; native Import Centre/runtime smoke; durable same-database relaunch and canonical hydration; V1–V17 migration identity/integrity; bundle/privacy/signing; explicit review of every unsafe/unchecked concurrency escape.
 

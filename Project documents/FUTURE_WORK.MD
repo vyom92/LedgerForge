@@ -136,7 +136,8 @@ Reconciliation outcomes:
 - `FW-P1-19` is removed from the active queue because Sprint 82 completed and Chat accepted the serial Unified Import Centre foundation at implementation commit `d239f939088b67e5a90c65117f08592891be17bb`. Its serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership, duplicate/recovery preservation and no-parallel-preparation evidence are recorded in `PROJECT_STATE.md` and the current roadmap.
 - `FW-P1-20` and `FW-P1-21` are removed from the active queue because Sprint 83 completed and Chat accepted serial batch import and multi-file picker/drag-and-drop at implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29`. Single and multi-file intake share the serial queue with independent review, explicit confirmation, failure isolation and truthful per-file outcomes. Parallel preparation remains unscheduled research under the existing `FW-P2-51`.
 - `FW-P2-73` is removed from the active queue because Sprint 84 completed and Chat accepted PR-2 SQLite/provider/migration ownership at implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`. The bounded ownership, strict closure and V1–V17 preservation evidence belongs in `PROJECT_STATE.md`. The subsequent Sprint-85 acceptance below closes PR-3; the current roadmap owns TEST-PR and the amended Sprint-85–87 validation policy.
-- <a id="fw-p2-74"></a>`FW-P2-74` is removed from the active queue because Sprint 85 completed and Chat accepted PR-3 Dependency Concurrency Boundary at implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2`: `LOCAL_CORRECTION` for ZIPFoundation and `SERIALIZED_PROCESS_LOCAL` for LegacyXLS/libxls. Evidence belongs in `PROJECT_STATE.md`; `FW-P2-75` is now Chat-authorized and `FW-P2-76` retains its separate production/runtime boundary.
+- <a id="fw-p2-74"></a>`FW-P2-74` is removed from the active queue because Sprint 85 completed and Chat accepted PR-3 Dependency Concurrency Boundary at implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2`: `LOCAL_CORRECTION` for ZIPFoundation and `SERIALIZED_PROCESS_LOCAL` for LegacyXLS/libxls. Evidence belongs in `PROJECT_STATE.md`; Sprint 86 subsequently accepted TEST-PR, and `FW-P2-76` retains its separate coordinated migration boundary.
+- <a id="fw-p2-75"></a>`FW-P2-75` is removed from the active queue because Sprint 86 completed and Chat accepted TEST-PR at implementation commit `022d436fc4563be9b0967ac2751e6114a31474c1`. Test/support ownership, independent assertions/oracles and proportional qualification are recorded in `PROJECT_STATE.md`. Sprint 87 (`FW-P2-76`) is now Chat-authorized; no production/runtime change, migration, ADR or native Swift-6 switch was accepted in Sprint 86.
 - `FW-P0-25` is removed from the active queue because the unnumbered 127-carrier authentic-corpus reset is technically accepted and complete; newly supplied recurring sources remain governed cumulatively by ADR-046.
 - Compound historical statuses are normalized to the defined planning vocabulary. Completed slices remain concise body notes while titles and statuses describe only remaining unscheduled work.
 - Exact source-family support remains exact. HDFC whole-statement PDF/XLS equivalence, Axis-card PDF/XLSX equivalence and CBQ current-account source lineage are separate accepted contracts; none is generalized to another institution, financial family or format.
@@ -7300,71 +7301,14 @@ Do not remove shared Xcode configuration merely because it lives beneath the pro
 
 ---
 
-<a id="fw-p2-75"></a>
-
-## FW-P2-75 — TEST-PR Unit-Test Strict-Concurrency Correction
-
-**Status:** Candidate
-**Depends on:** Sprint 80 accepted unit-test strict probe; PR-2 accepted in Sprint 84; PR-3 accepted in Sprint 85 at `b4e4e6ffb14deccef238352a6ef834514a2a37c2`. Chat has authorized Sprint 86 test/support-only execution.
-
-Make the unit-test target honest under coordinated strict migration through
-actor-aware fixture construction, async-safe test synchronization, subprocess
-Sendable ownership and actor-aware assertions/macros. The accepted Sprint-80 strict probe historically
-found 45 distinct error locations; Sprint 86 must reproduce the current diagnostic set.
-This family must preserve independent test oracles and
-must not weaken production assertions to silence diagnostics.
-
-TEST-PR is required before the unit-test target can participate in the
-coordinated Swift-6 migration.
-
-The current campaign amendment keeps production-source bytes frozen for TEST-PR and requires independent assertion/oracle and inventory preservation. A required production/runtime correction is a stop condition for Chat disposition, not permission to extend test-only work.
-
-**Discovery 2026-09-10:** REUSED_EVIDENCE / OWNED_BY_ACTIVE_SPRINT at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`. VERIFIED_REPOSITORY: the test target is Swift 5 with approachable concurrency but no explicit default MainActor setting in shown configurations; queue records 45 readiness error locations.
-
-**Discovery remainder:** MISSING: exact active diagnostics and offending test fixtures/support symbols. **Next boundary:** PROPOSED: active owner alone checks actor-aware construction/synchronization after matching diagnostics. **Acceptance:** Exact compiler diagnostics plus tests preserving independent assertions.
-
-<details>
-<summary>First-round evidence retained; no second-round scope expansion</summary>
-
-**question (research ref):** Does platform research alter TEST-PR?
-
-**current behavior (research ref):** VERIFIED_REPOSITORY: the test target is Swift 5 with approachable concurrency but no explicit default MainActor setting in shown configurations; queue records 45 readiness error locations.
-
-**accepted constraints (research ref):** Preserve independent source/test oracles; never weaken assertions merely to silence diagnostics.
-
-**missing (research ref):** MISSING: exact active diagnostics and offending test fixtures/support symbols.
-
-**options (research ref):** Reuse current active ownership; independently reproduce. The second is forbidden here.
-
-**proposed boundary (research ref):** PROPOSED: active owner alone checks actor-aware construction/synchronization after matching diagnostics.
-
-**scope exclusions (research ref):** No test execution, fixture edits, flag changes, or broad migration.
-
-**dependencies (research ref):** Active TEST-PR campaign.
-
-**adr migration impact (research ref):** None in this lane.
-
-**acceptance (research ref):** Exact compiler diagnostics plus tests preserving independent assertions.
-
-**invalidators (research ref):** Changing language/default-isolation settings invalidates snapshot conclusion.
-
-**personal v1 (research ref):** REPORTED_ONLY: coordinated migration prerequisite.
-
-**queue roadmap disposition (research ref):** OWNED_BY_ACTIVE_SPRINT; reuse only.
-
-- [LedgerForge.xcodeproj/project.pbxproj](<../LedgerForge.xcodeproj/project.pbxproj>):1465-1515 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `08dbe3df432f0dd1a78fe123eca04cb7d806a2809f599b30034c95eab7212d34` — LedgerForgeTests settings
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1782-1795 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-75
-
-</details>
-
----
-
 <a id="fw-p2-76"></a>
 
 ## FW-P2-76 — Coordinated Swift-6 Migration
 
-**Status:** Blocked
-**Depends on:** PR-2 accepted in Sprint 84 at `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`; PR-3 accepted in Sprint 85 at `b4e4e6ffb14deccef238352a6ef834514a2a37c2`; pending TEST-PR acceptance. The serial Unified Import Centre boundary is accepted through Sprints 82–83.
+**Status:** Candidate
+**Depends on:** PR-2 accepted in Sprint 84 at `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`; PR-3 accepted in Sprint 85 at `b4e4e6ffb14deccef238352a6ef834514a2a37c2`; TEST-PR accepted in Sprint 86 at `022d436fc4563be9b0967ac2751e6114a31474c1`. The serial Unified Import Centre boundary is accepted through Sprints 82–83.
+
+**Chat authorization — 2026-09-10:** Sprint 87 is CURRENT / CHAT-AUTHORIZED for the coordinated native Swift-6 migration only. Preserve accepted PR-1/PR-2/PR-3/TEST-PR ownership, serial Import Centre semantics and V1–V17 identity. The complete compiler/TestPlan/corpus/provider/runtime/durable/privacy/signing gate applies; stop for Chat on financial-semantic divergence or a new architecture/schema requirement. The historical discovery and five residual readiness findings below remain evidence, not additional feature scope.
 
 After the prerequisite families are accepted, perform one coordinated Swift-6
 strict migration and readiness pass. The migration is not a prerequisite to
