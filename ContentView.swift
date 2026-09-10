@@ -70,14 +70,6 @@ enum SettingsPresentation {
 }
 import UniformTypeIdentifiers
 
-enum StatementImportFileTypes {
-    static let allowed: [UTType] = [
-        .commaSeparatedText,
-        .pdf,
-        .spreadsheet
-    ]
-}
-
 enum AppShellSection: String, CaseIterable {
     case dashboard = "Dashboard"
     case accounts = "Accounts"
@@ -127,7 +119,8 @@ enum AppShellSection: String, CaseIterable {
 #if DEBUG
 private enum ProtectedImportIntent {
     case presentFileImporter
-    case prepareURL(URL)
+    case prepareURLs([URL])
+    case retryPreparation
     case prepareRecoveryURL(
         URL,
         contextID: UUID,
@@ -137,7 +130,7 @@ private enum ProtectedImportIntent {
 
     var protectedAction: DevelopmentProtectedAction {
         switch self {
-        case .presentFileImporter, .prepareURL, .prepareRecoveryURL:
+        case .presentFileImporter, .prepareURLs, .retryPreparation, .prepareRecoveryURL:
             return .importPreparation
         case .confirm:
             return .importConfirmation
@@ -153,6 +146,7 @@ enum ImportPresentationState {
     case validationFailed(PreparedImport)
     case committing(PreparedImport)
     case completed(ImportOutcomePresentation)
+    case skipped(fileName: String)
     case cancelled(fileName: String)
     case failed(fileName: String, message: String, retrySourceURL: URL?)
 }
@@ -236,7 +230,7 @@ enum ValidationReviewPresentation {
 private extension ImportPresentationState {
     var isTerminal: Bool {
         switch self {
-        case .completed, .cancelled, .failed:
+        case .completed, .skipped, .cancelled, .failed:
             return true
         default:
             return false
@@ -990,6 +984,8 @@ struct DurableImportAttemptPresentation: Equatable {
 struct ImportOutcomePresentation: Equatable {
     var fileName: String
     let transactionCount: Int
+    let persisted: Bool
+    let validationPassed: Bool
     let validationStatus: String
     var persistenceStatus: String
     var message: String?
@@ -1015,6 +1011,8 @@ struct ImportOutcomePresentation: Equatable {
     init(result: ImportEngineResult) {
         fileName = result.fileName
         transactionCount = result.transactionCount
+        persisted = result.persisted
+        validationPassed = result.validationPassed
         validationStatus = result.validationPassed ? "Validation Passed" : "Validation Failed"
         allowsViewingTransactions = Self.provesCommittedSuccess(result)
             && !result.isEquivalentSupportingSource
@@ -1259,6 +1257,14 @@ struct ImportActivityPresentation: Equatable {
                 iconName: outcome.iconName,
                 tone: outcome.tone
             )
+        case .skipped(let fileName):
+            self.init(
+                title: fileName,
+                subtitle: "Statement skipped. No data was written.",
+                status: "Skipped",
+                iconName: "forward.fill",
+                tone: .warning
+            )
         case .cancelled(let fileName):
             self.init(
                 title: fileName,
@@ -1317,6 +1323,8 @@ struct ContentView: View {
 
     @State private var showingImporter = false
     @State private var statementPassword = ""
+    @State private var statementDropIsTargeted = false
+    @State private var statementDropRequestGate = StatementDropRequestGate()
     @StateObject private var statementPasswordChallenges = StatementPasswordChallengeController.shared
     @ObservedObject private var importCentre = ProductionImportCentre.shared
     @State private var confirmedImportRecoveryActionExecutor = ConfirmedImportRecoveryActionExecutor()
@@ -1338,20 +1346,25 @@ struct ContentView: View {
     @State private var developmentActionMessage: String?
 #endif
 
+    private var displayedImportItem: ImportCentreCoordinator<PreparedImport>.Item? {
+        importCentre.currentItem
+            ?? (importCentre.batchSummary.isComplete ? importCentre.presentedItem : nil)
+    }
+
     private var selectedFile: String {
-        importCentre.currentItem?.displayFileName
+        displayedImportItem?.displayFileName
             ?? (importCentre.selectionFailureMessage == nil ? "No statement imported" : "Import failed")
     }
 
     private var importState: ImportPresentationState {
-        guard let item = importCentre.currentItem else {
+        guard let item = displayedImportItem else {
             if let message = importCentre.selectionFailureMessage {
                 return .failed(fileName: "Import failed", message: message, retrySourceURL: nil)
             }
             return .idle
         }
         switch item.phase {
-        case .preparing, .awaitingReview:
+        case .pending, .preparing, .awaitingReview:
             return .preparing(fileName: item.displayFileName, phase: item.progress.phase)
         case .awaitingConfirmation:
             guard let preparation = item.preparation else { return .idle }
@@ -1365,6 +1378,8 @@ struct ContentView: View {
         case .completed:
             guard let outcome = item.outcome else { return .idle }
             return .completed(outcome)
+        case .skipped:
+            return .skipped(fileName: item.displayFileName)
         case .cancelled:
             return .cancelled(fileName: item.displayFileName)
         case .failed:
@@ -1402,6 +1417,27 @@ struct ContentView: View {
 
     private var confirmedImportRecoveryActionRequestID: UUID? {
         importCentre.recoveryActionRequestID
+    }
+
+    private var activeStatementPasswordChallenge: StatementPasswordChallenge? {
+        guard let challenge = statementPasswordChallenges.challenge,
+              let item = importCentre.currentItem,
+              item.phase == .preparing,
+              item.preparationOperationID == challenge.id else { return nil }
+        return challenge
+    }
+
+    private var importBatchQueueItems: [ImportBatchQueueItemPresentation] {
+        let summaryIsComplete = importCentre.batchSummary.isComplete
+        return importCentre.items.map {
+            ImportBatchQueueItemPresentation(
+                item: $0,
+                total: importCentre.items.count,
+                activeItemID: importCentre.activeItemID,
+                presentedItemID: importCentre.presentedItemID,
+                permitsOutcomeNavigation: summaryIsComplete
+            )
+        }
     }
 
     var body: some View {
@@ -1444,14 +1480,15 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .fileImporter(
             isPresented: $showingImporter,
-            allowedContentTypes: StatementImportFileTypes.allowed
+            allowedContentTypes: StatementImportFileTypes.allowed,
+            allowsMultipleSelection: true
         ) { result in
             switch result {
-            case .success(let url):
+            case .success(let urls):
 #if DEBUG
-                requestProtectedImportAction(.prepareURL(url))
+                requestProtectedImportAction(.prepareURLs(urls))
 #else
-                beginPreparation(from: url)
+                beginImportBatch(from: urls)
 #endif
 
             case .failure(let error):
@@ -1467,6 +1504,8 @@ struct ContentView: View {
         }
         .onDisappear {
             statementPassword = ""
+            statementDropRequestGate.invalidate()
+            statementDropIsTargeted = false
             importCentre.detachPresentationOwner(importCentrePresentationOwnerID)
         }
         .onChange(of: statementPasswordChallenges.challenge?.id) { _, _ in
@@ -1745,11 +1784,19 @@ struct ContentView: View {
                 LFPanel {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("Prepare Statement")
+                            Text("Import Statements")
                                 .font(.title3.weight(.semibold))
-                            Text("Choose a file, review the parsed statement and confirm before LedgerForge writes financial data.")
+                            Text("Choose or drop statement files, then review and confirm each item before LedgerForge writes its financial data.")
                                 .font(.subheadline)
                                 .foregroundStyle(LFTheme.textSecondary)
+
+                            if !importCentre.items.isEmpty {
+                                ImportBatchProgressView(
+                                    activePosition: importCentre.currentItem.map { $0.queuePosition + 1 },
+                                    total: importCentre.items.count,
+                                    terminalCount: importCentre.terminalItems.count
+                                )
+                            }
 
                             Button {
                                 requestFileSelection()
@@ -1758,7 +1805,7 @@ struct ContentView: View {
                                     Image(systemName: "folder")
                                         .font(.system(size: 42, weight: .light))
                                         .foregroundStyle(LFTheme.primaryHover)
-                                    Text("Choose a statement file")
+                                    Text("Choose or drop statements")
                                         .font(.headline)
                                     Text("Browse Files")
                                         .font(.subheadline.weight(.semibold))
@@ -1770,16 +1817,42 @@ struct ContentView: View {
                                         )
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 210)
-                                .background(LFTheme.primary.opacity(0.05))
+                                .background(
+                                    LFTheme.primary.opacity(statementDropIsTargeted ? 0.15 : 0.05)
+                                )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(LFTheme.primary.opacity(0.75), lineWidth: 1)
+                                        .stroke(
+                                            statementDropIsTargeted
+                                                ? LFTheme.primaryHover
+                                                : LFTheme.primary.opacity(0.75),
+                                            lineWidth: statementDropIsTargeted ? 2 : 1
+                                        )
                                 )
                             }
                             .buttonStyle(.plain)
-                            .disabled(importSelectionDisabled)
+                            .disabled(importSelectionDisabled || statementDropRequestGate.isActive)
+                            .onDrop(
+                                of: [.fileURL],
+                                isTargeted: $statementDropIsTargeted,
+                                perform: receiveStatementDrop
+                            )
+                            .accessibilityLabel("Add statements")
+                            .accessibilityHint("Opens the file picker. You can also drop supported statement files here.")
+
+                            if !importCentre.items.isEmpty {
+                                ImportBatchQueueView(items: importBatchQueueItems) { itemID in
+                                    importCentre.presentItem(itemID)
+                                }
+                            }
 
                             importResultPanel
+
+                            if importCentre.hasTerminalOutcomesForEntireBatch {
+                                ImportBatchSummaryView(
+                                    summary: ImportBatchSummaryPresentation(importCentre.batchSummary)
+                                )
+                            }
 
                             importAttemptHistoryPanel
 
@@ -1835,26 +1908,51 @@ struct ContentView: View {
 
             HStack {
                 if case .committing = importState {
-                    Label("Cancellation unavailable", systemImage: "lock.fill")
+                    Label("Current commit cannot be cancelled", systemImage: "lock.fill")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(LFTheme.textSecondary)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 13)
                         .background(LFTheme.surface.opacity(0.65))
                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
-                    Button {
-                        cancelPreparedImport()
-                    } label: {
-                        Text("Cancel")
-                            .padding(.horizontal, 42)
-                            .padding(.vertical, 13)
-                            .background(LFTheme.surface)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .contentShape(RoundedRectangle(cornerRadius: 8))
+                }
+
+                if canCancelPreparation {
+                    Button("Cancel Current", action: cancelPreparedImport)
+                        .buttonStyle(.bordered)
+                }
+
+                if importCentre.permitsSkip {
+                    Button("Skip") {
+                        statementPassword = ""
+                        importCentre.skipCurrent()
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!canCancelPreparation)
+                    .buttonStyle(.bordered)
+                }
+
+                if importCentre.permitsContinue {
+                    Button("Continue") {
+                        importCentre.continueAfterCurrent()
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                if importCentre.permitsBatchCancellation {
+                    Button(
+                        importCentre.batchLifecycle == .committing
+                            ? "Cancel Remaining After Current Import"
+                            : "Cancel Batch"
+                    ) {
+                        statementPassword = ""
+                        importCentre.cancelBatch()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(importCentre.batchCancellationRequested)
+                }
+
+                if importCentre.batchSummary.isComplete {
+                    Button("Start New Batch", action: startNewImportBatch)
+                        .buttonStyle(.bordered)
                 }
 
                 Spacer()
@@ -2239,7 +2337,7 @@ struct ContentView: View {
             return 5
         case .failed:
             return 2
-        case .cancelled:
+        case .skipped, .cancelled:
             return 1
         }
     }
@@ -2496,10 +2594,14 @@ struct ContentView: View {
                     Text("Preparing a read-only preview. You can cancel before confirmation.")
                         .font(.caption)
                         .foregroundStyle(LFTheme.textSecondary)
-                    if let challenge = statementPasswordChallenges.challenge {
+                    if let challenge = activeStatementPasswordChallenge {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Password required")
                                 .font(.subheadline.weight(.semibold))
+                            if let item = importCentre.currentItem {
+                                Text("Statement \(item.queuePosition + 1) of \(importCentre.items.count): \(challenge.fileName)")
+                                    .font(.caption.weight(.semibold))
+                            }
                             Text("Enter the statement password to unlock this PDF. It will be remembered in macOS Keychain only after the institution is verified.")
                                 .font(.caption)
                                 .foregroundStyle(LFTheme.textSecondary)
@@ -2692,6 +2794,13 @@ struct ContentView: View {
                         }
                     }
                 }
+            case .skipped(let fileName):
+                importedFileRow(
+                    name: fileName,
+                    subtitle: "Statement skipped. No data was written.",
+                    icon: "forward.fill",
+                    color: LFTheme.warning
+                )
             case .cancelled(let fileName):
                 importedFileRow(
                     name: fileName,
@@ -3362,12 +3471,12 @@ struct ContentView: View {
                     .padding(.vertical, 13)
                     .background(LFTheme.surface.opacity(0.65))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-            case .retryPreparation(let retrySourceURL):
+            case .retryPreparation:
                 Button {
 #if DEBUG
-                    requestProtectedImportAction(.prepareURL(retrySourceURL))
+                    requestProtectedImportAction(.retryPreparation)
 #else
-                    beginPreparation(from: retrySourceURL)
+                    retryCurrentPreparation()
 #endif
                 } label: {
                     Label("Retry Preparation", systemImage: "arrow.clockwise")
@@ -3720,8 +3829,10 @@ struct ContentView: View {
         case .presentFileImporter:
             showingImporter = true
             selectedSection = .imports
-        case .prepareURL(let url):
-            beginPreparation(from: url)
+        case .prepareURLs(let urls):
+            beginImportBatch(from: urls)
+        case .retryPreparation:
+            retryCurrentPreparation()
         case .prepareRecoveryURL(let url, let contextID, let route):
             beginRecoveryPreparation(
                 from: url,
@@ -3757,6 +3868,8 @@ struct ContentView: View {
     private func clearStaleImportPresentationAfterProfileChange() {
         guard importCentre.reset() else { return }
         statementPassword = ""
+        statementDropRequestGate.invalidate()
+        statementDropIsTargeted = false
         pendingProtectedImportIntent = nil
         developmentAcknowledgementChallenge = nil
     }
@@ -3859,12 +3972,56 @@ struct ContentView: View {
               importCentre.isCurrentRecoveryContext(contextID, route: route) else {
             return
         }
-        beginPreparation(from: url)
+        guard availability.permitsMutation,
+              importCentre.reprepareCurrentRecovery(
+                contextID: contextID,
+                route: route,
+                sourceURL: url
+              ) else { return }
+        selectedSection = .imports
     }
 
-    private func beginPreparation(from url: URL) {
+    private func beginImportBatch(from urls: [URL]) {
         guard availability.permitsMutation else { return }
-        guard importCentre.selectSource(url) else { return }
+        guard importCentre.enqueueSources(urls) else { return }
+        selectedSection = .imports
+    }
+
+    private func receiveStatementDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard availability.permitsMutation,
+              importCentre.permitsSourceSelection,
+              let requestID = statementDropRequestGate.begin() else { return false }
+
+        selectedSection = .imports
+        StatementDropIntakeAdapter().resolve(
+            providers.map { StatementDropItemProvider($0) }
+        ) { result in
+            guard statementDropRequestGate.finish(requestID) else { return }
+            switch result {
+            case .success(let urls):
+#if DEBUG
+                requestProtectedImportAction(.prepareURLs(urls))
+#else
+                beginImportBatch(from: urls)
+#endif
+            case .failure(let error):
+                importCentre.recordSelectionFailure(error.importError)
+            }
+        }
+        return true
+    }
+
+    private func startNewImportBatch() {
+        guard importCentre.batchSummary.isComplete,
+              importCentre.reset() else { return }
+        statementDropRequestGate.invalidate()
+        statementDropIsTargeted = false
+        requestFileSelection()
+    }
+
+    private func retryCurrentPreparation() {
+        guard availability.permitsMutation,
+              importCentre.retryCurrent() else { return }
         selectedSection = .imports
     }
 

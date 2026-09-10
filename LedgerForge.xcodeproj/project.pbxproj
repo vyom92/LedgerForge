@@ -151,6 +151,8 @@
 		B600000F3050000000000001 /* LedgerForgeSubprocessProbe in Embed Subprocess Probe */ = {isa = PBXBuildFile; fileRef = B60000103050000000000001 /* LedgerForgeSubprocessProbe */; };
 		B60000503050000000000001 /* InMemoryRepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */; };
 		B82000023082000000000001 /* ImportCentreCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82000013082000000000001 /* ImportCentreCoordinator.swift */; };
+		B83000023083000000000001 /* StatementDropIntakeAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B83000013083000000000001 /* StatementDropIntakeAdapter.swift */; };
+		B83000043083000000000001 /* ImportCentreBatchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B83000033083000000000001 /* ImportCentreBatchViews.swift */; };
 		C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */; };
 		D57000113057000000000001 /* Category.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000013057000000000001 /* Category.swift */; };
 		D57000123057000000000001 /* CategoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000023057000000000001 /* CategoryStore.swift */; };
@@ -344,6 +346,8 @@
 		B60000113050000000000001 /* LedgerForgeSubprocessProbe.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LedgerForgeSubprocessProbe.entitlements; sourceTree = "<group>"; };
 		B60000513050000000000001 /* DeveloperConsoleStub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperConsoleStub.swift; sourceTree = "<group>"; };
 		B82000013082000000000001 /* ImportCentreCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCentreCoordinator.swift; sourceTree = "<group>"; };
+		B83000013083000000000001 /* StatementDropIntakeAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementDropIntakeAdapter.swift; sourceTree = "<group>"; };
+		B83000033083000000000001 /* ImportCentreBatchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCentreBatchViews.swift; sourceTree = "<group>"; };
 		C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImportReconciliationGate.swift; sourceTree = "<group>"; };
 		D57000013057000000000001 /* Category.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Category.swift; sourceTree = "<group>"; };
 		D57000023057000000000001 /* CategoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryStore.swift; sourceTree = "<group>"; };
@@ -453,6 +457,7 @@
 		281BB1642FFC4C73006E7424 /* Import */ = {
 			isa = PBXGroup;
 			children = (
+				B83000053083000000000001 /* Presentation */,
 				2862424B2FFCE80D00B8AA66 /* Password */,
 				286242562FFCE80D00B8AA66 /* Readers */,
 				281BB1662FFC4C88006E7424 /* Models */,
@@ -698,6 +703,7 @@
 		288EB0E32FF7A3D500F09BC9 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				B83000033083000000000001 /* ImportCentreBatchViews.swift */,
 				7A79000E307A000000000001 /* SalaryView.swift */,
 				DBB00003305E000000000001 /* DeveloperDatabaseProfileWarningView.swift */,
 				D57000043057000000000001 /* CategoryManagementView.swift */,
@@ -803,6 +809,14 @@
 				B60000513050000000000001 /* DeveloperConsoleStub.swift */,
 			);
 			path = SubprocessProbe;
+			sourceTree = "<group>";
+		};
+		B83000053083000000000001 /* Presentation */ = {
+			isa = PBXGroup;
+			children = (
+				B83000013083000000000001 /* StatementDropIntakeAdapter.swift */,
+			);
+			path = Presentation;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1019,6 +1033,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B83000023083000000000001 /* StatementDropIntakeAdapter.swift in Sources */,
+				B83000043083000000000001 /* ImportCentreBatchViews.swift in Sources */,
 				AB1700020000000000000003 /* DurableStartupEvidence.swift in Sources */,
 				AB1700020000000000000002 /* PlannerInputCodec.swift in Sources */,
 				AB1700020000000000000001 /* RuntimeDiagnostics.swift in Sources */,

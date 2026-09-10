@@ -14,6 +14,36 @@ struct ImportCentreReviewState {
 
 @MainActor
 final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: ObservableObject {
+    enum CompletionDisposition: Equatable {
+        case committed
+        case reconciliationRequired
+        case exactDuplicate
+        case transactionEventBlocked
+        case rejected
+    }
+
+    enum BatchLifecycle: Equatable {
+        case idle
+        case processing
+        case awaitingUserAction
+        case committing
+        case cancelling
+        case completed
+    }
+
+    struct BatchSummary: Equatable {
+        let totalSelected: Int
+        let committedCount: Int
+        let exactDuplicateCount: Int
+        let transactionEventBlockedCount: Int
+        let rejectedCount: Int
+        let failedPreparationCount: Int
+        let skippedCount: Int
+        let cancelledOrNotProcessedCount: Int
+        let reconciliationRequiredCount: Int
+        let isComplete: Bool
+    }
+
     struct Dependencies {
         let prepare: @MainActor (
             _ sourceURL: URL,
@@ -38,12 +68,14 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
 
     struct Item: Identifiable {
         enum Phase: Equatable {
+            case pending
             case preparing
             case awaitingReview
             case awaitingConfirmation
             case validationFailed
             case committing
             case completed
+            case skipped
             case cancelled
             case failed
         }
@@ -62,6 +94,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         fileprivate(set) var cardSectionDraftChoices: [String: ImportCardInstrumentChoice]
         fileprivate(set) var partialReview: PartialImportReviewResult
         fileprivate(set) var outcome: ImportOutcomePresentation?
+        fileprivate(set) var completionDisposition: CompletionDisposition?
         fileprivate(set) var failureMessage: String?
         fileprivate(set) var retrySourceURL: URL?
         fileprivate(set) var recoveryContext: ConfirmedImportRecoveryContext?
@@ -71,6 +104,10 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     @Published private(set) var selectionFailureMessage: String?
     @Published private(set) var recoveryActionRequestID: UUID?
     @Published private(set) var preparationIsActive = false
+    @Published private(set) var batchID: UUID?
+    @Published private(set) var activeItemID: UUID?
+    @Published private(set) var presentedItemID: UUID?
+    @Published private(set) var batchCancellationRequested = false
 
     private let dependencies: Dependencies
     private var preparationTask: Task<Void, Never>?
@@ -82,12 +119,75 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         self.dependencies = dependencies
     }
 
-    var currentItem: Item? { items.first }
+    var currentItem: Item? {
+        guard let activeItemID else { return nil }
+        return item(withID: activeItemID)
+    }
+
+    var presentedItem: Item? {
+        guard let presentedItemID else { return currentItem }
+        return item(withID: presentedItemID)
+    }
+
+    var pendingItems: [Item] {
+        items.filter { $0.phase == .pending }
+    }
+
+    var terminalItems: [Item] {
+        items.filter { Self.isTerminal($0.phase) }
+    }
+
+    var hasTerminalOutcomesForEntireBatch: Bool {
+        !items.isEmpty && terminalItems.count == items.count
+    }
+
+    var batchLifecycle: BatchLifecycle {
+        guard !items.isEmpty else { return .idle }
+        if batchCancellationRequested { return .cancelling }
+        guard let phase = currentItem?.phase else {
+            return terminalItems.count == items.count ? .completed : .processing
+        }
+        switch phase {
+        case .pending, .preparing, .awaitingReview:
+            return .processing
+        case .awaitingConfirmation, .validationFailed, .completed, .failed:
+            return .awaitingUserAction
+        case .committing:
+            return .committing
+        case .skipped, .cancelled:
+            return preparationIsActive ? .processing : .awaitingUserAction
+        }
+    }
+
+    var batchSummary: BatchSummary {
+        BatchSummary(
+            totalSelected: items.count,
+            committedCount: items.filter {
+                $0.completionDisposition == .committed
+                    || $0.completionDisposition == .reconciliationRequired
+            }.count,
+            exactDuplicateCount: items.filter { $0.completionDisposition == .exactDuplicate }.count,
+            transactionEventBlockedCount: items.filter {
+                $0.completionDisposition == .transactionEventBlocked
+            }.count,
+            rejectedCount: items.filter {
+                $0.completionDisposition == .rejected || $0.phase == .validationFailed
+            }.count,
+            failedPreparationCount: items.filter { $0.phase == .failed }.count,
+            skippedCount: items.filter { $0.phase == .skipped }.count,
+            cancelledOrNotProcessedCount: items.filter { $0.phase == .cancelled }.count,
+            reconciliationRequiredCount: items.filter {
+                $0.completionDisposition == .reconciliationRequired
+            }.count,
+            isComplete: hasTerminalOutcomesForEntireBatch && activeItemID == nil
+        )
+    }
+
     var isPreparationDraining: Bool { preparationIsActive }
     var presentationOwnerCount: Int { presentationOwnerIDs.count }
 
     var permitsSourceSelection: Bool {
-        !preparationIsActive && currentItem?.phase != .committing
+        items.isEmpty && !preparationIsActive && activeItemID == nil
     }
 
     var permitsCancellation: Bool {
@@ -95,35 +195,74 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         switch phase {
         case .preparing, .awaitingReview, .awaitingConfirmation, .validationFailed:
             return true
-        case .committing, .completed, .cancelled, .failed:
+        case .pending, .committing, .completed, .skipped, .cancelled, .failed:
             return false
         }
     }
 
+    var permitsSkip: Bool {
+        guard let phase = currentItem?.phase else { return false }
+        switch phase {
+        case .preparing, .awaitingReview, .awaitingConfirmation, .validationFailed:
+            return true
+        case .pending, .committing, .completed, .skipped, .cancelled, .failed:
+            return false
+        }
+    }
+
+    var permitsRetry: Bool {
+        guard let item = currentItem else { return false }
+        return item.phase == .failed
+            && item.retrySourceURL != nil
+            && !preparationIsActive
+            && !batchCancellationRequested
+    }
+
+    var permitsContinue: Bool {
+        guard let item = currentItem, !preparationIsActive else { return false }
+        switch item.phase {
+        case .failed, .validationFailed:
+            return true
+        case .completed:
+            guard let disposition = item.completionDisposition else { return false }
+            switch disposition {
+            case .exactDuplicate, .transactionEventBlocked, .rejected:
+                return true
+            case .committed, .reconciliationRequired:
+                return false
+            }
+        case .pending, .preparing, .awaitingReview, .awaitingConfirmation,
+                .committing, .skipped, .cancelled:
+            return false
+        }
+    }
+
+    var permitsBatchCancellation: Bool {
+        !items.isEmpty && batchLifecycle != .completed
+    }
+
     @discardableResult
     func selectSource(_ sourceURL: URL) -> Bool {
-        guard permitsSourceSelection else { return false }
-        disposeCurrentPreparationIfNeeded()
+        enqueueSources([sourceURL])
+    }
+
+    @discardableResult
+    func enqueueSources(_ sourceURLs: [URL]) -> Bool {
+        guard !sourceURLs.isEmpty, permitsSourceSelection else { return false }
 
         selectionFailureMessage = nil
         recoveryActionRequestID = nil
-        let itemID = UUID()
-        let operationID = UUID()
-        let progress = ImportProgress(
-            requestId: operationID,
-            phase: .openingSource,
-            completedUnitCount: 0,
-            totalUnitCount: 0
-        )
-        items = [
+        batchCancellationRequested = false
+        batchID = UUID()
+        items = sourceURLs.enumerated().map { queuePosition, sourceURL in
             Item(
-                id: itemID,
+                id: UUID(),
                 sourceURL: sourceURL,
                 displayFileName: sourceURL.lastPathComponent,
-                queuePosition: 0,
-                preparationOperationID: operationID,
-                progress: progress,
-                phase: .preparing,
+                queuePosition: queuePosition,
+                preparationOperationID: nil,
+                progress: Self.openingProgress(operationID: UUID()),
+                phase: .pending,
                 preparation: nil,
                 identityReview: .unavailable,
                 accountChoice: nil,
@@ -131,21 +270,16 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
                 cardSectionDraftChoices: [:],
                 partialReview: .ordinaryFullImport,
                 outcome: nil,
+                completionDisposition: nil,
                 failureMessage: nil,
                 retrySourceURL: nil,
                 recoveryContext: nil
             )
-        ]
-        activePreparation = (itemID, operationID)
-        preparationIsActive = true
-        preparationTask = Task { [weak self] in
-            await self?.runPreparation(
-                sourceURL: sourceURL,
-                itemID: itemID,
-                operationID: operationID
-            )
         }
-        return true
+        guard let firstItemID = items.first?.id else { return false }
+        activeItemID = firstItemID
+        presentedItemID = firstItemID
+        return startPreparation(for: firstItemID)
     }
 
     func attachPresentationOwner(_ ownerID: UUID) {
@@ -156,13 +290,22 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     func detachPresentationOwner(_ ownerID: UUID) {
         guard presentationOwnerIDs.remove(ownerID) != nil,
               presentationOwnerIDs.isEmpty else { return }
-        _ = reset()
+        if currentItem?.phase == .committing {
+            batchCancellationRequested = true
+        } else {
+            _ = reset()
+        }
     }
 
     func recordSelectionFailure(_ error: Error) {
-        guard currentItem == nil, !preparationIsActive else { return }
+        guard items.isEmpty, !preparationIsActive else { return }
         recoveryActionRequestID = nil
         selectionFailureMessage = dependencies.failureSummary(error).displayText
+    }
+
+    func presentItem(_ itemID: UUID) {
+        guard item(withID: itemID) != nil else { return }
+        presentedItemID = itemID
     }
 
     func cancelCurrent() {
@@ -179,7 +322,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             if let preparation = item.preparation {
                 dependencies.cancelPreparation(preparation)
             }
-        case .committing, .completed, .cancelled, .failed:
+        case .pending, .committing, .completed, .skipped, .cancelled, .failed:
             return
         }
         mutateItem(item.id) {
@@ -193,6 +336,132 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             $0.partialReview = .ordinaryFullImport
             $0.recoveryContext = nil
             $0.outcome = nil
+            $0.completionDisposition = nil
+        }
+        guard activePreparation == nil else { return }
+        advanceToNextPending(after: item.id)
+    }
+
+    func skipCurrent() {
+        guard let item = currentItem, permitsSkip else { return }
+        selectionFailureMessage = nil
+        switch item.phase {
+        case .preparing, .awaitingReview:
+            dependencies.cancelPasswordChallenge()
+            preparationTask?.cancel()
+            if let preparation = item.preparation {
+                dependencies.cancelPreparation(preparation)
+            }
+        case .awaitingConfirmation, .validationFailed:
+            if let preparation = item.preparation {
+                dependencies.cancelPreparation(preparation)
+            }
+        case .pending, .committing, .completed, .skipped, .cancelled, .failed:
+            return
+        }
+        mutateItem(item.id) {
+            $0.phase = .skipped
+            $0.preparationOperationID = nil
+            $0.preparation = nil
+            $0.identityReview = .unavailable
+            $0.accountChoice = nil
+            $0.cardSectionDraftAccountID = nil
+            $0.cardSectionDraftChoices = [:]
+            $0.partialReview = .ordinaryFullImport
+            $0.recoveryContext = nil
+            $0.outcome = nil
+            $0.completionDisposition = nil
+        }
+        guard activePreparation == nil else { return }
+        advanceToNextPending(after: item.id)
+    }
+
+    @discardableResult
+    func retryCurrent() -> Bool {
+        guard let item = currentItem, permitsRetry else { return false }
+        return startPreparation(for: item.id)
+    }
+
+    @discardableResult
+    func reprepareCurrentRecovery(
+        contextID: UUID,
+        route: ConfirmedImportRecoveryRoute,
+        sourceURL: URL
+    ) -> Bool {
+        guard !preparationIsActive,
+              !batchCancellationRequested,
+              let item = item(withRecoveryContextID: contextID),
+              activeItemID == item.id,
+              presentedItemID == item.id,
+              item.phase == .completed,
+              item.sourceURL == sourceURL,
+              item.recoveryContext?.route == route,
+              item.recoveryContext?.sourceURL == sourceURL,
+              item.outcome?.recoveryContextID == contextID,
+              item.outcome?.recoveryRoute == route,
+              item.outcome?.recoveryPresentation?.primaryAction?.requiresSourceURL == true else {
+            return false
+        }
+        mutateItem(item.id) { $0.phase = .pending }
+        return startPreparation(for: item.id)
+    }
+
+    @discardableResult
+    func continueAfterCurrent() -> Bool {
+        guard let item = currentItem, permitsContinue else { return false }
+        if let preparation = item.preparation {
+            dependencies.cancelPreparation(preparation)
+            mutateItem(item.id) { $0.preparation = nil }
+        }
+        advanceToNextPending(after: item.id)
+        return true
+    }
+
+    func cancelBatch() {
+        guard permitsBatchCancellation else { return }
+        batchCancellationRequested = true
+        selectionFailureMessage = nil
+
+        guard let item = currentItem else {
+            cancelPendingItems()
+            completeBatchCancellation()
+            return
+        }
+        if item.phase == .committing {
+            return
+        }
+
+        switch item.phase {
+        case .preparing, .awaitingReview:
+            dependencies.cancelPasswordChallenge()
+            preparationTask?.cancel()
+            if let preparation = item.preparation {
+                dependencies.cancelPreparation(preparation)
+            }
+            markItemCancelled(item.id)
+            cancelPendingItems()
+            if activePreparation == nil {
+                completeBatchCancellation()
+            }
+        case .awaitingConfirmation:
+            if let preparation = item.preparation {
+                dependencies.cancelPreparation(preparation)
+            }
+            markItemCancelled(item.id)
+            cancelPendingItems()
+            completeBatchCancellation()
+        case .validationFailed, .completed, .failed:
+            if let preparation = item.preparation {
+                dependencies.cancelPreparation(preparation)
+                mutateItem(item.id) { $0.preparation = nil }
+            }
+            cancelPendingItems()
+            completeBatchCancellation()
+        case .pending, .skipped, .cancelled:
+            cancelPendingItems()
+            completeBatchCancellation()
+        case .committing:
+            break
         }
     }
 
@@ -203,9 +472,13 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             dependencies.cancelPasswordChallenge()
             preparationTask?.cancel()
         } else {
-            disposeCurrentPreparationIfNeeded()
+            disposeAllPreparations()
         }
         items = []
+        activeItemID = nil
+        presentedItemID = nil
+        batchID = nil
+        batchCancellationRequested = false
         selectionFailureMessage = nil
         recoveryActionRequestID = nil
         return true
@@ -276,8 +549,8 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         mutateItem(itemID) { $0.phase = .committing }
 
         var outcome = await dependencies.commit(preparation, accountChoice, reviewedPartialPlan)
-        guard let current = currentItem,
-              current.id == itemID,
+        guard let current = self.item(withID: itemID),
+              activeItemID == itemID,
               current.phase == .committing,
               current.preparation?.id == preparationID else { return }
 
@@ -293,21 +566,35 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         } else {
             recoveryContext = nil
         }
+        let disposition = Self.completionDisposition(for: outcome)
         mutateItem(itemID) {
             $0.phase = .completed
             $0.preparation = nil
             $0.outcome = outcome
+            $0.completionDisposition = disposition
             $0.recoveryContext = recoveryContext
         }
+
         if hasAttachedPresentationOwner && presentationOwnerIDs.isEmpty {
-            items = []
-            recoveryActionRequestID = nil
+            cancelPendingItems()
+            clearBatchState()
+            return
+        }
+        if batchCancellationRequested {
+            cancelPendingItems()
+            completeBatchCancellation()
+            return
+        }
+        if disposition == .committed {
+            advanceToNextPending(after: itemID)
         }
     }
 
     func beginRecoveryAction(contextID: UUID) -> UUID? {
         guard recoveryActionRequestID == nil,
-              let item = currentItem,
+              let item = item(withRecoveryContextID: contextID),
+              activeItemID == item.id,
+              presentedItemID == item.id,
               item.phase == .completed,
               item.recoveryContext?.id == contextID else { return nil }
         let requestID = UUID()
@@ -321,8 +608,10 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     }
 
     func isCurrentRecoveryContext(_ contextID: UUID, route: ConfirmedImportRecoveryRoute) -> Bool {
-        guard let item = currentItem else { return false }
-        return item.phase == .completed
+        guard let item = item(withRecoveryContextID: contextID) else { return false }
+        return activeItemID == item.id
+            && presentedItemID == item.id
+            && item.phase == .completed
             && item.recoveryContext?.id == contextID
             && item.recoveryContext?.route == route
             && item.outcome?.recoveryContextID == contextID
@@ -331,13 +620,15 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
 
     @discardableResult
     func markCurrentOutcomeReconciled(contextID: UUID) -> Bool {
-        guard let item = currentItem,
+        guard let item = item(withRecoveryContextID: contextID),
               isCurrentRecoveryContext(contextID, route: .retryCanonicalReconciliation),
               let outcome = item.outcome else { return false }
         mutateItem(item.id) {
             $0.outcome = outcome.markingReconciled()
+            $0.completionDisposition = .committed
             $0.recoveryContext = nil
         }
+        advanceToNextPending(after: item.id)
         return true
     }
 
@@ -351,7 +642,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             }
             guard isCurrentPreparation(itemID: itemID, operationID: operationID),
                   !Task.isCancelled,
-                  currentItem?.phase == .preparing else {
+                  item(withID: itemID)?.phase == .preparing else {
                 dependencies.cancelPreparation(preparation)
                 return
             }
@@ -369,7 +660,7 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
             }
             guard isCurrentPreparation(itemID: itemID, operationID: operationID),
                   !Task.isCancelled,
-                  currentItem?.phase == .awaitingReview else {
+                  item(withID: itemID)?.phase == .awaitingReview else {
                 dependencies.cancelPreparation(preparation)
                 return
             }
@@ -411,13 +702,13 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     private func acceptProgress(_ progress: ImportProgress, itemID: UUID, operationID: UUID) {
         guard progress.requestId == operationID,
               isCurrentPreparation(itemID: itemID, operationID: operationID),
-              currentItem?.phase == .preparing else { return }
+              item(withID: itemID)?.phase == .preparing else { return }
         mutateItem(itemID) { $0.progress = progress }
     }
 
     private func preserveCancelledState(itemID: UUID, operationID: UUID) {
         guard isCurrentPreparation(itemID: itemID, operationID: operationID),
-              let item = currentItem,
+              let item = item(withID: itemID),
               item.phase != .cancelled else { return }
         mutateItem(itemID) {
             $0.phase = .cancelled
@@ -429,8 +720,8 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
     private func isCurrentPreparation(itemID: UUID, operationID: UUID) -> Bool {
         activePreparation?.itemID == itemID
             && activePreparation?.operationID == operationID
-            && currentItem?.id == itemID
-            && currentItem?.preparationOperationID == operationID
+            && activeItemID == itemID
+            && item(withID: itemID)?.preparationOperationID == operationID
     }
 
     private func releasePreparationSlot(itemID: UUID, operationID: UUID) {
@@ -439,11 +730,154 @@ final class ImportCentreCoordinator<Preparation: ImportCentrePreparation>: Obser
         activePreparation = nil
         preparationTask = nil
         preparationIsActive = false
+        if batchCancellationRequested {
+            cancelPendingItems()
+            completeBatchCancellation()
+            return
+        }
+        guard let item = item(withID: itemID), activeItemID == itemID else { return }
+        if item.phase == .cancelled || item.phase == .skipped {
+            advanceToNextPending(after: itemID)
+        }
     }
 
-    private func disposeCurrentPreparationIfNeeded() {
-        guard let preparation = currentItem?.preparation else { return }
-        dependencies.cancelPreparation(preparation)
+    @discardableResult
+    private func startPreparation(for itemID: UUID) -> Bool {
+        guard activeItemID == itemID,
+              let item = item(withID: itemID),
+              item.phase == .pending || item.phase == .failed,
+              activePreparation == nil,
+              !preparationIsActive,
+              !batchCancellationRequested else { return false }
+
+        let operationID = UUID()
+        mutateItem(itemID) {
+            $0.preparationOperationID = operationID
+            $0.progress = Self.openingProgress(operationID: operationID)
+            $0.phase = .preparing
+            $0.preparation = nil
+            $0.identityReview = .unavailable
+            $0.accountChoice = nil
+            $0.cardSectionDraftAccountID = nil
+            $0.cardSectionDraftChoices = [:]
+            $0.partialReview = .ordinaryFullImport
+            $0.outcome = nil
+            $0.completionDisposition = nil
+            $0.failureMessage = nil
+            $0.retrySourceURL = nil
+            $0.recoveryContext = nil
+        }
+        activePreparation = (itemID, operationID)
+        preparationIsActive = true
+        preparationTask = Task { [weak self] in
+            await self?.runPreparation(
+                sourceURL: item.sourceURL,
+                itemID: itemID,
+                operationID: operationID
+            )
+        }
+        return true
+    }
+
+    private func advanceToNextPending(after itemID: UUID) {
+        guard activeItemID == itemID else { return }
+        activeItemID = nil
+        guard let nextItemID = items.first(where: { $0.phase == .pending })?.id else {
+            presentedItemID = itemID
+            return
+        }
+        activeItemID = nextItemID
+        presentedItemID = nextItemID
+        _ = startPreparation(for: nextItemID)
+    }
+
+    private func cancelPendingItems() {
+        let pendingIDs = items.filter { $0.phase == .pending }.map(\.id)
+        for itemID in pendingIDs {
+            markItemCancelled(itemID)
+        }
+    }
+
+    private func markItemCancelled(_ itemID: UUID) {
+        mutateItem(itemID) {
+            $0.phase = .cancelled
+            $0.preparationOperationID = nil
+            $0.preparation = nil
+            $0.identityReview = .unavailable
+            $0.accountChoice = nil
+            $0.cardSectionDraftAccountID = nil
+            $0.cardSectionDraftChoices = [:]
+            $0.partialReview = .ordinaryFullImport
+            $0.outcome = nil
+            $0.completionDisposition = nil
+            $0.failureMessage = nil
+            $0.retrySourceURL = nil
+            $0.recoveryContext = nil
+        }
+    }
+
+    private func completeBatchCancellation() {
+        if currentItem?.phase != .committing {
+            activeItemID = nil
+        }
+        batchCancellationRequested = false
+    }
+
+    private func disposeAllPreparations() {
+        for preparation in items.compactMap(\.preparation) {
+            dependencies.cancelPreparation(preparation)
+        }
+    }
+
+    private func clearBatchState() {
+        items = []
+        activeItemID = nil
+        presentedItemID = nil
+        batchID = nil
+        batchCancellationRequested = false
+        selectionFailureMessage = nil
+        recoveryActionRequestID = nil
+    }
+
+    private func item(withID itemID: UUID) -> Item? {
+        items.first { $0.id == itemID }
+    }
+
+    private func item(withRecoveryContextID contextID: UUID) -> Item? {
+        items.first { $0.recoveryContext?.id == contextID }
+    }
+
+    private static func openingProgress(operationID: UUID) -> ImportProgress {
+        ImportProgress(
+            requestId: operationID,
+            phase: .openingSource,
+            completedUnitCount: 0,
+            totalUnitCount: 0
+        )
+    }
+
+    private static func isTerminal(_ phase: Item.Phase) -> Bool {
+        switch phase {
+        case .validationFailed, .completed, .skipped, .cancelled, .failed:
+            return true
+        case .pending, .preparing, .awaitingReview, .awaitingConfirmation, .committing:
+            return false
+        }
+    }
+
+    private static func completionDisposition(
+        for outcome: ImportOutcomePresentation
+    ) -> CompletionDisposition {
+        if outcome.persisted {
+            return outcome.requiresReconciliation ? .reconciliationRequired : .committed
+        }
+        if outcome.isPreviouslyImported {
+            return .exactDuplicate
+        }
+        if outcome.transactionEventBlock != nil {
+            return .transactionEventBlocked
+        }
+        return .rejected
     }
 
     private func mutateItem(_ id: UUID, mutation: (inout Item) -> Void) {
@@ -459,7 +893,10 @@ enum ProductionImportCentre {
 
 extension ImportCentreCoordinator where Preparation == PreparedImport {
     static func production() -> ImportCentreCoordinator<PreparedImport> {
-        let engine = ImportEngine.shared
+        production(using: ImportEngine.shared)
+    }
+
+    static func production(using engine: ImportEngine) -> ImportCentreCoordinator<PreparedImport> {
         return ImportCentreCoordinator(
             dependencies: Dependencies(
                 prepare: { sourceURL, operationID, progress in
