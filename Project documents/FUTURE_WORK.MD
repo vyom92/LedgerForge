@@ -62,11 +62,12 @@ A work item becomes executable only when Chat supplies one complete approved pro
 
 **Audit date:** 2026-09-09
 **Review baseline:** `main@a560312db5900645779a499016e13f0c87e81435`
-**Active candidate count after reconciliation:** 155
+**Sprint-81 queue-closure update:** 2026-09-10 at `main@13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`
+**Active candidate count after Sprint-81 acceptance closure:** 154
 **Current migration:** V17
 **Current source/reliability architecture:** ADR-046 complete-authentic-corpus authority
 **Current design authority:** `LF-UI-2026-09-R1` for its bounded scope
-**Latest accepted numbered implementation:** Sprint 79
+**Latest accepted numbered implementation:** Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam
 **Latest accepted numbered discovery:** Sprint 80 — `SWIFT6_READINESS_COMPLETE`
 **Personal-v1:** UNDECLARED / NOT CERTIFIED
 
@@ -74,6 +75,7 @@ This audit mechanically enumerated every active `FW-*` heading before reconcilia
 
 Reconciliation outcomes:
 
+- `FW-P2-72` is removed from the active queue because Sprint 81 completed and Chat accepted the PR-1 staging/runtime-publication ownership seam at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`.
 - `FW-P0-25` is removed from the active queue because the unnumbered 127-carrier authentic-corpus reset is technically accepted and complete; newly supplied recurring sources remain governed cumulatively by ADR-046.
 - Compound historical statuses are normalized to the defined planning vocabulary. Completed slices remain concise body notes while titles and statuses describe only remaining unscheduled work.
 - Exact source-family support remains exact. HDFC whole-statement PDF/XLS equivalence, Axis-card PDF/XLSX equivalence and CBQ current-account source lineage are separate accepted contracts; none is generalized to another institution, financial family or format.
@@ -821,13 +823,13 @@ OCR output remains untrusted until deterministic parsing and validation succeed.
 ## FW-P1-19 — LedgerForge Import Centre
 
 **Status:** Candidate
-**Depends on:** existing confirmation-gated Import Wizard foundation and `FW-P2-72` PR-1 staging/runtime-publication ownership seam
+**Depends on:** existing confirmation-gated Import Wizard foundation and the accepted Sprint-81 PR-1 staging/runtime-publication ownership seam
 
 **Sprint 80 readiness boundary:** The first implementation remains Swift 5 and serial. It requires explicit MainActor task ownership, deterministic queue ordering, per-file state ownership, security-scoped source and `SourceContentSnapshot` lifetimes, cancellation before confirmation, explicit per-statement confirmation, synchronous provider-owned persistence and canonical `RepositoryStoreHydrator` publication.
 
 Single-file import is **queue length one**. Future multi-file intake must use the same intake → preparation → sequential review/confirmation → result orchestration rather than a separate workflow. Each file retains an independent validation, account choice, duplicate/rejection, confirmation, persistence and result boundary.
 
-Bounded parallel preparation is unresolved and not authorized. PR-1 is the only Swift-6-derived prerequisite before this serial foundation. Roadmap placement does not authorize implementation.
+Bounded parallel preparation is unresolved and not authorized. The accepted Sprint-81 PR-1 seam satisfies the only Swift-6-derived prerequisite before this serial foundation. Roadmap placement does not authorize implementation.
 
 ---
 
@@ -1761,22 +1763,6 @@ Remaining work is prevention and broader hygiene:
 Do not remove shared Xcode configuration merely because it lives beneath the project bundle. Repository evidence must distinguish personal from shared state.
 
 ---
-
-## FW-P2-72 — PR-1 Staging and Publication Ownership Seam
-
-**Status:** Candidate
-**Depends on:** Sprint 80 accepted readiness discovery; existing repository and runtime-store contracts
-
-Correct the staging/publication ownership seam under Swift 5 while preserving
-behavior. The bounded surfaces are `RepositoryStoreHydrator`, `AccountStore`,
-`CardStore`, `CategoryStore`, `TransactionStore`, `ImportSessionStore` and
-`DeveloperConsole`.
-
-The correction must preserve synchronous pure staging, explicitly MainActor-owned
-runtime publication, complete-snapshot installation, observer ordering,
-provider-generation authority and SQLite/In-Memory parity. It is the only
-Swift-6-derived prerequisite before the serial Unified Import Centre. No
-parallel preparation or Swift-6 language-mode switch is part of PR-1.
 
 ## FW-P2-73 — PR-2 SQLite, Provider and Migration Ownership
 

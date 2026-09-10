@@ -1,7 +1,7 @@
 # LedgerForge Standing Execution Harness Guide
 
 **Status:** Active repository process authority  
-**Refreshed:** 2026-09-01
+**Refreshed:** 2026-09-10
 **Execution authority:** None by itself  
 **Architecture authority:** None by itself  
 **Purpose:** Reusable Chat/MCP/Codex planning, execution, validation and review method
@@ -317,6 +317,23 @@ Classify claims as:
 - missing.
 
 Chat verifies material claims before acceptance.
+
+### Cross-tool acceptance manifest
+
+When one executor's native acceptance artifacts may be outside another approved review surface, the executor should also emit a small privacy-safe acceptance manifest to a shared, repository-approved evidence location readable by every authorized reviewing tool. The manifest must not exist only in an executor's temporary directory or application container. It supports cross-tool review; it does not replace native `.xcresult`, log or source artifacts.
+
+At minimum, record:
+
+- candidate ref and parent;
+- repository-relative changed paths with hashes and the final candidate hash or fingerprint;
+- focused and complete TestPlan counts;
+- Debug and Release results;
+- authentic-corpus aggregate counts and semantic digest when applicable;
+- durable-startup aggregate result, migration count and database identity/fingerprint result when applicable;
+- validation run IDs and timestamps; and
+- private-input digests only, never private contents.
+
+Use opaque digests for private inputs. The manifest must not contain absolute private paths, credentials, passwords, private financial descriptions, account numbers, beneficiary information, original statement content or source-derived filenames where privacy policy prohibits them.
 
 ---
 

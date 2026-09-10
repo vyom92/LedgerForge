@@ -1,15 +1,15 @@
 # LedgerForge Roadmap: Sprints 80–89
 
 **Status:** Current repository cycle roadmap
-**Refreshed:** 2026-09-09
-**Planning review baseline:** `main@a560312db5900645779a499016e13f0c87e81435`
+**Refreshed:** 2026-09-10
+**Planning review baseline:** `main@13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`
 **Supersedes:** `Project documents/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
 
 ## Control
 
 - **Planning authority:** This file owns Sprint 80–89 numbering, corrective suffixes, cycle status and planned positions.
 - **Execution authority:** None. Roadmap assignment is planning, not implementation authorization; each sprint still requires Chat priority/dependency triage and a complete execution prompt.
-- **Latest numbered product implementation:** Sprint 79. The accepted startup/monthly-planner product package is commit `6455f662dd0ea8896d19af3e67be51546badb3ae`; the later `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` cleanup is non-product repository maintenance, and `a560312db5900645779a499016e13f0c87e81435` is the R1 documentation/planning publication reviewed by this reconciliation.
+- **Latest numbered product implementation:** Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam, accepted at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`. The accepted startup/monthly-planner product package is commit `6455f662dd0ea8896d19af3e67be51546badb3ae`; the later `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` cleanup is non-product repository maintenance, and `a560312db5900645779a499016e13f0c87e81435` is the R1 documentation/planning publication.
 - **Current migration:** V17; V1–V16 remain immutable.
 - **Current source/reliability authority:** ADR-046 complete-authentic-corpus certification.
 - **Current UI design authority:** `LF-UI-2026-09-R1` for its bounded scope; design approval is not native implementation.
@@ -38,7 +38,7 @@ A material source, credential, parser, persistence, orchestration or financial-s
 | Sprint | Outcome | Queue | Planning type | Status / entry gate |
 |---|---|---|---|---|
 | 80 | Swift 6 and macOS readiness closure | accepted discovery | Technical discovery | **Accepted / discovery complete** |
-| 81 | PR-1 Staging and Runtime Publication Ownership Seam | `FW-P2-72` | Behavior-preserving implementation gate | Planned position; rerun P0→P3 triage before start |
+| 81 | PR-1 Staging and Runtime Publication Ownership Seam | historical `FW-P2-72` (removed from active queue) | Behavior-preserving implementation gate | **ACCEPTED** — implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91` |
 | 82 | Serial Unified Import Centre Foundation | `FW-P1-19` | Core product implementation | Planned; single file = queue length one, same orchestration model for future batch |
 | 83 | Serial Batch Import and Multi-File Drag-and-Drop | `FW-P1-20` + `FW-P1-21` | P1 entry-gated product outcome | Blocked unless Sprint 82 proves named cancellation, duplicate, failure-isolation and per-file ownership prerequisites |
 | 84 | PR-2 SQLite / Provider / Migration Ownership | `FW-P2-73` | Swift-6 prerequisite | Planned; the name implies no schema migration |
@@ -80,11 +80,13 @@ families and perform a coordinated Swift-6 migration. Swift 6 is not required
 before the serial Import Centre, but it is required before personal-v1
 certification.
 
-The four bounded prerequisite families are separately recorded as `FW-P2-72`
+Sprint 80 recorded four bounded prerequisite families: `FW-P2-72`
 (PR-1 staging/publication ownership seam), `FW-P2-73` (PR-2
 SQLite/provider/migration ownership), `FW-P2-74` (PR-3 dependency boundary) and
 `FW-P2-75` (TEST-PR unit-test strict-concurrency correction). The coordinated
-migration gate is `FW-P2-76`. None is complete or authorized by Sprint 80.
+migration gate is `FW-P2-76`. Sprint 80 authorized none of them; Sprint 81 has
+since completed and accepted PR-1, while PR-2, PR-3, TEST-PR and the coordinated
+migration remain future work.
 
 The current product artifact is macOS-native, uses the macOS 26.5 SDK, App
 Sandbox and selected-file import. Stale platform/bundle metadata and the
@@ -98,17 +100,22 @@ the exact registered CBQ boundary while preserving historical minimum-due
 absence and enforcing the current authentic minimum-due contract. Personal-v1
 adoption remains a separate later gate.
 
-## Planned Sprints 81–89
+## Accepted Sprint 81 and planned Sprints 82–89
 
 ### Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam
 
-Queue: `FW-P2-72`.
+Historical queue origin: `FW-P2-72` (removed from the active queue).
 
-Behavior-preserving Swift-5 correction only. Establish pure synchronous staging and explicit MainActor runtime publication while preserving complete-snapshot installation, provider generations, observer ordering and provider parity. No parallel preparation or Swift-6 switch.
+**ACCEPTED on 2026-09-10.** Implementation commit:
+`13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`.
+
+The accepted behavior-preserving Swift-5 correction establishes pure synchronous staging and explicit MainActor runtime publication while preserving complete-snapshot installation, provider generations, observer ordering and provider parity. It adds no parallel preparation, Swift-6 switch, Import Centre implementation, schema/migration, parser/source or financial-semantic change.
 
 ### Sprint 82 — Serial Unified Import Centre Foundation
 
 Queue: `FW-P1-19`.
+
+**Next planned position.** Sprint 82 remains unselected and unimplemented. It requires a fresh Chat P0 → P1 → P2 → P3 triage, read-only implementation-readiness review and a complete execution prompt if still selected.
 
 Single-file import is queue length one. Use deterministic queue order, explicit per-file ownership, safe cancellation before confirmation, explicit per-statement confirmation, provider-owned persistence and canonical hydration. The orchestration shape is the future batch shape; no bounded parallel preparation is accepted here.
 
