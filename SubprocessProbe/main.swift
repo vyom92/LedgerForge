@@ -26,31 +26,32 @@ struct LedgerForgeSubprocessProbe {
         writeLine("READY")
         guard readLine() == "GO" else { exit(slot: slot, with: "rejected") }
 
-        let result: String
-        do {
-            try database.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-            try database.executePrepared(
-                sql: "INSERT INTO subprocess_mechanics_launches(slot) VALUES(?);",
-                params: [slot]
-            )
-            try database.executePrepared(
-                sql: "INSERT INTO subprocess_mechanics_keys(name,payload) VALUES(?,?);",
-                params: ["shared-key", CommandLine.arguments[3]]
-            )
-            try database.execute(sql: "COMMIT;")
-            result = "committed"
-        } catch let SQLiteDatabaseError.execution(error) {
-            try? database.execute(sql: "ROLLBACK;")
-            if error.isRetryableContention {
-                result = "retryable-contention"
-            } else if error.isUniqueConstraint {
-                result = "unique-conflict"
-            } else {
-                result = "rejected"
+        let result: String = database.withExclusiveAccess {
+            do {
+                try database.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+                try database.executePrepared(
+                    sql: "INSERT INTO subprocess_mechanics_launches(slot) VALUES(?);",
+                    params: [slot]
+                )
+                try database.executePrepared(
+                    sql: "INSERT INTO subprocess_mechanics_keys(name,payload) VALUES(?,?);",
+                    params: ["shared-key", CommandLine.arguments[3]]
+                )
+                try database.execute(sql: "COMMIT;")
+                return "committed"
+            } catch let SQLiteDatabaseError.execution(error) {
+                try? database.execute(sql: "ROLLBACK;")
+                if error.isRetryableContention {
+                    return "retryable-contention"
+                } else if error.isUniqueConstraint {
+                    return "unique-conflict"
+                } else {
+                    return "rejected"
+                }
+            } catch {
+                try? database.execute(sql: "ROLLBACK;")
+                return "rejected"
             }
-        } catch {
-            try? database.execute(sql: "ROLLBACK;")
-            result = "rejected"
         }
         database.close()
         exit(slot: slot, with: result)

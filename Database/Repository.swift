@@ -309,7 +309,9 @@ public struct PartialImportSessionUpdate {
 /// DatabaseProvider exposes repository implementations. Set the shared
 /// provider at application startup to swap implementations.
 public final class DatabaseProvider {
-    public static var shared: DatabaseProvider = .unavailable(reason: .notInitialized)
+    /// Lifecycle/bootstrap publication belongs to the runtime's main actor.
+    /// This does not impose actor isolation on repository protocol requirements.
+    @MainActor public static var shared: DatabaseProvider = .unavailable(reason: .notInitialized)
 
     public let persistenceState: PersistenceState
     let failureContext: PersistenceFailureContext?
@@ -450,83 +452,98 @@ public final class DatabaseProvider {
     }
 }
 
-private final class ProviderGenerationValidity {
-    private(set) var isValid = true
-    func invalidate() { isValid = false }
-    func check() throws {
+/// Serializes invalidation with each entire admitted repository operation.
+/// The private mutable flag is accessed only under the recursive lock; operations
+/// are synchronous and cannot suspend. This is the complete unchecked Sendable
+/// invariant. Internal visibility permits source-independent concurrency tests.
+/// Lock order is generation ownership, then SQLite connection ownership. A raw
+/// SQLite callback must not enter a different generation's repository guard.
+nonisolated final class ProviderGenerationValidity: @unchecked Sendable {
+    private let lock = NSRecursiveLock()
+    private var isValid = true
+
+    func invalidate() {
+        lock.lock()
+        defer { lock.unlock() }
+        isValid = false
+    }
+
+    func withValidOperation<Result>(_ operation: () throws -> Result) throws -> Result {
+        lock.lock()
+        defer { lock.unlock() }
         guard isValid else { throw RepositoryError.staleProviderGeneration }
+        return try operation()
     }
 }
 
 private struct GenerationCheckedWorkspaceRepository: WorkspaceRepository {
     let base: WorkspaceRepository
     let validity: ProviderGenerationValidity
-    func upsertWorkspace(_ workspace: WorkspaceDTO) throws -> String { try validity.check(); return try base.upsertWorkspace(workspace) }
-    func workspace(id: String) throws -> WorkspaceDTO? { try validity.check(); return try base.workspace(id: id) }
+    func upsertWorkspace(_ workspace: WorkspaceDTO) throws -> String { return try validity.withValidOperation { try base.upsertWorkspace(workspace) } }
+    func workspace(id: String) throws -> WorkspaceDTO? { return try validity.withValidOperation { try base.workspace(id: id) } }
 }
 
 private struct GenerationCheckedTransactionRepository: TransactionRepository {
     let base: TransactionRepository
     let validity: ProviderGenerationValidity
-    func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws { try validity.check(); try base.replaceTransactions(workspaceId: workspaceId, importSessionId: importSessionId, transactions: transactions) }
-    func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO] { try validity.check(); return try base.transactions(workspaceId: workspaceId, importSessionId: importSessionId) }
-    func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] { try validity.check(); return try base.trustedTransactions(workspaceId: workspaceId) }
+    func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws { try validity.withValidOperation { try base.replaceTransactions(workspaceId: workspaceId, importSessionId: importSessionId, transactions: transactions) } }
+    func transactions(workspaceId: String, importSessionId: String?) throws -> [TransactionDTO] { return try validity.withValidOperation { try base.transactions(workspaceId: workspaceId, importSessionId: importSessionId) } }
+    func trustedTransactions(workspaceId: String) throws -> [TransactionDTO] { return try validity.withValidOperation { try base.trustedTransactions(workspaceId: workspaceId) } }
 }
 
 private struct GenerationCheckedCategoryRepository: CategoryRepository {
     let base: CategoryRepository
     let validity: ProviderGenerationValidity
-    func categories(workspaceId: String) throws -> [CategoryDTO] { try validity.check(); return try base.categories(workspaceId: workspaceId) }
-    func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO] { try validity.check(); return try base.assignments(workspaceId: workspaceId) }
-    func createCategory(_ category: CategoryDTO) throws -> CategoryDTO { try validity.check(); return try base.createCategory(category) }
-    func renameCategory(id: String, workspaceId: String, name: String, updatedAtISO: String) throws -> Bool { try validity.check(); return try base.renameCategory(id: id, workspaceId: workspaceId, name: name, updatedAtISO: updatedAtISO) }
-    func setCategoryArchived(id: String, workspaceId: String, isArchived: Bool, updatedAtISO: String) throws -> Bool { try validity.check(); return try base.setCategoryArchived(id: id, workspaceId: workspaceId, isArchived: isArchived, updatedAtISO: updatedAtISO) }
-    func deleteUnusedCategory(id: String, workspaceId: String) throws { try validity.check(); try base.deleteUnusedCategory(id: id, workspaceId: workspaceId) }
-    func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool { try validity.check(); return try base.setCategory(categoryId: categoryId, transactionId: transactionId, workspaceId: workspaceId) }
+    func categories(workspaceId: String) throws -> [CategoryDTO] { return try validity.withValidOperation { try base.categories(workspaceId: workspaceId) } }
+    func assignments(workspaceId: String) throws -> [TransactionCategoryAssignmentDTO] { return try validity.withValidOperation { try base.assignments(workspaceId: workspaceId) } }
+    func createCategory(_ category: CategoryDTO) throws -> CategoryDTO { return try validity.withValidOperation { try base.createCategory(category) } }
+    func renameCategory(id: String, workspaceId: String, name: String, updatedAtISO: String) throws -> Bool { return try validity.withValidOperation { try base.renameCategory(id: id, workspaceId: workspaceId, name: name, updatedAtISO: updatedAtISO) } }
+    func setCategoryArchived(id: String, workspaceId: String, isArchived: Bool, updatedAtISO: String) throws -> Bool { return try validity.withValidOperation { try base.setCategoryArchived(id: id, workspaceId: workspaceId, isArchived: isArchived, updatedAtISO: updatedAtISO) } }
+    func deleteUnusedCategory(id: String, workspaceId: String) throws { try validity.withValidOperation { try base.deleteUnusedCategory(id: id, workspaceId: workspaceId) } }
+    func setCategory(categoryId: String?, transactionId: String, workspaceId: String) throws -> Bool { return try validity.withValidOperation { try base.setCategory(categoryId: categoryId, transactionId: transactionId, workspaceId: workspaceId) } }
 }
 
 private struct GenerationCheckedAccountRepository: AccountRepository {
     let base: AccountRepository
     let validity: ProviderGenerationValidity
-    func upsertAccount(_ account: AccountDTO) throws -> String { try validity.check(); return try base.upsertAccount(account) }
-    func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool { try validity.check(); return try base.updateAccountDisplayName(accountId: accountId, workspaceId: workspaceId, displayName: displayName) }
-    func account(id: String) throws -> AccountDTO? { try validity.check(); return try base.account(id: id) }
-    func accounts(workspaceId: String) throws -> [AccountDTO] { try validity.check(); return try base.accounts(workspaceId: workspaceId) }
-    func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String { try validity.check(); return try base.attachIdentifier(identifier) }
-    func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO] { try validity.check(); return try base.identifiers(accountId: accountId, workspaceId: workspaceId) }
-    func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String] { try validity.check(); return try base.accountIds(workspaceId: workspaceId, scheme: scheme, identifier: identifier) }
-    func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO] { try validity.check(); return try base.cbqSourceIdentityRecords(workspaceId: workspaceId) }
+    func upsertAccount(_ account: AccountDTO) throws -> String { return try validity.withValidOperation { try base.upsertAccount(account) } }
+    func updateAccountDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool { return try validity.withValidOperation { try base.updateAccountDisplayName(accountId: accountId, workspaceId: workspaceId, displayName: displayName) } }
+    func account(id: String) throws -> AccountDTO? { return try validity.withValidOperation { try base.account(id: id) } }
+    func accounts(workspaceId: String) throws -> [AccountDTO] { return try validity.withValidOperation { try base.accounts(workspaceId: workspaceId) } }
+    func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String { return try validity.withValidOperation { try base.attachIdentifier(identifier) } }
+    func identifiers(accountId: String, workspaceId: String) throws -> [AccountIdentifierDTO] { return try validity.withValidOperation { try base.identifiers(accountId: accountId, workspaceId: workspaceId) } }
+    func accountIds(workspaceId: String, scheme: String, identifier: String) throws -> [String] { return try validity.withValidOperation { try base.accountIds(workspaceId: workspaceId, scheme: scheme, identifier: identifier) } }
+    func cbqSourceIdentityRecords(workspaceId: String) throws -> [CBQSourceIdentityRecordDTO] { return try validity.withValidOperation { try base.cbqSourceIdentityRecords(workspaceId: workspaceId) } }
 }
 
 private struct GenerationCheckedCardRepository: CardRepository {
     let base: CardRepository
     let validity: ProviderGenerationValidity
     func snapshot(workspaceId: String) throws -> CardRepositorySnapshotDTO {
-        try validity.check()
-        return try base.snapshot(workspaceId: workspaceId)
+        return try validity.withValidOperation { try base.snapshot(workspaceId: workspaceId) }
     }
 }
 
 private struct GenerationCheckedImportSessionRepository: ImportSessionRepository {
     let base: ImportSessionRepository
     let validity: ProviderGenerationValidity
-    func createImportSession(_ payload: ImportSessionDTO) throws -> String { try validity.check(); return try base.createImportSession(payload) }
-    func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws { try validity.check(); try base.updateImportSession(id, updates: updates) }
-    func importSession(id: String) throws -> ImportSessionRecordDTO? { try validity.check(); return try base.importSession(id: id) }
-    func importedDocument(id: String) throws -> ImportedDocumentDTO? { try validity.check(); return try base.importedDocument(id: id) }
-    func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? { try validity.check(); return try base.priorImportedStatement(algorithm: algorithm, fingerprint: fingerprint) }
-    func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] { try validity.check(); return try base.transactionEventOwners(keys: keys) }
-    func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String { try validity.check(); return try base.recordImportAttempt(payload) }
-    func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] { try validity.check(); return try base.importAttempts(workspaceId: workspaceId) }
-    func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? { try validity.check(); return try base.partialImportSummary(importSessionId: importSessionId) }
-    func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] { try validity.check(); return try base.incomingRowDispositions(importSessionId: importSessionId) }
-    func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO] { try validity.check(); return try base.statementFinancialProjections(workspaceId: workspaceId) }
-    func statementZeroActivityControls(workspaceId: String) throws -> [StatementZeroActivityControlDTO] { try validity.check(); return try base.statementZeroActivityControls(workspaceId: workspaceId) }
-    func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO] { try validity.check(); return try base.statementEquivalenceGroups(workspaceId: workspaceId) }
-    func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] { try validity.check(); return try base.statementEquivalenceMembers(workspaceId: workspaceId) }
-    func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO] { try validity.check(); return try base.preferredTransactionSources(workspaceId: workspaceId) }
-    func cbqSourceObservationSummaries(workspaceId: String) throws -> [CBQSourceObservationSummaryDTO] { try validity.check(); return try base.cbqSourceObservationSummaries(workspaceId: workspaceId) }
-    func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult { try validity.check(); return try base.commitImportHistory(payload) }
+    func createImportSession(_ payload: ImportSessionDTO) throws -> String { return try validity.withValidOperation { try base.createImportSession(payload) } }
+    func updateImportSession(_ id: String, updates: PartialImportSessionUpdate) throws { try validity.withValidOperation { try base.updateImportSession(id, updates: updates) } }
+    func importSession(id: String) throws -> ImportSessionRecordDTO? { return try validity.withValidOperation { try base.importSession(id: id) } }
+    func importedDocument(id: String) throws -> ImportedDocumentDTO? { return try validity.withValidOperation { try base.importedDocument(id: id) } }
+    func priorImportedStatement(algorithm: String, fingerprint: String) throws -> PriorImportedStatementDTO? { return try validity.withValidOperation { try base.priorImportedStatement(algorithm: algorithm, fingerprint: fingerprint) } }
+    func transactionEventOwners(keys: Set<TransactionEventIdentityKeyDTO>) throws -> [TransactionEventIdentityKeyDTO: TransactionEventIdentityOwnerDTO] { return try validity.withValidOperation { try base.transactionEventOwners(keys: keys) } }
+    func recordImportAttempt(_ payload: ImportAttemptDTO) throws -> String { return try validity.withValidOperation { try base.recordImportAttempt(payload) } }
+    func importAttempts(workspaceId: String) throws -> [ImportAttemptDTO] { return try validity.withValidOperation { try base.importAttempts(workspaceId: workspaceId) } }
+    func partialImportSummary(importSessionId: String) throws -> PartialImportSummaryDTO? { return try validity.withValidOperation { try base.partialImportSummary(importSessionId: importSessionId) } }
+    func incomingRowDispositions(importSessionId: String) throws -> [IncomingRowDispositionDTO] { return try validity.withValidOperation { try base.incomingRowDispositions(importSessionId: importSessionId) } }
+    func statementFinancialProjections(workspaceId: String) throws -> [StatementFinancialProjectionRecordDTO] { return try validity.withValidOperation { try base.statementFinancialProjections(workspaceId: workspaceId) } }
+    func statementZeroActivityControls(workspaceId: String) throws -> [StatementZeroActivityControlDTO] { return try validity.withValidOperation { try base.statementZeroActivityControls(workspaceId: workspaceId) } }
+    func statementEquivalenceGroups(workspaceId: String) throws -> [StatementEquivalenceGroupDTO] { return try validity.withValidOperation { try base.statementEquivalenceGroups(workspaceId: workspaceId) } }
+    func statementEquivalenceMembers(workspaceId: String) throws -> [StatementEquivalenceMemberDTO] { return try validity.withValidOperation { try base.statementEquivalenceMembers(workspaceId: workspaceId) } }
+    func preferredTransactionSources(workspaceId: String) throws -> [PreferredTransactionSourceDTO] { return try validity.withValidOperation { try base.preferredTransactionSources(workspaceId: workspaceId) } }
+    func cbqSourceObservationSummaries(workspaceId: String) throws -> [CBQSourceObservationSummaryDTO] { return try validity.withValidOperation { try base.cbqSourceObservationSummaries(workspaceId: workspaceId) } }
+    func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult { return try validity.withValidOperation { try base.commitImportHistory(payload) } }
 }
 
 private struct GenerationCheckedConfirmedImportRepository: ConfirmedImportRepository {
@@ -535,8 +552,7 @@ private struct GenerationCheckedConfirmedImportRepository: ConfirmedImportReposi
 
     func reviewPartialImport(_ plan: ConfirmedImportPlanDTO) -> PartialImportReviewResult {
         do {
-            try validity.check()
-            return base.reviewPartialImport(plan)
+            return try validity.withValidOperation { base.reviewPartialImport(plan) }
         } catch {
             // The read-only review result predates the shared stale-generation
             // case; fail closed without consulting the inactive provider.
@@ -546,8 +562,7 @@ private struct GenerationCheckedConfirmedImportRepository: ConfirmedImportReposi
 
     func reviewStatementEquivalence(_ plan: ConfirmedImportPlanDTO) -> StatementEquivalenceReviewResult {
         do {
-            try validity.check()
-            return base.reviewStatementEquivalence(plan)
+            return try validity.withValidOperation { base.reviewStatementEquivalence(plan) }
         } catch {
             return .evidenceUnavailable
         }
@@ -555,8 +570,7 @@ private struct GenerationCheckedConfirmedImportRepository: ConfirmedImportReposi
 
     func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
         do {
-            try validity.check()
-            return base.commitConfirmedImport(plan)
+            return try validity.withValidOperation { base.commitConfirmedImport(plan) }
         } catch {
             return .staleProviderGeneration
         }
@@ -564,8 +578,7 @@ private struct GenerationCheckedConfirmedImportRepository: ConfirmedImportReposi
 
     func commitReviewedPartialImport(_ plan: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult {
         do {
-            try validity.check()
-            return base.commitReviewedPartialImport(plan)
+            return try validity.withValidOperation { base.commitReviewedPartialImport(plan) }
         } catch {
             return .staleProviderGeneration
         }
@@ -573,12 +586,12 @@ private struct GenerationCheckedConfirmedImportRepository: ConfirmedImportReposi
 
 
     func reviewCBQSourceOverlap(_ plan: ConfirmedImportPlanDTO) -> CBQSourceOverlapReviewResult {
-        do { try validity.check(); return base.reviewCBQSourceOverlap(plan) }
+        do { return try validity.withValidOperation { base.reviewCBQSourceOverlap(plan) } }
         catch { return .repositoryIntegrityConflict }
     }
 
     func commitReviewedCBQSourceOverlap(_ plan: ReviewedCBQSourceOverlapPlanDTO) -> ConfirmedImportRepositoryResult {
-        do { try validity.check(); return base.commitReviewedCBQSourceOverlap(plan) }
+        do { return try validity.withValidOperation { base.commitReviewedCBQSourceOverlap(plan) } }
         catch { return .staleProviderGeneration }
     }
 }
@@ -588,13 +601,12 @@ private struct GenerationCheckedSalaryRepository: SalaryRepository {
     let validity: ProviderGenerationValidity
 
     func commitImportedSalary(_ plan: SalaryImportPlanDTO) -> SalaryImportRepositoryResult {
-        do { try validity.check(); return base.commitImportedSalary(plan) }
+        do { return try validity.withValidOperation { base.commitImportedSalary(plan) } }
         catch { return .staleProviderGeneration }
     }
 
     func snapshot(workspaceId: String) throws -> SalaryRepositorySnapshotDTO {
-        try validity.check()
-        return try base.snapshot(workspaceId: workspaceId)
+        return try validity.withValidOperation { try base.snapshot(workspaceId: workspaceId) }
     }
 }
 
@@ -603,13 +615,11 @@ private struct GenerationCheckedFundingPlanRepository: FundingPlanRepository {
     let validity: ProviderGenerationValidity
 
     func plans(workspaceId: String) throws -> [FundingPlanDTO] {
-        try validity.check()
-        return try base.plans(workspaceId: workspaceId)
+        return try validity.withValidOperation { try base.plans(workspaceId: workspaceId) }
     }
 
     func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO {
-        try validity.check()
-        return try base.savePlan(plan)
+        return try validity.withValidOperation { try base.savePlan(plan) }
     }
 }
 

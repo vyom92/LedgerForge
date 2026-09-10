@@ -1,17 +1,17 @@
 import Foundation
 
-enum MigrationPreflightError: Error, Equatable, LocalizedError {
+nonisolated enum MigrationPreflightError: Error, Equatable, LocalizedError {
     case failed(issueCode: String)
     var errorDescription: String? { "Migration compatibility preflight failed." }
 }
 
-private func ownershipAudit(_ issueCode: String, _ sql: String) -> MigrationPreflightCheck {
+nonisolated private func ownershipAudit(_ issueCode: String, _ sql: String) -> MigrationPreflightCheck {
     MigrationPreflightCheck(issueCode: issueCode) { database in
         try database.queryInt(sql) == 0
     }
 }
 
-let migrationV5 = Migration(
+nonisolated let migrationV5 = Migration(
     version: 5,
     name: "identifier_ownership_and_observations",
     sql: """

@@ -25,30 +25,32 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     }
 
     func commitReviewedCBQSourceOverlap(_ reviewed: ReviewedCBQSourceOverlapPlanDTO) -> ConfirmedImportRepositoryResult {
-        guard consumePlan(reviewed.id), reviewed.basePlan.providerGeneration == generationToken,
-              reviewed.hasValidDigest(), reviewed.blockedCount == 0 else { return .reviewedPartialPlanStale }
-        do {
-            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-            let current = try reviewCBQSourceOverlapInsideTransaction(reviewed.basePlan, planID: reviewed.id)
-            guard case .eligible(let currentPlan) = current, currentPlan == reviewed else {
-                try db.execute(sql: "ROLLBACK;")
-                return .reviewedPartialPlanStale
+        return db.withExclusiveAccess {
+            guard consumePlan(reviewed.id), reviewed.basePlan.providerGeneration == generationToken,
+                  reviewed.hasValidDigest(), reviewed.blockedCount == 0 else { return .reviewedPartialPlanStale }
+            do {
+                try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+                let current = try reviewCBQSourceOverlapInsideTransaction(reviewed.basePlan, planID: reviewed.id)
+                guard case .eligible(let currentPlan) = current, currentPlan == reviewed else {
+                    try db.execute(sql: "ROLLBACK;")
+                    return .reviewedPartialPlanStale
+                }
+                let narrowed = try narrowedCBQPlan(reviewed)
+                let result = try commitInsideTransaction(narrowed)
+                guard case .committed(let receipt) = result else {
+                    try db.execute(sql: "ROLLBACK;")
+                    return result
+                }
+                try insertCBQSourceObservations(reviewed)
+                try db.execute(sql: "COMMIT;")
+                return .sourceOverlapCommitted(receipt, newTransactionCount: reviewed.newCount)
+            } catch let error as SQLiteExecutionError where error.isRetryableContention {
+                try? db.execute(sql: "ROLLBACK;"); return .retryableContention
+            } catch let SQLiteDatabaseError.execution(error) where error.isRetryableContention {
+                try? db.execute(sql: "ROLLBACK;"); return .retryableContention
+            } catch {
+                try? db.execute(sql: "ROLLBACK;"); return .repositoryIntegrityConflict
             }
-            let narrowed = try narrowedCBQPlan(reviewed)
-            let result = try commitInsideTransaction(narrowed)
-            guard case .committed(let receipt) = result else {
-                try db.execute(sql: "ROLLBACK;")
-                return result
-            }
-            try insertCBQSourceObservations(reviewed)
-            try db.execute(sql: "COMMIT;")
-            return .sourceOverlapCommitted(receipt, newTransactionCount: reviewed.newCount)
-        } catch let error as SQLiteExecutionError where error.isRetryableContention {
-            try? db.execute(sql: "ROLLBACK;"); return .retryableContention
-        } catch let SQLiteDatabaseError.execution(error) where error.isRetryableContention {
-            try? db.execute(sql: "ROLLBACK;"); return .retryableContention
-        } catch {
-            try? db.execute(sql: "ROLLBACK;"); return .repositoryIntegrityConflict
         }
     }
 
@@ -74,82 +76,86 @@ final class SQLiteConfirmedImportRepository: ConfirmedImportRepository {
     }
 
     func commitReviewedPartialImport(_ reviewedPlan: ReviewedPartialImportPlanDTO) -> ConfirmedImportRepositoryResult {
-        guard consumePlan(reviewedPlan.id),
-              reviewedPlan.basePlan.providerGeneration == generationToken,
-              reviewedPlan.hasValidDigest(),
-              (try? reviewedPlan.basePlan.historyTemplate.validateFingerprints()) != nil,
-              let authority = reviewedPlan.basePlan.historyTemplate.duplicateAuthorityFingerprint else {
-            return .reviewedPartialPlanStale
-        }
-        do {
-            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-            if try count("SELECT COUNT(*) FROM document_fingerprints WHERE algorithm = ? AND fingerprint = ? AND is_duplicate_authority = 1;", [authority.algorithm, authority.fingerprint]) > 0 {
-                try db.execute(sql: "ROLLBACK;")
+        return db.withExclusiveAccess {
+            guard consumePlan(reviewedPlan.id),
+                  reviewedPlan.basePlan.providerGeneration == generationToken,
+                  reviewedPlan.hasValidDigest(),
+                  (try? reviewedPlan.basePlan.historyTemplate.validateFingerprints()) != nil,
+                  let authority = reviewedPlan.basePlan.historyTemplate.duplicateAuthorityFingerprint else {
                 return .reviewedPartialPlanStale
             }
-            let currentReview = try reviewPartialImport(
-                reviewedPlan.basePlan,
-                planID: reviewedPlan.id
-            )
-            guard case .eligible(let currentPlan) = currentReview,
-                  currentPlan == reviewedPlan else {
-                try db.execute(sql: "ROLLBACK;")
-                return .reviewedPartialPlanStale
-            }
-            guard try validateExistingIdentity(
-                reviewedPlan.basePlan,
-                accountID: reviewedPlan.existingAccountId
-            ) else {
-                try db.execute(sql: "ROLLBACK;")
-                return .reviewedPartialPlanStale
-            }
-            try insert(reviewedPartialPlan: reviewedPlan)
-            try db.execute(sql: "COMMIT;")
-            let history = reviewedPlan.basePlan.historyTemplate
-            return .partialCommitted(
-                ConfirmedImportReceiptDTO(
-                    workspaceId: reviewedPlan.basePlan.workspace.id,
-                    accountId: reviewedPlan.existingAccountId,
-                    importSessionId: history.importSession.id,
-                    documentId: history.document.id
+            do {
+                try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+                if try count("SELECT COUNT(*) FROM document_fingerprints WHERE algorithm = ? AND fingerprint = ? AND is_duplicate_authority = 1;", [authority.algorithm, authority.fingerprint]) > 0 {
+                    try db.execute(sql: "ROLLBACK;")
+                    return .reviewedPartialPlanStale
+                }
+                let currentReview = try reviewPartialImport(
+                    reviewedPlan.basePlan,
+                    planID: reviewedPlan.id
                 )
-            )
-        } catch let error as SQLiteExecutionError where error.isRetryableContention {
-            try? db.execute(sql: "ROLLBACK;")
-            return .retryableContention
-        } catch let SQLiteDatabaseError.execution(error) where error.isRetryableContention {
-            try? db.execute(sql: "ROLLBACK;")
-            return .retryableContention
-        } catch {
-            try? db.execute(sql: "ROLLBACK;")
-            return .repositoryIntegrityConflict
+                guard case .eligible(let currentPlan) = currentReview,
+                      currentPlan == reviewedPlan else {
+                    try db.execute(sql: "ROLLBACK;")
+                    return .reviewedPartialPlanStale
+                }
+                guard try validateExistingIdentity(
+                    reviewedPlan.basePlan,
+                    accountID: reviewedPlan.existingAccountId
+                ) else {
+                    try db.execute(sql: "ROLLBACK;")
+                    return .reviewedPartialPlanStale
+                }
+                try insert(reviewedPartialPlan: reviewedPlan)
+                try db.execute(sql: "COMMIT;")
+                let history = reviewedPlan.basePlan.historyTemplate
+                return .partialCommitted(
+                    ConfirmedImportReceiptDTO(
+                        workspaceId: reviewedPlan.basePlan.workspace.id,
+                        accountId: reviewedPlan.existingAccountId,
+                        importSessionId: history.importSession.id,
+                        documentId: history.document.id
+                    )
+                )
+            } catch let error as SQLiteExecutionError where error.isRetryableContention {
+                try? db.execute(sql: "ROLLBACK;")
+                return .retryableContention
+            } catch let SQLiteDatabaseError.execution(error) where error.isRetryableContention {
+                try? db.execute(sql: "ROLLBACK;")
+                return .retryableContention
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                return .repositoryIntegrityConflict
+            }
         }
     }
 
     func commitConfirmedImport(_ plan: ConfirmedImportPlanDTO) -> ConfirmedImportRepositoryResult {
-        guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
-        guard (try? plan.historyTemplate.validateFingerprints()) != nil else {
-            return .repositoryIntegrityConflict
-        }
-        do {
-            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-            let result = try commitInsideTransaction(plan)
-            switch result {
-            case .committed, .equivalentSourceRecorded:
-                try db.execute(sql: "COMMIT;")
-            default:
-                try db.execute(sql: "ROLLBACK;")
+        return db.withExclusiveAccess {
+            guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+            guard (try? plan.historyTemplate.validateFingerprints()) != nil else {
+                return .repositoryIntegrityConflict
             }
-            return result
-        } catch let error as SQLiteExecutionError where error.isRetryableContention {
-            try? db.execute(sql: "ROLLBACK;")
-            return .retryableContention
-        } catch let SQLiteDatabaseError.execution(error) where error.isRetryableContention {
-            try? db.execute(sql: "ROLLBACK;")
-            return .retryableContention
-        } catch {
-            try? db.execute(sql: "ROLLBACK;")
-            return .repositoryIntegrityConflict
+            do {
+                try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+                let result = try commitInsideTransaction(plan)
+                switch result {
+                case .committed, .equivalentSourceRecorded:
+                    try db.execute(sql: "COMMIT;")
+                default:
+                    try db.execute(sql: "ROLLBACK;")
+                }
+                return result
+            } catch let error as SQLiteExecutionError where error.isRetryableContention {
+                try? db.execute(sql: "ROLLBACK;")
+                return .retryableContention
+            } catch let SQLiteDatabaseError.execution(error) where error.isRetryableContention {
+                try? db.execute(sql: "ROLLBACK;")
+                return .retryableContention
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                return .repositoryIntegrityConflict
+            }
         }
     }
 

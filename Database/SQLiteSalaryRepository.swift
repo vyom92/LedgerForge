@@ -10,41 +10,43 @@ final class SQLiteSalaryRepository: SalaryRepository {
     }
 
     func commitImportedSalary(_ plan: SalaryImportPlanDTO) -> SalaryImportRepositoryResult {
-        guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
-        do { try plan.history.validateFingerprints() } catch { return .repositoryIntegrityConflict }
-        do { try SalaryPersistenceDTOValidator.validate(statement: plan.statement) } catch { return .repositoryIntegrityConflict }
-        guard let authority = plan.history.duplicateAuthorityFingerprint,
-              let normalized = plan.history.normalizedDocument,
-              plan.workspace.id == plan.statement.workspaceId,
-              plan.history.document.workspaceId == plan.workspace.id,
-              plan.history.importSession.workspaceId == plan.workspace.id,
-              plan.history.document.importSessionId == plan.history.importSession.id,
-              plan.statement.documentId == plan.history.document.id,
-              plan.statement.importSessionId == plan.history.importSession.id,
-              plan.statement.normalizedDocumentId == normalized.id,
-              plan.statement.sourceFingerprintAlgorithm == authority.algorithm,
-              plan.statement.sourceFingerprintDigest == authority.fingerprint,
-              plan.statement.components.allSatisfy({ $0.salaryStatementId == plan.statement.id }) else {
-            return .repositoryIntegrityConflict
-        }
-        do {
-            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-            if let duplicate = try duplicate(algorithm: authority.algorithm, digest: authority.fingerprint) {
-                try db.execute(sql: "COMMIT;")
-                return .exactSourceDuplicate(duplicate)
+        return db.withExclusiveAccess {
+            guard plan.providerGeneration == generationToken else { return .staleProviderGeneration }
+            do { try plan.history.validateFingerprints() } catch { return .repositoryIntegrityConflict }
+            do { try SalaryPersistenceDTOValidator.validate(statement: plan.statement) } catch { return .repositoryIntegrityConflict }
+            guard let authority = plan.history.duplicateAuthorityFingerprint,
+                  let normalized = plan.history.normalizedDocument,
+                  plan.workspace.id == plan.statement.workspaceId,
+                  plan.history.document.workspaceId == plan.workspace.id,
+                  plan.history.importSession.workspaceId == plan.workspace.id,
+                  plan.history.document.importSessionId == plan.history.importSession.id,
+                  plan.statement.documentId == plan.history.document.id,
+                  plan.statement.importSessionId == plan.history.importSession.id,
+                  plan.statement.normalizedDocumentId == normalized.id,
+                  plan.statement.sourceFingerprintAlgorithm == authority.algorithm,
+                  plan.statement.sourceFingerprintDigest == authority.fingerprint,
+                  plan.statement.components.allSatisfy({ $0.salaryStatementId == plan.statement.id }) else {
+                return .repositoryIntegrityConflict
             }
-            try insert(plan, normalized: normalized)
-            try db.execute(sql: "COMMIT;")
-            return .committed(statementId: plan.statement.id, importSessionId: plan.history.importSession.id, documentId: plan.history.document.id)
-        } catch let error as SQLiteExecutionError where error.isRetryableContention {
-            try? db.execute(sql: "ROLLBACK;")
-            return .retryableContention
-        } catch let SQLiteDatabaseError.execution(error) where error.isRetryableContention {
-            try? db.execute(sql: "ROLLBACK;")
-            return .retryableContention
-        } catch {
-            try? db.execute(sql: "ROLLBACK;")
-            return .repositoryIntegrityConflict
+            do {
+                try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+                if let duplicate = try duplicate(algorithm: authority.algorithm, digest: authority.fingerprint) {
+                    try db.execute(sql: "COMMIT;")
+                    return .exactSourceDuplicate(duplicate)
+                }
+                try insert(plan, normalized: normalized)
+                try db.execute(sql: "COMMIT;")
+                return .committed(statementId: plan.statement.id, importSessionId: plan.history.importSession.id, documentId: plan.history.document.id)
+            } catch let error as SQLiteExecutionError where error.isRetryableContention {
+                try? db.execute(sql: "ROLLBACK;")
+                return .retryableContention
+            } catch let SQLiteDatabaseError.execution(error) where error.isRetryableContention {
+                try? db.execute(sql: "ROLLBACK;")
+                return .retryableContention
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                return .repositoryIntegrityConflict
+            }
         }
     }
 
@@ -188,56 +190,58 @@ final class SQLiteFundingPlanRepository: FundingPlanRepository {
     }
 
     func savePlan(_ plan: FundingPlanDTO) throws -> FundingPlanDTO {
-        try SalaryPersistenceDTOValidator.validate(plan: plan)
-        try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-        do {
-            // The first explicit planner save can precede the first import.
-            // Workspace creation and the plan remain in one transaction.
-            if plan.workspaceId == "default-workspace" {
-                try db.executePrepared(sql: "INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING;", params: [plan.workspaceId, "Default Workspace", plan.updatedAtISO])
+        return try db.withExclusiveAccess {
+            try SalaryPersistenceDTOValidator.validate(plan: plan)
+            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+            do {
+                // The first explicit planner save can precede the first import.
+                // Workspace creation and the plan remain in one transaction.
+                if plan.workspaceId == "default-workspace" {
+                    try db.executePrepared(sql: "INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING;", params: [plan.workspaceId, "Default Workspace", plan.updatedAtISO])
+                }
+                try validateRelationships(plan)
+                try db.executePrepared(sql: """
+                    INSERT INTO funding_plans (
+                      id, workspace_id, plan_month, rollover_source_plan_id,
+                      expected_fixed_minor, expected_fixed_decimal, expected_fixed_provenance,
+                      expected_variable_minor, expected_variable_decimal, expected_variable_provenance,
+                      expected_deductions_minor, expected_deductions_decimal, expected_deductions_provenance,
+                      configured_fee_minor, configured_fee_decimal, configured_fee_provenance,
+                      fx_inr_per_qar_decimal, fx_observation_date, fx_provenance,
+                      planned_investment_minor, planned_investment_decimal, planned_investment_provenance, updated_at
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(id) DO UPDATE SET
+                      rollover_source_plan_id=excluded.rollover_source_plan_id,
+                      expected_fixed_minor=excluded.expected_fixed_minor, expected_fixed_decimal=excluded.expected_fixed_decimal, expected_fixed_provenance=excluded.expected_fixed_provenance,
+                      expected_variable_minor=excluded.expected_variable_minor, expected_variable_decimal=excluded.expected_variable_decimal, expected_variable_provenance=excluded.expected_variable_provenance,
+                      expected_deductions_minor=excluded.expected_deductions_minor, expected_deductions_decimal=excluded.expected_deductions_decimal, expected_deductions_provenance=excluded.expected_deductions_provenance,
+                      configured_fee_minor=excluded.configured_fee_minor, configured_fee_decimal=excluded.configured_fee_decimal, configured_fee_provenance=excluded.configured_fee_provenance,
+                      fx_inr_per_qar_decimal=excluded.fx_inr_per_qar_decimal, fx_observation_date=excluded.fx_observation_date, fx_provenance=excluded.fx_provenance,
+                      planned_investment_minor=excluded.planned_investment_minor, planned_investment_decimal=excluded.planned_investment_decimal, planned_investment_provenance=excluded.planned_investment_provenance,
+                      updated_at=excluded.updated_at;
+                    """, params: [
+                        plan.id, plan.workspaceId, plan.planMonthISO, plan.rolloverSourcePlanId ?? NSNull(),
+                        plan.expectedFixedMinor, plan.expectedFixedDecimal, plan.expectedFixedProvenance,
+                        plan.expectedVariableMinor, plan.expectedVariableDecimal, plan.expectedVariableProvenance,
+                        plan.expectedDeductionsMinor, plan.expectedDeductionsDecimal, plan.expectedDeductionsProvenance,
+                        plan.configuredFeeMinor, plan.configuredFeeDecimal, plan.configuredFeeProvenance,
+                        plan.fxINRPerQARDecimal ?? NSNull(), plan.fxObservationDateISO ?? NSNull(), plan.fxINRPerQARDecimal == nil ? NSNull() : "user_entered",
+                        plan.plannedInvestmentMinor, plan.plannedInvestmentDecimal, plan.plannedInvestmentProvenance, plan.updatedAtISO
+                    ])
+                try db.executePrepared(sql: "DELETE FROM funding_plan_balances WHERE funding_plan_id = ?;", params: [plan.id])
+                try db.executePrepared(sql: "DELETE FROM funding_plan_commitments WHERE funding_plan_id = ?;", params: [plan.id])
+                for balance in plan.balances {
+                    try db.executePrepared(sql: "INSERT INTO funding_plan_balances (id, funding_plan_id, source_ordinal, account_id, native_currency, included, amount_currency, amount_minor, amount_decimal, provenance, carried_source_plan_id, captured_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [balance.id, balance.planId, balance.sourceOrdinal, balance.accountId, balance.nativeCurrency, balance.included ? 1 : 0, balance.amountCurrency ?? NSNull(), balance.amountMinor ?? NSNull(), balance.amountDecimal ?? NSNull(), balance.provenanceCode, balance.carriedSourcePlanId ?? NSNull(), balance.capturedAtISO ?? NSNull()])
+                }
+                for commitment in plan.commitments {
+                    try db.executePrepared(sql: "INSERT INTO funding_plan_commitments (id, funding_plan_id, region, source_ordinal, label, amount_currency, amount_minor, amount_decimal, included, funding_account_id, provenance, carried_source_plan_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [commitment.id, commitment.planId, commitment.regionCode, commitment.sourceOrdinal, commitment.label, commitment.amountCurrency, commitment.amountMinor, commitment.amountDecimal, commitment.included ? 1 : 0, commitment.fundingAccountId ?? NSNull(), commitment.provenanceCode, commitment.carriedSourcePlanId ?? NSNull()])
+                }
+                try db.execute(sql: "COMMIT;")
+                return plan
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                throw error
             }
-            try validateRelationships(plan)
-            try db.executePrepared(sql: """
-                INSERT INTO funding_plans (
-                  id, workspace_id, plan_month, rollover_source_plan_id,
-                  expected_fixed_minor, expected_fixed_decimal, expected_fixed_provenance,
-                  expected_variable_minor, expected_variable_decimal, expected_variable_provenance,
-                  expected_deductions_minor, expected_deductions_decimal, expected_deductions_provenance,
-                  configured_fee_minor, configured_fee_decimal, configured_fee_provenance,
-                  fx_inr_per_qar_decimal, fx_observation_date, fx_provenance,
-                  planned_investment_minor, planned_investment_decimal, planned_investment_provenance, updated_at
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                ON CONFLICT(id) DO UPDATE SET
-                  rollover_source_plan_id=excluded.rollover_source_plan_id,
-                  expected_fixed_minor=excluded.expected_fixed_minor, expected_fixed_decimal=excluded.expected_fixed_decimal, expected_fixed_provenance=excluded.expected_fixed_provenance,
-                  expected_variable_minor=excluded.expected_variable_minor, expected_variable_decimal=excluded.expected_variable_decimal, expected_variable_provenance=excluded.expected_variable_provenance,
-                  expected_deductions_minor=excluded.expected_deductions_minor, expected_deductions_decimal=excluded.expected_deductions_decimal, expected_deductions_provenance=excluded.expected_deductions_provenance,
-                  configured_fee_minor=excluded.configured_fee_minor, configured_fee_decimal=excluded.configured_fee_decimal, configured_fee_provenance=excluded.configured_fee_provenance,
-                  fx_inr_per_qar_decimal=excluded.fx_inr_per_qar_decimal, fx_observation_date=excluded.fx_observation_date, fx_provenance=excluded.fx_provenance,
-                  planned_investment_minor=excluded.planned_investment_minor, planned_investment_decimal=excluded.planned_investment_decimal, planned_investment_provenance=excluded.planned_investment_provenance,
-                  updated_at=excluded.updated_at;
-                """, params: [
-                    plan.id, plan.workspaceId, plan.planMonthISO, plan.rolloverSourcePlanId ?? NSNull(),
-                    plan.expectedFixedMinor, plan.expectedFixedDecimal, plan.expectedFixedProvenance,
-                    plan.expectedVariableMinor, plan.expectedVariableDecimal, plan.expectedVariableProvenance,
-                    plan.expectedDeductionsMinor, plan.expectedDeductionsDecimal, plan.expectedDeductionsProvenance,
-                    plan.configuredFeeMinor, plan.configuredFeeDecimal, plan.configuredFeeProvenance,
-                    plan.fxINRPerQARDecimal ?? NSNull(), plan.fxObservationDateISO ?? NSNull(), plan.fxINRPerQARDecimal == nil ? NSNull() : "user_entered",
-                    plan.plannedInvestmentMinor, plan.plannedInvestmentDecimal, plan.plannedInvestmentProvenance, plan.updatedAtISO
-                ])
-            try db.executePrepared(sql: "DELETE FROM funding_plan_balances WHERE funding_plan_id = ?;", params: [plan.id])
-            try db.executePrepared(sql: "DELETE FROM funding_plan_commitments WHERE funding_plan_id = ?;", params: [plan.id])
-            for balance in plan.balances {
-                try db.executePrepared(sql: "INSERT INTO funding_plan_balances (id, funding_plan_id, source_ordinal, account_id, native_currency, included, amount_currency, amount_minor, amount_decimal, provenance, carried_source_plan_id, captured_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [balance.id, balance.planId, balance.sourceOrdinal, balance.accountId, balance.nativeCurrency, balance.included ? 1 : 0, balance.amountCurrency ?? NSNull(), balance.amountMinor ?? NSNull(), balance.amountDecimal ?? NSNull(), balance.provenanceCode, balance.carriedSourcePlanId ?? NSNull(), balance.capturedAtISO ?? NSNull()])
-            }
-            for commitment in plan.commitments {
-                try db.executePrepared(sql: "INSERT INTO funding_plan_commitments (id, funding_plan_id, region, source_ordinal, label, amount_currency, amount_minor, amount_decimal, included, funding_account_id, provenance, carried_source_plan_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?);", params: [commitment.id, commitment.planId, commitment.regionCode, commitment.sourceOrdinal, commitment.label, commitment.amountCurrency, commitment.amountMinor, commitment.amountDecimal, commitment.included ? 1 : 0, commitment.fundingAccountId ?? NSNull(), commitment.provenanceCode, commitment.carriedSourcePlanId ?? NSNull()])
-            }
-            try db.execute(sql: "COMMIT;")
-            return plan
-        } catch {
-            try? db.execute(sql: "ROLLBACK;")
-            throw error
         }
     }
 

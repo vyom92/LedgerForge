@@ -701,12 +701,12 @@ struct ImportPersistenceCommitFailure: Error, LocalizedError {
 
 final class DefaultImportPersistenceCoordinator: ImportPersistenceCoordinating {
 
-    private let databaseProviderProvider: () -> DatabaseProvider
+    private let databaseProviderProvider: @MainActor () -> DatabaseProvider
     private let mapper: ImportPersistenceMapper
     private let developerConsole: DeveloperConsole?
 
     init(
-        databaseProviderProvider: @escaping () -> DatabaseProvider = { DatabaseProvider.shared },
+        databaseProviderProvider: @escaping @MainActor () -> DatabaseProvider = { DatabaseProvider.shared },
         mapper: ImportPersistenceMapper = ImportPersistenceMapper(),
         developerConsole: DeveloperConsole? = .shared
     ) {

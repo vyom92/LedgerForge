@@ -4,7 +4,7 @@
 import CommonCrypto
 import Foundation
 
-public struct Migration {
+nonisolated public struct Migration: Sendable {
     public let version: Int
     public let name: String
     public let sql: String
@@ -30,12 +30,14 @@ public struct Migration {
     }
 }
 
-struct MigrationPreflightCheck {
+// Checks run synchronously inside SQLiteDatabase migration ownership. Captures
+// must be Sendable; the received connection retains its own synchronization.
+nonisolated struct MigrationPreflightCheck: Sendable {
     let issueCode: String
-    let run: (SQLiteDatabase) throws -> Bool
+    let run: @Sendable (SQLiteDatabase) throws -> Bool
 }
 
-public let migrationV1 = Migration(version: 1, name: "initial_schema_v1", sql: """
+nonisolated public let migrationV1 = Migration(version: 1, name: "initial_schema_v1", sql: """
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -280,13 +282,13 @@ CREATE TABLE IF NOT EXISTS attachments (
 
 """)
 
-public let migrationV2 = Migration(version: 2, name: "import_session_version_columns", sql: """
+nonisolated public let migrationV2 = Migration(version: 2, name: "import_session_version_columns", sql: """
 ALTER TABLE import_sessions ADD COLUMN reader_version TEXT;
 ALTER TABLE import_sessions ADD COLUMN parser_version TEXT;
 ALTER TABLE import_sessions ADD COLUMN layout_version TEXT;
 """)
 
-public let migrationV3 = Migration(version: 3, name: "transaction_event_identities", sql: """
+nonisolated public let migrationV3 = Migration(version: 3, name: "transaction_event_identities", sql: """
 CREATE TABLE transaction_event_identities (
   id TEXT PRIMARY KEY,
   transaction_id TEXT NOT NULL,
@@ -306,7 +308,7 @@ CREATE TABLE transaction_event_identities (
 CREATE INDEX idx_transaction_event_identities_account ON transaction_event_identities(account_id, import_session_id);
 """)
 
-public let migrationV4 = Migration(version: 4, name: "import_attempt_history", sql: """
+nonisolated public let migrationV4 = Migration(version: 4, name: "import_attempt_history", sql: """
 CREATE TABLE import_attempts (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
@@ -348,7 +350,7 @@ WHERE s.validation_status = 'passed' AND s.completed_at IS NOT NULL;
 /// The first trusted statement-date and source-provenance schema. Existing
 /// financial graphs are deliberately rejected by the pre-production audit;
 /// no historical date, row order, or provenance is guessed or rewritten.
-public let migrationV6 = Migration(
+nonisolated public let migrationV6 = Migration(
     version: 6,
     name: "trusted_statement_dates_and_source_provenance",
     sql: """
@@ -372,7 +374,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_transaction_raw_rows_transaction_row ON tr
     ]
 )
 
-public let migrationV7 = Migration(version: 7, name: "reviewed_partial_overlap_import", sql: """
+nonisolated public let migrationV7 = Migration(version: 7, name: "reviewed_partial_overlap_import", sql: """
 ALTER TABLE import_attempts ADD COLUMN source_row_count INTEGER;
 ALTER TABLE import_attempts ADD COLUMN imported_transaction_count INTEGER;
 ALTER TABLE import_attempts ADD COLUMN recognized_existing_row_count INTEGER;
@@ -490,7 +492,7 @@ BEGIN
 END;
 """)
 
-public let migrationV8 = Migration(version: 8, name: "durable_transaction_categories", sql: """
+nonisolated public let migrationV8 = Migration(version: 8, name: "durable_transaction_categories", sql: """
 CREATE TABLE categories (
   id TEXT PRIMARY KEY,
   workspace_id TEXT NOT NULL,
@@ -551,7 +553,7 @@ BEGIN
 END;
 """)
 
-public let migrationV9 = Migration(
+nonisolated public let migrationV9 = Migration(
     version: 9,
     name: "versioned_document_fingerprint_authority",
     sql: """
@@ -590,7 +592,7 @@ CREATE INDEX idx_document_fingerprints_authority_lookup
     ]
 )
 
-public let migrationV10 = Migration(
+nonisolated public let migrationV10 = Migration(
     version: 10,
     name: "exact_cross_format_statement_equivalence",
     sql: """
@@ -773,7 +775,7 @@ END;
 """
 )
 
-public let migrationV11 = Migration(
+nonisolated public let migrationV11 = Migration(
     version: 11,
     name: "CBQ exact source observations and masked identity evidence",
     sql: """
@@ -917,7 +919,7 @@ END;
 """
 )
 
-public let migrationV12 = Migration(
+nonisolated public let migrationV12 = Migration(
     version: 12,
     name: "durable credit card instruments and statement evidence",
     sql: """
@@ -1116,7 +1118,7 @@ END;
 """
 )
 
-public let migrationV13 = Migration(
+nonisolated public let migrationV13 = Migration(
     version: 13,
     name: "multi-section card statements and exact semantic sources",
     sql: """
@@ -1417,7 +1419,7 @@ JOIN card_source_identity_observations o
 """
 )
 
-public let migrationV14 = Migration(
+nonisolated public let migrationV14 = Migration(
     version: 14,
     name: "generalized card reconciliation and structural section evidence",
     sql: """
@@ -1607,7 +1609,7 @@ END;
 """
 )
 
-public let migrationV15 = Migration(
+nonisolated public let migrationV15 = Migration(
     version: 15,
     name: "Axis card observations and representation-neutral semantic events",
     sql: """
@@ -1926,7 +1928,7 @@ PRAGMA legacy_alter_table = OFF;
     requiresForeignKeysDisabled: true
 )
 
-public let migrationV16 = Migration(
+nonisolated public let migrationV16 = Migration(
     version: 16,
     name: "Qatar Airways salary actuals and current-month funding plans",
     sql: """
@@ -2091,7 +2093,7 @@ END;
 /// source-proven `minimum_amount_due` component), permits a coherent empty
 /// card statement, and adds a typed zero-activity control graph.  It does not
 /// backfill or manufacture any statement rows.
-public let migrationV17 = Migration(
+nonisolated public let migrationV17 = Migration(
     version: 17,
     name: "zero-activity controls, CBQ minimum amount due, and Axis statement equivalence",
     sql: """
@@ -2733,9 +2735,9 @@ PRAGMA legacy_alter_table = OFF;
     requiresForeignKeysDisabled: true
 )
 
-public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17]
+nonisolated public let allMigrations: [Migration] = [migrationV1, migrationV2, migrationV3, migrationV4, migrationV5, migrationV6, migrationV7, migrationV8, migrationV9, migrationV10, migrationV11, migrationV12, migrationV13, migrationV14, migrationV15, migrationV16, migrationV17]
 
-enum MigrationIntegrityError: Error, Equatable, LocalizedError {
+nonisolated enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     case emptyRegisteredChain
     case duplicateRegisteredVersion(Int)
     case registeredOrderInvalid
@@ -2763,14 +2765,14 @@ enum MigrationIntegrityError: Error, Equatable, LocalizedError {
     }
 }
 
-struct PersistedMigrationRecord: Equatable {
+nonisolated struct PersistedMigrationRecord: Equatable, Sendable {
     let version: Int?
     let name: String?
     let checksum: String?
     let appliedAt: String?
 }
 
-enum MigrationChainValidator {
+nonisolated enum MigrationChainValidator {
     static func validateRegistered(_ migrations: [Migration]) throws {
         guard !migrations.isEmpty else {
             throw MigrationIntegrityError.emptyRegisteredChain
@@ -2850,7 +2852,7 @@ enum MigrationChainValidator {
 }
 
 extension Migration {
-    var checksum: String {
+    nonisolated var checksum: String {
         let preflightSource = preflightChecks.isEmpty ? "" : preflightChecks.map(\.issueCode).joined(separator: "\n") + "\n"
         let executionSource = requiresForeignKeysDisabled ? "requires_foreign_keys_disabled\n" : ""
         let source = executionSource + preflightSource + sql

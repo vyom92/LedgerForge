@@ -2296,6 +2296,8 @@ reached and that the remaining work is materially known.
 
 **Discovery remainder:** MISSING: acceptance of prerequisites and current full compiler result. **Next boundary:** PROPOSED: no recommendation beyond reuse of recorded sequencing and settings caveat. **Acceptance:** Future owner uses exact diagnostics/settings, build/test plan and behavior-sensitive validation.
 
+**Sprint 84 active, unaccepted readiness finding — 2026-09-10:** the Swift-5 complete strict-concurrency probe at published parent `af2d1949c6e9a73af3bb004422b72882d28195e2` also exposes five production diagnostics outside PR-2: the `PreparedImport` / `ImportCentrePreparation` conformance in `Import/Coordinator/ImportCentreCoordinator.swift`, the `StatementDropItemProvider.Completion` capture in `Import/Presentation/StatementDropIntakeAdapter.swift`, and three salary/funding-plan reconstruction isolation diagnostics in `Services/RepositoryStoreHydrator.swift`. These are recorded strict-readiness boundaries, not verified runtime or financial defects; no contradictory evidence against accepted PR-1 publication was established. They remain owned here for Chat disposition before Sprint 87 and are excluded from Sprint 84 persistence corrections and Sprint 86 test-only corrections. This finding does not authorize their repair or reopen accepted financial semantics. Exact before/after diagnostics belong to the local Sprint-84 acceptance evidence.
+
 ## FW-P2-77 — Source Tree and Documentation Organization Consolidation
 
 **Status:** Ready for discovery

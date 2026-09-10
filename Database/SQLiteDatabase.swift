@@ -4,11 +4,11 @@
 import Foundation
 import SQLite3
 
-private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+nonisolated private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-public enum SQLiteOperation: String, Equatable, Sendable { case open, transaction, statement, query, migration, backup, checkpoint, close }
+nonisolated public enum SQLiteOperation: String, Equatable, Sendable { case open, transaction, statement, query, migration, backup, checkpoint, close }
 
-public struct SQLiteExecutionError: Error, Equatable, Sendable, CustomStringConvertible {
+nonisolated public struct SQLiteExecutionError: Error, Equatable, Sendable, CustomStringConvertible {
     public let primaryCode: Int32
     public let extendedCode: Int32
     public let operation: SQLiteOperation
@@ -19,7 +19,7 @@ public struct SQLiteExecutionError: Error, Equatable, Sendable, CustomStringConv
     public var description: String { "SQLite \(operation.rawValue) failed (\(primaryCode)/\(extendedCode))." }
 }
 
-public enum SQLiteDatabaseError: Error, LocalizedError {
+nonisolated public enum SQLiteDatabaseError: Error, LocalizedError {
     case databaseNotOpen
     case prepareFailed(operation: SQLiteOperation)
     case execution(SQLiteExecutionError)
@@ -45,31 +45,61 @@ public enum SQLiteDatabaseError: Error, LocalizedError {
     }
 }
 
-public struct SQLiteRow {
-    fileprivate let statement: OpaquePointer?
+/// Owned values copied while the connection owns the prepared statement.
+/// A returned row never retains a SQLite statement or column pointer.
+nonisolated public struct SQLiteRow: Sendable {
+    private struct Column: Sendable {
+        let string: String?
+        let int64: Int64?
+        let bool: Bool
+    }
+    private let columns: [Column]
+
+    fileprivate init(statement: OpaquePointer?) {
+        columns = (0..<sqlite3_column_count(statement)).map { index in
+            guard sqlite3_column_type(statement, index) != SQLITE_NULL else {
+                return Column(string: nil, int64: nil, bool: false)
+            }
+            let string = sqlite3_column_text(statement, index).map { String(cString: $0) }
+            return Column(
+                string: string,
+                int64: sqlite3_column_int64(statement, index),
+                bool: sqlite3_column_int(statement, index) != 0
+            )
+        }
+    }
+
+    private func column(at index: Int32) -> Column? {
+        guard index >= 0, Int(index) < columns.count else { return nil }
+        return columns[Int(index)]
+    }
 
     public func string(at index: Int32) -> String? {
-        guard sqlite3_column_type(statement, index) != SQLITE_NULL,
-              let text = sqlite3_column_text(statement, index) else {
-            return nil
-        }
-        return String(cString: text)
+        column(at: index)?.string
     }
 
     public func int64(at index: Int32) -> Int64? {
-        guard sqlite3_column_type(statement, index) != SQLITE_NULL else {
-            return nil
-        }
-        return sqlite3_column_int64(statement, index)
+        column(at: index)?.int64
     }
 
     public func bool(at index: Int32) -> Bool {
-        return sqlite3_column_int(statement, index) != 0
+        column(at: index)?.bool ?? false
     }
 }
 
-public final class SQLiteDatabase {
+/// Synchronous connection ownership shared by the app and subprocess helper.
+///
+/// `ownershipLock` protects every access to `db`, all statement/backup lifetimes,
+/// and complete migration runs. Multi-call transactions must additionally hold
+/// `withExclusiveAccess` from BEGIN through COMMIT or ROLLBACK. The recursive
+/// lock permits existing nested repository queries on the same thread; callers
+/// must not wait for another thread to use this connection from inside a scope.
+/// Query callbacks execute synchronously under ownership and receive only copied
+/// values. No SQLite pointer leaves this type. These invariants, rather than
+/// SQLITE_OPEN_FULLMUTEX alone, justify the unchecked Sendable conformance.
+nonisolated public final class SQLiteDatabase: @unchecked Sendable {
     private let path: String
+    private let ownershipLock = NSRecursiveLock()
     private var db: OpaquePointer?
 
     public init(path: String) {
@@ -80,11 +110,22 @@ public final class SQLiteDatabase {
         close()
     }
 
+    /// Keeps a synchronous, multi-call operation on this connection indivisible.
+    /// Retain the repository's existing transaction decisions inside this scope.
+    func withExclusiveAccess<Result>(_ operation: () throws -> Result) rethrows -> Result {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
+        return try operation()
+    }
+
     public func open() throws {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
         if db != nil { return }
         let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
         if sqlite3_open_v2(path, &db, flags, nil) != SQLITE_OK {
             let extended = sqlite3_extended_errcode(db)
+            close()
             throw SQLiteDatabaseError.execution(SQLiteExecutionError(primaryCode: extended & 0xff, extendedCode: extended, operation: .open))
         }
         // Protect every startup statement from concurrent openers, including
@@ -92,21 +133,31 @@ public final class SQLiteDatabase {
         sqlite3_busy_timeout(db, 5000)
         // Configure recommended PRAGMAs for production-safe defaults
         // Enable write-ahead logging for concurrency
-        try execute(sql: "PRAGMA journal_mode = WAL;")
-        // Enable foreign keys enforcement
-        try execute(sql: "PRAGMA foreign_keys = ON;")
-        // Use NORMAL synchronous for balanced durability/performance
-        try execute(sql: "PRAGMA synchronous = NORMAL;")
+        do {
+            try execute(sql: "PRAGMA journal_mode = WAL;")
+            // Enable foreign keys enforcement
+            try execute(sql: "PRAGMA foreign_keys = ON;")
+            // Use NORMAL synchronous for balanced durability/performance
+            try execute(sql: "PRAGMA synchronous = NORMAL;")
+        } catch {
+            close()
+            throw error
+        }
     }
 
     public func close() {
-        if let db = db {
-            sqlite3_close(db)
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
+        // A reentrant callback can request close while its statement is active.
+        // Preserve the live handle if SQLite refuses; checked close reports why.
+        if let db, sqlite3_close(db) == SQLITE_OK {
             self.db = nil
         }
     }
 
     public func createBackup(at destinationPath: String) throws {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
         guard let db else { throw SQLiteDatabaseError.databaseNotOpen }
         var destination: OpaquePointer?
         guard sqlite3_open_v2(destinationPath, &destination, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK,
@@ -126,6 +177,8 @@ public final class SQLiteDatabase {
     }
 
     public func checkpointAndClose() throws {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
         guard let db else { throw SQLiteDatabaseError.databaseNotOpen }
         var logFrames: Int32 = 0
         var checkpointedFrames: Int32 = 0
@@ -147,6 +200,8 @@ public final class SQLiteDatabase {
     }
 
     public func execute(sql: String) throws {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
         guard let db = db else { throw NSError(domain: "SQLite", code: 1, userInfo: [NSLocalizedDescriptionKey: "DB not open"]) }
         var errMsg: UnsafeMutablePointer<Int8>? = nil
         let result = sqlite3_exec(db, sql, nil, nil, &errMsg)
@@ -158,6 +213,8 @@ public final class SQLiteDatabase {
 
     // Execute a prepared statement with parameter bindings. Parameters are bound in order.
     public func executePrepared(sql: String, params: [Any?] = []) throws {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
         guard let db = db else { throw SQLiteDatabaseError.databaseNotOpen }
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
@@ -174,6 +231,8 @@ public final class SQLiteDatabase {
     }
 
     public func query<T>(sql: String, params: [Any?] = [], map: (SQLiteRow) throws -> T) throws -> [T] {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
         guard let db = db else { throw SQLiteDatabaseError.databaseNotOpen }
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
@@ -197,6 +256,8 @@ public final class SQLiteDatabase {
     }
 
     public func runMigrations(_ migrations: [Migration]) throws {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
         try MigrationChainValidator.validateRegistered(migrations)
         try open()
 
@@ -309,6 +370,8 @@ public final class SQLiteDatabase {
     }
 
     public func queryInt(_ sql: String) throws -> Int {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
         return try querySingleInt(sql: sql)
     }
 
@@ -316,6 +379,8 @@ public final class SQLiteDatabase {
         against migrations: [Migration],
         requiresCompleteChain: Bool
     ) throws -> [PersistedMigrationRecord] {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
         try MigrationChainValidator.validateRegistered(migrations)
         guard try tableExists("schema_migrations") else {
             throw MigrationIntegrityError.missingPersistedVersion(1)

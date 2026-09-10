@@ -216,7 +216,7 @@ final class RepositoryStoreHydrator {
 #endif
 
     convenience init(
-        databaseProvider: DatabaseProvider = .shared,
+        databaseProvider: DatabaseProvider? = nil,
         accountStore: AccountStore = .shared,
         transactionStore: TransactionStore = .shared,
         categoryStore: CategoryStore = .shared,
@@ -226,6 +226,7 @@ final class RepositoryStoreHydrator {
         categoryReconciliationGate: CategoryReconciliationGate? = .shared,
         participatesInLifecycleGate: Bool = true
     ) {
+        let databaseProvider = databaseProvider ?? .shared
         self.init(
             accountRepo: databaseProvider.accountRepo,
             importSessionRepo: databaseProvider.importSessionRepo,

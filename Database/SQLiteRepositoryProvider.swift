@@ -793,7 +793,7 @@ enum DevelopmentDatabaseLifecycleResult: Equatable, CustomStringConvertible {
     }
 }
 
-enum DevelopmentDatabaseLifecycleFailurePoint: nonisolated Hashable {
+nonisolated enum DevelopmentDatabaseLifecycleFailurePoint: Hashable, Sendable {
     case backupCreation
     case backupVerification
     case providerQuiescence
@@ -1860,14 +1860,16 @@ fileprivate final class SQLiteCategoryRepo: CategoryRepository {
     }
 
     private func withImmediateTransaction<T>(_ body: () throws -> T) throws -> T {
-        try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-        do {
-            let value = try body()
-            try db.execute(sql: "COMMIT;")
-            return value
-        } catch {
-            try? db.execute(sql: "ROLLBACK;")
-            throw error
+        return try db.withExclusiveAccess {
+            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+            do {
+                let value = try body()
+                try db.execute(sql: "COMMIT;")
+                return value
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                throw error
+            }
         }
     }
 }
@@ -1951,65 +1953,67 @@ fileprivate final class SQLiteAccountRepo: AccountRepository {
     }
 
     func attachIdentifier(_ identifier: AccountIdentifierDTO) throws -> String {
-        try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-        do {
-            guard let account = try account(id: identifier.accountId) else {
-                throw RepositoryError.relationshipViolation("Account \(identifier.accountId) does not exist for identifier \(identifier.id).")
-            }
-            guard account.workspaceId == identifier.workspaceId else {
-                throw RepositoryError.relationshipViolation("Account \(identifier.accountId) belongs to workspace \(account.workspaceId), not \(identifier.workspaceId).")
-            }
+        return try db.withExclusiveAccess {
+            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+            do {
+                guard let account = try account(id: identifier.accountId) else {
+                    throw RepositoryError.relationshipViolation("Account \(identifier.accountId) does not exist for identifier \(identifier.id).")
+                }
+                guard account.workspaceId == identifier.workspaceId else {
+                    throw RepositoryError.relationshipViolation("Account \(identifier.accountId) belongs to workspace \(account.workspaceId), not \(identifier.workspaceId).")
+                }
 
-            let existing = try storedIdentifiers(
-                workspaceId: identifier.workspaceId,
-                scheme: identifier.scheme,
-                identifier: identifier.identifier
-            )
-
-            if let conflict = existing.first(where: { $0.accountId != identifier.accountId }) {
-                throw RepositoryError.conflictingAccountIdentifier(
+                let existing = try storedIdentifiers(
                     workspaceId: identifier.workspaceId,
                     scheme: identifier.scheme,
-                    identifier: identifier.identifier,
-                    existingAccountId: conflict.accountId,
-                    attemptedAccountId: identifier.accountId
+                    identifier: identifier.identifier
                 )
-            }
 
-            if let current = existing.sorted(by: { $0.id < $1.id }).first {
+                if let conflict = existing.first(where: { $0.accountId != identifier.accountId }) {
+                    throw RepositoryError.conflictingAccountIdentifier(
+                        workspaceId: identifier.workspaceId,
+                        scheme: identifier.scheme,
+                        identifier: identifier.identifier,
+                        existingAccountId: conflict.accountId,
+                        attemptedAccountId: identifier.accountId
+                    )
+                }
+
+                if let current = existing.sorted(by: { $0.id < $1.id }).first {
+                    try db.execute(sql: "COMMIT;")
+                    DeveloperConsole.shared.info(.database, "Existing account identifier reused", metadata: [
+                        "scheme": Self.diagnosticSchemeClassification(identifier.scheme),
+                        "identifier": "[redacted]"
+                    ])
+                    return current.id
+                }
+
+                let insert = "INSERT INTO account_identifiers (id, account_id, workspace_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?,?);"
+                try db.executePrepared(sql: insert, params: [
+                    identifier.id,
+                    identifier.accountId,
+                    identifier.workspaceId,
+                    identifier.scheme,
+                    identifier.identifier,
+                    Self.provenanceJSON(for: identifier),
+                    identifier.createdAtISO
+                ])
                 try db.execute(sql: "COMMIT;")
-                DeveloperConsole.shared.info(.database, "Existing account identifier reused", metadata: [
+                DeveloperConsole.shared.info(.database, "Account identifier attached", metadata: [
                     "scheme": Self.diagnosticSchemeClassification(identifier.scheme),
                     "identifier": "[redacted]"
                 ])
-                return current.id
+                return identifier.id
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                if case RepositoryError.conflictingAccountIdentifier(_, let scheme, _, _, _) = error {
+                    DeveloperConsole.shared.warning(.database, "Conflicting account identifier rejected", metadata: [
+                        "scheme": Self.diagnosticSchemeClassification(scheme),
+                        "identifier": "[redacted]"
+                    ])
+                }
+                throw error
             }
-
-            let insert = "INSERT INTO account_identifiers (id, account_id, workspace_id, scheme, identifier, provenance, created_at) VALUES (?,?,?,?,?,?,?);"
-            try db.executePrepared(sql: insert, params: [
-                identifier.id,
-                identifier.accountId,
-                identifier.workspaceId,
-                identifier.scheme,
-                identifier.identifier,
-                Self.provenanceJSON(for: identifier),
-                identifier.createdAtISO
-            ])
-            try db.execute(sql: "COMMIT;")
-            DeveloperConsole.shared.info(.database, "Account identifier attached", metadata: [
-                "scheme": Self.diagnosticSchemeClassification(identifier.scheme),
-                "identifier": "[redacted]"
-            ])
-            return identifier.id
-        } catch {
-            try? db.execute(sql: "ROLLBACK;")
-            if case RepositoryError.conflictingAccountIdentifier(_, let scheme, _, _, _) = error {
-                DeveloperConsole.shared.warning(.database, "Conflicting account identifier rejected", metadata: [
-                    "scheme": Self.diagnosticSchemeClassification(scheme),
-                    "identifier": "[redacted]"
-                ])
-            }
-            throw error
         }
     }
 
@@ -2406,123 +2410,125 @@ fileprivate final class SQLiteImportSessionRepo: ImportSessionRepository {
     }
 
     func commitImportHistory(_ payload: AtomicImportHistoryDTO) throws -> AtomicImportHistoryResult {
-        try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-        do {
-            if let duplicate = try priorImportedStatementWithoutTransaction(
-                algorithm: payload.fingerprint.algorithm,
-                fingerprint: payload.fingerprint.fingerprint
-            ) {
-                try db.execute(sql: "COMMIT;")
-                return .duplicate(duplicate)
-            }
+        return try db.withExclusiveAccess {
+            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+            do {
+                if let duplicate = try priorImportedStatementWithoutTransaction(
+                    algorithm: payload.fingerprint.algorithm,
+                    fingerprint: payload.fingerprint.fingerprint
+                ) {
+                    try db.execute(sql: "COMMIT;")
+                    return .duplicate(duplicate)
+                }
 
-            try validateAtomicImportHistory(payload)
-            try db.executePrepared(
-                sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, mime_type, size_bytes, sha256, storage_path, extracted_text_snippet, page_count, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?);",
-                params: [
-                    payload.document.id,
-                    payload.document.workspaceId,
-                    payload.document.importSessionId,
-                    payload.document.filename,
-                    payload.document.mimeType ?? NSNull(),
-                    payload.document.sizeBytes ?? NSNull(),
-                    payload.document.legacyRawTextSHA256,
-                    NSNull(),
-                    NSNull(),
-                    NSNull(),
-                    payload.document.createdAtISO
-                ]
-            )
-            try db.executePrepared(
-                sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, fingerprint_data, created_at, is_duplicate_authority) VALUES (?,?,?,?,?,?,?,?);",
-                params: [
-                    payload.fingerprint.id,
-                    payload.fingerprint.documentId,
-                    payload.fingerprint.importSessionId,
-                    payload.fingerprint.algorithm,
-                    payload.fingerprint.fingerprint,
-                    payload.fingerprint.fingerprintData ?? NSNull(),
-                    payload.fingerprint.createdAtISO,
-                    payload.fingerprint.isDuplicateAuthority ? 1 : 0
-                ]
-            )
-            try db.executePrepared(
-                sql: "INSERT INTO import_sessions (id, workspace_id, user_visible_name, started_at, validation_status, created_at, reader_version, parser_version, layout_version) VALUES (?,?,?,?,?,?,?,?,?);",
-                params: [
-                    payload.importSession.id,
-                    payload.importSession.workspaceId,
-                    payload.importSession.userVisibleName ?? NSNull(),
-                    payload.importSession.startedAtISO,
-                    payload.importSession.validationStatus,
-                    payload.importSession.startedAtISO,
-                    payload.importSession.readerVersion ?? NSNull(),
-                    payload.importSession.parserVersion ?? NSNull(),
-                    payload.importSession.layoutVersion ?? NSNull()
-                ]
-            )
+                try validateAtomicImportHistory(payload)
+                try db.executePrepared(
+                    sql: "INSERT INTO documents (id, workspace_id, import_session_id, filename, mime_type, size_bytes, sha256, storage_path, extracted_text_snippet, page_count, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?);",
+                    params: [
+                        payload.document.id,
+                        payload.document.workspaceId,
+                        payload.document.importSessionId,
+                        payload.document.filename,
+                        payload.document.mimeType ?? NSNull(),
+                        payload.document.sizeBytes ?? NSNull(),
+                        payload.document.legacyRawTextSHA256,
+                        NSNull(),
+                        NSNull(),
+                        NSNull(),
+                        payload.document.createdAtISO
+                    ]
+                )
+                try db.executePrepared(
+                    sql: "INSERT INTO document_fingerprints (id, document_id, import_session_id, algorithm, fingerprint, fingerprint_data, created_at, is_duplicate_authority) VALUES (?,?,?,?,?,?,?,?);",
+                    params: [
+                        payload.fingerprint.id,
+                        payload.fingerprint.documentId,
+                        payload.fingerprint.importSessionId,
+                        payload.fingerprint.algorithm,
+                        payload.fingerprint.fingerprint,
+                        payload.fingerprint.fingerprintData ?? NSNull(),
+                        payload.fingerprint.createdAtISO,
+                        payload.fingerprint.isDuplicateAuthority ? 1 : 0
+                    ]
+                )
+                try db.executePrepared(
+                    sql: "INSERT INTO import_sessions (id, workspace_id, user_visible_name, started_at, validation_status, created_at, reader_version, parser_version, layout_version) VALUES (?,?,?,?,?,?,?,?,?);",
+                    params: [
+                        payload.importSession.id,
+                        payload.importSession.workspaceId,
+                        payload.importSession.userVisibleName ?? NSNull(),
+                        payload.importSession.startedAtISO,
+                        payload.importSession.validationStatus,
+                        payload.importSession.startedAtISO,
+                        payload.importSession.readerVersion ?? NSNull(),
+                        payload.importSession.parserVersion ?? NSNull(),
+                        payload.importSession.layoutVersion ?? NSNull()
+                    ]
+                )
 
-            let insertTransaction = "INSERT INTO transactions (id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
-            let insertRawRow = "INSERT INTO transaction_raw_rows (id, transaction_id, normalized_row_id, contribution_type, created_at) VALUES (?,?,?,?,?);"
-            for transaction in payload.transactions {
-                try db.executePrepared(sql: insertTransaction, params: [
-                    transaction.id,
-                    transaction.workspaceId,
-                    transaction.accountId ?? NSNull(),
-                    transaction.importSessionId ?? NSNull(),
-                    transaction.documentId ?? NSNull(),
-                    transaction.originalRowId ?? NSNull(),
-                    transaction.postedDateISO,
-                    transaction.valueDateISO ?? NSNull(),
-                    transaction.description ?? NSNull(),
-                    transaction.payee ?? NSNull(),
-                    transaction.reference ?? NSNull(),
-                    transaction.nativeCurrency,
-                    transaction.amountMinor,
-                    transaction.amountDecimal,
-                    transaction.direction,
-                    transaction.runningBalanceMinor ?? NSNull(),
-                    transaction.isReconciled ? 1 : 0,
-                    transaction.isTrusted ? 1 : 0,
-                    transaction.trustedAtISO ?? NSNull(),
-                    transaction.createdAtISO,
-                    transaction.updatedAtISO ?? NSNull()
-                ])
-                for rawRow in transaction.rawRows {
-                    try db.executePrepared(sql: insertRawRow, params: [
-                        rawRow.id,
+                let insertTransaction = "INSERT INTO transactions (id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+                let insertRawRow = "INSERT INTO transaction_raw_rows (id, transaction_id, normalized_row_id, contribution_type, created_at) VALUES (?,?,?,?,?);"
+                for transaction in payload.transactions {
+                    try db.executePrepared(sql: insertTransaction, params: [
                         transaction.id,
-                        rawRow.normalizedRowId,
-                        rawRow.contributionType ?? NSNull(),
-                        transaction.createdAtISO
+                        transaction.workspaceId,
+                        transaction.accountId ?? NSNull(),
+                        transaction.importSessionId ?? NSNull(),
+                        transaction.documentId ?? NSNull(),
+                        transaction.originalRowId ?? NSNull(),
+                        transaction.postedDateISO,
+                        transaction.valueDateISO ?? NSNull(),
+                        transaction.description ?? NSNull(),
+                        transaction.payee ?? NSNull(),
+                        transaction.reference ?? NSNull(),
+                        transaction.nativeCurrency,
+                        transaction.amountMinor,
+                        transaction.amountDecimal,
+                        transaction.direction,
+                        transaction.runningBalanceMinor ?? NSNull(),
+                        transaction.isReconciled ? 1 : 0,
+                        transaction.isTrusted ? 1 : 0,
+                        transaction.trustedAtISO ?? NSNull(),
+                        transaction.createdAtISO,
+                        transaction.updatedAtISO ?? NSNull()
+                    ])
+                    for rawRow in transaction.rawRows {
+                        try db.executePrepared(sql: insertRawRow, params: [
+                            rawRow.id,
+                            transaction.id,
+                            rawRow.normalizedRowId,
+                            rawRow.contributionType ?? NSNull(),
+                            transaction.createdAtISO
+                        ])
+                    }
+                }
+
+                let insertEvent = "INSERT INTO transaction_event_identities (id, transaction_id, account_id, document_id, import_session_id, algorithm, digest, created_at) VALUES (?,?,?,?,?,?,?,?);"
+                for event in payload.transactionEventIdentities {
+                    try db.executePrepared(sql: insertEvent, params: [
+                        event.id, event.transactionId, event.accountId, event.documentId,
+                        event.importSessionId, event.algorithm, event.digest, event.createdAtISO
                     ])
                 }
-            }
 
-            let insertEvent = "INSERT INTO transaction_event_identities (id, transaction_id, account_id, document_id, import_session_id, algorithm, digest, created_at) VALUES (?,?,?,?,?,?,?,?);"
-            for event in payload.transactionEventIdentities {
-                try db.executePrepared(sql: insertEvent, params: [
-                    event.id, event.transactionId, event.accountId, event.documentId,
-                    event.importSessionId, event.algorithm, event.digest, event.createdAtISO
-                ])
-            }
+                guard payload.successfulAttempt.workspaceId == payload.importSession.workspaceId,
+                      payload.successfulAttempt.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue,
+                      payload.successfulAttempt.importSessionId == payload.importSession.id,
+                      payload.successfulAttempt.documentId == payload.document.id else {
+                    throw RepositoryError.relationshipViolation("Atomic import attempt relationships are inconsistent.")
+                }
+                try insertImportAttempt(payload.successfulAttempt)
 
-            guard payload.successfulAttempt.workspaceId == payload.importSession.workspaceId,
-                  payload.successfulAttempt.outcomeCode == ImportAttemptOutcome.successfulImport.rawValue,
-                  payload.successfulAttempt.importSessionId == payload.importSession.id,
-                  payload.successfulAttempt.documentId == payload.document.id else {
-                throw RepositoryError.relationshipViolation("Atomic import attempt relationships are inconsistent.")
+                try db.executePrepared(
+                    sql: "UPDATE import_sessions SET validation_status = ?, completed_at = ?, updated_at = ? WHERE id = ?;",
+                    params: ["passed", payload.completedAtISO, payload.completedAtISO, payload.importSession.id]
+                )
+                try db.execute(sql: "COMMIT;")
+                return .committed
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                throw error
             }
-            try insertImportAttempt(payload.successfulAttempt)
-
-            try db.executePrepared(
-                sql: "UPDATE import_sessions SET validation_status = ?, completed_at = ?, updated_at = ? WHERE id = ?;",
-                params: ["passed", payload.completedAtISO, payload.completedAtISO, payload.importSession.id]
-            )
-            try db.execute(sql: "COMMIT;")
-            return .committed
-        } catch {
-            try? db.execute(sql: "ROLLBACK;")
-            throw error
         }
     }
 
@@ -2608,36 +2614,38 @@ fileprivate final class SQLiteTransactionRepo: TransactionRepository {
     init(db: SQLiteDatabase) { self.db = db }
 
     func replaceTransactions(workspaceId: String, importSessionId: String?, transactions: [TransactionDTO]) throws {
-        // Atomic replace of candidate transactions for an import_session_id.
-        guard !transactions.contains(where: \.isTrusted) else {
-            throw RepositoryError.trustedTransactionWriteForbidden
-        }
-        try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
-        do {
-            if let importId = importSessionId {
-                // Remove prior non-trusted transactions for this import_session
-                let delRaw = "DELETE FROM transaction_raw_rows WHERE transaction_id IN (SELECT id FROM transactions WHERE import_session_id = ? AND is_trusted = 0);"
-                try db.executePrepared(sql: delRaw, params: [importId])
-                let delTx = "DELETE FROM transactions WHERE import_session_id = ? AND is_trusted = 0;"
-                try db.executePrepared(sql: delTx, params: [importId])
+        return try db.withExclusiveAccess {
+            // Atomic replace of candidate transactions for an import_session_id.
+            guard !transactions.contains(where: \.isTrusted) else {
+                throw RepositoryError.trustedTransactionWriteForbidden
             }
-
-            let insertTx = "INSERT OR REPLACE INTO transactions (id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at, financial_date_role, statement_timezone_evidence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
-
-            let insertRaw = "INSERT OR REPLACE INTO transaction_raw_rows (id, transaction_id, normalized_row_id, contribution_type, created_at) VALUES (?,?,?,?,?);"
-
-            for tx in transactions {
-                try db.executePrepared(sql: insertTx, params: [tx.id, tx.workspaceId, tx.accountId ?? NSNull(), tx.importSessionId ?? NSNull(), tx.documentId ?? NSNull(), tx.originalRowId ?? NSNull(), tx.postedDateISO, tx.valueDateISO ?? NSNull(), tx.description ?? NSNull(), tx.payee ?? NSNull(), tx.reference ?? NSNull(), tx.nativeCurrency, tx.amountMinor, tx.amountDecimal, tx.direction, tx.runningBalanceMinor ?? NSNull(), tx.isReconciled ? 1 : 0, tx.isTrusted ? 1 : 0, tx.trustedAtISO ?? NSNull(), tx.createdAtISO, tx.updatedAtISO ?? NSNull(), tx.financialDateRole, tx.statementTimezoneEvidence])
-
-                for raw in tx.rawRows {
-                    try db.executePrepared(sql: insertRaw, params: [raw.id, tx.id, raw.normalizedRowId, raw.contributionType ?? NSNull(), tx.createdAtISO])
+            try db.execute(sql: "BEGIN IMMEDIATE TRANSACTION;")
+            do {
+                if let importId = importSessionId {
+                    // Remove prior non-trusted transactions for this import_session
+                    let delRaw = "DELETE FROM transaction_raw_rows WHERE transaction_id IN (SELECT id FROM transactions WHERE import_session_id = ? AND is_trusted = 0);"
+                    try db.executePrepared(sql: delRaw, params: [importId])
+                    let delTx = "DELETE FROM transactions WHERE import_session_id = ? AND is_trusted = 0;"
+                    try db.executePrepared(sql: delTx, params: [importId])
                 }
-            }
 
-            try db.execute(sql: "COMMIT;")
-        } catch {
-            try? db.execute(sql: "ROLLBACK;")
-            throw error
+                let insertTx = "INSERT OR REPLACE INTO transactions (id, workspace_id, account_id, import_session_id, document_id, original_row_id, posted_date, value_date, description, payee, reference, native_currency, amount_minor, amount_decimal, direction, running_balance_minor, is_reconciled, is_trusted, trusted_at, created_at, updated_at, financial_date_role, statement_timezone_evidence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"
+
+                let insertRaw = "INSERT OR REPLACE INTO transaction_raw_rows (id, transaction_id, normalized_row_id, contribution_type, created_at) VALUES (?,?,?,?,?);"
+
+                for tx in transactions {
+                    try db.executePrepared(sql: insertTx, params: [tx.id, tx.workspaceId, tx.accountId ?? NSNull(), tx.importSessionId ?? NSNull(), tx.documentId ?? NSNull(), tx.originalRowId ?? NSNull(), tx.postedDateISO, tx.valueDateISO ?? NSNull(), tx.description ?? NSNull(), tx.payee ?? NSNull(), tx.reference ?? NSNull(), tx.nativeCurrency, tx.amountMinor, tx.amountDecimal, tx.direction, tx.runningBalanceMinor ?? NSNull(), tx.isReconciled ? 1 : 0, tx.isTrusted ? 1 : 0, tx.trustedAtISO ?? NSNull(), tx.createdAtISO, tx.updatedAtISO ?? NSNull(), tx.financialDateRole, tx.statementTimezoneEvidence])
+
+                    for raw in tx.rawRows {
+                        try db.executePrepared(sql: insertRaw, params: [raw.id, tx.id, raw.normalizedRowId, raw.contributionType ?? NSNull(), tx.createdAtISO])
+                    }
+                }
+
+                try db.execute(sql: "COMMIT;")
+            } catch {
+                try? db.execute(sql: "ROLLBACK;")
+                throw error
+            }
         }
     }
 

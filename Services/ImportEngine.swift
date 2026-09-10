@@ -219,7 +219,7 @@ struct PreparedImport: Identifiable {
         fingerprintSet: PreparedDocumentFingerprintSet? = nil,
         advisoryPreviousImport: PreviouslyImportedStatement? = nil,
         statementEquivalenceReview: StatementEquivalenceReviewResult = .notApplicable,
-        providerGeneration: ProviderGenerationToken = DatabaseProvider.shared.generationToken,
+        providerGeneration: ProviderGenerationToken? = nil,
         axisCreditCardPDFPresentation: AxisCreditCardPDFPresentation? = nil
     ) {
         self.id = id
@@ -242,7 +242,7 @@ struct PreparedImport: Identifiable {
         )
         self.advisoryPreviousImport = advisoryPreviousImport
         self.statementEquivalenceReview = statementEquivalenceReview
-        self.providerGeneration = providerGeneration
+        self.providerGeneration = providerGeneration ?? DatabaseProvider.shared.generationToken
         self.axisCreditCardPDFPresentation = axisCreditCardPDFPresentation
     }
 
@@ -278,8 +278,8 @@ final class ImportEngine {
     private let importCoordinator: any ImportFramework.ImportCoordinator
     private let sourceSnapshotAcquirer: (URL) throws -> SourceContentSnapshot
     private let importPersistenceCoordinatorFactory: () -> ImportPersistenceCoordinating
-    private let persistenceStateProvider: () -> PersistenceState
-    private let providerGenerationProvider: () -> ProviderGenerationToken
+    private let persistenceStateProvider: @MainActor () -> PersistenceState
+    private let providerGenerationProvider: @MainActor () -> ProviderGenerationToken
     private let forcedHydration: () throws -> RepositoryStoreHydrationResult
     private let rejectedAttemptHydration: () throws -> Void
     private let reconciliationGate: ConfirmedImportReconciliationGate
@@ -307,8 +307,8 @@ final class ImportEngine {
         sourceSnapshotAcquirer: ((URL) throws -> SourceContentSnapshot)? = nil,
         importPersistenceCoordinator: ImportPersistenceCoordinating? = nil,
         developerConsole: DeveloperConsole = .shared,
-        persistenceStateProvider: @escaping () -> PersistenceState = { DatabaseProvider.shared.persistenceState },
-        providerGenerationProvider: @escaping () -> ProviderGenerationToken = { DatabaseProvider.shared.generationToken },
+        persistenceStateProvider: @escaping @MainActor () -> PersistenceState = { DatabaseProvider.shared.persistenceState },
+        providerGenerationProvider: @escaping @MainActor () -> ProviderGenerationToken = { DatabaseProvider.shared.generationToken },
         forcedHydration: @escaping () throws -> RepositoryStoreHydrationResult = {
             try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
         },
@@ -346,8 +346,8 @@ final class ImportEngine {
         sourceSnapshotAcquirer: ((URL) throws -> SourceContentSnapshot)? = nil,
         importPersistenceCoordinator: ImportPersistenceCoordinating? = nil,
         developerConsole: DeveloperConsole = .shared,
-        persistenceStateProvider: @escaping () -> PersistenceState = { DatabaseProvider.shared.persistenceState },
-        providerGenerationProvider: @escaping () -> ProviderGenerationToken = { DatabaseProvider.shared.generationToken },
+        persistenceStateProvider: @escaping @MainActor () -> PersistenceState = { DatabaseProvider.shared.persistenceState },
+        providerGenerationProvider: @escaping @MainActor () -> ProviderGenerationToken = { DatabaseProvider.shared.generationToken },
         forcedHydration: @escaping () throws -> RepositoryStoreHydrationResult = {
             try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
         },
