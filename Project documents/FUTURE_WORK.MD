@@ -74,6 +74,8 @@ The final publication delta checked 519 combined citations, 357 unique dependenc
 
 **Current scope:** current holdings first; verified backup/restore required and complete structured export optional; appearance travels with workspace move/restore; reviewable rule suggestions preserve manual categories and expose every disagreeing match; current Al Dar Salary/budget INR receive estimates allow a manual override; current market net-worth estimates use direct INR→USD and QAR→USD observations. Historical conversions and the 2021 floor are superseded. Reporting output currencies/orientation and provider suitability remain Chat decisions.
 
+**Personal-v1 adoption decision — 2026-09-10:** the user intentionally defers adoption/certification until **after the bounded current-holdings investment outcome is accepted**. That outcome is `PRE_V1_REQUIRED`; investment history/performance remain separately gated and are not a personal-v1 prerequisite merely because adoption follows investment. Verified backup/restore remains required; complete structured export remains optional; current FX/net-worth reporting is not automatically an adoption prerequisite. The exact bounded holdings architecture and selected components still require their own Chat acceptance; this decision does not promote every broad investment candidate or reorder the prepared roadmap.
+
 | Decision | Exact user direction | Disposition |
 | --- | --- | --- |
 | UD-01 | Propose current holdings first; keep history and performance gated | CURRENT, subject to latest UD-09/10 scope |
@@ -131,7 +133,8 @@ Reconciliation outcomes:
 - `FW-P2-72` is removed from the active queue because Sprint 81 completed and Chat accepted the PR-1 staging/runtime-publication ownership seam at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`.
 - `FW-P1-19` is removed from the active queue because Sprint 82 completed and Chat accepted the serial Unified Import Centre foundation at implementation commit `d239f939088b67e5a90c65117f08592891be17bb`. Its serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership, duplicate/recovery preservation and no-parallel-preparation evidence are recorded in `PROJECT_STATE.md` and the current roadmap.
 - `FW-P1-20` and `FW-P1-21` are removed from the active queue because Sprint 83 completed and Chat accepted serial batch import and multi-file picker/drag-and-drop at implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29`. Single and multi-file intake share the serial queue with independent review, explicit confirmation, failure isolation and truthful per-file outcomes. Parallel preparation remains unscheduled research under the existing `FW-P2-51`.
-- `FW-P2-73` is removed from the active queue because Sprint 84 completed and Chat accepted PR-2 SQLite/provider/migration ownership at implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`. The bounded ownership, strict closure and V1–V17 preservation evidence belongs in `PROJECT_STATE.md`. The remaining PR-3 boundary is now Chat-authorized; the current roadmap owns its position and the amended Sprint-85–87 validation policy.
+- `FW-P2-73` is removed from the active queue because Sprint 84 completed and Chat accepted PR-2 SQLite/provider/migration ownership at implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`. The bounded ownership, strict closure and V1–V17 preservation evidence belongs in `PROJECT_STATE.md`. The subsequent Sprint-85 acceptance below closes PR-3; the current roadmap owns TEST-PR and the amended Sprint-85–87 validation policy.
+- <a id="fw-p2-74"></a>`FW-P2-74` is removed from the active queue because Sprint 85 completed and Chat accepted PR-3 Dependency Concurrency Boundary at implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2`: `LOCAL_CORRECTION` for ZIPFoundation and `SERIALIZED_PROCESS_LOCAL` for LegacyXLS/libxls. Evidence belongs in `PROJECT_STATE.md`; `FW-P2-75` is now Chat-authorized and `FW-P2-76` retains its separate production/runtime boundary.
 - `FW-P0-25` is removed from the active queue because the unnumbered 127-carrier authentic-corpus reset is technically accepted and complete; newly supplied recurring sources remain governed cumulatively by ADR-046.
 - Compound historical statuses are normalized to the defined planning vocabulary. Completed slices remain concise body notes while titles and statuses describe only remaining unscheduled work.
 - Exact source-family support remains exact. HDFC whole-statement PDF/XLS equivalence, Axis-card PDF/XLSX equivalence and CBQ current-account source lineage are separate accepted contracts; none is generalized to another institution, financial family or format.
@@ -1153,7 +1156,7 @@ Each family may require a separate ADR and implementation increment. No family m
 ## FW-P0-26 — Personal-v1 Adoption Certification Gate
 
 **Status:** Blocked
-**Depends on:** completion or explicit Chat deferral of every product boundary classified as pre-v1, including adopted import, required user backup/restore and support documentation; complete structured/user export is optional under UD-02 and must be completed only if adopted, or explicitly Chat-deferred in the frozen adoption matrix
+**Depends on:** acceptance of the bounded current-holdings investment outcome before personal-v1 adoption/certification, plus completion or explicit Chat deferral of every other product boundary classified as pre-v1, including adopted import, required verified backup/restore and support documentation. Complete structured export remains optional; investment history/performance remain separately gated; current FX/net-worth reporting is not automatically an adoption prerequisite.
 
 Personal-v1 may not be declared merely because current automated tests are green. Certification fails closed and must freeze the exact adopted product candidate.
 
@@ -1179,9 +1182,9 @@ Applicable evidence must include at minimum:
 
 Absent authentic cases remain uncertified and must not be manufactured. Certification does not require every Product Vision feature; it requires every feature Chat explicitly classifies as pre-v1 before the certification attempt. Personal-v1 remains undeclared until Chat explicitly accepts this gate.
 
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix.
+**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Accepted bounded current-holdings investment outcome; backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix.
 
-**Smallest proposed boundary:** Certify only frozen adopted candidate; required backup, authentic corpus and manual rows; optional export.
+**Smallest proposed boundary:** Certify only the frozen adopted candidate after the bounded current-holdings outcome is accepted; required backup, authentic corpus and manual rows; optional export.
 
 **Decision record:** [USER_BACKUP_RESTORE_ARCHITECTURE_PACKET](#packet-user-backup-restore-architecture-packet), [PERSONAL_V1_CERTIFICATION_PACKET](#packet-personal-v1-certification-packet).
 
@@ -1200,7 +1203,7 @@ Absent authentic cases remain uncertified and must not be manufactured. Certific
 
 **Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY at research ref: committed PROJECT_STATE and roadmap record accepted Sprint82 and complete-corpus alignment. Native import/hydration and migration tests are foundations, while user-owned backup/restore and domain export remain queue items. Subsequent separately owned Sprint83 acceptance closure at ffddebc6e12405c812a36855ab6212e973cff5ba is incorporated as publication authority, not self-accepted by this campaign. Second-level disposition is the exact decision/dependency/deferral stated here.
 
-**Exact next evidence or decision:** Exact next evidence/decision: Backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix. Owning authority: USER_BACKUP_RESTORE_ARCHITECTURE_PACKET, PERSONAL_V1_CERTIFICATION_PACKET.
+**Exact next evidence or decision:** Exact next evidence/decision: Accepted bounded current-holdings investment outcome; backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix. Owning authority: USER_BACKUP_RESTORE_ARCHITECTURE_PACKET, PERSONAL_V1_CERTIFICATION_PACKET.
 
 **Personal-v1:** PRE_V1_REQUIRED
 
@@ -1214,8 +1217,8 @@ Absent authentic cases remain uncertified and must not be manufactured. Certific
 
 **Typed dependencies:**
 
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P3-36`: The Verified Backup, Restore and Disaster Recovery boundary must provide: User-owned verified package; isolated restore; nonempty target protection.. This enables Certify only frozen adopted candidate; required backup, authentic corpus and manual rows; optional export. Remaining condition: Backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix.
-- `REQUIRES_RUNTIME_ACCEPTANCE` → `FW-P3-36`: The Verified Backup, Restore and Disaster Recovery boundary must provide: User-owned verified package; isolated restore; nonempty target protection.. This enables Certify only frozen adopted candidate; required backup, authentic corpus and manual rows; optional export. Remaining condition: Backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix.
+- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P3-36`: The Verified Backup, Restore and Disaster Recovery boundary must provide: User-owned verified package; isolated restore; nonempty target protection.. This enables Certify only the frozen adopted candidate after the bounded current-holdings outcome is accepted; required backup, authentic corpus and manual rows; optional export. Remaining condition: Accepted bounded current-holdings investment outcome; backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix.
+- `REQUIRES_RUNTIME_ACCEPTANCE` → `FW-P3-36`: The Verified Backup, Restore and Disaster Recovery boundary must provide: User-owned verified package; isolated restore; nonempty target protection.. This enables Certify only the frozen adopted candidate after the bounded current-holdings outcome is accepted; required backup, authentic corpus and manual rows; optional export. Remaining condition: Accepted bounded current-holdings investment outcome; backup/restoration ADR and independently accepted user restore drill; frozen Chat adoption matrix.
 - `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-adoption-matrix`: Chat owns this financial/privacy/architecture decision; it is not a technical questionnaire for the user.
 - `REQUIRES_AUTHENTIC_SOURCE` → `source-evidence-fw-p0-26`: The complete registered authentic corpus for every adopted source family, an independently checked adopted workspace snapshot and genuine backup/restore round-trip evidence; no certification from synthetic statements.
 
@@ -1245,8 +1248,8 @@ Absent authentic cases remain uncertified and must not be manufactured. Certific
 | 2 | User problem | A falsifiable adoption declaration rather than a claim derived from green tests. |
 | 3 | Verified current state | Accepted Sprint 83 records corpus/provider/order/build/relaunch evidence and explicitly does not declare personal-v1. |
 | 4 | Accepted authorities | PROJECT_STATE; FUTURE_WORK gate; ADR-024; ADR-046; immutable migration identity lock. |
-| 5 | Exact missing decision | Chat must accept exact candidate/adoption matrix; backup architecture/drill remains unaccepted. |
-| 6 | Evidence acquired | Current gate names recovery and export; user now requires backup/restore and marks complete export optional. |
+| 5 | Exact missing decision | Chat must accept the bounded current-holdings outcome before adoption/certification and the exact candidate/adoption matrix; backup architecture/drill remains unaccepted. |
+| 6 | Evidence acquired | The latest explicit user decision requires accepted bounded current holdings before adoption, retains required backup/restore and optional complete export, and does not automatically require investment history/performance or current FX/net-worth. |
 | 7 | Options considered | All vision features; frozen adopted-boundary matrix; green suite only. |
 | 8 | Recommended option | Candidate-frozen adoption matrix with each boundary, independent oracle, evidence, limitation and recertification trigger. |
 | 9 | Why competing options are rejected | Vision-wide is unbounded; a suite cannot prove source, native recovery, export, privacy or relaunch. |
@@ -1264,10 +1267,10 @@ Absent authentic cases remain uncertified and must not be manufactured. Certific
 | 21 | Reversal/correction semantics | Failed certification is not repaired retroactively; freeze new candidate and rerun affected rows. |
 | 22 | Source evidence requirement | Required for every statement-dependent claim; absent cases remain uncertified. |
 | 23 | Runtime acceptance requirement | Required for adopted import/credential/backup and durable UI flows. |
-| 24 | Dependencies | Accepted backup ADR+drill; exact candidate; corpus; support docs; Chat adoption matrix; workbook-successor decision. |
+| 24 | Dependencies | Accepted bounded current-holdings outcome before adoption/certification; accepted backup ADR+drill; exact candidate; corpus; support docs; Chat adoption matrix; workbook-successor decision. History/performance, optional complete export and current FX/net-worth are not automatic prerequisites. |
 | 25 | Evidence that falsifies the recommendation | Any missing matrix row, changed candidate/corpus/financial semantics, or claim lacking independent evidence. |
 | 26 | Personal-v1 relevance | PRE_V1_REQUIRED: declaration gate. |
-| 27 | Recommended FUTURE_WORK status after Chat review | READY_AFTER_NAMED_DEPENDENCY: backup contract/drill and Chat matrix. |
+| 27 | Recommended FUTURE_WORK status after Chat review | READY_AFTER_NAMED_DEPENDENCY: accepted bounded current holdings, backup contract/drill and Chat matrix. |
 | 28 | Recommended roadmap effect after Chat review | Add gate only; do not declare personal-v1 or select sprint. |
 
 </details>
@@ -7295,75 +7298,18 @@ Do not remove shared Xcode configuration merely because it lives beneath the pro
 
 ---
 
-<a id="fw-p2-74"></a>
-
-## FW-P2-74 — PR-3 Dependency Concurrency Boundary
-
-**Status:** Candidate
-**Depends on:** Sprint 80 accepted readiness discovery; PR-2 ownership accepted in Sprint 84 at `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`
-
-Chat has authorized this bounded execution after accepting PR-2. It remains unaccepted work until the next Chat gate; current execution and validation conditions belong to the current roadmap and supplied campaign prompt.
-
-Resolve the dependency boundary before coordinated Swift-6 migration:
-
-- make the ZIPFoundation Swift-6 correction or upgrade decision; and
-- define the LegacyXLS/libxls concurrency policy.
-
-The result must remain bounded to the approved dependency surfaces and must not
-be treated as generic third-party concurrency support.
-
-**Discovery 2026-09-10:** REUSED_EVIDENCE / OWNED_BY_ACTIVE_SPRINT at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`. VERIFIED_REPOSITORY: FW-P2-74 is bounded to ZIPFoundation and LegacyXLS/libxls; no UI evidence affects it.
-
-**Discovery remainder:** MISSING: dependency-specific diagnostic/upgrade evidence owned by active campaign. **Next boundary:** PROPOSED: no finding beyond preserving strict dependency-only scope. **Acceptance:** Owner supplies dependency-specific compilation/behavior evidence.
-
-<details>
-<summary>First-round evidence retained; no second-round scope expansion</summary>
-
-**question (research ref):** Does this lane add to PR-3 dependency policy?
-
-**current behavior (research ref):** VERIFIED_REPOSITORY: FW-P2-74 is bounded to ZIPFoundation and LegacyXLS/libxls; no UI evidence affects it.
-
-**accepted constraints (research ref):** No generic third-party concurrency support or Swift-6 migration.
-
-**missing (research ref):** MISSING: dependency-specific diagnostic/upgrade evidence owned by active campaign.
-
-**options (research ref):** Reuse active proof; independently inspect vendor. Reuse respects ownership.
-
-**proposed boundary (research ref):** PROPOSED: no finding beyond preserving strict dependency-only scope.
-
-**scope exclusions (research ref):** No vendor update, wrappers, flags, or UI code.
-
-**dependencies (research ref):** Active PR-3 campaign.
-
-**adr migration impact (research ref):** None in this lane.
-
-**acceptance (research ref):** Owner supplies dependency-specific compilation/behavior evidence.
-
-**invalidators (research ref):** Dependency surface expands into app architecture.
-
-**personal v1 (research ref):** REPORTED_ONLY: prepared prerequisite.
-
-**queue roadmap disposition (research ref):** OWNED_BY_ACTIVE_SPRINT; reuse only.
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1769-1780 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-74
-- [Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md](<Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md>):137-141 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `3f65ec7e7fefc1eed15ba874f18a66985ffbec855634bc9bd473c07b928ce82c` — Sprint 85
-
-</details>
-
----
-
 <a id="fw-p2-75"></a>
 
 ## FW-P2-75 — TEST-PR Unit-Test Strict-Concurrency Correction
 
 **Status:** Candidate
-**Depends on:** Sprint 80 accepted unit-test strict probe; accepted PR-2 ownership; Chat acceptance of the pending PR-3 boundary before execution
+**Depends on:** Sprint 80 accepted unit-test strict probe; PR-2 accepted in Sprint 84; PR-3 accepted in Sprint 85 at `b4e4e6ffb14deccef238352a6ef834514a2a37c2`. Chat has authorized Sprint 86 test/support-only execution.
 
 Make the unit-test target honest under coordinated strict migration through
 actor-aware fixture construction, async-safe test synchronization, subprocess
-Sendable ownership and actor-aware assertions/macros. The accepted strict probe
-found 45 distinct error locations and a large warning surface concentrated in
-fixtures/support code; this family must preserve independent test oracles and
+Sendable ownership and actor-aware assertions/macros. The accepted Sprint-80 strict probe historically
+found 45 distinct error locations; Sprint 86 must reproduce the current diagnostic set.
+This family must preserve independent test oracles and
 must not weaken production assertions to silence diagnostics.
 
 TEST-PR is required before the unit-test target can participate in the
@@ -7416,7 +7362,7 @@ The current campaign amendment keeps production-source bytes frozen for TEST-PR 
 ## FW-P2-76 — Coordinated Swift-6 Migration
 
 **Status:** Blocked
-**Depends on:** PR-2 accepted in Sprint 84 at `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`; pending PR-3 and TEST-PR acceptance. The serial Unified Import Centre boundary is accepted through Sprints 82–83.
+**Depends on:** PR-2 accepted in Sprint 84 at `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`; PR-3 accepted in Sprint 85 at `b4e4e6ffb14deccef238352a6ef834514a2a37c2`; pending TEST-PR acceptance. The serial Unified Import Centre boundary is accepted through Sprints 82–83.
 
 After the prerequisite families are accepted, perform one coordinated Swift-6
 strict migration and readiness pass. The migration is not a prerequisite to
@@ -8985,7 +8931,7 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 
 **Exact next evidence or decision:** Investment identity/position/revision ADR; exact adopted dated owner positions and AMFI scheme/ISIN/Direct-plan/option mapping. Provider NAV is not ownership.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_OPTIONAL. The bounded current-holdings outcome is required under `FW-P0-26`; only components selected into that outcome become prerequisites, not this entire broad candidate.
 
 **Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
 
@@ -9051,7 +8997,7 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 | 23 | Runtime acceptance requirement | Future native manual review/correction, failure/cancel, zero residue, provider parity, canonical hydration and same-database relaunch; external refresh only after provider permission. |
 | 24 | Dependencies | Chat investment ADR; selected genuine position evidence; exact post-87 provider/lifecycle review. FW-P3-27 is optional for a manual dated valuation boundary, not a prerequisite for merely recording positions. Brokerage history and performance are not foundation dependencies. |
 | 25 | Evidence that falsifies the recommendation | An adopted source requires simultaneous multiple snapshots, unsettled units, distributions, ownership restrictions or a materially different identity contract that this bounded family cannot preserve; any cost or units/date inference is a failure. |
-| 26 | Personal-v1 relevance | PRE_V1_OPTIONAL unless Chat explicitly adopts a bounded holdings outcome. UD-01 orders investment scope, not all personal-v1 prerequisites. |
+| 26 | Personal-v1 relevance | PRE_V1_REQUIRED for the bounded current-holdings outcome before adoption/certification. The exact selected components and architecture remain separately gated; history/performance is not a personal-v1 prerequisite. Broad unselected investment expansions remain optional. |
 | 27 | Recommended FUTURE_WORK status after Chat review | READY_FOR_CHAT_ARCHITECTURE_DECISION for the foundation; no Ready for planning until architecture, exact chosen evidence and post-87 ownership gates are satisfied. Brokerage ingestion stays source-blocked. |
 | 28 | Recommended roadmap effect after Chat review | Sprint 98 must be replanned into the coherent A/B/C/D slices in ROADMAP_REPLANNING_PACKET_98; retain numbering and no execution authority. |
 
@@ -9091,7 +9037,7 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 
 **Exact next evidence or decision:** Investment identity ADR and chosen genuine current broker/container/instrument/listing/currency evidence; no trades or performance scope is selected.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_OPTIONAL. The bounded current-holdings outcome is required under `FW-P0-26`; only components selected into that outcome become prerequisites, not this entire broad candidate.
 
 **Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
 
@@ -9221,7 +9167,7 @@ Any later reporting conversion is a separate provenance-bearing derived layer an
 
 **Exact next evidence or decision:** Chat must accept container versus instrument versus position ownership, scoped identifiers, collision policy and explicit immutable revision semantics.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_OPTIONAL. The bounded current-holdings outcome is required under `FW-P0-26`; only components selected into that outcome become prerequisites, not this entire broad candidate.
 
 **Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
 
@@ -9675,7 +9621,7 @@ This is a **fallback/manual** boundary. It is not the primary owner of the user'
 
 **Exact next evidence or decision:** Chat must select the bounded manual position/price input and append-only correction family, including effective/recorded date, provenance and precision rules.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_OPTIONAL. The bounded current-holdings outcome is required under `FW-P0-26`; only components selected into that outcome become prerequisites, not this entire broad candidate.
 
 **Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
 
@@ -9768,7 +9714,7 @@ Any later reporting conversion is separately derived with its own FX provenance.
 
 **Exact next evidence or decision:** Exact genuine policy/container and dated mandatory/AVC ownership evidence remain to qualify; Chat must accept unit-class/cost/revision architecture. FE price dates do not close ownership.
 
-**Personal-v1:** PRE_V1_OPTIONAL
+**Personal-v1:** PRE_V1_OPTIONAL. The bounded current-holdings outcome is required under `FW-P0-26`; only components selected into that outcome become prerequisites, not this entire broad candidate.
 
 **Recommendation after Chat:** Preserve Research until the exact evidence/architecture gates are accepted; discovery closure is READY_FOR_CHAT_ARCHITECTURE_DECISION. **Roadmap:** Retain numbering; use ROADMAP_REPLANNING_PACKET_98 slices A/B/C/D.
 

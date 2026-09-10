@@ -2,14 +2,14 @@
 
 **Status:** Current repository cycle roadmap
 **Refreshed:** 2026-09-10
-**Planning review baseline:** accepted Sprint 84, `main@a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`
+**Planning review baseline:** accepted Sprint 85, `main@b4e4e6ffb14deccef238352a6ef834514a2a37c2`
 **Supersedes:** `Project documents/Sprint roadmap/Archived/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
 
 ## Control
 
 - **Planning authority:** This file owns Sprint 80–89 numbering, corrective suffixes, cycle status and planned positions.
 - **Execution authority:** None. Roadmap assignment is planning, not implementation authorization; each sprint still requires Chat priority/dependency triage and a complete execution prompt.
-- **Latest numbered product implementation:** Sprint 84 — PR-2 SQLite / Provider / Migration Ownership, accepted at implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1` (parent `af2d1949c6e9a73af3bb004422b72882d28195e2`). Sprints 81–83 remain accepted as recorded below and in `PROJECT_STATE.md`; their financial, import and publication contracts remain current.
+- **Latest numbered product implementation:** Sprint 85 — PR-3 Dependency Concurrency Boundary, accepted at implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2` (parent `8d2dafd29de543660300ac8f37f16a152603f1f5`). Sprints 81–84 remain accepted as recorded below and in `PROJECT_STATE.md`; their financial, import and publication contracts remain current.
 - **Current migration:** V17; V1–V16 remain immutable.
 - **Current source/reliability authority:** ADR-046 complete-authentic-corpus certification.
 - **Current UI design authority:** `LF-UI-2026-09-R1` for its bounded scope; design approval is not native implementation.
@@ -42,9 +42,9 @@ A material source, credential, parser, persistence, orchestration or financial-s
 | 82 | Serial Unified Import Centre Foundation | completed `FW-P1-19` (removed from active queue) | Core product implementation | **ACCEPTED** — implementation commit `d239f939088b67e5a90c65117f08592891be17bb`; serial queue length one and the Sprint 83 entry evidence are established |
 | 83 | Serial Batch Import and Multi-File Drag-and-Drop | completed `FW-P1-20` + `FW-P1-21` (removed from active queue) | Core product implementation | **ACCEPTED** — implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; ordered serial queue length N, multi-file picker/drop, independent per-item review/confirmation and outcomes |
 | 84 | PR-2 SQLite / Provider / Migration Ownership | historical `FW-P2-73` (removed from active queue) | Swift-6 prerequisite | **ACCEPTED** — implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`; no schema migration |
-| 85 | PR-3 Dependency Concurrency Boundary | `FW-P2-74` | Swift-6 prerequisite | **CURRENT / CHAT-AUTHORIZED** — accepted Sprint 84 prerequisite; no higher-priority verified defect currently preempts it; stop for Chat acceptance before Sprint 86 |
-| 86 | TEST-PR Strict-Concurrency Test Correction | `FW-P2-75` | Swift-6 prerequisite | Planned; never weaken independent assertions merely to silence diagnostics |
-| 87 | Coordinated Swift-6 Migration | `FW-P2-76` | Implementation | Entry gate: serial Unified Import Centre through Sprints 82–83 and PR-2 through Sprint 84 accepted; Sprints 85–86 acceptance still required; no feature work bundled |
+| 85 | PR-3 Dependency Concurrency Boundary | historical `FW-P2-74` (removed from active queue) | Swift-6 prerequisite | **ACCEPTED** — implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2`; local ZIPFoundation correction and process-local libxls serialization |
+| 86 | TEST-PR Strict-Concurrency Test Correction | `FW-P2-75` | Swift-6 prerequisite | **CURRENT / CHAT-AUTHORIZED** — test/support-only, production bytes frozen; stop if production/runtime changes are required; return for Chat acceptance before Sprint 87 |
+| 87 | Coordinated Swift-6 Migration | `FW-P2-76` | Implementation | Entry gate: serial Unified Import Centre through Sprints 82–83 and PR-2 through Sprint 84 accepted; PR-3 through Sprint 85 accepted; Sprint 86 acceptance still required; no feature work bundled |
 | 88 | App Shell and Workflow Decomposition | `FW-P2-67` | Behavior-preserving maintenance | No financial redesign or broad source-tree move; preserve R1 shell direction |
 | 89 | LF-UI-2026-09-R1 Transactions Reference Implementation | `FW-P2-03` + `FW-P2-53`, bounded `FW-P2-48` + `FW-P2-49` + `FW-P2-50` | User-facing implementation / representative R1 proof surface | Planned position; financial semantics remain source/repository-authoritative |
 
@@ -86,7 +86,7 @@ SQLite/provider/migration ownership), `FW-P2-74` (PR-3 dependency boundary) and
 `FW-P2-75` (TEST-PR unit-test strict-concurrency correction). The coordinated
 migration gate is `FW-P2-76`. Sprint 80 authorized none of them; Sprint 81 has
 since completed and accepted PR-1 and Sprint 84 has completed and accepted PR-2.
-PR-3 is now authorized; TEST-PR and the coordinated migration remain gated work.
+Sprint 85 has since completed and accepted PR-3; TEST-PR is now Chat-authorized and the coordinated migration remains gated.
 
 The current product artifact is macOS-native, uses the macOS 26.5 SDK, App
 Sandbox and selected-file import. Stale platform/bundle metadata and the
@@ -100,7 +100,7 @@ the exact registered CBQ boundary while preserving historical minimum-due
 absence and enforcing the current authentic minimum-due contract. Personal-v1
 adoption remains a separate later gate.
 
-## Accepted Sprints 81–84, current Sprint 85 and planned Sprints 86–89
+## Accepted Sprints 81–85, current Sprint 86 and planned Sprints 87–89
 
 ### Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam
 
@@ -144,21 +144,25 @@ The accepted Swift-5 correction gives SQLite operations and lifetimes, provider-
 
 ### Sprint 85 — PR-3 Dependency Concurrency Boundary
 
-Queue: `FW-P2-74`.
+Historical queue origin: `FW-P2-74` (removed from the active queue).
 
-**CURRENT / CHAT-AUTHORIZED on 2026-09-10** by `ACCEPT_SPRINT_84_AND_CONTINUE_TO_85`. Chat accepts the prerequisite and records no higher-priority verified defect currently preempting this sprint.
+**ACCEPTED on 2026-09-10.** Implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2`.
 
-Resolve the bounded ZIPFoundation decision and LegacyXLS/libxls concurrency policy without inventing generic third-party concurrency architecture.
+Accepted decisions: `ZIPFOUNDATION_DECISION = LOCAL_CORRECTION` and `LEGACYXLS_POLICY = SERIALIZED_PROCESS_LOCAL`. The bounded dependency correction preserves financial/source semantics, adds no generic third-party concurrency framework, migration, ADR or Swift-6 product switch. Qualification and its explicit exclusions are recorded in `PROJECT_STATE.md`.
+
+The accepted Sprint-85 validation policy remains recorded below as its acceptance contract:
 
 Use dependency-proportional validation: reproduce and resolve exact dependency diagnostics/policy; run focused dependency/reader tests and every affected authentic XLSX family for ZIPFoundation changes and XLS family for LegacyXLS/libxls changes; then run one authoritative TestPlan on the frozen candidate and compile Debug and optimized Release. The complete all-family/provider-order campaign is required only if shared extraction, routing, snapshots, common persistence mapping or another boundary beyond the affected XLS/XLSX dependency surfaces changes. Durable startup/relaunch is required only if persistence, provider/bootstrap, migration, hydration or startup changes. Record `NOT_REQUIRED` with the evidence-based reason for each omitted broad gate; preserve source/oracle correctness.
 
 **Explicit TestPlan invocation clarification:** for dependency-only Sprint 85, Chat authorizes excluding only the conditional global authentic-corpus/provider-order campaign from the invocation. Every other TestPlan test must run. Keep the checked-in TestPlan and tests unchanged, and report the excluded campaign explicitly as `NOT_REQUIRED`; this is not an unchanged full-plan execution claim. If the broader shared-boundary trigger applies, include the campaign.
 
-Publish one implementation candidate and **STOP for Chat acceptance before Sprint 86**. This campaign-specific validation amendment supersedes broader repetitive wording in the original 84–87 prompt.
+Chat has accepted that implementation candidate and authorized Sprint 86. The campaign-specific validation amendment supersedes broader repetitive wording in the original 84–87 prompt.
 
 ### Sprint 86 — TEST-PR Strict-Concurrency Test Correction
 
 Queue: `FW-P2-75`.
+
+**CURRENT / CHAT-AUTHORIZED on 2026-09-10** by `ACCEPT_SPRINT_85_AND_CONTINUE_TO_86`. Reproduce the current diagnostic set; the historical Sprint-80 count is not an expected count. Publish one implementation candidate and **STOP for Chat acceptance before Sprint 87**.
 
 Make unit-test ownership/synchronization honest for strict migration. Preserve independent source/test oracles and assertions; never weaken tests merely to remove diagnostics.
 
@@ -168,7 +172,7 @@ Treat validation as test/support-only: freeze production-source bytes; reproduce
 
 Queue: `FW-P2-76`.
 
-Entry gate: the serial Unified Import Centre through Sprints 82–83 and PR-2 through Sprint 84 are accepted; Sprints 85–86 must also be accepted before Swift-6 migration. Perform the coordinated language/strict-concurrency migration only; no feature work bundled.
+Entry gate: the serial Unified Import Centre through Sprints 82–83 and PR-2 through Sprint 84 are accepted; PR-3 through Sprint 85 is also accepted; Sprint 86 must be accepted before Swift-6 migration. Perform the coordinated language/strict-concurrency migration only; no feature work bundled.
 
 Retain comprehensive integrated qualification: all native Swift targets in Swift 6; strict compiler closure; focused ownership/dependency/test checks; one complete TestPlan; complete registered authentic corpus and provider/order campaigns; Debug and optimized Release; native Import Centre/runtime smoke; durable same-database relaunch and canonical hydration; V1–V17 migration identity/integrity; bundle/privacy/signing; explicit review of every unsafe/unchecked concurrency escape.
 

@@ -14,6 +14,10 @@ The complete registered authentic corpus remains authority for statement-depende
 
 A verified higher-priority financial defect preempts a lower-priority planned sprint unless explicitly deferred by the user. An unmet dependency blocks its planned sprint without silently cascading later numbers.
 
+## Personal-v1 adoption dependency — explicit user decision, 2026-09-10
+
+Adoption/certification is intentionally deferred until **after the bounded current-holdings investment outcome is accepted**. That outcome is a personal-v1 prerequisite; this does not accept the proposed Sprint-98 architecture or promote every broad investment component. Investment history/performance remain separately gated and are not prerequisites merely because adoption follows investment. Verified backup/restore remains required, complete structured export remains optional, and current FX/net-worth reporting is not automatically an adoption prerequisite. Existing sprint numbers, positions and other entry gates remain unchanged.
+
 ## Prepared cycle overview
 
 | Sprint | Outcome | Queue | Entry / planning boundary |
@@ -133,7 +137,7 @@ Sprint 91 requires a typed nonfinancial preference ownership decision. UD-03 req
 | P0 | `FW-P0-11`, `FW-P0-12`, `FW-P0-13`, `FW-P0-14`, `FW-P0-15` | Blocked by explicit identity mutation/link/split/merge semantics. |
 | P0 | `FW-P0-16` | Architecture accepted, executable family still gated on exact impact/reversal contract. |
 | P0 | `FW-P0-18`, `FW-P0-19`, `FW-P0-20` | Respectively blocked on workspace architecture, a new exact equivalence contract, or still research/source evidence. |
-| P0 | `FW-P0-26` | Personal-v1 certification is deliberately after its adopted prerequisites; it is not a feature sprint and remains blocked. |
+| P0 | `FW-P0-26` | Personal-v1 adoption/certification intentionally follows accepted bounded current holdings and its other required prerequisites, including verified backup/restore. History/performance and current FX/net-worth are not automatic prerequisites; complete export remains optional. It is not a feature sprint and remains blocked. |
 | P1 | parser-family expansion | No new exact source family has been selected; exact currently registered families are already certified. |
 | P1 | `FW-P1-06` | Ready for planning but not a dependency of the 90–99 outcomes absent a selected new parser-family need. |
 | P1 | `FW-P1-25` | Duplicate-management discovery must be reevaluated before reconciliation/analytics and preempts them if current guarantees are insufficient. |
@@ -153,13 +157,13 @@ Sprint 91 requires a typed nonfinancial preference ownership decision. UD-03 req
 
 ## Post-Sprint-99 dependency direction — no sprint numbers assigned
 
-Do **not** infer Sprint 100+ numbers from this list. After Sprint 99, the current dependency direction is:
+Do **not** infer Sprint 100+ numbers from this list. The existing follow-up candidates below retain their positions; this list is **not** a personal-v1 prerequisite chain or a requirement to wait for Sprint 99. Adoption/certification follows accepted bounded current holdings and the other explicitly required gates:
 
-1. net-worth integration/history;
-2. verified user-owned backup/restore;
+1. net-worth integration/history — separately gated, not an automatic personal-v1 prerequisite;
+2. verified user-owned backup/restore — required before personal-v1 certification;
 3. structured data export only if later explicitly adopted (optional under UD-02);
 4. supported institution/source coverage documentation if not already completed;
-5. Personal-v1 Adoption Certification Gate (`FW-P0-26`).
+5. Personal-v1 Adoption Certification Gate (`FW-P0-26`) — after accepted bounded current holdings, verified backup/restore and the other required adoption inputs; optional export, history/performance and current FX/net-worth do not become prerequisites by this ordering.
 
 Personal-v1 remains undeclared until Chat explicitly accepts `FW-P0-26`. The gate requires only explicitly designated pre-v1 product boundaries, not every Product Vision feature.
 
@@ -240,7 +244,7 @@ These are complete decision packets from the second-level discovery round. They 
 | 23 | Runtime acceptance requirement | Each selected slice receives independent native/persistence acceptance; discovery passes none. |
 | 24 | Dependencies | Investment packet, selected A evidence, Chat acceptance and post-87 ownership. B/C/D are not dependencies of an evidence-only A. |
 | 25 | Evidence that falsifies the recommendation | An adopted A source cannot represent ownership without unsettled/trade/corporate-action semantics; then narrow or defer A rather than guess. |
-| 26 | Personal-v1 relevance | PRE_V1_OPTIONAL until adopted; D is POST_V1 under current-holdings direction. |
+| 26 | Personal-v1 relevance | PRE_V1_REQUIRED for the bounded current-holdings outcome before adoption/certification; the proposed slices and exact components remain separately gated. D/history/performance remains POST_V1 and is not a personal-v1 prerequisite. |
 | 27 | Recommended FUTURE_WORK status after Chat review | Keep existing FW statuses; record per-card closure and A/B/C/D gates. No automatic Ready for planning. |
 | 28 | Recommended roadmap effect after Chat review | Retain Sprint 98 and prepared status. Record the four slices; Chat selects and renumbers only through later explicit replanning. |
 
