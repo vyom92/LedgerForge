@@ -1126,7 +1126,7 @@ Only source-document reopening, browsing or library behavior remains here. It re
 **Status:** Ready for planning
 **Depends on:** Stable transaction fields
 
-**Owning design authority:** `UI_UX_v1.0_Frozen.md` and `UI Assets/Approved/LF-UI-2026-09-R1/DESIGN_HANDOFF.md`.
+**Owning design authority:** `UI_UX_v1.0_Frozen.md` and `UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md`.
 
 Expand the global repository-backed Transactions experience with bounded search/filtering over supported displayed fields and authoritative transaction semantics:
 

@@ -3,7 +3,7 @@
 **Status:** Current repository cycle roadmap
 **Refreshed:** 2026-09-10
 **Planning review baseline:** `main@d239f939088b67e5a90c65117f08592891be17bb`
-**Supersedes:** `Project documents/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
+**Supersedes:** `Project documents/Sprint roadmap/Archived/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
 
 ## Control
 

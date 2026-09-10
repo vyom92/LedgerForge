@@ -1013,9 +1013,9 @@ Production card support requires an approved family, source format, validation, 
 
 ## Repository eligibility
 
-Private-statement-derived evidence may enter Git only as an approved sanitized or clean-room package.
+Private-statement-derived evidence is accepted only through an approved sanitized or clean-room package.
 
-Never commit private originals.
+Private originals are accepted only from approved read-only source locations.
 
 ## Clean-room restrictions
 

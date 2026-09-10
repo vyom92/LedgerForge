@@ -42,10 +42,10 @@ merges the supplied dictionary into every generated test target's existing
 preserved. Without the option, validation retains its existing one-step
 `xcodebuild test` behavior.
 
-Keep the JSON file outside the repository and restrict it like any other
-private credential material. Its values are copied into the task-owned
+Treat the JSON file as restricted private credential material and store it only
+in an approved task-owned location. Its values are copied into the task-owned
 `.xctestrun`, so that artifact root is also private until it is recoverably
-removed. Do not commit passwords, authentic-source paths, source oracles or the
+removed. Do not publish passwords, authentic-source paths, source oracles or the
 environment file. Merely exporting the underlying variables in the shell is
 not evidence that an app-hosted test received them.
 

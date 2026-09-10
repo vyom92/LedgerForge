@@ -305,12 +305,12 @@ Chat semantic reasoning
 7. Luna Max does not integration-edit after subagents finish.
 8. Chat rereads the actual resulting files through MCP and performs semantic acceptance.
 9. Documentation-only work does not trigger application-wide tests unless executable material changed.
-10. The current repository-owned roadmap and Standing Execution Harness are durable Git authorities. Older private dated copies remain historical/context only and do not override the repository-owned current copies.
+10. The current repository-owned roadmap and Standing Execution Harness are durable repository authorities. Older dated copies remain historical/context only and do not override the repository-owned current copies.
 11. When parser/source-support documentation changes, reconcile it against ADR-046, the Standing Harness parser/authentic-corpus policy and the current `PROJECT_STATE.md` parser-reliability alignment; preserve historical records but remove contradictory current authority.
 12. A documentation sync may not close with a material out-of-scope finding stranded only in chat/report text; give it one durable disposition in the owning authority or canonical queue.
 
 ## Required end state: `DOCS_RECONCILED`
-Current authorities agree; obsolete current-state claims are removed or narrowed; historical claims remain historically accurate; policy has one durable home where practical; routing points to subject authorities instead of duplicating them; all material findings have durable dispositions; no private material leaked into Git; final diff is ready for publication review.
+Current authorities agree; obsolete current-state claims are removed or narrowed; historical claims remain historically accurate; policy has one durable home where practical; routing points to subject authorities instead of duplicating them; all material findings have durable dispositions; no private material leaked into published artifacts; final diff is ready for publication review.
 
 **END PG-50**
 

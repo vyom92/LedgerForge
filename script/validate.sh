@@ -96,7 +96,7 @@ prepare_test_environment_file() {
 
     resolved_file="$(canonical_path "$configured_file")" || fail "unable to resolve LEDGERFORGE_TEST_ENVIRONMENT_FILE" 70
     case "$resolved_file" in
-        "$ROOT_DIR"|"$ROOT_DIR"/*) fail "LEDGERFORGE_TEST_ENVIRONMENT_FILE must remain outside the repository" 64 ;;
+        "$ROOT_DIR"|"$ROOT_DIR"/*) fail "LEDGERFORGE_TEST_ENVIRONMENT_FILE must use an approved task-owned path" 64 ;;
     esac
 
     /usr/bin/jq -s -e '

@@ -175,7 +175,7 @@ ADR-046 is the current parser/source-support authority. For every supported fina
 - historical sprint/profile acceptance remains historical fact, but it is distinct from **current authentic-corpus production reliability certification**; personal-v1 parser reliability remains uncertified until the complete-corpus gate is satisfied; and
 - independent source oracles record source facts. Acceptance compares authentic source truth through an explicit architecture-aware semantic projection with ordinary production output; raw Oracle JSON need not equal raw production JSON when the representations intentionally differ.
 
-Private authentic originals remain outside Git and read-only. AI/model interpretation is not required for ordinary recurring structured parsing and is never financial authority unless separately approved.
+Private authentic originals remain read-only in their approved source location. AI/model interpretation is not required for ordinary recurring structured parsing and is never financial authority unless separately approved.
 
 ---
 
@@ -193,7 +193,7 @@ For financial imports, persistence, identity, balances, cards, salary, investmen
 - never infer institution, format, layout, account identity or credential family from structural similarity alone;
 - never invent dates, ordering, identifiers, balances or provenance;
 - keep private originals isolated and read-only;
-- do not place private originals in Git; the all-stages authentic-input rule above applies to every statement-dependent operation.
+- use private originals only from approved read-only source locations; the all-stages authentic-input rule above applies to every statement-dependent operation.
 
 A green suite proves only the boundary and oracle it exercised.
 

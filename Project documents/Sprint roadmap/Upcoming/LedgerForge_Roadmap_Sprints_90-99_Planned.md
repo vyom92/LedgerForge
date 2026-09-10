@@ -3,7 +3,7 @@
 **Status:** Prepared successor-cycle roadmap / planning forecast. This file is **not** current sprint-numbering authority until Sprint 89 is accepted and Chat explicitly activates the 90–99 cycle.
 **Prepared:** 2026-09-09
 **Planning review baseline:** `main@a560312db5900645779a499016e13f0c87e81435`
-**Current authority remains:** `LedgerForge_Roadmap_Sprints_80-89_Current.md`
+**Current authority remains:** `Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md`
 **Personal-v1:** UNDECLARED / NOT CERTIFIED
 
 This file does not supersede the 80–89 roadmap now. It assigns no execution authority. Before any future sprint starts, Chat must rerun P0 → P1 → P2 → P3 triage, enforce its entry gates and explicitly activate this cycle after Sprint 89 acceptance.
@@ -141,4 +141,4 @@ Personal-v1 remains undeclared until Chat explicitly accepts `FW-P0-26`. The gat
 
 ## Activation rule
 
-This prepared roadmap becomes current cycle authority only after Sprint 89 is accepted and Chat explicitly activates the 90–99 cycle. Until then, `LedgerForge_Roadmap_Sprints_80-89_Current.md` remains the numbering authority.
+This prepared roadmap becomes current cycle authority only after Sprint 89 is accepted and Chat explicitly activates the 90–99 cycle. Until then, `Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md` remains the numbering authority.

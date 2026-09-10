@@ -3,6 +3,8 @@
 **Revision:** LF-UI-2026-09-R1  
 **Status:** Requirements, not a record of passed native tests.
 
+> **Publication alignment — 2026-09-10:** The checklist below was authored for the original docs-only handoff. The user subsequently authorized the reversible asset archive/move, Xcode synchronized-folder update and sprint-roadmap publication; those actions are documented in the surrounding handoff and do not turn this checklist into native test evidence.
+
 ## A. Documentation-and-assets registration: this packet
 
 | ID | Required evidence |
@@ -57,4 +59,4 @@ Select only the rows applicable to each separately approved implementation packe
 
 ## C. Evidence record per implementation packet
 
-Report the exact code ref, runtime build identity, logical window dimensions, appearance/font/density settings, tested actions, named assertions, actual results and remaining gaps. Keep private originals outside Git. Record independent-oracle use for financial aggregates, and provider/hydration/relaunch evidence when those boundaries are changed. A passing build or visually plausible screenshot alone is insufficient.
+Report the exact code ref, runtime build identity, logical window dimensions, appearance/font/density settings, tested actions, named assertions, actual results and remaining gaps. Keep private originals read-only in their approved source location. Record independent-oracle use for financial aggregates, and provider/hydration/relaunch evidence when those boundaries are changed. A passing build or visually plausible screenshot alone is insufficient.

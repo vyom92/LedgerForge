@@ -6,6 +6,8 @@
 **Status:** Approved visual direction; consolidated written design specification; not implemented or natively verified.  
 **Scope:** Presentation and interaction requirements, not a sprint selection or financial-domain redesign.
 
+**Publication alignment — 2026-09-10:** At the user's explicit direction, this handoff is published under `Project documents/UI Assets/LF-UI-2026-09-R1/`, the unchanged legacy PNGs are archived under `Project documents/UI Assets/Archived/`, and the sprint roadmaps are organized under `Project documents/Sprint roadmap/`. These layout changes do not claim native implementation or financial validation.
+
 ## 0. Authority, approval and provenance
 
 The user approved the latest supplied collage labelled **LedgerForge v2.0**, following the agreed practical refresh: adaptive appearance, readable currency summaries, usable transaction filters/sorting, and native desktop interactions. The exact approved PNG is retained, without editing or recompression, as [MasterBoard_LF-UI-2026-09-R1.png](MasterBoard_LF-UI-2026-09-R1.png). Its embedded “v2.0” is not an app release version and does not identify the older repository `DesignBoard_v2.0.png`.
@@ -14,7 +16,7 @@ Approval covers the visual direction and agreed requirements. The numeric sizes,
 
 The following order applies to this handoff: explicit user decisions and accepted financial/architecture contracts; this written specification and its documented visual exceptions; the token file; the approved collage for appearance/composition; inherited legacy references for untouched screens. Register this relationship through the existing UI specification and ADR-023 before implementation. The handoff does not independently rewrite repository authority.
 
-**Repository evidence:** the current documents record V17, ADR-046, the accepted startup/monthly-planner corrections, and personal-v1 undeclared. Natural amount entry and coherent Salary Save are accepted work. The roadmap retains PR-1 before a serial Unified Import Centre. No new sprint number or migration is assigned here. See [SOURCES.md](SOURCES.md).
+**Repository evidence at preparation:** the source baseline recorded V17, ADR-046, the accepted startup/monthly-planner corrections, and personal-v1 undeclared. Natural amount entry and coherent Salary Save were accepted work; the roadmap then retained PR-1 before a serial Unified Import Centre. Sprint 82 is now accepted in the current roadmap, while this handoff still assigns no sprint number or migration. See [SOURCES.md](SOURCES.md).
 
 **Explicit user decisions:** avoid a compulsory fixed palette; offer simple appearance controls with optional advanced customization; include Transactions filtering/sorting; use Budget Analysis for task flow and existing master assets as an evolvable visual reference; keep Salary refinement lower priority. The user identifies supplied runtime data as disposable. This does not authorize publishing private source files or manufacturing financial acceptance inputs.
 
@@ -203,7 +205,7 @@ Accounts, Import, Salary and Developer Console inherit the common system while r
 
 ## 7. Boundaries and delivery status
 
-This package can be registered as a design-reference update without changing executable files. Do not implement app screens, preference storage, queries, filters or sorting during that registration. Preserve existing assets byte-for-byte; supersede references in place for the covered scope rather than deleting or moving historical files. Unchanged legacy screens remain inherited with the explicit exceptions above.
+This package is registered as a design-reference update without native app implementation. Do not implement app screens, preference storage, queries, filters or sorting under this handoff. Preserve existing asset bytes; the user explicitly authorized their archival under `Project documents/UI Assets/Archived/` and publication of this handoff on 2026-09-10. Unchanged legacy screens remain inherited with the explicit exceptions above.
 
 No migration, parser, Money contract, source identity, provenance, accepted financial formula or roadmap ordering changes here. A later app prompt must name its code/test surfaces and prove applicable financial mappings before implementation. Repository or runtime defects established during that work retain the project's financial-correctness priority.
 

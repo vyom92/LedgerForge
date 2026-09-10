@@ -962,9 +962,9 @@ Sprint 20, refined through Sprint 22 UI/UX asset freeze
 
 LedgerForge adopts a frozen UI/UX architecture in the same manner as the frozen backend architecture.
 
-Visual structure, navigation, interaction patterns and primary layouts are defined by `UI_UX_v1.0_Frozen.md` together with approved assets stored under `Project documents/UI Assets/Approved/`.
+Visual structure, navigation, interaction patterns and primary layouts are defined by `UI_UX_v1.0_Frozen.md` together with the current handoff under `Project documents/UI Assets/LF-UI-2026-09-R1/` and archived legacy references under `Project documents/UI Assets/Archived/`.
 
-`DesignBoard_v2.0.png` is the master UI reference. Individual approved assets define screen-level implementation details.
+`DesignBoard_v2.0.png` remains the historical master UI reference. The LF-UI-2026-09-R1 handoff/master board is the current visual authority for its covered scope; archived legacy assets define inherited screen-level detail where still applicable.
 
 Implementation sprints must implement the approved UI specification rather than redesigning the application during development.
 
@@ -980,7 +980,7 @@ This mirrors the successful approach used for `Architecture_v1.0_Frozen.md`.
 
 - UI/UX becomes an architectural concern rather than an implementation concern.
 - Approved UI assets become part of the project's architectural documentation.
-- `Project documents/UI Assets/Approved/DesignBoard_v2.0.png` is the authoritative visual reference for future UI implementation.
+- `Project documents/UI Assets/Archived/DesignBoard_v2.0.png` remains the historical visual reference; `LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png` is the current visual authority for its covered scope.
 - Future UI work must translate approved assets into SwiftUI rather than reinterpret layout, spacing, theme or navigation during implementation.
 - Implementation sprints focus on translating approved designs into SwiftUI components.
 - Significant UI changes require design review before implementation.
@@ -5327,7 +5327,7 @@ tolerant matching, generic masked identity, HDFC or Axis overlap, source
 replacement, canonical provenance reassignment, account merge, historical
 repair or backfill, OCR, password workflows, image-only PDFs, generic PDF or
 spreadsheet parsing, XLSX, source-byte storage or private-source material in
-Git.
+published artifacts.
 
 ---
 
@@ -5939,7 +5939,7 @@ For each supported financial source family, the complete registered set of authe
 
 A parser/profile is not currently reliability-certified merely because unit tests, synthetic regression tests, a full TestPlan, persistence/hydration tests or a subset of authentic examples pass. The complete affected authentic corpus must pass the ordinary production path.
 
-Private authentic originals remain outside Git and read-only.
+Private authentic originals remain read-only in their approved source location.
 
 ### 2. No fabricated financial statements at any stage
 

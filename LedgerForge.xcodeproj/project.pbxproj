@@ -28,7 +28,6 @@
 		281BB1902FFC4D6A006E7424 /* StatementClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB18F2FFC4D6A006E7424 /* StatementClassifier.swift */; };
 		281BB1922FFC4D6A006E7424 /* ImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1912FFC4D6A006E7424 /* ImportCoordinator.swift */; };
 		281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */; };
-		B82000023082000000000001 /* ImportCentreCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82000013082000000000001 /* ImportCentreCoordinator.swift */; };
 		286242592FFCE80D00B8AA66 /* DefaultReaderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242542FFCE80D00B8AA66 /* DefaultReaderRegistry.swift */; };
 		2862425F2FFCE80D00B8AA66 /* PDFDocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242552FFCE80D00B8AA66 /* PDFDocumentReader.swift */; };
 		286242612FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */; };
@@ -151,6 +150,7 @@
 		B600000E3050000000000001 /* DeveloperConsoleStub.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000513050000000000001 /* DeveloperConsoleStub.swift */; };
 		B600000F3050000000000001 /* LedgerForgeSubprocessProbe in Embed Subprocess Probe */ = {isa = PBXBuildFile; fileRef = B60000103050000000000001 /* LedgerForgeSubprocessProbe */; };
 		B60000503050000000000001 /* InMemoryRepositoryProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1602FFC4A84006E7424 /* InMemoryRepositoryProvider.swift */; };
+		B82000023082000000000001 /* ImportCentreCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82000013082000000000001 /* ImportCentreCoordinator.swift */; };
 		C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */; };
 		D57000113057000000000001 /* Category.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000013057000000000001 /* Category.swift */; };
 		D57000123057000000000001 /* CategoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000023057000000000001 /* CategoryStore.swift */; };
@@ -227,7 +227,6 @@
 		281BB18F2FFC4D6A006E7424 /* StatementClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementClassifier.swift; sourceTree = "<group>"; };
 		281BB1912FFC4D6A006E7424 /* ImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCoordinator.swift; sourceTree = "<group>"; };
 		281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultImportCoordinator.swift; sourceTree = "<group>"; };
-		B82000013082000000000001 /* ImportCentreCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCentreCoordinator.swift; sourceTree = "<group>"; };
 		286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Architecture_v1.0_Frozen.md; sourceTree = "<group>"; };
 		2862424A2FFCE80D00B8AA66 /* DefaultPasswordProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultPasswordProvider.swift; sourceTree = "<group>"; };
 		286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVDocumentReaderAdapter.swift; sourceTree = "<group>"; };
@@ -344,6 +343,7 @@
 		B60000103050000000000001 /* LedgerForgeSubprocessProbe */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LedgerForgeSubprocessProbe; sourceTree = BUILT_PRODUCTS_DIR; };
 		B60000113050000000000001 /* LedgerForgeSubprocessProbe.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LedgerForgeSubprocessProbe.entitlements; sourceTree = "<group>"; };
 		B60000513050000000000001 /* DeveloperConsoleStub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperConsoleStub.swift; sourceTree = "<group>"; };
+		B82000013082000000000001 /* ImportCentreCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCentreCoordinator.swift; sourceTree = "<group>"; };
 		C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImportReconciliationGate.swift; sourceTree = "<group>"; };
 		D57000013057000000000001 /* Category.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Category.swift; sourceTree = "<group>"; };
 		D57000023057000000000001 /* CategoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryStore.swift; sourceTree = "<group>"; };
@@ -357,23 +357,6 @@
 		F58000020000000000000001 /* ImportFailureSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFailureSummary.swift; sourceTree = "<group>"; };
 		F63000010000000000000001 /* SourceContentSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceContentSnapshot.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A90900013090000000000001 /* Exceptions for "UI Assets" folder in "LedgerForge" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				"Approved/LedgerForge_UI_Handoff_LF-UI-2026-09-R1.zip",
-				"Approved/LF-UI-2026-09-R1/ACCEPTANCE.md",
-				"Approved/LF-UI-2026-09-R1/ASSET_MANIFEST.json",
-				"Approved/LF-UI-2026-09-R1/DESIGN_HANDOFF.md",
-				"Approved/LF-UI-2026-09-R1/DESIGN_TOKENS.json",
-				"Approved/LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png",
-				"Approved/LF-UI-2026-09-R1/README.md",
-				"Approved/LF-UI-2026-09-R1/SOURCES.md",
-			);
-			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		283E97932FFE3A470034CA98 /* Branding */ = {
@@ -393,9 +376,6 @@
 		};
 		28A3A4C22FFE1E3900DD5727 /* UI Assets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				A90900013090000000000001 /* Exceptions for "UI Assets" folder in "LedgerForge" target */,
-			);
 			path = "UI Assets";
 			sourceTree = "<group>";
 		};

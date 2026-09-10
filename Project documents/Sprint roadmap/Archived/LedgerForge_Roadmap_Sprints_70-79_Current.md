@@ -3,18 +3,18 @@
 **Status:** Historical prior-cycle roadmap (superseded)
 **Refreshed:** 2026-09-01
 **Supersedes:** dated/private Sprints 70–79 roadmap copies through 2026-08-03
-**Superseded by:** `Project documents/LedgerForge_Roadmap_Sprints_80-89_Current.md`
+**Superseded by:** `Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md`
 
 ## Control
 
-- **Planning authority:** This file remains the historical authority for Sprints 70–79 numbering, corrective suffixes and closure status. The current-cycle authority is `Project documents/LedgerForge_Roadmap_Sprints_80-89_Current.md`.
+- **Planning authority:** This file remains the historical authority for Sprints 70–79 numbering, corrective suffixes and closure status. The current-cycle authority is `Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md`.
 - **Execution authority:** None. A complete Chat-approved prompt authorizes each task.
 - **Accepted production baseline:** Sprint 79 on `main` at implementation commit `9489f6b21c9d585d2d90f2ba4798a931590057f7`; the subsequent documentation-reconciliation commit is recorded by Git history.
 - **Current migration baseline:** V16 accepted with Sprint 79.
 - **Latest accepted ADR:** ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner; implemented and accepted with Sprint 79. ADR-044 remains the accepted card-domain authority.
 - **Current active correction:** none. Sprint 79 was technically accepted on 2026-08-28.
 - **Sprint 79:** **Accepted 2026-08-28.** Exact `qatar-airways.salary.pdf@1`, the dedicated Salary workspace/current-month funding planner and additive Migration V16 are accepted production state.
-- **Standing method:** `LedgerForge_Standing_Execution_Harness_Guide.md`.
+- **Standing method:** `Project documents/LedgerForge_Standing_Execution_Harness_Guide.md`.
 - **Post-cycle gate:** Sprint 80 is recorded as accepted discovery in the successor roadmap; it is not a production implementation or Swift-6 migration.
 
 ## Current parser-reliability alignment — 2026-09-01
@@ -392,7 +392,7 @@ The accepted final private gate proved:
 15. one liability account, zero Axis instruments/sections;
 16. SQLite checkpoint/close/reopen;
 17. canonical hydration;
-18. no private credential/path/financial listing in Git or durable logs.
+18. no private credential/path/financial listing in published artifacts or durable logs.
 
 The private automated gate must use the production credential seam and must not directly retrieve one raw Axis password or mutate real Keychain state to bootstrap itself.
 
@@ -502,7 +502,7 @@ The separately diagnosed authentic July 2026 CBQ credit-card compatibility defec
 Sprint 80 is accepted as `SWIFT6_READINESS_COMPLETE` discovery on 2026-08-28.
 The minimum current-cycle governance, bounded prerequisite families and
 post-Sprint-80 ordering are recorded in
-`Project documents/LedgerForge_Roadmap_Sprints_80-89_Current.md` and
+`Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md` and
 `Project documents/FUTURE_WORK.MD`. Sprint 79 remains the latest accepted
 production implementation; no Swift-6 migration or Import Centre implementation
 is authorized by this historical handoff.

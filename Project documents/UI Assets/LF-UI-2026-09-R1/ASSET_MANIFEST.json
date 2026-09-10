@@ -16,13 +16,13 @@
   "payload_files": [
     {
       "path": "ACCEPTANCE.md",
-      "bytes": 6480,
-      "sha256": "03d4bc5167994de72c98af5d195a5cfa5ccac59a5938b5f477b7815fc498ddfe"
+      "bytes": 6873,
+      "sha256": "b499ad7cadb659a5d4e44fcf095b1f6b704b49f8e5135c9064fb2e3bac8da86c"
     },
     {
       "path": "DESIGN_HANDOFF.md",
-      "bytes": 23295,
-      "sha256": "d13ac63a587883900021c81253a9a7e88f2141f9637bbdb6e31d3e0b1ae351d5"
+      "bytes": 23804,
+      "sha256": "f5b021e677bb7fc27a7125c00523a10fc49456f43836a292ca3ba3fb65cf1338"
     },
     {
       "path": "DESIGN_TOKENS.json",
@@ -36,82 +36,82 @@
     },
     {
       "path": "README.md",
-      "bytes": 2319,
-      "sha256": "7dd54d54db219a84d7447d511d8ac6ab13922aa0a0e2455f1e1b1b79ae491e23"
+      "bytes": 2855,
+      "sha256": "d4ff1ec223e6799c9bdab33d2546ad1442df5fbea97f30d45f07de64616162e0"
     },
     {
       "path": "SOURCES.md",
-      "bytes": 5045,
-      "sha256": "200c2e1d4f179eada46390f7a95a4b2dfa88f98512774d6869cec93178784723"
+      "bytes": 5471,
+      "sha256": "b9adae0653397ecdd94f1db5c20e37249ef7bef3bfc1e09f531a01d62ff7fbab"
     }
   ],
   "manifest_self_hash": "excluded to avoid recursive checksum; outer package manifest covers this file",
   "legacy_repository_assets": [
     {
-      "path": "Project documents/UI Assets/Approved/Accounts_v1.0.png",
+      "path": "Project documents/UI Assets/Archived/Accounts_v1.0.png",
       "git_blob_sha1": "8236c4258fe10e0ebdd1ecbc6dbcdbf4b395329d",
       "intended_status_after_registration": "inherited for untouched details, subject to shared-system contract",
-      "operation": "retain unchanged in place"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
     },
     {
-      "path": "Project documents/UI Assets/Approved/AppIcon_v1.0.png",
+      "path": "Project documents/UI Assets/Archived/AppIcon_v1.0.png",
       "git_blob_sha1": "c7c43756db8405c180980ed28e4d6774a5c33a89",
       "intended_status_after_registration": "retained; no app-icon replacement",
-      "operation": "retain unchanged in place"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
     },
     {
-      "path": "Project documents/UI Assets/Approved/ComponentLibrary_v1.0.png",
+      "path": "Project documents/UI Assets/Archived/ComponentLibrary_v1.0.png",
       "git_blob_sha1": "51f2e1a17a77b4f7b7374cc772be16612126cfe2",
       "intended_status_after_registration": "historical for revised component scope",
-      "operation": "retain unchanged in place"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
     },
     {
-      "path": "Project documents/UI Assets/Approved/Dashboard_v1.0.png",
+      "path": "Project documents/UI Assets/Archived/Dashboard_v1.0.png",
       "git_blob_sha1": "efbb2fb7855067c746f6f5435b56d5e60fa6e0d6",
       "intended_status_after_registration": "historical for revised Dashboard scope",
-      "operation": "retain unchanged in place"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
     },
     {
-      "path": "Project documents/UI Assets/Approved/DesignBoard_v2.0.png",
+      "path": "Project documents/UI Assets/Archived/DesignBoard_v2.0.png",
       "git_blob_sha1": "0234a1809c7afe099249e9cd96a704892b94c557",
       "intended_status_after_registration": "historical master for scope covered by new handoff",
-      "operation": "retain unchanged in place"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
     },
     {
-      "path": "Project documents/UI Assets/Approved/DesignSystem_v1.0.png",
+      "path": "Project documents/UI Assets/Archived/DesignSystem_v1.0.png",
       "git_blob_sha1": "b10922d4d16a21930cb10e9ebb3f64dcceac4bfd",
       "intended_status_after_registration": "historical for revised design-system scope",
-      "operation": "retain unchanged in place"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
     },
     {
-      "path": "Project documents/UI Assets/Approved/DeveloperConsole_v1.0.png",
+      "path": "Project documents/UI Assets/Archived/DeveloperConsole_v1.0.png",
       "git_blob_sha1": "7564e2c05beb5812fde76e80d927923166740c48",
       "intended_status_after_registration": "inherited only where consistent with accepted diagnostic contracts",
-      "operation": "retain unchanged in place"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
     },
     {
-      "path": "Project documents/UI Assets/Approved/ImportWizard_v1.0.png",
+      "path": "Project documents/UI Assets/Archived/ImportWizard_v1.0.png",
       "git_blob_sha1": "0c8233dd537552566edeaee09fc67e0e8af872d2",
       "intended_status_after_registration": "inherited composition only; accepted import/credential contracts override",
-      "operation": "retain unchanged in place"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
     },
     {
-      "path": "Project documents/UI Assets/Approved/Settings_v1.0.png",
+      "path": "Project documents/UI Assets/Archived/Settings_v1.0.png",
       "git_blob_sha1": "d48d52bd1219c8cdf32f72a47f060aeeacfa7d46",
       "intended_status_after_registration": "Appearance superseded; other unsupported controls remain excluded",
-      "operation": "retain unchanged in place"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
     },
     {
-      "path": "Project documents/UI Assets/Approved/Transactions_v1.0.png",
+      "path": "Project documents/UI Assets/Archived/Transactions_v1.0.png",
       "git_blob_sha1": "061be4722b62653e25debb44e77aed6fecef401c",
       "intended_status_after_registration": "historical for revised Transactions scope",
-      "operation": "retain unchanged in place"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
     },
     {
-      "path": "Project documents/UI Assets/Approved/UserJourney_v1.0.png",
+      "path": "Project documents/UI Assets/Archived/UserJourney_v1.0.png",
       "git_blob_sha1": "1ded77dc012686636f0b598f6a00c46d924c2e7c",
       "intended_status_after_registration": "historical/context only; no new feature authority",
-      "operation": "retain unchanged in place"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
     }
   ],
   "unapproved_alternatives_excluded": [
@@ -120,6 +120,6 @@
     "LedgerForge_Design_v3_Draft/reference/appearance_playground_check.png"
   ],
   "native_implementation_status": "not implemented by this package",
-  "documentation_integration_status": "not executed by Chat",
-  "git_publication_status": "not authorized in included task"
+  "documentation_integration_status": "published in Project documents/UI Assets/LF-UI-2026-09-R1/ on 2026-09-10",
+  "git_publication_status": "authorized by user on 2026-09-10"
 }

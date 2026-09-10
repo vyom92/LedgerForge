@@ -28,7 +28,7 @@ Implementation sprints translate this specification and its approved assets into
 
 ## Current design alignment — LF-UI-2026-09-R1 — 2026-09-09
 
-The user explicitly approved `LF-UI-2026-09-R1`. For its defined scope, [`UI Assets/Approved/LF-UI-2026-09-R1/DESIGN_HANDOFF.md`](UI%20Assets/Approved/LF-UI-2026-09-R1/DESIGN_HANDOFF.md) is the current written presentation/interaction authority and [`MasterBoard_LF-UI-2026-09-R1.png`](UI%20Assets/Approved/LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png) is the current visual authority. `DESIGN_TOKENS.json` and `ACCEPTANCE.md` define the shared-system and acceptance detail. The artwork label “LedgerForge v2.0” is design-board text, not an application version.
+The user explicitly approved `LF-UI-2026-09-R1`. For its defined scope, [`UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md`](UI%20Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md) is the current written presentation/interaction authority and [`MasterBoard_LF-UI-2026-09-R1.png`](UI%20Assets/LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png) is the current visual authority. `DESIGN_TOKENS.json` and `ACCEPTANCE.md` define the shared-system and acceptance detail. The artwork label “LedgerForge v2.0” is design-board text, not an application version.
 
 Design approval is independent from native implementation acceptance. SwiftUI implementation remains separate and incomplete. Details of untouched screens inherit legacy approved references only where they remain consistent with this handoff, accepted product behavior, current financial semantics and accessibility requirements.
 
@@ -138,8 +138,8 @@ Repository implementation is not design authority.
 The UI specification is governed by this hierarchy:
 
 1. `Project documents/UI_UX_v1.0_Frozen.md`, including its current R1 alignment and accepted financial/workflow semantics;
-2. `Project documents/UI Assets/Approved/LF-UI-2026-09-R1/DESIGN_HANDOFF.md` for the scope it defines;
-3. `Project documents/UI Assets/Approved/LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png` as the current visual authority for that covered scope, with its tokens/acceptance files;
+2. `Project documents/UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md` for the scope it defines;
+3. `Project documents/UI Assets/LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png` as the current visual authority for that covered scope, with its tokens/acceptance files;
 4. legacy approved screen/design assets for untouched details only where consistent with newer authority and accepted product behavior;
 5. SwiftUI implementation.
 
@@ -794,10 +794,10 @@ They must not appear as inert v1 navigation.
 
 # Approved UI Assets
 
-The approved assets are located under:
+The current R1 handoff is located under:
 
 ```text
-Project documents/UI Assets/Approved/
+Project documents/UI Assets/LF-UI-2026-09-R1/
 ```
 
 The current approved R1 package is:
@@ -806,19 +806,19 @@ The current approved R1 package is:
 - `LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png` — current master visual reference for its covered scope;
 - `LF-UI-2026-09-R1/DESIGN_TOKENS.json`, `ACCEPTANCE.md`, `SOURCES.md`, `ASSET_MANIFEST.json` and `README.md` — supporting design/acceptance evidence.
 
-Legacy assets are retained byte-identically as historical/inherited references, including:
+Legacy assets are retained byte-identically as historical/inherited references under `Project documents/UI Assets/Archived/`, including:
 
-- `DesignBoard_v2.0.png`;
-- `Dashboard_v1.0.png`
-- `Accounts_v1.0.png`
-- `Transactions_v1.0.png`
-- `ImportWizard_v1.0.png`
-- `Settings_v1.0.png`
-- `DeveloperConsole_v1.0.png`
-- `DesignSystem_v1.0.png`
-- `UserJourney_v1.0.png`
-- `ComponentLibrary_v1.0.png`
-- `AppIcon_v1.0.png` — approved application-icon reference
+- `Archived/DesignBoard_v2.0.png`;
+- `Archived/Dashboard_v1.0.png`
+- `Archived/Accounts_v1.0.png`
+- `Archived/Transactions_v1.0.png`
+- `Archived/ImportWizard_v1.0.png`
+- `Archived/Settings_v1.0.png`
+- `Archived/DeveloperConsole_v1.0.png`
+- `Archived/DesignSystem_v1.0.png`
+- `Archived/UserJourney_v1.0.png`
+- `Archived/ComponentLibrary_v1.0.png`
+- `Archived/AppIcon_v1.0.png` — approved application-icon reference
 
 For scope covered by R1, the R1 handoff/master board control presentation direction. Legacy screen assets define inherited detail only where consistent with that newer authority and accepted product behavior.
 

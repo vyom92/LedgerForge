@@ -32,7 +32,7 @@ Every executor/reviewer should receive:
 Before sprint selection, naming, roadmap change, execution prompt, implementation review or acceptance, Chat inspects in this order:
 
 1. exact ref/worktree under review;
-2. `LedgerForge_Roadmap_Sprints_80-89_Current.md`;
+2. `Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md`;
 3. this standing harness;
 4. `PROJECT_STATE.md`;
 5. `FUTURE_WORK.MD`;
@@ -205,7 +205,7 @@ For financial work:
 - reopen/hydration are acceptance boundaries;
 - support never generalizes from visual/structural similarity.
 
-Private originals remain read-only and outside Git.
+Private originals remain read-only in their approved source location.
 
 ---
 
@@ -226,7 +226,7 @@ ADR-046 governs current reader/parser/source-support acceptance. The reusable ru
 
 The canonical user import direction is batch intake (including queue length one) -> unlock as required -> generic extraction -> identify/segregate -> route each statement -> source-family semantic parser -> source-owned financial events -> normalize -> validate/reconcile -> duplicate/equivalence evaluation -> explicit review/confirmation where required -> atomic persistence -> one canonical database -> canonical financial rows -> query/extraction/presentation/viewer layers. Institution-specific parsers are ingestion modules, not separate analytical silos.
 
-Private authentic originals remain read-only and outside Git.
+Private authentic originals remain read-only in their approved source location.
 
 ---
 

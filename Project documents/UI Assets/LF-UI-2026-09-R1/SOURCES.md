@@ -4,6 +4,10 @@
 **Fresh inspected pushed baseline:** `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` on 2026-09-09.  
 **Local Mac state:** not inspected; GitHub does not establish worktree or runtime identity.
 
+**Publication alignment — 2026-09-10:** The links below remain pinned historical provenance at the inspected baseline. The user subsequently authorized the roadmap relocation and UI-asset archive/publication recorded by the surrounding handoff.
+
+Current published roadmap path: `Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md`. The pinned URL in the table records the pre-relocation source revision.
+
 ## Repository sources inspected in this task
 
 All links are pinned to the inspected commit. Git blob IDs identify repository text, not SHA-256 file hashes.
@@ -19,7 +23,7 @@ All links are pinned to the inspected commit. Git blob IDs identify repository t
 | [Approved asset directory](https://github.com/vyom92/LedgerForge/tree/d8124ef5a1f38a1e7547f4f8905c91f25b2f1194/Project%20documents/UI%20Assets/Approved) | Complete tree inventory of 11 PNGs | tree `99a997a5fa63486cccef11fc00c00647a34063b6` |
 | [Xcode project](https://github.com/vyom92/LedgerForge/blob/d8124ef5a1f38a1e7547f4f8905c91f25b2f1194/LedgerForge.xcodeproj/project.pbxproj) | Initial build-file section only; not a complete bundle-membership audit | Inspection does not establish new-asset exclusion; Codex preflight must do so. |
 
-The first three source priorities were read before scope preparation. The uploaded July/August private roadmaps are historical context, not current planning authority. No current P0/P1 queue audit or new sprint selection is claimed.
+The first three source priorities were read before scope preparation. The uploaded July/August historical roadmaps are context, not current planning authority. No current P0/P1 queue audit or new sprint selection is claimed.
 
 ## Explicit user decisions in this conversation
 
