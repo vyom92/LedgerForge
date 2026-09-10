@@ -165,6 +165,8 @@ Queue: `FW-P2-67`.
 
 Behavior-preserving decomposition only. Preserve financial/repository semantics and R1 shell direction. Do not combine broad source-tree moves (`FW-P2-77`) or financial redesign with this maintenance boundary.
 
+Discovery 2026-09-10: [FW-P2-67](../Discovery/Read_Only_Discovery_Register.md#fw-p2-67) maps shell, hydration/publication and import-presentation ownership. Preserve behavior while extracting established seams; [FW-P2-77](../Discovery/Read_Only_Discovery_Register.md#fw-p2-77) remains a separate path/membership/resource audit before any physical move. Native runtime parity remains future acceptance, not a discovery result.
+
 ### Sprint 89 — LF-UI-2026-09-R1 Transactions Reference Implementation
 
 Queue: `FW-P2-03` + `FW-P2-53`, with only necessary bounded portions of `FW-P2-48`, `FW-P2-49` and `FW-P2-50`.
@@ -182,8 +184,14 @@ Required boundary:
 - no debit = spending or credit = income inference;
 - targeted source/runtime verification of the existing INR colour observation **before** any financial-colour semantic change.
 
+Discovery 2026-09-10: [FW-P2-03](../Discovery/Read_Only_Discovery_Register.md#fw-p2-03), [FW-P2-53](../Discovery/Read_Only_Discovery_Register.md#fw-p2-53) and the linked accessibility cards retain the R1 contract. Current search/presentation evidence does not settle all new filter semantics or the INR colour observation. Require independent matching-scope totals/order and targeted native keyboard, VoiceOver, resize and contrast evidence; no financial-colour change from a screenshot inference.
+
 `FW-P2-77` remains explicitly deferred, not forgotten. Its maintenance value does not outrank the P1/P2 user outcomes above, and broad physical moves must not be mixed with app-shell or R1 behavioral work.
 
+
+## Read-only discovery index — 2026-09-10
+
+[The complete discovery register](../Discovery/Read_Only_Discovery_Register.md) records evidence, proposed boundaries and named blockers without selecting any sprint. Sprints 84–87 remain with their existing campaign owner. Historical repair/reversal still requires an exact source-provable family; backup, export and support documentation remain explicit adoption inputs. The prepared 90–99 entry refinements remain a forecast and do not activate that cycle.
 
 ## Serious candidates not silently selected
 

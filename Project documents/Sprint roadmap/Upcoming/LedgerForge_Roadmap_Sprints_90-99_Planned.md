@@ -37,11 +37,15 @@ Queue: `FW-P2-78`.
 
 Entry gate: Sprint 89 shared R1 implementation patterns accepted. Implement native-currency grouped position, bank balances distinct from card liabilities, full readable amounts, authoritative period/as-of context and current funding summary without changing formulas. No FX conversion, net-worth invention, fake trend/percentage/chart or hydration-as-import claim.
 
+Discovery 2026-09-10 (PROPOSED): [FW-P2-78](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-78): retain native-currency groups, account/liability separation and honest as-of/completeness. No new analytics/FX authority. Verify actual keyboard/readability and independent displayed values after shared R1 patterns are accepted.
+
 ### Sprint 91 — R1 Appearance Preferences and Adaptive Rendering
 
 Queue: `FW-P2-52` + narrowed `FW-P2-55`.
 
 Entry gate: a bounded preference-storage ownership decision. Implement System / Light / Dark; System Neutral / optional Deep Indigo; accent; text scale; small supported font set; density; bounded foreground/background/translucency; Preview/Apply/Cancel/Restore; reduced-transparency behavior and safe fallback. Appearance must not mutate financial truth.
+
+Discovery 2026-09-10 (PROPOSED): [FW-P2-52](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-52) establishes that preference scope/storage ownership is unresolved; current DEBUG profile UserDefaults is not general preference architecture. [FW-P2-55](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-55) stays gated. Future acceptance includes draft Apply/Cancel/Restore, relaunch, system/light/dark, accessible fallbacks and reduced transparency.
 
 ### Sprint 92 — R1 Cross-Screen Conformance and Accessibility Closure
 
@@ -49,11 +53,15 @@ Queue: `FW-P2-40`, `FW-P2-41`, `FW-P2-47`, `FW-P2-48`, `FW-P2-49`, `FW-P2-50`.
 
 Combine only because, after 89–91, the remaining Accounts, Import, Settings, Developer Console, shell/components and bounded Salary polish form one shared design-system/native-interaction acceptance boundary. Salary remains lower priority and the sprint must not reopen accepted editor, fee or persistence fixes.
 
+Discovery 2026-09-10 (PROPOSED): [FW-P2-49](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-49) and [FW-P2-50](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-50) separate frozen visual approval from native behavior. Require keyboard/focus/VoiceOver, resize/large text, color/material contrast, reduced settings and safe destructive-action interaction. No runtime accessibility proof was produced by discovery.
+
 ### Sprint 93 — Owned-Account Transfer Matching
 
 Queue: `FW-P2-10`.
 
 Require independently provable transfer evidence and a reviewable/correctable relationship. Weak similarity never creates a relationship automatically. Internal transfers never become new income or expense.
+
+Discovery 2026-09-10 (PROPOSED): [FW-P2-10](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-10) proposes independently evidenced same-currency one-to-one reviewable relationships first, leaving fees, splits, FX and date-tolerance policy separate. Preserve original transactions and independently prove no double income/expense. Acceptance/correction architecture remains unapproved.
 
 ### Sprint 94 — Transaction Reconciliation Workflow
 
@@ -61,11 +69,15 @@ Queue: `FW-P2-11`.
 
 Entry gate: accepted transfer relationship semantics and provenance. No silent financial mutation. Reevaluate `FW-P2-12` duplicate-transaction review before this sprint and again before Sprint 97; if current duplicate guarantees are insufficient for reconciliation/analytics, that higher-priority dependency preempts the dependent outcome.
 
+Discovery 2026-09-10 (PROPOSED): [FW-P2-11](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-11) remains gated by accepted relationship/provenance and mismatch semantics. [FW-P2-12](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-12) separates prospective duplicate review from [historical repair](../../Discovery/Read_Only_Discovery_Register.md#fw-p0-02); current bounded duplicate rejection is not proof that all later reconciliation cases are covered.
+
 ### Sprint 95 — Deterministic Categorization Rules with Explainability
 
 Queue: `FW-P2-21`, `FW-P2-22`, `FW-P2-23`.
 
 Combine only if targeted discovery proves explanation and conflict handling are one necessary safety boundary for the first rule engine. Deterministic before intelligent; manual assignments remain authoritative; imported transactions remain immutable; every rule result is explainable; conflicts are explicit; AI is not authority.
+
+Discovery 2026-09-10 (PROPOSED): [FW-P2-21](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-21) proposes read-only deterministic categorization proposals with rule/input/version explanation. [FW-P2-22](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-22) and [FW-P2-23](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-23) keep conflict, precedence and correction decisions explicit. Manual assignments remain authoritative. A durable automatic engine is not approved by this research.
 
 ### Sprint 96 — Merchant/Payee Normalization and Recurring Activity
 
@@ -73,11 +85,15 @@ Queue: `FW-P2-25` + `FW-P2-26`.
 
 Entry gate: accepted correction/provenance and rule foundations. Original imported descriptions remain immutable. Recurrence must distinguish proven deterministic recurrence from suggestion.
 
+Discovery 2026-09-10 (PROPOSED): [FW-P2-25](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-25) preserves original descriptions; [FW-P2-26](../../Discovery/Read_Only_Discovery_Register.md#fw-p2-26) requires a deterministic recurrence-evidence policy and explicit suggestion state. Neither merchant alias nor repeated cadence proves identity or a confirmed obligation.
+
 ### Sprint 97 — Deterministic Analytics and Current Planning Foundation
 
 Queue: `FW-P3-09` + `FW-P3-10`.
 
 Planning intent: replace applicable Budget Analysis workbook tasks with repository-backed, explainable derived results. Combine only if entry discovery proves one coherent derived-finance boundary; otherwise split and explicitly update this roadmap. No fabricated chart values, mixed-currency totals, transfer-as-income or prediction-as-fact.
+
+Discovery 2026-09-10 (PROPOSED): [FW-P3-09](../../Discovery/Read_Only_Discovery_Register.md#fw-p3-09) and [FW-P3-10](../../Discovery/Read_Only_Discovery_Register.md#fw-p3-10) distinguish source facts, user assumptions, derived results and forecasts. **Scope split/replanning decision required before execution.** Proposed split: current obligations/planning versus historical analytics, unless entry discovery proves one typed repository-backed projection with separate fact/assumption provenance, native-currency outputs and checks proving assumption changes cannot alter analytic facts. Workbook expense labels include remittance and are not spending authority.
 
 ### Sprint 98 — Investment / ISP Holdings and External Valuation Foundation
 
@@ -91,6 +107,8 @@ For Qatar Airways ISP, `FW-P3-29` owns policy/holding/contribution semantics. Pr
 
 For Indian mutual funds, `FW-P3-20` owns the holding/domain model and **Direct-plan-only** identity. Recurring lookup uses exact configured AMFI scheme code + ISIN + plan/option metadata; Regular plans never substitute. `FW-P3-27` may use the technically qualified current AMFI `NAVAll.txt` publication after provider/cache qualification; expected INR is configured/qualified separately because the feed does not itself carry an explicit currency field. `FW-P3-28` remains manual/custom fallback, not the primary Indian-mutual-fund domain.
 
+Discovery 2026-09-10 (PROPOSED): The user directed on 2026-09-10: **propose current holdings first; keep history and performance gated**. [FW-P3-20](../../Discovery/Read_Only_Discovery_Register.md#fw-p3-20), [FW-P3-23](../../Discovery/Read_Only_Discovery_Register.md#fw-p3-23) and [FW-P3-29](../../Discovery/Read_Only_Discovery_Register.md#fw-p3-29) propose explicit container/instrument identity, exact owned units and cost-evidence type before valuation. Workbook sections use different cost meanings and do not provide complete history. **Scope split/replanning decision required before execution:** separate holding/identity evidence, any broker-source qualification and provider observation qualification unless one bounded accepted contract is proven. [FW-P3-27](../../Discovery/Read_Only_Discovery_Register.md#fw-p3-27) retains the user-supplied FE page and narrows remaining per-row date, Change-% period and automation/cache permission gates; the date-semantic footer does not supply actual price dates. No multiplier, vesting replacement or performance model is adopted.
+
 ### Sprint 99 — General FX and Reporting-Currency Foundation
 
 Queue: `FW-P3-30`, `FW-P3-31`, `FW-P3-32`, `FW-P3-33`.
@@ -100,6 +118,8 @@ Sprint 99 is **general reporting/valuation FX**, not Salary remittance. Al Dar i
 The user-selected general conversion route is `INR → QAR → USD`, using a general QAR→INR leg and a general QAR→USD leg. `ExchangeRate-API` at `open.er-api.com/v6/latest/QAR` is a **technically qualified provider candidate**, not a permanent selected vendor, accepted architecture or unique allowed provider. Entry discovery/ADR must approve provider choice, attribution, provider-specific freshness/fallback, storage and derived-value semantics before implementation.
 
 For each accepted reference snapshot preserve both raw source legs and orientation, provider/source timestamp, fetch timestamp separately, provider/source identity, source-response digest and derivation algorithm/version. Native `Money` remains authority; derived conversion never overwrites imported or holding values. Failed/missing reference data remains stale/unavailable rather than zero, and no background polling requirement is implied.
+
+Discovery 2026-09-10 (PROPOSED): [FW-P3-31](../../Discovery/Read_Only_Discovery_Register.md#fw-p3-31) separates existing unused rate-schema capacity from an approved provider/service and likely additive persistence contract. [FW-P3-32](../../Discovery/Read_Only_Discovery_Register.md#fw-p3-32) remains blocked on historical-rate authority. [FW-P3-33](../../Discovery/Read_Only_Discovery_Register.md#fw-p3-33) cannot silently replace historical reporting with current-only reporting; Chat must approve any narrower boundary. Exact Decimal legs, orientation, source/fetch times, attribution, digest/version, rounding and stale/unavailable behavior remain gates. Al Dar remains with Salary/remittance.
 
 ## Serious candidates not silently selected
 

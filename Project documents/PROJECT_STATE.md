@@ -1,5 +1,9 @@
 # Repository State
 
+## Published discovery index — 2026-09-10
+
+[Read-only discovery register](Discovery/Read_Only_Discovery_Register.md): evidence and proposed boundaries for all 153 entries at research ref `adcf83f52d309ddac18d95f0321d0c0f6120dd29`, reconciled to 151 active entries at publication input `ffddebc6e12405c812a36855ab6212e973cff5ba`. Current FUTURE_WORK owns actionable remainders; roadmaps retain numbering and current/prepared status. This index adds no product, migration, source-support, sprint or personal-v1 acceptance.
+
 ## Accepted Sprint 83 — Serial Batch Import and Multi-File Drag-and-Drop — 2026-09-10
 
 Chat accepts Sprint 83 at implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29` (parent `057d70b6f39929735401d5211cd180db162c94cc`). Sprint 83 is the latest accepted numbered implementation.
