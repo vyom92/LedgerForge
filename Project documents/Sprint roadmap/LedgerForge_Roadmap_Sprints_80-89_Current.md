@@ -2,14 +2,14 @@
 
 **Status:** Current repository cycle roadmap
 **Refreshed:** 2026-09-10
-**Planning review baseline:** `main@adcf83f52d309ddac18d95f0321d0c0f6120dd29`
+**Planning review baseline:** accepted Sprint 84, `main@a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`
 **Supersedes:** `Project documents/Sprint roadmap/Archived/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
 
 ## Control
 
 - **Planning authority:** This file owns Sprint 80–89 numbering, corrective suffixes, cycle status and planned positions.
 - **Execution authority:** None. Roadmap assignment is planning, not implementation authorization; each sprint still requires Chat priority/dependency triage and a complete execution prompt.
-- **Latest numbered product implementation:** Sprint 83 — Serial Batch Import and Multi-File Drag-and-Drop, accepted at implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29` (parent `057d70b6f39929735401d5211cd180db162c94cc`). Sprint 82 — Serial Unified Import Centre Foundation remains accepted at `d239f939088b67e5a90c65117f08592891be17bb`. Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam remains accepted at `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`. The accepted startup/monthly-planner product package is commit `6455f662dd0ea8896d19af3e67be51546badb3ae`; the later `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` cleanup is non-product repository maintenance, and `a560312db5900645779a499016e13f0c87e81435` is the R1 documentation/planning publication.
+- **Latest numbered product implementation:** Sprint 84 — PR-2 SQLite / Provider / Migration Ownership, accepted at implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1` (parent `af2d1949c6e9a73af3bb004422b72882d28195e2`). Sprints 81–83 remain accepted as recorded below and in `PROJECT_STATE.md`; their financial, import and publication contracts remain current.
 - **Current migration:** V17; V1–V16 remain immutable.
 - **Current source/reliability authority:** ADR-046 complete-authentic-corpus certification.
 - **Current UI design authority:** `LF-UI-2026-09-R1` for its bounded scope; design approval is not native implementation.
@@ -41,10 +41,10 @@ A material source, credential, parser, persistence, orchestration or financial-s
 | 81 | PR-1 Staging and Runtime Publication Ownership Seam | historical `FW-P2-72` (removed from active queue) | Behavior-preserving implementation gate | **ACCEPTED** — implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91` |
 | 82 | Serial Unified Import Centre Foundation | completed `FW-P1-19` (removed from active queue) | Core product implementation | **ACCEPTED** — implementation commit `d239f939088b67e5a90c65117f08592891be17bb`; serial queue length one and the Sprint 83 entry evidence are established |
 | 83 | Serial Batch Import and Multi-File Drag-and-Drop | completed `FW-P1-20` + `FW-P1-21` (removed from active queue) | Core product implementation | **ACCEPTED** — implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; ordered serial queue length N, multi-file picker/drop, independent per-item review/confirmation and outcomes |
-| 84 | PR-2 SQLite / Provider / Migration Ownership | `FW-P2-73` | Swift-6 prerequisite | **Next planned position; not selected** — fresh P0 → P1 → P2 → P3 gate and readiness review required; the name implies no schema migration |
-| 85 | PR-3 Dependency Concurrency Boundary | `FW-P2-74` | Swift-6 prerequisite | Planned position |
+| 84 | PR-2 SQLite / Provider / Migration Ownership | historical `FW-P2-73` (removed from active queue) | Swift-6 prerequisite | **ACCEPTED** — implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`; no schema migration |
+| 85 | PR-3 Dependency Concurrency Boundary | `FW-P2-74` | Swift-6 prerequisite | **CURRENT / CHAT-AUTHORIZED** — accepted Sprint 84 prerequisite; no higher-priority verified defect currently preempts it; stop for Chat acceptance before Sprint 86 |
 | 86 | TEST-PR Strict-Concurrency Test Correction | `FW-P2-75` | Swift-6 prerequisite | Planned; never weaken independent assertions merely to silence diagnostics |
-| 87 | Coordinated Swift-6 Migration | `FW-P2-76` | Implementation | Entry gate: serial Unified Import Centre through Sprints 82–83 accepted, plus acceptance of Sprints 84–86; no feature work bundled |
+| 87 | Coordinated Swift-6 Migration | `FW-P2-76` | Implementation | Entry gate: serial Unified Import Centre through Sprints 82–83 and PR-2 through Sprint 84 accepted; Sprints 85–86 acceptance still required; no feature work bundled |
 | 88 | App Shell and Workflow Decomposition | `FW-P2-67` | Behavior-preserving maintenance | No financial redesign or broad source-tree move; preserve R1 shell direction |
 | 89 | LF-UI-2026-09-R1 Transactions Reference Implementation | `FW-P2-03` + `FW-P2-53`, bounded `FW-P2-48` + `FW-P2-49` + `FW-P2-50` | User-facing implementation / representative R1 proof surface | Planned position; financial semantics remain source/repository-authoritative |
 
@@ -85,8 +85,8 @@ Sprint 80 recorded four bounded prerequisite families: `FW-P2-72`
 SQLite/provider/migration ownership), `FW-P2-74` (PR-3 dependency boundary) and
 `FW-P2-75` (TEST-PR unit-test strict-concurrency correction). The coordinated
 migration gate is `FW-P2-76`. Sprint 80 authorized none of them; Sprint 81 has
-since completed and accepted PR-1, while PR-2, PR-3, TEST-PR and the coordinated
-migration remain future work.
+since completed and accepted PR-1 and Sprint 84 has completed and accepted PR-2.
+PR-3 is now authorized; TEST-PR and the coordinated migration remain gated work.
 
 The current product artifact is macOS-native, uses the macOS 26.5 SDK, App
 Sandbox and selected-file import. Stale platform/bundle metadata and the
@@ -100,7 +100,7 @@ the exact registered CBQ boundary while preserving historical minimum-due
 absence and enforcing the current authentic minimum-due contract. Personal-v1
 adoption remains a separate later gate.
 
-## Accepted Sprints 81–83 and planned Sprints 84–89
+## Accepted Sprints 81–84, current Sprint 85 and planned Sprints 86–89
 
 ### Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam
 
@@ -135,17 +135,26 @@ Repository/code/test verification and the retained final TestPlan, complete auth
 
 ### Sprint 84 — PR-2 SQLite / Provider / Migration Ownership
 
-Queue: `FW-P2-73`.
+Historical queue origin: `FW-P2-73` (removed from the active queue).
 
-**Next planned position; not selected.** A fresh Chat P0 → P1 → P2 → P3 gate, readiness review and separate execution prompt are required before selection or execution.
+**ACCEPTED on 2026-09-10.** Implementation commit:
+`a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1` (parent `af2d1949c6e9a73af3bb004422b72882d28195e2`).
 
-Correct only the bounded Swift-6 prerequisite ownership surfaces. The sprint title does not authorize schema change or a new migration.
+The accepted Swift-5 correction gives SQLite operations and lifetimes, provider-generation validity, migration registries/closures and app/helper shared sources explicit bounded ownership. It preserves financial behavior, provider parity, hydration and accepted V1–V17 identities, with no schema migration. Focused and complete TestPlan, complete authentic/provider-order, strict app/helper, Debug/Release and durable relaunch evidence is recorded in `PROJECT_STATE.md`.
 
 ### Sprint 85 — PR-3 Dependency Concurrency Boundary
 
 Queue: `FW-P2-74`.
 
+**CURRENT / CHAT-AUTHORIZED on 2026-09-10** by `ACCEPT_SPRINT_84_AND_CONTINUE_TO_85`. Chat accepts the prerequisite and records no higher-priority verified defect currently preempting this sprint.
+
 Resolve the bounded ZIPFoundation decision and LegacyXLS/libxls concurrency policy without inventing generic third-party concurrency architecture.
+
+Use dependency-proportional validation: reproduce and resolve exact dependency diagnostics/policy; run focused dependency/reader tests and every affected authentic XLSX family for ZIPFoundation changes and XLS family for LegacyXLS/libxls changes; then run one authoritative TestPlan on the frozen candidate and compile Debug and optimized Release. The complete all-family/provider-order campaign is required only if shared extraction, routing, snapshots, common persistence mapping or another boundary beyond the affected XLS/XLSX dependency surfaces changes. Durable startup/relaunch is required only if persistence, provider/bootstrap, migration, hydration or startup changes. Record `NOT_REQUIRED` with the evidence-based reason for each omitted broad gate; preserve source/oracle correctness.
+
+**Explicit TestPlan invocation clarification:** for dependency-only Sprint 85, Chat authorizes excluding only the conditional global authentic-corpus/provider-order campaign from the invocation. Every other TestPlan test must run. Keep the checked-in TestPlan and tests unchanged, and report the excluded campaign explicitly as `NOT_REQUIRED`; this is not an unchanged full-plan execution claim. If the broader shared-boundary trigger applies, include the campaign.
+
+Publish one implementation candidate and **STOP for Chat acceptance before Sprint 86**. This campaign-specific validation amendment supersedes broader repetitive wording in the original 84–87 prompt.
 
 ### Sprint 86 — TEST-PR Strict-Concurrency Test Correction
 
@@ -153,11 +162,15 @@ Queue: `FW-P2-75`.
 
 Make unit-test ownership/synchronization honest for strict migration. Preserve independent source/test oracles and assertions; never weaken tests merely to remove diagnostics.
 
+Treat validation as test/support-only: freeze production-source bytes; reproduce current strict-concurrency test diagnostics and prove zero unresolved Swift-6-blocking test diagnostics; preserve test/suite inventory, skips, expected-failure policy, assertion strength and independent financial/source oracles; run one authoritative complete TestPlan on the frozen candidate. Authentic-corpus campaigns are required only if the corpus/oracle/shared validation harness changes; otherwise record `NOT_REQUIRED` because production financial behavior and corpus machinery are unchanged. Debug/Release product runtime qualification and durable startup are `NOT_REQUIRED` for test-only changes. **STOP and return to Chat if production/runtime changes are required.**
+
 ### Sprint 87 — Coordinated Swift-6 Migration
 
 Queue: `FW-P2-76`.
 
-Entry gate: the serial Unified Import Centre through Sprints 82–83 is accepted; Sprints 84–86 must also be accepted before Swift-6 migration. Perform the coordinated language/strict-concurrency migration only; no feature work bundled.
+Entry gate: the serial Unified Import Centre through Sprints 82–83 and PR-2 through Sprint 84 are accepted; Sprints 85–86 must also be accepted before Swift-6 migration. Perform the coordinated language/strict-concurrency migration only; no feature work bundled.
+
+Retain comprehensive integrated qualification: all native Swift targets in Swift 6; strict compiler closure; focused ownership/dependency/test checks; one complete TestPlan; complete registered authentic corpus and provider/order campaigns; Debug and optimized Release; native Import Centre/runtime smoke; durable same-database relaunch and canonical hydration; V1–V17 migration identity/integrity; bundle/privacy/signing; explicit review of every unsafe/unchecked concurrency escape.
 
 ### Sprint 88 — App Shell and Workflow Decomposition
 

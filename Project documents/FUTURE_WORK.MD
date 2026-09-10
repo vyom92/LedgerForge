@@ -69,11 +69,12 @@ A work item becomes executable only when Chat supplies one complete approved pro
 **Sprint-81 queue-closure update:** 2026-09-10 at `main@13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`
 **Sprint-82 queue-closure update:** 2026-09-10 at `main@d239f939088b67e5a90c65117f08592891be17bb`
 **Sprint-83 queue-closure update:** 2026-09-10 at `main@ffddebc6e12405c812a36855ab6212e973cff5ba` (accepted implementation `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; implementation parent `057d70b6f39929735401d5211cd180db162c94cc`)
-**Active candidate count after Sprint-83 acceptance closure:** 151
+**Sprint-84 queue-closure update:** 2026-09-10 at accepted implementation `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`
+**Active queue count after Sprint-84 acceptance closure:** 150
 **Current migration:** V17
 **Current source/reliability architecture:** ADR-046 complete-authentic-corpus authority
 **Current design authority:** `LF-UI-2026-09-R1` for its bounded scope
-**Latest accepted numbered implementation:** Sprint 83 — Serial Batch Import and Multi-File Drag-and-Drop
+**Latest accepted numbered implementation:** Sprint 84 — PR-2 SQLite / Provider / Migration Ownership
 **Latest accepted numbered discovery:** Sprint 80 — `SWIFT6_READINESS_COMPLETE`
 **Personal-v1:** UNDECLARED / NOT CERTIFIED
 
@@ -83,7 +84,8 @@ Reconciliation outcomes:
 
 - `FW-P2-72` is removed from the active queue because Sprint 81 completed and Chat accepted the PR-1 staging/runtime-publication ownership seam at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`.
 - `FW-P1-19` is removed from the active queue because Sprint 82 completed and Chat accepted the serial Unified Import Centre foundation at implementation commit `d239f939088b67e5a90c65117f08592891be17bb`. Its serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership, duplicate/recovery preservation and no-parallel-preparation evidence are recorded in `PROJECT_STATE.md` and the current roadmap.
-- `FW-P1-20` and `FW-P1-21` are removed from the active queue because Sprint 83 completed and Chat accepted serial batch import and multi-file picker/drag-and-drop at implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29`. Single and multi-file intake share the serial queue with independent review, explicit confirmation, failure isolation and truthful per-file outcomes. Parallel preparation remains unscheduled research under the existing `FW-P2-51`; Sprint 84 (`FW-P2-73`) is the next planned position and is not selected.
+- `FW-P1-20` and `FW-P1-21` are removed from the active queue because Sprint 83 completed and Chat accepted serial batch import and multi-file picker/drag-and-drop at implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29`. Single and multi-file intake share the serial queue with independent review, explicit confirmation, failure isolation and truthful per-file outcomes. Parallel preparation remains unscheduled research under the existing `FW-P2-51`.
+- `FW-P2-73` is removed from the active queue because Sprint 84 completed and Chat accepted PR-2 SQLite/provider/migration ownership at implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`. The bounded ownership, strict closure and V1–V17 preservation evidence belongs in `PROJECT_STATE.md`. The remaining PR-3 boundary is now Chat-authorized; the current roadmap owns its position and the amended Sprint-85–87 validation policy.
 - `FW-P0-25` is removed from the active queue because the unnumbered 127-carrier authentic-corpus reset is technically accepted and complete; newly supplied recurring sources remain governed cumulatively by ADR-046.
 - Compound historical statuses are normalized to the defined planning vocabulary. Completed slices remain concise body notes while titles and statuses describe only remaining unscheduled work.
 - Exact source-family support remains exact. HDFC whole-statement PDF/XLS equivalence, Axis-card PDF/XLSX equivalence and CBQ current-account source lineage are separate accepted contracts; none is generalized to another institution, financial family or format.
@@ -2227,27 +2229,12 @@ Do not remove shared Xcode configuration merely because it lives beneath the pro
 
 ---
 
-## FW-P2-73 — PR-2 SQLite, Provider and Migration Ownership
-
-**Status:** Candidate
-**Depends on:** PR-1 where shared publication or lifecycle surfaces intersect
-
-Correct the bounded SQLite/provider/migration ownership issues identified by
-Sprint 80: `SQLiteDatabase` teardown isolation, `DatabaseProvider` ownership,
-migration registry/global ownership, migration closure/SQLite ownership and
-helper/database shared-source ownership.
-
-This family is required before the coordinated Swift-6 migration. It does not
-authorize a migration, a schema change or a generic concurrency framework.
-
-**Discovery 2026-09-10:** [REUSED_EVIDENCE / OWNED_BY_ACTIVE_SPRINT](Discovery/Read_Only_Discovery_Register.md#fw-p2-73) at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`. VERIFIED_REPOSITORY: app targets use Swift 5, approachable concurrency and default MainActor isolation; the test target lacks the app target's default isolation setting.
-
-**Discovery remainder:** MISSING: actual compiler diagnostics and exact offending symbols from the active concurrency campaign. **Next boundary:** PROPOSED: no platform/UI change; active owner must preserve existing app/test setting distinction in its diagnosis. **Acceptance:** Owner records exact diagnostics, isolation boundary, and targeted behavior parity.
-
 ## FW-P2-74 — PR-3 Dependency Concurrency Boundary
 
 **Status:** Candidate
-**Depends on:** Sprint 80 accepted readiness discovery
+**Depends on:** Sprint 80 accepted readiness discovery; PR-2 ownership accepted in Sprint 84 at `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`
+
+Chat has authorized this bounded execution after accepting PR-2. It remains unaccepted work until the next Chat gate; current execution and validation conditions belong to the current roadmap and supplied campaign prompt.
 
 Resolve the dependency boundary before coordinated Swift-6 migration:
 
@@ -2264,7 +2251,7 @@ be treated as generic third-party concurrency support.
 ## FW-P2-75 — TEST-PR Unit-Test Strict-Concurrency Correction
 
 **Status:** Candidate
-**Depends on:** Sprint 80 accepted unit-test strict probe
+**Depends on:** Sprint 80 accepted unit-test strict probe; accepted PR-2 ownership; Chat acceptance of the pending PR-3 boundary before execution
 
 Make the unit-test target honest under coordinated strict migration through
 actor-aware fixture construction, async-safe test synchronization, subprocess
@@ -2276,6 +2263,8 @@ must not weaken production assertions to silence diagnostics.
 TEST-PR is required before the unit-test target can participate in the
 coordinated Swift-6 migration.
 
+The current campaign amendment keeps production-source bytes frozen for TEST-PR and requires independent assertion/oracle and inventory preservation. A required production/runtime correction is a stop condition for Chat disposition, not permission to extend test-only work.
+
 **Discovery 2026-09-10:** [REUSED_EVIDENCE / OWNED_BY_ACTIVE_SPRINT](Discovery/Read_Only_Discovery_Register.md#fw-p2-75) at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`. VERIFIED_REPOSITORY: the test target is Swift 5 with approachable concurrency but no explicit default MainActor setting in shown configurations; queue records 45 readiness error locations.
 
 **Discovery remainder:** MISSING: exact active diagnostics and offending test fixtures/support symbols. **Next boundary:** PROPOSED: active owner alone checks actor-aware construction/synchronization after matching diagnostics. **Acceptance:** Exact compiler diagnostics plus tests preserving independent assertions.
@@ -2283,7 +2272,7 @@ coordinated Swift-6 migration.
 ## FW-P2-76 — Coordinated Swift-6 Migration
 
 **Status:** Blocked
-**Depends on:** PR-2, PR-3 and TEST-PR; completion of the serial Unified Import Centre boundary
+**Depends on:** PR-2 accepted in Sprint 84 at `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`; pending PR-3 and TEST-PR acceptance. The serial Unified Import Centre boundary is accepted through Sprints 82–83.
 
 After the prerequisite families are accepted, perform one coordinated Swift-6
 strict migration and readiness pass. The migration is not a prerequisite to
@@ -2296,7 +2285,7 @@ reached and that the remaining work is materially known.
 
 **Discovery remainder:** MISSING: acceptance of prerequisites and current full compiler result. **Next boundary:** PROPOSED: no recommendation beyond reuse of recorded sequencing and settings caveat. **Acceptance:** Future owner uses exact diagnostics/settings, build/test plan and behavior-sensitive validation.
 
-**Sprint 84 active, unaccepted readiness finding — 2026-09-10:** the Swift-5 complete strict-concurrency probe at published parent `af2d1949c6e9a73af3bb004422b72882d28195e2` also exposes five production diagnostics outside PR-2: the `PreparedImport` / `ImportCentrePreparation` conformance in `Import/Coordinator/ImportCentreCoordinator.swift`, the `StatementDropItemProvider.Completion` capture in `Import/Presentation/StatementDropIntakeAdapter.swift`, and three salary/funding-plan reconstruction isolation diagnostics in `Services/RepositoryStoreHydrator.swift`. These are recorded strict-readiness boundaries, not verified runtime or financial defects; no contradictory evidence against accepted PR-1 publication was established. They remain owned here for Chat disposition before Sprint 87 and are excluded from Sprint 84 persistence corrections and Sprint 86 test-only corrections. This finding does not authorize their repair or reopen accepted financial semantics. Exact before/after diagnostics belong to the local Sprint-84 acceptance evidence.
+**Readiness finding retained after Sprint-84 acceptance — 2026-09-10:** the Swift-5 complete strict-concurrency probe at published parent `af2d1949c6e9a73af3bb004422b72882d28195e2` also exposes five production diagnostics outside PR-2: the `PreparedImport` / `ImportCentrePreparation` conformance in `Import/Coordinator/ImportCentreCoordinator.swift`, the `StatementDropItemProvider.Completion` capture in `Import/Presentation/StatementDropIntakeAdapter.swift`, and three salary/funding-plan reconstruction isolation diagnostics in `Services/RepositoryStoreHydrator.swift`. These are recorded strict-readiness boundaries, not verified runtime or financial defects; no contradictory evidence against accepted PR-1 publication was established. They remain owned here for Chat disposition before Sprint 87 and are excluded from Sprint 84 persistence corrections, Sprint 85 dependency corrections and Sprint 86 test-only corrections. This finding does not authorize their repair or reopen accepted financial semantics. Exact before/after diagnostics belong to the local Sprint-84 acceptance evidence.
 
 ## FW-P2-77 — Source Tree and Documentation Organization Consolidation
 
