@@ -61,23 +61,25 @@ A work item becomes executable only when Chat supplies one complete approved pro
 ## Full Candidate Verification Audit
 
 **Audit date:** 2026-09-09
-**Review baseline:** `main@a560312db5900645779a499016e13f0c87e81435`
+**Original audit baseline:** `main@a560312db5900645779a499016e13f0c87e81435`
 **Sprint-81 queue-closure update:** 2026-09-10 at `main@13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`
 **Sprint-82 queue-closure update:** 2026-09-10 at `main@d239f939088b67e5a90c65117f08592891be17bb`
-**Active candidate count after Sprint-82 acceptance closure:** 153
+**Sprint-83 queue-closure update:** 2026-09-10 at `main@adcf83f52d309ddac18d95f0321d0c0f6120dd29` (implementation parent `057d70b6f39929735401d5211cd180db162c94cc`)
+**Active candidate count after Sprint-83 acceptance closure:** 151
 **Current migration:** V17
 **Current source/reliability architecture:** ADR-046 complete-authentic-corpus authority
 **Current design authority:** `LF-UI-2026-09-R1` for its bounded scope
-**Latest accepted numbered implementation:** Sprint 82 — Serial Unified Import Centre Foundation
+**Latest accepted numbered implementation:** Sprint 83 — Serial Batch Import and Multi-File Drag-and-Drop
 **Latest accepted numbered discovery:** Sprint 80 — `SWIFT6_READINESS_COMPLETE`
 **Personal-v1:** UNDECLARED / NOT CERTIFIED
 
-This audit mechanically enumerated every active `FW-*` heading before reconciliation: 153 candidates, 153 unique IDs, no duplicate IDs and no malformed candidate headings. Every candidate was reconciled against `PROJECT_STATE.md`, the current 80–89 roadmap, the Standing Harness, relevant accepted ADRs, Product Vision, R1 design authority and current repository evidence where documentation was insufficient.
+The Sprint-83 closure mechanically re-enumerated every active `FW-*` heading: 151 candidates, 151 unique IDs, no duplicate IDs and no malformed candidate headings. The original audit reconciled candidates against `PROJECT_STATE.md`, the current 80–89 roadmap, the Standing Harness, relevant accepted ADRs, Product Vision, R1 design authority and current repository evidence where documentation was insufficient.
 
 Reconciliation outcomes:
 
 - `FW-P2-72` is removed from the active queue because Sprint 81 completed and Chat accepted the PR-1 staging/runtime-publication ownership seam at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`.
-- `FW-P1-19` is removed from the active queue because Sprint 82 completed and Chat accepted the serial Unified Import Centre foundation at implementation commit `d239f939088b67e5a90c65117f08592891be17bb`. Its serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership, duplicate/recovery preservation and no-parallel-preparation evidence are recorded in `PROJECT_STATE.md` and the current roadmap; Sprint 83 remains the next planned position and is not selected.
+- `FW-P1-19` is removed from the active queue because Sprint 82 completed and Chat accepted the serial Unified Import Centre foundation at implementation commit `d239f939088b67e5a90c65117f08592891be17bb`. Its serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership, duplicate/recovery preservation and no-parallel-preparation evidence are recorded in `PROJECT_STATE.md` and the current roadmap.
+- `FW-P1-20` and `FW-P1-21` are removed from the active queue because Sprint 83 completed and Chat accepted serial batch import and multi-file picker/drag-and-drop at implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29`. Single and multi-file intake share the serial queue with independent review, explicit confirmation, failure isolation and truthful per-file outcomes. Parallel preparation remains unscheduled research under the existing `FW-P2-51`; Sprint 84 (`FW-P2-73`) is the next planned position and is not selected.
 - `FW-P0-25` is removed from the active queue because the unnumbered 127-carrier authentic-corpus reset is technically accepted and complete; newly supplied recurring sources remain governed cumulatively by ADR-046.
 - Compound historical statuses are normalized to the defined planning vocabulary. Completed slices remain concise body notes while titles and statuses describe only remaining unscheduled work.
 - Exact source-family support remains exact. HDFC whole-statement PDF/XLS equivalence, Axis-card PDF/XLSX equivalence and CBQ current-account source lineage are separate accepted contracts; none is generalized to another institution, financial family or format.
@@ -822,36 +824,6 @@ OCR output remains untrusted until deterministic parsing and validation succeed.
 
 # P1 — Import Workflow
 
-## FW-P1-20 — Batch Import
-
-**Status:** Candidate
-**Depends on:** accepted Sprint 82 serial Import Centre foundation at `d239f939088b67e5a90c65117f08592891be17bb`, mature duplicate handling, cancellation boundaries, failure isolation and the PR-1 staging/runtime-publication seam
-
-Extend the same Import Centre queue from length one to multiple independent files. The first adopted batch model is serial unless a later architecture separately accepts bounded parallel preparation.
-
-Required boundaries:
-
-- deterministic queue order;
-- explicit per-statement review and confirmation;
-- independent account choice and duplicate/rejection outcome;
-- independent provider-owned persistence result;
-- cancellation that cannot transfer stale `PreparedImport` ownership;
-- one failed/rejected file must not contaminate unrelated files;
-- no batch-wide atomicity requirement or implication.
-
-Sprint 82 has now established the serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership, duplicate/recovery preservation and failure-isolation prerequisites. This candidate remains unscheduled; Sprint 83 is the next planned position but is not selected. A fresh Chat P0 → P1 → P2 → P3 gate and readiness review are required before execution. Parallel preparation remains unresolved.
-
----
-
-## FW-P1-21 — Multi-File Drag-and-Drop Import Centre
-
-**Status:** Blocked
-**Depends on:** `FW-P1-20`
-
-Add authorized multi-file drag-and-drop intake, queue visibility, per-file progress/outcomes and result navigation to the same orchestration model. Drag-and-drop must not create a second batch engine, weaken macOS file authorization or imply batch-wide atomic persistence.
-
----
-
 ## FW-P1-22 — Editable Import Preview
 
 **Status:** Blocked
@@ -1513,6 +1485,8 @@ Measure and improve:
 - import preparation and confirmation;
 - large-statement parsing;
 - search and filtering.
+
+Sprint 83 completes the serial batch Import Centre. Any future bounded parallel preparation remains unscheduled Research under this existing performance candidate, requiring measured need, transferable `PreparedImport`/source-snapshot ownership and proven dependency thread safety, including the `FW-P2-74` boundary. It must preserve deterministic queue order and per-file review/confirmation and cannot parallelize confirmation or provider commit. This note does not approve implementation.
 
 A splash or launch-progress experience may be considered only when measured startup delay justifies one.
 

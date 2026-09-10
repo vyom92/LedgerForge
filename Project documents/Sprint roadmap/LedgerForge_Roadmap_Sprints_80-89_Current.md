@@ -2,14 +2,14 @@
 
 **Status:** Current repository cycle roadmap
 **Refreshed:** 2026-09-10
-**Planning review baseline:** `main@d239f939088b67e5a90c65117f08592891be17bb`
+**Planning review baseline:** `main@adcf83f52d309ddac18d95f0321d0c0f6120dd29`
 **Supersedes:** `Project documents/Sprint roadmap/Archived/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
 
 ## Control
 
 - **Planning authority:** This file owns Sprint 80–89 numbering, corrective suffixes, cycle status and planned positions.
 - **Execution authority:** None. Roadmap assignment is planning, not implementation authorization; each sprint still requires Chat priority/dependency triage and a complete execution prompt.
-- **Latest numbered product implementation:** Sprint 82 — Serial Unified Import Centre Foundation, accepted at implementation commit `d239f939088b67e5a90c65117f08592891be17bb`. Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam remains accepted at `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`. The accepted startup/monthly-planner product package is commit `6455f662dd0ea8896d19af3e67be51546badb3ae`; the later `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` cleanup is non-product repository maintenance, and `a560312db5900645779a499016e13f0c87e81435` is the R1 documentation/planning publication.
+- **Latest numbered product implementation:** Sprint 83 — Serial Batch Import and Multi-File Drag-and-Drop, accepted at implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29` (parent `057d70b6f39929735401d5211cd180db162c94cc`). Sprint 82 — Serial Unified Import Centre Foundation remains accepted at `d239f939088b67e5a90c65117f08592891be17bb`. Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam remains accepted at `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`. The accepted startup/monthly-planner product package is commit `6455f662dd0ea8896d19af3e67be51546badb3ae`; the later `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` cleanup is non-product repository maintenance, and `a560312db5900645779a499016e13f0c87e81435` is the R1 documentation/planning publication.
 - **Current migration:** V17; V1–V16 remain immutable.
 - **Current source/reliability authority:** ADR-046 complete-authentic-corpus certification.
 - **Current UI design authority:** `LF-UI-2026-09-R1` for its bounded scope; design approval is not native implementation.
@@ -40,11 +40,11 @@ A material source, credential, parser, persistence, orchestration or financial-s
 | 80 | Swift 6 and macOS readiness closure | accepted discovery | Technical discovery | **Accepted / discovery complete** |
 | 81 | PR-1 Staging and Runtime Publication Ownership Seam | historical `FW-P2-72` (removed from active queue) | Behavior-preserving implementation gate | **ACCEPTED** — implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91` |
 | 82 | Serial Unified Import Centre Foundation | completed `FW-P1-19` (removed from active queue) | Core product implementation | **ACCEPTED** — implementation commit `d239f939088b67e5a90c65117f08592891be17bb`; serial queue length one and the Sprint 83 entry evidence are established |
-| 83 | Serial Batch Import and Multi-File Drag-and-Drop | `FW-P1-20` + `FW-P1-21` | P1 entry-gated product outcome | **Next planned position; not selected** — Sprint 82 establishes serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership and duplicate/recovery preservation; fresh P0 → P1 → P2 → P3 gate and readiness review required; parallel preparation remains unresolved |
-| 84 | PR-2 SQLite / Provider / Migration Ownership | `FW-P2-73` | Swift-6 prerequisite | Planned; the name implies no schema migration |
+| 83 | Serial Batch Import and Multi-File Drag-and-Drop | completed `FW-P1-20` + `FW-P1-21` (removed from active queue) | Core product implementation | **ACCEPTED** — implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; ordered serial queue length N, multi-file picker/drop, independent per-item review/confirmation and outcomes |
+| 84 | PR-2 SQLite / Provider / Migration Ownership | `FW-P2-73` | Swift-6 prerequisite | **Next planned position; not selected** — fresh P0 → P1 → P2 → P3 gate and readiness review required; the name implies no schema migration |
 | 85 | PR-3 Dependency Concurrency Boundary | `FW-P2-74` | Swift-6 prerequisite | Planned position |
 | 86 | TEST-PR Strict-Concurrency Test Correction | `FW-P2-75` | Swift-6 prerequisite | Planned; never weaken independent assertions merely to silence diagnostics |
-| 87 | Coordinated Swift-6 Migration | `FW-P2-76` | Implementation | Entry gate: Sprint 82 and Sprints 84–86 accepted; no feature work bundled |
+| 87 | Coordinated Swift-6 Migration | `FW-P2-76` | Implementation | Entry gate: serial Unified Import Centre through Sprints 82–83 accepted, plus acceptance of Sprints 84–86; no feature work bundled |
 | 88 | App Shell and Workflow Decomposition | `FW-P2-67` | Behavior-preserving maintenance | No financial redesign or broad source-tree move; preserve R1 shell direction |
 | 89 | LF-UI-2026-09-R1 Transactions Reference Implementation | `FW-P2-03` + `FW-P2-53`, bounded `FW-P2-48` + `FW-P2-49` + `FW-P2-50` | User-facing implementation / representative R1 proof surface | Planned position; financial semantics remain source/repository-authoritative |
 
@@ -100,7 +100,7 @@ the exact registered CBQ boundary while preserving historical minimum-due
 absence and enforcing the current authentic minimum-due contract. Personal-v1
 adoption remains a separate later gate.
 
-## Accepted Sprints 81–82 and planned Sprints 83–89
+## Accepted Sprints 81–83 and planned Sprints 84–89
 
 ### Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam
 
@@ -120,17 +120,24 @@ Historical queue origin: `FW-P1-19` (removed from the active queue).
 
 The accepted Swift-5 implementation establishes one shared @MainActor serial Import Centre coordinator with queue length one, deterministic ordering, per-item identity/state ownership, safe cancellation before confirmation, explicit per-statement confirmation, provider-owned persistence and canonical hydration. It preserves the existing ImportEngine/parser/normalizer, duplicate/equivalence, account/card/partial/recovery and provider contracts; no reader, parser, schema, migration or financial-semantic boundary changed.
 
-Sprint 83 entry evidence is established: serial coordinator; per-item identity/state ownership; cancelled-task draining; explicit confirmation; shared production ownership; duplicate/recovery preservation; and no parallel preparation. The complete focused coordinator validation, canonical TestPlan, complete registered authentic corpus, native preview/cancel/confirm/navigation checks and durable same-database relaunch evidence are recorded in `PROJECT_STATE.md`.
+This foundation established the entry evidence for the now-accepted Sprint 83: serial coordinator; per-item identity/state ownership; cancelled-task draining; explicit confirmation; shared production ownership; duplicate/recovery preservation; and no parallel preparation. The complete focused coordinator validation, canonical TestPlan, complete registered authentic corpus, native preview/cancel/confirm/navigation checks and durable same-database relaunch evidence are recorded in `PROJECT_STATE.md`.
 
 ### Sprint 83 — Serial Batch Import and Multi-File Drag-and-Drop
 
-Queue: `FW-P1-20` + `FW-P1-21`.
+Historical queue origins: `FW-P1-20` + `FW-P1-21` (removed from the active queue).
 
-**Next planned position; not selected.** Sprint 82 has accepted the serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership and duplicate/recovery preservation prerequisites. A fresh Chat P0 → P1 → P2 → P3 gate and readiness review are required before Sprint 83 selection or execution. One failed file must not contaminate unrelated files; no batch-wide atomicity is required or implied. Parallel preparation remains unresolved unless separately accepted.
+**ACCEPTED on 2026-09-10.** Implementation commit:
+`adcf83f52d309ddac18d95f0321d0c0f6120dd29` (parent `057d70b6f39929735401d5211cd180db162c94cc`).
+
+The accepted Swift-5 implementation extends the shared serial coordinator to ordered queue length N, with the same path for single-file import, multi-file picker and drag-and-drop. Received intake order and per-occurrence identity are preserved. One active preparation, independent per-item review and explicit confirmation, skip/cancel/retry/continue, per-file failure isolation and truthful batch summaries are established. Provider-owned persistence and canonical hydration remain unchanged; no batch-wide atomicity is implied.
+
+Repository/code/test verification and the retained final TestPlan, complete authentic-corpus, Debug/Release, native interaction and durable same-database relaunch evidence are classified in `PROJECT_STATE.md`. Native drag gestures and one CSV confirmation were user-assisted. No reader, parser, normalizer, financial-semantic, schema/migration or ADR change was included; V17 and Swift 5 remain current. Bounded parallel preparation remains unscheduled research under existing `FW-P2-51` and is not approved by this acceptance.
 
 ### Sprint 84 — PR-2 SQLite / Provider / Migration Ownership
 
 Queue: `FW-P2-73`.
+
+**Next planned position; not selected.** A fresh Chat P0 → P1 → P2 → P3 gate, readiness review and separate execution prompt are required before selection or execution.
 
 Correct only the bounded Swift-6 prerequisite ownership surfaces. The sprint title does not authorize schema change or a new migration.
 
@@ -150,7 +157,7 @@ Make unit-test ownership/synchronization honest for strict migration. Preserve i
 
 Queue: `FW-P2-76`.
 
-Entry gate: Sprint 82 plus Sprints 84–86 accepted. Perform the coordinated language/strict-concurrency migration only; no feature work bundled.
+Entry gate: the serial Unified Import Centre through Sprints 82–83 is accepted; Sprints 84–86 must also be accepted before Swift-6 migration. Perform the coordinated language/strict-concurrency migration only; no feature work bundled.
 
 ### Sprint 88 — App Shell and Workflow Decomposition
 
