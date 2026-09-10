@@ -18,7 +18,7 @@ The following order applies to this handoff: explicit user decisions and accepte
 
 **Repository evidence at preparation:** the source baseline recorded V17, ADR-046, the accepted startup/monthly-planner corrections, and personal-v1 undeclared. Natural amount entry and coherent Salary Save were accepted work; the roadmap then retained PR-1 before a serial Unified Import Centre. Sprint 82 is now accepted in the current roadmap, while this handoff still assigns no sprint number or migration. See [SOURCES.md](SOURCES.md).
 
-**Explicit user decisions:** avoid a compulsory fixed palette; offer simple appearance controls with optional advanced customization; include Transactions filtering/sorting; use Budget Analysis for task flow and existing master assets as an evolvable visual reference; keep Salary refinement lower priority. The user identifies supplied runtime data as disposable. This does not authorize publishing private source files or manufacturing financial acceptance inputs.
+**Explicit user decisions:** avoid a compulsory fixed palette; offer simple appearance controls with optional advanced customization; include Transactions filtering/sorting; use Budget Analysis for task flow and existing master assets as an evolvable visual reference; keep Salary refinement lower priority. The user identifies supplied runtime data as disposable. This does not authorize publishing private originals or unsanitized private-source material or manufacturing financial acceptance inputs; approved sanitized, clean-room or privacy-safe derived artifacts remain governed by the repository privacy policy.
 
 ## 1. Master design board: shell and information hierarchy
 

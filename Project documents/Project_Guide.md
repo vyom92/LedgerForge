@@ -310,7 +310,7 @@ Chat semantic reasoning
 12. A documentation sync may not close with a material out-of-scope finding stranded only in chat/report text; give it one durable disposition in the owning authority or canonical queue.
 
 ## Required end state: `DOCS_RECONCILED`
-Current authorities agree; obsolete current-state claims are removed or narrowed; historical claims remain historically accurate; policy has one durable home where practical; routing points to subject authorities instead of duplicating them; all material findings have durable dispositions; no private material leaked into published artifacts; final diff is ready for publication review.
+Current authorities agree; obsolete current-state claims are removed or narrowed; historical claims remain historically accurate; policy has one durable home where practical; routing points to subject authorities instead of duplicating them; all material findings have durable dispositions; no private originals or unsanitized private-source material leaked into published artifacts; only approved sanitized, clean-room or privacy-safe derived artifacts are eligible for publication; final diff is ready for publication review.
 
 **END PG-50**
 

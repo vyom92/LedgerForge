@@ -1013,9 +1013,9 @@ Production card support requires an approved family, source format, validation, 
 
 ## Repository eligibility
 
-Private-statement-derived evidence is accepted only through an approved sanitized or clean-room package.
+Private-statement-derived artifacts may be published only when they are approved sanitized, clean-room or privacy-safe derivatives; publication does not make them authentic statement inputs or current parser authority.
 
-Private originals are accepted only from approved read-only source locations.
+Private originals are isolated, read-only source evidence in approved source locations and are never included in published repository artifacts. Only approved sanitized, clean-room or privacy-safe derived artifacts may be published.
 
 ## Clean-room restrictions
 
@@ -1621,7 +1621,7 @@ Do not treat “tests passed” as sufficient without explaining what the tests 
 - Never use model confidence as evidence.
 - Never permit AI output to become the sole validation oracle.
 - Never permit AI to choose a trusted financial mutation.
-- Never place private source material into prompts, logs or repository artifacts without an approved sanitized boundary.
+- Never place private originals or unsanitized private-source material into prompts, logs or repository artifacts. Only approved sanitized, clean-room or privacy-safe derived artifacts may cross that boundary.
 - Verify filenames and target paths before editing.
 - Verify repository state before and after execution.
 - Build and test according to the approved boundary.

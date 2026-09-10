@@ -5326,7 +5326,8 @@ ADR-043 does not authorize CBQ credit cards, generic partial import, fuzzy or
 tolerant matching, generic masked identity, HDFC or Axis overlap, source
 replacement, canonical provenance reassignment, account merge, historical
 repair or backfill, OCR, password workflows, image-only PDFs, generic PDF or
-spreadsheet parsing, XLSX, source-byte storage or private-source material in
+spreadsheet parsing, XLSX, source-byte storage or private originals or
+unsanitized private-source material in
 published artifacts.
 
 ---
@@ -5939,7 +5940,7 @@ For each supported financial source family, the complete registered set of authe
 
 A parser/profile is not currently reliability-certified merely because unit tests, synthetic regression tests, a full TestPlan, persistence/hydration tests or a subset of authentic examples pass. The complete affected authentic corpus must pass the ordinary production path.
 
-Private authentic originals remain read-only in their approved source location.
+Private authentic originals are isolated, read-only source evidence in their approved source location and are never included in published repository artifacts. Only approved sanitized, clean-room or privacy-safe derived artifacts may be published.
 
 ### 2. No fabricated financial statements at any stage
 

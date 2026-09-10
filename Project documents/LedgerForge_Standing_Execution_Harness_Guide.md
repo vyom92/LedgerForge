@@ -205,7 +205,7 @@ For financial work:
 - reopen/hydration are acceptance boundaries;
 - support never generalizes from visual/structural similarity.
 
-Private originals remain read-only in their approved source location.
+Private originals are isolated, read-only source evidence in their approved source location and are never included in published repository artifacts. Only approved sanitized, clean-room or privacy-safe derived artifacts may be published.
 
 ---
 
@@ -226,7 +226,7 @@ ADR-046 governs current reader/parser/source-support acceptance. The reusable ru
 
 The canonical user import direction is batch intake (including queue length one) -> unlock as required -> generic extraction -> identify/segregate -> route each statement -> source-family semantic parser -> source-owned financial events -> normalize -> validate/reconcile -> duplicate/equivalence evaluation -> explicit review/confirmation where required -> atomic persistence -> one canonical database -> canonical financial rows -> query/extraction/presentation/viewer layers. Institution-specific parsers are ingestion modules, not separate analytical silos.
 
-Private authentic originals remain read-only in their approved source location.
+Private authentic originals are isolated, read-only source evidence in their approved source location and are never included in published repository artifacts. Only approved sanitized, clean-room or privacy-safe derived artifacts may be published.
 
 ---
 

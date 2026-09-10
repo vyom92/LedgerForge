@@ -29,7 +29,7 @@ The first three source priorities were read before scope preparation. The upload
 
 The user requested a practical refresh guided by Budget Analysis and evolvable master assets. They requested a configurable appearance instead of a fixed theme, including foreground/background controls, transparency and font style/size subject to simplicity and safety. They requested transaction filters/sort. They stated that supplied runtime data was disposable, that recent Salary fixes existed, and that Salary polish was not urgent. They approved the latest generated board labelled “LedgerForge v2.0” and requested the next step.
 
-The last approval concerns the exact board recorded in ASSET_MANIFEST.json and the agreed written direction. It is not permission to implement every depicted button, publish private financial material, change app versions or claim native tests passed.
+The last approval concerns the exact board recorded in ASSET_MANIFEST.json and the agreed written direction. It is not permission to implement every depicted button, publish private originals or unsanitized private-source material, change app versions or claim native tests passed. Approved sanitized, clean-room or privacy-safe derived artifacts remain governed by the repository privacy policy.
 
 ## User-supplied and prior-conversation supporting material
 
