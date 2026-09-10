@@ -202,10 +202,12 @@ struct ConfirmedImportHydrationTests {
         let gate = ConfirmedImportReconciliationGate()
         var hydrationShouldFail = true
         var hydrationCount = 0
-        var persistenceState: PersistenceState = .intentionalNonDurable(.testMemory)
+        let persistenceStateOwner = HydrationPersistenceStateOwner(
+            initial: .intentionalNonDurable(.testMemory)
+        )
         let engine = ImportEngine(
             importPersistenceCoordinator: coordinator,
-            persistenceStateProvider: { persistenceState },
+            persistenceStateProvider: { persistenceStateOwner.value },
             forcedHydration: {
                 hydrationCount += 1
                 if hydrationShouldFail { throw HydrationTestError.failed }
@@ -218,7 +220,7 @@ struct ConfirmedImportHydrationTests {
         defer { committedPreparedOwner.cancel() }
         let committedPrepared = committedPreparedOwner.preparedImport
         let committed = await engine.commitPreparedImport(committedPrepared)
-        persistenceState = .unavailable(.databaseOpenFailed)
+        persistenceStateOwner.value = .unavailable(.databaseOpenFailed)
         let blockedPreparedOwner = try await AuthenticSourceTestSupport.preparedAxisBankCSV()
         defer { blockedPreparedOwner.cancel() }
         let blocked = await engine.commitPreparedImport(blockedPreparedOwner.preparedImport)
@@ -236,7 +238,7 @@ struct ConfirmedImportHydrationTests {
         #expect(gate.isBlocked)
 
         hydrationShouldFail = false
-        persistenceState = .intentionalNonDurable(.testMemory)
+        persistenceStateOwner.value = .intentionalNonDurable(.testMemory)
         #expect(engine.retryCanonicalHydration())
         #expect(!gate.isBlocked)
 
@@ -317,12 +319,12 @@ struct ConfirmedImportHydrationTests {
     func providerReplacementRejectsPreparedGenerationBeforeFinancialWrites() async throws {
         let first = InMemoryRepositoryProvider()
         let second = InMemoryRepositoryProvider()
-        var current = databaseProvider(first)
-        let coordinator = DefaultImportPersistenceCoordinator(databaseProviderProvider: { current })
+        let providerOwner = HydrationDatabaseProviderOwner(provider: databaseProvider(first))
+        let coordinator = DefaultImportPersistenceCoordinator(databaseProviderProvider: { providerOwner.provider })
         let engine = ImportEngine(
             importPersistenceCoordinator: coordinator,
-            persistenceStateProvider: { current.persistenceState },
-            providerGenerationProvider: { current.generationToken },
+            persistenceStateProvider: { providerOwner.provider.persistenceState },
+            providerGenerationProvider: { providerOwner.provider.generationToken },
             forcedHydration: { hydrationResult() },
             reconciliationGate: ConfirmedImportReconciliationGate()
         )
@@ -330,7 +332,7 @@ struct ConfirmedImportHydrationTests {
         defer { preparedOwner.cancel() }
         let prepared = preparedOwner.preparedImport
 
-        current = databaseProvider(second)
+        providerOwner.provider = databaseProvider(second)
         let result = await engine.commitPreparedImport(prepared)
 
         #expect(!result.persisted)
@@ -400,6 +402,25 @@ struct ConfirmedImportHydrationTests {
 
 private enum HydrationTestError: Error { case failed }
 
+@MainActor
+private final class HydrationPersistenceStateOwner {
+    var value: PersistenceState
+
+    init(initial: PersistenceState) {
+        value = initial
+    }
+}
+
+@MainActor
+private final class HydrationDatabaseProviderOwner {
+    var provider: DatabaseProvider
+
+    init(provider: DatabaseProvider) {
+        self.provider = provider
+    }
+}
+
+@MainActor
 private final class HydrationPersistenceCoordinator: ImportPersistenceCoordinating {
     var persistCount = 0
     var result = ImportPersistenceResult(
@@ -464,10 +485,12 @@ private final class ConfirmedImportInvocationProbe: ConfirmedImportRepository {
     }
 }
 
+@MainActor
 private func hydrationResult() -> RepositoryStoreHydrationResult {
     RepositoryStoreHydrationResult(didHydrate: true, accountCount: 1, transactionCount: 1, importSessionCount: 1, importAttemptCount: 1)
 }
 
+@MainActor
 private func databaseProvider(_ provider: InMemoryRepositoryProvider) -> DatabaseProvider {
     DatabaseProvider(
         workspaceRepo: provider.workspaceRepo,

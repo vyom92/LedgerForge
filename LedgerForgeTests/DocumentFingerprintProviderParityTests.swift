@@ -96,6 +96,7 @@ struct DocumentFingerprintProviderParityTests {
     }
 }
 
+@MainActor
 private func makeProviders(
     name: String
 ) throws -> (sqlite: SQLiteRepositoryProvider, memory: InMemoryRepositoryProvider, folder: URL) {

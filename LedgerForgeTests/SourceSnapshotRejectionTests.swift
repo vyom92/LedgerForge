@@ -104,6 +104,7 @@ private final class RejectionReaderProbe: ImportFramework.ImportCoordinator, @un
     }
 }
 
+@MainActor
 private func rejectionSetup(name: String) throws -> (
     sqlite: SQLiteRepositoryProvider,
     provider: DatabaseProvider,
@@ -137,6 +138,7 @@ private func rejectionSetup(name: String) throws -> (
     )
 }
 
+@MainActor
 private func assertSnapshotAttempt(_ attempt: ImportAttemptDTO, outcome: ImportAttemptOutcome) {
     #expect(attempt.outcomeCode == outcome.rawValue)
     #expect(attempt.coverageCode == ImportAttemptCoverage.unsupportedOrUnevaluated.rawValue)

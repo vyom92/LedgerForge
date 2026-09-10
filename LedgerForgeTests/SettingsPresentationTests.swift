@@ -322,6 +322,7 @@ struct SettingsPresentationTests {
 #endif
 }
 
+@MainActor
 private func attempt(
     id: String,
     outcome: ImportAttemptOutcome,

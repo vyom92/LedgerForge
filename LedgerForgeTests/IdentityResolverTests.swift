@@ -165,6 +165,7 @@ private struct ResolverFixture {
 
 private let resolverTimestamp = "2026-07-12T12:00:00Z"
 
+@MainActor
 private func seedResolverWorkspace(_ provider: InMemoryRepositoryProvider) throws -> ResolverFixture {
     try seedResolverWorkspace(
         workspaceRepo: provider.workspaceRepo,
@@ -172,6 +173,7 @@ private func seedResolverWorkspace(_ provider: InMemoryRepositoryProvider) throw
     )
 }
 
+@MainActor
 private func seedResolverWorkspace(_ provider: SQLiteRepositoryProvider) throws -> ResolverFixture {
     try seedResolverWorkspace(
         workspaceRepo: provider.workspaceRepo,
@@ -179,6 +181,7 @@ private func seedResolverWorkspace(_ provider: SQLiteRepositoryProvider) throws 
     )
 }
 
+@MainActor
 private func seedResolverWorkspace(workspaceRepo: WorkspaceRepository, accountRepo: AccountRepository) throws -> ResolverFixture {
     let workspace = WorkspaceDTO(id: "workspace-resolver", name: "Resolver Workspace", createdAtISO: resolverTimestamp)
     let primary = resolverAccount(id: "account-primary", workspaceId: workspace.id, name: "Primary")
@@ -191,6 +194,7 @@ private func seedResolverWorkspace(workspaceRepo: WorkspaceRepository, accountRe
     return ResolverFixture(workspaceId: workspace.id, primaryAccountId: primary.id, secondaryAccountId: secondary.id)
 }
 
+@MainActor
 private func attach(_ identifier: FinancialIdentifier,
                     accountId: String,
                     workspaceId: String,
@@ -204,6 +208,7 @@ private func attach(_ identifier: FinancialIdentifier,
     _ = try provider.accountRepo.attachIdentifier(dto)
 }
 
+@MainActor
 private func financialIdentifier(kind: FinancialIdentifierKind, value: String) throws -> FinancialIdentifier {
     try FinancialIdentifier(
         kind: kind,
@@ -227,6 +232,7 @@ private struct DuplicateCandidateAccountRepository: AccountRepository {
     private enum TestDoubleError: Error { case unused }
 }
 
+@MainActor
 private func resolverAccount(id: String, workspaceId: String, name: String) -> AccountDTO {
     AccountDTO(
         id: id,

@@ -505,6 +505,7 @@ private final class DiagnosticPersistenceCoordinator: ImportPersistenceCoordinat
     }
 }
 
+@MainActor
 private func resetDiagnosticRuntimeStores() {
     AccountStore.shared.replaceAccounts([])
     TransactionStore.shared.replaceTransactions([])

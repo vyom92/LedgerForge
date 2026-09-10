@@ -48,12 +48,12 @@ struct SourceSnapshotConfirmationTests {
         let firstTask = Task.detached {
             await startGate.arriveAndWait()
             let result = await context.engine.commitPreparedImport(context.prepared)
-            return ConfirmationTaskObservation(result)
+            return await ConfirmationTaskObservation(result)
         }
         let secondTask = Task.detached {
             await startGate.arriveAndWait()
             let result = await context.engine.commitPreparedImport(context.prepared)
-            return ConfirmationTaskObservation(result)
+            return await ConfirmationTaskObservation(result)
         }
 
         let firstObservation = await firstTask.value
@@ -218,6 +218,7 @@ private struct ConfirmationTaskObservation: Sendable {
     let persisted: Bool
     let errorMessage: String?
 
+    @MainActor
     init(_ result: ImportEngineResult) {
         persisted = result.persisted
         errorMessage = result.errorMessage
@@ -249,9 +250,10 @@ private actor ConcurrentConfirmationStartGate {
     }
 }
 
+@MainActor
 private func confirmationEngine(
     persistence: ImportPersistenceCoordinating,
-    forcedHydration: @escaping () throws -> RepositoryStoreHydrationResult = {
+    forcedHydration: @escaping @MainActor () throws -> RepositoryStoreHydrationResult = {
         RepositoryStoreHydrationResult(didHydrate: true, accountCount: 0, transactionCount: 0)
     }
 ) -> ImportEngine {

@@ -437,6 +437,7 @@ private struct SeededCategoryTransaction {
     let transactionID: String
 }
 
+@MainActor
 private struct CategoryRuntimeStores {
     let accounts = AccountStore()
     let transactions = TransactionStore()
@@ -516,6 +517,7 @@ private final class CountingCategoryRepository: CategoryRepository {
     }
 }
 
+@MainActor
 private func createCategory(
     name: String,
     id: String,

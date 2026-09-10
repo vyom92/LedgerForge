@@ -500,6 +500,7 @@ private struct RuntimeStoresSnapshot {
         fundingPlanGeneration = stores.fundingPlans.generation
     }
 
+    @MainActor
     init(_ snapshot: RepositoryRuntimeSnapshot) {
         accounts = snapshot.accounts
         transactions = snapshot.transactions
@@ -616,6 +617,7 @@ private struct HydratedTransactionObservation {
     let repositoryPreferredStructuredReferenceDigest: String?
     let verifiedAxisUPIEventEvidence: AxisUPITransactionEventEvidence?
 
+    @MainActor
     init(_ transaction: Transaction) {
         id = transaction.id
         repositoryTransactionId = transaction.repositoryTransactionId
@@ -691,6 +693,7 @@ private struct HydratedAccountObservation: Equatable {
     let workspaceId: String?
     let identitySummaries: [HydratedIdentityObservation]
 
+    @MainActor
     init(_ account: Account) {
         id = account.id
         repositoryAccountId = account.repositoryAccountId
@@ -707,6 +710,7 @@ private struct HydratedIdentityObservation: Equatable {
     let verificationState: String
     let provenance: String
 
+    @MainActor
     init(_ summary: AccountIdentitySummary) {
         id = summary.id
         kind = summary.kind

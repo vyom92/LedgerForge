@@ -4,6 +4,7 @@ import Foundation
 import Testing
 @testable import LedgerForge
 
+@MainActor
 struct ImportOutcomePresentationTests {
 
     @Test func successfulImportShowsValidationAndPersistenceSuccess() {
@@ -633,6 +634,7 @@ struct ImportOutcomePresentationTests {
     }
 }
 
+@MainActor
 private func durableAttempt(outcome: ImportAttemptOutcome, transactionCount: Int) -> RepositoryImportAttempt {
     durableAttempt(
         id: "attempt-\(outcome.rawValue)",
@@ -642,6 +644,7 @@ private func durableAttempt(outcome: ImportAttemptOutcome, transactionCount: Int
     )
 }
 
+@MainActor
 private func durableAttempt(
     id: String,
     createdAtISO: String,

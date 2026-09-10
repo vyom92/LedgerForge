@@ -173,6 +173,7 @@ private struct SQLiteImportHistoryCounts: Equatable {
     let transactions: Int
 }
 
+@MainActor
 private func integrationHydrationResult() -> RepositoryStoreHydrationResult {
     RepositoryStoreHydrationResult(
         didHydrate: true,
@@ -183,6 +184,7 @@ private func integrationHydrationResult() -> RepositoryStoreHydrationResult {
     )
 }
 
+@MainActor
 private func sqliteImportHistoryCounts(_ provider: SQLiteRepositoryProvider) throws -> SQLiteImportHistoryCounts {
     SQLiteImportHistoryCounts(
         documents: try provider.database.queryInt("SELECT COUNT(*) FROM documents;"),

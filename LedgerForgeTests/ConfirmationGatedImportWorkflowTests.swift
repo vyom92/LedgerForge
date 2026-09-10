@@ -273,6 +273,7 @@ struct ConfirmationGatedImportWorkflowTests {
     }
 }
 
+@MainActor
 private final class CountingPersistenceCoordinator: ImportPersistenceCoordinating {
     private(set) var persistCallCount = 0
     private(set) var legacyPersistCallCount = 0
@@ -354,6 +355,7 @@ private func resetRuntimeStoresForConfirmationWorkflow() async {
     await Task.yield()
 }
 
+@MainActor
 private func availableImportEngine(_ persistence: ImportPersistenceCoordinating, providerGeneration: ProviderGenerationToken? = nil) -> ImportEngine {
     ImportEngine(
         importPersistenceCoordinator: persistence,

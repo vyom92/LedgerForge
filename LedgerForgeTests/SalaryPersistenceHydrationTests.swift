@@ -94,11 +94,13 @@ private func temporaryFolder(_ name: String) throws -> URL {
     return folder
 }
 
+@MainActor
 private func providers(_ name: String) throws -> (sqlite: SQLiteRepositoryProvider, memory: InMemoryRepositoryProvider, folder: URL) {
     let folder = try temporaryFolder(name)
     return (try SQLiteRepositoryProvider(path: folder.appendingPathComponent("provider.sqlite").path), InMemoryRepositoryProvider(), folder)
 }
 
+@MainActor
 private func planAccounts() -> [AccountDTO] {
     [
         AccountDTO(id: "cbq", workspaceId: "workspace-plan", name: "CBQ Current", institutionId: "CBQ", accountType: "bank", nativeCurrency: "QAR", createdAtISO: timestamp),
@@ -107,6 +109,7 @@ private func planAccounts() -> [AccountDTO] {
 }
 
 
+@MainActor
 private func copyPlan(_ plan: FundingPlanDTO, planMonthISO: String? = nil, rolloverSourcePlanId: String? = nil, balances: [FundingPlanBalanceDTO]? = nil, commitments: [FundingPlanCommitmentDTO]? = nil) -> FundingPlanDTO {
     FundingPlanDTO(id: plan.id, workspaceId: plan.workspaceId, planMonthISO: planMonthISO ?? plan.planMonthISO, rolloverSourcePlanId: rolloverSourcePlanId ?? plan.rolloverSourcePlanId, expectedFixedMinor: plan.expectedFixedMinor, expectedFixedDecimal: plan.expectedFixedDecimal, expectedFixedProvenance: plan.expectedFixedProvenance, expectedVariableMinor: plan.expectedVariableMinor, expectedVariableDecimal: plan.expectedVariableDecimal, expectedVariableProvenance: plan.expectedVariableProvenance, expectedDeductionsMinor: plan.expectedDeductionsMinor, expectedDeductionsDecimal: plan.expectedDeductionsDecimal, expectedDeductionsProvenance: plan.expectedDeductionsProvenance, configuredFeeMinor: plan.configuredFeeMinor, configuredFeeDecimal: plan.configuredFeeDecimal, configuredFeeProvenance: plan.configuredFeeProvenance, fxINRPerQARDecimal: plan.fxINRPerQARDecimal, fxObservationDateISO: plan.fxObservationDateISO, plannedInvestmentMinor: plan.plannedInvestmentMinor, plannedInvestmentDecimal: plan.plannedInvestmentDecimal, plannedInvestmentProvenance: plan.plannedInvestmentProvenance, updatedAtISO: plan.updatedAtISO, balances: balances ?? plan.balances, commitments: commitments ?? plan.commitments)
 }

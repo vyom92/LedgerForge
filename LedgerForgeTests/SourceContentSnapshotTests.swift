@@ -47,24 +47,41 @@ struct SourceContentSnapshotTests {
         let releaseRead = DispatchSemaphore(value: 0)
         let invalidationStarted = DispatchSemaphore(value: 0)
 
-        let readTask = Task.detached {
+        // Match the test runner's user-initiated waiter and the lock owner.
+        let readTask = Task.detached(priority: .high) {
             try snapshot.withBytes { bytes in
                 readEntered.signal()
-                releaseRead.wait()
+                guard releaseRead.wait(timeout: .now() + 5) == .success else {
+                    throw SourceContentSnapshotTestError.timedOutWaitingForSignal
+                }
                 return bytes
             }
         }
-        await awaitSignal(readEntered)
+        var invalidationTask: Task<Void, Never>?
 
-        let invalidationTask = Task.detached {
-            invalidationStarted.signal()
-            snapshot.invalidate()
+        do {
+            try await awaitSignal(readEntered)
+
+            let task = Task.detached(priority: .high) {
+                invalidationStarted.signal()
+                snapshot.invalidate()
+            }
+            invalidationTask = task
+            try await awaitSignal(invalidationStarted)
+            releaseRead.signal()
+
+            #expect(try await readTask.value == expected)
+            if let invalidationTask = invalidationTask {
+                await invalidationTask.value
+            }
+        } catch {
+            releaseRead.signal()
+            _ = try? await readTask.value
+            if let invalidationTask = invalidationTask {
+                await invalidationTask.value
+            }
+            throw error
         }
-        await awaitSignal(invalidationStarted)
-        releaseRead.signal()
-
-        #expect(try await readTask.value == expected)
-        await invalidationTask.value
         #expect(throws: SourceContentSnapshotError.invalidated) {
             try snapshot.withBytes { $0 }
         }
@@ -87,11 +104,18 @@ struct SourceContentSnapshotTests {
         }
     }
 
-    private func awaitSignal(_ semaphore: DispatchSemaphore) async {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global().async {
-                semaphore.wait()
-                continuation.resume()
+    private enum SourceContentSnapshotTestError: Error, Sendable {
+        case timedOutWaitingForSignal
+    }
+
+    private func awaitSignal(_ semaphore: DispatchSemaphore) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            DispatchQueue.global(qos: .default).async {
+                guard semaphore.wait(timeout: .now() + 5) == .success else {
+                    continuation.resume(throwing: SourceContentSnapshotTestError.timedOutWaitingForSignal)
+                    return
+                }
+                continuation.resume(returning: ())
             }
         }
     }

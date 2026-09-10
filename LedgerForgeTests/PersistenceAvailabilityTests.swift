@@ -222,15 +222,17 @@ struct PersistenceAvailabilityTests {
 
     @Test(.globalRuntimeStateIsolation)
     func preparedImportConfirmationRechecksAvailabilityBeforePersistence() async throws {
-        var availability: PersistenceState = .intentionalNonDurable(.testMemory)
+        let availabilityOwner = PersistenceAvailabilityStateOwner(
+            initial: .intentionalNonDurable(.testMemory)
+        )
         let persistence = AvailabilityCountingPersistenceCoordinator()
         let engine = ImportEngine(
             importPersistenceCoordinator: persistence,
-            persistenceStateProvider: { availability }
+            persistenceStateProvider: { availabilityOwner.value }
         )
 
         let prepared = try await engine.prepareImport(from: AuthenticSourceTestSupport.axisBankCSV())
-        availability = .unavailable(.migrationIntegrityFailed)
+        availabilityOwner.value = .unavailable(.migrationIntegrityFailed)
         let result = await engine.commitPreparedImport(prepared)
 
         #expect(!result.persisted)
@@ -438,6 +440,15 @@ struct PersistenceAvailabilityTests {
     }
 
 
+}
+
+@MainActor
+private final class PersistenceAvailabilityStateOwner {
+    var value: PersistenceState
+
+    init(initial: PersistenceState) {
+        value = initial
+    }
 }
 
 private final class AvailabilityCountingPersistenceCoordinator: ImportPersistenceCoordinating {

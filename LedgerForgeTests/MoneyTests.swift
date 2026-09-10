@@ -135,6 +135,7 @@ struct MoneyTests {
         }
     }
 
+    @MainActor
     @Test func signedPresentationUsesNativeMoneyAndDirection() throws {
         let money = try Money(amount: Decimal(string: "-4.125")!, currency: "KWD")
 

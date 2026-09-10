@@ -231,16 +231,19 @@ private struct IdentifierRepositoryFixture {
 
 private let timestamp = "2026-07-12T12:00:00Z"
 
+@MainActor
 private func runIdentifierScenarioForEachProvider(_ body: (IdentifierRepositoryHandles) throws -> Void) throws {
     try body(makeIdentifierInMemoryProvider())
     try withTemporaryIdentifierSQLiteProvider(body)
 }
 
+@MainActor
 private func makeIdentifierInMemoryProvider() -> IdentifierRepositoryHandles {
     let provider = InMemoryRepositoryProvider()
     return IdentifierRepositoryHandles(workspaceRepo: provider.workspaceRepo, accountRepo: provider.accountRepo)
 }
 
+@MainActor
 private func withTemporaryIdentifierSQLiteProvider<T>(_ body: (IdentifierRepositoryHandles) throws -> T) throws -> T {
     let folder = FileManager.default.temporaryDirectory
         .appendingPathComponent("LedgerForgeIdentifierRepositoryTests")
@@ -252,6 +255,7 @@ private func withTemporaryIdentifierSQLiteProvider<T>(_ body: (IdentifierReposit
     return try body(IdentifierRepositoryHandles(workspaceRepo: provider.workspaceRepo, accountRepo: provider.accountRepo))
 }
 
+@MainActor
 private func seedIdentifierWorkspace(_ provider: IdentifierRepositoryHandles) throws -> IdentifierRepositoryFixture {
     let workspace = WorkspaceDTO(id: "workspace-identifiers", name: "Identifier Workspace", createdAtISO: timestamp)
     let primary = account(id: "account-primary", workspaceId: workspace.id, name: "Primary Account")
@@ -268,6 +272,7 @@ private func seedIdentifierWorkspace(_ provider: IdentifierRepositoryHandles) th
     )
 }
 
+@MainActor
 private func account(id: String, workspaceId: String, name: String) -> AccountDTO {
     AccountDTO(
         id: id,
@@ -281,6 +286,7 @@ private func account(id: String, workspaceId: String, name: String) -> AccountDT
     )
 }
 
+@MainActor
 private func accountIdentifier(id: String,
                                accountId: String,
                                workspaceId: String,

@@ -174,6 +174,7 @@ private func makeViewModel(
     )
 }
 
+@MainActor
 private func runtimeAccount(repositoryID: String, name: String) -> Account {
     Account(
         repositoryAccountId: repositoryID,

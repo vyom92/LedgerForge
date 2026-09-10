@@ -887,8 +887,9 @@ private struct HostileRecoveryError: LocalizedError {
     let errorDescription: String?
 }
 
+@MainActor
 private final class RecoveryPersistenceProbe: ImportPersistenceCoordinating {
-    private let operation: (FinancialDocument) throws -> ImportPersistenceResult
+    private let operation: @MainActor (FinancialDocument) throws -> ImportPersistenceResult
     private(set) var persistInvocationCount = 0
     private(set) var receivedAccountChoices: [ImportAccountChoice?] = []
 
@@ -929,6 +930,7 @@ private final class RecoveryPersistenceProbe: ImportPersistenceCoordinating {
     }
 }
 
+@MainActor
 private func persistenceResult(
     _ result: ImportPersistenceResult,
     boundTo document: FinancialDocument
@@ -974,6 +976,7 @@ private func persistenceResult(
     )
 }
 
+@MainActor
 private func recoveryHydrationResult() -> RepositoryStoreHydrationResult {
     RepositoryStoreHydrationResult(
         didHydrate: true,
