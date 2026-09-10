@@ -120,17 +120,20 @@ Total: **145** targets. A whole-card closure can remain blocked after one factua
 **Sprint-83 queue-closure update:** 2026-09-10 at `main@ffddebc6e12405c812a36855ab6212e973cff5ba` (accepted implementation `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; implementation parent `057d70b6f39929735401d5211cd180db162c94cc`)
 **Sprint-84 queue-closure update:** 2026-09-10 at accepted implementation `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`
 **Sprint-85 queue-closure update:** 2026-09-10 at accepted implementation `b4e4e6ffb14deccef238352a6ef834514a2a37c2`
-**Active queue count after Sprint-85 acceptance closure:** 149
+**Sprint-87 queue-closure update:** 2026-09-10 at accepted implementation `93c068c23027a8cd59753ac4ac916e6cee75adbf`
+**Active queue count after Sprint-87 acceptance closure:** 147
 **Current migration:** V17
 **Current source/reliability architecture:** ADR-046 complete-authentic-corpus authority
 **Current design authority:** `LF-UI-2026-09-R1` for its bounded scope
-**Latest accepted numbered implementation:** Sprint 85 — PR-3 Dependency Concurrency Boundary
+**Latest accepted numbered implementation:** Sprint 87 — Coordinated Swift-6 Migration
 **Latest accepted numbered discovery:** Sprint 80 — `SWIFT6_READINESS_COMPLETE`
 **Personal-v1:** UNDECLARED / NOT CERTIFIED
 
 The Sprint-83 closure mechanically re-enumerated every active `FW-*` heading: 151 candidates, 151 unique IDs, no duplicate IDs and no malformed candidate headings. The original audit reconciled candidates against `PROJECT_STATE.md`, the current 80–89 roadmap, the Standing Harness, relevant accepted ADRs, Product Vision, R1 design authority and current repository evidence where documentation was insufficient.
 
 Reconciliation outcomes:
+
+- <a id="fw-p2-76"></a>`FW-P2-76` is removed from the active queue because Chat accepted Sprint 87 — Coordinated Swift-6 Migration at `93c068c23027a8cd59753ac4ac916e6cee75adbf`. All native targets are Swift 6; V17, ADR-046 and Personal-v1 UNDECLARED / NOT CERTIFIED remain unchanged. `FW-P2-67` now records the satisfied static ownership gate and Chat-authorized Sprint 88, with native parity still required.
 
 - `FW-P2-72` is removed from the active queue because Sprint 81 completed and Chat accepted the PR-1 staging/runtime-publication ownership seam at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`.
 - `FW-P1-19` is removed from the active queue because Sprint 82 completed and Chat accepted the serial Unified Import Centre foundation at implementation commit `d239f939088b67e5a90c65117f08592891be17bb`. Its serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership, duplicate/recovery preservation and no-parallel-preparation evidence are recorded in `PROJECT_STATE.md` and the current roadmap.
@@ -7059,7 +7062,7 @@ Required direction includes:
 
 The exact file names, scene hierarchy and coordinator types require implementation planning. This candidate does not authorize an application architecture rewrite.
 
-**Current discovery disposition — 2026-09-10:** `WAIT_POST_SWIFT6`. **Exact remaining gate:** Static decomposition is prepared; exact accepted post-Sprint-87 provider/hydrator/actor ownership must be revalidated before any Sprint88 refactor planning. Native parity then remains implementation acceptance.
+**Current disposition — 2026-09-10:** `CURRENT / CHAT-AUTHORIZED` for Sprint 88. **Static gate satisfied:** Chat revalidated provider/hydrator/actor ownership at accepted Sprint 87 `93c068c23027a8cd59753ac4ac916e6cee75adbf` and continuation head `b2f7ac2a6a517c1365b93274e2ba868b5068a7a4`. `LedgerForgeApp` retains persistence bootstrap/WindowGroup ownership; `ContentView` retains shell/navigation, availability, feature view models, import presentation and startup triggering; ADR-024 `RepositoryStoreHydrator` and MainActor `ProductionImportCentre` retain their authority. **Remaining acceptance:** pre-edit characterization and native behavioral parity on the final bounded extraction; these are not already-passed gates.
 
 **Smallest proposed boundary:** Five-phase shell extraction blueprint in packet.
 
@@ -7084,17 +7087,17 @@ The exact file names, scene hierarchy and coordinator types require implementati
 
 **Personal-v1:** PRE_V1_OPTIONAL
 
-**Recommendation after Chat:** WAIT_POST_SWIFT6, then bounded implementation planning after ownership delta; native parity remains future acceptance. **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
+**Recommendation after Chat:** Execute the bounded Sprint-88 contract after characterization; native parity remains implementation acceptance. **Roadmap:** Sprint 88 is CURRENT / CHAT-AUTHORIZED; Sprint 89 and unrelated candidate priorities/statuses remain unchanged.
 
-**Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
+**Publication delta:** `POST_SWIFT6_STATIC_GATE_SATISFIED` by Chat's exact accepted Sprint-87/current-head ownership revalidation. Native runtime parity remains unverified Sprint-88 acceptance evidence.
 
 **Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
 
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=true, authentic source=false. **Blocker types:** MACOS_PLATFORM, ACCESSIBILITY_ACCEPTANCE, DEPENDENCY.
+**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** MACOS_PLATFORM, ACCESSIBILITY_ACCEPTANCE, DEPENDENCY.
 
 **Typed dependencies:**
 
-- `REQUIRES_POST_SWIFT6` → `FW-P2-73`: The explicitly named gate FW-P2-73 must be satisfied. This enables Five-phase shell extraction blueprint in packet. Remaining condition: Static decomposition is prepared; exact accepted post-Sprint-87 provider/hydrator/actor ownership must be revalidated before any Sprint88 refactor planning. Native parity then remains implementation acceptance.
+- `SATISFIED` → accepted PR-1/PR-2/PR-3/TEST-PR and Sprint 87: existing provider, hydration, actor and serial Import Centre ownership is revalidated. The five-phase shell blueprint is planning guidance; native parity is still required for Sprint-88 acceptance. FW-P2-77 source-tree organization remains separately excluded.
 
 **Pinned evidence references:**
 
@@ -7296,64 +7299,6 @@ Do not remove shared Xcode configuration merely because it lives beneath the pro
 - [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1737-1752 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-71
 - [LedgerForge.xcodeproj/project.pbxproj](<../LedgerForge.xcodeproj/project.pbxproj>):365-390;966-990 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `08dbe3df432f0dd1a78fe123eca04cb7d806a2809f599b30034c95eab7212d34` — UI Assets exception set/resources
 - [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):2206-2229 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Repository and Xcode Metadata Hygiene as Maintenance and records this unresolved boundary: MISSING: current ignored/generated/private metadata inventory and a proportionate prevention check.
-
-</details>
-
----
-
-<a id="fw-p2-76"></a>
-
-## FW-P2-76 — Coordinated Swift-6 Migration
-
-**Status:** Candidate
-**Depends on:** PR-2 accepted in Sprint 84 at `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`; PR-3 accepted in Sprint 85 at `b4e4e6ffb14deccef238352a6ef834514a2a37c2`; TEST-PR accepted in Sprint 86 at `022d436fc4563be9b0967ac2751e6114a31474c1`. The serial Unified Import Centre boundary is accepted through Sprints 82–83.
-
-**Chat authorization — 2026-09-10:** Sprint 87 is CURRENT / CHAT-AUTHORIZED for the coordinated native Swift-6 migration only. Preserve accepted PR-1/PR-2/PR-3/TEST-PR ownership, serial Import Centre semantics and V1–V17 identity. The complete compiler/TestPlan/corpus/provider/runtime/durable/privacy/signing gate applies; stop for Chat on financial-semantic divergence or a new architecture/schema requirement. The historical discovery and five residual readiness findings below remain evidence, not additional feature scope.
-
-After the prerequisite families are accepted, perform one coordinated Swift-6
-strict migration and readiness pass. The migration is not a prerequisite to
-begin the serial Swift-5 Unified Import Centre, but it is required before
-personal-v1 certification. Swift-6 migration is not complete or approved by
-Sprint 80; the readiness discovery only establishes that the compiler can be
-reached and that the remaining work is materially known.
-
-**Discovery 2026-09-10:** REUSED_EVIDENCE / OWNED_BY_ACTIVE_SPRINT at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`. VERIFIED_REPOSITORY: Swift 6 migration is blocked; only readiness discovery is accepted, and root UI is currently captured by app default MainActor isolation.
-
-**Discovery remainder:** MISSING: acceptance of prerequisites and current full compiler result. **Next boundary:** PROPOSED: no recommendation beyond reuse of recorded sequencing and settings caveat. **Acceptance:** Future owner uses exact diagnostics/settings, build/test plan and behavior-sensitive validation.
-
-**Readiness finding retained after Sprint-84 acceptance — 2026-09-10:** the Swift-5 complete strict-concurrency probe at published parent `af2d1949c6e9a73af3bb004422b72882d28195e2` also exposes five production diagnostics outside PR-2: the `PreparedImport` / `ImportCentrePreparation` conformance in `Import/Coordinator/ImportCentreCoordinator.swift`, the `StatementDropItemProvider.Completion` capture in `Import/Presentation/StatementDropIntakeAdapter.swift`, and three salary/funding-plan reconstruction isolation diagnostics in `Services/RepositoryStoreHydrator.swift`. These are recorded strict-readiness boundaries, not verified runtime or financial defects; no contradictory evidence against accepted PR-1 publication was established. They remain owned here for Chat disposition before Sprint 87 and are excluded from Sprint 84 persistence corrections, Sprint 85 dependency corrections and Sprint 86 test-only corrections. This finding does not authorize their repair or reopen accepted financial semantics. Exact before/after diagnostics belong to the local Sprint-84 acceptance evidence.
-
-<details>
-<summary>First-round evidence retained; no second-round scope expansion</summary>
-
-**question (research ref):** Does UI discovery change coordinated Swift-6 migration?
-
-**current behavior (research ref):** VERIFIED_REPOSITORY: Swift 6 migration is blocked; only readiness discovery is accepted, and root UI is currently captured by app default MainActor isolation.
-
-**accepted constraints (research ref):** Prerequisites PR-2/PR-3/TEST-PR plus serial Import Centre; no feature work bundled.
-
-**missing (research ref):** MISSING: acceptance of prerequisites and current full compiler result.
-
-**options (research ref):** Wait for prerequisites; migrate early; combine feature work. Only wait conforms.
-
-**proposed boundary (research ref):** PROPOSED: no recommendation beyond reuse of recorded sequencing and settings caveat.
-
-**scope exclusions (research ref):** No source edit, flag change, actor redesign, or UI refactor.
-
-**dependencies (research ref):** PR-2, PR-3, TEST-PR accepted; serial Import Centre complete.
-
-**adr migration impact (research ref):** No migration in this lane.
-
-**acceptance (research ref):** Future owner uses exact diagnostics/settings, build/test plan and behavior-sensitive validation.
-
-**invalidators (research ref):** Accepted prerequisite scope changes.
-
-**personal v1 (research ref):** REPORTED_ONLY: required before certification in current queue.
-
-**queue roadmap disposition (research ref):** OWNED_BY_ACTIVE_SPRINT; retain Blocked.
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1797-1807 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-76
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):1663-1664 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `7843854eee6c85888f41af52c52aba70f2d0138c5f6f21e518211c75aca62797` — Sprint 80 sequencing
 
 </details>
 

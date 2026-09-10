@@ -4,9 +4,19 @@
 
 **Discovery reconciliation — 2026-09-10:** both read-only discovery rounds are incorporated in the existing [FUTURE_WORK](FUTURE_WORK.MD#discovery-reconciled-into-existing-subject-authorities--2026-09-10), current/prepared roadmaps and R1 DESIGN_HANDOFF. The redundant standalone register is retired. Findings and decision packets remain proposals unless explicitly identified as settled user scope; this documentation does not accept implementation, migrations, source support, a sprint or personal-v1 certification. The existing accepted-state and current-sprint records below remain authoritative.
 
+## Accepted Sprint 87 — Coordinated Swift-6 Migration — 2026-09-10
+
+Chat accepts Sprint 87 (`FW-P2-76`) at implementation commit `93c068c23027a8cd59753ac4ac916e6cee75adbf`. Sprint 87 is the latest accepted numbered implementation.
+
+- **Repository continuation baseline:** `b2f7ac2a6a517c1365b93274e2ba868b5068a7a4` contains only the subsequent user-approved Xcode serialization change: quote removal from eleven existing UI-asset membership exclusion strings. It does not change Sprint 87's accepted implementation identity.
+- **Accepted boundary:** all native targets are Swift 6. Accepted Sprint-81 through Sprint-87 ownership, serial Import Centre behavior and financial/source semantics remain preserved. No Sprint 87A, schema migration or new ADR; V17 and the accepted ADRs remain current, with ADR-046 governing parser/source authority.
+- **Post-Swift-6 static entry gate:** Chat revalidated the accepted implementation/current head. `LedgerForgeApp` owns persistence bootstrap and `WindowGroup` creation; `ContentView` still owns shell/navigation, availability presentation, feature view-model lifetimes, Import Centre presentation and startup hydration invocation. `RepositoryStoreHydrator` remains ADR-024's sole persistence-to-runtime boundary; `ProductionImportCentre` / `ImportCentreCoordinator` remains MainActor-owned. Sprint-87 annotations state existing ownership and do not introduce a workflow architecture.
+- **Authorized continuation:** completed `FW-P2-76` leaves the active queue. Sprint 88 — App Shell and Workflow Decomposition (`FW-P2-67`) is **CURRENT / CHAT-AUTHORIZED** under `ACCEPT_SPRINT_87_AND_CONTINUE_TO_88`. Its static post-Swift-6 gate is satisfied; native behavioral parity remains required Sprint-88 acceptance evidence. Characterize the exact current shell before product edits, then extract established structural/presentation and narrowly named startup-invocation seams while preserving existing owners and behavior. No R1 redesign, Sprint-89 work, FW-P2-77 consolidation or financial/source change is authorized. Publish one candidate and stop for Chat acceptance before Sprint 89.
+- **Personal-v1:** **UNDECLARED / NOT CERTIFIED**. Sprint 89 and the prepared 90–99 / 100–109 sequence remain unchanged; Sprint 100 remains LedgerForge 1.0 Personal Adoption Validation & Certification.
+
 ## Accepted Sprint 86 — TEST-PR Strict-Concurrency Test Correction — 2026-09-10
 
-Chat accepts Sprint 86 at implementation commit `022d436fc4563be9b0967ac2751e6114a31474c1` (parent `dee5968c8268e69f8540aefc73613c28736d01ec`). Sprint 86 is the latest accepted numbered implementation.
+Chat accepts Sprint 86 at implementation commit `022d436fc4563be9b0967ac2751e6114a31474c1` (parent `dee5968c8268e69f8540aefc73613c28736d01ec`). Sprint 86 remains an accepted prior numbered implementation; Sprint 87 above is now the latest accepted numbered implementation.
 
 - **Accepted boundary:** 21 test files gained actor-aware fixture/assertion ownership, actor-owned mutable provider/state captures, checked Sendable subprocess callback state and bounded confirmation/snapshot synchronization. Production/runtime source, project settings, shared corpus machinery, independent source oracles, migrations and resources remained unchanged. No Sprint 86A, migration, new ADR or language-mode switch; V17 remains current and all native targets remain Swift 5 at this acceptance boundary.
 - **Verified strict and focused evidence:** the current baseline contained 11 source error locations and 350 warning headers (307 distinct reported location/message combinations). Final Swift-6 complete-strict object/module generation passed for 83 unit-test files, two UI-test files and 18 native subprocess/shared inputs with zero source errors or warnings. Three redundant upcoming-feature notices were reported separately. All 21 corrected suites passed 181 tests; the reviewed snapshot-priority repair passed its five-test rerun with no priority-inversion notice.
@@ -17,7 +27,7 @@ Chat accepts Sprint 86 at implementation commit `022d436fc4563be9b0967ac2751e611
 
 ## Accepted Sprint 85 — PR-3 Dependency Concurrency Boundary — 2026-09-10
 
-Chat accepts Sprint 85 at implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2` (parent `8d2dafd29de543660300ac8f37f16a152603f1f5`). Sprint 85 remains an accepted prior numbered implementation; Sprint 86 above is now the latest accepted numbered implementation.
+Chat accepts Sprint 85 at implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2` (parent `8d2dafd29de543660300ac8f37f16a152603f1f5`). Sprint 85 remains an accepted prior numbered implementation; Sprint 87 above is now the latest accepted numbered implementation.
 
 - **Accepted decisions:** `ZIPFOUNDATION_DECISION = LOCAL_CORRECTION`; vendored ZIPFoundation 0.9.20 closes its two native Swift-6 diagnostics by making two unchanged-value globals immutable. `LEGACYXLS_POLICY = SERIALIZED_PROCESS_LOCAL`; one bounded owner retains the complete source-buffer/open/read/copy/close lifetime and cancellation checks around non-interruptible C work. No libxls concurrent-reentrancy claim is made.
 - **Verified qualification:** 19 OOXML and eight LegacyXLS focused tests passed. The frozen TestPlan invocation passed **515 definitions / 79 suites / 573 expanded executions**, with zero failures, skips or expected failures; all prior definitions except the single explicitly authorized conditional global campaign executed, plus 11 added tests. Complete affected authentic Axis bank, HDFC bank-account and Axis credit-card source/oracle and provider gates passed. The checked-in TestPlan and selection settings remain unchanged. Debug and optimized Release, dependency linkage, signature/privacy and bundle containment checks passed; all 452 committed file blobs matched the frozen candidate and all 140 registered originals retained their bytes and registered paths.
@@ -27,7 +37,7 @@ Chat accepts Sprint 85 at implementation commit `b4e4e6ffb14deccef238352a6ef8345
 
 ## Accepted Sprint 84 — PR-2 SQLite / Provider / Migration Ownership — 2026-09-10
 
-Chat accepts Sprint 84 at implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1` (parent `af2d1949c6e9a73af3bb004422b72882d28195e2`). Sprint 84 remains an accepted prior numbered implementation; Sprint 86 above is now the latest accepted numbered implementation.
+Chat accepts Sprint 84 at implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1` (parent `af2d1949c6e9a73af3bb004422b72882d28195e2`). Sprint 84 remains an accepted prior numbered implementation; Sprint 87 above is now the latest accepted numbered implementation.
 
 - **Accepted ownership boundary:** one synchronous SQLite owner protects connection, statement, backup, migration and compound-transaction lifetimes; copied row values leave that owner. Provider-generation validity protects each check and operation and drains active operations before invalidation. The immutable migration registry and Sendable closures, MainActor provider defaults and shared helper/database sources have explicit ownership.
 - **Preserved contracts:** financial parsing, source snapshots, provider parity, transaction semantics and canonical hydration remain unchanged. Accepted V1–V17 identities and integrity are preserved, with no schema change or V18. Native targets remain in Swift 5; PR-3, TEST-PR and the final coordinated Swift-6 switch are not accepted by this closure.
@@ -37,7 +47,7 @@ Chat accepts Sprint 84 at implementation commit `a4dd6929a2282cc94c850eb1dccf350
 
 ## Accepted Sprint 83 — Serial Batch Import and Multi-File Drag-and-Drop — 2026-09-10
 
-Chat accepts Sprint 83 at implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29` (parent `057d70b6f39929735401d5211cd180db162c94cc`). Sprint 83 remains an accepted prior numbered implementation; Sprint 86 above is now the latest accepted numbered implementation.
+Chat accepts Sprint 83 at implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29` (parent `057d70b6f39929735401d5211cd180db162c94cc`). Sprint 83 remains an accepted prior numbered implementation; Sprint 87 above is now the latest accepted numbered implementation.
 
 - **Accepted intake and ownership:** the shared @MainActor Import Centre coordinator now owns an ordered serial queue of length N. Single-file import uses the same path with N = 1. Multi-file picker and drag-and-drop intake preserve the received selection/provider order, including distinct occurrence identity for repeated URLs; asynchronous drop-provider completion cannot reorder the queue. Exactly one item may own active preparation, and there is no parallel preparation.
 - **Per-item control and isolation:** each statement retains independent preparation, progress, review, account/card choice, duplicate/rejection and terminal state. Review and explicit confirmation remain per item. Skip, cancel current, cancel batch, retry and continue preserve cancelled-task draining, stale-callback rejection and one-shot confirmation. A failed, rejected, skipped or cancelled file cannot contaminate another item or undo an already committed item. The batch summary reports actual per-file outcomes; there is no batch-wide atomicity claim.
@@ -50,7 +60,7 @@ Chat accepts Sprint 83 at implementation commit `adcf83f52d309ddac18d95f0321d0c0
 
 ## Accepted Sprint 82 — Serial Unified Import Centre Foundation — 2026-09-10
 
-Chat accepts Sprint 82 at implementation commit `d239f939088b67e5a90c65117f08592891be17bb` (parent `17944e104081279ce6267f26a0bac5d8468a3247`). Sprint 82 remains an accepted prior numbered implementation; Sprint 86 above is now the latest accepted numbered implementation.
+Chat accepts Sprint 82 at implementation commit `d239f939088b67e5a90c65117f08592891be17bb` (parent `17944e104081279ce6267f26a0bac5d8468a3247`). Sprint 82 remains an accepted prior numbered implementation; Sprint 87 above is now the latest accepted numbered implementation.
 
 - **Accepted outcome:** one shared @MainActor serial Import Centre coordinator owns a deterministic queue of length one. Each item retains stable identity and independent source, preparation, progress, review, account/card choice, duplicate/rejection, confirmation, persistence, terminal and recovery state. Preparation, review, explicit confirmation, provider-owned persistence and canonical hydration remain distinct stages.
 - **Accepted orchestration boundary:** cancellation drains the preparation task and releases `PreparedImport` before confirmation; confirmation is explicit and one-shot; commit is provider-owned and non-cancellable; stale callbacks cannot publish into a different item; shared production ownership is used across import surfaces; no multi-file, drag-and-drop, folder, batch or parallel-preparation workflow was introduced.
@@ -63,7 +73,7 @@ Chat accepts Sprint 82 at implementation commit `d239f939088b67e5a90c65117f08592
 
 ## Accepted Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam — 2026-09-10
 
-Chat accepts Sprint 81 at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91` (parent `f2290532b29b9aa057326929bd695a121d790db0`). Sprint 81 remains an accepted prior numbered implementation; Sprint 86 above is now the latest accepted numbered implementation.
+Chat accepts Sprint 81 at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91` (parent `f2290532b29b9aa057326929bd695a121d790db0`). Sprint 81 remains an accepted prior numbered implementation; Sprint 87 above is now the latest accepted numbered implementation.
 
 - **Accepted outcome:** explicit MainActor ownership for canonical runtime-store installation and notification methods, with synchronous pure staging retained. Complete snapshots are installed before observers are notified, canonical notification order is preserved, and provider-generation/reconciliation semantics remain unchanged. The central observer-atomicity test was independently assessed as `INDEPENDENT_ENOUGH` and establishes that the first observation sees the complete installed snapshot in canonical order.
 - **Exact implementation boundary:** production changes are limited to `Core/AccountStore.swift`, `Core/CardStore.swift`, `Core/CategoryStore.swift`, `Core/DeveloperConsole.swift`, `Core/ImportSessionStore.swift`, `Core/TransactionStore.swift` and `Services/RepositoryStoreHydrator.swift`; test changes are limited to `LedgerForgeTests/DeveloperDiagnosticsTests.swift` and `LedgerForgeTests/RepositoryStoreHydratorTests.swift`.
@@ -107,7 +117,7 @@ See the current [cycle roadmap](Sprint%20roadmap/LedgerForge_Roadmap_Sprints_80-
 
 This is the current parser/source-support alignment layer. It supersedes conflicting **current-support, fixture-authority and incidental-layout** wording below while preserving historical sprint/ADR records as historical facts.
 
-- **Latest accepted numbered implementation:** Sprint 85 — PR-3 Dependency Concurrency Boundary at `b4e4e6ffb14deccef238352a6ef834514a2a37c2`. Sprint 79 remains the latest numbered financial-domain feature implementation, and historical Sprint 70–79 implementation/acceptance records remain intact.
+- **Latest accepted numbered implementation:** Sprint 87 — Coordinated Swift-6 Migration at `93c068c23027a8cd59753ac4ac916e6cee75adbf`. All native targets are Swift 6. Sprint 79 remains the latest numbered financial-domain feature implementation, and historical Sprint 70–79 implementation/acceptance records remain intact.
 - **Accepted migration:** additive V17 is current; V1–V16 remain immutable historical migrations.
 - **Architecture:** ADR-045 remains the historical accepted architecture through Sprint 79. ADR-046 — Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation — is accepted by explicit user decision on 2026-09-01 as the current parser/import authority.
 - **Historical acceptance versus reliability:** historical parser/profile implementation acceptance alone is not current authentic-corpus production reliability certification. The accepted reset separately established current reliability for the complete registered corpus through ordinary production, persistence, reopen and hydration paths; a synthetic fixture campaign or partial authentic sample remains insufficient.
@@ -448,10 +458,10 @@ ChatGPT Chat owns sprint/architecture/prompt/acceptance decisions. MCP executor 
 ## Repository Baseline
 
 - **Primary branch:** `main`
-- **Current repository implementation baseline:** accepted Sprint 84 at `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`, layered on accepted Sprints 81–83 and the technically accepted unnumbered Authentic-Corpus Parser / Import Reliability Reset with additive V17; Sprint 79 and its commit `9489f6b21c9d585d2d90f2ba4798a931590057f7` remain in Git history
-- **Documentation alignment:** Reconciled for accepted Sprints 81–84, the accepted unnumbered reset, additive V17, the Sprint 79 financial-domain implementation and the accepted Sprint 80 readiness-discovery boundary
+- **Current repository implementation baseline:** accepted Sprint 87 at `93c068c23027a8cd59753ac4ac916e6cee75adbf`, followed only by the user-approved project serialization commit `b2f7ac2a6a517c1365b93274e2ba868b5068a7a4`, layered on accepted Sprints 81–86 and the technically accepted unnumbered Authentic-Corpus Parser / Import Reliability Reset with additive V17; Sprint 79 and its commit `9489f6b21c9d585d2d90f2ba4798a931590057f7` remain in Git history
+- **Documentation alignment:** Reconciled for accepted Sprints 81–87 and Chat-authorized Sprint 88, the accepted unnumbered reset, additive V17, the Sprint 79 financial-domain implementation and the accepted Sprint 80 readiness-discovery boundary
 - **Accepted source-truth repair:** P0 Axis bank-account source-truth restoration remains historical accepted work. Sprint 65's clean-room/sanitized fixture work is retained only as historical mechanics evidence under ADR-046 and is not current parser regression or acceptance authority; no historical financial data was altered
-- **Latest chronologically accepted production implementation:** Sprint 84 — PR-2 SQLite / Provider / Migration Ownership; the unnumbered Authentic-Corpus Parser / Import Reliability Reset remains the latest accepted parser/source implementation, and Sprint 79 remains the latest numbered financial-domain feature implementation
+- **Latest chronologically accepted production implementation:** Sprint 87 — Coordinated Swift-6 Migration; the unnumbered Authentic-Corpus Parser / Import Reliability Reset remains the latest accepted parser/source implementation, and Sprint 79 remains the latest numbered financial-domain feature implementation
 - **Latest verified Debug development-tooling implementation:** DBP-01 Developer Database Profiles at `2d86f91dc46b9e88bcdfea65c88ddf671968b388`
 - **Non-implementation commits after Sprint 53:**
   - `bdb51b0ddcdde097e456a16bab7f0bf999fd595b` — roadmap update
