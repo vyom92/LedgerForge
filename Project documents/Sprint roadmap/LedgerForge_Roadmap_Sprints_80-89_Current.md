@@ -1,17 +1,17 @@
 # LedgerForge Roadmap: Sprints 80–89
 
 **Status:** Current repository cycle roadmap
-**Refreshed:** 2026-09-10
-**Planning review baseline:** accepted Sprint 87, `main@93c068c23027a8cd59753ac4ac916e6cee75adbf`; continuation head `b2f7ac2a6a517c1365b93274e2ba868b5068a7a4` is the subsequent user-approved project serialization change only
+**Refreshed:** 2026-09-11
+**Planning review baseline:** accepted Sprint 88, `main@4f5eeb7b11c0f5879204a06ae9f08045304342b5`; parent documentation closure `4973d2d2507ae5891bfa593b359af2b9393e5fa1`
 **Supersedes:** `Project documents/Sprint roadmap/Archived/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
 
-**Forward planning — explicit user decision, 2026-09-10:** LedgerForge 1.0 personal-adoption certification is fixed at Sprint 100 after its required pre-1.0 product boundaries. The prepared [90–99](Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md) and [100–109](Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md) roadmaps own that future sequence; neither is current or implementation-authorized. Active 80–89 numbering and Sprint 89 scope remain unchanged; Sprint 87 is accepted and Sprint 88 is now Chat-authorized below.
+**Forward planning — explicit user decision, 2026-09-10:** LedgerForge 1.0 personal-adoption certification is fixed at Sprint 100 after its required pre-1.0 product boundaries. The prepared [90–99](Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md) and [100–109](Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md) roadmaps own that future sequence; neither is current or implementation-authorized. Active 80–89 numbering and Sprint 89 scope remain unchanged; Sprints 87 and 88 are accepted below; Sprint 89 remains planned and not yet Chat-authorized.
 
 ## Control
 
 - **Planning authority:** This file owns Sprint 80–89 numbering, corrective suffixes, cycle status and planned positions.
 - **Execution authority:** None. Roadmap assignment is planning, not implementation authorization; each sprint still requires Chat priority/dependency triage and a complete execution prompt.
-- **Latest accepted numbered implementation:** Sprint 87 — Coordinated Swift-6 Migration, accepted at `93c068c23027a8cd59753ac4ac916e6cee75adbf`. All native targets are Swift 6; accepted Sprint-81 through Sprint-87 ownership and financial/import semantics remain preserved. No Sprint 87A, migration or new ADR.
+- **Latest accepted numbered implementation:** Sprint 88 — App Shell and Workflow Decomposition, accepted at `4f5eeb7b11c0f5879204a06ae9f08045304342b5`. Behavior-preserving shell/workflow extraction retains root, provider, hydrator and serial Import Centre ownership. All native targets remain Swift 6; no Sprint 88A, migration, new ADR or financial/source change.
 - **Current migration:** V17; V1–V16 remain immutable.
 - **Current source/reliability authority:** ADR-046 complete-authentic-corpus certification.
 - **Current UI design authority:** `LF-UI-2026-09-R1` for its bounded scope; design approval is not native implementation.
@@ -47,8 +47,8 @@ A material source, credential, parser, persistence, orchestration or financial-s
 | 85 | PR-3 Dependency Concurrency Boundary | historical `FW-P2-74` (removed from active queue) | Swift-6 prerequisite | **ACCEPTED** — implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2`; local ZIPFoundation correction and process-local libxls serialization |
 | 86 | TEST-PR Strict-Concurrency Test Correction | historical `FW-P2-75` (removed from active queue) | Swift-6 prerequisite | **ACCEPTED** — implementation commit `022d436fc4563be9b0967ac2751e6114a31474c1`; test/support-only, production bytes frozen |
 | 87 | Coordinated Swift-6 Migration | completed `FW-P2-76` (removed from active queue) | Implementation | **ACCEPTED** — implementation `93c068c23027a8cd59753ac4ac916e6cee75adbf`; all native targets Swift 6; V17 and ADRs unchanged |
-| 88 | App Shell and Workflow Decomposition | `FW-P2-67` | Behavior-preserving maintenance | **CURRENT / CHAT-AUTHORIZED** — static post-Swift-6 ownership gate satisfied; pre-edit characterization and native parity required; no financial redesign, R1 implementation or FW-P2-77 consolidation |
-| 89 | LF-UI-2026-09-R1 Transactions Reference Implementation | `FW-P2-03` + `FW-P2-53`, bounded `FW-P2-48` + `FW-P2-49` + `FW-P2-50` | User-facing implementation / representative R1 proof surface | Planned position; financial semantics remain source/repository-authoritative |
+| 88 | App Shell and Workflow Decomposition | completed `FW-P2-67` (removed from active queue) | Behavior-preserving maintenance | **ACCEPTED** — implementation `4f5eeb7b11c0f5879204a06ae9f08045304342b5`; ownership and native parity preserved; V17 and ADRs unchanged |
+| 89 | LF-UI-2026-09-R1 Transactions Reference Implementation | `FW-P2-03` + `FW-P2-53`, bounded `FW-P2-48` + `FW-P2-49` + `FW-P2-50` | User-facing implementation / representative R1 proof surface | **PLANNED / NOT YET CHAT-AUTHORIZED**; fresh Chat entry review and P0 → P1 → P2 → P3 triage required; financial semantics remain source/repository-authoritative |
 
 ## Sprint entry-gate rule
 
@@ -102,7 +102,7 @@ the exact registered CBQ boundary while preserving historical minimum-due
 absence and enforcing the current authentic minimum-due contract. Personal-v1
 adoption remains a separate later gate.
 
-## Accepted Sprints 81–87, current Sprint 88 and planned Sprint 89
+## Accepted Sprints 81–88 and planned, not-yet-authorized Sprint 89
 
 ### Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam
 
@@ -178,17 +178,17 @@ Completed queue: `FW-P2-76` (removed from active queue).
 
 ### Sprint 88 — App Shell and Workflow Decomposition
 
-Queue: `FW-P2-67`.
+Completed queue: `FW-P2-67` (removed from active queue).
 
-**CURRENT / CHAT-AUTHORIZED on 2026-09-10** under `ACCEPT_SPRINT_87_AND_CONTINUE_TO_88`. Chat revalidated exact accepted post-Sprint-87/current-head provider, hydrator, actor and serial Import Centre ownership. The static entry gate is satisfied; native behavioral parity remains Sprint-88 acceptance evidence.
+**ACCEPTED on 2026-09-11** under `SPRINT_88_APP_SHELL_DECOMPOSITION_ACCEPTED`, at implementation commit `4f5eeb7b11c0f5879204a06ae9f08045304342b5` (parent documentation closure `4973d2d2507ae5891bfa593b359af2b9393e5fa1`). The seven-path, behavior-preserving extraction separates shell/sidebar/contextual-toolbar presentation, lazy selected destinations, Import Centre footer presentation and a stateless MainActor hydration-invocation seam. `ContentView` retains state, selection, model lifetimes, importer/lifecycle/tasks and callbacks; `LedgerForgeApp`, ADR-024 `RepositoryStoreHydrator` and the MainActor serial Import Centre retain their authority, including one active preparation and explicit per-statement review/confirmation.
 
-Characterize the exact current shell/native behavior before product edits, then perform bounded structural, sidebar, toolbar, destination, import-presentation and startup-invocation extraction with explicit inputs/callbacks and existing owner objects. Preserve selected-section behavior, root/window/minimum-size behavior, availability/mutation gating, DEBUG profile acknowledgement, feature model lifetimes, provider generation, complete-snapshot publication, ADR-024 hydration and the existing MainActor serial Import Centre with per-statement review/confirmation, cancellation/retry/recovery and password/source-snapshot behavior.
+Chat accepted focused 261 definitions / 286 expanded executions / 29 suites and complete TestPlan 518 definitions / 576 expanded executions / 79 suites, with zero failures, skips or expected failures; Debug and optimized Release; the existing six-campaign authentic-corpus gate; native destination/import parity; and durable same-database SQLite relaunch with canonical hydration, all 17 migration identities, integrity and foreign-key checks. CSV cancellation left zero accepted residue; explicit confirmation persisted 97 transactions; the 62/178-transaction serial batch ended with 1 skipped / 1 cancelled and no additional accepted financial data. [PROJECT_STATE](../PROJECT_STATE.md) records the accepted evidence and containment/binding details. This documentation closure reuses that evidence without an executable run.
 
-Required acceptance: focused shell/navigation, availability, hydration/publication, import lifecycle and affected DEBUG/Salary checks; one complete TestPlan on the frozen candidate; Debug and optimized Release with native Swift 6 and zero new source diagnostics; pre/post native destination/import parity using authentic bytes; durable-startup and ordinary same-database SQLite relaunch with complete canonical hydration, migration identity/integrity and foreign-key checks; privacy and bundle containment. A separate complete authentic provider/order corpus campaign is NOT_REQUIRED only while the final diff avoids reader/parser/normalizer/source-routing/persistence-mapping/duplicate-equivalence/financial-semantic changes. Stop and return to Chat before crossing any such boundary.
-
-No R1 redesign, Sprint-89 Transactions work, recovered/provisional UI assets, FW-P2-77 organization consolidation, new import coordinator, parallel preparation, financial/source change, migration, ADR or Swift-setting change. Publish one implementation candidate and **STOP for Chat acceptance before Sprint 89**. The [SHELL88 blueprint](#packet-shell88-blueprint) remains planning guidance; its optional phase 5 is excluded.
+Accepted limitations: physical resize was not separately completed, transient loading used preserved-source/focused-test coverage, native selection needed user assistance, and the thread limit prevented a fresh independent Sol reviewer; bounded Terra/Luna and primary-session reviews completed. These limitations did not falsify Sprint 88. No migration, new ADR, financial/source or Swift-setting change, Sprint 88A, R1 implementation or parallel preparation; V17, ADR-046, native Swift 6 and Personal-v1 UNDECLARED / NOT CERTIFIED remain unchanged. FW-P2-77 remains separately unscheduled; the [historical SHELL88 blueprint](#packet-shell88-blueprint) does not authorize its optional phase 5.
 
 ### Sprint 89 — LF-UI-2026-09-R1 Transactions Reference Implementation
+
+**PLANNED / NOT YET CHAT-AUTHORIZED.** This closure does not authorize implementation. Require a fresh Chat entry review and P0 → P1 → P2 → P3 triage before an execution prompt.
 
 Queue: `FW-P2-03` + `FW-P2-53`, with only necessary bounded portions of `FW-P2-48`, `FW-P2-49` and `FW-P2-50`.
 
@@ -216,7 +216,7 @@ PROPOSED documentation reconciliation at `af2d1949c6e9a73af3bb004422b72882d28195
 
 ## Read-only discovery index — 2026-09-10
 
-The actionable queue is [FUTURE_WORK.MD](../FUTURE_WORK.MD); the unaccepted, Sprint-88/89-specific proposals are preserved in the appendix below. Neither record selects a sprint. Sprints 84–87 remain with their existing campaign owner. Historical repair/reversal still requires an exact source-provable family; verified user backup/restore and support documentation remain explicit adoption inputs; complete structured export is optional under UD-02 and is required only if adopted in the frozen Chat scope. The prepared 90–99 entry refinements remain a forecast and do not activate that cycle.
+The actionable queue is [FUTURE_WORK.MD](../FUTURE_WORK.MD); historical Sprint-88 guidance and proposed Sprint-89 work are preserved in the appendix below. The appendix does not authorize Sprint 89; Sprint 88 acceptance is recorded above. Historical repair/reversal still requires an exact source-provable family; verified user backup/restore and support documentation remain explicit adoption inputs; complete structured export is optional under UD-02 and is required only if adopted in the frozen Chat scope. The prepared 90–99 entry refinements remain a forecast and do not activate that cycle.
 
 ## Serious candidates not silently selected
 
@@ -254,9 +254,9 @@ The cycle forecast does not erase higher-priority or competing queue work. Befor
 When this roadmap changes, preserve accepted numbering/history, distinguish plans from execution/acceptance, keep detailed implementation truth in `PROJECT_STATE.md`/ADRs, retain exact source-support boundaries, keep private source/credential/transaction detail out of roadmap prose and update queue dispositions before scheduling new work.
 
 <a id="second-level-sprint-88-and-sprint-89-packets"></a>
-## Second-level Sprint 88 and Sprint 89 packets — proposed, unaccepted
+## Second-level packets — historical Sprint-88 guidance and proposed Sprint-89 work
 
-This appendix consolidates the discovery material that supports the already-numbered positions. It is planning input only: it does not select, authorize, implement, or accept either sprint. References to queue work use durable [FUTURE_WORK.MD](../FUTURE_WORK.MD) anchors.
+This appendix preserves historical discovery/planning material. Sprint 88 is now accepted in its section above; the retained blueprint is historical guidance, not new work. Sprint-89 proposals remain unaccepted planning input and do not select, authorize or implement that sprint. References to queue work use durable [FUTURE_WORK.MD](../FUTURE_WORK.MD) anchors.
 
 <a id="packet-shell88-and-sprint89-native-procedure"></a>
 <a id="packet-shell88-blueprint"></a>
@@ -273,7 +273,7 @@ This appendix consolidates the discovery material that supports the already-numb
 | 4 | Explicit bootstrap adapter around existing setup, hydrator and import | ADR-024, generation, MainActor and cancellation | Focused hydration/import/lifecycle proof |
 | 5 | [FW-P2-77](../FUTURE_WORK.MD#fw-p2-77) naming/groups only after parity | Resource and target membership | Xcode/path-consumer review |
 
-**Sprint-88 entry update — 2026-09-10:** Chat has satisfied the static post-Swift-6 ownership gate and supplied the current bounded execution contract above. Phase 0 characterization and native parity remain required. Provider, activity-gate, hydrator, Import Centre and actor-publication ownership/semantics must remain unchanged. Phase 5 source-tree organization remains a separate queue decision and is excluded from Sprint 88.
+**Sprint-88 acceptance update — 2026-09-11:** The static ownership gate, characterization and bounded native parity are satisfied by accepted Sprint 88 at `4f5eeb7b11c0f5879204a06ae9f08045304342b5`, with limitations recorded above. Provider, activity-gate, hydrator, Import Centre and actor-publication authority/semantics remain preserved. Phase 5 source-tree organization remains a separate unscheduled queue decision under FW-P2-77 and was excluded from Sprint 88.
 
 <a id="packet-sprint89-data-algebra-packet"></a>
 <a id="packet-sprint89-data-algebra"></a>

@@ -121,11 +121,12 @@ Total: **145** targets. A whole-card closure can remain blocked after one factua
 **Sprint-84 queue-closure update:** 2026-09-10 at accepted implementation `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`
 **Sprint-85 queue-closure update:** 2026-09-10 at accepted implementation `b4e4e6ffb14deccef238352a6ef834514a2a37c2`
 **Sprint-87 queue-closure update:** 2026-09-10 at accepted implementation `93c068c23027a8cd59753ac4ac916e6cee75adbf`
-**Active queue count after Sprint-87 acceptance closure:** 147
+**Sprint-88 queue-closure update:** 2026-09-11 at accepted implementation `4f5eeb7b11c0f5879204a06ae9f08045304342b5`
+**Active queue count after Sprint-88 acceptance closure:** 146
 **Current migration:** V17
 **Current source/reliability architecture:** ADR-046 complete-authentic-corpus authority
 **Current design authority:** `LF-UI-2026-09-R1` for its bounded scope
-**Latest accepted numbered implementation:** Sprint 87 — Coordinated Swift-6 Migration
+**Latest accepted numbered implementation:** Sprint 88 — App Shell and Workflow Decomposition at `4f5eeb7b11c0f5879204a06ae9f08045304342b5`
 **Latest accepted numbered discovery:** Sprint 80 — `SWIFT6_READINESS_COMPLETE`
 **Personal-v1:** UNDECLARED / NOT CERTIFIED
 
@@ -133,7 +134,9 @@ The Sprint-83 closure mechanically re-enumerated every active `FW-*` heading: 15
 
 Reconciliation outcomes:
 
-- <a id="fw-p2-76"></a>`FW-P2-76` is removed from the active queue because Chat accepted Sprint 87 — Coordinated Swift-6 Migration at `93c068c23027a8cd59753ac4ac916e6cee75adbf`. All native targets are Swift 6; V17, ADR-046 and Personal-v1 UNDECLARED / NOT CERTIFIED remain unchanged. `FW-P2-67` now records the satisfied static ownership gate and Chat-authorized Sprint 88, with native parity still required.
+- <a id="fw-p2-67"></a>`FW-P2-67` — App Shell and Workflow Decomposition is completed and removed from the active queue because Chat accepted Sprint 88 at `4f5eeb7b11c0f5879204a06ae9f08045304342b5` under `SPRINT_88_APP_SHELL_DECOMPOSITION_ACCEPTED`. The shell/workflow ownership prerequisite is `SATISFIED`; no migration or ADR consequence. Other candidates retain their priorities/statuses and remaining gates; FW-P2-77 organization and FW-P2-51 bounded parallel preparation remain separately unscheduled. Sprint 89 is planned, not implementation-authorized. [PROJECT_STATE.md](PROJECT_STATE.md) records the accepted boundary and evidence.
+
+- <a id="fw-p2-76"></a>`FW-P2-76` is removed from the active queue because Chat accepted Sprint 87 — Coordinated Swift-6 Migration at `93c068c23027a8cd59753ac4ac916e6cee75adbf`. All native targets are Swift 6; V17, ADR-046 and Personal-v1 UNDECLARED / NOT CERTIFIED remain unchanged. The formerly outstanding `FW-P2-67` shell prerequisite is now `SATISFIED` by accepted Sprint 88, recorded above.
 
 - `FW-P2-72` is removed from the active queue because Sprint 81 completed and Chat accepted the PR-1 staging/runtime-publication ownership seam at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`.
 - `FW-P1-19` is removed from the active queue because Sprint 82 completed and Chat accepted the serial Unified Import Centre foundation at implementation commit `d239f939088b67e5a90c65117f08592891be17bb`. Its serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership, duplicate/recovery preservation and no-parallel-preparation evidence are recorded in `PROJECT_STATE.md` and the current roadmap.
@@ -5727,7 +5730,7 @@ Conform remaining destination toolbars to functional, page-specific controls wit
 
 **Typed dependencies:**
 
-- `REQUIRES_IMPLEMENTATION` → `FW-P2-67`: The App Shell and Workflow Decomposition boundary must provide: Five-phase shell extraction blueprint in packet.. This enables Page-specific native toolbar/commands. Remaining condition: Stable destination workflows and exact command/action inventory.
+- `SATISFIED` → accepted Sprint 88 (`FW-P2-67`, `4f5eeb7b11c0f5879204a06ae9f08045304342b5`): behavior-preserving shell/sidebar/contextual-toolbar and lazy destination seams are implemented. Page-specific native toolbar/commands, their exact command/action inventory and their own runtime parity remain this candidate's separate gate; this acceptance does not promote its status.
 - `REQUIRES_RUNTIME_ACCEPTANCE` → `runtime-contextual-command-parity`: Toolbar-specific keyboard/menu/confirmation parity is its own acceptance check; cross-screen keyboard closure consumes the implemented toolbar, not vice versa.
 
 **Pinned evidence references:**
@@ -6059,7 +6062,7 @@ Evidence boundary: read-only archive declared as af2d1949c6e9a73af3bb004422b7288
 | Preview meaning | Project documents/UI_UX_v1.0_Frozen.md:480-553, Import Workflow and Preview | Binding workflow authority. Preserve source/statement summary, identity review, transactions, validation/duplicate outcome and explicit confirmation distinctions. |
 | Responsive and scroll behavior | UI_UX_v1.0_Frozen.md:720-729 and UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md:27-45,204-212 | Subject authority. One obvious scroll owner, visible focus/selection, responsive hierarchy; not native certification. |
 | Existing FW owner | FW-P2-48 R1 Cross-Screen Visual Polish, FUTURE_WORK.MD:1859-1870 | Owns responsive/cross-screen presentation after stable layouts. FW-P2-49 owns native acceptance. |
-| Conditional structural coordination | FW-P2-67, FUTURE_WORK.MD:2137-2165 | Coordinate only if selected shell extraction changes composition; it is not the design owner. |
+| Conditional structural coordination | Accepted Sprint 88 (completed FW-P2-67) | Optional structural coordination is SATISFIED by the accepted extraction; it is not a layout prerequisite or the design owner. |
 | Explicit non-owner: terminology | FW-P2-40, FUTURE_WORK.MD:1751-1762 | Wording/provenance only, not panel geometry. |
 | Explicit non-owner: editable preview | FW-P1-22, FUTURE_WORK.MD:975-991 | Correction/provenance only, not placement. |
 | Suggested FW-P2-02 | No active FW-P2-02 occurs in pinned FUTURE_WORK, discovery register, UI/UX authority, or target matrix. | Do not invent/revive ID. Attach the discovery to FW-P2-48 and FW-P2-49 dependency. |
@@ -6108,7 +6111,7 @@ Root may append a clearly marked unaccepted appendix named DRAFT - Import Previe
 
 ## Matrix and revalidation
 
-This adds a second-level discovery row under FW-P2-48, with FW-P2-49 as REQUIRES_RUNTIME_ACCEPTANCE and FW-P2-67 conditional structural coordination. It creates no new FW ID, replaces no campaign, affects no personal-v1 DAG, and is independent of FX/current-historical conversion scope. No verified P0, parser, financial, or privacy defect was found.
+This historical discovery adds a second-level row under FW-P2-48, with FW-P2-49 as REQUIRES_RUNTIME_ACCEPTANCE and conditional structural coordination from FW-P2-67 (now SATISFIED by accepted Sprint 88). It creates no new FW ID, replaces no campaign, affects no personal-v1 DAG, and is independent of FX/current-historical conversion scope. No verified P0, parser, financial, or privacy defect was found.
 
 
 <details>
@@ -6142,7 +6145,7 @@ This adds a second-level discovery row under FW-P2-48, with FW-P2-49 as REQUIRES
 
 - `REQUIRES_IMPLEMENTATION` → `FW-P2-78`: The LF-UI-2026-09-R1 Dashboard Implementation boundary must provide: Dashboard supports native values only.. This enables Rebalance existing read-only Import preview placement without changing source order, identity/validation/confirmation, selection or financial semantics; FW-P2-48 owns it. Remaining condition: Compare the subjective wide right-column preview proposal with a responsive shared/full-width fallback, preserve accepted Import semantics, then independently verify native width/long-validation/scroll/focus/VoiceOver/footer behavior.
 - `REQUIRES_RUNTIME_ACCEPTANCE` → `FW-P2-49`: Independent native resize/keyboard/VoiceOver and action-visibility acceptance; user feedback is subjective.
-- `OPTIONAL_ENHANCEMENT` → `FW-P2-67`: Coordinate only if selected shell decomposition changes the composition; not a prerequisite for the layout discovery.
+- `OPTIONAL_ENHANCEMENT` → accepted Sprint 88 (`FW-P2-67`): optional structural coordination is `SATISFIED`; it remains optional, is not a prerequisite for layout discovery and does not establish layout/native acceptance.
 
 **Pinned evidence references:**
 
@@ -6502,7 +6505,7 @@ Presentation sorting must never rewrite source order, running-balance semantics 
 
 **Typed dependencies:**
 
-- `REQUIRES_IMPLEMENTATION` → `FW-P2-67`: The App Shell and Workflow Decomposition boundary must provide: Five-phase shell extraction blueprint in packet.. This enables Generation-pinned transient filters; native-currency totals. Remaining condition: Sprint-89 selection plus independent filter/sort/total oracle and native procedure.
+- `SATISFIED` → accepted Sprint 88 (`FW-P2-67`, `4f5eeb7b11c0f5879204a06ae9f08045304342b5`): the shell/destination ownership seam is implemented. Generation-pinned transient filters and native-currency totals remain unimplemented here; Sprint-89 Chat entry review/authorization, the independent filter/sort/total oracle and native procedure remain separate gates.
 - `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-sprint89-oracle`: The explicitly named gate decision-sprint89-oracle must be satisfied. This enables Generation-pinned transient filters; native-currency totals. Remaining condition: Sprint-89 selection plus independent filter/sort/total oracle and native procedure.
 
 **Pinned evidence references:**
@@ -7034,82 +7037,6 @@ Production repair remains governed by `FW-P0-08`. Sprint 47 completed focused fa
 
 ---
 
-<a id="fw-p2-67"></a>
-
-## FW-P2-67 — App Shell and Workflow Decomposition
-
-**Status:** Maintenance
-**Depends on:** Stable current navigation, window structure and import behaviour; PR-1 where hydration/runtime-store ownership is touched
-
-**Sprint 80 ownership boundary:** Any decomposition that touches hydration,
-runtime stores or import coordination must follow PR-1's explicit staging and
-MainActor publication seam. The accepted serial Import Centre boundary does not
-authorize a parallel coordinator or a Swift-6 migration as part of this
-maintenance item.
-
-Decompose the monolithic SwiftUI application shell while preserving approved financial behaviour and the current product design.
-
-Required direction includes:
-
-- the root scene owning structural composition rather than financial workflows;
-- purpose-owned views for major presentation domains;
-- import preparation, confirmation and result coordination moved out of presentation-only views;
-- persistence lifecycle and provider state coordinated outside ordinary view rendering;
-- repository hydration coordination moved behind an explicit workflow or application boundary;
-- repository, provider and `RepositoryStoreHydrator` authority preserved;
-- existing navigation, keyboard behaviour, accessibility and window behaviour retained unless separately approved;
-- no financial-domain redesign merely to complete the structural refactor.
-
-The exact file names, scene hierarchy and coordinator types require implementation planning. This candidate does not authorize an application architecture rewrite.
-
-**Current disposition — 2026-09-10:** `CURRENT / CHAT-AUTHORIZED` for Sprint 88. **Static gate satisfied:** Chat revalidated provider/hydrator/actor ownership at accepted Sprint 87 `93c068c23027a8cd59753ac4ac916e6cee75adbf` and continuation head `b2f7ac2a6a517c1365b93274e2ba868b5068a7a4`. `LedgerForgeApp` retains persistence bootstrap/WindowGroup ownership; `ContentView` retains shell/navigation, availability, feature view models, import presentation and startup triggering; ADR-024 `RepositoryStoreHydrator` and MainActor `ProductionImportCentre` retain their authority. **Remaining acceptance:** pre-edit characterization and native behavioral parity on the final bounded extraction; these are not already-passed gates.
-
-**Smallest proposed boundary:** Five-phase shell extraction blueprint in packet.
-
-**Decision record:** [SHELL88_AND_SPRINT89_NATIVE_PROCEDURE](<Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md#packet-shell88-and-sprint89-native-procedure>).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: ContentView is 4,103 lines and owns navigation, hydration startup, multiple view models, import presentation and DEBUG profile state; app root is WindowGroup -> ContentView.
-
-**First-round scope and constraints:** Behavior-preserving; preserve repository/hydrator/provider authority and R1 shell direction; do not bundle Swift-6, parallel coordinator, financial redesign or broad moves. No file-tree consolidation, database/provider rewrite, concurrency migration, or navigation redesign.
-
-**First-round question/options:** How should the shell be decomposed without physical reorganization? Extract presentation subviews only; create explicit app workflow boundary; broad architecture rewrite. The first two should be phased under Sprint 88.
-
-**First-round remainder and implications:** MISSING: a responsibility map and stable pre/post behavioral contract; runtime regression evidence. No migration; ADR only if authority changes.
-
-**First-round proposed acceptance/falsifier:** Existing targeted behavior plus hydration, cancellation, keyboard/accessibility and lifecycle parity; runtime as required by future packet. Extraction changes owner/publication order or introduces new coordinator semantics.
-
-**Second-round new evidence/resolved direction:** Five-phase extraction and native acceptance procedure.
-
-**Exact next evidence or decision:** Task-owned native runtime evidence
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Execute the bounded Sprint-88 contract after characterization; native parity remains implementation acceptance. **Roadmap:** Sprint 88 is CURRENT / CHAT-AUTHORIZED; Sprint 89 and unrelated candidate priorities/statuses remain unchanged.
-
-**Publication delta:** `POST_SWIFT6_STATIC_GATE_SATISFIED` by Chat's exact accepted Sprint-87/current-head ownership revalidation. Native runtime parity remains unverified Sprint-88 acceptance evidence.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** MACOS_PLATFORM, ACCESSIBILITY_ACCEPTANCE, DEPENDENCY.
-
-**Typed dependencies:**
-
-- `SATISFIED` → accepted PR-1/PR-2/PR-3/TEST-PR and Sprint 87: existing provider, hydration, actor and serial Import Centre ownership is revalidated. The five-phase shell blueprint is planning guidance; native parity is still required for Sprint-88 acceptance. FW-P2-77 source-tree organization remains separately excluded.
-
-**Pinned evidence references:**
-
-- [ContentView.swift](<../ContentView.swift>):1322-1480 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `c315381adf31633a27671b14499fc5dd12d7b794af047c82cfb2acf67990202b` — ContentView
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1683-1707 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-67
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):2137-2165 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Shell decomposition must preserve runtime ownership.
-- [ContentView.swift](<../ContentView.swift>):1443-1624 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Archive has a custom monolithic shell.
-
-</details>
-
----
-
 <a id="fw-p2-69"></a>
 
 ## FW-P2-69 — Remaining macOS CI and UI Smoke Validation
@@ -7333,9 +7260,9 @@ Explicit boundaries:
 - no migration;
 - no speculative target tree accepted before discovery.
 
-Cross-links: `FW-P2-67` owns app-shell/workflow decomposition; `FW-P2-71` owns Xcode/user-metadata hygiene; `FW-P2-77` owns repository organization/naming discovery.
+Cross-links: accepted Sprint 88 (completed `FW-P2-67`) supplies the `SATISFIED` shell/workflow ownership boundary; `FW-P2-71` owns Xcode/user-metadata hygiene; `FW-P2-77` owns repository organization/naming discovery.
 
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Shell ownership clarity and target/path-consumer map.
+**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Target/path-consumer map against accepted Sprint-88 shell ownership.
 
 **Smallest proposed boundary:** No moves before source boundary map.
 
@@ -7354,7 +7281,7 @@ Cross-links: `FW-P2-67` owns app-shell/workflow decomposition; `FW-P2-71` owns X
 
 **Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: root contains mixed layer/feature directories and a 4,103-line ContentView; Xcode groups include docs and synchronized UI assets with explicit target exceptions. R1 package is excluded but AGENTS.md is a resource. Second-level disposition is the exact decision/dependency/deferral stated here.
 
-**Exact next evidence or decision:** Exact next evidence/decision: Shell ownership clarity and target/path-consumer map. Owning authority: FW-P2-77 pinned queue scope and the named dependency below.
+**Exact next evidence or decision:** Exact next evidence/decision: Target/path-consumer map against accepted Sprint-88 shell ownership. Owning authority: FW-P2-77 pinned queue scope and the named dependency below.
 
 **Personal-v1:** POST_V1
 
@@ -7368,7 +7295,7 @@ Cross-links: `FW-P2-67` owns app-shell/workflow decomposition; `FW-P2-71` owns X
 
 **Typed dependencies:**
 
-- `REQUIRES_IMPLEMENTATION` → `FW-P2-67`: The App Shell and Workflow Decomposition boundary must provide: Five-phase shell extraction blueprint in packet.. This enables No moves before source boundary map. Remaining condition: Shell ownership clarity and target/path-consumer map.
+- `SATISFIED` → accepted Sprint 88 (`FW-P2-67`, `4f5eeb7b11c0f5879204a06ae9f08045304342b5`): shell/workflow ownership clarity is established. The target/path-consumer map and any physical moves remain separate unscheduled FW-P2-77 discovery/authorization work; no organization work or overall status change follows from this closure.
 
 **Pinned evidence references:**
 
