@@ -1,115 +1,82 @@
-# LedgerForge – Architecture Decision Records (ADR)
+# Architecture decision records
 
-This document records significant architectural decisions made during the development of LedgerForge.
+One numeric register of accepted architecture. Current [product state](PROJECT_STATE.md), [scope decisions](SCOPE_DECISIONS.md) and open [queue](FUTURE_WORK.MD) own their separate facts. Original accepted bodies and historical limitations remain intact; a later alignment does not retroactively change what was implemented or tested.
 
-Each ADR captures:
-- The problem.
-- The decision.
-- The reasoning.
-- The long-term consequences.
+## Reading and maintenance
 
-These records explain *why* the architecture evolved the way it did.
+1. Read the selected ADR's current applicability/alignment, then its original decision in historical context.
+2. Apply later accepted ADRs and explicit owner decisions where they supersede earlier limits.
+3. Check current state for implementation/support and the approved prompt for execution authority.
 
+Order inherits [Guide rule G](Project_Guide.md#documentation-order): ADR number ascending; dated alignments newest first, undated alignments after dated ones; original record interiors remain unchanged. No new ADR number is allocated here. Schema/fixture/protocol capacity is not production support. Historical artifact permissions do not override the current owner source-processing rule.
 
-## Record Governance and Current Baseline
+## Current scope applicability — 2026-09-11
 
-Architecture decisions are historical records.
+[SCOPE_DECISIONS](SCOPE_DECISIONS.md) supersedes historical generalized public/commercial/platform proposals and owns the retained local exceptions. Rejected work is not an architecture program or dependency. R1 requires practical owner usability and simple local appearance; formal accessibility and advanced portability programs are excluded. Existing exact credentials, diagnostics, schema and financial/persistence contracts remain. No implementation is accepted by this documentation refactor.
 
-The original decision text below is preserved. Current-state corrections are additive and appear in dated **Current Alignment** blocks. A later implementation, migration or ADR may supersede an earlier limitation without erasing the evidence that the earlier decision existed.
+## Numeric index
 
-When reading this file:
+| ADR | Decision |
+| --- | --- |
+| [ADR-001](#adr-001) | Offline-First Architecture |
+| [ADR-002](#adr-002) | Dashboard-First Product |
+| [ADR-003](#adr-003) | Generic Import Engine |
+| [ADR-004](#adr-004) | Explainable Automation |
+| [ADR-005](#adr-005) | Import Profiles |
+| [ADR-006](#adr-006) | Financial Dashboard as Single Source of Truth |
+| [ADR-007](#adr-007) | Explain Before Automating |
+| [ADR-008](#adr-008) | Multi-Currency Domain Model |
+| [ADR-009](#adr-009) | Reactive Store Architecture |
+| [ADR-010](#adr-010) | Validation Before Persistence |
+| [ADR-011](#adr-011) | Unified FinancialDocument Pipeline |
+| [ADR-012](#adr-012) | Separation of Readers and Parsers |
+| [ADR-013](#adr-013) | Store Ownership |
+| [ADR-014](#adr-014) | Document-First Architecture |
+| [ADR-015](#adr-015) | Automatic Password Management |
+| [ADR-016](#adr-016) | Universal Import Pipeline |
+| [ADR-017](#adr-017) | Deterministic Before Intelligent |
+| [ADR-018](#adr-018) | Unified Import Framework Operational |
+| [ADR-019](#adr-019) | Reference Fixtures Define Financial Truth |
+| [ADR-020](#adr-020) | Deterministic Institution Detection |
+| [ADR-021](#adr-021) | Deterministic Statement Classification |
+| [ADR-022](#adr-022) | Preview Compatibility During Test Builds |
+| [ADR-023](#adr-023) | Frozen UI/UX Architecture |
+| [ADR-024](#adr-024) | Repository Hydration Boundary |
+| [ADR-025](#adr-025) | Stable Financial Entity Identity |
+| [ADR-026](#adr-026) | Structured Developer Diagnostics |
+| [ADR-027](#adr-027) | Parser-Owned Financial Identifier Extraction |
+| [ADR-028](#adr-028) | Bounded Parser Source Evidence |
+| [ADR-029](#adr-029) | User-Confirmed Financial Identifier Attachment |
+| [ADR-030](#adr-030) | Versioned Exact-Content Fingerprints and Atomic Import-History Commit |
+| [ADR-031](#adr-031) | Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking |
+| [ADR-032](#adr-032) | Durable Import Attempt History and Rejected-Outcome Semantics |
+| [ADR-033](#adr-033) | Deterministic Money and Native-Currency Integrity |
+| [ADR-034](#adr-034) | Document-Scoped Card Statement Evidence |
+| [ADR-035](#adr-035) | Development Database Lifecycle and Recoverable Reset |
+| [ADR-036](#adr-036) | Category Identity, Assignment, and Mutable Transaction Metadata |
+| [ADR-037](#adr-037) | Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal |
+| [ADR-038](#adr-038) | Atomic Confirmed Import and Durable Identifier Ownership |
+| [ADR-039](#adr-039) | Trusted Statement Dates and Durable Source Provenance |
+| [ADR-040](#adr-040) | Explicit Reviewed Partial-Overlap Import |
+| [ADR-041](#adr-041) | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority |
+| [ADR-042](#adr-042) | Exact Cross-Format Statement Equivalence and Supporting-Source Persistence |
+| [ADR-043](#adr-043) | Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts |
+| [ADR-044](#adr-044) | Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence |
+| [ADR-045](#adr-045) | Qatar Airways Salary Actuals and Current-Month Funding Planner |
+| [ADR-046](#adr-046) | Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation |
 
-1. read the ADR's **Current Alignment** block;
-2. read the original decision in its historical context;
-3. apply later accepted ADRs where they extend or supersede the earlier decision;
-4. use `PROJECT_STATE.md` for verified implementation reality;
-5. use `FUTURE_WORK.MD` for unscheduled work.
-
-**Status alignment date:** 2026-09-09
-**Repository/planning alignment reviewed through:** `main@a560312db5900645779a499016e13f0c87e81435` — R1 documentation/planning publication. The accepted startup/monthly-planner product implementation/package remains `6455f662dd0ea8896d19af3e67be51546badb3ae`; `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` is subsequent non-product cleanup.
-**Latest technically accepted production implementation:** unnumbered startup reliability and monthly-planner package, including non-negative configured-fee validation; the earlier authentic-parser reset remains closed and Sprint 79 remains the latest accepted numbered implementation
-**Latest verified Debug development-tooling implementation:** accepted startup recurrence-prevention tooling; DBP-01 remains the developer-profile architecture
-**Latest completed numbered implementation outcome:** Sprint 79
-**Latest accepted ADR:** ADR-046 — Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation (architecture authority; no product implementation or migration implied)
-**Current migration:** V17; V1–V16 remain immutable
-
-No alignment note authorizes implementation.
-
-## Current Alignment — 2026-09-11 — Private Personal App Scope
-
-The explicit owner scope reset in PROJECT_STATE.md and the Private Personal App Scope Gate supersede historical forward-looking product proposals wherever they imply generalized public/commercial/platform work. Rejected categories are not active architecture programs or dependencies. R1 now requires ordinary owner usability and simple device-local System/Light/Dark appearance with optional approved Indigo/accent direction; formal accessibility and advanced preference-portability programs are excluded. Existing parser-profile provenance, exact credential behavior, Developer Console, workspace schema and accepted financial/persistence architecture remain intact. This is an additive scope alignment only: no original ADR decision text, new ADR, migration or product implementation is changed or accepted.
-
-## Current ADR Index
-
-| ADR | Decision | Current standing | Implementation |
-|---|---|---|---|
-| ADR-001 | Offline-First Architecture | Accepted foundational decision. | Operational as a product and persistence constraint. |
-| ADR-002 | Dashboard-First Product | Accepted foundational product decision. | Reflected in the current Dashboard-first application shell. |
-| ADR-003 | Generic Import Engine | Accepted and implemented incrementally. | Unified import orchestration became operational in Sprint 11C and was extended by later ADRs. |
-| ADR-004 | Explainable Automation | Accepted, amended by ADR-037. | Explainability and inspectability remain binding. |
-| ADR-005 | Import Profiles | Accepted product and architecture direction; general framework not implemented. | Current production persistence records parser profile ID/version as provenance under ADR-039. |
-| ADR-006 | Financial Dashboard as Single Source of Truth | Accepted product principle. | Consolidated in effect with ADR-002. |
-| ADR-007 | Explain Before Automating | Accepted foundational automation principle. | Applies to future rules, suggestions and financial intelligence. |
-| ADR-008 | Multi-Currency Domain Model | Accepted and extended by ADR-033. | The Money/native-currency foundation was implemented in Sprint 44 without a migration. |
-| ADR-009 | Reactive Store Architecture | Accepted, refined by ADR-024. | Stores own observable runtime state. |
-| ADR-010 | Validation Before Persistence | Accepted, refined by ADR-032, ADR-038 and ADR-039. | Validation remains mandatory before accepted persistence. |
-| ADR-011 | Unified FinancialDocument Pipeline | Accepted architectural direction. | Exact supported Axis, HDFC and CBQ bank-account profiles use the shared pipeline; no generic institution or layout support is implied. |
-| ADR-012 | Separation of Readers and Parsers | Accepted and implemented. | Readers own extraction; parsers own financial interpretation. |
-| ADR-013 | Store Ownership | Accepted, refined by ADR-024. | Dedicated stores own runtime domain state. |
-| ADR-014 | Document-First Architecture | Accepted product direction. | Document-oriented extraction and classification foundations exist. |
-| ADR-015 | Automatic Password Management | Accepted and implemented as shared exact-profile PDF credential infrastructure. | Exact Amex/CBQ profiles and the Sprint 78B Axis App/traditional PDF families are proven consumers; Axis uses two independent canonical scopes and broader encrypted-document support remains outside the boundary. |
-| ADR-016 | Universal Import Pipeline | Accepted, superseded in part by ADR-030, ADR-031, ADR-032, ADR-038 and ADR-039. | The unified pipeline remains authoritative, but its current ordering and persistence boundary have changed. |
-| ADR-017 | Deterministic Before Intelligent | Accepted foundational principle. | Deterministic processing remains mandatory at trusted boundaries. |
-| ADR-018 | Unified Import Framework Operational | Accepted and implemented in Sprint 11C. | CSV entered the unified framework. |
-| ADR-019 | Reference Fixtures Define Financial Truth | Historical accepted decision; superseded by ADR-046 as current fixture/source-support authority. | Original fixture-based acceptance remains historical record only; synthetic/sanitized/reconstructed financial-source fixtures cannot certify current parser support. |
-| ADR-020 | Deterministic Institution Detection | Accepted and implemented in Sprint 12C. | Institution detection is a deterministic pipeline stage. |
-| ADR-021 | Deterministic Statement Classification | Accepted and implemented in Sprint 13. | Statement classification is a deterministic pipeline stage. |
-| ADR-022 | Preview Compatibility During Test Builds | Accepted and implemented as a toolchain-compatibility decision. | Historical Sprint 18 build compatibility evidence remains valid for that toolchain. |
-| ADR-023 | Frozen UI/UX Architecture | Accepted; current design alignment is LF-UI-2026-09-R1 for its bounded scope. | Frozen hierarchy remains authoritative; R1 design approval is not native implementation acceptance. |
-| ADR-024 | Repository Hydration Boundary | Accepted and implemented. | RepositoryStoreHydrator is the sole persistence-to-runtime boundary. |
-| ADR-025 | Stable Financial Entity Identity | Accepted and implemented, then extended by ADR-027, ADR-029, ADR-038, ADR-039, ADR-043 and ADR-044. | Strong parser-owned identifiers remain ownership authority; bounded masked/source observations never become strong identifiers. |
-| ADR-026 | Structured Developer Diagnostics | Accepted and implemented in Sprint 31. | Structured diagnostics remain in-memory, bounded and privacy-safe. |
-| ADR-027 | Parser-Owned Financial Identifier Extraction | Accepted and implemented through Sprints 33, 35 and 36. | Verified financial identifiers originate exclusively in approved StatementParser implementations. |
-| ADR-028 | Bounded Parser Source Evidence | Accepted and implemented in Sprint 34. | Bounded transient pre-transaction source context supports parser-owned interpretation. |
-| ADR-029 | User-Confirmed Financial Identifier Attachment | Accepted and implemented in Sprint 38; atomicity limitation superseded by ADR-038 implementation. | Explicit Use Existing Account versus Create New Account control remains authoritative for eligible no-match cases. |
-| ADR-030 | Versioned Exact-Content Fingerprints and Atomic Import-History Commit | Accepted and implemented in Sprint 39; persistence/concurrency limitations superseded in part by ADR-038 implementation. | ledgerforge.raw-text.sha256.v1 remains the exact reader-text authority. |
-| ADR-031 | Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking | Accepted and implemented in Sprint 41; concurrency boundary extended by ADR-038 implementation. | ledgerforge.transaction-event.axis-upi-reference.v1 remains limited to approved account-scoped Axis UPI evidence. |
-| ADR-032 | Durable Import Attempt History and Rejected-Outcome Semantics | Accepted and implemented in Sprint 42; atomicity limitation superseded by ADR-038 implementation. | Durable attempts remain distinct from accepted import sessions. |
-| ADR-033 | Deterministic Money and Native-Currency Integrity | Accepted and implemented in Sprint 44; the catalog authority was extended in Sprint 76A. | Money, `ledgerforge.currency-catalog.v2` with 155 active ordinary ISO-backed currencies, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation are operational. |
-| ADR-034 | Document-Scoped Card Statement Evidence | Accepted and implemented for the exact Sprint 76 American Express profile; refined by ADR-044. | The document-scoped evidence boundary is operational for `amex.credit-card.pdf@1`; no generic card-family support follows. |
-| ADR-035 | Development Database Lifecycle and Recoverable Reset | Accepted and implemented in Sprint 45 Phase A; expanded by DBP-01 on 2026-07-29. | Four DEBUG-only profiles, lifecycle-owned observer-atomic switching and reset, non-current warnings and generation-scoped protected-action acknowledgement are operational; all profile machinery is absent from Release. |
-| ADR-036 | Category Identity, Assignment, and Mutable Transaction Metadata | Accepted and implemented in Sprint 57; reconciliation closure aligned 2026-07-26. | Flat durable categories, current assignments, canonical hydration and category-specific reconciliation blocking/retry are operational; hierarchy and parent selection remain deferred. |
-| ADR-037 | Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal | Accepted contract-first architecture; no executable mutation family implemented. | The shared lifecycle remains architecture-only. |
-| ADR-038 | Atomic Confirmed Import and Durable Identifier Ownership | Accepted and implemented in Sprint 50. | Migration V5, provider-owned atomic confirmed import, durable identifier ownership/observations, provider parity and subprocess contention acceptance are operational. |
-| ADR-039 | Trusted Statement Dates and Durable Source Provenance | Accepted and implemented in Sprint 52, with Sprint 52A corrective closure. | Migration V6, StatementDate, date-role/timezone evidence, parser-profile provenance, source ordinal/digest relationships and strict hydration are operational. |
-| ADR-040 | Explicit Reviewed Partial-Overlap Import | Accepted; architecture and V7 compatibility structures remain readable and validated, but the former Axis production partial-overlap family is suspended. | Mixed supported overlap currently fails closed pending new immutable source evidence and an independently derived direction/event oracle. |
-| ADR-041 | Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority | Accepted and implemented in Sprint 63. | Immutable source snapshots and exact source-byte fingerprint authority are operational for supported CSV, PDF and XLS imports. |
-| ADR-042 | Exact Cross-Format Statement Equivalence and Supporting-Source Persistence | Accepted and implemented in Sprint 73. | Exact whole-statement equivalence is operational only for the independently approved HDFC bank-account PDF/XLS v1 pair. |
-| ADR-043 | Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts | Accepted and implemented in Sprint 75. | Exact CBQ history XLS, history PDF and monthly PDF sources coexist through bounded masked/full account resolution and one canonical transaction with durable per-source observations. |
-| ADR-044 | Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence | Accepted and implemented in Sprint 76; amended and implemented in Sprints 76A, 77 and 78B. | The shared provider-owned card domain through Migration V15 supports exact Amex, CBQ and Axis boundaries, including Axis zero-instrument liability ownership and representation-neutral PDF/XLSX equivalence without generic card support. |
-| ADR-045 | Qatar Airways Salary Actuals and Current-Month Funding Planner | Accepted and implemented in Sprint 79; historical implementation architecture remains recorded. | Salary domain/planner and Migration V16 remain implemented; current parser reliability certification is separately governed by ADR-046. |
-| ADR-046 | Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation | Accepted by explicit user decision on 2026-09-01; complete registered-corpus implementation technically accepted on 2026-09-09. | Current parser/import/source-support authority; the unnumbered reset implements its reliability boundary through additive Migration V17 without changing the original architecture decision. |
-
-## Alignment Policy
-
-- Original ADR decision text is retained.
-- Current Alignment blocks are authoritative for present status.
-- Historical limitations are not silently deleted.
-- A decision is not marked implemented without verified repository evidence.
-- Fixture presence, schema capacity, protocol presence or UI placeholders do not establish production support. Under ADR-046, synthetic/sanitized/reconstructed financial-source fixtures are prohibited as parser/source regression or acceptance authority; complete affected authentic corpora are required.
-- Future corrections should add a dated amendment or a new ADR rather than retroactively rewriting architectural history.
-
----
-
+<a id="adr-001"></a>
 
 # ADR-001 — Offline-First Architecture
-
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted foundational decision.
 - **Implementation:** Operational as a product and persistence constraint.
 - **Current qualification:** The statement that categorization and reporting remain fully functional offline is a product-direction requirement, not a claim that the current category or reporting domains are implemented.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -130,14 +97,19 @@ LedgerForge is designed as an offline-first application. All core functionality 
 
 ---
 
-# ADR-002 — Dashboard-First Product
 
+<a id="adr-002"></a>
+
+# ADR-002 — Dashboard-First Product
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted foundational product decision.
 - **Implementation:** Reflected in the current Dashboard-first application shell.
 - **Current qualification:** This ADR defines product priority, not analytical support. Dashboard cards still require repository-backed financial authority.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -153,14 +125,19 @@ All new features should improve the dashboard, reduce manual work or increase co
 
 ---
 
-# ADR-003 — Generic Import Engine
 
+<a id="adr-003"></a>
+
+# ADR-003 — Generic Import Engine
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented incrementally.
 - **Implementation:** Unified import orchestration became operational in Sprint 11C and was extended by later ADRs.
 - **Current qualification:** Supporting a new institution still requires independently approved reader, detection, classification, parser, validation, identity, duplicate, persistence and complete authentic-corpus boundaries under ADR-046. A parser profile or synthetic fixture alone is not sufficient.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -176,14 +153,19 @@ The codebase remains scalable as supported institutions grow.
 
 ---
 
-# ADR-004 — Explainable Automation
 
+<a id="adr-004"></a>
+
+# ADR-004 — Explainable Automation
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted, amended by ADR-037.
 - **Implementation:** Explainability and inspectability remain binding.
 - **Current qualification:** The original universal reversibility language is no longer authoritative. ADR-037 requires each financial-mutation family to be explicitly classified as reversible, compensatable, irreversible or unsupported.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -199,14 +181,19 @@ Rules, AI assistance and automation must expose the reasoning behind every decis
 
 ---
 
-# ADR-005 — Import Profiles
 
+<a id="adr-005"></a>
+
+# ADR-005 — Import Profiles
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted product and architecture direction; general framework not implemented.
 - **Implementation:** Current production persistence records parser profile ID/version as provenance under ADR-039.
 - **Current qualification:** Parser-profile provenance is not a reusable user-managed Import Profile repository, learned mapping system or automatic profile promotion mechanism.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -224,14 +211,19 @@ Financial institutions evolve their exports over time. Profiles allow LedgerForg
 
 ---
 
-# ADR-006 — Financial Dashboard as Single Source of Truth
 
+<a id="adr-006"></a>
+
+# ADR-006 — Financial Dashboard as Single Source of Truth
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted product principle.
 - **Implementation:** Consolidated in effect with ADR-002.
 - **Current qualification:** The Dashboard is the primary experience, but it is not the durable source of truth. Repositories remain authoritative under ADR-024.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -247,14 +239,19 @@ Development priorities should favour insights, automation and confidence over im
 
 ---
 
-# ADR-007 — Explain Before Automating
 
+<a id="adr-007"></a>
+
+# ADR-007 — Explain Before Automating
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted foundational automation principle.
 - **Implementation:** Applies to future rules, suggestions and financial intelligence.
 - **Current qualification:** Explanation does not itself authorize persistence or mutation. Trusted writes remain governed by validation, explicit control and provider-owned boundaries.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -270,14 +267,19 @@ Rules, AI assistance and future learning systems must provide an audit trail exp
 
 ---
 
-# ADR-008 — Multi-Currency Domain Model
 
+<a id="adr-008"></a>
+
+# ADR-008 — Multi-Currency Domain Model
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and extended by ADR-033.
 - **Implementation:** The Money/native-currency foundation was implemented in Sprint 44 without a migration.
 - **Current qualification:** Exchange-rate storage, FX conversion, selectable reporting currency and consolidated mixed-currency totals remain unimplemented.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -296,14 +298,19 @@ LedgerForge is designed to manage financial data across multiple countries, inst
 
 ---
 
-# ADR-009 — Reactive Store Architecture
 
+<a id="adr-009"></a>
+
+# ADR-009 — Reactive Store Architecture
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted, refined by ADR-024.
 - **Implementation:** Stores own observable runtime state.
 - **Current qualification:** Repositories own durable truth, and RepositoryStoreHydrator is the sole persistence-to-runtime boundary. Store ownership must not be read as persistence authority.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -323,14 +330,19 @@ Separating ownership, business logic and presentation improves maintainability a
 ---
 
 
-# ADR-010 — Validation Before Persistence
 
+<a id="adr-010"></a>
+
+# ADR-010 — Validation Before Persistence
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted, refined by ADR-032, ADR-038 and ADR-039.
 - **Implementation:** Validation remains mandatory before accepted persistence.
 - **Current qualification:** Preview candidates are transient. Accepted trusted transactions are published only through the provider-owned confirmed-import graph. Rejected workflow history belongs to import attempts, not successful sessions.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -348,14 +360,19 @@ Incorrect financial data is more damaging than delayed imports. Validation shoul
 
 ---
 
-# ADR-011 — Unified FinancialDocument Pipeline
 
+<a id="adr-011"></a>
+
+# ADR-011 — Unified FinancialDocument Pipeline
 ## Current Alignment — 2026-09-01
 
 - **Decision standing:** Accepted architectural direction, refined by ADR-046.
 - **Implementation:** Supported formats continue to converge on shared downstream financial domains. Historical profile acceptances remain implementation history; current parser reliability requires complete authentic-corpus recertification.
 - **Current qualification:** Source support is gated by financial/source semantics, not stationery or incidental formatting. Different transports may share one source-family parser when their semantic contract is the same; a separate profile/parser requires a materially different source/financial semantic contract. Complete affected authentic corpora, not representative fixtures, establish current reliability.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -374,14 +391,19 @@ Keeping downstream components independent of file formats dramatically simplifie
 
 ---
 
-# ADR-012 — Separation of Readers and Parsers
 
+<a id="adr-012"></a>
+
+# ADR-012 — Separation of Readers and Parsers
 ## Current Alignment — 2026-09-01
 
 - **Decision standing:** Accepted and implemented; refined by ADR-046.
 - **Implementation:** Readers own generic extraction/evidence preservation; source-family parsers own financial interpretation.
 - **Current qualification:** Readers must preserve physical source evidence and must not encode institution-specific financial-layout decisions. For PDF, a nonfinancial/image-only/no-native-text page does not by itself invalidate an otherwise readable document. Downstream source-family analysis determines financial/nonfinancial/alternate-extraction/ambiguity meaning.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -399,14 +421,19 @@ Extraction and interpretation change for different reasons. Separating them redu
 
 ---
 
-# ADR-013 — Store Ownership
 
+<a id="adr-013"></a>
+
+# ADR-013 — Store Ownership
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted, refined by ADR-024.
 - **Implementation:** Dedicated stores own runtime domain state.
 - **Current qualification:** Repositories remain durable authority. Future stores must hydrate through RepositoryStoreHydrator and must not create parallel persistence-to-runtime paths.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -425,14 +452,19 @@ Single ownership prevents duplicated state and inconsistent dashboard calculatio
 
 ---
 
-# ADR-014 — Document-First Architecture
 
+<a id="adr-014"></a>
+
+# ADR-014 — Document-First Architecture
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted product direction.
 - **Implementation:** Document-oriented extraction and classification foundations exist.
 - **Current qualification:** The statement that PDF becomes a first-class source is aspirational. Production PDF, XLS, XLSX, TXT and OCR support remain unimplemented.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -450,14 +482,19 @@ Every supported institution provides financial documents in one or more formats.
 
 ---
 
-# ADR-015 — Automatic Password Management
 
+<a id="adr-015"></a>
+
+# ADR-015 — Automatic Password Management
 ## Current Alignment — 2026-08-27
 
 - **Decision standing:** Accepted and implemented as shared Keychain-backed PDF credential infrastructure with exact institution/profile-family scopes. Sprint 78B extends the accepted boundary to Axis without turning the reader or filenames into credential policy.
 - **Implementation:** Import coordination first attempts uncredentialed reading, then bounded remembered candidates, then a secure challenge. A canonical credential is written only after the same immutable source successfully unlocks, structurally identifies the exact supported family, parses and validates. Axis uses two independent durable canonical scopes, `axis-bank.credit-card.app-pdf` and `axis-bank.credit-card.traditional-pdf`; rotating one never overwrites the other. The unscoped `axis-bank` item and registered historical Axis item(s) are compatibility candidates only and are not rewritten merely because they succeed. Readers receive only an optional candidate and never access Keychain, UI prompting, filename selection or institution password policy.
 - **Current qualification:** The workflow is proven for exact `amex.credit-card.pdf@1`, exact `cbq.credit-card.pdf@1`, and the encrypted App/traditional PDF families accepted under `axis.credit-card.pdf@1`. Axis XLSX support is non-PDF and does not use this credential path. The decision does not claim arbitrary encrypted PDFs, filename-based institution inference or generic credential profiles. Production credentials never enter SQLite, source evidence, fixtures, private result payloads or diagnostics. Deterministic tests use injected/in-memory stores and bounded fictional real-Keychain smoke items.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -476,14 +513,19 @@ Most financial institutions consistently use the same password pattern for month
 
 ---
 
-# ADR-016 — Universal Import Pipeline
 
+<a id="adr-016"></a>
+
+# ADR-016 — Universal Import Pipeline
 ## Current Alignment — 2026-09-01
 
 - **Decision standing:** Accepted, superseded/refined in part by ADR-030, ADR-031, ADR-032, ADR-038, ADR-039 and ADR-046.
 - **Implementation:** The unified import pipeline remains authoritative; ADR-046 establishes the current batch-capable direction without authorizing implementation.
 - **Current qualification:** Canonical direction is batch intake (single import = queue length one) → unlock as required → generic source extraction → identify/segregate statements → deterministic source-family routing → adaptive semantic parser → source-owned financial events → normalize → validate/reconcile → duplicate/equivalence evaluation → explicit review/confirmation where required → provider-owned atomic persistence → one canonical database/canonical financial rows → query/extraction/presentation/viewer layers. Each statement remains independently authorized.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -554,14 +596,19 @@ This ADR extends ADR-011 by defining the complete document ingestion workflow.
 ADR-011 introduced the concept of a unified downstream pipeline. ADR-016 defines the canonical ordering of that pipeline and supersedes any earlier ordering assumptions.
 ---
 
-# ADR-017 — Deterministic Before Intelligent
 
+<a id="adr-017"></a>
+
+# ADR-017 — Deterministic Before Intelligent
 ## Current Alignment — 2026-09-01
 
 - **Decision standing:** Accepted foundational principle, refined by ADR-046.
 - **Implementation:** Deterministic processing remains mandatory at trusted financial boundaries.
 - **Current qualification:** Deterministic does **not** mean hard-coded page counts, absolute row/line coordinates or rigid stationery templates. Adaptive deterministic parsing may combine multiple reproducible source signals such as labels, column roles, data shapes, dates, Money, balance transitions, controls, continuity and ordering. AI is not required for ordinary recurring parsing and remains non-authority unless separately approved for genuine ambiguity/adjudication.
 
+
+
+## Original accepted decision
 
 ## Status
 Accepted
@@ -594,14 +641,19 @@ Structured documents should be processed using deterministic rules. AI should on
 - AI never becomes the financial source of truth.
 ---
 
-# ADR-018 — Unified Import Framework Operational
 
+<a id="adr-018"></a>
+
+# ADR-018 — Unified Import Framework Operational
 ## Current Alignment — 2026-09-01
 
 - **Decision standing:** Accepted and implemented in Sprint 11C; current parser/source acceptance is refined by ADR-046.
 - **Implementation:** The unified framework remains historical and operational infrastructure.
 - **Current qualification:** The original pipeline diagram and fixture-based observable-behaviour consequence are historical. Current routing/persistence ordering follows later ADRs; current source-family reliability requires complete authentic-corpus ordinary-production acceptance under ADR-046. Existing synthetic/reference fixtures cannot define or regression-certify financial source support.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -688,8 +740,10 @@ This establishes a single extensible architecture for every supported import for
 
 ---
 
-# ADR-019 — Reference Fixtures Define Financial Truth
 
+<a id="adr-019"></a>
+
+# ADR-019 — Reference Fixtures Define Financial Truth
 ## Current Alignment — 2026-09-01
 
 - **Decision standing:** Historical accepted decision, **superseded by ADR-046 as current fixture/source-support authority**.
@@ -697,6 +751,9 @@ This establishes a single extensible architecture for every supported import for
 - **Current qualification:** The complete registered authentic corpus is cumulative parser reliability authority. Every newly supplied recurring statement extends it unless explicitly excluded/archived. Source semantics and independently derived source-oracle facts outrank generated expected data.
 - **Historical text below:** retained verbatim to document the earlier architecture; its statement that fixtures define financial truth is no longer current authority.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -739,14 +796,19 @@ Using approved reference fixtures creates a deterministic financial baseline tha
 
 ---
 
-# ADR-020 — Deterministic Institution Detection
 
+<a id="adr-020"></a>
+
+# ADR-020 — Deterministic Institution Detection
 ## Current Alignment — 2026-09-01
 
 - **Decision standing:** Accepted and implemented in Sprint 12C; refined by ADR-046.
 - **Implementation:** Institution/source-family detection remains deterministic and explainable downstream of generic extraction.
 - **Current qualification:** Detection must use coherent semantic/content evidence rather than incidental physical coordinates or synthetic reference stationery. Complete authentic-corpus production-path evidence is required for current supported-family reliability; synthetic fixture tests cannot establish it. AI does not become ordinary detection authority.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -806,14 +868,19 @@ Deterministic rules preserve reproducibility, simplify regression testing and en
 - ADR-019 — Reference Fixtures Define Financial Truth
 ---
 
-# ADR-021 — Deterministic Statement Classification
 
+<a id="adr-021"></a>
+
+# ADR-021 — Deterministic Statement Classification
 ## Current Alignment — 2026-09-01
 
 - **Decision standing:** Accepted and implemented in Sprint 13; refined by ADR-046.
 - **Implementation:** Statement classification remains deterministic and explainable downstream of source-family detection.
 - **Current qualification:** Classification must be based on source-semantic evidence, not fixed page count, transaction count, absolute row/line position or synthetic reference stationery. Complete authentic-corpus production-path evidence is required for current family reliability; classification alone never certifies parser/persistence/end-user support.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -871,14 +938,19 @@ Separating these responsibilities keeps parser selection deterministic while all
 - ADR-020 — Deterministic Institution Detection
 ---
 
-# ADR-022 — Preview Compatibility During Test Builds
 
+<a id="adr-022"></a>
+
+# ADR-022 — Preview Compatibility During Test Builds
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented as a toolchain-compatibility decision.
 - **Implementation:** Historical Sprint 18 build compatibility evidence remains valid for that toolchain.
 - **Current qualification:** This is not a permanent prohibition on #Preview. Reintroduction requires fresh toolchain and command-line build verification.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -936,8 +1008,10 @@ Using `PreviewProvider` preserves Xcode preview functionality while avoiding the
 
 ---
 
-# ADR-023 — Frozen UI/UX Architecture
 
+<a id="adr-023"></a>
+
+# ADR-023 — Frozen UI/UX Architecture
 ## Current Alignment — 2026-09-09 — LF-UI-2026-09-R1
 
 - **Explicit user decision:** `LF-UI-2026-09-R1` is approved as the current design revision for its defined scope.
@@ -953,6 +1027,9 @@ Using `PreviewProvider` preserves Xcode preview functionality while avoiding the
 - **Implementation:** The frozen UI/UX hierarchy remains authoritative.
 - **Current qualification:** Current status alignment belongs in UI_UX_v1.0_Frozen.md. Future modules must not appear as inert navigation merely because they exist in Product Vision.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -1000,14 +1077,19 @@ This mirrors the successful approach used for `Architecture_v1.0_Frozen.md`.
 
 ---
 
-# ADR-024 — Repository Hydration Boundary
 
+<a id="adr-024"></a>
+
+# ADR-024 — Repository Hydration Boundary
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented.
 - **Implementation:** RepositoryStoreHydrator is the sole persistence-to-runtime boundary.
 - **Current qualification:** Later ADRs extend fail-closed hydration to Money, attempts, identifier observations, trusted dates, parser profiles and source provenance.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -1064,14 +1146,19 @@ It also keeps SwiftUI presentation code independent of persistence implementatio
 
 ---
 
-# ADR-025 — Stable Financial Entity Identity
 
+<a id="adr-025"></a>
+
+# ADR-025 — Stable Financial Entity Identity
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented, then extended by ADR-027, ADR-029, ADR-038 and ADR-039.
 - **Implementation:** Stable account identity, parser-owned identifiers, deterministic resolution, durable ownership and accepted-import observations are operational for the approved Axis path.
 - **Current qualification:** Examples of future financial entities do not establish parser or institution support.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -1134,8 +1221,10 @@ Stable repository identity and verified identifiers provide a deterministic foun
 
 ---
 
-# ADR-026 — Structured Developer Diagnostics
 
+<a id="adr-026"></a>
+
+# ADR-026 — Structured Developer Diagnostics
 ## Implementation Alignment — 2026-09-09
 
 Chat accepted the unnumbered startup reliability and monthly-planner package. Typed migration, provider, hydration and save diagnostics retain bounded cause/effect context, related failure references and safe next actions. Diagnostics remain deterministic, privacy-safe, bounded to 1,000 retained entries and ephemeral; Copy All preserves retained chronology and safe metadata independently of filters. No persistent diagnostic history, unrestricted export, automatic repair, migration or new architecture decision is introduced.
@@ -1146,6 +1235,9 @@ Chat accepted the unnumbered startup reliability and monthly-planner package. Ty
 - **Implementation:** Structured diagnostics remain in-memory, bounded and privacy-safe.
 - **Current qualification:** No persistent diagnostic history, unrestricted export, SQL browser or financial-truth role is authorized.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -1328,14 +1420,19 @@ ADR-026 was accepted after:
 
 ---
 
-# ADR-027 — Parser-Owned Financial Identifier Extraction
 
+<a id="adr-027"></a>
+
+# ADR-027 — Parser-Owned Financial Identifier Extraction
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented through Sprints 33, 35 and 36.
 - **Implementation:** Verified financial identifiers originate exclusively in approved StatementParser implementations.
 - **Current qualification:** Later identifier ownership and observation persistence under ADR-038 does not move verification authority out of parsers.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -1448,14 +1545,19 @@ Those changes belong to future implementation sprints.
 
 ---
 
-# ADR-028 — Bounded Parser Source Evidence
 
+<a id="adr-028"></a>
+
+# ADR-028 — Bounded Parser Source Evidence
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented in Sprint 34.
 - **Implementation:** Bounded transient pre-transaction source context supports parser-owned interpretation.
 - **Current qualification:** ADR-039 durable normalized provenance is a separate privacy-minimal post-acceptance graph. It does not authorize persistence of ADR-028 source-fragment text.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -1703,14 +1805,19 @@ Those changes require separate implementation decisions and sprints.
 * ADR-026 — Structured Developer Diagnostics
 * ADR-027 — Parser-Owned Financial Identifier Extraction
 
-# ADR-029 — User-Confirmed Financial Identifier Attachment
 
+<a id="adr-029"></a>
+
+# ADR-029 — User-Confirmed Financial Identifier Attachment
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented in Sprint 38; atomicity limitation superseded by ADR-038 implementation.
 - **Implementation:** Explicit Use Existing Account versus Create New Account control remains authoritative for eligible no-match cases.
 - **Current qualification:** The original statement that early identifier writes may survive later failure describes pre-Sprint-50 behavior. Sprint 50 places the complete accepted graph inside one provider-owned transaction.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -1844,14 +1951,19 @@ This ADR does not:
 - ADR-027 — Parser-Owned Financial Identifier Extraction
 - ADR-028 — Bounded Parser Source Evidence
 
-# ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit
 
+<a id="adr-030"></a>
+
+# ADR-030 — Versioned Exact-Content Fingerprints and Atomic Import-History Commit
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented in Sprint 39; persistence/concurrency limitations superseded in part by ADR-038 implementation.
 - **Implementation:** ledgerforge.raw-text.sha256.v1 remains the exact reader-text authority.
 - **Current qualification:** The original account/identifier residue and same-process-only confirmed-import limitations describe pre-Sprint-50 behavior. Binary-document and cross-format identity remain future work.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -1947,16 +2059,21 @@ Sprint 39 does not include transaction-level duplicate detection, overlapping-st
 
 ---
 
+
+<a id="adr-031"></a>
+
 # ADR-031 — Verified Transaction-Event Evidence and Pre-Write Duplicate Blocking
-
-> **Current alignment — Axis source-truth restoration:** Whole-import supported-overlap blocking is again universal in production. ADR-040's former Axis mixed-overlap exception is suspended because its synthetic source pair lacks immutable lineage; provider review returns unsupported evidence without accepted residue for mixed overlap.
-
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented in Sprint 41; concurrency boundary extended by ADR-038 implementation.
 - **Implementation:** ledgerforge.transaction-event.axis-upi-reference.v1 remains limited to approved account-scoped Axis UPI evidence.
 - **Current qualification:** Sprint 50 added provider-owned transaction-time revalidation and verified multi-process competition for approved writers. It did not broaden the event family.
 
+
+
+## Original accepted decision
+
+> **Current alignment — Axis source-truth restoration:** Whole-import supported-overlap blocking is again universal in production. ADR-040's former Axis mixed-overlap exception is suspended because its synthetic source pair lacks immutable lineage; provider review returns unsupported evidence without accepted residue for mixed overlap.
 
 ## Status
 
@@ -2119,16 +2236,21 @@ This ADR does not implement parser extraction, domain models, repository lookup,
 
 ---
 
+
+<a id="adr-032"></a>
+
 # ADR-032 — Durable Import Attempt History and Rejected-Outcome Semantics
-
-> **Current alignment — Axis source-truth restoration:** The durable partial-attempt schema and strict historical readback remain implemented, and any previously committed reviewed partial import retains its explicit counts. Production no longer creates a new mixed partial attempt without lineage-backed source evidence. Historical attempts remain nullable and are not reinterpreted.
-
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented in Sprint 42; atomicity limitation superseded by ADR-038 implementation.
 - **Implementation:** Durable attempts remain distinct from accepted import sessions.
 - **Current qualification:** The original statement that account or identifier side effects may precede atomic history describes pre-Sprint-50 behavior. Successful attempts now commit with the complete accepted graph.
 
+
+
+## Original accepted decision
+
+> **Current alignment — Axis source-truth restoration:** The durable partial-attempt schema and strict historical readback remain implemented, and any previously committed reviewed partial import retains its explicit counts. Production no longer creates a new mixed partial attempt without lineage-backed source evidence. Historical attempts remain nullable and are not reinterpreted.
 
 ## Status
 
@@ -2179,14 +2301,19 @@ Users gain durable, privacy-safe explanation of supported import outcomes withou
 
 ---
 
-# ADR-033 — Deterministic Money and Native-Currency Integrity
 
+<a id="adr-033"></a>
+
+# ADR-033 — Deterministic Money and Native-Currency Integrity
 ## Current Alignment — 2026-08-17
 
 - **Decision standing:** Accepted and implemented in Sprint 44.
 - **Implementation:** Money, exact decimal/minor persistence and hydration, provider parity and grouped native-currency presentation remain operational. Sprint 76A advances the offline authority to `ledgerforge.currency-catalog.v2`: 155 active ordinary ISO 4217 List One currencies with numeric minor units, compiled from the SIX 2026-01-01 publication after excluding current List Two fund codes and List One `N.A.`-scale entries.
 - **Current qualification:** Sprint 44 introduced no migration. Production non-INR import, FX storage, conversion and reporting-currency totals remain unsupported.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -2398,14 +2525,19 @@ ADR-033 does not establish QAR production support, PDF or XLS/XLSX support, card
 
 ---
 
-# ADR-034 — Document-Scoped Card Statement Evidence
 
+<a id="adr-034"></a>
+
+# ADR-034 — Document-Scoped Card Statement Evidence
 ## Current Alignment — 2026-08-17
 
 - **Decision standing:** Accepted and implemented for the exact Sprint 76 American Express profile; refined by ADR-044.
 - **Implementation:** `CardStatementEvidence` is operational through exact `amex.credit-card.pdf@1` parsing, card-aware validation, Migration V12 persistence, provider parity, hydration and bounded presentation.
 - **Current qualification:** ADR-044 supersedes ADR-034's historical persistence deferral only for the implemented shared foundation and exact American Express Middle East Platinum QAR plus CBQ v1/v2 QAR native-text PDF families. Axis, HDFC, other Amex/CBQ layouts and all other card profiles remain unsupported.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -2524,8 +2656,10 @@ ADR-034 does not implement card evidence models, parsers, persistence, migration
 
 ---
 
-# ADR-035 — Development Database Lifecycle and Recoverable Reset
 
+<a id="adr-035"></a>
+
+# ADR-035 — Development Database Lifecycle and Recoverable Reset
 ## Implementation Alignment — 2026-09-09
 
 The accepted startup package completed one owner-authorized recreation of the disposable Debug Current Database as a one-time maintenance exception. It does not establish automatic recovery, general reset authority or an adopted-database upgrade path. Ordinary startup still selects Current Database. Verification directly launched the resolved Xcode Debug product and established canonical SQLite activation, complete hydration, clean quit and same-database relaunch. The explicit guarded schema-experiment command and independent accepted-migration lock support prevention; they do not change lifecycle authority. V1–V17 definitions remain unchanged, with no migration or new architecture decision.
@@ -2553,6 +2687,9 @@ The accepted startup package completed one owner-authorized recreation of the di
 - DBP-01 added no schema migration and changed no financial parser or durable financial semantics.
 - DBP-01 does not establish production backup, arbitrary restore, financial reversal, Release database-profile control or personal-v1 adoption.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -2654,14 +2791,10 @@ ADR-035 does not authorize Release or production reset, arbitrary database delet
 
 ---
 
+
+<a id="adr-036"></a>
+
 # ADR-036 — Category Identity, Assignment, and Mutable Transaction Metadata
-
-## Current Alignment — 2026-07-24
-
-- **Decision standing:** Accepted architecture; not implemented.
-- **Implementation:** Discovery is complete and the candidate is ready for planning, subject to the approved UI supplement and current-baseline execution planning.
-- **Current qualification:** The durable repository transaction-ID prerequisite was satisfied by ADR-039/Sprint 52. The historical possible V5 number is obsolete because V5 and V6 are now consumed; the expected additive category migration is V7 unless another approved migration takes precedence.
-
 ## Implementation Amendment — 2026-07-26
 
 - Sprint 57 implemented the bounded flat durable category subset in additive Migration V8.
@@ -2671,6 +2804,15 @@ ADR-035 does not authorize Release or production reset, arbitrary database delet
 - Provider-generation replacement, development reset, temporary-session transition, recovery and relaunch use canonical hydration before stale category reconciliation state is cleared.
 - No migration was added by this reconciliation increment; Migration V8 remains unchanged.
 
+
+## Current Alignment — 2026-07-24
+
+- **Decision standing:** Accepted architecture; not implemented.
+- **Implementation:** Discovery is complete and the candidate is ready for planning, subject to the approved UI supplement and current-baseline execution planning.
+- **Current qualification:** The durable repository transaction-ID prerequisite was satisfied by ADR-039/Sprint 52. The historical possible V5 number is obsolete because V5 and V6 are now consumed; the expected additive category migration is V7 unless another approved migration takes precedence.
+
+
+## Original accepted decision
 
 ## Status
 
@@ -3385,14 +3527,19 @@ This ADR must be marked **Accepted** before category implementation begins.
 
 ---
 
-# ADR-037 — Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal
 
+<a id="adr-037"></a>
+
+# ADR-037 — Financial Mutation Planning, Authorization, Atomic Execution, and Family-Specific Reversal
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted contract-first architecture; no executable mutation family implemented.
 - **Implementation:** The shared lifecycle remains architecture-only.
 - **Current qualification:** Its historical context about partial confirmed-import side effects was superseded by ADR-038/Sprint 50 for accepted imports. That bounded import operation does not implement the generic mutation executor, audit ledger or family-specific reversal framework.
 
+
+
+## Original accepted decision
 
 ## Status
 
@@ -4407,16 +4554,21 @@ This ADR must be marked **Accepted** before source-level financial-mutation cont
 
 ---
 
+
+<a id="adr-038"></a>
+
 # ADR-038 — Atomic Confirmed Import and Durable Identifier Ownership
-
-> **Current alignment — Axis source-truth restoration:** The provider-owned partial graph remains implemented and fail-closed for historical compatibility, but no current source family is eligible to create it. New Axis mixed overlap is rejected before confirmation because the former acceptance fixture lacks immutable source lineage.
-
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented in Sprint 50.
 - **Implementation:** Migration V5, provider-owned atomic confirmed import, durable identifier ownership/observations, provider parity and subprocess contention acceptance are operational.
 - **Current qualification:** Statements below that production implementation remains pending, V5 is merely proposed or the guarantees cannot yet be claimed describe Sprint 49 architecture state and are no longer current.
 
+
+
+## Original accepted decision
+
+> **Current alignment — Axis source-truth restoration:** The provider-owned partial graph remains implemented and fail-closed for historical compatibility, but no current source family is eligible to create it. New Axis mixed overlap is rejected before confirmation because the former acceptance fixture lacks immutable source lineage.
 
 ## Status
 
@@ -4666,10 +4818,10 @@ No production guarantee may be recorded until implementation, migration safety w
 
 ---
 
+
+<a id="adr-039"></a>
+
 # ADR-039 — Trusted Statement Dates and Durable Source Provenance
-
-> **Current alignment — Axis source-truth restoration:** Typed incoming-row dispositions and recognized-row relationships remain valid durable readback contracts. New Axis bank-account imports use profile version `2`; version `1` remains historical provenance and is never rewritten. No current mixed-overlap fixture is eligible to create new dispositions.
-
 ## Current Alignment — 2026-07-24
 
 - **Decision standing:** Accepted and implemented in Sprint 52, with Sprint 52A corrective closure.
@@ -4678,6 +4830,11 @@ No production guarantee may be recorded until implementation, migration safety w
 
 
 **Status:** Accepted and implemented by Sprint 52.
+
+
+## Original accepted decision
+
+> **Current alignment — Axis source-truth restoration:** Typed incoming-row dispositions and recognized-row relationships remain valid durable readback contracts. New Axis bank-account imports use profile version `2`; version `1` remains historical provenance and is never rewritten. No current mixed-overlap fixture is eligible to create new dispositions.
 
 ## Decision
 
@@ -4706,30 +4863,20 @@ Generic transaction replacement rejects trusted DTOs. Only the provider-owned co
 
 ---
 
-# ADR Status Alignment Log
 
-## 2026-07-24 — Full ADR Audit
-
-- Reviewed all 39 ADRs against `main@686e3b91bfbf9459a38e9137abee6a2588ecec7f`.
-- Preserved every original ADR decision and historical limitation.
-- Added a complete current-status index.
-- Added dated Current Alignment blocks to every ADR.
-- Recorded partial supersession without deleting historical evidence.
-- Corrected current implementation status for ADR-033, ADR-035, ADR-038 and ADR-039.
-- Recorded Sprint 50's effect on the historical non-atomicity limitations in ADR-029 through ADR-032 and ADR-037.
-- Recorded the current pipeline ordering governed by ADR-030, ADR-031, ADR-032, ADR-038 and ADR-039.
-
----
+<a id="adr-040"></a>
 
 # ADR-040 — Explicit Reviewed Partial-Overlap Import
+## Current Alignment — Axis Source-Truth Restoration
+
+ADR-040's schema, provider-transaction, hydration and presentation contracts remain implemented for strict historical compatibility, but its production Axis family is suspended. The synthetic three-shared/one-later fixture lacks immutable source lineage and therefore cannot authorize a financial import under ADR-019. `axis.bank-account.csv@2` mixed overlap returns unsupported evidence with zero accepted residue. Reauthorization requires new lineage-backed source evidence and an independently derived direction/event oracle; no second semantic variant is inferred.
+
+
+## Original accepted decision
 
 **Status:** Accepted and implemented in Sprint 56
 **Scope:** Prospective imports only
 **Migration:** V7
-
-## Current Alignment — Axis Source-Truth Restoration
-
-ADR-040's schema, provider-transaction, hydration and presentation contracts remain implemented for strict historical compatibility, but its production Axis family is suspended. The synthetic three-shared/one-later fixture lacks immutable source lineage and therefore cannot authorize a financial import under ADR-019. `axis.bank-account.csv@2` mixed overlap returns unsupported evidence with zero accepted residue. Reauthorization requires new lineage-backed source evidence and an independently derived direction/event oracle; no second semantic variant is inferred.
 
 ## Context
 
@@ -4770,11 +4917,22 @@ This decision does not authorize historical repair, arbitrary row selection, own
 
 ---
 
+
+<a id="adr-041"></a>
+
 # ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
+### Current Alignment — 2026-09-01
 
-## Status
+ADR-046 supersedes the historical implementation-readiness sentence that required revalidation of a sanitized fixture as parser/source acceptance evidence. Exact source-byte identity and snapshot architecture remain valid; current parser reliability instead requires the complete affected authentic corpus through ordinary production.
 
-Accepted
+---
+
+### Current Alignment — 2026-08-02
+
+Sprint 73 preserves ADR-041 exact source-byte identity as the duplicate
+authority for PDF and XLS while adding ADR-042 as a separate, format-neutral
+financial-equivalence contract. No existing fingerprint or historical source
+record is reinterpreted.
 
 ## Current Alignment — 2026-07-28
 
@@ -4784,6 +4942,13 @@ Accepted
 - **Operational boundary:** New CSV preparation, confirmation and persistence use one transient immutable `SourceContentSnapshot` and exact `ledgerforge.source-bytes.sha256.v1` source-byte authority. The raw-text `ledgerforge.raw-text.sha256.v1` fingerprint remains the CSV duplicate authority; source-byte is the secondary CSV fingerprint.
 - **Compatibility:** Existing historical raw-text-only documents remain valid and unchanged. Source bytes remain transient, confirmation remains bound to the retained snapshot, and no historical source-byte reconstruction or durable source-byte storage is performed.
 - **Production-support boundary:** No production PDF support is established by this implementation.
+
+
+## Original accepted decision
+
+## Status
+
+Accepted
 
 ## Context
 
@@ -4999,20 +5164,12 @@ This ADR does not authorize:
 - durable storage of complete source files;
 - changes to existing CSV fingerprint outcomes.
 
-### Current Alignment — 2026-08-02
 
-Sprint 73 preserves ADR-041 exact source-byte identity as the duplicate
-authority for PDF and XLS while adding ADR-042 as a separate, format-neutral
-financial-equivalence contract. No existing fingerprint or historical source
-record is reinterpreted.
-
-### Current Alignment — 2026-09-01
-
-ADR-046 supersedes the historical implementation-readiness sentence that required revalidation of a sanitized fixture as parser/source acceptance evidence. Exact source-byte identity and snapshot architecture remain valid; current parser reliability instead requires the complete affected authentic corpus through ordinary production.
-
----
+<a id="adr-042"></a>
 
 # ADR-042 — Exact Cross-Format Statement Equivalence and Supporting-Source Persistence
+
+## Original accepted decision
 
 **Status:** Accepted and implemented in Sprint 73
 **Date:** 2026-08-02
@@ -5127,7 +5284,12 @@ storage or generic mutation infrastructure.
 
 ---
 
+
+<a id="adr-043"></a>
+
 # ADR-043 — Exact Multi-Source Transaction Observation and Reviewed Overlap for CBQ Current Accounts
+
+## Original accepted decision
 
 **Status:** Accepted and implemented in Sprint 75
 **Date:** 2026-08-17
@@ -5336,15 +5498,20 @@ published artifacts.
 
 ---
 
+
+<a id="adr-044"></a>
+
 # ADR-044 — Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence
+## Current Alignment — 2026-09-01
+
+ADR-044 remains historical accepted card-domain implementation architecture. ADR-046 supersedes any reading of its historical exact-layout/page-count wording as current parser identity or reliability authority. In particular, an incidental three-page CBQ month, fixed page boundary or prior stationery shape cannot define support; the recurring family must be interpreted semantically and recertified against its complete authentic corpus. A separate parser/profile remains justified only by materially different financial/source semantics. Card persistence, liability direction, source provenance and reconciliation structures remain historical implemented facts.
+
+
+## Original accepted decision
 
 ## Status
 
 Accepted and implemented in Sprint 76; amended and implemented by Sprints 76A, 77 and 78B
-
-## Current Alignment — 2026-09-01
-
-ADR-044 remains historical accepted card-domain implementation architecture. ADR-046 supersedes any reading of its historical exact-layout/page-count wording as current parser identity or reliability authority. In particular, an incidental three-page CBQ month, fixed page boundary or prior stationery shape cannot define support; the recurring family must be interpreted semantically and recertified against its complete authentic corpus. A separate parser/profile remains justified only by materially different financial/source semantics. Card persistence, liability direction, source provenance and reconciliation structures remain historical implemented facts.
 
 ## Context
 
@@ -5681,8 +5848,10 @@ bank overlap does not generalize to cards. Accepted Amex semantic grouping and
 accepted Axis representation-neutral equivalence remain exact family contracts,
 not generic card equivalence.
 
-# ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner
 
+<a id="adr-045"></a>
+
+# ADR-045 — Qatar Airways Salary Actuals and Current-Month Funding Planner
 ## Implementation Alignment — 2026-09-09
 
 Chat accepted the unnumbered startup reliability and monthly-planner usability package, including the non-negative-transfer-fee correction. One immediately updated draft and Save/Command-S action validate visible input, retain invalid text with inline feedback and protect canonical/provider ownership. Contextual provenance replaces the standalone Truth classes panel, not the underlying provenance requirements; imported salary remains immutable. The configured native-QAR transfer fee is non-negative and permits zero, enforced in editing/final Save and shared durable validation. The existing effective-fee rule is unchanged: a positive India funding shortfall activates the fee; otherwise effective fee is zero while the configured value remains retained, editable and eligible for rollover. Signed Money, legitimate negative balances/buffers and calculator formulas are unchanged. No migration or new architecture decision is introduced. See [PROJECT_STATE.md](PROJECT_STATE.md) for accepted evidence and limitations.
@@ -5718,6 +5887,9 @@ No migration is authorized by this planning note.
 ADR-045 is implemented and accepted in Sprint 79. The production implementation is published at `main@9489f6b21c9d585d2d90f2ba4798a931590057f7`. Additive Migration V16 is accepted and is the current migration baseline; V1–V15 remain immutable. The final authentic Salary suite passed 9/9 including the complete 20-source oracle gate, and the authoritative complete TestPlan passed 814 of 819 tests with 5 intentionally skipped external/private-context tests and 0 failures. The historical decision text below is retained as the architecture that governed implementation.
 
 The separately diagnosed authentic July 2026 CBQ credit-card compatibility defect is `PRE_EXISTING_OR_EXTERNAL` relative to Sprint 79 and remains outside this ADR.
+
+
+## Original accepted decision
 
 ## Context
 
@@ -5921,16 +6093,25 @@ ADR-045 does not authorize generic payroll/employer support, OCR/image payroll, 
 
 ---
 
+
+<a id="adr-046"></a>
+
 # ADR-046 — Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation
+## Current Alignment — 2026-09-11 — Original inputs and in-memory evidence
+
+The owner’s explicit [source-processing decision](SCOPE_DECISIONS.md#source-processing-decision) supersedes older permissions for exact/decrypted/extracted files and persisted oracle/evidence artifacts. Only authentic originals in the approved root are statement inputs; processing and independent financial-oracle comparison remain in memory, with no derived financial evidence files on disk. The normal app database remains permitted. Financial correctness, complete affected corpus, independent truth, exact provenance and failure/persistence/hydration proof remain required. This documentation alignment changes no migration, parser, accepted original decision body or executable validation tooling; future runs must establish compliance rather than assume old artifact recipes remain allowed. <!-- user-specified -->
+
+## Current Alignment — 2026-09-09
+
+ADR-046 is the current authority for reader/parser/source-support evidence and supersedes ADR-019 wherever ADR-019 treats reference/sanitized/synthetic financial-source fixtures as current financial truth or regression authority. ADR-019 remains intact as historical architecture. Historical sprint/profile acceptance remains historical fact. Chat technically accepted the unnumbered complete registered-corpus reliability reset on 2026-09-09: additive Migration V17 is the current accepted migration, V1–V16 remain immutable, and personal-v1 adoption remains a separate undeclared gate. The accepted boundary covers 127 financial carriers, 103 logical statements, 3,165 canonical bank/card transactions and 258 separate salary components through the successful 443-test / 72-suite / 500-expanded-execution TestPlan and all six provider/order campaigns. Genuine zero-activity statements and the absent CBQ transaction-history XLS remain source-uncertified; EML remains certification-only container provenance; no multi-file UI or batch-wide atomicity is implied.
+
+
+## Original accepted decision
 
 **Status:** Accepted by explicit user decision
 **Date:** 2026-09-01
 **Decision owner:** User-settled LedgerForge parser/import architecture
 **Migration:** None. This ADR does not authorize product code, parser edits, test edits, fixture creation or source mutation.
-
-## Current Alignment — 2026-09-09
-
-ADR-046 is the current authority for reader/parser/source-support evidence and supersedes ADR-019 wherever ADR-019 treats reference/sanitized/synthetic financial-source fixtures as current financial truth or regression authority. ADR-019 remains intact as historical architecture. Historical sprint/profile acceptance remains historical fact. Chat technically accepted the unnumbered complete registered-corpus reliability reset on 2026-09-09: additive Migration V17 is the current accepted migration, V1–V16 remain immutable, and personal-v1 adoption remains a separate undeclared gate. The accepted boundary covers 127 financial carriers, 103 logical statements, 3,165 canonical bank/card transactions and 258 separate salary components through the successful 443-test / 72-suite / 500-expanded-execution TestPlan and all six provider/order campaigns. Genuine zero-activity statements and the absent CBQ transaction-history XLS remain source-uncertified; EML remains certification-only container provenance; no multi-file UI or batch-wide atomicity is implied.
 
 ## Context
 
@@ -6092,3 +6273,19 @@ No parser/profile is considered personal-v1 reliability-certified solely because
 ## Exclusions
 
 ADR-046 does **not** implement or authorize parser fixes, reader changes, batch-import UI, migrations, source mutation, fixture creation, test edits, new supported institutions, AI parsing authority, OCR support, new duplicate semantics or any other product feature. It records current architecture and acceptance authority only.
+
+
+# ADR Status Alignment Log
+
+## 2026-07-24 — Full ADR Audit
+
+- Reviewed all 39 ADRs against `main@686e3b91bfbf9459a38e9137abee6a2588ecec7f`.
+- Preserved every original ADR decision and historical limitation.
+- Added a complete current-status index.
+- Added dated Current Alignment blocks to every ADR.
+- Recorded partial supersession without deleting historical evidence.
+- Corrected current implementation status for ADR-033, ADR-035, ADR-038 and ADR-039.
+- Recorded Sprint 50's effect on the historical non-atomicity limitations in ADR-029 through ADR-032 and ADR-037.
+- Recorded the current pipeline ordering governed by ADR-030, ADR-031, ADR-032, ADR-038 and ADR-039.
+
+---

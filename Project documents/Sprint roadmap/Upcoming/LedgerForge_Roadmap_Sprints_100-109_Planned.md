@@ -9,6 +9,8 @@ Only Sprint 100 is fixed. This document authorizes no implementation, verificati
 
 ## Prepared milestone overview
 
+Order inherits [Guide rule E](../../Project_Guide.md#documentation-order): sprint number ascending; unassigned numbers remain unassigned.
+
 | Sprint | Planned outcome | Authority |
 | --- | --- | --- |
 | 100 | LedgerForge 1.0 Personal Adoption Verification | FW-P0-26; explicit owner decision |
@@ -48,10 +50,12 @@ No synthetic, generated, reconstructed, sanitized, reduced, mutated or hand-auth
 
 ## Scope limits and future selection
 
-No external certification/compliance, public-release qualification, formal accessibility campaign, API/plugin, sync, multiple-workspace, cross-platform or support-organization readiness is required. The [canonical rejection register](../../FUTURE_WORK.MD#rejected-private-personal-scope) prevents those categories re-entering active scope.
+No external certification/compliance, public-release qualification, formal accessibility campaign, API/plugin, sync, multiple-workspace, cross-platform or support-organization readiness is required. The [canonical rejection register](../../SCOPE_DECISIONS.md#rejected-private-personal-scope) prevents those categories re-entering active scope.
 
 Historical FX/Al Dar, investment history/performance, tax lots, realized P/L, TWR/IRR and corporate-action reconstruction are not required for current holdings and estimates. Generic brokerage ingestion is not required if current holdings can be truthfully established without it. Transfers, reconciliation, rules, recurrence and personally useful analytics may enter future selection only for an actual owner workflow or verified correctness need. No feature is assigned to Sprints 101–109 here.
 
 ## Authority
 
 The current roadmap owns active numbering, PROJECT_STATE.md owns accepted production reality, and accepted ADRs own architecture. Chat owns activation, corrective attribution and final technical acceptance; the owner controls adoption. This planning correction allocates no ADR or migration and changes no accepted decision text.
+
+The owner’s [current source-processing decision](../../SCOPE_DECISIONS.md#source-processing-decision) governs future financial execution: in-memory source interpretation and independent comparison, no derived financial evidence files on disk, normal app database retained. Existing scripts were not changed or certified against that rule by this documentation task.

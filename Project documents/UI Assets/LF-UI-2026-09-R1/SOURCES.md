@@ -1,14 +1,20 @@
 # Sources and decision provenance
 
+## Current private-personal scope alignment — 2026-09-11
+
+The owner has superseded the advanced appearance, formal accessibility and generalized product-completeness portions above. Current authority is the private-personal gate, the canonical rejection register, and DESIGN_HANDOFF.md: simple local System/Light/Dark with an optional existing accent choice; readable Money, ordinary keyboard use, resizing, focus and selection. The explicit icon-rail preference is folded into the canonical responsive hierarchy. The three specifically annotated PNGs remain byte-for-byte design references with only their rejected caption portions ignored. Historical provenance above is retained, not renewed as active requirements.
+
+The owner’s latest [source-processing decision](../../SCOPE_DECISIONS.md#source-processing-decision) supersedes older derived-statement/oracle-artifact permissions for new work. Historical source/decision bodies below are unchanged in meaning. Order inherits [Guide rules H/I](../../Project_Guide.md#documentation-order); original inspected-authority priority and historical decision narrative are preserved as record interiors, not a current append-order register.
+
 **Revision:** LF-UI-2026-09-R1  
 **Historical inspected pushed baseline:** `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` on 2026-09-09.
-**Local Mac state:** not inspected; GitHub does not establish worktree or runtime identity.
+**Original handoff local Mac state:** not inspected then; GitHub did not establish worktree or runtime identity.
 
 **Publication alignment — 2026-09-10:** The links below remain pinned historical provenance at the inspected baseline. The user subsequently authorized the roadmap relocation and UI-asset archive/publication recorded by the surrounding handoff.
 
 Current published roadmap path: `Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md`. The pinned URL in the table records the pre-relocation source revision.
 
-## Repository sources inspected in this task
+## Historical repository sources inspected in the original handoff
 
 All links are pinned to the inspected commit. Git blob IDs identify repository text, not SHA-256 file hashes.
 
@@ -42,7 +48,3 @@ The previously generated v1.2 collage and the earlier draft contact sheet/playgr
 Numeric token values, supported font-style choices, filter combination rules, default All dates and newest-first sorting, appearance preview/Apply mechanics, responsive reference sizes and acceptance targets are specification details supplied under the approved direction. They are not represented as current implementation or measured facts from the PNG.
 
 This is a consolidation, not a new external design-research campaign. No claims about current third-party products or software releases are required for this package.
-
-## Current private-personal scope alignment — 2026-09-11
-
-The owner has superseded the advanced appearance, formal accessibility and generalized product-completeness portions above. Current authority is the private-personal gate, the canonical rejection register, and DESIGN_HANDOFF.md: simple local System/Light/Dark with an optional existing accent choice; readable Money, ordinary keyboard use, resizing, focus and selection. The explicit icon-rail preference is folded into the canonical responsive hierarchy. The three specifically annotated PNGs remain byte-for-byte design references with only their rejected caption portions ignored. Historical provenance above is retained, not renewed as active requirements.

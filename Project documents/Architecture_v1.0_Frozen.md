@@ -1,167 +1,12 @@
-# LedgerForge Architecture v1.0 Frozen
+# Architecture v1.0 — boundaries and accepted alignments
 
-**Version:** 1.0  
-**Status:** FROZEN BASELINE  
-**Status alignment reviewed:** 2026-07-26
-**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb`
-**Latest verified production implementation:** Sprint 58 — Deterministic Import Verification Workspace
-**Latest accepted architecture decision:** ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
-**Current migration:** V8
+## Current applicability
 
-## Current scope alignment — 2026-09-11
+This file owns cross-layer contracts, not current support, migration inventory or a feature roadmap. [PROJECT_STATE](PROJECT_STATE.md) owns current accepted implementation and active WIP. [ADR](ADR.md) owns accepted architectural decisions, especially ADR-046 for adaptive authentic-source interpretation and its current processing alignment. [Database architecture](Database_v1_Architecture.md) owns persistence boundaries; registered source/migrations are exact DDL authority. [Scope decisions](SCOPE_DECISIONS.md) constrains future proposals.
 
-This file preserves a historical architectural baseline, including its dated implementation/migration snapshot. Current accepted production state and source support come from PROJECT_STATE.md and applicable accepted ADRs. The old milestone and future-outlook lists below do not keep generalized import, learning, encrypted sync, multi-workspace or plugin initiatives active. The private-personal gate and the canonical FUTURE_WORK.MD rejection register supersede those planning implications. No accepted financial, persistence, identity, migration or credential decision is changed by this scope alignment.
+The original v1 architecture was reviewed at `b661472a58fc24144361322f1853b8001437a3eb` on 2026-07-26. The retained contracts below explain that architecture with later accepted constraints; original implementation-status/support inventories are historical and have been replaced by a current-state link. A dormant protocol/table or future domain name is not an implemented capability. Later accepted alignments control applicability; no architecture is created by this refactor.
 
-## Document Role
-
-This document defines LedgerForge's frozen v1.0 architectural baseline.
-
-It remains frozen except for status-alignment changes required to reflect:
-
-- accepted ADRs;
-- verified implementation milestones;
-- current production boundaries;
-- corrected architectural authority;
-- removal of stale or contradicted claims.
-
-This document does not:
-
-- authorize implementation;
-- assign sprint order;
-- replace accepted ADRs;
-- replace `PROJECT_STATE.md`;
-- replace `FUTURE_WORK.MD`;
-- establish production support merely because a protocol, model, reader, parser candidate or fixture exists.
-
-Architecture authority is:
-
-1. this frozen baseline;
-2. accepted ADRs, which extend or supersede specific parts of it;
-3. verified production implementation;
-4. tests and runtime evidence within their proven acceptance boundary.
-
-When an accepted ADR conflicts with this baseline, the ADR controls.
-
----
-
-# Vision
-
-LedgerForge is an offline-first personal financial operating system.
-
-The primary product is financial understanding through repository-backed views.
-
-Document import is an enabling capability, not the product's final purpose.
-
-Every subsystem should advance at least one of:
-
-- financial correctness;
-- durable persistence;
-- deterministic behavior;
-- explicit user control;
-- privacy;
-- recoverability;
-- meaningful financial insight;
-- reduced manual maintenance.
-
-Financial truth outranks convenience and delivery speed.
-
----
-
-# Current Implementation Status Boundary
-
-## Verified production support
-
-Production import support is verified only for the approved shared Axis bank-account CSV grammar represented by:
-
-- the approved Axis Bank NRE CSV evidence;
-- the supplied shared-layout Axis Bank NRO CSV evidence.
-
-Both use one production `AxisBankAccountParser`.
-
-New supported imports emit:
-
-```text
-axis.bank-account.csv
-version 2
-```
-
-Historical durable provenance using:
-
-```text
-axis.nre.csv
-version 1
-```
-
-remains readable and is never rewritten merely to adopt the neutral forward profile.
-
-## Implemented foundations that are not broader production support
-
-The repository contains architectural or extraction foundations for:
-
-- PDF text extraction;
-- password-provider coordination;
-- locked-PDF reader contracts;
-- institution detection;
-- statement classification;
-- parser selection;
-- approved PDF, XLS and XLSX fixture evidence;
-- card-statement evidence architecture;
-- multiple institution and document-family candidates.
-
-These foundations do not establish production support for:
-
-- broader Axis layouts;
-- production PDF import;
-- XLS or XLSX import;
-- TXT import;
-- OCR;
-- production password entry;
-- Keychain integration;
-- HDFC parsing;
-- CBQ parsing;
-- American Express parsing;
-- Axis card parsing;
-- production credit-card persistence;
-- arbitrary multi-institution or cross-format import.
-
-## Current persisted architecture
-
-The verified implementation includes:
-
-- SQLite production persistence;
-- equivalent In-Memory provider behavior within approved boundaries;
-- registered migrations through V8;
-- fail-closed migration-chain verification;
-- repository-owned atomic confirmed import;
-- durable exact-content fingerprints;
-- bounded transaction-event identity;
-- durable import-attempt history;
-- durable parser-owned financial identifiers;
-- workspace-scoped identifier ownership;
-- accepted-import identifier observations;
-- `Money` and native-currency integrity;
-- trusted statement dates;
-- durable source order and provenance;
-- workspace-owned categories and current transaction-category assignments;
-- canonical repository hydration;
-- DEBUG-only recoverable development-database lifecycle.
-
-## Accepted but not implemented architecture
-
-Accepted architecture also exists for:
-
-- document-scoped card-statement evidence under ADR-034;
-- financial-mutation planning and authorization under ADR-037.
-
-Acceptance does not mean production implementation.
-
-No generic production mutation executor, audit ledger or card persistence currently exists.
-
-## Current Alignment — Sprint 59
-
-The reviewed ref is `main@b661472a58fc24144361322f1853b8001437a3eb`. Sprint 57A completed category reconciliation without a migration. Sprint 58's approved-fixture verification workspace is DEBUG-only, follows the ordinary import path and has verified Release containment. Sprint 59 accepted ADR-041, selecting `ledgerforge.source-bytes.sha256.v1` and one immutable app-owned `SourceContentSnapshot` for future binary-capable imports; implementation remains pending. Existing `ledgerforge.raw-text.sha256.v1` history remains untouched, and production support remains limited to the approved Axis bank-account CSV grammar. ADR-040/V7 compatibility structures remain readable, but the former provenance-less Axis partial-import family is suspended and mixed supported overlap fails closed. No production PDF workflow, automatic categorization or unsupported analytics/reporting authority is established.
-
----
+Accepted later ownership includes provider-owned atomic imports and canonical hydration, immutable original-byte source snapshots/provenance, exact source-specific equivalence, current Salary planning and the ADR-046 authentic-corpus reset. Accepted Swift 6, staging/provider publication and Sprint 88 shell ownership are recorded in current state and accepted outcomes. Physical layers may change only under an approved boundary; institution parsers remain ingestion modules, not analytical silos.
 
 # Core Principles
 
@@ -395,11 +240,7 @@ Readers:
 - preserve source order;
 - perform no financial interpretation.
 
-Current production reader support is CSV within the approved Axis evidence boundary.
-
-PDF extraction is a foundation only.
-
-Future XLS, XLSX, TXT and OCR require independently approved reader authority.
+Current exact reader/source support and unobserved formats are maintained in [PROJECT_STATE](PROJECT_STATE.md). Do not infer support from this original baseline, extraction capacity or institution/layout similarity. [SCOPE_DECISIONS](SCOPE_DECISIONS.md) owns rejected hypothetical source expansion.
 
 ## RawDocument
 
@@ -414,7 +255,7 @@ It supplies deterministic evidence to:
 - parser selection;
 - exact-content fingerprinting where the algorithm supports that representation.
 
-Reader-produced text and binary source bytes are distinct fingerprint authorities. ADR-041 selects exact source bytes for future binary-capable imports; the source snapshot and source-byte implementation remain pending.
+Reader-produced text and original binary bytes are distinct fingerprint authorities. Accepted ADR-041 defines the immutable source snapshot and exact source-byte contract; current implementation applicability is in [PROJECT_STATE](PROJECT_STATE.md). Processing remains in memory under the current owner rule.
 
 ## Institution Detection
 
@@ -683,21 +524,7 @@ The active database is accepted only after:
 
 ## Registered migration chain
 
-Migrations are append-only, registered and checksum-verified.
-
-Current production schema ends at V6.
-
-The migration system rejects:
-
-- edited applied migrations;
-- missing lower migrations;
-- duplicate versions;
-- incomplete records;
-- unsupported future versions;
-- chain inconsistencies;
-- execution failures.
-
-Migration failure does not silently substitute an in-memory provider.
+Current implementation, migration and material limits are maintained in [PROJECT_STATE](PROJECT_STATE.md); the relevant accepted ADR owns its exact contract. This section does not promote schema/protocol capacity into behavior.
 
 ## Persistence unavailable state
 
@@ -860,19 +687,7 @@ Historical observations are not invented.
 
 ## Unimplemented identity operations
 
-The architecture does not currently implement:
-
-- unlinking;
-- reassignment;
-- incorrect-link recovery;
-- account split;
-- account merge;
-- contradictory-ownership repair;
-- historical identifier backfill.
-
-These require separately approved mutation families.
-
----
+Current implementation, migration and material limits are maintained in [PROJECT_STATE](PROJECT_STATE.md); the relevant accepted ADR owns its exact contract. This section does not promote schema/protocol capacity into behavior.
 
 # Duplicate and Transaction-Event Architecture
 
@@ -906,7 +721,7 @@ Legacy fingerprints are not reconstructed from reduced history.
 
 ## Binary-document fingerprints
 
-ADR-041 accepts exact source bytes under `ledgerforge.source-bytes.sha256.v1` for future binary-capable imports. The source snapshot and source-byte foundation remain unimplemented.
+ADR-041 owns `ledgerforge.source-bytes.sha256.v1` and immutable source-snapshot authority. Accepted implementation is linked from [PROJECT_STATE](PROJECT_STATE.md); older raw-text provenance remains unchanged.
 
 Production PDF support remains blocked until that foundation is implemented and accepted, and one approved PDF family is selected and revalidated through the ordinary production path.
 
@@ -944,19 +759,7 @@ Explicit partial-overlap import requires separate review and persistence semanti
 
 ## Unsupported event families
 
-The architecture does not generalize current UPI semantics to:
-
-- IMPS;
-- NEFT;
-- card events;
-- refunds;
-- reversals;
-- e-commerce references;
-- unstructured tokens.
-
-Each family requires independent evidence and a versioned contract.
-
----
+Current implementation, migration and material limits are maintained in [PROJECT_STATE](PROJECT_STATE.md); the relevant accepted ADR owns its exact contract. This section does not promote schema/protocol capacity into behavior.
 
 # Import Attempt Architecture
 
@@ -1109,9 +912,9 @@ A nonempty V5 financial graph fails closed for explicit pre-production reset rat
 
 ADR-034 accepts a document-scoped card-statement evidence direction.
 
-It does not establish production card parsing or persistence.
+The architectural decision alone does not establish a particular source family. Later accepted card implementations and their exact limits are in [PROJECT_STATE](PROJECT_STATE.md) and ADR-044.
 
-Future card evidence may preserve, only when source-supported:
+The card evidence contract may preserve, only when source-supported:
 
 - posted statement amount;
 - statement currency;
@@ -1131,7 +934,7 @@ A card instrument does not automatically become a separate financial account.
 
 Missing FX, fee, tax or summary evidence must not be calculated merely to populate a common model.
 
-Production card support requires a selected fixture-backed family plus approved:
+Each exact card support claim requires its complete authentic family corpus and independent source proof plus approved:
 
 - validation;
 - persistence;
@@ -1144,9 +947,7 @@ Production card support requires a selected fixture-backed family plus approved:
 
 # Category Architecture
 
-ADR-036 accepts category identity and current assignment architecture.
-
-It is not implemented.
+ADR-036 owns category identity and current assignment architecture. Its accepted implementation and remaining limits are linked from [PROJECT_STATE](PROJECT_STATE.md).
 
 ## Separation from imported truth
 
@@ -1193,13 +994,7 @@ Runtime-generated transaction IDs are not persistence targets.
 
 ## Current state
 
-No category repository, store, schema, migration or UI is currently implemented.
-
-The expected first implementation requires an additive V7 migration, but V7 is not authorized by this document.
-
-**Current alignment — Sprint 57/57A:** The preceding state describes the pre-V8 architecture baseline. Migration V8 now provides the durable category repository, current assignment relationship, hydration and bounded UI; Sprint 57A completed category reconciliation without another migration. Category hierarchy, rules, bulk mutation and richer metadata remain future work.
-
----
+Current implementation, migration and material limits are maintained in [PROJECT_STATE](PROJECT_STATE.md); the relevant accepted ADR owns its exact contract. This section does not promote schema/protocol capacity into behavior.
 
 # Financial-Mutation Architecture
 
@@ -1273,13 +1068,7 @@ Financial mutation must not be simulated by:
 
 ## Current state
 
-No production generic mutation executor exists.
-
-No generic mutation schema or audit ledger exists.
-
-Every repair, reversal, merge, split, unlink, delete or historical correction remains separately gated.
-
----
+Current implementation, migration and material limits are maintained in [PROJECT_STATE](PROJECT_STATE.md); the relevant accepted ADR owns its exact contract. This section does not promote schema/protocol capacity into behavior.
 
 # Development Diagnostics Architecture
 
@@ -1396,13 +1185,7 @@ Ordinary presentation must not expose:
 
 ## Fixtures
 
-Sanitized fixtures may be stored in Git.
-
-Private originals remain isolated and read-only.
-
-Fixture presence is not production support.
-
----
+Apply [authentic source/oracle invariants](Engineering%20Standards.md#authentic-source-and-oracle-invariants), the owner’s [in-memory processing decision](SCOPE_DECISIONS.md#source-processing-decision) and ADR-046. Historical fixture/copy permissions are not current development authority.
 
 # Concurrency Architecture
 
@@ -1466,28 +1249,11 @@ No committed result may be reclassified as uncommitted merely because hydration 
 
 ## Source truth
 
-Financial acceptance uses independent oracles.
-
-Production parser output is not its own sole oracle.
-
-Verification should distinguish:
-
-- source truth;
-- implementation behavior;
-- test evidence;
-- inference.
+Apply [authentic source/oracle invariants](Engineering%20Standards.md#authentic-source-and-oracle-invariants), the owner’s [in-memory processing decision](SCOPE_DECISIONS.md#source-processing-decision) and ADR-046. Historical fixture/copy permissions are not current development authority.
 
 ## Fixture requirements
 
-A production-supported family requires:
-
-- approved sanitized fixture;
-- source-to-fixture provenance;
-- independent expected financial baseline;
-- deterministic detection/classification evidence;
-- parser/profile selection evidence;
-- identifier evidence where applicable;
-- malformed and unsupported falsification cases.
+Apply [authentic source/oracle invariants](Engineering%20Standards.md#authentic-source-and-oracle-invariants), the owner’s [in-memory processing decision](SCOPE_DECISIONS.md#source-processing-decision) and ADR-046. Historical fixture/copy permissions are not current development authority.
 
 ## Financial invariants
 
@@ -1541,197 +1307,6 @@ Every accepted implementation should pass the approved:
 - runtime boundary where required.
 
 A green suite proves only the boundary it actually exercises.
-
----
-
-# Core Domain
-
-## Implemented or operational domains
-
-- Workspace
-- Account
-- FinancialIdentifier
-- FinancialIdentifierObservation
-- Transaction
-- Money
-- StatementDate
-- ImportSession
-- ImportAttempt
-- DocumentMetadata
-- DocumentFingerprint
-- RawDocument
-- FinancialDocument
-- StatementClassification
-- Parser Profile Provenance
-- NormalizedDocument
-- NormalizedRow
-- Transaction Source Relationship
-- Transaction Event Evidence
-- AccountStore
-- TransactionStore
-- RepositoryStoreHydrator
-- DatabaseProvider
-
-## Accepted but not yet implemented domains
-
-- Category
-- TransactionCategoryAssignment
-- Document-Scoped Card Statement Evidence
-- Financial Mutation Plan and Authorization Contracts
-
-## Future domains
-
-- Security
-- Holding
-- ExchangeRate
-- Rule
-- WorkspaceSettings
-- Loan and Liability
-- Budget
-- Goal
-- Recurring Obligation
-- Transfer Relationship
-- Investment Transaction
-- Financial Intelligence Conclusion
-
-Listing a domain does not establish implementation.
-
----
-
-# Long-Term Product Modules
-
-Architecture compatibility targets include:
-
-- Dashboard
-- Accounts
-- Transactions
-- Imports
-- Documents and Provenance
-- Investments
-- Budget and Cash Flow
-- Rules and Automation
-- Financial Intelligence
-- Financial Health
-- Goals
-- Universal Search
-- Financial Timeline
-- Multi-Currency Reporting
-- Salary and Planning
-- Exchange Rates
-
-The current v1 implementation foundation centers on:
-
-- Dashboard;
-- Accounts;
-- Transactions;
-- Imports;
-- Settings.
-
-Future modules extend the same repository, identity and hydration architecture.
-
-They must not create parallel financial truth.
-
----
-
-# Target Document Families
-
-These are compatibility targets, not current production parser coverage:
-
-- bank accounts;
-- credit cards;
-- brokerage;
-- salary;
-- tax;
-- mutual funds;
-- insurance;
-- government financial records.
-
-Current fixture-backed review targets include:
-
-- Axis Bank Account;
-- Axis Credit Card;
-- HDFC Bank Account;
-- CBQ Bank Account;
-- CBQ Credit Card;
-- American Express Credit Card;
-- IBKR;
-- Salary Slip;
-- Mutual Fund CAS;
-- AIS and Form 16.
-
-Each family requires independent approval.
-
-One supported family never implies full institution support.
-
----
-
-# Milestones
-
-| Milestone | State | Boundary |
-|---|---|---|
-| M1 — Statement Import Foundation | Complete foundation | Production parsing remains limited to approved Axis bank-account CSV evidence |
-| M2 — Statement Understanding | Complete foundation | Detection, classification and parser selection exist |
-| M3 — Canonical Financial Handoff | Complete | `FinancialDocument` is canonical parser output |
-| M4 — FinancialDocument-Native Parsing | Complete | Production Axis parser uses the canonical domain path |
-| M5 — Validation Pipeline Refinement | Complete foundation | Validation remains mandatory and fail-closed |
-| M6 — Repository and Data Platform | Complete foundation | SQLite, provider abstraction, migrations and canonical hydration operational |
-| M7 — Dashboard Experience | Foundation complete | Repository-backed core screens operational |
-| M8 — Insights and Analytics | Not implemented | Depends on reliable categories, transfers and analytical truth |
-| M9 — Financial Ecosystem | Not implemented | Investments, planning, multi-currency conversion and integrations remain future work |
-
----
-
-# Historical architecture outlook — superseded
-
-The following is retained solely as the original outlook, not current future work or a dependency list. Some entries were later implemented; others are rejected by the private-personal scope reset. Consult PROJECT_STATE.md and eligible FUTURE_WORK.MD cards for current disposition:
-
-- immutable source-snapshot and source-byte fingerprint foundation under ADR-041;
-- production PDF support;
-- XLS and XLSX readers;
-- TXT reader;
-- OCR fallback;
-- production password workflow;
-- Keychain storage;
-- reusable Import Profile framework;
-- profile learning;
-- AI-assisted unsupported-layout mapping;
-- production card persistence;
-- category hierarchy, rules, bulk operations and richer metadata;
-- transfer matching;
-- partial-overlap import;
-- historical repair;
-- import reversal;
-- generic rules engine;
-- financial intelligence engine;
-- financial replay;
-- exchange-rate storage;
-- reporting currency;
-- predictive cash flow;
-- production backup and restore;
-- encrypted sync;
-- multiple workspaces;
-- external plugin architecture.
-
-Any separately selected future architecture must preserve the accepted financial and safety invariants and pass the private-personal scope gate.
-
----
-
-# North Star
-
-LedgerForge should quietly maintain an accurate, explainable and recoverable financial model while presenting useful financial understanding through a native macOS experience.
-
-Users should spend less time maintaining records and more time understanding decisions.
-
-Imports, readers, parsers, fixtures, rules and future intelligence exist to support that outcome.
-
-Financial conclusions must remain:
-
-- deterministic;
-- explainable;
-- auditable;
-- reproducible;
-- source-traceable;
-- native-currency safe.
 
 ---
 

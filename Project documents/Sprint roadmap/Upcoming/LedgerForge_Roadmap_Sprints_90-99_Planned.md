@@ -2,7 +2,7 @@
 
 **Status:** PREPARED / NOT CURRENT. This successor roadmap becomes current numbering authority only after Sprint 89 is accepted and Chat explicitly activates the cycle.
 **Prepared:** 2026-09-09; realigned by explicit user decisions through 2026-09-11.
-**Accepted implementation baseline:** Sprint 88, `4f5eeb7b11c0f5879204a06ae9f08045304342b5`.
+**Accepted product baseline:** see [PROJECT_STATE](../../PROJECT_STATE.md); documentation publication is not product acceptance.
 **Current authority remains:** [Sprints 80–89](../LedgerForge_Roadmap_Sprints_80-89_Current.md).
 **PERSONAL-V1: NOT YET ADOPTED.**
 
@@ -18,9 +18,11 @@ The user fixes [Sprint 100 — LedgerForge 1.0 Personal Adoption Verification](L
 
 Required outcomes include accepted Swift 6 and selected R1/native UI, verified backup/restore, existing Qatar Airways Salary actuals and Salary History, the current This Month planner with bounded current Al Dar reference use and manual override, current holdings and valuation sufficient for the owner's present holdings, current market FX/net-worth reporting, private supported-source matrix and the final Chat adoption matrix. Exact scope and architecture remain gated; assigning a position does not promote a queue status or make every expansion on a broad card required.
 
-Complete structured export remains optional. Historical FX, historical Al Dar, investment history/performance, tax lots, realized P/L, TWR/IRR, corporate-action reconstruction and generic brokerage transaction ingestion are not required merely to establish current holdings. Transfer matching, reconciliation, rule/merchant/recurrence automation and personally useful analytics are eligible only for an actual selected owner workflow or verified correctness need. Generalized platform categories are **NOT REQUIRED-DO NOT CONSIDER** under the [canonical scope register](../../FUTURE_WORK.MD#rejected-private-personal-scope), not future candidates.
+Complete structured export remains optional. Historical FX, historical Al Dar, investment history/performance, tax lots, realized P/L, TWR/IRR, corporate-action reconstruction and generic brokerage transaction ingestion are not required merely to establish current holdings. Transfer matching, reconciliation, rule/merchant/recurrence automation and personally useful analytics are eligible only for an actual selected owner workflow or verified correctness need. Generalized platform categories are **NOT REQUIRED-DO NOT CONSIDER** under the [canonical scope register](../../SCOPE_DECISIONS.md#rejected-private-personal-scope), not future candidates.
 
 ## Prepared cycle overview
+
+Order inherits [Guide rule E](../../Project_Guide.md#documentation-order): sprint number ascending; readiness does not reorder the sequence.
 
 | Sprint | Outcome | Queue | Entry / planning boundary |
 |---|---|---|---|
@@ -43,8 +45,6 @@ Queue: `FW-P2-78`.
 
 Entry gate: Sprint 89 shared R1 implementation patterns accepted. Implement native-currency grouped position, bank balances distinct from card liabilities, full readable amounts, authoritative period/as-of context and current funding summary without changing formulas. No FX conversion, net-worth invention, fake trend/percentage/chart or hydration-as-import claim.
 
-Discovery 2026-09-10 (PROPOSED): [FW-P2-78](../../FUTURE_WORK.MD#fw-p2-78): retain native-currency groups, account/liability separation and honest as-of/completeness. No new analytics/FX authority. Verify actual keyboard/readability and independent displayed values after shared R1 patterns are accepted.
-
 ### Sprint 91 — R1 Simple Appearance Choice
 
 Queue: narrowed [FW-P2-52](../../FUTURE_WORK.MD#fw-p2-52) only.
@@ -63,7 +63,7 @@ Primary queue: [FW-P3-36](../../FUTURE_WORK.MD#fw-p3-36). **PRE_V1_REQUIRED.**
 
 Implement only the subsequently approved user-owned backup/restore contract. Architecture must settle backup contents, integrity manifest, SQLite/WAL/SHM-consistent snapshot, compatibility/version policy, isolated restore verification, non-empty-current-data protection, explicit confirmation, rollback if activation fails, canonical hydration and same-database relaunch. The owner may save/copy a verified package to a personally chosen destination. This does not create sync, live portable workspace or cloud integration. Appearance stays device-local; no theme preference snapshot is required. Reporting currency remains separate financial configuration.
 
-The [backup/restore packet](../../FUTURE_WORK.MD#packet-user-backup-restore-architecture-packet) retains the unresolved architecture and genuine restore-drill requirements. Complete structured export is optional and separate. A roadmap position does not establish recoverability.
+The [backup/restore packet](../../Work%20notes/Backup_and_export.md#packet-user-backup-restore-architecture-packet) retains the unresolved architecture and genuine restore-drill requirements. Complete structured export is optional and separate. A roadmap position does not establish recoverability.
 
 ### Sprint 94 — Salary / This Month Current Al Dar Planning Completion
 
@@ -81,7 +81,7 @@ Primary candidates: bounded [FW-P3-20](../../FUTURE_WORK.MD#fw-p3-20), [FW-P3-21
 
 Settle and implement the selected container/instrument identity, scoped identifiers, native currency, exact Decimal quantity semantics and current position ownership/revision architecture. Exact genuine owner/source evidence and Chat architecture acceptance remain entry gates. Current holdings come first; generic brokerage ingestion and transaction-history reconstruction are not prerequisites merely to establish positions.
 
-The [investment architecture packet](../../FUTURE_WORK.MD#packet-investment-holdings-architecture-packet) retains separate evidence, identity, correction and provider blockers. This position does not accept its proposed persistence shape or allocate a migration.
+The [investment architecture packet](../../Work%20notes/Holdings_and_valuation.md#packet-investment-holdings-architecture-packet) retains separate evidence, identity, correction and provider blockers. This position does not accept its proposed persistence shape or allocate a migration.
 
 ### Sprint 96 — Current Holdings, Cost-Evidence and ISP Positions
 
@@ -113,7 +113,7 @@ Produce current, explainable net-worth estimates after accepted current investme
 
 Preserve non-overlapping membership and account/liability/investment distinctions, current observation and fetch timestamps, current/last-success freshness, provider attribution, exact Decimal rates, and deterministic rounding at the approved final Money boundary. Missing/stale balances, holdings, prices or rates make the result explicitly incomplete; never replace missing components with zero or hide them in a complete total.
 
-The [general FX packet](../../FUTURE_WORK.MD#packet-general-fx-architecture-packet) still requires provider suitability, permission/cache/freshness, membership, reporting-currency and rounding/orientation decisions. Technical access is not provider qualification; the researched provider's financial-data suitability warning remains unresolved. No history collection or assumed inverse/cross conversion is authorized. Al Dar stays confined to Sprint 94 current Salary/budget QAR→INR evidence and is not net-worth FX authority.
+The [general FX packet](../../Work%20notes/Current_FX_and_net_worth.md#packet-general-fx-architecture-packet) still requires provider suitability, permission/cache/freshness, membership, reporting-currency and rounding/orientation decisions. Technical access is not provider qualification; the researched provider's financial-data suitability warning remains unresolved. No history collection or assumed inverse/cross conversion is authorized. Al Dar stays confined to Sprint 94 current Salary/budget QAR→INR evidence and is not net-worth FX authority.
 
 ## Displaced outcomes retained as unscheduled post-1.0 candidates
 
@@ -152,9 +152,11 @@ The proposal to separate current obligations/user-assumption projections from fa
 <a id="packet-roadmap-replanning-packet-98"></a>
 ### Former ROADMAP_REPLANNING_PACKET_98 — investment boundaries
 
-The [investment architecture packet](../../FUTURE_WORK.MD#packet-investment-holdings-architecture-packet) preserves the genuine ownership/cost evidence, missing brokerage-source qualification and independent provider permission/date/identity gates. The user now places foundation, current holdings, valuation and integrated acceptance at 95, 96, 97 and 98 respectively. Brokerage ingestion/history/performance remain separately gated and outside the required current outcome. Exact architecture and per-sprint source/persistence splits still need Chat acceptance.
+The [investment architecture packet](../../Work%20notes/Holdings_and_valuation.md#packet-investment-holdings-architecture-packet) preserves the genuine ownership/cost evidence, missing brokerage-source qualification and independent provider permission/date/identity gates. The user now places foundation, current holdings, valuation and integrated acceptance at 95, 96, 97 and 98 respectively. Brokerage ingestion/history/performance remain separately gated and outside the required current outcome. Exact architecture and per-sprint source/persistence splits still need Chat acceptance.
 
 <a id="packet-roadmap-replanning-packet-99"></a>
 ### ROADMAP_REPLANNING_PACKET_99 — current FX and net worth
 
-The [general FX packet](../../FUTURE_WORK.MD#packet-general-fx-architecture-packet) retains the current direct-market evidence and unresolved financial-data suitability, current membership, orientation, rounding, cache/freshness and reporting-setting decisions. The required Sprint-99 queue explicitly includes net-worth owner `FW-P3-26` with bounded `FW-P3-30/31/33`. Historical `FW-P3-32`, historical Al Dar and performance remain non-required. This planning decision changes required adoption scope, not the accepted architecture or provider.
+The [general FX packet](../../Work%20notes/Current_FX_and_net_worth.md#packet-general-fx-architecture-packet) retains the current direct-market evidence and unresolved financial-data suitability, current membership, orientation, rounding, cache/freshness and reporting-setting decisions. The required Sprint-99 queue explicitly includes net-worth owner `FW-P3-26` with bounded `FW-P3-30/31/33`. Historical `FW-P3-32`, historical Al Dar and performance remain non-required. This planning decision changes required adoption scope, not the accepted architecture or provider.
+
+The owner’s [current source-processing decision](../../SCOPE_DECISIONS.md#source-processing-decision) governs future financial execution: in-memory source interpretation and independent comparison, no derived financial evidence files on disk, normal app database retained. Existing scripts were not changed or certified against that rule by this documentation task.

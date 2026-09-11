@@ -1,36 +1,40 @@
-# LedgerForge approved-design handoff
+# LF-UI-2026-09-R1
 
-## LF-UI-2026-09-R1
+Approved visual direction and canonical written contracts for the private personal app. This package does not select a sprint or claim native implementation/acceptance. Order inherits [Guide rule H](../../Project_Guide.md#documentation-order): revision, then natural screen ID/suffix; machine payload paths are deterministic. [Current product state](../../PROJECT_STATE.md) and [scope decisions](../../SCOPE_DECISIONS.md) control applicability.
 
-**Use this revision identifier, not the “v2.0” text embedded in the image.**
+## Canonical inputs
 
-The user-approved image and agreed direction are preserved. This package adds the written interaction contract, shared design values, visual exceptions and acceptance boundary. It does not contain new mockups or a native app implementation.
+| Input | Responsibility / status |
+| --- | --- |
+| [DESIGN_HANDOFF](DESIGN_HANDOFF.md) | Shared design and component requirements, artwork/caption exceptions |
+| [DESIGN_TOKENS](DESIGN_TOKENS.json) | Existing numeric roles; numeric values and semantic arrays unchanged |
+| [SC-01_App_Shell](SC-01_App_Shell.md) | Canonical shell/navigation text relocated from approved handoff |
+| [SC-02_Transactions](SC-02_Transactions.md) | Canonical Transactions text relocated from approved handoff |
+| [SC-03_Dashboard](SC-03_Dashboard.md) | Canonical Dashboard text relocated from approved handoff |
+| [Inherited_Screens](Inherited_Screens.md) | Simple appearance plus inherited accepted screen contracts from frozen UI |
+| [MasterBoard](MasterBoard_LF-UI-2026-09-R1.png) | Approved unchanged collage; embedded “v2.0” is a design label only |
+| [ACCEPTANCE](ACCEPTANCE.md) | Required checks, not invented pass evidence |
+| [SOURCES](SOURCES.md) | Provenance and historical source refs |
+| [ASSET_MANIFEST](ASSET_MANIFEST.json) | Payload hashes/sizes; manifest excludes itself |
 
-> **Publication alignment — 2026-09-10:** At the user's explicit direction, this handoff is published under `Project documents/UI Assets/LF-UI-2026-09-R1/`, the legacy PNGs are archived byte-for-byte under `Project documents/UI Assets/Archived/`, and the roadmap files are published under `Project documents/Sprint roadmap/`. This layout publication does not claim native implementation or financial validation.
+These new screen files reorganize already approved written text; they are not new designs or approval of local drafts. [UI/UX](../../UI_UX_v1.0_Frozen.md) owns shared interface architecture.
 
-| File | Purpose |
-|---|---|
-| [Master board](MasterBoard_LF-UI-2026-09-R1.png) | Exact approved 1536 × 1024 collage, unchanged. |
-| [Design handoff](DESIGN_HANDOFF.md) | Five requested design areas, behaviours and exclusions. |
-| [Design tokens](DESIGN_TOKENS.json) | Machine-readable presentation values, separate from financial data. |
-| [Acceptance checklist](ACCEPTANCE.md) | Historical registration evidence and current bounded native interaction/financial checks for approved packets. |
-| [Sources](SOURCES.md) | Pinned repository evidence, explicit decisions and designer-specified details. |
-| [Asset manifest](ASSET_MANIFEST.json) | Exact approved-image identity, package payload and inherited-asset status. |
-| [App Shell reference draft](LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md) | Reconciled written design reference; accepted Sprint-88 history remains separate. |
-| [Transactions reference draft](LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md) | Reconciled written layout/state proposal; Sprint 89 and native acceptance remain unaccepted. |
+## Supporting and draft material
 
-### What is settled
+The tracked `LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md` and `LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md` remain **draft/supporting specifications**, not competing canonical owners. Their status is unchanged by this restructure.
 
-Simple local Light/Dark/System appearance; optional existing Indigo accent; readable currency-grouped summaries; practical filters and sorting; adaptable tables/inspectors; clear states; Salary refinement lower priority. Do not reopen these merely because old repository assets depict something different.
+Local untracked SC PNGs remain unpublished supporting/designer work. The owner has excluded ongoing design-PNG changes from this documentation task; their local presence or replacement does not confer approval. References observed during this refactor, in natural screen order:
 
-### What is not claimed
+- SC-01 App Shell Supporting Reference;
+- SC-01 App Shell Visual Contract;
+- SC-02A Transactions Wide Reference;
+- SC-02B Transactions Narrow Responsive Reference;
+- SC-02C Transactions State Component Contract;
+- SC-03A Dashboard Wide Reference;
+- SC-03B Dashboard Narrow Responsive Reference;
+- SC-03C Dashboard State Component Contract;
+- SC-04A Appearance Settings Reference.
 
-Five standalone high-resolution screen renders, a native prototype, a completed preference-storage design, financial query implementation, accessibility certification, a new sprint, a migration, or completed app changes. The accompanying specification resolves illustrative limitations without altering the approved image.
+Each uses the `LF-UI-2026-09-R1_` prefix and its existing underscore filename. Their presence is not approval or a native pass. Keep every PNG intact; [exact ignored caption portions](DESIGN_HANDOFF.md#ignored-caption-portions) apply to SC-02A/02C/03B only. Do not regenerate/delete images to remove superseded text. [Archived visuals](../Archived) remain historical references with unchanged bytes.
 
-### Repository registration
-
-The package destination is `Project documents/UI Assets/LF-UI-2026-09-R1/`. The original outer registration prompt and package-validation report are historical local artifacts, not current execution authority. The complete current Chat-approved task controls repository writes. The 2026-09-11 private-personal scope reset supersedes advanced appearance and formal accessibility requirements. See the handoff’s file-specific caption exceptions for retained local working PNGs; their artwork remains unchanged.
-
-Existing PNG bytes remain unchanged in `Project documents/UI Assets/Archived/`. Their master authority is superseded only for the explicitly covered scope after documentation integration; untouched screen details remain inherited. The user explicitly authorized the physical archiving, directory move and Git publication on 2026-09-10. Native app implementation and financial acceptance remain separate.
-
-The separately supplied local SC PNG working references are preserved unchanged and remain outside this published payload. DESIGN_HANDOFF.md records the exact caption exceptions without making a PNG-publication or native-acceptance claim. The two published written reference drafts remain subordinate to the canonical handoff and current approved execution contract.
+The [Import Preview alternatives and Sprint-89 evidence](../../Work%20notes/Transaction_and_R1_workflows.md) are unaccepted work notes, not approved screen replacements. No other untracked file is included merely by this inventory.

@@ -3,7 +3,7 @@
 **Authority:** LF-UI-2026-09-R1 and the inspected current roadmap.
 **Status:** written draft for coordinator review; no native or Figma visual acceptance.
 **Owner:** existing `FW-P2-67`; no new sprint or queue ID.
-**References:** the current roadmap §§Sprint 88 and SHELL88; [canonical R1 handoff](DESIGN_HANDOFF.md) §§1, 2 and 6; [tokens](DESIGN_TOKENS.json); standing harness.
+**References:** [accepted Sprint 88 and historical SHELL88](../../Archive/Accepted%20outcomes/Sprints_80-89.md); [canonical shell](SC-01_App_Shell.md); [shared R1 handoff and exceptions](DESIGN_HANDOFF.md); [tokens](DESIGN_TOKENS.json); standing harness.
 
 **Scope alignment — 2026-09-11:** Sprint 88 is accepted history. This draft remains a design reference for later selected work; it does not reopen Sprint 88 or accept Sprint 89. The canonical handoff owns component states, icon-rail responsive treatment and simple local appearance. No formal accessibility or advanced appearance programme is required.
 

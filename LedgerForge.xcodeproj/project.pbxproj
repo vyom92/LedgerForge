@@ -34,7 +34,6 @@
 		286242632FFCE80D00B8AA66 /* DefaultPasswordProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2862424A2FFCE80D00B8AA66 /* DefaultPasswordProvider.swift */; };
 		2862426F2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2862426E2FFD0A2D00B8AA66 /* SignatureInstitutionDetector.swift */; };
 		286D63F02FFD3057000CEC65 /* FinancialDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D63EF2FFD3057000CEC65 /* FinancialDocument.swift */; };
-		286D68F02FFFE6440078AAC5 /* AGENTS.md in Resources */ = {isa = PBXBuildFile; fileRef = 286D68EF2FFFE6440078AAC5 /* AGENTS.md */; };
 		286D68F32FFFF60E0078AAC5 /* LFTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68F22FFFF60E0078AAC5 /* LFTheme.swift */; };
 		286D68F52FFFF6300078AAC5 /* LFPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68F42FFFF6300078AAC5 /* LFPanel.swift */; };
 		286D68F92FFFF67D0078AAC5 /* LFStatusBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D68F82FFFF67D0078AAC5 /* LFStatusBadge.swift */; };
@@ -374,23 +373,38 @@
 		A90900013090000000000001 /* Exceptions for "UI Assets" folder in "LedgerForge" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Archived/Accounts_v1.0.png,
-				Archived/AppIcon_v1.0.png,
-				Archived/ComponentLibrary_v1.0.png,
-				Archived/Dashboard_v1.0.png,
-				Archived/DesignBoard_v2.0.png,
-				Archived/DesignSystem_v1.0.png,
-				Archived/DeveloperConsole_v1.0.png,
-				Archived/ImportWizard_v1.0.png,
-				Archived/Settings_v1.0.png,
-				Archived/Transactions_v1.0.png,
-				Archived/UserJourney_v1.0.png,
+				"Archived/Accounts_v1.0.png",
+				"Archived/AppIcon_v1.0.png",
+				"Archived/ComponentLibrary_v1.0.png",
+				"Archived/Dashboard_v1.0.png",
+				"Archived/DesignBoard_v2.0.png",
+				"Archived/DesignSystem_v1.0.png",
+				"Archived/DeveloperConsole_v1.0.png",
+				"Archived/ImportWizard_v1.0.png",
+				"Archived/Settings_v1.0.png",
+				"Archived/Transactions_v1.0.png",
+				"Archived/UserJourney_v1.0.png",
 				"LF-UI-2026-09-R1/ACCEPTANCE.md",
 				"LF-UI-2026-09-R1/ASSET_MANIFEST.json",
 				"LF-UI-2026-09-R1/DESIGN_HANDOFF.md",
 				"LF-UI-2026-09-R1/DESIGN_TOKENS.json",
+				"LF-UI-2026-09-R1/Inherited_Screens.md",
+				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-01_App_Shell_Supporting_Reference.png",
+				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md",
+				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.png",
+				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-02A_Transactions_Wide_Reference.png",
+				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-02B_Transactions_Narrow_Responsive_Reference.png",
+				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-02C_Transactions_State_Component_Contract.png",
+				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md",
+				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-03A_Dashboard_Wide_Reference.png",
+				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-03B_Dashboard_Narrow_Responsive_Reference.png",
+				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-03C_Dashboard_State_Component_Contract.png",
+				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-04A_Appearance_Settings_Reference.png",
 				"LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png",
 				"LF-UI-2026-09-R1/README.md",
+				"LF-UI-2026-09-R1/SC-01_App_Shell.md",
+				"LF-UI-2026-09-R1/SC-02_Transactions.md",
+				"LF-UI-2026-09-R1/SC-03_Dashboard.md",
 				"LF-UI-2026-09-R1/SOURCES.md",
 			);
 			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
@@ -980,7 +994,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				286D68F02FFFE6440078AAC5 /* AGENTS.md in Resources */,
 				288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

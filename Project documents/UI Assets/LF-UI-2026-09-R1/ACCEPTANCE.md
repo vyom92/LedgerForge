@@ -1,31 +1,10 @@
-# Acceptance checklist
+# R1 implementation acceptance
 
-**Revision:** LF-UI-2026-09-R1  
-**Status:** Requirements, not a record of passed native tests.
+**Revision:** LF-UI-2026-09-R1. Requirements only; no native pass is implied. Use only the applicable rows of a separately approved implementation contract. [README](README.md) owns canonical/draft routing; [SOURCES](SOURCES.md) retains original registration provenance. The original docs-only no-publication checklist is historical and superseded by subsequent explicit publication instructions; [Harness](../../LedgerForge_Standing_Execution_Harness_Guide.md) owns current documentation checks.
 
-> **Publication alignment — 2026-09-10:** The checklist below was authored for the original docs-only handoff. The user subsequently authorized the reversible asset archive/move, Xcode synchronized-folder update and sprint-roadmap publication; those actions are documented in the surrounding handoff and do not turn this checklist into native test evidence.
+Order inherits [Guide rules H/J](../../Project_Guide.md#documentation-order): shared prerequisites, SC-02 Transactions, SC-03 Dashboard, simple appearance, then final truthfulness checks; natural numeric IDs within each group.
 
-## A. Historical original registration checklist
-
-| ID | Required evidence |
-|---|---|
-| DOC-01 | Starting HEAD equals the pinned base; branch/main/origin relationship and complete local safety inventory are recorded. |
-| DOC-02 | Supplied approved board decodes at 1536 × 1024 and its SHA-256 equals the manifest. The destination is byte-identical. |
-| DOC-03 | Every packaged design-file hash/size matches the manifest; Markdown links and JSON parse successfully. |
-| DOC-04 | Only the exact allowed documentation and design paths change. No source, test, Xcode, build, dependency or database changes occur. |
-| DOC-05 | All 11 legacy PNG Git blob identities are unchanged. No deletion, move, recompression or historical rewrite occurs. |
-| DOC-06 | Current UI authority points to the uniquely identified new handoff for its scope; legacy inheritance and visual exceptions are explicit. |
-| DOC-07 | ADR-023 receives only a dated alignment note; financial ADR decisions, roadmap sequence and migration baseline remain unchanged. |
-| DOC-08 | Future work records the user's new appearance/filter requirements without claiming implementation, selecting a sprint or promoting readiness. |
-| DOC-09 | Design assets are not added to executable resources or target membership. If exclusion cannot be established, stop before copying. |
-| DOC-10 | The report distinguishes design approval, documentation integration, app implementation and native validation; no app test is claimed from static checks. |
-| DOC-11 | End state is unstaged reviewable changes only; no commit/push/branch/PR or destructive Git operation occurs. |
-
-No Swift build, financial import, fixture generation, TestPlan run, app launch or database reset is needed for this docs-only task. An unexpected resource/build impact is a stop condition, not permission to broaden validation and edit Xcode. Existing production results are historical baseline evidence only.
-
-The table above records the original registration contract, including its original no-publication boundary. It is historical. The 2026-09-11 approved scope-reset prompt controls the current documentation correction and its authorized commit/push; current requirements below exclude the rejected formal accessibility and advanced appearance programmes.
-
-## B. Future native-app implementation acceptance
+## Required native-app checks
 
 Select only the rows applicable to each separately approved implementation packet. Use authentic, read-only source-backed data where statement-dependent values are exercised. Never extract the collage's sample values into a financial fixture or DTO graph.
 
@@ -56,6 +35,6 @@ Select only the rows applicable to each separately approved implementation packe
 | SAFE-01 | No renamed “Cleared/Reconciled/Income/Spending/Net worth” label overstates the underlying accepted authority. |
 | SAFE-02 | The final report distinguishes static token checks, screenshot inspection, user interaction, build/test evidence and financial oracle evidence. |
 
-## C. Evidence record per implementation packet
+## Evidence record per implementation packet
 
-Report the exact code ref, runtime build identity, logical window dimensions, appearance choice, tested actions, named assertions, actual results and remaining gaps. Keep private originals isolated as read-only source evidence in their approved source location; they are never included in published repository artifacts. Only approved sanitized, clean-room or privacy-safe derived evidence may be published. Record independent-oracle use for financial aggregates, and provider/hydration/relaunch evidence when those boundaries are changed. A passing build or visually plausible screenshot alone is insufficient.
+Report the exact code ref, runtime build identity, logical window dimensions, appearance choice, tested actions, named assertions, actual results and remaining gaps. Keep private originals isolated as read-only source evidence in their approved source location; they are never included in published repository artifacts. The owner’s [current processing rule](../../SCOPE_DECISIONS.md#source-processing-decision) prohibits derived financial evidence files on disk; source/oracle comparison stays in memory, while the normal app database remains permitted. Report only permitted operational evidence. Existing images remain preserved historical/reference bytes. Record independent-oracle use for financial aggregates, and provider/hydration/relaunch evidence when those boundaries are changed. A passing build or visually plausible screenshot alone is insufficient.

@@ -16,18 +16,36 @@
   "payload_files": [
     {
       "path": "ACCEPTANCE.md",
-      "bytes": 7059,
-      "sha256": "f6fcc22e8272dfb3c020ee7fa5077e979bc173ae6dd00b102f25c35f5e78a2da"
+      "bytes": 5280,
+      "sha256": "8b71600fd29744b97df07d903a94109bc2719bc5ec458246e23124b306a8e902"
     },
     {
       "path": "DESIGN_HANDOFF.md",
-      "bytes": 27711,
-      "sha256": "8bd2037c5bc856803d774128df210718e8d07c9019aad8ca57a44b4c7025e372"
+      "bytes": 10696,
+      "sha256": "e64405952ca9b22462aadfe84719b8d9fb14cf674171b96ffb79deab64d5788b"
     },
     {
       "path": "DESIGN_TOKENS.json",
       "bytes": 4781,
       "sha256": "744337069754556197573d3a6e16019645bb406c8844a1445a645c64f885a2e3"
+    },
+    {
+      "path": "Inherited_Screens.md",
+      "role": "canonical written contract relocated from existing approved text; no new native acceptance",
+      "bytes": 10556,
+      "sha256": "4691f574f1ac21aa94ea30ebada6fbb6427ba3961448acc03e555b0dcadcca65"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md",
+      "role": "reconciled written reference draft; no native acceptance",
+      "bytes": 10399,
+      "sha256": "d606b18d34377a783bfe9c4a65a6a3de32fc962d932122964efb1aabcdbd7a9a"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md",
+      "role": "reconciled written reference draft; no native acceptance",
+      "bytes": 13885,
+      "sha256": "5c23a92ee86e89e1dba5a56f423c9acf728a8737b0983843a7f3bdf47790f4f7"
     },
     {
       "path": "MasterBoard_LF-UI-2026-09-R1.png",
@@ -36,25 +54,31 @@
     },
     {
       "path": "README.md",
-      "bytes": 3862,
-      "sha256": "1c0b355eca64601e7a3d2649c61748a488abf0205a276093372ace7d3ecb9816"
+      "bytes": 3327,
+      "sha256": "6006ac80f862e0830c660e9282ec85cf70a5160b8bd81768b322294cbc0a7642"
+    },
+    {
+      "path": "SC-01_App_Shell.md",
+      "role": "canonical written contract relocated from existing approved text; no new native acceptance",
+      "bytes": 2817,
+      "sha256": "0e7e7bc22747e551cb877b629d1a8f81cfc2d5b2e362e3647461f9b6c0de520d"
+    },
+    {
+      "path": "SC-02_Transactions.md",
+      "role": "canonical written contract relocated from existing approved text; no new native acceptance",
+      "bytes": 6149,
+      "sha256": "8a667fb9409c7005991547e87c7577eadfa8f2606305f16ced34498b3c5a54f5"
+    },
+    {
+      "path": "SC-03_Dashboard.md",
+      "role": "canonical written contract relocated from existing approved text; no new native acceptance",
+      "bytes": 2499,
+      "sha256": "65f51e35045bf2a4d2ccda469d75566eb97ac2a9298551190529220c6469abb1"
     },
     {
       "path": "SOURCES.md",
-      "bytes": 6370,
-      "sha256": "84533464c1dd52066bbd5c20b5a9584fe42df153c89069dc773758a338ac7bf2"
-    },
-    {
-      "path": "LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md",
-      "role": "reconciled written reference draft; no native acceptance",
-      "bytes": 10313,
-      "sha256": "4205f17c1d1c3431c01e88d9b1913c22d4436c6badd139eda6b30413fbff3560"
-    },
-    {
-      "path": "LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md",
-      "role": "reconciled written reference draft; no native acceptance",
-      "bytes": 13775,
-      "sha256": "686a793dbbdf9079ea9781f4c1a5870f3ffc71022e6dd9b6a5678a86870d1488"
+      "bytes": 6882,
+      "sha256": "40d4dd9679ab2207a0c1008cc4e79ad33f1a6761699864813413ac4b2b440b1c"
     }
   ],
   "manifest_self_hash": "Excluded to avoid recursive checksum; any original outer package manifest is historical.",
@@ -136,5 +160,5 @@
   "git_publication_status": "authorized by user on 2026-09-10",
   "scope_alignment_date": "2026-09-11",
   "scope_alignment": "Private personal app: simple local appearance and ordinary owner usability. Existing PNG bytes and historical provenance retained; DESIGN_HANDOFF.md records exact rejected caption exceptions. Two screen-reference drafts are separately reconciled; redundant scratch inventories are removed.",
-  "local_sc_png_status": "Seven local SC PNG working references remain untracked and outside this published payload, unchanged from the scope-reset preflight. Exact caption exceptions are recorded in DESIGN_HANDOFF.md."
+  "local_sc_png_status": "Local SC PNG working references remain untracked and outside this published payload. Ongoing design-PNG additions and replacements are outside this documentation task by explicit owner instruction. Exact caption exceptions are recorded in DESIGN_HANDOFF.md; local presence does not approve new canonical inputs."
 }

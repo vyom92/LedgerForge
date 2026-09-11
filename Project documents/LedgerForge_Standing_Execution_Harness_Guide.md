@@ -1,239 +1,57 @@
-# LedgerForge Standing Execution Harness Guide
+# Standing execution harness
 
-**Status:** Active repository process authority  
-**Refreshed:** 2026-09-11
-**Execution authority:** None by itself  
-**Architecture authority:** None by itself  
-**Purpose:** Reusable Chat/MCP/Codex planning, execution, validation and review method
+Reusable execution/review method; no independent scope or architecture authorization. [Project Guide](Project_Guide.md) routes the task and owns documentation ordering. Numbered procedures follow Guide rule J.
 
-This repository-local guide supersedes the older private dated copy as the standing execution-method authority.
+## Authority and intake
 
-It does not authorize implementation. A complete Chat-approved prompt still authorizes each concrete task.
+Use exact current refs and the selected task's relevant state, scope, queue, roadmap and accepted ADR sections. Reports/memory guide inspection, never override evidence. The owner decides product scope; Chat owns sprint/correction selection, architecture/financial semantics, prompts and technical acceptance. The approved prompt determines publication authority.
 
----
+Record eligible ideas, features, defects and maintenance under the [scope/intake decision](SCOPE_DECISIONS.md). Distinguish owner request, verified finding, reported defect and contributor proposal. A meaningful new rejection gets a short durable reason; an existing rejected capability gets a reference. No rejected work blocks a retained item. Capture is not approval/readiness/scheduling/execution. Close material findings as EXISTING_ENTRY_UPDATED, NEW_CANDIDATE_RECORDED, ALREADY_COMPLETED, DUPLICATE, DEFERRED_WITH_REASON, REJECTED_WITH_REASON or REJECTED_BY_PRIVATE_PERSONAL_SCOPE. Do not strand a material finding only in a report or expand implementation to absorb it.
 
-## 1. Core principle
+## Environments and reasoning ownership
 
-Retain context within one coherent task. Reset or compact between different outcomes.
+Chat, Codex and MCP executor are distinct. Codex receives a self-contained prompt and relevant local authorities; it does not inherit unseen Chat attachments. MCP executor is a Chat plugin with leases and exact repository checks, not a model or authorization source. MCP leases cannot fence independent Codex/local writers. Use actual available controls and the selected execution route; never invent a missing tool or bypass a required gate.
 
-Every executor/reviewer should receive:
+The repository's reasoning hierarchy remains Sol, Terra, Luna: Sol for architecture-sensitive financial/migration/credential reasoning, Terra for strong bounded or adversarial review, Luna for mechanical work after causal ownership is settled. The user-selected model/prompt controls a task. Escalate unresolved reasoning, not merely verbosity; no model may silently reopen architecture or change its authorized topology.
 
-- exact current repository state;
-- current sprint/corrective status;
-- only the durable decisions relevant to the task;
-- the smallest sufficient code/test/source boundary;
-- explicit stop conditions;
-- no stale transcript archaeology masquerading as authority.
+<a id="one-writer-and-publication"></a>
+## One writer and publication
 
----
+Default: existing main, primary worktree, one active writer. A dirty understood worktree is permitted; unexplained work or overlapping ownership is a stop condition.
 
-## 2. Mandatory authority gate
+1. Verify branch/exact HEAD, recorded and fresh origin/main relationship, index/conflicts, unstaged/untracked paths, worktrees/branches/stashes, active Git operations, validations, writers and relevant leases.
+2. Freeze the initial changed-file inventory and diffs/hashes. Establish exact write ownership and preserve unrelated work byte-for-byte. Do not stop another writer/validation to make room.
+3. Perform only authorized edits. Never reset, restore, clean, stash, prune, overwrite/delete unique work, rewrite history or force-push as an assumed repair.
+4. Review complete candidate diff, paths/links, privacy, executable/resource boundaries and required validation. Preserve failed/non-run evidence. A changing foreign fingerprint is a stop condition.
+5. Commit/push only when explicitly authorized. Stage exact paths/hunks; never `git add .`. Inspect the staged diff separately from unstaged WIP and include all new linked dependencies. Preserve actual multiline commit/report text.
+6. Recheck remote before normal push; unexplained divergence stops publication. Tags need explicit authorization. Verify ending local/remote refs and staged/unstaged/untracked residue; release only task-owned resources/leases and hand off writer ownership.
 
-Before sprint selection, naming, roadmap change, execution prompt, implementation review or acceptance, Chat inspects in this order:
+No task requires an unrelated dirty worktree to become clean. “Clean” means the promised exact boundary, with protected residue explicitly reported. A new branch, PR or worktree is not implicit in a docs task.
 
-1. exact ref/worktree under review;
-2. `Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md`;
-3. this standing harness;
-4. `PROJECT_STATE.md`;
-5. `FUTURE_WORK.MD`;
-6. relevant accepted ADR entries;
-7. production code/tests when documentation is insufficient;
-8. bounded local/private evidence when source truth or local state requires it.
+<a id="task-capsule"></a>
+## Task capsule and execution rhythm
 
-Material claims are classified as:
+A complete prompt states primary PG type; reasoning owner/model/effort and justification; any subagents/parallelism with read/write roles and exact ownership; selected environment/tool role; required terminal; exact baseline and accepted/WIP distinction; one outcome; relevant evidence/authority; included files/boundaries and exclusions; falsifiable acceptance; named focused tests and full-suite trigger; migration/ADR impact; stop conditions and report/publication expectations. Use the smallest sufficient context, not a pasted transcript. Topology changes require the prompt's delegated authority; one writer plus read-only reviewers is the safe default when parallel review is authorized.
 
-- **Verified repository/local evidence**
-- **Explicit user decision**
-- **Reported only**
-- **Inference**
+Implement a coherent boundary, compile/type-check, run focused falsification, inspect and continue. Do not wait until a high-risk cross-layer change is complete before compiling, or split an atomic architectural outcome into misleading tiny commits.
 
-Memory and old reports may guide a search but never override current authorities.
+## Financial correctness and source ownership
 
----
+[Engineering Standards](Engineering%20Standards.md#authentic-source-and-oracle-invariants) owns source/Money/date/identity/persistence/recovery invariants. Financial proof outranks time/token efficiency. No generated statement or production-derived sole oracle; preserve exact native semantics, fail closed on financial ambiguity and prove zero accepted losing-path residue, provider parity and canonical hydration/reopen where relevant. The [owner's current source-processing decision](SCOPE_DECISIONS.md#source-processing-decision) supersedes older on-disk copy/oracle-artifact permissions; historical evidence is not current permission.
 
-## Material Finding / Requirement Intake Rule
-
-First apply the [Private Personal App Scope Gate](../AGENTS.md#private-personal-app-scope-gate). LedgerForge is private, personal, single-user and macOS-local. Only a real owner workflow, actual owner-data correctness/persistence/privacy/recovery need, authentic supplied/selected source or concrete day-to-day usability benefit is eligible. Otherwise: **NOT REQUIRED-DO NOT CONSIDER**. Rejected categories never enter P0 → P3 triage, cannot block retained work, and require a new explicit owner decision naming a real personal need before reopening. <!-- user-specified -->
-
-Scope-eligible material findings need a durable disposition. Speculative commercial/platform concerns and brainstormed ideas without a concrete owner need are not material findings and must not generate queue cards or detailed discovery/ADR packets. Return `REJECTED_BY_PRIVATE_PERSONAL_SCOPE` instead. Every sprint-selection prompt answers all four AGENTS.md eligibility questions before priority: the real owner workflow; the actual data/source/safety issue; why the smallest direct solution is insufficient; and whether generalized commercial convention is the only justification. If either of the first two lacks a concrete answer, reject the proposal.
-
-1. `FUTURE_WORK.MD` is the default home for unscheduled work.
-2. Accepted design requirements belong in the UI/design authority.
-3. Accepted architecture belongs in ADR.
-4. Implemented verified state belongs in `PROJECT_STATE.md`.
-5. The current roadmap selects from already-recorded work; it must not become a second backlog.
-6. A report/task may not close with a scope-eligible material out-of-scope finding stranded only in report or chat text; rejected speculation requires no candidate card.
-7. Implementation prompts may include only work traceable to a durable queue entry, accepted subject authority or explicit corrective defect.
-8. New eligible discoveries that materially change scope must be recorded and returned to Chat before implementation expands. Discovery must not revive rejected scope or broaden an actual owner problem into a generalized program.
-9. Recording a proposal does not approve it, design approval does not imply implementation acceptance, and roadmap presence does not authorize execution.
-
-Required report-close disposition vocabulary:
-
-- `EXISTING_ENTRY_UPDATED`
-- `NEW_CANDIDATE_RECORDED`
-- `ALREADY_COMPLETED`
-- `DUPLICATE`
-- `DEFERRED_WITH_REASON`
-- `REJECTED_WITH_REASON`
-- `REJECTED_BY_PRIVATE_PERSONAL_SCOPE` — no future-work card or packet; existing rejected categories use the compact canonical register.
-
-Prospective queue metadata may include Origin, Evidence / authority, Disposition date, Owning specification / ADR and Personal-v1 relevance where useful; do not mechanically retrofit every historical candidate.
-
----
-
-## 3. Execution environments and model tiers
-
-### Chat
-
-Chat owns:
-
-- sprint/corrective selection;
-- architecture and financial semantics;
-- prompt generation;
-- acceptance;
-- durable documentation reconciliation.
-
-### MCP executor
-
-MCP executor is a Chat plugin for local Mac repository/Xcode access.
-
-It may perform:
-
-- read-only inspection;
-- builds/tests/runtime inspection;
-- private-evidence work under the approved privacy boundary;
-- Chat-authorized writes under one exact execution lease.
-
-The lease is mechanical fencing for MCP, not project authorization.
-
-### Codex
-
-Codex is a separate execution environment. It does not inherit Chat-only conversation or attachments.
-
-Every Codex task must be self-contained and must read the repository-local bootstrap, current roadmap, harness, state and relevant ADRs.
-
-### Model tiers
-
-Model capability order is:
-
-**Sol > Terra > Luna**
-
-Recommended use:
-
-- **Sol:** architecture-sensitive/high-risk implementation or reasoning;
-- **Terra:** independent adversarial review or bounded strong implementation;
-- **Luna:** mechanical cleanup/narrow implementation after architecture is settled.
-
-Model tier and environment are orthogonal.
-
----
-
-## 4. One-writer rule
-
-One primary worktree, one active writer.
-
-Before mutation verify:
-
-- exact HEAD;
-- branch;
-- local/fetched remote relationship;
-- staged/unstaged/untracked state;
-- worktrees/branches/stashes;
-- active Git operation;
-- active validation/build;
-- active MCP lease;
-- independent Codex/local writers.
-
-MCP's lease cannot fence an independent Codex/local process. A changing fingerprint while an MCP lease is held is a stop condition.
-
-Do not reset, restore, clean, stash, prune, force-push or overwrite unexplained work.
-
----
-
-## 5. Compact task capsule
-
-Every execution prompt contains the task-relevant form of:
-
-### Baseline
-Exact ref, worktree expectations, accepted baseline, active correction, migration/ADR baseline.
-
-### Outcome
-One sentence describing the required result.
-
-### Evidence
-Only source/repository/local facts needed for this task.
-
-### Authority
-Relevant roadmap rules, ADRs and explicit user decisions.
-
-### Scope
-Expected files/types/protocols/migrations/tests.
-
-### Exclusions
-What must not change or be inferred.
-
-### Acceptance
-Falsifiable functional, financial, persistence, hydration, privacy and presentation conditions.
-
-### Validation
-Named focused tests, adjacent tests, full-suite trigger.
-
-### Stop conditions
-Conditions that require returning to Chat.
-
-### Report
-Exact ending state, diff, tests/artifacts, oracle, residue, limitations and falsification.
-
-Do not paste whole chat histories into execution prompts.
-
----
-
-## 6. Financial-correctness override
-
-Token or schedule efficiency never weakens financial proof.
-
-For financial work:
-
-- no synthetic, generated, reconstructed, sanitized, representative, reduced, mutated or hand-authored financial statement may be created or used at any stage; only authentic corpus statements may exercise statement-dependent behaviour;
-- parser output is not the sole oracle;
-- preserve Money currency/scale exactly;
-- preserve financial direction/liability effect;
-- preserve source date semantics;
-- preserve multiplicity;
-- preserve source order where authoritative;
-- preserve source-proven identifiers and provenance;
-- fail closed on malformed, financially ambiguous, contradictory or unsupported evidence; harmless presentation variation alone is not a fail-closed reason;
-- rejection leaves zero accepted durable residue;
-- SQLite/In-Memory parity is required where both matter;
-- reopen/hydration are acceptance boundaries;
-- support never generalizes from visual/structural similarity.
-
-Private originals are isolated, read-only source evidence in their approved source location and are never included in published repository artifacts. Only approved sanitized, clean-room or privacy-safe derived artifacts may be published.
-
----
-
+<a id="parser--authentic-corpus-acceptance-policy"></a>
 ## Parser / Authentic-Corpus Acceptance Policy
 
-ADR-046 governs current reader/parser/source-support acceptance. The reusable rules are:
+1. Inventory every original authentic carrier in the approved root and its logical representation separately. Newly supplied recurring statements extend the cumulative corpus unless explicitly excluded/archived; never substitute a sample or representative month.
+2. Apply the all-stages authentic-input and in-memory processing rule before development/debugging, tests, oracles, persistence/migration acceptance, batch/developer UI or review. Missing genuine shapes remain uncertified, not manufactured.
+3. Derive independent source meaning before comparing ordinary production. Compare through an explicit architecture-aware semantic projection; raw oracle JSON need not equal production JSON. Preserve exact multiplicity and source order where authoritative, with no invented occurrence identity.
+4. Exercise ordinary prepare/validate/confirm and every affected accepted persistence/provider/reopen/hydration boundary. Generic extraction preserves physical/source evidence; family parsers interpret coherent financial controls flexibly across inert packaging and fail closed on ambiguous financial meaning.
+5. For shared readers, unlock orchestration, snapshots, detection/classification/routing, normalizers, Money, validation, duplicate/equivalence or persistence mapping, rerun the complete corpus of every affected supported family. Shared tests/full TestPlan supplement this proof; they do not replace it.
+6. Tie acceptance to the exact candidate and independent input freeze. Material corrections invalidate affected old green evidence. Distinguish historical profile acceptance from current complete-corpus certification and record real unobserved cases.
 
-1. **Authentic corpus only.** The complete registered authentic source corpus for every affected supported family is the parser regression and reliability authority. No sampling, representative month or synthetic/sanitized/reconstructed financial statement substitutes for it. Newly supplied recurring statements extend the corpus unless explicitly excluded or archived by the user.
-2. **All-stages authentic-input rule.** No synthetic, generated, recreated, reconstructed, sanitized, representative, reduced, mutated, hand-authored or model-created financial statement may be created or used for development, debugging, reader/normalizer semantics, detector/classifier/parser tests, oracles/expected outputs, edge cases, migration/persistence, import/batch acceptance, developer/debug UI or adversarial review. Remove generated-statement catalogs, reconstructed resources, mutation variants and financial statement factories; hand-built statement/domain/DTO graphs are not substitutes. Exact working copies, necessary decrypted copies and actual extracted PDF attachment bytes are permitted authentic carriers; retain original source-byte provenance/fingerprint authority. Pure source-independent mechanics may use nonfinancial values/files, never content shaped to impersonate a financial statement. If no authentic zero-activity, malformed or other edge case exists, record it as source-uncertified rather than manufacturing coverage. <!-- user-specified -->
-3. **Flexible packaging; strict financial semantics.** Parser support is not defined by incidental page count, transaction count, absolute source row/line number, harmless whitespace/Unicode variation, blank rows, benign page breaks, nonfinancial preambles/footers/pages or statement length. Zero-transaction and variable-page statements must remain supportable when source controls coherently establish their meaning.
-4. **Adaptive deterministic interpretation.** One recurring source-family parser dynamically identifies financial regions, roles and continuity from coherent deterministic evidence: semantic labels, column roles, data shapes, dates, Money, liability/debit-credit direction, running balances, statement/section controls, source order and surrounding structure. Determinism means reproducible/explainable semantics, not rigid physical coordinates. Separate profiles require materially different financial/source semantics.
-5. **Reader boundary.** Generic readers preserve source evidence and physical boundaries. A PDF page with no extractable text does not by itself invalidate the document; downstream family analysis decides whether it is nonfinancial, needs another extraction mode or is genuinely ambiguous. Reader-level rejection is reserved for reader failures such as corrupt/unreadable source material, unresolved encryption or resource failure.
-6. **Financial ambiguity is the stop condition.** Fail closed when financial meaning is ambiguous, contradictory, malformed or unsupported. Do not fail merely because inert packaging differs from a prior month.
-7. **Shared-infrastructure regression.** Any change to generic readers, unlock/password orchestration, source snapshots, detection, classification, routing, normalizer infrastructure, Money, common validation, duplicate/equivalence semantics or persistence mapping must rerun the complete authentic corpus for every affected supported family. Shared unit tests and a full TestPlan are supplementary, not substitutes.
-8. **Historical acceptance is not current reliability certification.** Historical sprint/profile acceptance remains a factual record. Present-day parser reliability is certified only by the complete authentic-corpus ordinary-production-path gate under ADR-046.
-9. **Oracle projection.** Independent oracles record source facts without importing production assumptions. Comparison is `authentic source truth -> explicit architecture-aware semantic projection -> expected LedgerForge financial meaning` versus ordinary production output. Raw Oracle JSON equality with raw production JSON is not an acceptance rule when architectures differ.
-10. **AI boundary.** Prefer deterministic/native extraction, especially for structured XLS/XLSX. Model analysis is reserved for genuinely ambiguous interpretation or independent adjudication and is not ordinary recurring-parser authority.
+The canonical ownership is intake (queue length one or many), unlock/extract, identify/classify/route, family semantic interpretation, normalize/validate/reconcile, duplicate/equivalence, explicit review/confirmation, provider-owned atomic persistence, canonical database/hydration and presentation. Institution parsers are ingestion modules, not separate analytical stores. Prefer deterministic/native structured extraction; model adjudication is not ordinary financial authority.
 
-The canonical user import direction is batch intake (including queue length one) -> unlock as required -> generic extraction -> identify/segregate -> route each statement -> source-family semantic parser -> source-owned financial events -> normalize -> validate/reconcile -> duplicate/equivalence evaluation -> explicit review/confirmation where required -> atomic persistence -> one canonical database -> canonical financial rows -> query/extraction/presentation/viewer layers. Institution-specific parsers are ingestion modules, not separate analytical silos.
-
-Private authentic originals are isolated, read-only source evidence in their approved source location and are never included in published repository artifacts. Only approved sanitized, clean-room or privacy-safe derived artifacts may be published.
-
----
-
-## 7. Credential-correctness rules
+## Credential correctness
 
 For password-protected financial sources:
 
@@ -249,190 +67,30 @@ For password-protected financial sources:
 - legacy Keychain state is compatibility evidence, not permanent architecture;
 - private automated acceptance must not expose or bootstrap real credentials.
 
----
+## Proportional validation
 
-## 8. Selective-test policy
+Start with the smallest check that can falsify the changed boundary. Compile affected targets and execute real nonzero focused selectors before broadening for a named risk or failure. Use [Build conventions](BUILD_AND_PROJECT_CONVENTIONS.md) and actual [script interfaces](../script/README.md).
 
-Default:
+One complete TestPlan per stable implementation state is authoritative when a recorded trigger applies: material cross-cutting final acceptance; migrations/provider transactions; canonical hydration/shared orchestration; shared duplicate/credential/reader routing effects; global test infrastructure/concurrency; a named unexplained cross-area failure; or explicitly required cycle close. A second full pass needs a material change or named diagnostic hypothesis. Do not rerun suites to compensate for missing financial or runtime evidence.
 
-1. compile the smallest affected target;
-2. run the named focused suites;
-3. broaden only when the ownership boundary or a failure requires it.
+Persistence/startup changes preserve the independent accepted migration identity lock, explicit task-owned schema experiment namespace and genuine adopted-data upgrade acceptance. Use the existing durable-startup gate for actual SQLite/provider publication, clean quit and same-database relaunch; memory Run is insufficient. One-time disposable database recreation is not future reset authority. Keep product build identity and dirty/unavailable provenance truthful.
 
-A full `TestPlan.xctestplan` pass is required when the prompt records a trigger, including:
+Runtime checks are required where automation cannot establish launch, navigation, import review/confirmation, provider replacement/relaunch, process contention or actual native interaction. Label passed/pending/unavailable/explicitly accepted deferral separately. No guessed native pass or blanket formal accessibility campaign.
 
-- migration;
-- provider transaction semantics;
-- canonical hydration;
-- shared duplicate/equivalence semantics;
-- shared credential orchestration;
-- reader/registry routing with broad effect;
-- global test infrastructure/concurrency;
-- final cycle-close where explicitly required.
+Documentation-only changes require full diff, status-claim, link/path/anchor, ordering, privacy and Git-state review. They need no executable suite when executable sources/tests/migrations/resources/project metadata are unchanged. Exact Xcode documentation membership changes require project parse and the smallest affected build/resource-containment check, not product-feature acceptance. Changed checkers require focused checks.
 
-At most one authoritative full pass per stable implementation state.
+## Reports and cross-tool evidence
 
-A second full pass requires a material code change or named diagnostic hypothesis.
+Report exact starting/ending refs, changed paths/fingerprints, scope/exclusions, migration/ADR impact, source/oracle authority, named build/test/run IDs and nonzero counts, results/failures/non-runs, native/provider/recovery proof, privacy/residue, publication and falsification/limitations. Classify material claims **verified**, **reported only**, **contradicted** or **missing**. Complete logs are not the default report. Chat verifies before acceptance.
 
-Every selector must discover and execute nonzero tests.
+Where reviewers cannot access native artifacts, provide an allowed compact operational acceptance manifest readable by the authorized review surfaces, with candidate/parent, paths/hashes, test/build results, run IDs/times and only permitted evidence. It supplements native artifacts, never replaces them. It must not contain originals, credentials or derived financial evidence prohibited by the current owner processing rule. Do not persist source-oracle records merely to satisfy a historical cross-tool recipe; resolve any incompatible evidence requirement before execution.
 
-For persistence/startup changes, independently pin accepted migration identities (including name and checksum inputs), keep intentional schema experiments in explicit task-owned namespaces, and finish with the existing runner’s `durable-startup` gate. This requires the actual ordinary Debug product to verify SQLite and canonical hydration, quit cleanly, and relaunch the same database. The safe memory Run helper is insufficient. Test upgrades on copies of adopted databases; an explicitly authorized disposable-database recreation does not establish future compatibility. Runtime build provenance comes from the product’s embedded build identity, with dirty or unavailable state retained. See [local validation guidance](../script/README.md).
+## Corrective numbering and documentation close
 
----
+Chat assigns N, NA, NB in sequence without shifting later numbers. A blocker within a correction does not create another correction; unrelated defects need their own classification.
 
-## 9. Source/oracle discipline
+After technical acceptance, update the current snapshot, owning roadmap outcome, necessary ADR alignment and queue remainder with accepted-history links. Detailed tests/non-runs/limitations belong in accepted outcome collections. If acceptance is incomplete, label active unaccepted WIP. Decisions/rejection reasons belong in SCOPE_DECISIONS; substantive unresolved evidence in shared Work notes. Update AGENTS/Guide/Harness together only for reusable routing/ownership changes. Publication alone is not acceptance or personal adoption.
 
-For private-source acceptance:
+## Stop conditions and exceptions
 
-- define physical source inventory independently;
-- define logical representations separately from duplicate physical copies;
-- do not use filenames to infer financial meaning when source evidence can prove it;
-- do not let production parser output become the independent oracle;
-- compare source truth to production through an explicit architecture-aware semantic projection rather than requiring raw oracle JSON to equal raw production JSON;
-- use exact multiset/multiplicity where order is not source-equivalent;
-- use exact ordered comparison where source order is authoritative;
-- preserve duplicate occurrences without invented occurrence identity;
-- retain only aggregate/private-safe acceptance results in durable docs.
-
----
-
-## 10. Report compression
-
-Reports preserve:
-
-- exact refs/fingerprints;
-- changed files;
-- source/oracle;
-- test/build commands or run IDs;
-- result;
-- failure classification;
-- remaining unknowns;
-- residue/privacy state;
-- falsification analysis.
-
-Do not paste complete logs by default.
-
-Classify claims as:
-
-- verified;
-- reported only;
-- contradicted;
-- missing.
-
-Chat verifies material claims before acceptance.
-
-### Cross-tool acceptance manifest
-
-When one executor's native acceptance artifacts may be outside another approved review surface, the executor should also emit a small privacy-safe acceptance manifest to a shared, repository-approved evidence location readable by every authorized reviewing tool. The manifest must not exist only in an executor's temporary directory or application container. It supports cross-tool review; it does not replace native `.xcresult`, log or source artifacts.
-
-At minimum, record:
-
-- candidate ref and parent;
-- repository-relative changed paths with hashes and the final candidate hash or fingerprint;
-- focused and complete TestPlan counts;
-- Debug and Release results;
-- authentic-corpus aggregate counts and semantic digest when applicable;
-- durable-startup aggregate result, migration count and database identity/fingerprint result when applicable;
-- validation run IDs and timestamps; and
-- private-input digests only, never private contents.
-
-Use opaque digests for private inputs. The manifest must not contain absolute private paths, credentials, passwords, private financial descriptions, account numbers, beneficiary information, original statement content or source-derived filenames where privacy policy prohibits them.
-
----
-
-## 11. Model escalation
-
-Escalate reasoning/model, not merely verbosity.
-
-Use **Sol** when:
-
-- architecture ownership is unresolved;
-- financial correctness spans several layers;
-- migration/credential/persistence semantics are changing;
-- repeated lower-tier attempts disagree with source truth.
-
-Use **Terra** when:
-
-- architecture is frozen but an independent adversarial review is needed;
-- a strong second opinion can falsify a near-final candidate;
-- implementation is bounded but still nontrivial.
-
-Use **Luna** when:
-
-- causal ownership is settled;
-- work is mechanical;
-- test/source expectations are already authoritative.
-
-A lower model must not reopen settled architecture without new evidence.
-
----
-
-## 12. Corrective-sprint rule
-
-The current roadmap governs sprint numbering.
-
-For Sprint `N`:
-
-- `NA` is the first bounded correction attributable to `N`;
-- `NB` is another separately bounded correction attributable to `N`;
-- later numbered sprints do not move;
-- a blocker inside a correction does not create another correction;
-- an unrelated P0 defect is not disguised as the previous sprint's correction.
-
-Only Chat assigns or accepts corrective numbering.
-
----
-
-## 13. Documentation synchronization
-
-Documentation synchronization applies both at technical acceptance and when execution/discovery surfaces a scope-eligible material out-of-scope finding.
-
-At technical acceptance:
-
-- update `PROJECT_STATE.md`;
-- update the current roadmap;
-- publish required ADR alignment/amendment;
-- reconcile `FUTURE_WORK.MD`;
-- update AGENTS/Project Guide/Harness only when reusable process changed.
-
-When a scope-eligible material out-of-scope finding is discovered:
-
-- link it to an existing queue item or owning authority, record a new candidate, or classify it as already completed, duplicate, deferred with reason or rejected with reason;
-- do not widen current implementation merely because the finding is useful;
-- return decision-changing discoveries to Chat before implementation scope expands;
-- ensure the report closes with one of the required intake dispositions rather than leaving the finding only in narrative text.
-
-Reject ineligible generalized speculation without creating a candidate or packet. During documentation sync, remove or narrow every retained dependency on rejected work. Acceptance concerns the owner's actual private-app outcome; financial correctness and recovery proof remain unchanged.
-
-If acceptance is not complete, record the work as **active unaccepted WIP**, not production support.
-
-Repository-local current roadmap/harness are preferred over private dated copies to prevent authority drift.
-
----
-
-## 14. Durable task close
-
-Preserve:
-
-- accepted ref/outcome;
-- migration/ADR consequence;
-- support and exclusion boundary;
-- focused/full validation;
-- runtime/private-source evidence at aggregate level;
-- rejected alternatives that constrain future work;
-- remaining future work.
-
-Detailed implementation history stays in Git.
-
----
-
-## 15. Exceptions
-
-A deviation from this harness requires Chat to record:
-
-- exact rule overridden;
-- reason;
-- evidence/safety consequence;
-- user approval when the deviation broadens scope, privacy, testing or Git operations.
-
-Silence is not an exception.
+Stop for conflicting owner/source/architecture authority, unexplained ref/WIP divergence, another writer, possible unique-work loss, guessed migration/identity, absent independent financial proof, failed required validation/parity/residue/recovery, private Git leakage, unavailable required controls or scope expansion. Name the boundary, preserve evidence and return to Chat. A deviation must identify the exact rule, reason and safety consequence; obtain owner authorization where not already supplied. Silence is not approval.

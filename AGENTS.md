@@ -1,317 +1,43 @@
-# LedgerForge Agent Bootstrap
+# LedgerForge agent bootstrap
 
-## Purpose
-
-This file is the mandatory repository entry point for LedgerForge agents and execution sessions.
-
-LedgerForge is a private, single-user, offline-first macOS personal-finance application built with Swift and SwiftUI.
-
-Apply this priority order:
-
-1. financial correctness;
-2. durable persistence;
-3. deterministic behaviour;
-4. explicit user control;
-5. privacy;
-6. recoverability;
-7. explainability;
-8. maintainability;
-9. delivery speed.
-
-A faster implementation never outranks a higher-priority invariant.
-
----
-
-## PRIVATE PERSONAL APP SCOPE GATE
-
-LedgerForge is private, personal, single-user and macOS-local, for the owner's own finances on the owner's Mac. It is not a commercial product, public platform, team product or general-purpose financial software framework. <!-- user-specified -->
-
-Before adding, selecting, researching or preserving future work, require a concrete connection to at least one of:
-
-- an actual personal workflow explicitly requested by the owner;
-- financial correctness, durable persistence, privacy or recoverability of the owner's real data;
-- an authentic financial source actually supplied or selected by the owner;
-- a direct improvement to the owner's real day-to-day use.
-
-Otherwise the binding disposition is **NOT REQUIRED-DO NOT CONSIDER**. It is not deferred, post-v1, research or a future sprint candidate. Rejected categories do not enter P0 → P3 triage or candidate comparison, cannot block retained work and must not be resurrected by discovery. Remove or narrow dependencies on rejected work. A new explicit owner decision naming the real personal need is required to reopen only the named capability. <!-- user-specified -->
-
-Every sprint-selection prompt must answer these four questions first:
-
-1. What real owner workflow does this solve?
-2. What actual owner data/source/safety issue requires it?
-3. Why is the smallest direct solution insufficient?
-4. Is this being proposed only because commercial/generalized software often has it?
-
-If question 1 or 2 has no concrete answer, the disposition is **NOT REQUIRED-DO NOT CONSIDER**. Do not research it, add a card, assign a sprint, create an ADR packet or ask the owner to choose hypothetical architectures. “Best practice,” imagined users and possible future usefulness do not establish eligibility.
-
-The compact [rejected-scope register](Project%20documents/FUTURE_WORK.MD#rejected-private-personal-scope) records the excluded categories. Financial/source truth, independent oracles, atomic persistence, zero-residue rejection, migration integrity, hydration/relaunch, password privacy, backup/restore and Git/worktree safety remain binding. Existing useful Developer Console behavior, exact Keychain behavior, local signing/sandbox requirements and harmless native SwiftUI semantics remain accepted behavior.
-
----
+LedgerForge is a private, personal, single-user, offline-first Swift/SwiftUI macOS app for the owner's MacBook. Its purpose is to replace the Budget Analysis sheet with truthful unified bank, card and investment data for personal use. Do not overengineer it or invent public/commercial workflows. Clarify unresolved owner choices; do not infer approval. <!-- user-specified -->
 
 ## Mandatory bootstrap
 
-For every LedgerForge planning, implementation, review, recovery or documentation task:
+1. Read this file and the complete current Chat-approved prompt.
+2. Establish the exact ref and local worktree state mechanically; preserve unexplained work.
+3. Use the [Project Guide task index](Project%20documents/Project_Guide.md#pg-01) to select the relevant playbook and sections. Do not load the whole folder for ordinary tasks.
+4. Read [current state](Project%20documents/PROJECT_STATE.md) for accepted product facts and active WIP. Read scope/queue only for relevant planning or findings; inspect code/tests/local evidence where documents are insufficient.
+5. Before source/import/duplicate-support work, read [ADR-046](Project%20documents/ADR.md#adr-046), [authentic-source invariants](Project%20documents/Engineering%20Standards.md#authentic-source-and-oracle-invariants) and the [Harness corpus policy](Project%20documents/LedgerForge_Standing_Execution_Harness_Guide.md#parser--authentic-corpus-acceptance-policy). Before architecture, persistence, identity or credentials, read the relevant accepted ADRs.
 
-1. Read this file.
-2. Read the complete Chat-approved task prompt, if one exists.
-3. Establish the exact repository ref and local worktree state mechanically.
-6. Read the relevant current sections of `Project documents/PROJECT_STATE.md`.
-7. Read `Project documents/FUTURE_WORK.MD` when selecting, comparing, deferring or reconciling unscheduled work.
-8. Read relevant accepted entries in `Project documents/ADR.md` before changing architecture, persistence, identity, import semantics, credential ownership or domain ownership.
-9. For any task touching a reader, detector, classifier, parser, normalizer, import validation, duplicate/equivalence semantics or source-support acceptance, read ADR-046, the Standing Execution Harness **Parser / Authentic-Corpus Acceptance Policy**, and the current `PROJECT_STATE.md` parser-reliability alignment before treating support as established.
-10. Inspect production code, tests, private-source evidence or local build/runtime evidence only where the documents are insufficient.
+## Private personal app scope gate
 
-Do not infer current sprint status, accepted support, migration version, architecture or local Git state from memory or an older report.
+Check [SCOPE_DECISIONS](Project%20documents/SCOPE_DECISIONS.md) before new scope proposals. Any one concrete personal workflow, real correctness/persistence/privacy/recovery need, authentic selected source, or day-to-day convenience/appearance improvement establishes relevance. A convenience idea need not solve a financial safety problem. Record useful ideas, features, defects and maintenance distinctly as owner requests, verified findings, reported problems or proposals. <!-- user-specified -->
 
-### Material finding intake
+**Capture ≠ approval ≠ readiness ≠ scheduling ≠ execution.** Record eligible work in the [queue](Project%20documents/FUTURE_WORK.MD) or its subject authority. Preserve meaningful rejection reasons in SCOPE_DECISIONS. Rejected work is **NOT REQUIRED-DO NOT CONSIDER**, cannot block retained work and can reopen only through a new explicit owner decision naming the real need. Parked ideas retain their recorded revisit condition. Do not create research packets for already rejected categories. <!-- user-specified -->
 
-Apply the Private Personal App Scope Gate first. An eligible material finding, requirement, defect, workflow issue, design finding, architecture issue or maintenance need must receive a durable disposition in `FUTURE_WORK.MD` or its owning subject authority before sprint selection or implementation. Speculative public/commercial/generalized concerns and brainstormed ideas without a concrete owner need are not material findings: return `REJECTED_BY_PRIVATE_PERSONAL_SCOPE` without creating a future-work card or detailed decision packet. Recording an eligible proposal does not approve it, and implementation must trace to durable authority or an explicitly authorized corrective defect.
+## Critical financial and source rules
 
-The complete Chat-approved prompt is the execution contract for the current task. Repository documents provide durable context and constraints; they do not independently authorize implementation.
+Priority: financial correctness → durable persistence → deterministic behavior → explicit control → privacy → recoverability → explainability → maintainability → speed. Preserve exact native Money/currency/scale, date meaning, direction/liability effect, source order, multiplicity, identifiers and provenance. Independent source oracles outrank production-derived expectations; financial ambiguity fails closed with zero accepted durable residue. Verify provider parity, migration integrity, canonical hydration and relaunch where the boundary requires them.
 
----
+Only authentic originals in `/Users/vyom/Documents/Ledger Forge` are financial statement inputs. No synthetic, generated, sanitized, reconstructed, representative, reduced, mutated or hand-authored statements or statement/domain/DTO substitutes may be created or used at any stage. The owner's current processing rule allows in-memory processing only and prohibits derivative statement files and derived financial evidence files on disk; the normal app database remains permitted; see the exact [scope decision](Project%20documents/SCOPE_DECISIONS.md#source-processing-decision). Nonfinancial source-independent mechanics remain permitted. Missing authentic cases stay uncertified. <!-- user-specified -->
 
-## Authority map
+Keep private originals, credentials and financial source content out of Git. Legitimate local/ChatGPT inspection is permitted within the task; do not add blanket local-inspection bans. Accepted ordinary app diagnostic/password protections remain. Data being disposable does not authorize deleting a database or changing migration history. <!-- user-specified -->
 
-| Question | Primary authority |
-|---|---|
-| What is accepted production reality? | Exact repository evidence + `PROJECT_STATE.md` |
-| What sprint/correction is current? | Current cycle roadmap |
-| What may execute now? | Complete Chat-approved prompt |
-| What reusable execution method applies? | Standing execution harness |
-| What remains unscheduled? | `FUTURE_WORK.MD` |
-| What architecture is accepted? | Accepted ADR entries |
-| What is product direction? | `Product Vision.md` |
-| What UI is approved? | Frozen UI/UX documents and approved assets |
-| What build/Xcode/Git rules apply? | `BUILD_AND_PROJECT_CONVENTIONS.md` |
-| What is true only on the local Mac? | Direct local evidence through MCP executor or the selected local execution environment |
-| What happened historically? | Git history and historical ADR text |
+## Execution and Git safety
 
-When authorities conflict:
+The complete approved prompt authorizes execution; roadmaps and proposals do not. Chat owns scope/architecture decisions and final technical acceptance. Codex needs self-contained instructions; MCP executor/admin are Chat tooling, not required Codex tooling. Use the selected local execution environment and obey the prompt's tool restrictions.
 
-1. identify the exact conflict;
-2. inspect the exact current ref;
-3. distinguish accepted production state from active unaccepted WIP;
-4. prefer authentic source truth and current production evidence over derived fixtures;
-5. apply explicit user decisions until superseded;
-6. stop rather than select the most convenient interpretation.
+One writer in the primary worktree by default. Before writes, inspect exact HEAD/branch/remote relationship, staged/unstaged/untracked files, worktrees/branches/stashes, Git operations, active writers/leases and validations. Never reset, restore, clean, stash, prune, overwrite or delete unexplained work. MCP leases do not fence an external writer. Stop on overlapping ownership, unexplained divergence, source/architecture conflict, failed required proof, private Git leakage or scope expansion. Follow [Harness execution and publication](Project%20documents/LedgerForge_Standing_Execution_Harness_Guide.md#one-writer-and-publication); stage exact authorized paths only.
 
----
+## Subject routing
 
-## Chat, MCP executor, Codex and model tiers
+| Task boundary | Read the selected sections |
+| --- | --- |
+| Execution/review, writer coordination, validation and reporting | [Standing Harness](Project%20documents/LedgerForge_Standing_Execution_Harness_Guide.md) |
+| Xcode, local build/test/Run commands and resources | [Build conventions](Project%20documents/BUILD_AND_PROJECT_CONVENTIONS.md) and [script guide](script/README.md) |
+| Financial, Money, source, identity, persistence and recovery invariants | [Engineering Standards](Project%20documents/Engineering%20Standards.md) |
+| Cross-layer or database boundaries | [Architecture](Project%20documents/Architecture_v1.0_Frozen.md), [Database](Project%20documents/Database_v1_Architecture.md), relevant [ADRs](Project%20documents/ADR.md) |
+| UI changes and canonical/draft distinction | [UI routing](Project%20documents/UI_UX_v1.0_Frozen.md), [R1 package](Project%20documents/UI%20Assets/LF-UI-2026-09-R1/README.md) |
 
-These are different concepts. Do not conflate them.
-
-### ChatGPT Chat
-
-Chat is the LedgerForge coordinator and decision owner.
-
-Chat owns:
-
-- sprint selection, numbering and corrective classification;
-- architecture and financial-semantics decisions;
-- task/prompt preparation;
-- reconciliation of roadmap, state and ADR implications;
-- review of implementation reports and evidence;
-- final technical acceptance;
-- authorization of publication, commit and push.
-
-Planning does not authorize implementation.
-
-### MCP executor
-
-`MCP executor` is a ChatGPT plugin/tool that gives a regular Chat session guarded access to the local Mac LedgerForge repository, Xcode/build/test environment and approved local evidence roots.
-
-It is:
-
-- not a model;
-- not Codex;
-- not a source of project authorization;
-- mechanically fenced by exact HEAD/worktree/index checks and an execution lease for writes.
-
-Chat may use MCP executor read-only for local evidence at any time. Chat may use it for implementation only when the user or a Chat-approved execution contract authorizes that route.
-
-The MCP writer lease fences MCP writes only. It cannot prevent an independent Codex/local process from editing the same worktree. Concurrent external writers are therefore a stop condition.
-
-### Codex
-
-Codex is a separate execution environment/session.
-
-Codex does not automatically inherit:
-
-- this Chat conversation;
-- Chat-only attachments;
-- unstated user decisions;
-- private context that exists only in another session.
-
-A Codex task must therefore receive a self-contained Chat-approved execution prompt and must read the repository-local bootstrap, roadmap, harness, state and relevant ADRs.
-
-Codex must not redesign the sprint, widen support claims, reinterpret source truth or continue past a stop condition.
-
-### Model hierarchy
-
-Model capability is orthogonal to execution environment.
-
-LedgerForge model order is:
-
-1. **Sol** — highest reasoning tier; use for architecture-sensitive implementation, financial-correctness work, migrations, credential semantics and difficult cross-layer debugging.
-2. **Terra** — second tier; use for strong independent/adversarial review, bounded implementation with settled architecture, and broad evidence analysis.
-3. **Luna** — third tier; use for bounded mechanical cleanup, straightforward test maintenance and narrow tasks after causal ownership is established.
-
-Model choice never grants authority or changes repository safety rules.
-
----
-
-## One-writer rule
-
-Default repository workflow is one `main` branch, one primary worktree and one active writer.
-
-Before any write:
-
-- verify branch and exact HEAD;
-- verify `main`/`origin/main` divergence;
-- inspect staged, unstaged and untracked paths;
-- inspect linked worktrees, branches and stashes;
-- inspect active Git operations;
-- identify active Codex/local/MCP writers or validations;
-- preserve unexplained work.
-
-Never run MCP writes while an independent Codex/local writer is actively changing the same worktree.
-
-Never reset, restore, clean, stash, prune, overwrite or delete unique/unexplained work.
-
-A dirty worktree is not automatically a failure. An unexplained dirty worktree is a stop condition.
-
----
-
-## Current parser / import authority — 2026-09-01
-
-ADR-046 is the current parser/source-support authority. For every supported financial source family:
-
-- no synthetic, generated, recreated, sanitized, reconstructed, representative, reduced, mutated, hand-authored or model-created financial statement may be created or used at any stage, including development, debugging, tests, oracles, persistence, batch acceptance, developer UI or adversarial review; remove statement fixture factories/catalogs and do not replace them with hand-built statement/domain/DTO graphs; <!-- user-specified -->
-- only authentic corpus statements may exercise statement-dependent behaviour. Exact working copies, necessary decrypted copies and actual extracted attachment bytes are permitted; original bytes remain provenance/fingerprint authority. Pure source-independent nonfinancial values/files may test isolated mechanics, but must not impersonate financial statements. Missing authentic cases remain source-uncertified, not manufactured; <!-- user-specified -->
-- the **complete registered authentic corpus** supplied by the user is the cumulative parser regression authority; sampling or a representative month is insufficient;
-- each newly supplied recurring authentic statement extends that corpus unless the user explicitly excludes or archives it;
-- generic readers extract and preserve source evidence; institution/source-family financial interpretation belongs downstream;
-- parsers must be tolerant about inert packaging and strict about financial meaning: page count, transaction count, absolute row/line positions, harmless whitespace/typography, benign page breaks and nonfinancial pages do not define support;
-- zero-transaction statements and variable page counts are valid when coherent source controls establish them; technical resource limits must not masquerade as financial-profile rules;
-- one adaptive deterministic runtime parser should own one recurring financial source family unless a materially different source/financial semantic contract justifies a separate profile; deterministic means reproducible and explainable, not hard-coded physical coordinates;
-- financial meaning is established from coherent source evidence such as semantic labels, column roles, data shapes, dates, Money, direction, balance transitions, statement/section controls, continuity, ordering and surrounding structure; fail closed when financial meaning is ambiguous, contradictory, malformed or unsupported, not merely because inert presentation changed;
-- any shared ingestion change that can affect source interpretation must rerun the complete authentic corpus of every affected supported family; a green unit suite or full TestPlan alone does not certify parser reliability;
-- historical sprint/profile acceptance remains historical fact, but it is distinct from **current authentic-corpus production reliability certification**; personal-v1 parser reliability remains uncertified until the complete-corpus gate is satisfied; and
-- independent source oracles record source facts. Acceptance compares authentic source truth through an explicit architecture-aware semantic projection with ordinary production output; raw Oracle JSON need not equal raw production JSON when the representations intentionally differ.
-
-Private authentic originals are isolated, read-only source evidence in their approved source location and are never included in published repository artifacts. Only approved sanitized, clean-room or privacy-safe derived artifacts may be published. AI/model interpretation is not required for ordinary recurring structured parsing and is never financial authority unless separately approved.
-
----
-
-## Financial truth
-
-For financial imports, persistence, identity, balances, cards, salary, investments or valuation:
-
-- complete authentic source semantics and independently derived source oracles outrank generated expected data;
-- production parser output must not be its own sole oracle;
-- preserve native currency, scale, liability/direction semantics, date meaning, source order, balances, identifiers, multiplicity and provenance;
-- fail closed on malformed, ambiguous, conflicting or unsupported evidence;
-- verify zero accepted durable residue on rejection;
-- require SQLite/In-Memory parity where both matter;
-- verify persistence, provider reconstruction, close/reopen, hydration and presentation;
-- never infer institution, format, layout, account identity or credential family from structural similarity alone;
-- never invent dates, ordering, identifiers, balances or provenance;
-- keep private originals isolated and read-only;
-- use private originals only as isolated read-only source evidence from approved locations; never include them in published repository artifacts; the all-stages authentic-input rule above applies to every statement-dependent operation.
-
-A green suite proves only the boundary and oracle it exercised.
-
----
-
-## Startup and accepted migration prevention
-
-Accepted migration identities are append-only: retain the independent baseline lock in `MigrationIdentityLockTests`; never refresh its expected identities from candidate source merely to make a test pass. Run deliberate schema experiments only on task-owned isolated targets through the namespace-checked `script/validate.sh schema-experiment` path. Ordinary Xcode Run remains Current Database. A memory Run check cannot establish durable startup: use `script/validate.sh durable-startup` for provider verification, canonical hydration, clean quit and same-database relaunch. An adopted database requires upgrade-copy acceptance; recreating the disposable database in the 2026-09-09 continuation was a one-time explicit authorization, not a general recovery rule. See `script/README.md` for the exact commands and evidence boundaries.
-
-## Validation policy
-
-Start with the smallest validation that can falsify the changed boundary.
-
-Run the complete `TestPlan.xctestplan` only when a recorded trigger applies, including:
-
-- final integrated acceptance after material cross-cutting changes;
-- migrations or provider-transaction changes;
-- hydration or shared orchestration changes;
-- global test-infrastructure/concurrency changes;
-- a named unexplained cross-area failure;
-- cycle-close verification required by the current roadmap/prompt.
-
-Run at most one authoritative full-suite pass per stable implementation state. A second pass requires a material code change or named diagnostic hypothesis.
-
-Documentation-only work does not require executable validation when source, tests, migrations, fixtures, project metadata, schemes, TestPlan, build settings and executable resources remain unchanged. It still requires complete diff, link/path, privacy and Git-state review.
-
----
-
-## Reports and acceptance
-
-Implementation and review reports are claims, not acceptance.
-
-Classify material claims as:
-
-- **verified**;
-- **reported only**;
-- **contradicted**;
-- **missing**.
-
-Verify, where relevant:
-
-- starting/ending refs;
-- changed files;
-- branch/worktree handling;
-- source and oracle authority;
-- migration/ADR impact;
-- test selection and nonzero execution;
-- persistence/hydration/relaunch;
-- privacy and residue;
-- staged/unstaged/untracked state;
-- commit/push result;
-- limitations and falsification analysis.
-
-Chat alone accepts the implementation outcome.
-
----
-
-## Durable records
-
-- `PROJECT_STATE.md`: accepted production baseline plus explicitly labelled active unaccepted WIP.
-- Current cycle roadmap: sprint numbering, corrective status, cycle outcomes and next gates.
-- `FUTURE_WORK.MD`: unscheduled queue, bugs, debt and research.
-- `ADR.md`: accepted architectural decisions.
-- Standing execution harness: reusable Chat/MCP/Codex execution method.
-- Git history: detailed implementation history.
-
-Do not duplicate every fact everywhere. Cross-link instead.
-
----
-
-## Stop conditions
-
-Stop and report when:
-
-- repository state materially differs from the approved task;
-- another writer is active or worktree ownership is ambiguous;
-- unique work may be lost;
-- architecture or source truth is contradictory;
-- a migration would require guessing;
-- an independent financial oracle is unavailable;
-- provider parity or zero-residue behaviour cannot be established;
-- private data or credentials would leak;
-- required validation fails;
-- scope must expand beyond the approved outcome;
-- the result would overstate accepted production support.
-
-Do not silently weaken validation or manufacture a green result.
-
----
-
-## Maintenance rule
-
-Keep this bootstrap stable. Do not embed current commit hashes, current sprint test counts or detailed sprint history here.
-
-When workflow ownership or authority routing changes, update this file, the Project Guide and Standing Execution Harness together.
+Do not infer current support, migration or sprint acceptance from memory, old reports or a green suite outside its exercised oracle. Reports distinguish verified, reported only, contradicted and missing evidence. Keep current facts in PROJECT_STATE, accepted architecture in ADR, decisions in SCOPE_DECISIONS, open work in FUTURE_WORK and history in linked outcome collections. Update this bootstrap, Guide and Harness together only when reusable routing/ownership changes.

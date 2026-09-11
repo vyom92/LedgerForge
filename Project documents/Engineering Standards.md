@@ -1,44 +1,10 @@
-# LedgerForge — Engineering Standards
+# Engineering Standards
 
-**Status:** Active engineering and verification policy  
-**Status alignment reviewed:** 2026-07-26
-**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb`
-**Latest verified production implementation:** Sprint 58 — Deterministic Import Verification Workspace; Sprint 59 ADR-041 architecture-only
+Financial and correctness invariants for the private personal app. [Scope decisions](SCOPE_DECISIONS.md) owns product choices; [Harness](LedgerForge_Standing_Execution_Harness_Guide.md) owns execution/validation/reporting; [Build conventions](BUILD_AND_PROJECT_CONVENTIONS.md) owns Xcode/commands; [Architecture](Architecture_v1.0_Frozen.md), [Database](Database_v1_Architecture.md) and accepted [ADRs](ADR.md) own their technical boundaries. Current support/migration/WIP belongs only in [PROJECT_STATE](PROJECT_STATE.md).
 
-## Document Role
+Procedures inherit [Guide rule J](Project_Guide.md#documentation-order). The invariant sections below have no priority/sprint meaning.
 
-This document defines LedgerForge engineering quality, financial-correctness, privacy, evidence and verification standards.
-
-It does not define:
-
-- current production support;
-- sprint priority;
-- implementation scope;
-- active execution authority;
-- exact build commands;
-- exact migration DDL;
-- product direction;
-- UI design authority.
-
-Those belong respectively to:
-
-- `Project documents/PROJECT_STATE.md`;
-- `Project documents/FUTURE_WORK.MD`;
-- the complete Chat-approved execution prompt;
-- `AGENTS.md` and `Project documents/BUILD_AND_PROJECT_CONVENTIONS.md`;
-- registered migrations;
-- `Project documents/Product Vision.md`;
-- `Project documents/UI_UX_v1.0_Frozen.md` and approved assets.
-
-`AGENTS.md` is the sole mandatory bootstrap entry point.
-
-The complete Chat-approved prompt supplied directly in the current conversation is the sole execution contract.
-
-No repository document creates an active task by itself.
-
----
-
-# 1. Priority Order
+## Priority Order
 
 When engineering concerns conflict, apply this order:
 
@@ -56,7 +22,7 @@ A faster implementation is not preferable when it weakens a higher-priority prop
 
 ---
 
-# 2. Decision Framework
+## Decision Framework
 
 Before implementing a capability, establish:
 
@@ -84,237 +50,7 @@ A feature that does none of these should not be built merely because the interfa
 
 ---
 
-# 3. Mode Ownership
-
-## Chat
-
-Chat owns:
-
-- sprint planning;
-- prioritization;
-- architecture discussion;
-- prompt preparation;
-- review of Work and Codex reports;
-- final acceptance decisions.
-
-Planning does not authorize implementation.
-
-## Work
-
-Work is limited to bounded, read-only investigation when GitHub cannot efficiently establish the required evidence.
-
-Work may investigate:
-
-- local or unpushed state;
-- worktrees;
-- filesystem and Xcode configuration;
-- build, test or runtime evidence;
-- broad cross-file tracing;
-- one unresolved architecture boundary.
-
-Work does not:
-
-- edit files;
-- commit;
-- push;
-- select a sprint;
-- define architecture;
-- authorize implementation.
-
-Before escalation, Chat identifies:
-
-1. the exact unknown;
-2. why it affects the decision;
-3. the bounded evidence Work must return.
-
-## Codex
-
-Codex performs only the edits, builds, tests, documentation updates and Git operations authorized by the complete Chat-approved execution prompt.
-
-Codex reports evidence and limitations directly in chat.
-
-## User edits
-
-The user may edit repository files directly.
-
-Legitimate compatible user work must be preserved and reconciled.
-
-Unexplained, ambiguous, private, incompatible or unsafe work triggers a stop condition.
-
----
-
-# 4. Repository Authority
-
-Inspect repository evidence in this order:
-
-1. exact ref or commit under review;
-2. `Project documents/PROJECT_STATE.md`;
-3. `Project documents/FUTURE_WORK.MD`;
-4. relevant accepted ADRs;
-5. frozen Architecture and Database Architecture;
-6. production code and tests when documentation is insufficient;
-7. approved fixtures and independent expected evidence.
-
-Memory, uploads and earlier conversations are context only.
-
-They do not override current repository evidence.
-
-GitHub establishes pushed state only.
-
-It does not establish:
-
-- local worktree cleanliness;
-- staged or unstaged changes;
-- untracked files;
-- local branches;
-- linked worktrees;
-- stashes;
-- unpushed commits.
-
-When local state matters, use local evidence.
-
----
-
-# 5. Repository and Git Safety
-
-## Pre-execution gate
-
-Before an editing task, verify:
-
-- current branch;
-- current HEAD;
-- `main`;
-- `origin/main`;
-- divergence;
-- staged files;
-- unstaged files;
-- untracked files;
-- linked worktrees;
-- local branches;
-- remote branches;
-- stashes.
-
-Default workflow is one `main` branch and one primary worktree.
-
-Do not create a branch, worktree or pull request unless:
-
-1. the user explicitly approves it;
-2. a repository-specific reason is stated;
-3. the complete execution prompt requires it.
-
-Generic branching habit is not a repository-specific reason.
-
-## Existing work
-
-A dirty worktree is not automatically a failure.
-
-Preserve and reconcile legitimate compatible work.
-
-Stop when existing material is:
-
-- unrelated;
-- ambiguous;
-- private;
-- sensitive;
-- broken;
-- incompatible;
-- unexplained;
-- unsafe to combine;
-- uniquely owned by an unverified branch, worktree or stash.
-
-Never silently:
-
-- discard;
-- reset;
-- overwrite;
-- delete;
-- drop;
-- prune;
-- abandon;
-- force-push;
-- rewrite published history.
-
-## Commit gate
-
-Commit only after:
-
-- the authorized change is complete;
-- required validation passes;
-- the complete diff is reviewed;
-- conflict markers are absent;
-- privacy boundaries are verified;
-- documentation claims match evidence;
-- the staged set is legitimate and compatible;
-- `origin` has been fetched again;
-- unexpected remote advancement has been ruled out.
-
-Prefer one coherent commit for one approved task unless the prompt requires independently validated commits.
-
-## Push gate
-
-Push only after the commit and final repository reconciliation succeed.
-
-Finish with:
-
-- `HEAD == origin/main`;
-- clean primary worktree;
-- no legitimate uncommitted changes;
-- no unpushed commits;
-- no leftover task branch;
-- no additional task worktree;
-- no unexplained stash.
-
-A failed validation result must not be committed or pushed as completed work.
-
----
-
-# 6. Core Architecture Standards
-
-Preserve the approved production flow:
-
-```text
-ImportCoordinator
-    ↓
-PasswordProvider
-    ↓
-ReaderRegistry
-    ↓
-Reader
-    ↓
-RawDocument
-    ↓
-Institution Detection
-    ↓
-Statement Classification
-    ↓
-Parser Selection
-    ↓
-Statement Parser
-    ↓
-FinancialDocument
-    ↓
-Validation
-    ↓
-Exact-Content and Supported Transaction-Event Evaluation
-    ↓
-Account / Identity Review
-    ↓
-Explicit User Confirmation
-    ↓
-DatabaseProvider Confirmed-Import Operation
-    ↓
-Provider-Owned Atomic Persistence
-    ↓
-RepositoryStoreHydrator
-    ↓
-Runtime Stores
-    ↓
-ViewModels
-    ↓
-Views
-```
-
-## Required boundaries
+## Layer ownership constraints
 
 - Readers understand source formats.
 - Readers perform file access and extraction only.
@@ -353,115 +89,7 @@ Never:
 
 ---
 
-# 7. Folder Responsibilities
-
-The repository structure may evolve, but responsibility boundaries remain stable.
-
-## Views
-
-- SwiftUI presentation.
-- User intent collection.
-- Accessibility behavior.
-- No parsing.
-- No financial calculation authority.
-- No repository coordination.
-- No SQLite access.
-
-## ViewModels
-
-- Presentation transformation.
-- UI state derived from stores and typed workflow results.
-- No durable ownership.
-- No parsing.
-- No direct persistence.
-- No financial identity inference.
-
-## Core
-
-- Shared runtime infrastructure.
-- Observable application state where appropriate.
-- Cross-cutting values that do not belong to one feature module.
-- No institution-specific financial interpretation.
-
-## Models
-
-- Domain values.
-- Immutable financial evidence.
-- Typed outcomes.
-- No UI code.
-- No persistence implementation.
-- No source-format I/O.
-
-## Services and Coordinators
-
-- Application workflow orchestration.
-- Domain-specific coordination.
-- Activity and lifecycle ownership.
-- No institution-specific source interpretation unless the service is explicitly the approved parser.
-- No direct SQLite access.
-- No alternate persistence-to-runtime path.
-
-## Readers
-
-- Authorized source access.
-- Format-specific extraction.
-- `RawDocument` production.
-- Optional supplied-password handling.
-- No Keychain access.
-- No UI prompting.
-- No financial interpretation.
-
-## Analyzers and Normalizers
-
-- Format structure.
-- Deterministic extraction support.
-- Ordered, uninterpreted evidence transport.
-- No financial identifier verification.
-- No institution-specific financial meaning unless explicitly assigned by an accepted ADR.
-
-## Detectors
-
-- Deterministic institution detection.
-- Deterministic document-family classification.
-- Parser-selection evidence.
-- Unknown remains a valid result.
-- No filename authority.
-
-## Parsers
-
-- Financial interpretation.
-- `FinancialDocument` production.
-- Parser profile identity/version.
-- Verified financial identifiers.
-- Approved transaction-event evidence.
-- No file I/O.
-- No persistence.
-- No runtime-store mutation.
-- No validation authority over their own output.
-
-## Database
-
-- Repository contracts.
-- DTOs.
-- SQLite provider.
-- In-Memory provider.
-- Registered migrations.
-- Provider-owned atomic operations.
-- No UI logic.
-- No parser logic.
-
-## Tests and Fixtures
-
-- Independent financial truth.
-- Provider parity.
-- Migration integrity.
-- Hydration and relaunch evidence.
-- Privacy and falsification cases.
-- No private source material.
-
----
-
-# 8. Financial Truth Standards
+## Financial Truth Standards
 
 ## Source semantics
 
@@ -546,7 +174,7 @@ Where the accepted graph includes new identity, zero residue includes:
 
 ---
 
-# 9. Money and Currency Standards
+## Money and Currency Standards
 
 ## Money authority
 
@@ -627,7 +255,7 @@ Production FX storage and conversion are not.
 
 ---
 
-# 10. Financial Identity Standards
+## Financial Identity Standards
 
 ## Durable identity
 
@@ -681,7 +309,7 @@ Do not implement them through generic repository calls.
 
 ---
 
-# 11. Duplicate and Event-Evidence Standards
+## Duplicate and Event-Evidence Standards
 
 ## Exact-content duplicate identity
 
@@ -701,11 +329,11 @@ Do not reconstruct legacy fingerprints from reduced repository evidence.
 
 ## Binary source snapshots under ADR-041
 
-Future binary-capable imports must use exact source bytes under `ledgerforge.source-bytes.sha256.v1`. Fingerprinting and extraction must consume one immutable app-owned `SourceContentSnapshot` through confirmation, and confirmation must revalidate that snapshot. Source bytes must not enter diagnostics or durable history merely for fingerprinting. Existing raw-text fingerprints remain valid and untouched. This is a prospective standard: the snapshot and source-byte foundation do not exist in production today.
+Under ADR-041, exact source bytes use `ledgerforge.source-bytes.sha256.v1`. Fingerprinting and extraction consume one immutable app-owned `SourceContentSnapshot` through confirmation, which revalidates that snapshot. Keep processing in memory under the current owner rule. Source bytes must not enter diagnostics or durable history merely for fingerprinting. Existing raw-text fingerprints remain valid and untouched; [PROJECT_STATE](PROJECT_STATE.md) owns accepted implementation.
 
 ## Binary documents
 
-Binary exact-content authority is accepted by ADR-041 for prospective implementation; the source snapshot and source-byte foundation are not implemented.
+ADR-041 owns binary exact-content authority; current implementation is recorded in [PROJECT_STATE](PROJECT_STATE.md).
 
 Do not represent parsed PDF text, normalized transactions or fixture equivalence as binary identity.
 
@@ -740,7 +368,7 @@ Do not silently import a subset.
 
 ---
 
-# 12. Date, Order and Provenance Standards
+## Date, Order and Provenance Standards
 
 ## StatementDate
 
@@ -801,7 +429,7 @@ Rejection occurs before runtime-store mutation.
 
 ---
 
-# 13. Persistence and Migration Standards
+## Persistence and Migration Standards
 
 ## Exact authority
 
@@ -864,7 +492,7 @@ Do not silently substitute an empty or In-Memory repository.
 
 ---
 
-# 14. Provider Parity
+## Provider Parity
 
 Where SQLite and In-Memory providers both matter, they must expose equivalent domain behavior.
 
@@ -890,7 +518,7 @@ In-Memory must publish affected collections together for atomic operations.
 
 ---
 
-# 15. Concurrency Standards
+## Concurrency Standards
 
 Correctness relies on:
 
@@ -928,7 +556,7 @@ State the proven concurrency boundary precisely.
 
 ---
 
-# 16. Mutation and Correction Standards
+## Mutation and Correction Standards
 
 Imported financial truth is not edited casually.
 
@@ -969,7 +597,7 @@ Generic “undo” is not an architectural substitute for family semantics.
 
 ---
 
-# 17. Card Evidence Standards
+## Card Evidence Standards
 
 Card evidence is parser-owned and document-scoped.
 
@@ -1009,104 +637,24 @@ Production card support requires an approved family, source format, validation, 
 
 ---
 
-# 18. Fixture Evidence Standards
+<a id="authentic-source-and-oracle-invariants"></a>
+## Authentic source and oracle invariants
 
-## Repository eligibility
+Only authentic original statements in `/Users/vyom/Documents/Ledger Forge` are input authority. Original bytes remain provenance/fingerprint authority and originals remain read-only. The [owner's current processing decision](SCOPE_DECISIONS.md#source-processing-decision) allows in-memory processing only, prohibits copied/decrypted/extracted/reconstructed statement files and all derived financial evidence files on disk, and preserves the app's normal database. No saved financial source-oracle or validation-output file is permitted. Older artifact recipes are historical, not exceptions. <!-- user-specified -->
 
-Private-statement-derived artifacts may be published only when they are approved sanitized, clean-room or privacy-safe derivatives; publication does not make them authentic statement inputs or current parser authority.
+No synthetic, generated, recreated, sanitized, reconstructed, representative, reduced, mutated, hand-authored or model-created financial statement may be created or used at any stage: development/debugging, extraction, normalizers/detectors/classifiers/parsers, tests/expected outputs/oracles, migrations/persistence/batch acceptance, developer UI or review. Statement factories/catalogs and hand-built statement/domain/DTO graphs cannot substitute for authentic sources. Pure source-independent nonfinancial values/files may test mechanics but must not impersonate financial statements. Missing genuine zero-activity/malformed/other cases remain source-uncertified. <!-- user-specified -->
 
-Private originals are isolated, read-only source evidence in approved source locations and are never included in published repository artifacts. Only approved sanitized, clean-room or privacy-safe derived artifacts may be published.
+The complete registered authentic corpus for every affected supported family is cumulative regression authority; each new recurring statement extends it unless explicitly excluded or archived. No representative month or sample certifies a family. Independent source facts must be established before production comparison, in memory under the current rule; production output cannot be its own sole oracle. Compare authentic truth through an explicit architecture-aware semantic projection, preserving exact ordered evidence or multiset/multiplicity as appropriate. Raw Oracle JSON need not equal production JSON where representations intentionally differ. Never invent occurrence identity, source ordering, dates or financial values.
 
-## Clean-room restrictions
+Readers extract/preserve source evidence and physical boundaries. A PDF page with no extractable text is not alone financial invalidity; downstream interpretation determines nonfinancial, alternative-extraction or ambiguous content. Reader failures include corrupt/unreadable material, unresolved encryption and real resource failure. Technical limits must not masquerade as financial profiles.
 
-For clean-room reconstructions, do not reuse private:
+One adaptive deterministic parser should own a recurring family unless materially different financial/source semantics justify a profile. Infer meaning from coherent labels, column roles, shapes, dates, Money, direction/liability effect, running balances, statement/section controls, continuity, multiplicity, order and surrounding evidence. Page/transaction count, absolute positions, inert whitespace/typography, benign breaks and nonfinancial pages do not define support. Zero-activity and variable-page sources are valid when coherent controls establish them. Fail closed on financial ambiguity, contradiction, malformation or unsupported semantics, not inert packaging changes.
 
-- PDF objects;
-- content streams;
-- images;
-- XObjects;
-- fonts;
-- metadata;
-- annotations;
-- forms;
-- attachments;
-- rasterized backgrounds.
+A shared ingestion change that can affect a supported family requires its complete authentic corpus through ordinary production, provider persistence, reopen and hydration with independent projections. Green shared tests or a full TestPlan supplement, never replace, that gate. Historical profile acceptance is separate from current authentic-corpus reliability. Prefer native/deterministic extraction for structured formats; model interpretation is not ordinary financial authority. [ADR-046](ADR.md#adr-046) retains original accepted architecture; its current alignment records the processing clarification.
 
-## Financial preservation
+Required verification remains binding even where an old fixture/artifact recipe is now prohibited. Inspect current tool output behavior before financial execution; stop if in-memory independent proof and allowed persistence/output cannot be established. This documentation refactor does not change validation code or delete existing artifacts.
 
-Preserve source-supported:
-
-- exact amounts;
-- native currencies;
-- direction;
-- dates;
-- source order;
-- balances;
-- identifiers;
-- statement summaries;
-- structural relationships;
-- cross-period continuity where verified.
-
-## Independent truth
-
-Expected results must not be generated solely by the production parser under test.
-
-Use:
-
-- manual enumeration;
-- source arithmetic;
-- independent scripts;
-- cross-format reconciliation;
-- approved manifest evidence.
-
-Distinguish source truth from implementation behavior.
-
-## Geometry and extraction
-
-- State native-text versus OCR boundaries.
-- Do not use OCR when reliable native extraction exists.
-- Use measured tolerances for geometry claims.
-- Do not let visual review override numeric failure.
-- Preserve source relationships without preserving private source objects.
-
-## Fictional identity
-
-Fictional identity continuity must be deterministic.
-
-Do not expose:
-
-- original identifiers;
-- suffixes;
-- merchants;
-- references;
-- filenames;
-- paths;
-- private mapping tables.
-
-## Metadata compatibility
-
-Use current repository-approved metadata for new packages.
-
-Do not rewrite older approved fixtures solely for cosmetic uniformity.
-
-## Support claim
-
-A fixture proves only what its tests and metadata establish.
-
-It does not automatically prove:
-
-- production reader support;
-- production parser support;
-- institution-wide support;
-- layout-family support;
-- persistence;
-- hydration;
-- UI;
-- exact-content identity.
-
----
-
-# 19. Error Handling Standards
+## Error Handling Standards
 
 ## Typed outcomes
 
@@ -1161,7 +709,7 @@ Do not expose:
 
 ---
 
-# 20. Diagnostic Standards
+## Diagnostic Standards
 
 Diagnostics are governed by ADR-026.
 
@@ -1201,7 +749,7 @@ Do not log:
 
 ---
 
-# 21. Privacy and Repository Safety
+## Privacy and Repository Safety
 
 Never commit:
 
@@ -1237,7 +785,7 @@ Privacy failure is a stop condition.
 
 ---
 
-# 22. Swift Coding Standards
+## Swift Coding Standards
 
 ## Design
 
@@ -1288,7 +836,7 @@ Comments should not narrate obvious syntax or preserve obsolete behavior as folk
 
 ---
 
-# 23. SwiftUI and Presentation Standards
+## SwiftUI and Presentation Standards
 
 - Views present state and emit user intent.
 - ViewModels prepare presentation state.
@@ -1311,306 +859,7 @@ Numeric values should use consistent alignment and tabular figures where appropr
 
 ---
 
-# 24. Implementation Rhythm
-
-Use small, coherent, verifiable changes.
-
-A coherent change may require several files.
-
-Do not force an architectural increment into “one file at a time” when the boundary requires:
-
-- domain;
-- provider;
-- migration;
-- hydration;
-- tests;
-- UI;
-- documentation.
-
-Prefer checkpoints that leave the repository buildable and explainable.
-
-A reasonable rhythm is:
-
-```text
-inspect authority
-    ↓
-implement one coherent boundary
-    ↓
-build or type-check
-    ↓
-run focused tests
-    ↓
-review result
-    ↓
-continue
-```
-
-Do not implement an entire high-risk sprint before the first compilation.
-
-Do not create tiny commits that split one atomic architectural outcome into misleading fragments.
-
----
-
-# 25. Validation Planning
-
-Every execution prompt should identify:
-
-- baseline ref;
-- included scope;
-- exclusions;
-- acceptance boundary;
-- stop conditions;
-- migration impact;
-- ADR impact;
-- fixture/oracle authority;
-- focused tests;
-- regression tests;
-- build requirements;
-- runtime verification;
-- documentation updates;
-- Git requirements.
-
-Validation should test the claimed boundary, not merely nearby code.
-
-A test suite is not acceptance evidence until its oracle and exercised boundary are understood.
-
----
-
-# 26. Automated Verification
-
-## Focused tests
-
-Run focused tests early for the changed boundary.
-
-Focused tests should include:
-
-- success;
-- malformed input;
-- unsupported evidence;
-- conflict;
-- privacy;
-- deterministic order;
-- provider parity where relevant;
-- injected failure where atomicity matters.
-
-## Canonical suite
-
-Run the approved canonical TestPlan when required by the execution prompt or when the change can affect shared behavior.
-
-## Builds
-
-Use approved Debug and Release build requirements from the execution prompt and Build Conventions.
-
-A clean Debug build is the minimum for executable source changes unless a more specific boundary is approved.
-
-Release and static analysis are required when the prompt, risk or changed boundary requires them.
-
-## Migration tests
-
-Migration changes require:
-
-- fresh creation;
-- supported predecessor upgrade;
-- chain validation;
-- checksum failure;
-- gap failure;
-- unsupported future state;
-- preflight stop;
-- injected failure;
-- reopen;
-- no partial publication.
-
-## Runtime verification
-
-Runtime verification is required when automated evidence cannot establish the user-visible or process-level boundary.
-
-Examples include:
-
-- app launch;
-- navigation;
-- import review;
-- confirmation;
-- provider replacement;
-- relaunch hydration;
-- multiple process contention;
-- ordinary keyboard, readability or visual behavior.
-
-Manual verification must distinguish:
-
-- passed;
-- pending;
-- unavailable;
-- explicitly accepted deferral.
-
-Do not claim runtime verification that was not performed.
-
----
-
-# 27. Manual Import Verification
-
-A DEBUG-only approved-fixture launcher may verify deterministic runtime presentation and navigation.
-
-The launcher:
-
-- enters the ordinary production preparation seam;
-- preserves validation;
-- preserves account/identity review;
-- preserves explicit confirmation;
-- preserves provider-owned persistence;
-- does not inject expected results;
-- does not bypass readers, parsers or repositories;
-- is compile-time absent from Release.
-
-Native macOS file selection receives a bounded smoke test where required.
-
-Repeated fixture scenarios should not depend on fragile accessibility traversal of `NSOpenPanel`.
-
-Private fixtures and alternate trusted import paths are prohibited.
-
----
-
-# 28. Documentation-Only Cycles
-
-A documentation-only cycle may skip full build and test execution only when all of the following remain unchanged:
-
-- Swift source;
-- tests;
-- schemas;
-- migrations;
-- fixtures;
-- executable build settings;
-- Xcode project metadata;
-- assets;
-- generated production resources.
-
-Every documentation-only cycle still requires:
-
-- current-ref verification;
-- authority review;
-- complete diff review;
-- conflict-marker scan;
-- link and path validation;
-- privacy review;
-- status-claim verification;
-- Git-state verification.
-
-A `project.pbxproj`, scheme, test-plan or build-setting change is not ordinary documentation-only work.
-
-It requires project-integrity validation and an appropriate clean build.
-
----
-
-# 29. Xcode Project Standards
-
-- Prefer Xcode-safe project operations.
-- Avoid manual `.pbxproj` edits when safer tooling exists.
-- Verify target membership.
-- Verify synchronized-group behavior.
-- Verify shared-scheme and TestPlan integrity.
-- Keep user-specific Xcode state untracked.
-- Do not commit DerivedData or local scheme-management state.
-- Validate project-file changes before continuing.
-- Do not infer target membership from folder location alone.
-
----
-
-# 30. Definition of Done
-
-An implementation task is complete only when all applicable conditions are satisfied.
-
-## Scope
-
-- Included work is complete.
-- Excluded work remains excluded.
-- No unauthorized opportunistic refactor is present.
-- Stop conditions were not crossed.
-
-## Correctness
-
-- Financial invariants are preserved.
-- Unsupported evidence fails closed.
-- No accepted losing-path residue exists.
-- SQLite and In-Memory parity is verified where required.
-- Source truth and independent oracle evidence agree.
-
-## Persistence
-
-- Migration impact is correct.
-- Provider behavior is verified.
-- Hydration succeeds.
-- Relaunch or provider reconstruction is verified where relevant.
-- Presentation reflects canonical state.
-
-## Quality
-
-- Required focused tests pass.
-- Required regression tests pass.
-- Required builds pass.
-- Required analysis passes.
-- Applicable runtime verification passes or is explicitly accepted as deferred.
-- No unresolved conflict markers exist.
-- Privacy checks pass.
-
-## Documentation
-
-- Accepted ADRs are updated only when architecture changed.
-- `PROJECT_STATE.md` records only verified durable facts.
-- `FUTURE_WORK.MD` is changed only when the prompt authorizes queue reconciliation.
-- Detailed implementation history remains in Git.
-- Production support is not overstated.
-
-## Git
-
-- Complete diff reviewed.
-- Authorized files staged.
-- Commit created.
-- Tag created only when required.
-- Push completed.
-- `HEAD == origin/main`.
-- Primary worktree clean.
-- No unpushed commits or unexplained residue remain.
-
-Documentation-only tasks use their applicable validation boundary rather than pretending a Swift build proves prose correctness.
-
----
-
-# 31. Report Standards
-
-Execution reports are claims requiring evidence.
-
-A report should state:
-
-- starting ref;
-- ending ref;
-- branch and worktree state;
-- changed files;
-- included scope;
-- excluded scope;
-- migration impact;
-- ADR impact;
-- validation commands and results;
-- runtime evidence;
-- fixture/oracle evidence;
-- documentation changes;
-- staged, unstaged and untracked residue;
-- commit;
-- tag where applicable;
-- push result;
-- limitations;
-- falsification analysis.
-
-Classify material claims as:
-
-- verified;
-- reported only;
-- contradicted;
-- missing.
-
-Do not treat “tests passed” as sufficient without explaining what the tests prove.
-
----
-
-# 32. AI-Assisted Development Standards
+## AI-Assisted Development Standards
 
 - Chat owns planning and approval.
 - Work owns bounded read-only discovery.
@@ -1621,7 +870,7 @@ Do not treat “tests passed” as sufficient without explaining what the tests 
 - Never use model confidence as evidence.
 - Never permit AI output to become the sole validation oracle.
 - Never permit AI to choose a trusted financial mutation.
-- Never place private originals or unsanitized private-source material into prompts, logs or repository artifacts. Only approved sanitized, clean-room or privacy-safe derived artifacts may cross that boundary.
+- Legitimate task-scoped local/ChatGPT inspection of originals is permitted. Never put originals, credentials or private source/financial content in Git; preserve ordinary diagnostic protections and the current prohibition on derived financial evidence files on disk.
 - Verify filenames and target paths before editing.
 - Verify repository state before and after execution.
 - Build and test according to the approved boundary.
@@ -1639,7 +888,7 @@ Trusted acceptance still requires deterministic evidence and approved human-cont
 
 ---
 
-# 33. Technical Debt Policy
+## Technical Debt Policy
 
 Technical debt must be explicit.
 
@@ -1667,34 +916,7 @@ A temporary compatibility path should include:
 
 ---
 
-# 34. Long-Term Engineering Philosophy
-
-Optimize for durable correctness and maintainability over cleverness.
-
-Prefer versioned, evidence-backed generalization over accumulating institution-specific special cases.
-
-Make the next supported institution easier by improving:
-
-- reader contracts;
-- parser boundaries;
-- fixture quality;
-- independent oracles;
-- provider parity;
-- provenance;
-- validation;
-- failure behavior.
-
-Do not broaden trusted behavior through automatic learning.
-
-Future learning may produce reviewable suggestions.
-
-It must not silently mutate parser authority, financial truth or persistence behavior.
-
-Build systems that become easier to verify, not merely easier to extend.
-
----
-
-# 35. Change Policy
+## Change Policy
 
 Update this document when repeated verified experience establishes a durable engineering standard.
 
@@ -1717,4 +939,12 @@ Implementation remains separately authorized.
 
 ---
 
-## End of Engineering Standards
+## Local inspection and publication
+
+Legitimate local/ChatGPT inspection is permitted within the authorized task. Do not add blanket privacy gates for that inspection. Keep originals, credentials, private source/financial content, local databases/sidecars and sensitive output out of Git; accepted ordinary diagnostic/password-minimization behavior remains binding. The current source-processing rule separately prohibits derived financial evidence files on disk. Git publication is not permission to sanitize/reconstruct statements for development.
+
+## Verification principles
+
+Test the changed causal boundary: success, malformed/ambiguous/unsupported evidence, conflict, deterministic order, privacy, failure atomicity and provider parity where applicable. Migration tests include fresh creation, supported predecessor upgrade, checksum/gap/future-state rejection, preflight, injected failure, reopen and no partial publication; accepted migration identities stay append-only and independently locked. Preserve exact Money and provenance through provider reconstruction, hydration, presentation and same-database relaunch. A memory launch is not durable startup proof.
+
+Manual import checks must use ordinary production preparation, validation/account review, explicit confirmation and provider persistence; no injected expected outcomes or alternate trusted financial path. Any debug launcher remains absent from Release. Native checks report their actual boundary and non-runs. [Harness proportional validation](LedgerForge_Standing_Execution_Harness_Guide.md#proportional-validation) controls test selection and reports.

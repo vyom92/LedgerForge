@@ -3,7 +3,7 @@
 **Status:** written working draft; full-size visual frames and native acceptance remain pending.
 **Design authority:** LF-UI-2026-09-R1. No new master board.
 **Owners:** existing `FW-P2-03`, `FW-P2-53` and bounded `FW-P2-48/50`.
-**Sources:** [canonical R1 handoff](DESIGN_HANDOFF.md) §3, [tokens](DESIGN_TOKENS.json), current roadmap Sprint 89 and its unaccepted appendix.
+**Sources:** [canonical R1 Transactions contract](SC-02_Transactions.md), [shared handoff](DESIGN_HANDOFF.md), [tokens](DESIGN_TOKENS.json), current roadmap Sprint 89 and its [unaccepted evidence note](../../Work%20notes/Transaction_and_R1_workflows.md).
 
 **Scope alignment — 2026-09-11:** Sprint 89 remains paused and unaccepted. Its financial algebra and independent source proof remain required. Formal accessibility and advanced appearance requirements are removed. The canonical handoff’s exact caption exceptions apply to the retained local SC-02A and SC-02C PNGs; those images remain artwork, not passed native evidence.
 

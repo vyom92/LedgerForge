@@ -1,125 +1,16 @@
-<!-- Project documents/Database_v1_Architecture.md -->
+# Database architecture — persistence boundaries
 
-# LedgerForge — Database v1 Architecture
+## Current applicability and exact authority
 
-**Status:** Frozen database-design baseline, status-aligned through ADR-041, Migration V8, Sprint 57A, Sprint 58 and the Axis source-truth restoration
-**Status alignment reviewed:** 2026-07-26
-**Repository ref reviewed:** `main@b661472a58fc24144361322f1853b8001437a3eb`
-**Latest verified production implementation:** Sprint 58 Deterministic Import Verification Workspace; Sprint 59 accepted ADR-041 architecture only
-**Current registered migration:** V8
-**Production database:** SQLite behind repository and provider boundaries
+This file describes durable contracts and the historical v1 persistence design. Current accepted migration and implementation/support limits live only in [PROJECT_STATE](PROJECT_STATE.md). The exact schema is [Database/Migrations.swift](../Database/Migrations.swift) and its registered migration sources; repository/DTO mappings and accepted ADRs control their implementation boundary. Do not infer features from dormant schema, older source-support text or migration capacity.
 
-## Document Role
+The original database baseline was reviewed 2026-07-26 at `b661472a58fc24144361322f1853b8001437a3eb`. Earlier V1–V6 explanations below are historical migration semantics, not a current migration inventory. Original migrations/identity locks are not edited by documentation alignment.
 
-This document defines the approved LedgerForge database architecture and its current production-aligned persistence contracts.
+Later accepted boundaries include exact source-byte authority, source-specific equivalence/lineage, categories, card evidence, Salary and the authentic-source reset; see their numeric [ADRs](ADR.md) and accepted outcomes via current state. The owner’s [current processing decision](SCOPE_DECISIONS.md#source-processing-decision) preserves the normal app database but prohibits derived financial evidence files; old on-disk fixture/oracle recipes are superseded. Product backup/restore remains required but unimplemented until its own architecture and proof are accepted. Encryption, sync and multiple workspaces are not prerequisites.
 
-It is not:
+## Database Principles
 
-- the executable DDL authority;
-- an inventory of every dormant table or column;
-- a claim of production parser or source-format support;
-- a backlog;
-- a migration script;
-- an implementation authorization.
-
-The exact schema authority is the registered migration chain and the repository/DTO mapping implemented at the exact ref under review.
-
-When this document conflicts with:
-
-1. an accepted ADR;
-2. a registered migration;
-3. verified repository/provider behavior;
-
-the accepted ADR, migration and verified behavior control in that order.
-
-Current implementation state belongs in `PROJECT_STATE.md`. Unscheduled work belongs in `FUTURE_WORK.MD`.
-
----
-
-## Current private-personal alignment — 2026-09-11
-
-The dated status and implementation descriptions below preserve this frozen historical database baseline. PROJECT_STATE.md and accepted ADRs own current production, migration and exact credential/source support. The private-personal gate and canonical rejection register supersede generalized future-planning implications here. Verified owner backup/restore remains required; app-level encryption, cloud sync and multiple-workspace programmes are not prerequisites. This alignment changes no accepted database behavior.
-
-# 1. Current Status Boundary
-
-## 1.1 Verified production import
-
-Production import support is limited to the verified shared Axis bank-account CSV grammar represented by:
-
-- the privacy-safe source-derived Axis Bank NRE semantic evidence;
-- the verified clean-room Axis Bank NRO CSV transaction evidence.
-
-Both use one production `AxisBankAccountParser`.
-
-New supported imports emit:
-
-```text
-axis.bank-account.csv
-version 2
-```
-
-Historical durable provenance using:
-
-```text
-axis.nre.csv
-version 1
-```
-
-remains readable and is not rewritten merely to adopt the neutral forward profile. Historical `axis.bank-account.csv@1` provenance is also read unchanged and is separately subject to integrity discovery.
-
-No broader Axis, PDF, XLS, XLSX, card, HDFC, CBQ, American Express or other institution support is established by this database design.
-
-## 1.2 Current migration and accepted architecture
-
-The active registered migration chain ends at V8. V7 adds reviewed-partial summaries, dispositions and attempt counts; V8 adds categories and current transaction-category assignments. The Axis source-truth restoration adds no migration and creates no historical backfill.
-
-The current database architecture includes verified implementation of:
-
-- versioned exact-content document fingerprints;
-- bounded transaction-event identity;
-- durable import-attempt history;
-- provider-owned atomic confirmed import;
-- workspace-scoped financial-identifier ownership;
-- accepted-import identifier observations;
-- exact `Money` persistence and hydration;
-- strict statement-date semantics;
-- durable document-scoped source order and provenance;
-- parser-profile provenance;
-- fail-closed migration-chain verification;
-- canonical repository-to-runtime hydration;
-- strict historical readback of V7 partial-import provenance while new provenance-less mixed overlap is unsupported;
-- V8 workspace-owned categories and separate current transaction-category assignments;
-- SQLite and In-Memory parity within accepted boundaries.
-
-Accepted but unimplemented database architecture includes:
-
-- document-scoped card-statement evidence under ADR-034;
-- financial-mutation planning, authorization and family-specific audit under ADR-037.
-
-Acceptance does not create tables, migrations or production behavior.
-
-## 1.3 Current source-format boundary
-
-The repository contains fixture and extraction foundations for PDF and spreadsheet families.
-
-Those foundations do not activate:
-
-- production PDF persistence;
-- binary-document fingerprint authority under accepted ADR-041, not implemented production behavior;
-- production XLS or XLSX readers;
-- production source-file archival;
-- OCR;
-- password storage;
-- production card persistence;
-- cross-format duplicate suppression.
-
-Schema capacity, protocols and fixtures are not support.
-
----
-
-# 2. Database Principles
-
-## 2.1 Durable financial truth
+### Durable financial truth
 
 Accepted imported financial truth is durable and immutable.
 
@@ -141,7 +32,7 @@ Trusted persisted values include, where source-supported:
 
 User-authored metadata remains separate from imported financial truth.
 
-## 2.2 Validation before accepted persistence
+### Validation before accepted persistence
 
 Preview transactions are transient domain values.
 
@@ -162,7 +53,7 @@ Accepted transaction rows are published only after:
 
 Malformed, ambiguous, conflicting or unsupported trusted evidence fails closed.
 
-## 2.3 One durable authority
+### One durable authority
 
 SQLite is the production durable authority.
 
@@ -170,7 +61,7 @@ Runtime stores are projections.
 
 Views, ViewModels, coordinators and stores must not become persistence authority.
 
-## 2.4 Canonical hydration
+### Canonical hydration
 
 `RepositoryStoreHydrator` is the only persistence-to-runtime boundary.
 
@@ -178,7 +69,7 @@ Successful writes are followed by canonical hydration.
 
 Runtime stores are never patched manually to simulate a durable outcome.
 
-## 2.5 Native currency
+### Native currency
 
 Every trusted monetary value retains its native currency and canonical scale.
 
@@ -186,13 +77,13 @@ Conversion is derived and never replaces imported values.
 
 Mixed currencies are not silently aggregated.
 
-## 2.6 Immutable identity
+### Immutable identity
 
 Repository IDs are opaque and immutable.
 
 Display names, filenames, institution labels, masked identifiers, suffixes, transaction similarity and runtime presentation IDs are not durable identity.
 
-## 2.7 Privacy-minimal persistence
+### Privacy-minimal persistence
 
 Persist only evidence required for:
 
@@ -206,7 +97,7 @@ Persist only evidence required for:
 
 Do not persist unrestricted source text, raw canonical fingerprint payloads or diagnostics merely because storage is available.
 
-## 2.8 Fail closed
+### Fail closed
 
 The database layer does not invent:
 
@@ -222,7 +113,7 @@ The database layer does not invent:
 
 ---
 
-# 3. Persistence Topology
+## Persistence Topology
 
 ```text
 Views
@@ -242,7 +133,7 @@ SQLite / approved In-Memory provider
 
 Import persistence enters through a provider-owned confirmed-import operation rather than through a View or ViewModel composing independent repository writes.
 
-## 3.1 DatabaseProvider
+### DatabaseProvider
 
 `DatabaseProvider` owns:
 
@@ -256,7 +147,7 @@ Import persistence enters through a provider-owned confirmed-import operation ra
 
 Repositories captured from an earlier provider generation become stale after provider replacement.
 
-## 3.2 Repository protocols
+### Repository protocols
 
 Repositories define domain-specific read and write boundaries.
 
@@ -264,7 +155,7 @@ They do not expose a general transaction closure for arbitrary cross-domain writ
 
 A coordinator must not simulate one atomic financial operation by calling several narrow repositories.
 
-## 3.3 SQLite provider
+### SQLite provider
 
 SQLite remains an implementation detail behind repositories.
 
@@ -276,13 +167,13 @@ Production publishes the provider only after:
 4. the final chain revalidates;
 5. repository construction succeeds.
 
-## 3.4 In-Memory provider
+### In-Memory provider
 
 The In-Memory provider is authoritative only within approved test or explicit Debug boundaries.
 
 Where parity is required, it must expose the same observable domain outcomes as SQLite, including atomic publication and rejection residue.
 
-## 3.5 Persistence unavailable
+### Persistence unavailable
 
 Open, initialization, migration-integrity or migration-execution failure installs centrally rejecting unavailable repositories.
 
@@ -292,7 +183,7 @@ The application must not silently substitute a temporary In-Memory provider for 
 
 ---
 
-# 4. Authoritative Schema Ownership
+## Authoritative Schema Ownership
 
 The registered migrations are the exact DDL authority.
 
@@ -309,7 +200,7 @@ A copied table definition in documentation becomes stale as soon as a migration 
 
 Maintainers must inspect the exact migration chain and DTO mappers when exact columns or constraints matter.
 
-## 4.1 Logical production graph
+### Logical production graph
 
 The current durable graph contains the following logical areas.
 
@@ -336,9 +227,9 @@ The current database contract does not require all original Sprint 10 design tab
 
 ---
 
-# 5. Import Persistence Lifecycle
+## Import Persistence Lifecycle
 
-## 5.1 Preparation is read-only
+### Preparation is read-only
 
 Preparation may:
 
@@ -366,7 +257,7 @@ Preparation must not:
 
 Cancellation before confirmed persistence creates no accepted financial graph.
 
-## 5.2 Explicit confirmation
+### Explicit confirmation
 
 The user confirms one immutable prepared import.
 
@@ -382,7 +273,7 @@ Confirmation binds the reviewed:
 
 A stale preparation is not authority.
 
-## 5.3 Provider-owned atomic confirmed import
+### Provider-owned atomic confirmed import
 
 The provider-owned transaction begins before authoritative confirmation-time claims are accepted.
 
@@ -419,7 +310,7 @@ The graph may contain:
 
 A losing or failed accepted operation leaves zero accepted account, identifier or financial residue.
 
-## 5.4 Rejected attempts
+### Rejected attempts
 
 Rejected attempts remain distinct from accepted import sessions.
 
@@ -433,7 +324,7 @@ Failure to record a rejected attempt must not:
 - convert rejection to success;
 - conceal persistence unavailability.
 
-## 5.5 Post-commit hydration
+### Post-commit hydration
 
 After successful durable commit, the workflow performs one forced canonical hydration.
 
@@ -445,9 +336,9 @@ Further work may be blocked until canonical reconciliation succeeds.
 
 ---
 
-# 6. Durable Domain Contracts
+## Durable Domain Contracts
 
-## 6.1 Workspace
+### Workspace
 
 The workspace is the durable scope for:
 
@@ -465,7 +356,7 @@ Updating an existing workspace changes only DTO-owned metadata in place.
 
 It must not delete and recreate the parent.
 
-## 6.2 Account
+### Account
 
 An account is the durable owner of imported financial history.
 
@@ -494,7 +385,7 @@ It must preserve:
 
 SQLite and In-Memory providers must expose equivalent parent-update behavior.
 
-## 6.3 Financial identifier ownership
+### Financial identifier ownership
 
 Only approved statement parsers may produce verified financial identifiers.
 
@@ -516,7 +407,7 @@ Ownership by another account rejects the complete accepted import.
 
 Weak values are not promoted to strong identifiers.
 
-## 6.4 Identifier observations
+### Identifier observations
 
 An accepted-import observation records bounded evidence that one accepted import supplied a trusted identifier for an account.
 
@@ -533,7 +424,7 @@ Historical observations are not reconstructed from:
 - transaction history;
 - display metadata.
 
-## 6.5 Imported document
+### Imported document
 
 The imported-document record owns bounded durable document provenance.
 
@@ -558,7 +449,7 @@ Any future source-document archive must first pass the private-personal scope ga
 
 Filename or path metadata, when retained, is never identity or duplicate authority.
 
-## 6.6 Document fingerprint
+### Document fingerprint
 
 ADR-030 defines the current production exact-content algorithm:
 
@@ -595,11 +486,11 @@ It does not persist:
 
 Uniqueness is database-wide under the current ADR-030 contract.
 
-`ledgerforge.source-bytes.sha256.v1` is accepted by ADR-041 for future binary-capable imports. It is not implemented. Production has no `SourceContentSnapshot`; source bytes are not retained merely for fingerprinting, and existing `ledgerforge.raw-text.sha256.v1` history remains untouched.
+ADR-041 owns the accepted immutable source-snapshot and `ledgerforge.source-bytes.sha256.v1` contract; [PROJECT_STATE](PROJECT_STATE.md) owns current implementation. Processing is in memory under the current owner rule. Existing `ledgerforge.raw-text.sha256.v1` history remains untouched.
 
-The legacy role of `documents.sha256`, any compatibility or future migration shape, singular-to-multiple fingerprint ownership, snapshot storage and security-scope ownership, cleanup, concurrent preparation and confirmation-time revalidation remain implementation-foundation discovery questions. This document does not invent V9 or a migration design.
+Legacy `documents.sha256`, multiple fingerprint ownership, compatibility, snapshot/security-scope lifetime, cleanup, concurrent preparation and confirmation-time revalidation follow the exact accepted ADR-041 implementation and later source-specific equivalence contracts. Historical migration identities remain unchanged; this document does not invent a migration.
 
-## 6.7 Import session
+### Import session
 
 An import session represents accepted import history.
 
@@ -613,7 +504,7 @@ Session metadata remains bounded and privacy-safe.
 
 Parser profile authority is held by the normalized-document provenance relationship, not inferred from a session label.
 
-## 6.8 Import attempt
+### Import attempt
 
 An import attempt records bounded workflow history.
 
@@ -647,7 +538,7 @@ Attempt history excludes:
 
 The attempt model and presentation must remain forward-compatible with unknown future codes.
 
-## 6.9 Transaction
+### Transaction
 
 A persisted trusted transaction is accepted financial truth.
 
@@ -678,7 +569,7 @@ A persisted transaction ID survives:
 
 Runtime-generated presentation IDs are not persistence targets.
 
-## 6.10 Money
+### Money
 
 Trusted transaction persistence uses two agreeing representations:
 
@@ -702,7 +593,7 @@ The integer representation is a checked query encoding, not independent financia
 
 The database `currencies` table does not override the compiled catalog.
 
-## 6.11 Statement date
+### Statement date
 
 ADR-039 defines `StatementDate`.
 
@@ -722,7 +613,7 @@ Separate fields preserve:
 
 The supported Axis profile carries `Asia/Kolkata` evidence without transforming the printed date.
 
-## 6.12 Normalized document
+### Normalized document
 
 For accepted trusted imports, the normalized document owns:
 
@@ -735,7 +626,7 @@ The trusted V6 contract does not depend on persisting unrestricted `RawDocument`
 
 A dormant legacy JSON column, if present, is not authority and must not be populated with unrestricted source evidence without a separately approved contract.
 
-## 6.13 Normalized row
+### Normalized row
 
 A normalized row owns privacy-minimal source provenance:
 
@@ -750,7 +641,7 @@ The digest proves bounded normalized-record identity within the accepted provena
 
 It is not a transaction-event identifier or document fingerprint.
 
-## 6.14 Transaction/source relationship
+### Transaction/source relationship
 
 One transaction may relate to one or more normalized source rows.
 
@@ -764,7 +655,7 @@ The relationship must be complete and consistent before the accepted graph commi
 
 Missing, duplicate, conflicting or cross-document source relationships fail closed.
 
-## 6.15 Transaction-event identity
+### Transaction-event identity
 
 ADR-031 defines the current supported event family:
 
@@ -792,7 +683,7 @@ The current family is limited to approved Axis UPI semantics.
 
 It does not generalize to IMPS, NEFT, card transactions, refunds, reversals or unstructured references.
 
-## 6.16 Migration history
+### Migration history
 
 Migration history is part of database integrity.
 
@@ -809,13 +700,13 @@ Startup validates the complete chain, not merely the highest version number.
 
 ---
 
-# 7. Registered Migration Semantics
+## Historical V1–V6 migration semantics
 
 The migration registry and migration tests are the exact authority.
 
 This section records only the accepted semantic increments.
 
-## 7.1 V1 and V2
+### V1 and V2
 
 V1 and V2 establish the earlier repository and identity foundations.
 
@@ -825,7 +716,7 @@ This document does not duplicate their column-level SQL.
 
 Later migrations and accepted ADRs control current semantics where the original design baseline differs.
 
-## 7.2 V3 — Transaction-event ownership
+### V3 — Transaction-event ownership
 
 V3 adds bounded `transaction_event_identities`.
 
@@ -840,7 +731,7 @@ The accepted contract includes:
 
 Accepted ownership commits atomically with accepted import history.
 
-## 7.3 V4 — Durable import attempts
+### V4 — Durable import attempts
 
 V4 adds `import_attempts`.
 
@@ -855,7 +746,7 @@ It establishes:
 - privacy-safe payload;
 - SQLite/In-Memory parity.
 
-## 7.4 V5 — Atomic confirmed import and identifier ownership
+### V5 — Atomic confirmed import and identifier ownership
 
 V5 implements the ADR-038 persistence direction.
 
@@ -874,7 +765,7 @@ V5 does not invent historical observations.
 
 Identifier correction, detachment and reassignment remain future mutation families.
 
-## 7.5 V6 — Trusted statement dates and source provenance
+### V6 — Trusted statement dates and source provenance
 
 V6 establishes:
 
@@ -898,7 +789,7 @@ It does not reconstruct:
 - profile provenance;
 - transaction/source links.
 
-## 7.6 Migration safety policy
+### Migration safety policy
 
 Migrations must not use generic “best effort” backfill merely because a value can be approximated.
 
@@ -919,7 +810,7 @@ A database backup is not a substitute for a correct migration contract.
 
 ---
 
-# 8. Migration-Chain Integrity
+## Migration-Chain Integrity
 
 The provider validates:
 
@@ -945,7 +836,7 @@ The application does not:
 
 ---
 
-# 9. Parent-Write Safety
+## Parent-Write Safety
 
 Existing workspace and account writes update DTO-owned columns in place.
 
@@ -968,7 +859,7 @@ A new parent ID represents a new durable entity, not a rename.
 
 ---
 
-# 10. Currency and Exchange-Rate Capacity
+## Currency and Exchange-Rate Capacity
 
 The compiled offline currency catalog is the current semantic authority for:
 
@@ -1007,7 +898,7 @@ Imported native values remain unchanged.
 
 ---
 
-# 11. Card Evidence Capacity
+## Card Evidence Capacity
 
 ADR-034 accepts a document-scoped card evidence direction.
 
@@ -1027,7 +918,7 @@ No generic JSON column is approved as a substitute for a concrete card schema.
 
 A production card family requires:
 
-1. one selected fixture-backed family;
+1. the complete registered authentic corpus for the selected family, with independent source truth;
 2. one supported source format;
 3. exact card validation semantics;
 4. durable query requirements;
@@ -1041,7 +932,7 @@ Fixture integration alone does not authorize database change.
 
 ---
 
-# 12. Category Architecture
+## Category Architecture
 
 ADR-036 governs the implemented category domain added by Migration V8.
 
@@ -1063,7 +954,7 @@ Migration V8 implements workspace-owned category definitions and one separate op
 
 ---
 
-# 13. Financial Mutation and Corrections
+## Financial Mutation and Corrections
 
 ADR-037 rejects a generic corrections table or arbitrary JSON before/after ledger as the initial architecture.
 
@@ -1096,7 +987,7 @@ Current database v1 contains no generic mutation schema or audit ledger.
 
 ---
 
-# 14. Validation Persistence
+## Validation Persistence
 
 Validation occurs before accepted persistence.
 
@@ -1120,9 +1011,9 @@ A future durable validation-detail domain requires closed codes, retention rules
 
 ---
 
-# 15. Search, Analytics and Derived Storage
+## Search, Analytics and Derived Storage
 
-## 15.1 Full-text search
+### Full-text search
 
 A transaction FTS table is not a current production contract merely because the original design recommended one.
 
@@ -1137,7 +1028,7 @@ Production search requires:
 - query tests;
 - provider parity or an explicitly SQLite-only read projection.
 
-## 15.2 Balance snapshots
+### Balance snapshots
 
 Balance snapshots are not current financial authority.
 
@@ -1151,7 +1042,7 @@ A future snapshot table may be introduced only when:
 
 Snapshots must never replace trusted transactions or source balances.
 
-## 15.3 Materialized analytics
+### Materialized analytics
 
 Derived tables or materialized views require:
 
@@ -1167,7 +1058,7 @@ No analytical cache may become unrecoverable financial truth.
 
 ---
 
-# 16. Import Profiles
+## Import Profiles
 
 The current production path persists parser profile ID/version with the accepted normalized document.
 
@@ -1184,11 +1075,11 @@ The database does not currently claim a production repository for:
 
 A reusable Import Profile domain requires separate identity, versioning, review and conflict semantics.
 
-Parser code and approved fixture truth remain authoritative for current support.
+Current support requires ordinary production against the complete authentic corpus and independent source truth under ADR-046; historical fixtures are not authority.
 
 ---
 
-# 17. Rules and Enrichment
+## Rules and Enrichment
 
 Rules are future user-authored enrichment.
 
@@ -1214,7 +1105,7 @@ A generic `rule_json` column is not an approved production contract by itself.
 
 ---
 
-# 18. Source Files, Attachments and Retention
+## Source Files, Attachments and Retention
 
 The current architecture does not require permanent storage of original imported file bytes.
 
@@ -1243,7 +1134,7 @@ A retention policy must prove which durable evidence remains sufficient after de
 
 ---
 
-# 19. Database Backup and Restore
+## Database Backup and Restore
 
 Sprint 45 implements a DEBUG-only development database lifecycle.
 
@@ -1280,7 +1171,7 @@ Production backup and restore require separate architecture for:
 
 ---
 
-# 20. SQLite Operational Contract
+## SQLite Operational Contract
 
 The production provider must configure and verify the SQLite behavior required by its implementation.
 
@@ -1309,7 +1200,7 @@ Correctness comes from:
 
 ---
 
-# 21. Indexing and Query Design
+## Indexing and Query Design
 
 Indexes are introduced to support verified query and uniqueness requirements.
 
@@ -1338,7 +1229,7 @@ Indexes do not define financial identity unless an accepted ADR explicitly makes
 
 ---
 
-# 22. Deletion and Foreign-Key Policy
+## Deletion and Foreign-Key Policy
 
 Deletion semantics are domain-specific.
 
@@ -1361,15 +1252,15 @@ Parent metadata updates remain in place and must not trigger cascades.
 
 ---
 
-# 23. Security and Privacy
+## Security and Privacy
 
-## 23.1 Local database
+### Local database
 
 Core financial truth is stored locally.
 
 No internet service is required for current repository operation.
 
-## 23.2 Sensitive values
+### Sensitive values
 
 The database may contain trusted financial identifiers and financial history required for correct operation.
 
@@ -1385,7 +1276,7 @@ Do not expose:
 - database paths;
 - arbitrary source fragments.
 
-## 23.3 Encryption
+### Encryption
 
 Database encryption, SQLCipher and encrypted source-file storage are not current production capabilities.
 
@@ -1393,17 +1284,17 @@ The owner identifies no current encryption concern; no app-level encryption cand
 
 A design recommendation must not be described as implemented security.
 
-## 23.4 Credentials
+### Credentials
 
 Passwords do not belong in SQLite under the current architecture.
 
-Future credentials belong behind an approved Keychain boundary.
+Credentials belong behind the accepted exact Keychain/credential ownership boundary; current supported families are recorded in PROJECT_STATE.
 
 Readers receive a supplied credential and never retrieve one from the database.
 
 ---
 
-# 24. Determinism
+## Determinism
 
 Database behavior must not vary because of:
 
@@ -1425,7 +1316,7 @@ A generated stable display tiebreaker must not be represented as financial chron
 
 ---
 
-# 25. Concurrency
+## Concurrency
 
 Confirmed-import correctness uses:
 
@@ -1451,7 +1342,7 @@ A losing confirmed import must leave zero accepted financial residue.
 
 ---
 
-# 26. Failure Semantics
+## Failure Semantics
 
 Database failures map to typed domain outcomes.
 
@@ -1479,9 +1370,9 @@ An audit-write failure is not reported as financial success.
 
 ---
 
-# 27. Testing and Verification
+## Testing and Verification
 
-## 27.1 Migration tests
+### Migration tests
 
 Every migration requires tests for:
 
@@ -1497,7 +1388,7 @@ Every migration requires tests for:
 - reopen after success;
 - no partial schema publication.
 
-## 27.2 Provider parity
+### Provider parity
 
 Where both providers matter, verify equivalent:
 
@@ -1512,7 +1403,7 @@ Where both providers matter, verify equivalent:
 - hydration evidence;
 - typed errors.
 
-## 27.3 Atomicity
+### Atomicity
 
 Inject failure at every accepted-write stage.
 
@@ -1529,7 +1420,7 @@ Verify that no losing path leaves accepted:
 - event identity;
 - successful attempt.
 
-## 27.4 Financial truth
+### Financial truth
 
 Production parser output is not the sole oracle.
 
@@ -1545,7 +1436,7 @@ Use independent expected evidence for:
 - identifiers;
 - provenance.
 
-## 27.5 Hydration and relaunch
+### Hydration and relaunch
 
 Verify:
 
@@ -1558,7 +1449,7 @@ Verify:
 - date semantics;
 - presentation.
 
-## 27.6 Privacy
+### Privacy
 
 Tests and reviews must reject:
 
@@ -1573,104 +1464,7 @@ A green suite is acceptance evidence only for the boundary it exercises.
 
 ---
 
-# 28. Future Database Gates
-
-## 28.1 Production PDF
-
-Before PDF persistence becomes production-supported, approve:
-
-- binary exact-content authority;
-- source-content ownership through confirmation;
-- one fixture-backed PDF family;
-- deterministic extraction and source order;
-- malformed/encrypted/image-only outcomes;
-- provider parity;
-- independent financial oracle.
-
-ADR-041 satisfies the representation decision but not the implementation gate. PDF extraction infrastructure remains a foundation only; no production PDF support is established.
-
-## 28.2 XLS and XLSX
-
-Before spreadsheet support, approve:
-
-- reader/extraction authority;
-- sheet selection;
-- cell-type and date semantics;
-- formula-result policy;
-- source row ordering;
-- binary/container fingerprint authority;
-- malformed workbook behavior;
-- licensing and Release implications.
-
-## 28.3 Categories
-
-Migration V8 implements the bounded flat manual category slice. Future category hierarchy, automatic rules, provenance/precedence for rule-produced assignments, bulk operations and richer recovery semantics require separate approval and must not rewrite trusted transaction rows.
-
-## 28.4 Card persistence
-
-Before card migration, select one concrete family and define:
-
-- card account/instrument identity;
-- posted amount and currency;
-- original merchant evidence;
-- summaries;
-- reconciliation;
-- queries;
-- hydration;
-- privacy.
-
-## 28.5 Search
-
-Before FTS, define:
-
-- searchable source fields;
-- tokenization;
-- privacy;
-- rebuild;
-- index lifecycle;
-- provider behavior.
-
-## 28.6 Backup and restore
-
-Before production backup, define:
-
-- consistent snapshot;
-- version and migration compatibility;
-- restore validation;
-- failure recovery;
-- user control.
-
-## 28.7 Financial mutation
-
-Before any correction or reversal schema, approve one concrete operation family under ADR-037.
-
----
-
-# 29. Maintainer Checklist
-
-Before changing persistence:
-
-- [ ] Inspect the exact current ref.
-- [ ] Read `PROJECT_STATE.md`.
-- [ ] Read the relevant `FUTURE_WORK.MD` candidate.
-- [ ] Read accepted ADRs.
-- [ ] Inspect the registered migration chain.
-- [ ] Inspect repository DTOs and provider mappings.
-- [ ] Identify the exact durable authority.
-- [ ] Define SQLite and In-Memory behavior.
-- [ ] Define migration and compatibility impact.
-- [ ] Define failure and zero-residue behavior.
-- [ ] Define hydration and relaunch acceptance.
-- [ ] Define privacy boundaries.
-- [ ] Use independent financial truth where money or provenance changes.
-- [ ] Stop rather than infer missing historical evidence.
-- [ ] Do not expose a partial repository workflow as one atomic operation.
-- [ ] Do not represent dormant schema capacity as production support.
-- [ ] Do not copy speculative SQL into this baseline as though it were active DDL.
-
----
-
-# 30. Change Policy
+## Change policy
 
 This database baseline may be status-aligned without reopening its core architecture when:
 
@@ -1695,24 +1489,3 @@ A database architecture change requires an accepted ADR when it changes:
 Implementation remains separately authorized by a complete Chat-approved execution prompt.
 
 ---
-
-## End of Database v1 Architecture
-
-Originally created for Sprint 10 Phase 2A.
-
-Status aligned through:
-
-- ADR-030 exact-content fingerprints;
-- ADR-031 transaction-event identity;
-- ADR-032 durable attempts;
-- ADR-033 Money;
-- ADR-034 card evidence;
-- ADR-035 development database lifecycle;
-- ADR-036 category architecture;
-- ADR-037 financial mutation architecture;
-- ADR-038 atomic confirmed import and identifier ownership;
-- ADR-039 trusted statement dates and source provenance;
-- verified Sprint 57 durable category foundation and post-Sprint 57 reconciliation closure;
-- registered migration V8.
-
-Detailed DDL and migration behavior remain authoritative in the repository implementation.
