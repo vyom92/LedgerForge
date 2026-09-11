@@ -23,7 +23,7 @@ These new screen files reorganize already approved written text; they are not ne
 
 The tracked `LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md` and `LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md` remain **draft/supporting specifications**, not competing canonical owners. Their status is unchanged by this restructure.
 
-Local untracked SC PNGs remain unpublished supporting/designer work. The owner has excluded ongoing design-PNG changes from this documentation task; their local presence or replacement does not confer approval. References observed during this refactor, in natural screen order:
+The five SC-01/SC-02 PNGs listed first below are **owner-curated / Chat-approved / published visual references** for the Sprint-89 candidate. They retain the exact owner-placed bytes recorded in ASSET_MANIFEST.json. Publication does not mark Sprint 89 accepted. SC-03 and later local design items remain unpublished and outside Sprint 89; ongoing additions and replacements are intentionally ignored. The existing reference inventory, in natural screen order:
 
 - SC-01 App Shell Supporting Reference;
 - SC-01 App Shell Visual Contract;

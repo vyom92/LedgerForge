@@ -1338,6 +1338,8 @@ struct ContentView: View {
     @ObservedObject private var cardStore: CardStore = .shared
     @ObservedObject private var fundingPlanStore: FundingPlanStore = .shared
     @State private var selectedSection: AppShellSection = .dashboard
+    @State private var transactionSidebarRailOverride: Bool?
+    @State private var shellPresentationWidth: CGFloat = 1440
     @State private var didStartRepositoryHydration = false
 #if DEBUG
     @StateObject private var developerDatabaseProfileViewModel = DeveloperDatabaseProfileViewModel()
@@ -1446,11 +1448,16 @@ struct ContentView: View {
             availabilityState: availability.state,
             permitsMutation: availability.permitsMutation,
             sidebar: {
+                let usesRail = selectedSection == .transactions
+                    && (transactionSidebarRailOverride ?? (shellPresentationWidth < 1280))
                 AppShellSidebar(
                     selectedSection: selectedSection,
                     developerConsoleVisible: developerConsoleVisible,
                     latestImportActivity: importActivityPresentation,
-                    selectSection: { selectedSection = $0 }
+                    selectSection: { selectedSection = $0 },
+                    isCollapsed: usesRail,
+                    allowsCollapse: selectedSection == .transactions,
+                    toggleCollapsed: { transactionSidebarRailOverride = !usesRail }
                 )
             },
             toolbar: {
@@ -1465,6 +1472,7 @@ struct ContentView: View {
             availabilityBanner: { availabilityBanner },
             destination: { destinationContent }
         )
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { shellPresentationWidth = $0 }
         .fileImporter(
             isPresented: $showingImporter,
             allowedContentTypes: StatementImportFileTypes.allowed,
@@ -1566,7 +1574,9 @@ struct ContentView: View {
             selectedSection: selectedSection,
             dashboard: { dashboardContent },
             accounts: { accountsContent },
-            transactions: { TransactionListView() },
+            transactions: {
+                TransactionListView(generation: availability.generation, availabilityState: availability.state)
+            },
             imports: { importWizardContent },
             salary: { SalaryView(viewModel: salaryViewModel) },
             settings: { settingsContent },

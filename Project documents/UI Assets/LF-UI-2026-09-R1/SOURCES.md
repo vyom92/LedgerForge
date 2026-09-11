@@ -2,6 +2,8 @@
 
 ## Current private-personal scope alignment — 2026-09-11
 
+**Sprint-89 reference publication:** The owner’s corrected resume prompt explicitly approves publication of the unchanged local SC-01 Visual Contract, SC-01 Supporting Reference, and SC-02A/02B/02C PNGs. ASSET_MANIFEST.json records their exact package paths, sizes and SHA-256 hashes. They are visual references; canonical SC-01/SC-02 written contracts remain authoritative. Later SC items are excluded, and native candidate publication does not constitute Chat acceptance.
+
 The owner has superseded the advanced appearance, formal accessibility and generalized product-completeness portions above. Current authority is the private-personal gate, the canonical rejection register, and DESIGN_HANDOFF.md: simple local System/Light/Dark with an optional existing accent choice; readable Money, ordinary keyboard use, resizing, focus and selection. The explicit icon-rail preference is folded into the canonical responsive hierarchy. The three specifically annotated PNGs remain byte-for-byte design references with only their rejected caption portions ignored. Historical provenance above is retained, not renewed as active requirements.
 
 The owner’s latest [source-processing decision](../../SCOPE_DECISIONS.md#source-processing-decision) supersedes older derived-statement/oracle-artifact permissions for new work. Historical source/decision bodies below are unchanged in meaning. Order inherits [Guide rules H/I](../../Project_Guide.md#documentation-order); original inspected-authority priority and historical decision narrative are preserved as record interiors, not a current append-order register.

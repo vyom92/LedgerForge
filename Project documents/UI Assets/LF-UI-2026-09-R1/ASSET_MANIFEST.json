@@ -36,10 +36,40 @@
       "sha256": "4691f574f1ac21aa94ea30ebada6fbb6427ba3961448acc03e555b0dcadcca65"
     },
     {
+      "path": "LF-UI-2026-09-R1_SC-01_App_Shell_Supporting_Reference.png",
+      "role": "owner-curated / Chat-approved / published visual reference; unchanged pixels; no native acceptance",
+      "bytes": 1862985,
+      "sha256": "253c4970011e7ddc6532c5bd64debba108df884ec758cf2d7b964e1b44946486"
+    },
+    {
       "path": "LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md",
       "role": "reconciled written reference draft; no native acceptance",
       "bytes": 10399,
       "sha256": "d606b18d34377a783bfe9c4a65a6a3de32fc962d932122964efb1aabcdbd7a9a"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.png",
+      "role": "owner-curated / Chat-approved / published visual reference; unchanged pixels; no native acceptance",
+      "bytes": 492980,
+      "sha256": "9d4ec8fe4c66c89c0878e1c9623da01b83b89c5c2c0bf74aee5c3cce782cb60b"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-02A_Transactions_Wide_Reference.png",
+      "role": "owner-curated / Chat-approved / published visual reference; unchanged pixels; no native acceptance",
+      "bytes": 394957,
+      "sha256": "08075e2f8c3456c5a568f85cd4c4295c200f9a11ac7add18e4554dc0457766dc"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-02B_Transactions_Narrow_Responsive_Reference.png",
+      "role": "owner-curated / Chat-approved / published visual reference; unchanged pixels; no native acceptance",
+      "bytes": 1477959,
+      "sha256": "b6c7e894a7809cb954a204e7b13a0d78b8b3e36aae418b644e8b22037d1c9d26"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-02C_Transactions_State_Component_Contract.png",
+      "role": "owner-curated / Chat-approved / published visual reference; unchanged pixels; no native acceptance",
+      "bytes": 497217,
+      "sha256": "4d60a657c1e9cec801b69f692bad0101cbe0b0173ba57be240ad61909947ae7b"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md",
@@ -54,8 +84,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 3327,
-      "sha256": "6006ac80f862e0830c660e9282ec85cf70a5160b8bd81768b322294cbc0a7642"
+      "bytes": 3509,
+      "sha256": "459199eec26250b4134ea51948509ea9232536238c742cdbd592ae984d2bc37e"
     },
     {
       "path": "SC-01_App_Shell.md",
@@ -77,8 +107,8 @@
     },
     {
       "path": "SOURCES.md",
-      "bytes": 6882,
-      "sha256": "40d4dd9679ab2207a0c1008cc4e79ad33f1a6761699864813413ac4b2b440b1c"
+      "bytes": 7359,
+      "sha256": "4c6bb58f34c3b145e0808bb13e55b277720e78d4d6cd1b7528a24d77be3a76ba"
     }
   ],
   "manifest_self_hash": "Excluded to avoid recursive checksum; any original outer package manifest is historical.",
@@ -160,5 +190,5 @@
   "git_publication_status": "authorized by user on 2026-09-10",
   "scope_alignment_date": "2026-09-11",
   "scope_alignment": "Private personal app: simple local appearance and ordinary owner usability. Existing PNG bytes and historical provenance retained; DESIGN_HANDOFF.md records exact rejected caption exceptions. Two screen-reference drafts are separately reconciled; redundant scratch inventories are removed.",
-  "local_sc_png_status": "Local SC PNG working references remain untracked and outside this published payload. Ongoing design-PNG additions and replacements are outside this documentation task by explicit owner instruction. Exact caption exceptions are recorded in DESIGN_HANDOFF.md; local presence does not approve new canonical inputs."
+  "local_sc_png_status": "The five owner-curated, Chat-approved SC-01/SC-02 PNGs are published with unchanged bytes in this payload for the Sprint-89 candidate. SC-03 and later items remain excluded; their ongoing local changes are intentionally ignored. Exact caption exceptions remain in DESIGN_HANDOFF.md. Publication does not mark Sprint 89 accepted."
 }

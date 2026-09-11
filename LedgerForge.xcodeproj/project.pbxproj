@@ -429,9 +429,6 @@
 		};
 		28A3A4C22FFE1E3900DD5727 /* UI Assets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				A90900013090000000000001 /* Exceptions for "UI Assets" folder in "LedgerForge" target */,
-			);
 			path = "UI Assets";
 			sourceTree = "<group>";
 		};
@@ -863,7 +860,6 @@
 			);
 			fileSystemSynchronizedGroups = (
 				283E97932FFE3A470034CA98 /* Branding */,
-				28A3A4C22FFE1E3900DD5727 /* UI Assets */,
 				28B87B3E2FFBD1DE009BEE8C /* .github */,
 			);
 			name = LedgerForge;
