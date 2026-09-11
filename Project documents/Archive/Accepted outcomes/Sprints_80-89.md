@@ -6,6 +6,8 @@ For repeated records of one outcome, the original state record precedes roadmap 
 
 ## Index
 
+- [Accepted Sprint 89 — R1 Transactions Reference Implementation — 2026-09-11](#sprint-89) — 2026-09-11
+- [Sprint 89 roadmap acceptance detail](#roadmap-sprint-89) — 2026-09-11
 - [Accepted Sprint 88 — App Shell and Workflow Decomposition — 2026-09-11](#sprint-88) — 2026-09-11
 - [Sprint 88 roadmap acceptance detail](#roadmap-sprint-88) — 2026-09-11
 - [Historical SHELL88 proposal and acceptance alignment](#historical-shell88-blueprint) — 2026-09-11
@@ -24,6 +26,32 @@ For repeated records of one outcome, the original state record precedes roadmap 
 - [Accepted Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam — 2026-09-10](#sprint-81) — 2026-09-10
 - [Sprint 81 roadmap acceptance detail](#roadmap-sprint-81) — 2026-09-10
 - [Sprint 80 accepted discovery](#sprint-80) — 2026-08-28
+
+---
+
+<a id="sprint-89"></a>
+
+## Accepted Sprint 89 — R1 Transactions Reference Implementation — 2026-09-11
+
+Chat accepts Sprint 89 at implementation commit `038af8d9ebebe66b3f17925416821941cfa33d3d` (parent documentation baseline `000dfd3866603ed1fd1153afbd37a23573ad342c`). Acceptance token: `SPRINT_89_TRANSACTIONS_REFERENCE_ACCEPTED`.
+
+- **Accepted outcome:** literal multi-term search covers only description, account, institution and current category. Explicit period/account/currency/category/family/effect/institution/amount filters combine AND across groups and OR within multi-select groups. Date, Description, Account, Category and Amount sort deterministically, with exact native-currency amount ordering and source-order ties preserved. Matching-scope totals partition native currency and established financial domain/effect; bank cash effects and card liability effects do not combine, and unsupported effects are withheld rather than inferred.
+- **Selection and presentation:** selection begins empty, follows only the explicitly chosen durable transaction, survives sorting, clears when filtered out or when the generation changes, and never substitutes another record. The collapsible inspector preserves the selected identity; complete canonical Money/currency display, useful keyboard interaction, visibly distinct focus/selection, and named icon-rail controls are accepted. Decorative colour carries no financial meaning.
+- **Repository and design boundary:** the implementation commit changed 21 paths: six product/test/project paths (`AppShellPresentation.swift`, `ContentView.swift`, `ViewModels/TransactionListViewModel.swift`, `Views/TransactionListView.swift`, `LedgerForgeTests/TransactionListViewModelTests.swift`, and `LedgerForge.xcodeproj/project.pbxproj`) plus 15 UI-design/package publication paths. The owner then directed that the entire current UI Assets folder be published as-is; design publication is separate from future SC-03/SC-04 native implementation.
+- **Chat-accepted validation evidence, reused without a new run:** 22 focused definitions/executions passed with zero failures, skips or unrun tests. Debug and optimized Release passed under Swift 6 with no Sprint-89 source warnings/errors; Apple’s AppIntents metadata-skip warning was the only reported warning. A canonical Current Database was opened read-only with SQLite query-only enabled; ordinary repository hydration supplied the snapshot while membership, order and native-currency/domain totals were calculated independently in memory. The comparison passed without a derived financial evidence file.
+- **Accepted native/no-write/containment evidence:** all 53 database-table comparisons were unchanged after presentation interactions. Native Transactions checks passed at 1440 × 900 and 1024 × 768 across search/filter/sort/selection/inspector/responsive controls; moving from narrow Transactions to Settings restored the accepted Settings size and returning to Transactions passed. Fresh Debug and Release bundles contained no UI design-reference package and their final build records contained no UI Assets resource-copy operation.
+- **Accepted non-runs and limitations:** no complete TestPlan, parser/source corpus campaign or formal VoiceOver/accessibility qualification ran because the corrected scope was Transactions-local. Genuine accepted presentation data had no mixed-native-currency or unavailable-source-date row. Native category assignment/clear could not be exercised because the current database had no categories; relevant category regressions passed. Native 768/640 layouts were not separately qualified.
+- **Preserved boundaries:** V17 remains current; no V18, migration, persistence/schema change or new ADR was introduced; ADR-046 remains current parser/source authority; and Personal-v1 remains **NOT YET ADOPTED**. `FW-P2-49` remains **NOT REQUIRED-DO NOT CONSIDER**. Completed `FW-P2-03` and `FW-P2-53` leave the active queue; only the remaining cross-screen portions of `FW-P2-48` and `FW-P2-50` remain open. Sprint 90 is prepared, not Chat-authorized.
+
+---
+
+<a id="roadmap-sprint-89"></a>
+
+### Sprint 89 — R1 Transactions Reference Implementation
+
+Completed queue: `FW-P2-03` and `FW-P2-53`; necessary Transactions portions of `FW-P2-48` and `FW-P2-50`.
+
+**ACCEPTED on 2026-09-11** under `SPRINT_89_TRANSACTIONS_REFERENCE_ACCEPTED`, at implementation commit `038af8d9ebebe66b3f17925416821941cfa33d3d`. Transactions now has literal multi-term search, explicit transient filters, deterministic native-currency-safe sorting, full matching-scope totals with bank/card separation, stable explicit selection and collapsible details. Chat accepted the focused tests, Debug/Release, independent in-memory presentation oracle, zero-write comparison, native 1440 × 900/1024 × 768 checks and final bundle containment. The complete TestPlan, parser/source campaign and formal accessibility programme were not run for this bounded scope; detailed limits are recorded above. No migration or ADR, V17 remains current, Personal-v1 remains **NOT YET ADOPTED**, and the prepared 90–99 roadmap is not activated.
 
 ---
 

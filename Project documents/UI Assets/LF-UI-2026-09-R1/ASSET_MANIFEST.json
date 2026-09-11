@@ -15,100 +15,146 @@
   },
   "payload_files": [
     {
+      "path": "04C_Appearance_State_Component_Contract",
+      "bytes": 378793,
+      "sha256": "714067ded658e6b81ef33c901792f98c9641b00c6c97dd523a3d789efde753c7",
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+    },
+    {
       "path": "ACCEPTANCE.md",
       "bytes": 5280,
-      "sha256": "8b71600fd29744b97df07d903a94109bc2719bc5ec458246e23124b306a8e902"
+      "sha256": "8b71600fd29744b97df07d903a94109bc2719bc5ec458246e23124b306a8e902",
+      "role": "required checks; not native pass evidence"
     },
     {
       "path": "DESIGN_HANDOFF.md",
       "bytes": 10696,
-      "sha256": "e64405952ca9b22462aadfe84719b8d9fb14cf674171b96ffb79deab64d5788b"
+      "sha256": "e64405952ca9b22462aadfe84719b8d9fb14cf674171b96ffb79deab64d5788b",
+      "role": "shared design requirements and exact caption exceptions"
     },
     {
       "path": "DESIGN_TOKENS.json",
       "bytes": 4781,
-      "sha256": "744337069754556197573d3a6e16019645bb406c8844a1445a645c64f885a2e3"
+      "sha256": "744337069754556197573d3a6e16019645bb406c8844a1445a645c64f885a2e3",
+      "role": "existing numeric roles; semantic arrays unchanged"
     },
     {
       "path": "Inherited_Screens.md",
-      "role": "canonical written contract relocated from existing approved text; no new native acceptance",
       "bytes": 10556,
-      "sha256": "4691f574f1ac21aa94ea30ebada6fbb6427ba3961448acc03e555b0dcadcca65"
+      "sha256": "4691f574f1ac21aa94ea30ebada6fbb6427ba3961448acc03e555b0dcadcca65",
+      "role": "canonical written contract relocated from existing approved text; no new native acceptance"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-01_App_Shell_Supporting_Reference.png",
-      "role": "owner-curated / Chat-approved / published visual reference; unchanged pixels; no native acceptance",
       "bytes": 1862985,
       "sha256": "253c4970011e7ddc6532c5bd64debba108df884ec758cf2d7b964e1b44946486"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md",
-      "role": "reconciled written reference draft; no native acceptance",
       "bytes": 10399,
-      "sha256": "d606b18d34377a783bfe9c4a65a6a3de32fc962d932122964efb1aabcdbd7a9a"
+      "sha256": "d606b18d34377a783bfe9c4a65a6a3de32fc962d932122964efb1aabcdbd7a9a",
+      "role": "supporting specification; not a competing canonical owner"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.png",
-      "role": "owner-curated / Chat-approved / published visual reference; unchanged pixels; no native acceptance",
       "bytes": 492980,
       "sha256": "9d4ec8fe4c66c89c0878e1c9623da01b83b89c5c2c0bf74aee5c3cce782cb60b"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-02A_Transactions_Wide_Reference.png",
-      "role": "owner-curated / Chat-approved / published visual reference; unchanged pixels; no native acceptance",
       "bytes": 394957,
-      "sha256": "08075e2f8c3456c5a568f85cd4c4295c200f9a11ac7add18e4554dc0457766dc"
+      "sha256": "08075e2f8c3456c5a568f85cd4c4295c200f9a11ac7add18e4554dc0457766dc",
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-02B_Transactions_Narrow_Responsive_Reference.png",
-      "role": "owner-curated / Chat-approved / published visual reference; unchanged pixels; no native acceptance",
       "bytes": 1477959,
-      "sha256": "b6c7e894a7809cb954a204e7b13a0d78b8b3e36aae418b644e8b22037d1c9d26"
+      "sha256": "b6c7e894a7809cb954a204e7b13a0d78b8b3e36aae418b644e8b22037d1c9d26",
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-02C_Transactions_State_Component_Contract.png",
-      "role": "owner-curated / Chat-approved / published visual reference; unchanged pixels; no native acceptance",
       "bytes": 497217,
-      "sha256": "4d60a657c1e9cec801b69f692bad0101cbe0b0173ba57be240ad61909947ae7b"
+      "sha256": "4d60a657c1e9cec801b69f692bad0101cbe0b0173ba57be240ad61909947ae7b",
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md",
-      "role": "reconciled written reference draft; no native acceptance",
       "bytes": 13885,
-      "sha256": "5c23a92ee86e89e1dba5a56f423c9acf728a8737b0983843a7f3bdf47790f4f7"
+      "sha256": "5c23a92ee86e89e1dba5a56f423c9acf728a8737b0983843a7f3bdf47790f4f7",
+      "role": "supporting specification; not a competing canonical owner"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-03A_Dashboard_Wide_Reference.png",
+      "bytes": 1426346,
+      "sha256": "16b667024e840182f0de7b7d6ed5f3b1a292d68645d977bc2b220e290cce395f",
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-03B_Dashboard_Narrow_Responsive_Reference.png",
+      "bytes": 185430,
+      "sha256": "5cd2e113277cc3debc1c7702a73975842686d6c72816354d7d8e51488896c9ec",
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-03C_Dashboard_State_Component_Contract.png",
+      "bytes": 1918344,
+      "sha256": "4a3a19e2be777ba3de02d10b9eaddd75f0a8b85ef3ae881cf62bd3c0c798b526",
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-04A_Appearance_Settings_Reference.png",
+      "bytes": 1379526,
+      "sha256": "da18ff990d3914ae0f74962168c367bcd3bccf4b4d3ee05a4b92ada0fa83a5d2",
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-04B_Appearance_Light_Dark_Surface_Comparison.png",
+      "bytes": 208972,
+      "sha256": "939d3ce133b7f2448feddf6471c914aa9c2b89baaf5337882ce6f83a06d93c0f",
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-05A_Cross_Screen_Conformance_Matrix.md",
+      "bytes": 23842,
+      "sha256": "cc6d22d5bac270f84c2f6dbc208017f3049cd7eff6dc92cb9912b51fd1d785df",
+      "role": "coordinator-accepted cross-screen audit; historical Sprint-88 evidence boundary; no implementation"
     },
     {
       "path": "MasterBoard_LF-UI-2026-09-R1.png",
       "bytes": 1857582,
-      "sha256": "da0a6f07c6faaef90c6de2cd33f3ad250399a73ff9f214ef86640b487ed55ca4"
+      "sha256": "da0a6f07c6faaef90c6de2cd33f3ad250399a73ff9f214ef86640b487ed55ca4",
+      "role": "owner-curated / Chat-approved / published visual reference; no native implementation"
     },
     {
       "path": "README.md",
-      "bytes": 3509,
-      "sha256": "459199eec26250b4134ea51948509ea9232536238c742cdbd592ae984d2bc37e"
+      "bytes": 4139,
+      "sha256": "7ecd27fc2480f10d2e49b3acc94656a1b916cc6f82957d6b2adb2b9c1cc0d018",
+      "role": "package map and current publication status"
     },
     {
       "path": "SC-01_App_Shell.md",
-      "role": "canonical written contract relocated from existing approved text; no new native acceptance",
       "bytes": 2817,
-      "sha256": "0e7e7bc22747e551cb877b629d1a8f81cfc2d5b2e362e3647461f9b6c0de520d"
+      "sha256": "0e7e7bc22747e551cb877b629d1a8f81cfc2d5b2e362e3647461f9b6c0de520d",
+      "role": "canonical written contract relocated from existing approved text; no new native acceptance"
     },
     {
       "path": "SC-02_Transactions.md",
-      "role": "canonical written contract relocated from existing approved text; no new native acceptance",
       "bytes": 6149,
-      "sha256": "8a667fb9409c7005991547e87c7577eadfa8f2606305f16ced34498b3c5a54f5"
+      "sha256": "8a667fb9409c7005991547e87c7577eadfa8f2606305f16ced34498b3c5a54f5",
+      "role": "canonical written contract relocated from existing approved text; no new native acceptance"
     },
     {
       "path": "SC-03_Dashboard.md",
-      "role": "canonical written contract relocated from existing approved text; no new native acceptance",
       "bytes": 2499,
-      "sha256": "65f51e35045bf2a4d2ccda469d75566eb97ac2a9298551190529220c6469abb1"
+      "sha256": "65f51e35045bf2a4d2ccda469d75566eb97ac2a9298551190529220c6469abb1",
+      "role": "canonical written contract relocated from existing approved text; no new native acceptance"
     },
     {
       "path": "SOURCES.md",
-      "bytes": 7359,
-      "sha256": "4c6bb58f34c3b145e0808bb13e55b277720e78d4d6cd1b7528a24d77be3a76ba"
+      "bytes": 7402,
+      "sha256": "777d6a3435140c1240ffc750dc1d4f7d20bc944142835eed9bc1b15853d4f43b",
+      "role": "historical provenance and current publication truth"
     }
   ],
   "manifest_self_hash": "Excluded to avoid recursive checksum; any original outer package manifest is historical.",
@@ -185,10 +231,10 @@
     "LedgerForge_Design_v3_Draft/reference/contact_sheet.png",
     "LedgerForge_Design_v3_Draft/reference/appearance_playground_check.png"
   ],
-  "native_implementation_status": "not implemented by this package",
-  "documentation_integration_status": "published in Project documents/UI Assets/LF-UI-2026-09-R1/ on 2026-09-10",
-  "git_publication_status": "authorized by user on 2026-09-10",
+  "native_implementation_status": "R1 package is design/reference material. Sprint 89 is accepted for its SC-01/SC-02 Transactions boundary; SC-03 and SC-04 native implementation remain future work.",
+  "documentation_integration_status": "all current UI Assets files published as-is at Sprint-89 candidate 038af8d9ebebe66b3f17925416821941cfa33d3d; Sprint 89 later Chat-accepted",
+  "git_publication_status": "all current UI Assets files published as-is by owner instruction in Sprint-89 candidate 038af8d9ebebe66b3f17925416821941cfa33d3d",
   "scope_alignment_date": "2026-09-11",
-  "scope_alignment": "Private personal app: simple local appearance and ordinary owner usability. Existing PNG bytes and historical provenance retained; DESIGN_HANDOFF.md records exact rejected caption exceptions. Two screen-reference drafts are separately reconciled; redundant scratch inventories are removed.",
-  "local_sc_png_status": "The five owner-curated, Chat-approved SC-01/SC-02 PNGs are published with unchanged bytes in this payload for the Sprint-89 candidate. SC-03 and later items remain excluded; their ongoing local changes are intentionally ignored. Exact caption exceptions remain in DESIGN_HANDOFF.md. Publication does not mark Sprint 89 accepted."
+  "scope_alignment": "Private personal app: simple local appearance and ordinary owner usability. All current R1 payload files are owner-curated / Chat-approved / published design references where applicable; publication remains separate from native implementation. DESIGN_HANDOFF.md records exact rejected caption exceptions; canonical written authorities retain semantic control.",
+  "local_sc_png_status": "All current owner-placed SC images in the R1 folder are approved and published design references. Publication does not constitute product implementation: SC-01/SC-02 informed accepted Sprint 89, SC-03 is future Sprint-90 design authority, SC-04 is future Sprint-91 design authority, and SC-05A is the coordinator-accepted audit for a future Sprint-92 refresh. Exact caption exceptions remain in DESIGN_HANDOFF.md."
 }

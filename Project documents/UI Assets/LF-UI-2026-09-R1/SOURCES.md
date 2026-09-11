@@ -2,7 +2,7 @@
 
 ## Current private-personal scope alignment — 2026-09-11
 
-**Sprint-89 reference publication:** The owner’s corrected resume prompt explicitly approves publication of the unchanged local SC-01 Visual Contract, SC-01 Supporting Reference, and SC-02A/02B/02C PNGs. ASSET_MANIFEST.json records their exact package paths, sizes and SHA-256 hashes. They are visual references; canonical SC-01/SC-02 written contracts remain authoritative. Later SC items are excluded, and native candidate publication does not constitute Chat acceptance.
+**Sprint-89 reference publication and acceptance:** The owner’s final instruction published every current UI Assets file as-is at the Sprint-89 candidate, including all current SC images. Chat subsequently accepted Sprint 89 at `038af8d9ebebe66b3f17925416821941cfa33d3d`. ASSET_MANIFEST.json records the exact current R1 package inventory, sizes and SHA-256 hashes. The files are design references; canonical written authorities remain semantic control, and publication does not implement future SC-03/SC-04 screens.
 
 The owner has superseded the advanced appearance, formal accessibility and generalized product-completeness portions above. Current authority is the private-personal gate, the canonical rejection register, and DESIGN_HANDOFF.md: simple local System/Light/Dark with an optional existing accent choice; readable Money, ordinary keyboard use, resizing, focus and selection. The explicit icon-rail preference is folded into the canonical responsive hierarchy. The three specifically annotated PNGs remain byte-for-byte design references with only their rejected caption portions ignored. Historical provenance above is retained, not renewed as active requirements.
 

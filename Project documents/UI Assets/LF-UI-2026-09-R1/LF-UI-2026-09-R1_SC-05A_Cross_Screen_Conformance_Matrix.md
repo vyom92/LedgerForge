@@ -2,7 +2,7 @@
 
 **Revision:** LF-UI-2026-09-R1 / SC-05A  
 **Review date:** 11 September 2026  
-**Status:** Draft audit for coordinator review. Source/reference comparison, not native-screen acceptance.  
+**Status:** Coordinator-accepted cross-screen audit. Recheck against accepted Sprints 89–91 before Sprint-92 implementation. Source/reference comparison, not native-screen acceptance.
 **Destinations:** Dashboard · Accounts · Transactions · Import · Salary · Settings
 
 ## 1. Result and evidence boundary
@@ -17,10 +17,10 @@ This is one conformance matrix, not a new design board, app screen, component li
 | --- | --- | --- |
 | Current repository documentation | `main@000dfd3866603ed1fd1153afbd37a23573ad342c` | Current status, scope and ownership of planned work. E01–E04, E11. |
 | Latest accepted executable baseline | Sprint 88, `4f5eeb7b11c0f5879204a06ae9f08045304342b5` | The six inspected destination implementations and shared presentation. E05–E10. |
-| Accepted design direction | User/coordinator decisions in this conversation: SC-01; SC-02 A/B/C; SC-03 A/B/C; SC-04 A/B and the explicitly bounded SC-04 state requirements | Target appearance/interaction rules, not implemented product state. **U** below refers to those decisions. No additional acceptance of SC-04C is inferred from this audit. |
+| Accepted design direction | User/coordinator decisions in this conversation: SC-01 complete; SC-02 A/B/C complete; SC-03 A/B/C complete; SC-04 A/B/C complete | Target appearance/interaction rules, not implemented product state. **U** below refers to those decisions. |
 | Native visual evidence | Earlier supplied screenshots and design references are not a matched current six-destination runtime set | They cannot prove today's pixel fit, focus behavior or post-89–91 conformance. No current native pass/fail is assigned from them. |
 
-**Important:** current PROJECT_STATE records Sprint 89 as **PAUSED / UNACCEPTED WIP**, while Sprint 88 remains the accepted implementation. The audit therefore does not promote WIP into the baseline. The prepared roadmap places cross-screen cleanup after 89–91. Missing Transactions/Dashboard/Appearance implementations are not automatically Sprint-92 polish tasks. [E01](https://github.com/vyom92/LedgerForge/blob/000dfd3866603ed1fd1153afbd37a23573ad342c/Project%20documents/PROJECT_STATE.md) · [E02](https://github.com/vyom92/LedgerForge/blob/000dfd3866603ed1fd1153afbd37a23573ad342c/Project%20documents/Sprint%20roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md)
+**Important:** this audit was performed against the Sprint-88 executable baseline and the `main@000dfd3866603ed1fd1153afbd37a23573ad342c` documentation state, where Sprint 89 was paused/unaccepted. Sprint 89's later acceptance does not retroactively mean this audit inspected it. The prepared roadmap places cross-screen cleanup after 89–91. Missing Dashboard/Appearance implementations are not automatically Sprint-92 polish tasks. [E01](https://github.com/vyom92/LedgerForge/blob/000dfd3866603ed1fd1153afbd37a23573ad342c/Project%20documents/PROJECT_STATE.md) · [E02](https://github.com/vyom92/LedgerForge/blob/000dfd3866603ed1fd1153afbd37a23573ad342c/Project%20documents/Sprint%20roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md)
 
 The accepted Sprint-88 record also states that physical resizing was not separately completed. Small reference frames are therefore design targets, not proof that the existing app supports or behaves correctly at those sizes. No app was launched or tested for this matrix.
 
@@ -37,7 +37,7 @@ The accepted Sprint-88 record also states that physical resizing was not separat
 | 01 | Page title / subtitle hierarchy | K | K | K | K | K | K |
 | 02 | Sidebar / icon rail | K · 89 | K · 89 | K · 89 | K · 89 | K · 89 | K · 89 |
 | 03 | Contextual toolbar placement | K | K | 89 | K | K | 91 |
-| 04 | Page / panel spacing | P1 | P1 | P1 / 89 | P1 | P1 | P1 / 91 |
+| 04 | Page / panel spacing | K | K | K / 89 | K | P1 | K / 91 |
 | 05 | Panel material / appearance | K · 91 | K · 91 | K · 89/91 | K · 91 | K · 91 | 91 |
 | 06 | Buttons / action hierarchy | N1 · 90 | N1 | N1 · 89 | N1 | N1 | N1 · 91 |
 | 07 | Tables / list rows | 90 | N2 | 89 | N2 | N2 | K |
@@ -88,7 +88,7 @@ These are audit findings, **not six authorized changes**. Remove a candidate if 
 
 ### P1 — Align existing outer content insets
 
-**Observed in source:** `AppShellToolbar` has 28-pt horizontal padding. Dashboard, Accounts, Transactions, Import and Settings use 28-pt content padding; Salary uses 24 pt. Shared `LFPanel` already supplies 16-pt inner padding. This produces a 4-pt source-level leading-edge difference on Salary; no new pixel measurement is claimed. **E05–E09.**
+**Observed in source:** `AppShellToolbar` has 28-pt horizontal padding. Dashboard, Accounts, Transactions, Import and Settings use 28-pt content padding; Salary uses 24 pt. Shared `LFPanel` already supplies 16-pt inner padding. This produces a 4-pt source-level leading-edge difference on Salary; no new pixel measurement is claimed. Salary is the sole P1 destination in row 04. **E05–E09.**
 
 **Smallest correction:** use the same accepted outer inset for the shared header and each destination container. If the prior R1 implementation retains its specified 24-pt page inset, consume that value rather than adding another local constant. Leave internal form/table layouts, the existing 16-pt panel padding, controls and workflow ownership alone. Do not mechanically convert every 14/18/20-pt internal gap: different roles can justify different spacing.
 
@@ -179,13 +179,13 @@ The matrix proposes no executable change, no new screen and no new control. It d
 
 Before Sprint-92 edits, rebase this **audit**, not the repository: compare the then-accepted 89–91 implementation, close findings already resolved, and confirm only the remaining observations in the actual six destinations. An unavailable screenshot/interaction is **Not checked**, never PASS or an assumed defect. Preserve the accepted references and already-working workflows.
 
-**SC-05A is returned for coordinator review. No SC-05B, image regeneration, implementation prompt, Git write, app run or test campaign is included.**
+**SC-05A is coordinator-accepted as an audit. Its historical Sprint-88 evidence boundary remains intact. No SC-05B, image regeneration, implementation prompt, app run or test campaign is included.**
 
 ## 7. Evidence index
 
 Repository links below are pinned. Source inspection was limited to presentation/related scope documentation; no private originals, personal account data or financial workbook content was used. An unsuccessful direct source-download attempt supplied no evidence; the GitHub connector reads listed here are the source basis.
 
-- **E01 — [Current accepted-state boundary](https://github.com/vyom92/LedgerForge/blob/000dfd3866603ed1fd1153afbd37a23573ad342c/Project%20documents/PROJECT_STATE.md)** · `Project documents/PROJECT_STATE.md`. Sprint 88 accepted; Sprint 89 paused/unaccepted; native resize limitation.
+- **E01 — [Historical accepted-state boundary](https://github.com/vyom92/LedgerForge/blob/000dfd3866603ed1fd1153afbd37a23573ad342c/Project%20documents/PROJECT_STATE.md)** · `Project documents/PROJECT_STATE.md`. At this audit baseline, Sprint 88 was accepted and Sprint 89 was paused/unaccepted; native resize limitation.
 - **E02 — [Prepared Sprint-92 boundary](https://github.com/vyom92/LedgerForge/blob/000dfd3866603ed1fd1153afbd37a23573ad342c/Project%20documents/Sprint%20roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md)** · `Project documents/Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md`. Sprint 92 selects actual owner usability after 89–91; no formal accessibility campaign.
 - **E03 — [Shared R1 authority](https://github.com/vyom92/LedgerForge/blob/000dfd3866603ed1fd1153afbd37a23573ad342c/Project%20documents/UI%20Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md)** · `Project documents/UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md`. Readable Money, shared roles, ordinary keyboard operation and exact obsolete-caption exceptions.
 - **E04 — [Inherited screens and simple appearance](https://github.com/vyom92/LedgerForge/blob/000dfd3866603ed1fd1153afbd37a23573ad342c/Project%20documents/UI%20Assets/LF-UI-2026-09-R1/Inherited_Screens.md)** · `Project documents/UI Assets/LF-UI-2026-09-R1/Inherited_Screens.md`. Existing Accounts/Import/Salary/Settings behavior; simple local appearance; preserve editor/recovery semantics.
@@ -197,6 +197,6 @@ Repository links below are pinned. Source inspection was limited to presentation
 - **E10 — [Shared colours](https://github.com/vyom92/LedgerForge/blob/4f5eeb7b11c0f5879204a06ae9f08045304342b5/Views/Common/LFTheme.swift)** · `Views/Common/LFTheme.swift`. Full source inspected: fixed palette, translucency and gradients.
 - **E11 — [Current owner scope](https://github.com/vyom92/LedgerForge/blob/000dfd3866603ed1fd1153afbd37a23573ad342c/Project%20documents/SCOPE_DECISIONS.md)** · `Project documents/SCOPE_DECISIONS.md`. Private personal app; exclusions of formal accessibility and advanced appearance; no financial-evidence generation.
 
-**U — User/coordinator decisions in this conversation:** SC-05's exact six-destination cleanup scope; approved SC-02/03 structures; icon-only rail preference; noninteractive Dashboard display cards/activity rows; ordinary keyboard/naming only; immediate device-local two-preference Appearance. These user decisions take precedence over older instructions. SC-04C remains a supplied state reference, not independently accepted here.
+**U — User/coordinator decisions in this conversation:** SC-05's exact six-destination cleanup scope; SC-01 complete; SC-02 A/B/C complete; SC-03 A/B/C complete; SC-04 A/B/C complete; icon-only rail preference; noninteractive Dashboard display cards/activity rows; ordinary keyboard/naming only; immediate device-local two-preference Appearance. These user decisions take precedence over older instructions. SC-04C is coordinator-accepted design direction, not native implementation.
 
 The uploaded July/August private roadmaps and MCP release reports were not used as current product-state evidence. Old runtime screenshots were not promoted to post-Sprint-88/89/90/91 evidence. No numeric financial values or sample records are reproduced in this deliverable.

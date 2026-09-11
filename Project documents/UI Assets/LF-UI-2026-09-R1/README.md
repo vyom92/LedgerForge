@@ -16,6 +16,7 @@ Approved visual direction and canonical written contracts for the private person
 | [ACCEPTANCE](ACCEPTANCE.md) | Required checks, not invented pass evidence |
 | [SOURCES](SOURCES.md) | Provenance and historical source refs |
 | [ASSET_MANIFEST](ASSET_MANIFEST.json) | Payload hashes/sizes; manifest excludes itself |
+| [SC-05A](LF-UI-2026-09-R1_SC-05A_Cross_Screen_Conformance_Matrix.md) | Coordinator-accepted cross-screen audit to refresh before Sprint 92 |
 
 These new screen files reorganize already approved written text; they are not new designs or approval of local drafts. [UI/UX](../../UI_UX_v1.0_Frozen.md) owns shared interface architecture.
 
@@ -23,7 +24,11 @@ These new screen files reorganize already approved written text; they are not ne
 
 The tracked `LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md` and `LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md` remain **draft/supporting specifications**, not competing canonical owners. Their status is unchanged by this restructure.
 
-The five SC-01/SC-02 PNGs listed first below are **owner-curated / Chat-approved / published visual references** for the Sprint-89 candidate. They retain the exact owner-placed bytes recorded in ASSET_MANIFEST.json. Publication does not mark Sprint 89 accepted. SC-03 and later local design items remain unpublished and outside Sprint 89; ongoing additions and replacements are intentionally ignored. The existing reference inventory, in natural screen order:
+All current SC images in this R1 folder are **owner-curated / Chat-approved / published design references**. Their exact current bytes are listed in ASSET_MANIFEST.json. Publication does not itself implement a screen or create a competing written authority: canonical written contracts continue to control semantics.
+
+SC-01/SC-02 informed accepted Sprint 89. SC-03 A/B/C are design authority for a future Sprint 90, and SC-04 A/B/C are design authority for a future Sprint 91; neither future sprint is activated or implemented by publication. SC-05A is the coordinator-accepted audit to refresh against accepted Sprints 89–91 before any Sprint-92 implementation.
+
+The current reference inventory, in natural screen order:
 
 - SC-01 App Shell Supporting Reference;
 - SC-01 App Shell Visual Contract;
@@ -33,8 +38,10 @@ The five SC-01/SC-02 PNGs listed first below are **owner-curated / Chat-approved
 - SC-03A Dashboard Wide Reference;
 - SC-03B Dashboard Narrow Responsive Reference;
 - SC-03C Dashboard State Component Contract;
-- SC-04A Appearance Settings Reference.
+- SC-04A Appearance Settings Reference;
+- SC-04B Appearance Light/Dark Surface Comparison;
+- 04C Appearance State Component Contract.
 
-Each uses the `LF-UI-2026-09-R1_` prefix and its existing underscore filename. Their presence is not approval or a native pass. Keep every PNG intact; [exact ignored caption portions](DESIGN_HANDOFF.md#ignored-caption-portions) apply to SC-02A/02C/03B only. Do not regenerate/delete images to remove superseded text. [Archived visuals](../Archived) remain historical references with unchanged bytes.
+The named SC images retain their existing filenames; the extensionless `04C_Appearance_State_Component_Contract` remains published as-is. Their presence is not a native pass. Keep every PNG intact; [exact ignored caption portions](DESIGN_HANDOFF.md#ignored-caption-portions) apply to SC-02A/02C/03B only. Do not regenerate/delete images to remove superseded text. [Archived visuals](../Archived) remain historical references with unchanged bytes.
 
-The [Import Preview alternatives and Sprint-89 evidence](../../Work%20notes/Transaction_and_R1_workflows.md) are unaccepted work notes, not approved screen replacements. No other untracked file is included merely by this inventory.
+The [Import Preview alternatives and remaining R1 questions](../../Work%20notes/Transaction_and_R1_workflows.md) are unaccepted work notes, not approved screen replacements. ASSET_MANIFEST.json inventories every current non-metadata R1 payload file; private originals and Finder metadata are not package payloads.

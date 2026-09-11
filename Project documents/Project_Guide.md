@@ -102,7 +102,7 @@ Apply any one concrete personal relevance ground; check existing rejections. Sep
 
 Resolve the named question read-only unless the prompt explicitly authorizes writes. Distinguish verified, reported, inference and missing evidence; retain negative findings and falsifiers. Record an eligible finding in its owner, or a meaningful rejection in SCOPE_DECISIONS. An existing rejected category returns REJECTED_BY_PRIVATE_PERSONAL_SCOPE with its reference, not a new packet.
 
-**Terminal:** `DISCOVERY_RESOLVED`.
+**Terminal:** `DISCOVERY_RESOLVED` or `REJECTED_BY_PRIVATE_PERSONAL_SCOPE`.
 
 **END PG-20**
 

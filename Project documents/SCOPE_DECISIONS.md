@@ -95,6 +95,8 @@ Order inherits Guide rule D: former ID in natural ascending order. IDs are never
 
 | Former ID | Destination / meaning |
 | --- | --- |
+| <a id="fw-p2-03"></a>FW-P2-03 | Completed by [accepted Sprint 89](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-89). |
+| <a id="fw-p2-53"></a>FW-P2-53 | Completed by [accepted Sprint 89](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-89). |
 | <a id="fw-p2-55"></a>FW-P2-55 | Consolidated into [FW-P2-52](FUTURE_WORK.MD#fw-p2-52), simple device-local appearance. Theme-engine machinery is removed, not deferred. |
 | <a id="fw-p2-67"></a>FW-P2-67 | Completed by [accepted Sprint 88](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-88). |
 | <a id="fw-p2-74"></a>FW-P2-74 | Completed by [accepted Sprint 85](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-85). |
