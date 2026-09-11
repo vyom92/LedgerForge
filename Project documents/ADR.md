@@ -35,6 +35,10 @@ When reading this file:
 
 No alignment note authorizes implementation.
 
+## Current Alignment — 2026-09-11 — Private Personal App Scope
+
+The explicit owner scope reset in PROJECT_STATE.md and the Private Personal App Scope Gate supersede historical forward-looking product proposals wherever they imply generalized public/commercial/platform work. Rejected categories are not active architecture programs or dependencies. R1 now requires ordinary owner usability and simple device-local System/Light/Dark appearance with optional approved Indigo/accent direction; formal accessibility and advanced preference-portability programs are excluded. Existing parser-profile provenance, exact credential behavior, Developer Console, workspace schema and accepted financial/persistence architecture remain intact. This is an additive scope alignment only: no original ADR decision text, new ADR, migration or product implementation is changed or accepted.
+
 ## Current ADR Index
 
 | ADR | Decision | Current standing | Implementation |

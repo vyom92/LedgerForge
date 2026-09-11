@@ -8,6 +8,10 @@
 **Latest accepted architecture decision:** ADR-041 — Immutable Source Snapshot and Exact Source-Byte Fingerprint Authority
 **Current migration:** V8
 
+## Current scope alignment — 2026-09-11
+
+This file preserves a historical architectural baseline, including its dated implementation/migration snapshot. Current accepted production state and source support come from PROJECT_STATE.md and applicable accepted ADRs. The old milestone and future-outlook lists below do not keep generalized import, learning, encrypted sync, multi-workspace or plugin initiatives active. The private-personal gate and the canonical FUTURE_WORK.MD rejection register supersede those planning implications. No accepted financial, persistence, identity, migration or credential decision is changed by this scope alignment.
+
 ## Document Role
 
 This document defines LedgerForge's frozen v1.0 architectural baseline.
@@ -1677,9 +1681,9 @@ One supported family never implies full institution support.
 
 ---
 
-# Future Architecture Boundaries
+# Historical architecture outlook — superseded
 
-The following remain future work and require separate evidence or decisions:
+The following is retained solely as the original outlook, not current future work or a dependency list. Some entries were later implemented; others are rejected by the private-personal scope reset. Consult PROJECT_STATE.md and eligible FUTURE_WORK.MD cards for current disposition:
 
 - immutable source-snapshot and source-byte fingerprint foundation under ADR-041;
 - production PDF support;
@@ -1708,7 +1712,7 @@ The following remain future work and require separate evidence or decisions:
 - multiple workspaces;
 - external plugin architecture.
 
-Future architecture must preserve the v1 invariants.
+Any separately selected future architecture must preserve the accepted financial and safety invariants and pass the private-personal scope gate.
 
 ---
 

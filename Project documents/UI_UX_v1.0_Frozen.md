@@ -2,9 +2,9 @@
 
 **Version:** 1.0  
 **Status:** FROZEN  
-**Status alignment reviewed:** 2026-09-09
-**Repository ref reviewed:** `main@d8124ef5a1f38a1e7547f4f8905c91f25b2f1194`
-**Current implementation context:** Sprint 79 remains the latest numbered implementation; later accepted unnumbered reliability/startup-planner packages are recorded in `PROJECT_STATE.md`. `LF-UI-2026-09-R1` is approved design authority for its bounded scope and is not implemented merely by this documentation alignment.
+**Status alignment reviewed:** 2026-09-11
+**Repository ref reviewed:** `main@23f216a3d9cb8d432d177916e13febde23516b4a`
+**Current implementation context:** Sprint 88 is the accepted numbered baseline; Sprint 89 is paused, unaccepted WIP. The private-personal scope reset changes documentation authority only. `LF-UI-2026-09-R1` is approved visual direction for its bounded scope and is not implemented merely by this alignment.
 
 ## Purpose
 
@@ -26,11 +26,11 @@ Implementation sprints translate this specification and its approved assets into
 
 ---
 
-## Current design alignment — LF-UI-2026-09-R1 — 2026-09-09
+## Current design alignment — LF-UI-2026-09-R1 — 2026-09-11
 
 The user explicitly approved `LF-UI-2026-09-R1`. For its defined scope, [`UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md`](UI%20Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md) is the current written presentation/interaction authority and [`MasterBoard_LF-UI-2026-09-R1.png`](UI%20Assets/LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png) is the current visual authority. `DESIGN_TOKENS.json` and `ACCEPTANCE.md` define the shared-system and acceptance detail. The artwork label “LedgerForge v2.0” is design-board text, not an application version.
 
-Design approval is independent from native implementation acceptance. SwiftUI implementation remains separate and incomplete. Details of untouched screens inherit legacy approved references only where they remain consistent with this handoff, accepted product behavior, current financial semantics and accessibility requirements.
+Design approval is independent from native implementation acceptance. SwiftUI implementation remains separate and incomplete. Details of untouched screens inherit legacy approved references only where they remain consistent with this handoff, accepted product behavior, current financial semantics and ordinary owner-usability requirements.
 
 ### Shared appearance and design-system direction
 
@@ -39,11 +39,10 @@ For covered scope, R1 supersedes the former fixed-theme requirement:
 - **Follow System** is the default target; **Light** and **Dark** are explicit choices.
 - **System Neutral** and **Deep Indigo** are preset concepts; Deep Indigo is optional, not mandatory.
 - Shared semantic colour roles replace theme-specific semantic assumptions. Colour never establishes financial meaning by itself.
-- Bounded foreground/background customization and bounded translucency apply only to eligible surfaces and must retain automatic readable fallback.
-- App-wide text size, a small supported font-style set and comfortable/compact density are approved directions.
-- Appearance changes require safe Preview / Apply / Cancel / Restore defaults behavior and compliance with reduced-transparency accessibility settings.
+- Appearance is limited to simple local System/Light/Dark and an optional existing accent choice, with readable defaults and local persistence.
+- Advanced foreground/background, font/text-scale, density, translucency, Preview/Apply/Cancel and portable-preference programmes are excluded by the private-personal scope gate.
 - Preference persistence/storage ownership is not chosen by this design approval.
-- The overall shell remains sidebar + contextual toolbar + primary content, while R1 responsive hierarchy supersedes any fixed 20/80 proportion as a hard requirement; narrow layouts may close the inspector first and collapse the sidebar while preserving accessible navigation.
+- The overall shell remains sidebar + contextual toolbar + primary content, while R1 responsive hierarchy supersedes any fixed 20/80 proportion as a hard requirement; narrow layouts close the inspector first, prefer an icon-only navigation rail, and hide navigation only when even the rail harms usable content width, retaining labelled navigation/details controls.
 
 ### Transactions direction
 
@@ -71,7 +70,7 @@ Presentation filtering/sorting never changes durable source order or balance sem
 
 ### Appearance settings direction
 
-The approved settings surface includes Follow System / Light / Dark, System Neutral / Deep Indigo presets, accent, text size, font style and density. An Advanced area may expose bounded foreground/background/translucency controls with Preview, Apply, Cancel and Restore defaults. Unsafe combinations require automatic readable fallback; reduced-transparency settings must be respected.
+The approved settings surface is simple local Follow System / Light / Dark with an optional existing system/Deep Indigo accent choice. A selected preference persists locally and invalid values fall back safely. [FW-P2-52](FUTURE_WORK.MD#fw-p2-52) owns this narrowed outcome; no advanced editor, portable preference contract or new preference architecture/ADR is a default requirement.
 
 ### Explicit exclusions retained
 
@@ -168,7 +167,6 @@ The interface prioritizes:
 5. Predictability
 6. Consistency
 7. Privacy
-8. Accessibility
 
 Every screen should answer a user question.
 
@@ -262,21 +260,13 @@ DEBUG-only destructive database controls must never appear in Release builds.
 
 ## Future navigation
 
-Future modules may include:
-
-- Insights
-- Budgets
-- Reports
-- Investments
-- Financial Timeline
-- Financial Intelligence
-- Rules & Automation
+Add a destination only for a named owner workflow that passes the private-personal scope gate. A catalogue of possible finance-app modules is not a requirement.
 
 Future destinations must not appear as inactive navigation, “Soon” rows or unrelated placeholder screens.
 
 A future module enters the sidebar only after:
 
-1. its product scope is approved;
+1. its actual owner workflow passes the private-personal scope gate and its product scope is approved;
 2. its repository-backed data authority exists;
 3. an approved screen asset or frozen UI update exists;
 4. its navigation outcome is functional.
@@ -609,8 +599,8 @@ It is available only through Developer Mode and appropriate build configuration.
 - parser and source-evidence diagnostics;
 - repository and persistence diagnostics;
 - validation summaries;
-- performance evidence;
-- controlled fixture launching;
+- bounded evidence for an actual local failure;
+- authentic-source validation through the ordinary import path;
 - DEBUG-only lifecycle operations where approved.
 
 ## Privacy and authority
@@ -631,7 +621,7 @@ Developer tools must not:
 - bypass validation, duplicate handling, identity review or persistence;
 - become the source of financial truth.
 
-Approved fixtures enter the ordinary production URL-driven preparation seam.
+Only permitted authentic statement evidence enters statement-dependent checks through the ordinary production URL-driven preparation seam; artwork and generated statement fixtures are not test inputs.
 
 ---
 
@@ -661,8 +651,7 @@ Animation is:
 
 - fast;
 - subtle;
-- purposeful;
-- reducible through accessibility settings.
+- purposeful.
 
 Motion must not obscure changes in financial truth or workflow state.
 
@@ -674,9 +663,9 @@ New reusable components require alignment with the applicable R1 handoff/tokens 
 
 ---
 
-# Component Library
+# Shared visual components
 
-For components covered by R1, the R1 shared component/state contract is current. `ComponentLibrary_v1.0.png` remains historical/inherited component direction where compatible.
+For components covered by R1, DESIGN_HANDOFF.md §2.2 and DESIGN_TOKENS.json are canonical. Redundant scratch component inventories are not authority. `ComponentLibrary_v1.0.png` remains historical/inherited component direction where compatible.
 
 ## Navigation
 
@@ -713,7 +702,7 @@ For components covered by R1, the R1 shared component/state contract is current.
 - Privacy-Safe Diagnostic Summary
 - DEBUG-Only Lifecycle Controls
 
-Components must retain semantic, privacy and accessibility behavior across screens.
+Components retain financial meaning, privacy, useful native names, focus and selection across screens.
 
 ---
 
@@ -736,25 +725,11 @@ Components must retain semantic, privacy and accessibility behavior across scree
 
 ---
 
-# Accessibility
+# Ordinary owner usability
 
-Accessibility is a release requirement.
+Keep readable Money and currency, no clipping, useful keyboard paths and native shortcuts, visible focus, distinct selection, usable resizing and meaningful icon names/tooltips. Consequential status cannot rely on colour alone. Verify actual owner workflows under the selected implementation scope.
 
-## Required behavior
-
-- keyboard-first navigation;
-- native macOS shortcuts where appropriate;
-- complete keyboard access to primary interactions;
-- visible focus;
-- VoiceOver-compatible labels and grouping;
-- resizable layouts;
-- support for reduced motion;
-- sufficient contrast;
-- semantic status beyond color;
-- tabular figures without harming spoken accessibility;
-- predictable traversal order.
-
-Follow System is the current default design target for R1-covered scope, with explicit Light and Dark choices. Native implementation and runtime accessibility verification remain required before this direction is considered implemented.
+Formal VoiceOver, Full Keyboard Access, reduced-motion/transparency campaigns, contrast certification and a separate accessibility release gate are **NOT REQUIRED — DO NOT CONSIDER**. Existing harmless native labels may remain. Follow System/Light/Dark stays the simple appearance target. The handoff's exact PNG-caption exceptions preserve valid design while superseding rejected acceptance captions.
 
 ---
 
@@ -774,21 +749,7 @@ Follow System is the current default design target for R1-covered scope, with ex
 
 ## Future screens
 
-- Insights
-- Budgets
-- Reports
-- Investments
-- Financial Timeline
-- Financial Intelligence
-- Rules & Automation
-- Financial Health
-- Goals
-- Documents and Provenance
-- Multi-Currency Reporting
-
-Future screens extend the frozen shell.
-
-They must not appear as inert v1 navigation.
+A new screen requires a concrete owner workflow, durable eligible scope in FUTURE_WORK.MD, approved design and implementation authorization. It must be functional when exposed; no speculative module inventory or inert navigation is required.
 
 ---
 
@@ -833,7 +794,7 @@ A UI implementation increment is acceptable only when its bounded scope satisfie
 ## Shell and navigation
 
 - Navigation matches the frozen shell.
-- The sidebar remains persistent.
+- Navigation remains discoverable under the approved full-sidebar, icon-rail and last-resort hidden treatments.
 - Only functional approved destinations appear.
 - Developer tooling is hidden during normal use.
 - Future modules do not appear as inert placeholders.
@@ -863,11 +824,11 @@ A UI implementation increment is acceptable only when its bounded scope satisfie
 - Dashboard and Imports distinguish current workflow from durable history.
 - Repository-unavailable is distinct from empty.
 
-## Interaction and accessibility
+## Interaction and ordinary usability
 
 - Primary actions are keyboard accessible.
 - Focus, selection and scope remain visible.
-- VoiceOver labels are meaningful.
+- Native controls retain meaningful names and useful icon tooltips.
 - Status is not color-only.
 - Resizing preserves usable hierarchy.
 - No control implies an unsupported outcome.
@@ -878,7 +839,7 @@ A UI implementation increment is acceptable only when its bounded scope satisfie
 - `LF-UI-2026-09-R1` is the master visual authority for its covered scope; legacy master assets remain historical/inherited references.
 - Any intentional visual change is approved before implementation.
 
-A green test suite alone does not prove visual, semantic or accessibility acceptance.
+A green test suite alone does not prove visual, financial-semantic or owner-usability acceptance.
 
 ---
 

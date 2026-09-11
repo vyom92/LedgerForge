@@ -1,12 +1,12 @@
 # LedgerForge Roadmap: Sprints 90–99
 
 **Status:** PREPARED / NOT CURRENT. This successor roadmap becomes current numbering authority only after Sprint 89 is accepted and Chat explicitly activates the cycle.
-**Prepared:** 2026-09-09; realigned by explicit user decision on 2026-09-10.
-**Accepted implementation baseline:** Sprint 85, `b4e4e6ffb14deccef238352a6ef834514a2a37c2`.
+**Prepared:** 2026-09-09; realigned by explicit user decisions through 2026-09-11.
+**Accepted implementation baseline:** Sprint 88, `4f5eeb7b11c0f5879204a06ae9f08045304342b5`.
 **Current authority remains:** [Sprints 80–89](../LedgerForge_Roadmap_Sprints_80-89_Current.md).
-**Personal-v1:** UNDECLARED / NOT CERTIFIED.
+**PERSONAL-V1: NOT YET ADOPTED.**
 
-This is documentation and planning. It authorizes no Sprint 90–100 implementation, accepts no proposed architecture and allocates no ADR or migration number. Before selecting each future sprint, Chat must rerun P0 → P1 → P2 → P3 triage, enforce exact entry gates and revalidate the implementation split against accepted post-Swift-6 ownership. A verified higher-priority correctness defect preempts a lower-priority outcome unless explicitly deferred; unmet dependencies do not silently cascade sprint numbers.
+This is documentation and planning. It authorizes no Sprint 90–100 implementation, accepts no proposed architecture and allocates no ADR or migration number. Before selecting each future sprint, Chat must apply the Private Personal App Scope Gate, then rerun P0 → P1 → P2 → P3 triage only for eligible owner needs, enforce exact entry gates and revalidate the implementation split against accepted post-Swift-6 ownership. A verified higher-priority correctness defect preempts a lower-priority outcome unless explicitly deferred; unmet dependencies do not silently cascade sprint numbers.
 
 ## Governing source and financial rules
 
@@ -14,19 +14,19 @@ The complete registered authentic corpus remains authority for statement-depende
 
 ## Explicit personal-adoption plan — 2026-09-10
 
-The user fixes [Sprint 100 — LedgerForge 1.0 certification](LedgerForge_Roadmap_Sprints_100-109_Planned.md#sprint-100--ledgerforge-10--personal-adoption-validation--certification) after the accepted pre-100 product boundaries. This supersedes the earlier instruction to retain the former 93–99 positions and the earlier statement that current FX/net-worth was not an adoption prerequisite.
+The user fixes [Sprint 100 — LedgerForge 1.0 Personal Adoption Verification](LedgerForge_Roadmap_Sprints_100-109_Planned.md#sprint-100--ledgerforge-10-personal-adoption-verification) after the accepted pre-100 product boundaries. This supersedes the earlier instruction to retain the former 93–99 positions and the earlier statement that current FX/net-worth was not an adoption prerequisite.
 
-Required outcomes include accepted Swift 6 and selected R1/native UI, verified backup/restore, existing Qatar Airways Salary actuals and Salary History, the current This Month planner with bounded current Al Dar reference use and manual override, current holdings and valuation sufficient for the owner's present holdings, current market FX/net-worth reporting, supported-source documentation and the final Chat adoption matrix. Exact scope and architecture remain gated; assigning a position does not promote a queue status or make every expansion on a broad card required.
+Required outcomes include accepted Swift 6 and selected R1/native UI, verified backup/restore, existing Qatar Airways Salary actuals and Salary History, the current This Month planner with bounded current Al Dar reference use and manual override, current holdings and valuation sufficient for the owner's present holdings, current market FX/net-worth reporting, private supported-source matrix and the final Chat adoption matrix. Exact scope and architecture remain gated; assigning a position does not promote a queue status or make every expansion on a broad card required.
 
-Complete structured export remains optional. Historical FX, historical Al Dar, investment history/performance, tax lots, realized P/L, TWR/IRR, corporate-action reconstruction and generic brokerage transaction ingestion are not required merely to establish current holdings. Transfer matching, reconciliation, rule/merchant/recurrence automation, broad historical analytics, forecasting, sync/cloud/APIs/plugins and multiple workspaces remain future candidates unless separately promoted or required by a verified correctness dependency.
+Complete structured export remains optional. Historical FX, historical Al Dar, investment history/performance, tax lots, realized P/L, TWR/IRR, corporate-action reconstruction and generic brokerage transaction ingestion are not required merely to establish current holdings. Transfer matching, reconciliation, rule/merchant/recurrence automation and personally useful analytics are eligible only for an actual selected owner workflow or verified correctness need. Generalized platform categories are **NOT REQUIRED-DO NOT CONSIDER** under the [canonical scope register](../../FUTURE_WORK.MD#rejected-private-personal-scope), not future candidates.
 
 ## Prepared cycle overview
 
 | Sprint | Outcome | Queue | Entry / planning boundary |
 |---|---|---|---|
 | 90 | R1 Dashboard Native-Currency Hierarchy | `FW-P2-78` | Sprint 89 shared R1 patterns accepted; no unsupported analytics |
-| 91 | R1 Appearance Preferences and Adaptive Rendering | `FW-P2-52` + narrowed `FW-P2-55` | Bounded preference-storage ownership decision first |
-| 92 | R1 Cross-Screen Conformance and Accessibility Closure | `FW-P2-40` + `FW-P2-41` + `FW-P2-47` + `FW-P2-48` + `FW-P2-49` + `FW-P2-50` | Combine only after 89–91 establish one shared design/native interaction boundary |
+| 91 | R1 Simple Appearance Choice | `FW-P2-52` | Simple device-local System/Light/Dark; optional approved Deep Indigo/accent direction |
+| 92 | R1 Cross-Screen Visual and Interaction Polish | bounded `FW-P2-40` + `FW-P2-41` + `FW-P2-47` + `FW-P2-48` + `FW-P2-50` | Only actual owner usability after 89–91; terminology, truthful states, readable layout and useful native interaction |
 | 93 | Verified Backup, Restore and Disaster Recovery | `FW-P3-36` | PRE_V1_REQUIRED; accepted user-owned backup/restore architecture and independent restore drill |
 | 94 | Salary / This Month Current Al Dar Planning Completion | bounded `FW-P3-08` | PRE_V1_REQUIRED current planning slice; explicit ADR-045 alignment or successor architecture, access/permission/freshness/amount binding |
 | 95 | Current Investment Domain and Identity Foundation | bounded `FW-P3-20`, `FW-P3-21`, `FW-P3-23` | Container/instrument identity, scoped identifiers, native currency, exact Decimal quantities and current ownership/revision architecture |
@@ -45,27 +45,23 @@ Entry gate: Sprint 89 shared R1 implementation patterns accepted. Implement nati
 
 Discovery 2026-09-10 (PROPOSED): [FW-P2-78](../../FUTURE_WORK.MD#fw-p2-78): retain native-currency groups, account/liability separation and honest as-of/completeness. No new analytics/FX authority. Verify actual keyboard/readability and independent displayed values after shared R1 patterns are accepted.
 
-### Sprint 91 — R1 Appearance Preferences and Adaptive Rendering
+### Sprint 91 — R1 Simple Appearance Choice
 
-Queue: `FW-P2-52` + narrowed `FW-P2-55`.
+Queue: narrowed [FW-P2-52](../../FUTURE_WORK.MD#fw-p2-52) only.
 
-Entry gate: a bounded preference-storage ownership decision. Implement System / Light / Dark; System Neutral / optional Deep Indigo; accent; text scale; small supported font set; density; bounded foreground/background/translucency; Preview/Apply/Cancel/Restore; reduced-transparency behavior and safe fallback. Appearance must not mutate financial truth.
+Implement Follow System, Light and Dark with optional already-approved Deep Indigo/accent direction and simple device-local persistence. Verify ordinary readable rendering and remembrance after relaunch without financial writes. No theme engine, preference portability, formal qualification or automatic new-ADR gate. If implementation exposes a real architecture decision, return to Chat before widening scope.
 
-Discovery 2026-09-10 (PROPOSED): [FW-P2-52](../../FUTURE_WORK.MD#fw-p2-52) establishes that preference scope/storage ownership is unresolved; current DEBUG profile UserDefaults is not general preference architecture. [FW-P2-55](../../FUTURE_WORK.MD#fw-p2-55) stays gated. Future acceptance includes draft Apply/Cancel/Restore, relaunch, system/light/dark, accessible fallbacks and reduced transparency.
+### Sprint 92 — R1 Cross-Screen Visual and Interaction Polish
 
-### Sprint 92 — R1 Cross-Screen Conformance and Accessibility Closure
+Queue: bounded `FW-P2-40`, `FW-P2-41`, `FW-P2-47`, `FW-P2-48`, `FW-P2-50` only.
 
-Queue: `FW-P2-40`, `FW-P2-41`, `FW-P2-47`, `FW-P2-48`, `FW-P2-49`, `FW-P2-50`.
-
-Combine only because, after 89–91, the remaining Accounts, Import, Settings, Developer Console, shell/components and bounded Salary polish form one shared design-system/native-interaction acceptance boundary. Salary remains lower priority and the sprint must not reopen accepted editor, fee or persistence fixes.
-
-Discovery 2026-09-10 (PROPOSED): [FW-P2-49](../../FUTURE_WORK.MD#fw-p2-49) and [FW-P2-50](../../FUTURE_WORK.MD#fw-p2-50) separate frozen visual approval from native behavior. Require keyboard/focus/VoiceOver, resize/large text, color/material contrast, reduced settings and safe destructive-action interaction. No runtime accessibility proof was produced by discovery.
+After 89–91, select only actual owner usability needs across the existing screens: terminology, truthful states, clipping/overlap, responsive layout, readable complete Money, useful ordinary keyboard interaction, focus distinct from selection, icon names/tooltips and visual consistency. Acceptance is the owner's actual workflow. No formal accessibility campaign is scheduled. Salary remains lower priority and accepted editor, fee, source and persistence semantics remain unchanged.
 
 ### Sprint 93 — Verified Backup, Restore and Disaster Recovery
 
 Primary queue: [FW-P3-36](../../FUTURE_WORK.MD#fw-p3-36). **PRE_V1_REQUIRED.**
 
-Implement only the subsequently approved user-owned backup/restore contract. Architecture must settle backup contents, integrity manifest, SQLite/WAL/SHM-consistent snapshot, compatibility/version policy, isolated restore verification, non-empty-current-data protection, explicit confirmation, rollback if activation fails, canonical hydration and same-database relaunch. Include appearance-preference portability where adopted: a validated versioned snapshot and retain-current choice remain proposals until accepted. Reporting currency is separate financial configuration.
+Implement only the subsequently approved user-owned backup/restore contract. Architecture must settle backup contents, integrity manifest, SQLite/WAL/SHM-consistent snapshot, compatibility/version policy, isolated restore verification, non-empty-current-data protection, explicit confirmation, rollback if activation fails, canonical hydration and same-database relaunch. The owner may save/copy a verified package to a personally chosen destination. This does not create sync, live portable workspace or cloud integration. Appearance stays device-local; no theme preference snapshot is required. Reporting currency remains separate financial configuration.
 
 The [backup/restore packet](../../FUTURE_WORK.MD#packet-user-backup-restore-architecture-packet) retains the unresolved architecture and genuine restore-drill requirements. Complete structured export is optional and separate. A roadmap position does not establish recoverability.
 
@@ -133,15 +129,15 @@ The former 93–97 positions no longer assign the following work. [FUTURE_WORK](
 
 ## Other candidates and pre-100 documentation
 
-Existing P0 integrity/identity/reversal candidates and P1 source/duplicate/recovery work remain subject to fresh priority triage, with their current blockers intact. A new verified correctness dependency may preempt this prepared sequence; a roadmap position itself changes no queue status. Account lifecycle, document retention, broad repository reorganization, encryption/sync and multiple workspaces remain separately gated candidates.
+Existing P0 integrity/identity/reversal candidates and P1 source/duplicate/recovery work remain subject to fresh priority triage, with their current blockers intact. A new verified correctness dependency may preempt this prepared sequence; a roadmap position itself changes no queue status. Only scope-eligible account lifecycle, document retention and bounded local maintenance remain candidates; rejected scope cannot block this cycle.
 
-[FW-P2-79 supported-source documentation](../../FUTURE_WORK.MD#fw-p2-79) is required before Sprint 100, without inventing a numbered implementation sprint here. It must describe the exact accepted supported-source matrix and cumulative authentic corpus accurately. [FW-P3-35 complete structured export](../../FUTURE_WORK.MD#fw-p3-35) stays optional unless the user separately promotes it.
+[FW-P2-79 private supported-source matrix](../../FUTURE_WORK.MD#fw-p2-79) is required before Sprint 100, without inventing a numbered implementation sprint here. It must describe the exact accepted supported-source matrix and cumulative authentic corpus accurately. [FW-P3-35 complete structured export](../../FUTURE_WORK.MD#fw-p3-35) stays optional unless the user separately promotes it.
 
 ## Successor milestone and activation
 
-[Sprints 100–109](LedgerForge_Roadmap_Sprints_100-109_Planned.md) own the fixed future Sprint-100 certification milestone. No feature is deliberately deferred into certification. A product defect or missing required capability fails certification and returns to Chat for separate corrective attribution/scheduling; LedgerForge 1.0 remains undeclared until the corrected candidate is recertified. Sprints 101–109 remain unassigned for fresh selection after LedgerForge 1.0.
+[Sprints 100–109](LedgerForge_Roadmap_Sprints_100-109_Planned.md) own the fixed future Sprint-100 personal adoption verification milestone. No feature is deliberately deferred into adoption verification. A product defect or missing required capability fails adoption verification and returns to Chat for separate corrective attribution/scheduling; LedgerForge 1.0 remains undeclared until the corrected candidate passes verification. Sprints 101–109 remain unassigned for fresh selection after LedgerForge 1.0.
 
-The 90–99 cycle remains prepared until Sprint 89 acceptance and explicit Chat activation. The [current 80–89 roadmap](../LedgerForge_Roadmap_Sprints_80-89_Current.md) continues to own active numbering and the unchanged Sprint-86/87 implementation gates.
+The 90–99 cycle remains prepared until Sprint 89 acceptance and explicit Chat activation. The [current 80–89 roadmap](../LedgerForge_Roadmap_Sprints_80-89_Current.md) continues to own active numbering and accepted Sprint-86/87 history.
 
 <a id="roadmap-replanning-packets-97-99"></a>
 ## Earlier replanning evidence — positions superseded, architecture still gated

@@ -22,6 +22,32 @@ A faster implementation never outranks a higher-priority invariant.
 
 ---
 
+## PRIVATE PERSONAL APP SCOPE GATE
+
+LedgerForge is private, personal, single-user and macOS-local, for the owner's own finances on the owner's Mac. It is not a commercial product, public platform, team product or general-purpose financial software framework. <!-- user-specified -->
+
+Before adding, selecting, researching or preserving future work, require a concrete connection to at least one of:
+
+- an actual personal workflow explicitly requested by the owner;
+- financial correctness, durable persistence, privacy or recoverability of the owner's real data;
+- an authentic financial source actually supplied or selected by the owner;
+- a direct improvement to the owner's real day-to-day use.
+
+Otherwise the binding disposition is **NOT REQUIRED-DO NOT CONSIDER**. It is not deferred, post-v1, research or a future sprint candidate. Rejected categories do not enter P0 → P3 triage or candidate comparison, cannot block retained work and must not be resurrected by discovery. Remove or narrow dependencies on rejected work. A new explicit owner decision naming the real personal need is required to reopen only the named capability. <!-- user-specified -->
+
+Every sprint-selection prompt must answer these four questions first:
+
+1. What real owner workflow does this solve?
+2. What actual owner data/source/safety issue requires it?
+3. Why is the smallest direct solution insufficient?
+4. Is this being proposed only because commercial/generalized software often has it?
+
+If question 1 or 2 has no concrete answer, the disposition is **NOT REQUIRED-DO NOT CONSIDER**. Do not research it, add a card, assign a sprint, create an ADR packet or ask the owner to choose hypothetical architectures. “Best practice,” imagined users and possible future usefulness do not establish eligibility.
+
+The compact [rejected-scope register](Project%20documents/FUTURE_WORK.MD#rejected-private-personal-scope) records the excluded categories. Financial/source truth, independent oracles, atomic persistence, zero-residue rejection, migration integrity, hydration/relaunch, password privacy, backup/restore and Git/worktree safety remain binding. Existing useful Developer Console behavior, exact Keychain behavior, local signing/sandbox requirements and harmless native SwiftUI semantics remain accepted behavior.
+
+---
+
 ## Mandatory bootstrap
 
 For every LedgerForge planning, implementation, review, recovery or documentation task:
@@ -39,7 +65,7 @@ Do not infer current sprint status, accepted support, migration version, archite
 
 ### Material finding intake
 
-A material new finding, requirement, defect, workflow issue, design finding, architecture issue, maintenance need or product idea may not remain only in memory, chat or a report. Before sprint selection or implementation, route it to `FUTURE_WORK.MD` or its owning subject authority and give it a durable disposition. Recording a proposal does not approve it, and implementation work must trace to durable authority or an explicitly authorized corrective defect.
+Apply the Private Personal App Scope Gate first. An eligible material finding, requirement, defect, workflow issue, design finding, architecture issue or maintenance need must receive a durable disposition in `FUTURE_WORK.MD` or its owning subject authority before sprint selection or implementation. Speculative public/commercial/generalized concerns and brainstormed ideas without a concrete owner need are not material findings: return `REJECTED_BY_PRIVATE_PERSONAL_SCOPE` without creating a future-work card or detailed decision packet. Recording an eligible proposal does not approve it, and implementation must trace to durable authority or an explicitly authorized corrective defect.
 
 The complete Chat-approved prompt is the execution contract for the current task. Repository documents provide durable context and constraints; they do not independently authorize implementation.
 

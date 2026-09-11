@@ -4,7 +4,9 @@
 **Prepared:** 2026-09-09  
 **Repository baseline:** `main@d8124ef5a1f38a1e7547f4f8905c91f25b2f1194`  
 **Status:** Approved visual direction; consolidated written design specification; not implemented or natively verified.  
-**Scope:** Presentation and interaction requirements, not a sprint selection or financial-domain redesign.
+**Scope:** Presentation and interaction requirements for one owner on one MacBook; no sprint selection or financial-domain redesign.
+
+**Current scope — 2026-09-11:** The private-personal scope gate supersedes earlier advanced appearance and formal accessibility requirements. Simple System/Light/Dark appearance, an optional existing accent choice, readable Money, useful keyboard actions and practical resizing remain. The [canonical rejection register](../../FUTURE_WORK.MD#rejected-private-personal-scope) controls excluded initiatives. Approved image bytes remain intact; written exceptions below control their implementation meaning.
 
 **Publication alignment — 2026-09-10:** At the user's explicit direction, this handoff is published under `Project documents/UI Assets/LF-UI-2026-09-R1/`, the unchanged legacy PNGs are archived under `Project documents/UI Assets/Archived/`, and the sprint roadmaps are organized under `Project documents/Sprint roadmap/`. These layout changes do not claim native implementation or financial validation.
 
@@ -18,7 +20,7 @@ The following order applies to this handoff: explicit user decisions and accepte
 
 **Repository evidence at preparation:** the source baseline recorded V17, ADR-046, the accepted startup/monthly-planner corrections, and personal-v1 undeclared. Natural amount entry and coherent Salary Save were accepted work; the roadmap then retained PR-1 before a serial Unified Import Centre. Sprint 82 is now accepted in the current roadmap, while this handoff still assigns no sprint number or migration. See [SOURCES.md](SOURCES.md).
 
-**Explicit user decisions:** avoid a compulsory fixed palette; offer simple appearance controls with optional advanced customization; include Transactions filtering/sorting; use Budget Analysis for task flow and existing master assets as an evolvable visual reference; keep Salary refinement lower priority. The user identifies supplied runtime data as disposable. This does not authorize publishing private originals or unsanitized private-source material or manufacturing financial acceptance inputs; approved sanitized, clean-room or privacy-safe derived artifacts remain governed by the repository privacy policy.
+**Explicit user decisions:** avoid a compulsory fixed palette; offer simple local System/Light/Dark appearance with an optional existing accent choice; include Transactions filtering/sorting; use Budget Analysis for task flow and existing master assets as an evolvable visual reference; keep Salary refinement lower priority. The user identifies supplied runtime data as disposable. This does not authorize publishing private originals or unsanitized private-source material or manufacturing financial acceptance inputs; approved sanitized, clean-room or privacy-safe derived artifacts remain governed by the repository privacy policy.
 
 ## 1. Master design board: shell and information hierarchy
 
@@ -34,9 +36,9 @@ Toolbar actions belong to the active task. Financial destinations retain access 
 
 Use **1440 × 900** and **1024 × 768 logical points** as comparison frames, not as a change to the supported minimum window size. A later implementation packet must establish any minimum-size change explicitly.
 
-Standard Transactions layout: sidebar, searchable/filterable table and optional inspector. In the narrow layout, close the inspector first and offer it through a clearly labelled control; collapse the sidebar when needed. Keep its navigation toggle accessible. Move secondary filters under a labelled Filters control with an active-filter count. Never drop account identity, currency or an applied-filter indication solely to fit the window.
+Standard Transactions layout: sidebar, searchable/filterable table and optional inspector. In the narrow layout, close the inspector first and retain a labelled Show details control. Prefer an icon-only navigation rail at constrained widths. Hide navigation only when even the rail materially harms usable content width; retain a labelled Show Navigation control. Preserve destination order, selection, focus, useful keyboard access and Developer Console gating. Each rail icon retains a name and tooltip. A compact drawing with hidden navigation is a last-resort example, not an automatic width breakpoint. Move secondary filters under a labelled Filters control with an active-filter count. Never drop account identity, currency or an applied-filter indication solely to fit the window.
 
-At larger font sizes, adapt based on measured content fit, not window width alone. Preserve date, description and complete native amount; show account/category on secondary lines or retain horizontal scrolling when required. Reopening details must not lose selection or filter state.
+Adapt based on measured content fit, not window width alone. Preserve date, description and complete native amount; show account/category on secondary lines or retain horizontal scrolling when required. Reopening details must not lose selection or filter state.
 
 The Dashboard uses at most two currency groups side by side and stacks them when content cannot fit. A group may lay out its metrics vertically. Do not repeat four independent cards per currency across one unbounded row.
 
@@ -44,17 +46,17 @@ The Dashboard uses at most two currency groups side by side and stacks them when
 
 This subsection records subjective user feedback and an unaccepted layout proposal. It does not change the approved visual direction, accepted Import workflow, source interpretation or native acceptance status. The user reports heavy scrolling in the left prepared-import region while the right region beneath Validation Review has unused space. The supplied private screenshot supports broad layout geometry only; its financial/source content is neither transcribed nor published.
 
-**Owner:** [FW-P2-48](../../FUTURE_WORK.MD#fw-p2-48), with native acceptance under [FW-P2-49](../../FUTURE_WORK.MD#fw-p2-49). This is an unaccepted discovery proposal, not an implementation or native-acceptance claim. Coordinate with [FW-P2-67](../../FUTURE_WORK.MD#fw-p2-67) only when a selected shell decomposition affects this composition; no sprint is selected here.
+**Owner:** [FW-P2-48](../../FUTURE_WORK.MD#fw-p2-48), including its bounded owner-usability checks. This is an unaccepted discovery proposal, not an implementation or native-acceptance claim. Coordinate with [FW-P2-67](../../FUTURE_WORK.MD#fw-p2-67) only when a selected shell decomposition affects this composition; no sprint is selected here.
 
 **Candidate A, preferred for a sufficiently wide window:** place the existing read-only Transaction Preview beneath Validation Review in one right-column review stack. Keep the queue, prepared statement summary, account/identity and duplicate/equivalence explanation readable at left, with confirmation/cancel/skip controls visibly available. This placement is a suggestion, not a forced rule.
 
 **Candidate B, responsive fallback:** place one full-width/shared Transaction Preview below the summary/review split when the right-side table cannot remain readable or validation content is long. Determine the breakpoint from content fit and text size. Do not duplicate the preview or create nested unbounded scroll owners.
 
-Both candidates preserve source order/multiplicity, prepared status, identity/account review, validation, duplicate/equivalence semantics and explicit confirmation. They introduce no editing, filtering, sorting, source reopening, new selection semantics or financial/color change. Future native acceptance must cover broad/narrow windows, long validation, keyboard/VoiceOver, scroll/focus and existing selection, footer visibility, cancellation/confirmation, and truthful empty states. A zero-transaction statement case requires genuine authentic evidence; if absent it stays untested. No native verification is claimed by this appendix.
+Both candidates preserve source order/multiplicity, prepared status, identity/account review, validation, duplicate/equivalence semantics and explicit confirmation. They introduce no editing, filtering, sorting, source reopening, new selection semantics or financial/color change. Future native acceptance must cover broad/narrow windows, long validation, useful keyboard actions, scroll/focus and existing selection, footer visibility, cancellation/confirmation, and truthful empty states. A zero-transaction statement case requires genuine authentic evidence; if absent it stays untested. No native verification is claimed by this appendix.
 
-### 1.3 Text and visual density
+### 1.3 Readable text and layout
 
-Use the shared token values rather than local per-view substitutions. Body text defaults to 16 points. Text size adjusts within the defined range, while captions have a 12-point floor. Compact density reduces spacing; it does not reduce text size or omit important fields.
+Use the shared token values rather than local per-view substitutions. Body text defaults to 16 points and captions have a 12-point floor. Compact layout references describe composition and spacing; they do not require a user-facing density or text-scaling system. Rows grow when their actual content needs room.
 
 Full amounts, minus signs, currency context and fractional digits must remain readable. Never wrap an amount, truncate it, display an unexplained abbreviation, or shrink it until it fits. Reallocate width, reflow the group or allow scrolling instead.
 
@@ -62,11 +64,11 @@ Full amounts, minus signs, currency context and fractional digits must remain re
 
 ### 2.1 Appearance system
 
-Default to **Follow System** with a neutral system-oriented preset. **Light** and **Dark** are explicit overrides. **Deep Indigo** is an optional preset, not the only valid appearance. The JSON palettes are deterministic fallback/reference values for the handoff, not permission to override native control accessibility.
+Default to **Follow System** with a neutral system-oriented preset. **Light** and **Dark** are explicit overrides. **Deep Indigo** is an optional preset, not the only valid appearance. The JSON palettes are deterministic fallback/reference values for the handoff, not permission to make native controls unreadable.
 
 Use semantic roles: background, surface, raised surface, primary/secondary text, control border, separator, accent, focus, selected surface and semantic status text. Do not scatter arbitrary colours through screens. Accent is not a substitute for success/error semantics. A negative number is not automatically a problem and a credit is not automatically income.
 
-The token file records a small consistent spacing/radius scale, typography, minimum control sizes, row density, column widths and responsive policies. Sizes are minima or defaults where labelled, not rigid constraints that can crop larger text.
+The token file records a small consistent spacing/radius scale, typography, minimum control sizes, row minima, column widths and responsive policies. Sizes are minima or defaults where labelled, not rigid constraints that can crop larger text.
 
 ### 2.2 Components and states
 
@@ -81,17 +83,14 @@ The token file records a small consistent spacing/radius scale, typography, mini
 | Metric | Label, native-currency context, value and time/coverage context where available. Missing evidence is distinct from zero. |
 | Money input | Natural exact user entry; deterministic validation and formatting; persisted Money validation is not weakened. |
 | Feedback | Field-specific errors, meaningful empty/loading states and bounded recovery; no green “success” before durable acceptance. |
-| Appearance preview | Existing draft preference values only; no financial data generation or imported-data edits. |
 
-Check selected, focus, hover, pressed, disabled, loading, empty, no-matches, unavailable and error states. Do not add animation beyond brief purposeful transitions; accessibility preferences take precedence.
+Check selected, focus, hover, pressed, disabled, loading, empty, no-matches, unavailable and error states. Keep transitions brief and purposeful; do not animate financial values in ways that obscure their meaning.
 
 A successful import validation badge is not the same as a cleared or reconciled transaction. Prefer contextual validation information in the inspector, with prominent row attention only where an authoritative actionable state exists. Do not invent a new transaction-review status model to support a badge.
 
-### 2.3 Accessibility boundary
+### 2.3 Ordinary owner usability
 
-All core actions need a keyboard path and useful accessibility labels. Control state cannot rely on colour alone. Honour reduced motion and reduced transparency. User text size must also affect tables and forms, not just headings.
-
-Product contrast targets are at least 4.5:1 for ordinary text and 3:1 for meaningful control boundaries/focus against adjacent surfaces. The package checks opaque fallback token pairs only. A collage, a token check or an “AA” label is not native accessibility certification. Custom/system colours and composited materials need runtime verification.
+Keep useful keyboard paths, meaningful native control names, visible focus and distinct selection. Financial values, currency context and consequential states remain readable and cannot rely on colour alone. Verify no clipping, usable resizing, reachable actions and understandable feedback in the actual owner workflow. No VoiceOver campaign, Full Keyboard Access qualification, reduced-transparency programme, contrast certification or separate accessibility release gate is required.
 
 ## 3. Transactions reference
 
@@ -123,7 +122,7 @@ Date filtering uses the same approved primary source-date field shown by the row
 
 ### 3.3 Sorting and state
 
-Default to newest source date first. Clicking a supported heading selects that sort; repeating reverses it. Show direction in the heading and expose the action/state to accessibility. Support Date, Description, Account, Category and Amount as their data contracts permit.
+Default to newest source date first. Clicking a supported heading selects that sort; repeating reverses it. Show direction in the heading and retain a meaningful native action/state label. Support Date, Description, Account, Category and Amount as their data contracts permit.
 
 Amount sorting is exact within a single native currency. With several currencies, group by currency before sorting amounts and label that grouping; never numerically rank mixed currencies as if converted. Missing values remain last in both directions.
 
@@ -167,31 +166,11 @@ Recent activity can navigate to its existing account or transaction details only
 
 Loading, empty, unavailable and failed are different states. Never display zero financial values as a loading placeholder. Show data freshness limits without claiming live bank connectivity. “Saved, view refresh required” remains distinct from “Nothing saved”; the design cannot simplify away that difference.
 
-## 5. Appearance settings reference
+## 5. Simple local appearance
 
-### 5.1 Default view
+Offer **Follow System**, **Light** and **Dark** using native controls. An optional choice using the existing system/Deep Indigo accent direction may remain. Keep the chosen local preference across relaunch; missing or malformed values fall back to a readable default without blocking financial hydration. Monetary columns retain tabular digits and complete amounts.
 
-Offer Appearance (Follow System/Light/Dark), preset (System Neutral/Deep Indigo), accent choice, Text size, Font style and Density. Keep this one simple panel with an adjacent or stacked preview. Use native controls rather than an elaborate custom theme editor.
-
-The font-style set is intentionally small: System, Rounded and Serif. Use the locally supported system fallback; do not download or distribute fonts. Monetary columns always retain tabular/aligned digits, even when prose uses another supported style. The artwork's optional “monospace numbers” checkbox does not make amount alignment optional.
-
-Text-size range is body-equivalent 14 to 22 points, default 16, in one-point steps. Secondary text follows the scale with its documented minimum. Comfortable and Compact change spacing and row minima, not text size or data inclusion.
-
-### 5.2 Advanced appearance
-
-Keep Advanced collapsed initially. It contains **Background colour**, **Foreground colour: Automatic/Custom**, and **Translucency**. Use native colour pickers with their colour-channel sliders. Do not add per-widget colour settings or a dozen interdependent sliders.
-
-Store light and dark overrides separately; selecting one appearance does not destructively overwrite the other. Automatic foreground derives readable text roles. Validate Custom foreground/background and selection/focus combinations before Apply; explain an unreadable choice without applying it. Do not silently alter an explicitly chosen custom colour.
-
-Translucency ranges from 0 to 30%, default 0, on eligible surfaces only. It never changes whole-window, text or amount opacity. Reduced transparency forces an opaque rendering while retaining the saved preference for later restoration. Do not allow the background to make text illegible.
-
-### 5.3 Preview, Apply and recovery
-
-Changing controls modifies a draft preview. **Apply** commits the validated appearance preferences together. **Cancel** discards that draft. **Restore defaults** resets the preview to the documented defaults; it takes effect only on Apply and touches appearance preferences only.
-
-When leaving with unapplied changes, provide Keep editing or Discard, without applying silently. After Apply, relaunch restores the chosen settings. Follow System continues following system mode. Missing fonts and malformed preference values fall back to readable defaults with bounded diagnostics; they must not stop financial data loading.
-
-Preference storage remains an implementation/architecture decision under FW-P2-52. This handoff does not choose UserDefaults, SQLite, a new settings repository or a migration. No network or financial-data mutation is required by this design.
+[FW-P2-52](../../FUTURE_WORK.MD#fw-p2-52) owns this bounded work. It does not require an advanced theme editor, custom foreground/background controls, font-style or text-scale system, density preferences, translucency controls, Preview/Apply/Cancel transaction, appearance portability or a new preference architecture/ADR by default. Appearance changes do not mutate financial data. Implementation and storage choices require the separately approved bounded task.
 
 ## 6. Exact visual exceptions and inherited screens
 
@@ -208,8 +187,21 @@ The approved PNG remains intact as the visual reference. These limitations are e
 | Raw identifiers and source filenames | Retain applicable privacy rules; the disposable screenshot decision does not override repository policy. |
 | Always-visible Developer Console | Retain current developer/build gating. |
 | Tight mobile-looking narrow table | Treat as compact composition guidance; native macOS keyboard, account and currency context remain required. |
+| Advanced appearance controls, font/text-scale/density options and preview/Apply UI | Superseded by §5; retain the artwork while ignoring those controls as requirements. |
 | Optional numeric alignment | Tabular amount alignment is mandatory. |
 | Multiple visible logos | No icon or branding replacement is authorized; retain the existing app asset until separately selected. |
+
+### Retained local references: caption exceptions — 2026-09-11
+
+The user explicitly requires preserving the design while ignoring the rejected acceptance portions. The following local PNGs remain unchanged visual references. Their VoiceOver/formal-accessibility captions do not create work, dependencies or acceptance gates. Ordinary keyboard use, readable full Money/currency, resizing, selection and focus remain subject to the bounded native checks above. These local working references are not a claim of published assets or passed app tests.
+
+| Local filename | Specific caption portion to ignore |
+|---|---|
+| `LF-UI-2026-09-R1_SC-02A_Transactions_Wide_Reference.png` | The bottom caption's “VoiceOver reads full Money and currency” requirement. Full readable Money and currency remain required. |
+| `LF-UI-2026-09-R1_SC-02C_Transactions_State_Component_Contract.png` | The bottom Keyboard & accessibility caption's “VoiceOver receives full Money and currency” requirement. Keep the valid component states and ordinary keyboard guidance. |
+| `LF-UI-2026-09-R1_SC-03B_Dashboard_Narrow_Responsive_Reference.png` | The “VoiceOver” and formal qualification portions of “Native keyboard, VoiceOver and material checks remain pending.” Actual keyboard usability and readable native rendering still require applicable evidence. |
+
+No PNG regeneration is required for this reset. This written exception is the controlling disposition for the affected captions.
 
 The collage is 1536 × 1024 pixels and contains small embedded panels. It is **not** five independently rendered, full-size pixel-perfect screens, an editable native prototype or a complete component-state sheet. This written contract supplies details absent from the image. Do not claim missing renders or native interaction tests exist.
 
@@ -221,7 +213,7 @@ This package is registered as a design-reference update without native app imple
 
 No migration, parser, Money contract, source identity, provenance, accepted financial formula or roadmap ordering changes here. A later app prompt must name its code/test surfaces and prove applicable financial mappings before implementation. Repository or runtime defects established during that work retain the project's financial-correctness priority.
 
-**Remaining evidence gaps:** local branch/worktree/writer state; exact current native behaviour after the supplied screenshots; preference storage ownership; complete financial mapping for mixed bank/card aggregates; runtime accessibility and resizing; the apparent transaction-summary mismatch noticed in the screenshot. The latter is an observation requiring verification, not a diagnosed defect or an excuse to infer new totals.
+**Remaining evidence gaps:** local branch/worktree/writer state; exact current native behaviour after the supplied screenshots; preference storage ownership; complete financial mapping for mixed bank/card aggregates; ordinary native readability and resizing; the apparent transaction-summary mismatch noticed in the screenshot. The latter is an observation requiring verification, not a diagnosed defect or an excuse to infer new totals.
 
 Approval of the design is settled. Implementation acceptance is not. Use [ACCEPTANCE.md](ACCEPTANCE.md) for the bounded checks rather than reopening the visual direction at every prompt.
 
@@ -230,4 +222,4 @@ Approval of the design is settled. Implementation acceptance is not. Use [ACCEPT
 
 The Import Preview proposal in §1.2 is retained as **USER_REPORTED_SUBJECTIVE** and **VERIFIED_USER_IMAGE layout-only** input. It proposes A, a sufficiently-wide right-column stack with Transaction Preview below Validation Review, and B, a content-fit responsive full-width/shared Preview fallback. It does not claim that either composition is current behavior, approved behavior or native acceptance.
 
-The existing owner is [FW-P2-48](../../FUTURE_WORK.MD#fw-p2-48); native keyboard, VoiceOver, broad/narrow window, long-validation, selection/scroll, confirmation/cancel visibility and truthful empty-state acceptance remains [FW-P2-49](../../FUTURE_WORK.MD#fw-p2-49). Preserve preview, identity, validation and confirmation as distinct surfaces; preserve source order and the genuine-source gate for a zero-transaction case. No private image content, financial values or source assertions are reproduced here.
+The existing owner is [FW-P2-48](../../FUTURE_WORK.MD#fw-p2-48), including useful native keyboard actions, broad/narrow windows, long validation, selection/scroll, confirmation/cancel visibility and truthful empty-state checks. Preserve preview, identity, validation and confirmation as distinct surfaces; preserve source order and the genuine-source gate for a zero-transaction case. No private image content, financial values or source assertions are reproduced here.

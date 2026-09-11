@@ -1303,7 +1303,7 @@ Comments should not narrate obvious syntax or preserve obsolete behavior as folk
 - Controls must perform the stated outcome.
 - Do not add placeholder navigation to future modules.
 - Preserve the frozen UI hierarchy and approved assets.
-- Accessibility is part of acceptance.
+- Ordinary owner usability is part of bounded acceptance: readable Money, no clipping, useful keyboard actions, focus, selection and resizing. No formal accessibility campaign or certification is a release gate.
 
 Status must not be communicated by color alone.
 
@@ -1433,7 +1433,7 @@ Examples include:
 - provider replacement;
 - relaunch hydration;
 - multiple process contention;
-- accessibility or visual behavior.
+- ordinary keyboard, readability or visual behavior.
 
 Manual verification must distinguish:
 

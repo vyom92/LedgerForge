@@ -1,7 +1,7 @@
 # LedgerForge Standing Execution Harness Guide
 
 **Status:** Active repository process authority  
-**Refreshed:** 2026-09-10
+**Refreshed:** 2026-09-11
 **Execution authority:** None by itself  
 **Architecture authority:** None by itself  
 **Purpose:** Reusable Chat/MCP/Codex planning, execution, validation and review method
@@ -53,16 +53,18 @@ Memory and old reports may guide a search but never override current authorities
 
 ## Material Finding / Requirement Intake Rule
 
-Every material proposed change, requirement, defect, workflow issue, design finding, architecture issue, maintenance need or product idea from any project contributor must receive a durable disposition. A material finding existing only in chat, memory, a task report, screenshot review, ignored output or temporary handoff is not queued project work.
+First apply the [Private Personal App Scope Gate](../AGENTS.md#private-personal-app-scope-gate). LedgerForge is private, personal, single-user and macOS-local. Only a real owner workflow, actual owner-data correctness/persistence/privacy/recovery need, authentic supplied/selected source or concrete day-to-day usability benefit is eligible. Otherwise: **NOT REQUIRED-DO NOT CONSIDER**. Rejected categories never enter P0 → P3 triage, cannot block retained work, and require a new explicit owner decision naming a real personal need before reopening. <!-- user-specified -->
+
+Scope-eligible material findings need a durable disposition. Speculative commercial/platform concerns and brainstormed ideas without a concrete owner need are not material findings and must not generate queue cards or detailed discovery/ADR packets. Return `REJECTED_BY_PRIVATE_PERSONAL_SCOPE` instead. Every sprint-selection prompt answers all four AGENTS.md eligibility questions before priority: the real owner workflow; the actual data/source/safety issue; why the smallest direct solution is insufficient; and whether generalized commercial convention is the only justification. If either of the first two lacks a concrete answer, reject the proposal.
 
 1. `FUTURE_WORK.MD` is the default home for unscheduled work.
 2. Accepted design requirements belong in the UI/design authority.
 3. Accepted architecture belongs in ADR.
 4. Implemented verified state belongs in `PROJECT_STATE.md`.
 5. The current roadmap selects from already-recorded work; it must not become a second backlog.
-6. A report/task may not close with a material out-of-scope suggestion stranded only in report or chat text.
+6. A report/task may not close with a scope-eligible material out-of-scope finding stranded only in report or chat text; rejected speculation requires no candidate card.
 7. Implementation prompts may include only work traceable to a durable queue entry, accepted subject authority or explicit corrective defect.
-8. New discoveries during execution that materially change scope must be recorded and returned to Chat before implementation expands.
+8. New eligible discoveries that materially change scope must be recorded and returned to Chat before implementation expands. Discovery must not revive rejected scope or broaden an actual owner problem into a generalized program.
 9. Recording a proposal does not approve it, design approval does not imply implementation acceptance, and roadmap presence does not authorize execution.
 
 Required report-close disposition vocabulary:
@@ -73,6 +75,7 @@ Required report-close disposition vocabulary:
 - `DUPLICATE`
 - `DEFERRED_WITH_REASON`
 - `REJECTED_WITH_REASON`
+- `REJECTED_BY_PRIVATE_PERSONAL_SCOPE` — no future-work card or packet; existing rejected categories use the compact canonical register.
 
 Prospective queue metadata may include Origin, Evidence / authority, Disposition date, Owning specification / ADR and Personal-v1 relevance where useful; do not mechanically retrofit every historical candidate.
 
@@ -382,7 +385,7 @@ Only Chat assigns or accepts corrective numbering.
 
 ## 13. Documentation synchronization
 
-Documentation synchronization applies both at technical acceptance and when execution/discovery surfaces a material out-of-scope finding.
+Documentation synchronization applies both at technical acceptance and when execution/discovery surfaces a scope-eligible material out-of-scope finding.
 
 At technical acceptance:
 
@@ -392,12 +395,14 @@ At technical acceptance:
 - reconcile `FUTURE_WORK.MD`;
 - update AGENTS/Project Guide/Harness only when reusable process changed.
 
-When a material out-of-scope finding is discovered:
+When a scope-eligible material out-of-scope finding is discovered:
 
 - link it to an existing queue item or owning authority, record a new candidate, or classify it as already completed, duplicate, deferred with reason or rejected with reason;
 - do not widen current implementation merely because the finding is useful;
 - return decision-changing discoveries to Chat before implementation scope expands;
 - ensure the report closes with one of the required intake dispositions rather than leaving the finding only in narrative text.
+
+Reject ineligible generalized speculation without creating a candidate or packet. During documentation sync, remove or narrow every retained dependency on rejected work. Acceptance concerns the owner's actual private-app outcome; financial correctness and recovery proof remain unchanged.
 
 If acceptance is not complete, record the work as **active unaccepted WIP**, not production support.
 

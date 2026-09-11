@@ -1,7 +1,7 @@
 # Sources and decision provenance
 
 **Revision:** LF-UI-2026-09-R1  
-**Fresh inspected pushed baseline:** `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` on 2026-09-09.  
+**Historical inspected pushed baseline:** `d8124ef5a1f38a1e7547f4f8905c91f25b2f1194` on 2026-09-09.
 **Local Mac state:** not inspected; GitHub does not establish worktree or runtime identity.
 
 **Publication alignment — 2026-09-10:** The links below remain pinned historical provenance at the inspected baseline. The user subsequently authorized the roadmap relocation and UI-asset archive/publication recorded by the surrounding handoff.
@@ -25,7 +25,7 @@ All links are pinned to the inspected commit. Git blob IDs identify repository t
 
 The first three source priorities were read before scope preparation. The uploaded July/August historical roadmaps are context, not current planning authority. No current P0/P1 queue audit or new sprint selection is claimed.
 
-## Explicit user decisions in this conversation
+## Historical user decisions — superseded in part on 2026-09-11
 
 The user requested a practical refresh guided by Budget Analysis and evolvable master assets. They requested a configurable appearance instead of a fixed theme, including foreground/background controls, transparency and font style/size subject to simplicity and safety. They requested transaction filters/sort. They stated that supplied runtime data was disposable, that recent Salary fixes existed, and that Salary polish was not urgent. They approved the latest generated board labelled “LedgerForge v2.0” and requested the next step.
 
@@ -37,8 +37,12 @@ The supplied legacy assets and app screenshots establish visual comparisons. The
 
 The previously generated v1.2 collage and the earlier draft contact sheet/playground are not part of the approved set for this revision. They are not copied or treated as tested prototypes.
 
-## Designer-specified decisions
+## Historical designer-specified decisions
 
 Numeric token values, supported font-style choices, filter combination rules, default All dates and newest-first sorting, appearance preview/Apply mechanics, responsive reference sizes and acceptance targets are specification details supplied under the approved direction. They are not represented as current implementation or measured facts from the PNG.
 
 This is a consolidation, not a new external design-research campaign. No claims about current third-party products or software releases are required for this package.
+
+## Current private-personal scope alignment — 2026-09-11
+
+The owner has superseded the advanced appearance, formal accessibility and generalized product-completeness portions above. Current authority is the private-personal gate, the canonical rejection register, and DESIGN_HANDOFF.md: simple local System/Light/Dark with an optional existing accent choice; readable Money, ordinary keyboard use, resizing, focus and selection. The explicit icon-rail preference is folded into the canonical responsive hierarchy. The three specifically annotated PNGs remain byte-for-byte design references with only their rejected caption portions ignored. Historical provenance above is retained, not renewed as active requirements.

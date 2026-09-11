@@ -36,6 +36,10 @@ Current implementation state belongs in `PROJECT_STATE.md`. Unscheduled work bel
 
 ---
 
+## Current private-personal alignment — 2026-09-11
+
+The dated status and implementation descriptions below preserve this frozen historical database baseline. PROJECT_STATE.md and accepted ADRs own current production, migration and exact credential/source support. The private-personal gate and canonical rejection register supersede generalized future-planning implications here. Verified owner backup/restore remains required; app-level encryption, cloud sync and multiple-workspace programmes are not prerequisites. This alignment changes no accepted database behavior.
+
 # 1. Current Status Boundary
 
 ## 1.1 Verified production import
@@ -543,9 +547,8 @@ The current architecture does not require durable storage of:
 - extracted text snippets;
 - document thumbnails.
 
-Any future source-document archive requires separate decisions for:
+Any future source-document archive must first pass the private-personal scope gate and requires separate decisions for:
 
-- encryption;
 - retention;
 - access;
 - backup;
@@ -1261,10 +1264,11 @@ It is not:
 - financial-mutation reversal;
 - arbitrary database file import.
 
+**Private-personal scope alignment — 2026-09-11:** Verified owner backup/restore remains required. App-level encryption has no current owner concern and is excluded by the canonical FUTURE_WORK.MD rejection register; it is not a backup dependency. This changes no accepted SQLite, migration, privacy or recovery behavior.
+
 Production backup and restore require separate architecture for:
 
 - consistent snapshot;
-- encryption;
 - version compatibility;
 - migration;
 - identity;
@@ -1385,7 +1389,7 @@ Do not expose:
 
 Database encryption, SQLCipher and encrypted source-file storage are not current production capabilities.
 
-They require separate platform, recovery and migration design.
+The owner identifies no current encryption concern; no app-level encryption candidate or backup dependency remains. Only a new explicit owner decision naming a concrete disclosure concern may reopen a bounded security decision. Existing privacy, credential and recovery guarantees remain binding.
 
 A design recommendation must not be described as implemented security.
 
@@ -1631,7 +1635,6 @@ Before FTS, define:
 Before production backup, define:
 
 - consistent snapshot;
-- encryption;
 - version and migration compatibility;
 - restore validation;
 - failure recovery;

@@ -5,7 +5,9 @@
 **Planning review baseline:** accepted Sprint 88, `main@4f5eeb7b11c0f5879204a06ae9f08045304342b5`; parent documentation closure `4973d2d2507ae5891bfa593b359af2b9393e5fa1`
 **Supersedes:** `Project documents/Sprint roadmap/Archived/LedgerForge_Roadmap_Sprints_70-79_Current.md` as current-cycle authority; that file remains historical
 
-**Forward planning — explicit user decision, 2026-09-10:** LedgerForge 1.0 personal-adoption certification is fixed at Sprint 100 after its required pre-1.0 product boundaries. The prepared [90–99](Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md) and [100–109](Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md) roadmaps own that future sequence; neither is current or implementation-authorized. Active 80–89 numbering and Sprint 89 scope remain unchanged; Sprints 87 and 88 are accepted below; Sprint 89 remains planned and not yet Chat-authorized.
+**Private personal scope reset — 2026-09-11:** apply the [Private Personal App Scope Gate](../../AGENTS.md#private-personal-app-scope-gate) before P0 → P3 triage. Rejected work is **NOT REQUIRED-DO NOT CONSIDER**, excluded from scheduling and dependencies. The [canonical register](../FUTURE_WORK.MD#rejected-private-personal-scope) owns the exact rejected categories. Accepted Sprint 80–88 sections and the SHELL88 blueprint below remain historical records; their former future-work references cannot reopen rejected scope.
+
+**Forward planning:** the prepared [90–99](Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md) and [100–109](Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md) roadmaps retain the owner's selected personal outcomes and Sprint 100 — LedgerForge 1.0 Personal Adoption Verification. Neither successor cycle is current or implementation-authorized. Sprint 89 has existing local unaccepted WIP, paused for this documentation correction; continuation requires the corrected execution contract and a fresh exact-ref preflight.
 
 ## Control
 
@@ -16,7 +18,7 @@
 - **Current source/reliability authority:** ADR-046 complete-authentic-corpus certification.
 - **Current UI design authority:** `LF-UI-2026-09-R1` for its bounded scope; design approval is not native implementation.
 - **Latest accepted discovery:** Sprint 80 — `SWIFT6_READINESS_COMPLETE`.
-- **Personal-v1:** UNDECLARED / NOT CERTIFIED.
+- **PERSONAL-V1: NOT YET ADOPTED.**
 - **Canonical queue:** `FUTURE_WORK.MD`. This roadmap consumes recorded IDs and must not become a second backlog.
 
 Repository/source evidence overrides stale wording. Explicit user decisions remain binding until superseded. Active WIP is not accepted product state.
@@ -48,11 +50,11 @@ A material source, credential, parser, persistence, orchestration or financial-s
 | 86 | TEST-PR Strict-Concurrency Test Correction | historical `FW-P2-75` (removed from active queue) | Swift-6 prerequisite | **ACCEPTED** — implementation commit `022d436fc4563be9b0967ac2751e6114a31474c1`; test/support-only, production bytes frozen |
 | 87 | Coordinated Swift-6 Migration | completed `FW-P2-76` (removed from active queue) | Implementation | **ACCEPTED** — implementation `93c068c23027a8cd59753ac4ac916e6cee75adbf`; all native targets Swift 6; V17 and ADRs unchanged |
 | 88 | App Shell and Workflow Decomposition | completed `FW-P2-67` (removed from active queue) | Behavior-preserving maintenance | **ACCEPTED** — implementation `4f5eeb7b11c0f5879204a06ae9f08045304342b5`; ownership and native parity preserved; V17 and ADRs unchanged |
-| 89 | LF-UI-2026-09-R1 Transactions Reference Implementation | `FW-P2-03` + `FW-P2-53`, bounded `FW-P2-48` + `FW-P2-49` + `FW-P2-50` | User-facing implementation / representative R1 proof surface | **PLANNED / NOT YET CHAT-AUTHORIZED**; fresh Chat entry review and P0 → P1 → P2 → P3 triage required; financial semantics remain source/repository-authoritative |
+| 89 | LF-UI-2026-09-R1 Transactions Reference Implementation | `FW-P2-03` + `FW-P2-53`, necessary Transactions portions of `FW-P2-48` + `FW-P2-50` | Bounded owner-facing R1 implementation | **PAUSED / UNACCEPTED WIP**; scope reset preempts continuation; re-preflight against the published correction and complete corrected execution contract |
 
 ## Sprint entry-gate rule
 
-Before every planned sprint starts, Chat reruns P0 → P1 → P2 → P3 triage. A verified higher-priority defect preempts lower-priority execution unless the user explicitly defers it. If a dependency remains unsatisfied, do not silently substitute another implementation or shift every later sprint number: record/update the block in `FUTURE_WORK.MD`, return to Chat and revise the roadmap only through an explicit planning decision.
+Before every planned sprint starts, Chat applies PRIVATE PERSONAL APP ELIGIBILITY, then reruns P0 → P1 → P2 → P3 triage only over eligible work. A verified higher-priority defect preempts lower-priority execution unless the user explicitly defers it. If a dependency remains unsatisfied, do not silently substitute another implementation or shift every later sprint number: record/update the block in `FUTURE_WORK.MD`, return to Chat and revise the roadmap only through an explicit planning decision.
 
 
 ## Sprint 80 — Swift 6 and macOS readiness closure
@@ -102,7 +104,7 @@ the exact registered CBQ boundary while preserving historical minimum-due
 absence and enforcing the current authentic minimum-due contract. Personal-v1
 adoption remains a separate later gate.
 
-## Accepted Sprints 81–88 and planned, not-yet-authorized Sprint 89
+## Accepted Sprints 81–88 and paused, unaccepted Sprint 89
 
 ### Sprint 81 — PR-1 Staging and Runtime Publication Ownership Seam
 
@@ -188,9 +190,9 @@ Accepted limitations: physical resize was not separately completed, transient lo
 
 ### Sprint 89 — LF-UI-2026-09-R1 Transactions Reference Implementation
 
-**PLANNED / NOT YET CHAT-AUTHORIZED.** This closure does not authorize implementation. Require a fresh Chat entry review and P0 → P1 → P2 → P3 triage before an execution prompt.
+**PAUSED / UNACCEPTED WIP.** Existing Sprint-89 product changes remain separate and unaccepted. The explicit 2026-09-11 scope correction removes the formal accessibility work before acceptance. This documentation task does not accept Sprint 89 or implement product changes; continuation uses the corrected approved contract after a fresh exact-ref preflight.
 
-Queue: `FW-P2-03` + `FW-P2-53`, with only necessary bounded portions of `FW-P2-48`, `FW-P2-49` and `FW-P2-50`.
+Queue: `FW-P2-03` + `FW-P2-53`, with only necessary bounded portions of `FW-P2-48` and `FW-P2-50`.
 
 Required boundary:
 
@@ -205,14 +207,16 @@ Required boundary:
 - no debit = spending or credit = income inference;
 - targeted source/runtime verification of the existing INR colour observation **before** any financial-colour semantic change.
 
-Discovery 2026-09-10: [FW-P2-03](../FUTURE_WORK.MD#fw-p2-03), [FW-P2-53](../FUTURE_WORK.MD#fw-p2-53) and the linked accessibility cards retain the R1 contract. Current search/presentation evidence does not settle all new filter semantics or the INR colour observation. Require independent matching-scope totals/order and targeted native keyboard, VoiceOver, resize and contrast evidence; no financial-colour change from a screenshot inference.
+**Owner usability acceptance:** no clipping/overlap; usable target widths and full readable Money/currency; deterministic filters, sorting and matching-scope totals; stable selection and inspector behavior; useful ordinary keyboard interaction; focus distinct from selection; useful names/tooltips for icon-rail controls. No formal accessibility campaign is part of this sprint.
+
+The [data algebra](#packet-sprint89-data-algebra) retains the independent membership/order/native-currency-total oracle. The [native procedure](#packet-sprint89-native-acceptance-procedure) tests the actual Transactions workflow. Targeted source/runtime evidence remains required before changing the observed INR colour semantics; a screenshot alone cannot establish a financial defect.
 
 `FW-P2-77` remains explicitly deferred, not forgotten. Its maintenance value does not outrank the P1/P2 user outcomes above, and broad physical moves must not be mixed with app-shell or R1 behavioral work.
 
 
 ## Second-level entry-gate reconciliation — 2026-09-10
 
-PROPOSED documentation reconciliation at `af2d1949c6e9a73af3bb004422b72882d28195e2`; no sprint selection, acceptance or numbering change. [The proposed appendix](#second-level-sprint-88-and-sprint-89-packets) preserves all first-level evidence and records explicit user decisions. Sprint 88 has a static five-phase shell blueprint (characterization through bounded bootstrap adapter), followed only later by optional source-tree organization; exact accepted post-Sprint-87 ownership is its entry gate. Sprint 89 has an independent filter/search/stable-sort/native-currency-total/selection oracle plus a separate native keyboard/focus/VoiceOver/resize procedure. These procedures do not establish runtime acceptance. No Sprint 84–87 implementation or acceptance section is changed by this campaign.
+PROPOSED documentation reconciliation at `af2d1949c6e9a73af3bb004422b72882d28195e2`; no sprint selection, acceptance or numbering change. [The proposed appendix](#second-level-sprint-88-and-sprint-89-packets) preserves all first-level evidence and records explicit user decisions. Sprint 88 has a static five-phase shell blueprint (characterization through bounded bootstrap adapter), followed only later by optional source-tree organization; exact accepted post-Sprint-87 ownership is its entry gate. Sprint 89 has an independent filter/search/stable-sort/native-currency-total/selection oracle plus ordinary native keyboard/focus/resize checks, narrowed by the scope reset. These procedures do not establish runtime acceptance. No Sprint 84–87 implementation or acceptance section is changed by this campaign.
 
 ## Read-only discovery index — 2026-09-10
 
@@ -228,26 +232,20 @@ The cycle forecast does not erase higher-priority or competing queue work. Befor
 | P0 | `FW-P0-08` | Ready for discovery, but no concrete affected repository/family is selected; a broad repair-everything operation remains invalid. |
 | P0 | `FW-P0-11`, `FW-P0-12`, `FW-P0-13`, `FW-P0-14`, `FW-P0-15` | Blocked by linking/unlinking, identifier-detachment, split, duplicate-account and survivor/conflict semantics. |
 | P0 | `FW-P0-16` | Architecture accepted, but executable mutation is gated on selecting one concrete family with exact impact and reversal/irreversibility. |
-| P0 | `FW-P0-18` | Blocked on the future multiple-workspace architecture and fingerprint-scope decision. |
-| P0 | `FW-P0-19` | Blocked until one new exact representation relationship has source truth and family-specific identity/equivalence authority; Axis-bank semantic parity alone is not durable equivalence. |
-| P0 | `FW-P0-20` | Research only; each additional transaction-event family needs authentic overlapping evidence and its own deterministic semantics. |
-| P0 | `FW-P0-26` | Blocked certification gate; adopted pre-v1 import, required backup/restore, support matrix and other designated prerequisites remain incomplete or unaccepted; complete export is optional under UD-02 and must be completed only if adopted, or Chat-deferred. |
-| P1 | parser-family expansion | Existing registered families are certified; no additional exact source family has been selected. `FW-P1-04` is discovery-ready, while other families remain Candidate/Research by their evidence. |
-| P1 | `FW-P1-06` | Ready for planning, but no new parser family requires framework expansion before the ownership/import/Swift sequence; it does not outrank an active financial defect if one appears. |
+| P0 | `FW-P0-18` | Owner-retained single-ledger fingerprint review; waits for one concrete replay/restore question and authentic evidence, with no fingerprint/schema change implied. |
+| P0 | `FW-P0-19` | Owner-retained bounded review of the three existing Axis-bank source groups; explain the recorded projection mismatches without inferring durable equivalence or extending source families. |
+| P0 | `FW-P0-26` | Personal adoption verification waits for the actual adopted import, recovery, planning, holdings/valuation, current-FX/net-worth and private source-matrix outcomes; complete export remains optional. |
+| P1 | Actual owner-source correctness | Existing registered-family limits remain governed by ADR-046. A newly supplied/selected source may establish a bounded new need; hypothetical source placeholders are removed. |
 | P1 | `FW-P1-25` | Ready for discovery; broader duplicate-management/override/reversible semantics remain unresolved and must be reevaluated before dependent reconciliation/analytics. |
 | P1 | `FW-P1-27` | Ready for discovery, but no exact import-session reversal family/impact contract has been selected. |
-| P1 | `FW-P1-29` | Ready for planning, but accepted immediate recovery guidance already exists; only broader education remains and is not an entry dependency for 81–89. |
-| P1 | `FW-P1-37` | Ready for planning, but broader diagnostics remain nonblocking absent a newly verified diagnostic correctness defect. |
 | P2 | `FW-P2-12` | Ready for discovery; must preempt reconciliation/analytics if current duplicate guarantees prove insufficient, otherwise remains separate. |
 | P2 | account lifecycle (`FW-P2-30`, `FW-P2-31`, `FW-P2-32`, `FW-P2-33`, `FW-P2-34`, `FW-P2-35`, `FW-P2-36`, `FW-P2-37`) | Several are blocked/candidate pending targeted mutation, visibility, closure or asset semantics; none is an entry dependency for the planned cycle. |
 | P2 | `FW-P2-54` | Ready for discovery, but user-facing document browsing still needs an approved privacy-safe metadata/retention/navigation boundary. |
 | P2 | `FW-P2-77` | Ready for discovery and explicitly deferred: broad structural moves must not be mixed with app-shell or R1 behavioral work. |
-| P2 | `FW-P2-79` | Ready for planning and mandatory input to personal-v1 certification, but it is documentation/support-matrix work rather than an 81–89 executable product dependency. |
+| P2 | `FW-P2-79` | Ready for planning and mandatory input to personal adoption verification, but it is a small private supported-source truth table rather than an 81–89 executable product dependency. |
 | P3 | net worth | Blocked on investment and reporting-currency foundations; no current consolidated net-worth authority exists. |
 | P3 | `FW-P3-36` backup/restore | Ready for discovery, but the user-owned backup contents/integrity/restore-target/compatibility contract is not approved. |
-| P3 | export (`FW-P3-17`, `FW-P3-35`) | Optional under UD-02; selection of an export feature still requires its schema/privacy contract. Its absence alone does not block personal-v1 certification. |
-| P3 | `FW-P3-40` multiple workspaces | Research; identity, fingerprint, settings and repository isolation are undecided. |
-| P3 | encryption/sync (`FW-P3-37`, `FW-P3-43`) | Research; depends on backup, key ownership/recovery, conflict and opt-in architecture. |
+| P3 | export (`FW-P3-17`, `FW-P3-35`) | Optional under UD-02; selection of an export feature still requires its schema/privacy contract. Its absence alone does not block personal adoption verification. |
 
 ## Maintenance
 
@@ -256,7 +254,7 @@ When this roadmap changes, preserve accepted numbering/history, distinguish plan
 <a id="second-level-sprint-88-and-sprint-89-packets"></a>
 ## Second-level packets — historical Sprint-88 guidance and proposed Sprint-89 work
 
-This appendix preserves historical discovery/planning material. Sprint 88 is now accepted in its section above; the retained blueprint is historical guidance, not new work. Sprint-89 proposals remain unaccepted planning input and do not select, authorize or implement that sprint. References to queue work use durable [FUTURE_WORK.MD](../FUTURE_WORK.MD) anchors.
+This appendix preserves historical discovery/planning material. Sprint 88 is now accepted in its section above; the retained blueprint is historical guidance, not new work. Sprint-89 data proposals remain unaccepted; the current scope correction above governs its paused local WIP and next acceptance boundary. References to queue work use durable [FUTURE_WORK.MD](../FUTURE_WORK.MD) anchors.
 
 <a id="packet-shell88-and-sprint89-native-procedure"></a>
 <a id="packet-shell88-blueprint"></a>
@@ -279,7 +277,7 @@ This appendix preserves historical discovery/planning material. Sprint 88 is now
 <a id="packet-sprint89-data-algebra"></a>
 ### SPRINT89_DATA_ALGEBRA_PACKET
 
-1. **Owning FW IDs:** [FW-P2-03](../FUTURE_WORK.MD#fw-p2-03), [FW-P2-04](../FUTURE_WORK.MD#fw-p2-04) and [FW-P2-38](../FUTURE_WORK.MD#fw-p2-38). Native focus/accessibility is intentionally separated into the procedure below.
+1. **Owning FW IDs:** [FW-P2-03](../FUTURE_WORK.MD#fw-p2-03), [FW-P2-04](../FUTURE_WORK.MD#fw-p2-04) and [FW-P2-38](../FUTURE_WORK.MD#fw-p2-38). Ordinary native focus/selection is intentionally separated into the procedure below.
 
 2. **User problem:** reproducible transaction search/filter/navigation that does not alter financial truth.
 3. **Verified current state:** current search is presentation-only and narrow; no saved-filter contract exists.
@@ -302,7 +300,7 @@ This appendix preserves historical discovery/planning material. Sprint 88 is now
 20. **Failure cases:** missing supported field, unavailable snapshot, unknown filter value or empty match set returns no rows/no totals and performs no write.
 21. **Reversal/correction semantics:** none.
 22. **Source evidence requirement:** authentic source-backed canonical integration input; isolated source-independent query mechanics may use nonfinancial primitive values, never fabricated statement-shaped rows.
-23. **Runtime acceptance requirement:** native focus/keyboard/VoiceOver is the separate procedure below; an INR-colour change requires its own targeted probe.
+23. **Runtime acceptance requirement:** ordinary native focus/keyboard/selection is the separate procedure below; an INR-colour change requires its own targeted probe.
 24. **Dependencies:** stable displayed fields and native acceptance only.
 25. **Evidence that falsifies the recommendation:** differing output for the same snapshot/spec, hidden-field search or an unsegregated cross-currency total.
 26. **Personal-v1 relevance:** PRE_V1_OPTIONAL.
@@ -330,12 +328,13 @@ The independent oracle enumerates `R` and the predicate/order directly, never pr
 This procedure is a proposed runtime gate, not evidence of a pass. The data lane supplies the trusted `R` oracle above: AND groups, OR values, transient normalized case/diacritic-folded multi-term search over the frozen display fields, stable source-ordinal/durable-identity order, and native-currency plus accepted bank/card-domain/effect totals without conversion or grand total.
 
 1. Freeze `R`, provider generation, filter specification, expected membership/order/totals and an opaque oracle hash.
-2. Exercise pointer and keyboard date/account/currency/direction/category/search/sort/reverse/inspector/selection/clear; compare visible and accessibility output to the oracle.
+2. Exercise pointer and keyboard date/account/currency/direction/category/search/sort/reverse/inspector/selection/clear; compare visible output to the oracle.
 3. Resize, collapse/reopen inspector and change focus. Selection persists only while a member; otherwise it becomes explicit nil and no substitute row is selected.
 4. Check Tab/Shift-Tab, arrows, Space/Return as native-owned, shortcut collisions, and absence of implicit import or financial write.
-5. With VoiceOver and Full Keyboard Access, announce sort, filter scope, count, currency, selection and inspector state.
-6. For empty/loading/unavailable/stale generation, require truthful enabled state and no stale totals/selection or fabricated zero Money.
-7. Use adversarial presentation text only through the oracle: membership may change; source fields never do.
-8. Store only a privacy-safe manifest: build, opaque generation, case/oracle hash, counts and accessibility result/failure; never values, rows, text, IDs, paths or sensitive screenshots.
+5. Check complete readable Money/currency, useful icon names/tooltips, visible sort/filter scope and count, and focus distinct from selection.
+6. Check broad/narrow target widths, no clipping/overlap, readable contrast and no colour-only financial semantics; preserve actual action visibility.
+7. For empty/loading/unavailable/stale generation, require truthful enabled state and no stale totals/selection or fabricated zero Money.
+8. Use adversarial presentation text only through the oracle: membership may change; source fields never do.
+9. Store only a privacy-safe manifest: build, opaque generation, case/oracle hash, counts and observed interaction result/failure; never values, rows, text, IDs, paths or sensitive screenshots.
 
-Focus, VoiceOver, resize, contrast/transparency, multi-window behavior and panel cancellation remain **WAIT_FOR_RUNTIME_ACCEPTANCE**. No discovery text establishes native parity.
+Actual Transactions focus, useful keyboard interaction, resize/readability, selection and panel cancellation still require observation. This is a bounded owner-usability check; no discovery text establishes a native pass.

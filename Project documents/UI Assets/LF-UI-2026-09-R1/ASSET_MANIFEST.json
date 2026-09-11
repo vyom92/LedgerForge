@@ -16,18 +16,18 @@
   "payload_files": [
     {
       "path": "ACCEPTANCE.md",
-      "bytes": 6873,
-      "sha256": "b499ad7cadb659a5d4e44fcf095b1f6b704b49f8e5135c9064fb2e3bac8da86c"
+      "bytes": 7059,
+      "sha256": "f6fcc22e8272dfb3c020ee7fa5077e979bc173ae6dd00b102f25c35f5e78a2da"
     },
     {
       "path": "DESIGN_HANDOFF.md",
-      "bytes": 23804,
-      "sha256": "f5b021e677bb7fc27a7125c00523a10fc49456f43836a292ca3ba3fb65cf1338"
+      "bytes": 27711,
+      "sha256": "8bd2037c5bc856803d774128df210718e8d07c9019aad8ca57a44b4c7025e372"
     },
     {
       "path": "DESIGN_TOKENS.json",
-      "bytes": 5754,
-      "sha256": "06f9d89133cd4dd9da391339c0d59d58597aa426c542bb893cbd161e1d77c5af"
+      "bytes": 4781,
+      "sha256": "744337069754556197573d3a6e16019645bb406c8844a1445a645c64f885a2e3"
     },
     {
       "path": "MasterBoard_LF-UI-2026-09-R1.png",
@@ -36,16 +36,28 @@
     },
     {
       "path": "README.md",
-      "bytes": 2855,
-      "sha256": "d4ff1ec223e6799c9bdab33d2546ad1442df5fbea97f30d45f07de64616162e0"
+      "bytes": 3862,
+      "sha256": "1c0b355eca64601e7a3d2649c61748a488abf0205a276093372ace7d3ecb9816"
     },
     {
       "path": "SOURCES.md",
-      "bytes": 5471,
-      "sha256": "b9adae0653397ecdd94f1db5c20e37249ef7bef3bfc1e09f531a01d62ff7fbab"
+      "bytes": 6370,
+      "sha256": "84533464c1dd52066bbd5c20b5a9584fe42df153c89069dc773758a338ac7bf2"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md",
+      "role": "reconciled written reference draft; no native acceptance",
+      "bytes": 10313,
+      "sha256": "4205f17c1d1c3431c01e88d9b1913c22d4436c6badd139eda6b30413fbff3560"
+    },
+    {
+      "path": "LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md",
+      "role": "reconciled written reference draft; no native acceptance",
+      "bytes": 13775,
+      "sha256": "686a793dbbdf9079ea9781f4c1a5870f3ffc71022e6dd9b6a5678a86870d1488"
     }
   ],
-  "manifest_self_hash": "excluded to avoid recursive checksum; outer package manifest covers this file",
+  "manifest_self_hash": "Excluded to avoid recursive checksum; any original outer package manifest is historical.",
   "legacy_repository_assets": [
     {
       "path": "Project documents/UI Assets/Archived/Accounts_v1.0.png",
@@ -121,5 +133,8 @@
   ],
   "native_implementation_status": "not implemented by this package",
   "documentation_integration_status": "published in Project documents/UI Assets/LF-UI-2026-09-R1/ on 2026-09-10",
-  "git_publication_status": "authorized by user on 2026-09-10"
+  "git_publication_status": "authorized by user on 2026-09-10",
+  "scope_alignment_date": "2026-09-11",
+  "scope_alignment": "Private personal app: simple local appearance and ordinary owner usability. Existing PNG bytes and historical provenance retained; DESIGN_HANDOFF.md records exact rejected caption exceptions. Two screen-reference drafts are separately reconciled; redundant scratch inventories are removed.",
+  "local_sc_png_status": "Seven local SC PNG working references remain untracked and outside this published payload, unchanged from the scope-reset preflight. Exact caption exceptions are recorded in DESIGN_HANDOFF.md."
 }

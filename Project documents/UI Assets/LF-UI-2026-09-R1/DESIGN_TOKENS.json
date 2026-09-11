@@ -3,7 +3,7 @@
   "status": "Designer-specified implementation targets under the approved visual direction; not measured pixel values or native-app acceptance evidence.",
   "units": {
     "layout": "macOS logical points",
-    "font": "points at text_scale 1",
+    "font": "reference points; no user text-scale system required",
     "colors": "sRGB hex, opaque unless otherwise specified"
   },
   "appearance": {
@@ -19,43 +19,8 @@
       "deep-indigo"
     ],
     "default_accent": "system",
-    "custom_accent": true,
-    "custom_background": true,
-    "foreground_modes": [
-      "automatic",
-      "custom"
-    ],
-    "foreground_default": "automatic",
-    "translucency": {
-      "default_percent": 0,
-      "min_percent": 0,
-      "max_percent": 30,
-      "step_percent": 1,
-      "applies_to": [
-        "sidebar",
-        "toolbar",
-        "eligible panel surface"
-      ],
-      "never_applies_to": [
-        "text",
-        "icons",
-        "financial values",
-        "whole window"
-      ],
-      "reduce_transparency_override_percent": 0
-    },
-    "font_styles": [
-      "system",
-      "rounded",
-      "serif"
-    ],
-    "default_font_style": "system",
-    "font_fallback": "system",
     "money_tabular_digits": "mandatory",
-    "density_default": "comfortable",
-    "preview_then_apply": true,
-    "restore_defaults_scope": "appearance only",
-    "custom_light_dark_values": "retain separately; no inferred inversion of user-picked colors"
+    "scope": "Simple local appearance; optional existing system/Deep Indigo accent choice. No advanced editor or portable preference contract."
   },
   "typography": {
     "body": 16,
@@ -69,12 +34,6 @@
       "title": "semibold",
       "section": "semibold",
       "metric": "semibold"
-    },
-    "text_scale": {
-      "min": 0.875,
-      "max": 1.375,
-      "step": 0.0625,
-      "default": 1.0
     },
     "minimum_caption_size": 12,
     "money_line_limit": 1,
@@ -105,7 +64,7 @@
       "comfortable": 44,
       "compact": 36
     },
-    "row_height_policy": "minimum only; grow for font size and wrapped descriptions",
+    "row_height_policy": "Reference minima for composition, not a user density preference; grow for actual content and wrapped descriptions",
     "header_min_height": 32,
     "numeric_alignment": "trailing",
     "description_max_lines": 2,
@@ -158,7 +117,7 @@
       ]
     },
     "reference_sizes_are_not_deployment_minima": true,
-    "responsive_policy": "content-fit; collapse inspector first, then sidebar; keep all controls discoverable",
+    "responsive_policy": "Content fit: close inspector first; prefer an icon-only navigation rail; hide navigation only if even the rail materially harms content; retain labelled navigation/details controls",
     "dashboard_currency_columns_max": 2
   },
   "palette": {
@@ -198,11 +157,6 @@
       "warning_text": "#FCD34D",
       "info_text": "#93C5FD"
     }
-  },
-  "contrast_targets": {
-    "ordinary_text": 4.5,
-    "control_boundaries_and_focus": 3.0,
-    "note": "Product acceptance targets. Static opaque pairs are checked in package validation. Native translucent/custom/system colors require separate runtime checks."
   },
   "state_rules": {
     "selected": "tint plus selection semantics; distinct from keyboard focus",

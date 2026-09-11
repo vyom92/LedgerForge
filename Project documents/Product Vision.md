@@ -2,553 +2,88 @@
 
 ## Document Role
 
-This document defines what LedgerForge should become.
+This document defines the owner's intended personal-finance outcomes. It does not establish current production support, sprint order, architecture, migration state or execution authorization.
 
-It does not define:
-
-- current production support;
-- sprint order;
-- implementation readiness;
-- migration state;
-- repository status;
-- active execution scope.
-
-Current authority instead comes from:
-
-- `Project documents/PROJECT_STATE.md` for accepted product/migration reality;
-- the current cycle roadmap for sprint order and numbering;
-- `Project documents/FUTURE_WORK.MD` for unscheduled work and readiness;
-- accepted entries in `Project documents/ADR.md` for architecture;
-- Git plus guarded local evidence for repository state; and
-- the complete Chat-approved execution prompt for active scope.
-
-The Product Vision may remain ambitious, but it must not imply that planned capabilities already exist.
-
-## Current alignment — 2026-09-09
-
-This document remains product direction, not a current-support registry. Current implementation and exact source reliability belong to `PROJECT_STATE.md`, accepted ADRs and the canonical queue.
-
-Current planning priority is: financial correctness; durable persistence; deterministic behavior; explicit user control; privacy; recoverability; explainability; maintainability; delivery speed.
-
-For R1-covered UI scope, `LF-UI-2026-09-R1` is the approved design authority. Follow System/Light/Dark with optional Deep Indigo replaces any reading of Deep Indigo as a mandatory current theme. Design approval remains separate from native implementation.
-
-For statement-dependent financial behavior, ADR-046 and the complete registered authentic corpus supersede synthetic/sanitized/reconstructed/representative fixture authority. Production parser output is never its own sole oracle, fixture presence never establishes support and exact support cannot be inferred from institution name or structural similarity. Historical passages that once described “only Axis CSV” production support are no longer current authority.
-
-Current supported-source coverage is intentionally not enumerated in Product Vision; use `PROJECT_STATE.md` and the maintained support-matrix candidate `FW-P2-79`.
-
----
+[PROJECT_STATE.md](PROJECT_STATE.md) records accepted production reality; the current roadmap owns sprint numbering; [FUTURE_WORK.MD](FUTURE_WORK.MD) owns eligible unscheduled work; accepted [ADRs](ADR.md) own architecture; exact Git/local evidence establishes repository state. Only a complete Chat-approved prompt authorizes execution.
 
 ## Mission
 
-LedgerForge is an offline-first personal financial operating system that consolidates a user's financial life into one trustworthy local workspace.
+LedgerForge is a private personal finance application for the owner's own financial life. It is single-user, macOS-native, offline-first and run primarily on the owner's Mac. It is not intended to become a general-purpose commercial platform.
 
-The primary product is financial understanding.
+The owner should be able to understand financial position, review actual activity, plan current commitments and trace every financial conclusion to trustworthy evidence. Imports support that outcome by preserving accurate local financial records from the owner's actual sources.
 
-Document import, future OCR, profile assistance, rules and automation exist to maintain accurate repository-backed financial truth with as little manual effort as safely possible.
+The priority order remains financial correctness, durable persistence, deterministic behavior, explicit owner control, privacy, recoverability, explainability, maintainability and delivery speed. A private app still requires rigorous protection of the owner's real money and data.
 
-LedgerForge is designed for private personal use. It prioritizes:
+## Private Personal App Scope
 
-1. financial correctness;
-2. durable persistence;
-3. deterministic behavior;
-4. explicit user control;
-5. privacy;
-6. recoverability;
-7. explainability;
-8. maintainability;
-9. delivery speed.
+Before adding, selecting, researching or preserving a capability, identify an actual requested owner workflow, an owner-data correctness/persistence/privacy/recovery need, a real authentic source supplied or selected by the owner, or a direct day-to-day usability benefit. Without one, the disposition is **NOT REQUIRED-DO NOT CONSIDER**.
 
-LedgerForge is multi-currency by design. Every monetary value retains its native currency. Conversion, reporting currency and consolidated views are derived presentation concerns that must remain transparent and auditable.
+Rejected work is excluded from priority triage, dependencies, roadmaps and discovery packets. It is not deferred or a post-v1 candidate. Reopening requires a new explicit owner decision naming the real personal need. Commercial best practice, hypothetical users and possible future usefulness do not establish scope.
 
----
+## Personal Financial Outcomes
 
-## Product Vision
+The core experience centers on Dashboard, Accounts, Transactions, Imports, Salary and Settings, with categories and contextual source evidence. These surfaces present authoritative persisted and hydrated state, including truthful empty, unavailable and incomplete states.
 
-A user should eventually be able to open LedgerForge and understand:
+The owner-selected personal-adoption outcomes include:
 
-- current financial position;
-- cash available;
-- account balances by native currency;
-- net worth and its changes over time;
-- investment allocation and performance;
-- budget and category performance;
-- upcoming obligations;
-- internal movement between owned accounts;
-- financial health;
-- currency exposure;
-- important changes requiring attention;
-- the evidence supporting every conclusion.
+- accurate imports from the owner's actual supported financial sources;
+- a readable Dashboard with native-currency position and authoritative time/coverage context;
+- Accounts with trustworthy identity, balances and history;
+- Transactions with useful search, filters, deterministic sorting, stable selection and complete native-currency totals;
+- accepted Qatar Airways Salary actuals, Salary History and This Month planning, with the selected bounded current Al Dar reference and manual-rate override;
+- current holdings and valuation for the owner's adopted investments;
+- selected current market FX and net-worth estimates with explicit incomplete/stale states;
+- verified backup creation, restore, canonical hydration and same-database relaunch; and
+- a small private supported-source matrix naming each actual institution/product, accepted format/family, exact boundary and known limitation.
 
-LedgerForge should answer financial questions rather than merely store financial records.
+These are intended outcomes, not claims that every boundary is implemented. **PERSONAL-V1: NOT YET ADOPTED.** The prepared roadmap retains Sprint 100 — LedgerForge 1.0 Personal Adoption Verification as the final owner adoption gate.
 
-The application should ultimately help answer:
+Transfers, reconciliation, categorization rules, recurrence, investment history and personally useful analytics remain eligible only when selected for an actual owner workflow or required by a verified financial-correctness need. Their existence in a financial-software category does not make them requirements.
 
-- Where did my money come from?
-- Where did it go?
-- What merely moved between my own accounts?
-- What changed my net worth?
-- What requires attention?
-- What should I consider doing next?
+## Financial Truth and Identity
 
-Recommendations and planning assistance must remain explainable and must not masquerade as guaranteed outcomes or regulated financial advice.
+Original imported evidence remains immutable. Normalized values, owner-entered planning assumptions and derived estimates remain distinguishable from source facts. Missing dates, identifiers, quantities, balances and provenance remain missing.
 
----
+Financial entities have immutable repository identity. Institution names, filenames, display labels and structural similarity do not establish ownership or identity. Bank accounts, card-liability accounts and subordinate card instruments retain their accepted distinctions. New adopted investment entities require their own source-backed identity contract; current prices cannot establish ownership or units.
 
-## Financial Identity
+Every Money value retains native currency, scale and source-specific direction or liability meaning. Mixed currencies are not silently aggregated. Bank cash movement and card-liability effects are not combined into misleading income or spending totals. Any adopted conversion is derived, with explicit rate orientation, provenance, effective time and deterministic rounding; it never overwrites source values.
 
-LedgerForge models financial entities rather than treating an institution name as sufficient identity.
+If owner-selected transfer or reconciliation work is implemented, internal movement between owned accounts must not invent income, expense or net-worth change. Similar dates and amounts are not sufficient relationship evidence.
 
-A financial institution may contain multiple independent financial entities, including:
+## Authentic Sources and Deterministic Imports
 
-- bank accounts;
-- credit-card accounts;
-- card instruments subordinate to an account;
-- loans;
-- brokerage accounts;
-- retirement accounts;
-- investment folios;
-- future financial products.
+ADR-046 and the complete registered authentic corpus govern every statement-dependent behavior. No synthetic, generated, reconstructed, sanitized, representative, reduced, mutated or hand-authored financial statement may be created or used for development, debugging, tests, source oracles, persistence or acceptance. Exact operational/decrypted copies and actual extracted attachments remain permitted with original-byte provenance. Pure nonfinancial mechanics may use nonfinancial values; missing authentic cases remain source-uncertified.
 
-Repository identity remains immutable.
+Each supplied recurring source extends its registered corpus unless the owner explicitly excludes or archives it. Independent source oracles establish source truth; production parser output is never its own sole oracle. Exact support does not generalize across institutions, products, formats, credential families or materially different source contracts. The private supported-source matrix under FW-P2-79 records the actual accepted boundary.
 
-Display names, filenames, profile labels and institution branding are presentation or routing evidence only. They do not establish financial identity.
+Readers extract and preserve evidence. Source-family parsers interpret financial meaning deterministically, tolerating inert packaging changes while failing closed on ambiguous, contradictory, malformed or unsupported financial evidence. Page count, transaction count, harmless whitespace and benign page breaks do not define support. Any minimum shared parser change must be demonstrated by a real selected owner source, not a standing framework-expansion program.
 
-Supported imports should resolve to the authoritative owning financial entity using verified source evidence wherever available.
+Single-file and multi-file intake use the accepted serial Import Centre. The ordinary path preserves authorized file access, optional exact-family unlock, extraction, detection/classification, source-family parsing, normalization, validation, duplicate/equivalence checks, explicit per-statement review and confirmation, provider-owned atomic persistence and canonical hydration through `RepositoryStoreHydrator`.
 
-Potential verified identifiers include:
+Rejection leaves zero accepted durable residue. Accepted writes cannot bypass validation, duplicate/identity checks or provider revalidation. Preserve SQLite/In-Memory parity where both matter, accepted migration identities, SQLite integrity, hydration and same-database relaunch. Private originals remain isolated read-only evidence and never enter published artifacts.
 
-- institution account numbers;
-- IBANs;
-- card-account identifiers;
-- card-instrument identifiers where the source distinguishes them;
-- broker account IDs;
-- investment identifiers such as folio numbers.
+## Native Owner Experience
 
-A document may also contain document-scoped relationships, such as multiple card instruments belonging to one account. Those relationships must not be flattened into separate financial entities without source and architecture authority.
+The approved R1 handoff and [UI_UX_v1.0_Frozen.md](UI_UX_v1.0_Frozen.md), as narrowed by the 2026-09-11 scope reset, govern actual screens. Design approval remains distinct from native implementation.
 
-Financial entities own durable financial history. Documents, import sessions, statements, transactions and source evidence describe activity associated with those entities.
+The interface should keep financial text and complete Money readable, avoid clipping and overlap, resize sensibly, show focus separately from selection, provide useful ordinary keyboard interaction and name ambiguous icon controls with labels/tooltips. Financial meaning never depends on decorative colour alone. Existing harmless native SwiftUI semantics remain useful.
 
-Weak similarity must never silently establish identity.
+Appearance is one bounded device-local choice: Follow System, Light or Dark, with optional already-approved Deep Indigo/accent direction. Simple nonfinancial local persistence is sufficient; no theme engine, preference portability or speculative architecture program follows from it.
 
----
+Keep contextual toolbars, useful Transactions search/filtering, truthful states and explicit action scope. Do not display unsupported controls, fake analytics, inactive destinations or unproven financial status. Existing useful Developer Console and immediate validation/recovery guidance remain available through their accepted boundaries.
 
-## Product Principles
+## Privacy, Offline Use and Recovery
 
-Every feature should advance at least one of these outcomes:
+Core financial use remains local and functional offline. External network access is limited to an explicitly selected personal-finance workflow, such as current investment valuation, current market FX or current Al Dar planning evidence. Each selected source retains its own identity, permission, freshness, cache and unavailable-state boundary. This does not create a general integration, API or sync platform.
 
-1. Reduce manual work.
-2. Increase confidence.
-3. Surface meaningful financial insight.
-4. Preserve financial truth.
-5. Improve recoverability or explainability.
+Passwords and raw financial identifiers must not leak through ordinary presentation, diagnostics, exports or published artifacts. Exact accepted Keychain behavior, sandboxing and build/signing requirements needed to run safely on the owner's Mac remain intact. No financial data is silently sent to an external service.
 
-LedgerForge must not sacrifice accuracy for convenience.
+Verified backup/restore remains required. The owner may save or copy a verified backup package to a personally chosen destination. A backup package is not a live/shared workspace, sync protocol, multiwriter system or cloud-provider integration. Restore must preserve the accepted integrity, compatibility, confirmation, rollback, hydration and relaunch boundaries. Complete structured export remains optional unless separately selected.
 
-### Financial truth
+## Explicit Non-Goals
 
-- Original imported evidence remains immutable.
-- Normalized and derived values remain distinguishable from source values.
-- Every persisted imported transaction remains traceable to trusted document and source evidence.
-- Import order must not change final financial truth.
-- Unsupported, malformed, ambiguous or conflicting evidence must fail closed.
-- Historical evidence must not be invented to make a migration or repair convenient.
+**NOT REQUIRED-DO NOT CONSIDER** applies to hypothetical public/commercial products, teams or organizations, generalized parser/profile-learning/AI-column-detection programs, generic credential products, validation education/support organizations, generalized developer inspector/export platforms beyond accepted useful diagnostics, global cross-domain search, formal accessibility/compliance campaigns, standing performance/profiling programs, public distribution/notarization/App Store programs, sync, public APIs/integrations, plugin ecosystems, multiple workspaces, live portable workspaces, cross-platform clients and advanced theme editors.
 
-### Determinism
+The single compact [rejected-scope register](FUTURE_WORK.MD#rejected-private-personal-scope) owns rejected IDs and exact boundaries. This does not remove accepted production behavior or weaken financial correctness, persistence, privacy or recoverability. A newly experienced measurable performance defect or actual new authentic source is handled as that exact owner problem after it exists.
 
-- The same approved evidence should produce the same observable result.
-- Complete registered authentic financial corpora and independent source oracles define statement-dependent financial truth; source-independent mechanics may use nonfinancial test data.
-- Production parser output must not be the sole authority for its own correctness.
-- Similar layouts do not imply support.
-- Filename or display similarity does not imply institution, account or duplicate identity.
-
-### Native currency
-
-- Every monetary value retains native currency and scale.
-- Conversion never overwrites imported values.
-- Mixed currencies are not silently aggregated.
-- Exchange rates, when implemented, retain provenance and effective time.
-- Derived reporting values remain visibly distinct from source amounts.
-
-### Owned-account transfers
-
-Internal transfers between financial entities owned by the user must not be counted as new income, expense or net-worth change.
-
-Transfer relationships must remain deterministic, explainable and correctable.
-
-### Explicit control
-
-- Financial mutation requires explicit user authorization.
-- Destructive or corrective actions require impact preview.
-- Reversible actions should provide family-specific reversal or compensation.
-- Irreversible operations must state that boundary before execution.
-- Automation must not silently promote weak evidence into trusted truth.
-
----
-
-## Core Product Experience
-
-LedgerForge should feel like a financial operating system rather than an import utility.
-
-### Foundational product experiences
-
-The current product foundation centers on:
-
-- Dashboard;
-- Accounts;
-- Transactions;
-- Imports;
-- Salary;
-- Settings.
-
-These experiences are repository-backed and must present only authoritative persisted and hydrated state.
-
-### Long-term product experiences
-
-The broader product direction includes:
-
-- Salary & Planning;
-- Investments;
-- Multi-Currency Reporting;
-- Financial Timeline;
-- Financial Intelligence;
-- Rules & Automation;
-- Budgets and Cash Flow;
-- Financial Health;
-- Goals;
-- Documents and Provenance;
-- Universal Search.
-
-These are product directions, not claims of current implementation.
-
-### Dashboard first
-
-The Dashboard remains the primary destination.
-
-It should answer:
-
-- What is my financial position?
-- What changed?
-- What needs attention?
-- What evidence supports this view?
-
-Unsupported analytics must not be presented as real financial facts.
-
-### Imports as supporting work
-
-Imports remain an important supporting experience, not the reason the product exists.
-
-The Import Centre should own:
-
-- file selection and authorized access;
-- preparation;
-- validation;
-- account and identity review;
-- duplicate and overlap outcomes;
-- explicit confirmation;
-- progress and cancellation within safe boundaries;
-- persistence outcomes;
-- history and navigation.
-
-macOS grants access to user-selected files and folders. LedgerForge must not claim unrestricted filesystem access.
-
-All supported bank and card transactions belong to one global repository-backed Transactions experience. Institution-specific parsers must not create separate transaction applications, stores or financial truth.
-
----
-
-## User Experience Philosophy
-
-LedgerForge should feel like a native macOS financial application.
-
-For R1-covered scope, current visual and interaction authority is `UI_UX_v1.0_Frozen.md` plus the approved `LF-UI-2026-09-R1` handoff/master board. Legacy assets remain inherited only where consistent with that newer authority and accepted product behavior. Follow System is the default R1 target, with explicit Light/Dark and optional Deep Indigo.
-
-Implementation translates approved design authority. It must not silently redesign the product, and design approval does not claim native implementation.
-
-The experience should emphasize:
-
-- Dashboard-first navigation;
-- persistent sidebar structure;
-- contextual toolbars;
-- dense but legible financial information;
-- predictable keyboard and pointer behavior;
-- clear empty and unavailable states;
-- explicit scope for filters and actions;
-- developer tooling separated from ordinary user workflows;
-- privacy-safe presentation;
-- temporary import workflows that return the user to financial understanding.
-
-The R1 Light/Dark/System direction is already approved; future visual revisions still require design authority rather than ad hoc implementation drift.
-
----
-
-## Automation Philosophy
-
-LedgerForge should not ask the user for information that can be determined reliably from approved evidence.
-
-It should automate reasoning before automating mutation.
-
-Small amounts of explicit user input are preferable to fragile or opaque inference.
-
-Automation should focus on:
-
-- reconciliation;
-- financial understanding;
-- relationship discovery;
-- deterministic classification;
-- recurring-activity recognition;
-- planning support;
-- explanation and review.
-
-### Learning boundary
-
-Future profile assistance or learning may help LedgerForge recognize:
-
-- statement layouts;
-- institution families;
-- financial entities;
-- categories;
-- recurring activity;
-- salary patterns;
-- subscriptions;
-- investments;
-- user preferences.
-
-Learning must remain:
-
-- reviewable;
-- versioned;
-- privacy-safe;
-- deterministic at the trusted boundary;
-- subordinate to validation;
-- unable to silently replace approved production parsing.
-
-A successful import may contribute bounded evidence for future suggestions. It must not silently mutate trusted parser behavior or financial truth.
-
-Automation should disappear into the background only after its authority, evidence and failure modes are understood.
-
----
-
-## Intelligent Document Processing
-
-LedgerForge treats an imported document as structured financial evidence, not merely as a file.
-
-### Product compatibility direction
-
-Initial institution and family priorities include:
-
-- Axis bank-account statement families;
-- HDFC bank-account statement families;
-- CBQ bank-account and credit-card statement families;
-- American Express credit-card statement families;
-- source-proven Axis card families.
-
-Every institution, document family, layout and source format is approved independently.
-
-Support for one family never implies support for:
-
-- all products from the institution;
-- visually similar layouts;
-- another source format;
-- historical layouts;
-- card semantics;
-- another currency.
-
-### Source-format direction
-
-Target source formats include:
-
-- CSV;
-- PDF;
-- XLS;
-- XLSX;
-- TXT where institutions provide deterministic text exports;
-- future OCR only for sources that cannot provide trustworthy native text.
-
-This is product direction, not current production coverage.
-
-### Current support authority
-
-Current production/source support is intentionally not enumerated in Product Vision because it changes independently of long-term direction. `PROJECT_STATE.md`, accepted profile/source architecture and ADR-046 complete-authentic-corpus certification define current support. `FW-P2-79` owns the maintained user/engineering coverage matrix.
-
-The former “only Axis CSV is production supported” snapshot is historical and superseded. Repository fixture presence, reader capability, file extension or structural similarity never establishes a supported institution/family/layout. Every recurring source family remains exact to its proven semantic contract and current complete authentic corpus.
-
-### Deterministic import pipeline
-
-Every supported import converges into one production pipeline:
-
-1. `ImportCoordinator` owns orchestration.
-2. `PasswordProvider` supplies an optional credential when an approved workflow exists.
-3. `ReaderRegistry` selects the source-format reader.
-4. The reader extracts a `RawDocument`.
-5. Institution Detection identifies the institution from approved extracted-content evidence.
-6. Statement Classification identifies the document family.
-7. Parser Selection chooses the approved parser/profile.
-8. The Statement Parser creates an immutable `FinancialDocument`.
-9. Validation evaluates structural and financial correctness.
-10. Exact-content duplicate and supported transaction-event evidence are evaluated.
-11. The user reviews account, identity, validation and import outcomes.
-12. The user explicitly confirms the prepared import.
-13. One provider-owned atomic persistence operation revalidates authoritative claims and commits the accepted financial graph.
-14. `RepositoryStoreHydrator` publishes canonical persisted truth into runtime stores.
-15. View models and views present repository-backed state.
-
-Readers understand source formats only.
-
-Parsers interpret financial meaning.
-
-Validation does not depend on AI.
-
-Persistence must not bypass validation, duplicate checks, explicit confirmation or provider-owned revalidation.
-
-`RepositoryStoreHydrator` remains the sole persistence-to-runtime boundary.
-
-### Detection and selection
-
-Institution detection and statement classification must rely on approved extracted-content evidence.
-
-They must not rely on filenames as authority.
-
-Previous successful imports may inform future reviewed profile suggestions, but they must not silently become trusted detection or parser-selection evidence.
-
-Unknown or unsupported documents remain unknown or unsupported rather than being guessed.
-
-### Format independence
-
-Once reader-specific extraction has produced approved evidence, downstream financial interpretation, validation, persistence and presentation remain independent of the transport format.
-
-Equivalent source documents should preserve equivalent observable financial truth across formats.
-
-Exact-content fingerprinting and cross-format financial equivalence are separate concerns:
-
-- exact-content identity protects one exact source representation;
-- cross-format equivalence proves that different representations describe the same financial statement.
-
-Neither may be inferred from matching filenames, totals or transaction collections alone.
-
-### Source fidelity
-
-Supported imports preserve, where the source provides them:
-
-- native currency;
-- exact decimal meaning;
-- debit, credit or source-specific direction;
-- printed date meaning;
-- source order;
-- balances;
-- verified identifiers;
-- document and row provenance;
-- parser profile identity and version.
-
-Missing evidence must remain missing.
-
----
-
-## Financial Intelligence
-
-LedgerForge should evolve from document processing into deterministic financial understanding.
-
-Future intelligence may include:
-
-- statement continuity;
-- historical backfill;
-- overlap-aware importing;
-- duplicate review;
-- owned-account transfer recognition;
-- money-journey reconstruction;
-- salary verification;
-- subscription and recurring-activity understanding;
-- retirement tracking;
-- investment understanding;
-- obligations and cash-flow planning;
-- financial forecasting;
-- cross-account reconciliation;
-- anomaly and change detection.
-
-Financial intelligence builds on repository-backed truth. It must not operate directly on transient parser output.
-
-Every conclusion must identify:
-
-- supporting source and repository evidence;
-- deterministic rules;
-- relevant assumptions;
-- limitations;
-- native-currency and conversion treatment;
-- whether the conclusion is confirmed, derived, suggested or unavailable.
-
----
-
-## Explainable Intelligence
-
-Every automated conclusion must be:
-
-- explainable;
-- inspectable;
-- reproducible;
-- auditable;
-- bounded by its evidence.
-
-Every automated mutation must additionally be:
-
-- explicitly authorized;
-- previewed;
-- transactionally safe;
-- reversible, compensatable or explicitly irreversible.
-
-Users should be able to understand why LedgerForge reached a conclusion and what evidence would falsify it.
-
-AI may assist with unsupported or ambiguous evidence only as a reviewable suggestion. It must never become the sole source of financial truth, validation, identity, persistence or mutation authority.
-
----
-
-## Privacy and Offline Operation
-
-LedgerForge remains fully functional for core financial use without an internet connection.
-
-Core financial truth is stored locally.
-
-Online services, when introduced, remain optional and explicitly controlled.
-
-Passwords, raw financial identifiers and unrestricted source fragments must not appear in diagnostics, ordinary presentation or exports without an explicit approved boundary.
-
-Backups, sync, external integrations and market-data services must preserve:
-
-- explicit user control;
-- provenance;
-- encryption and credential boundaries where applicable;
-- offline access to existing trusted data;
-- truthful unavailable and stale states;
-- recoverability.
-
-User data must never be silently sent to an external service merely to improve convenience.
-
----
-
-## Long-Term Goal
-
-LedgerForge should become a trusted personal financial operating system that users open because it provides a clear, accurate and evidence-backed understanding of their financial life.
-
-Importing documents should become a quiet maintenance activity.
-
-Repository-backed financial views should evolve into a living model of:
-
-- financial position;
-- money movement;
-- obligations;
-- investments;
-- plans;
-- risks;
-- changes requiring attention.
-
-LedgerForge should progress from historical record keeping toward intelligent planning and decision support without weakening:
-
-- offline-first operation;
-- native-currency truth;
-- deterministic processing;
-- explainability;
-- privacy;
-- explicit user control;
-- durable persistence;
-- recoverability.
-
-Every future capability should help the user understand, not merely record, their financial life.
-
-LedgerForge should always favor deterministic financial understanding over opaque statistical inference or black-box automation.
+Any app-level encryption decision requires a concrete owner disclosure concern; it is never an automatic backup dependency or normal sprint candidate. No hypothetical capability is required to call the private app complete enough for the owner.

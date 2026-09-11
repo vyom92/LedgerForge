@@ -1,86 +1,24 @@
 # LedgerForge Future Work
 
-## Process authority
+## PRIVATE PERSONAL APP SCOPE
 
-Execution, recovery, Git/worktree safety, evidence handling and material-finding intake are governed by `AGENTS.md`, `Project_Guide.md` and `LedgerForge_Standing_Execution_Harness_Guide.md`.
+LedgerForge is private, personal, single-user, macOS-native and offline-first, for the owner's own finances on the owner's Mac. Before adding, selecting, researching or preserving work, require an actual owner-requested workflow, a real data correctness/persistence/privacy/recovery need, an authentic source actually supplied or selected by the owner, or a concrete day-to-day usability benefit.
 
-`FUTURE_WORK.MD` owns the canonical unscheduled queue. It does not duplicate executor mechanics and it does not authorize implementation.
+Otherwise: **NOT REQUIRED-DO NOT CONSIDER**. Rejected work is not Research, Candidate, deferred or post-v1; it cannot block retained work or re-enter discovery. Only a new explicit owner decision naming the real personal need can reopen the exact category. Generalized commercial best practice is insufficient. [AGENTS](../AGENTS.md#private-personal-app-scope-gate), [Project Guide](Project_Guide.md) and [Standing Harness](LedgerForge_Standing_Execution_Harness_Guide.md) govern routing and safety.
 
-## Purpose
-
-This document is the canonical planning queue for LedgerForge work that is not yet authorized for execution.
-
-It records:
-
-- product feature candidates;
-- architectural follow-up work;
-- verified bugs;
-- maintenance work;
-- technical debt;
-- engineering-quality improvements;
-- product ideas;
-- research topics.
-
-It exists so future work is selected from a recorded, evidence-based queue rather than reconstructed from conversations or inferred from incomplete project history.
-
-Completed and verified work belongs in:
-
-`Project documents/PROJECT_STATE.md`
-
-Architectural decisions belong in:
-
-`Project documents/ADR.md`
-
-Execution is authorized only by the complete Chat-approved prompt supplied directly in the current conversation. Reports are returned directly in chat; verified durable facts belong in their subject authorities and Git history.
-
-Items selected for execution must be removed from this document or narrowed to the portion that remains unscheduled.
-
----
-
-## Authority
-
-This document is a planning queue, not an implementation contract.
-
-An item appearing here means only that the work has been recorded for future consideration.
-
-It does not mean that the item:
-
-- is approved for implementation;
-- has been assigned a sprint number;
-- will be selected next;
-- has completed repository discovery;
-- has an approved architecture;
-- can be implemented independently of its dependencies.
-
-No future sprint number may be assigned in this document.
-
-A work item becomes executable only when Chat supplies one complete approved prompt to the explicitly authorized execution surface for that task.
-
----
-
-## Discovery reconciled into existing subject authorities — 2026-09-10
-
-Both read-only discovery rounds are incorporated here, in the existing [current roadmap](<Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md>), [prepared roadmap](<Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md>), [prepared 1.0 roadmap](<Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md>) and [R1 design handoff](<UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md>). The redundant standalone register is retired. First-round research used `adcf83f52d309ddac18d95f0321d0c0f6120dd29`, reconciled at `ffddebc6e12405c812a36855ab6212e973cff5ba` and published at `af2d1949c6e9a73af3bb004422b72882d28195e2`. Second-round research is pinned to `af2d1949c6e9a73af3bb004422b72882d28195e2`; latest production acceptance remains owned by PROJECT_STATE and the current roadmap.
-
-First-round coverage was 153 baseline entries: 151 then-active entries and two separately completed Sprint-83 entries (FW-P1-20/21). Sprint-84 closure subsequently retires FW-P2-73 independently. This campaign preserves every current queue ID, title, status and priority; a discovery closure is a separate research classification, never a status promotion. The second round targets 145 cards; active Sprint-84–87 ownership, dashboard customization and accepted corpus maintenance were excluded as recorded by their first-round dispositions.
-
-All packet recommendations, proposed ADR contexts, personal-v1 classifications and roadmap changes below await Chat review. No architecture is accepted, ADR number allocated, sprint selected, source support certified, or product behavior implemented here. No executable validation was performed by this campaign. Repository citations are immutable research facts; an existing test is a definition or previously accepted result, never newly executed evidence. Statement-dependent acceptance must use complete registered authentic sources and independent semantic projection under ADR-046; absent genuine cases stay uncertified.
-
-The typed dependency lists in each card are the durable graph: a card requires its target; OPTIONAL_ENHANCEMENT is not a blocking edge. The graph was checked as acyclic. An accepted authority is not a missing implementation; backup is a prerequisite of adopted personal-v1 certification, not its dependent; toolbar runtime checks do not depend cyclically on global shortcut closure. Current holdings need not wait for ingestion, external prices or performance. Historical FX and optional complete export do not block the selected current estimates or required backup. Technical decisions belong to Chat; the 19 current user product choices each have bounded options in their owning cards.
-
-The final publication delta checked 519 combined citations, 357 unique dependencies and 44 referenced paths against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`: 91 STILL_VALID, 19 REVALIDATED_AFTER_CHANGE, 35 WAIT_POST_SWIFT6, and zero unresolved stale targets. Source citations retain their original research ref and lines; the per-card delta below records the latest comparison.
+This file owns scope-eligible unscheduled work; it does not authorize implementation or assign sprint numbers. Accepted state belongs in PROJECT_STATE.md, architecture in accepted ADRs, and execution only in a complete Chat-approved prompt. The gate preserves financial rigor: complete authentic sources, independent oracles, exact native Money, identity/duplicates, atomic persistence, zero-residue rejection, migration integrity, hydration/relaunch, privacy and verified backup/restore.
 
 ## Explicit user-decision chronology
 
-**Current scope:** verified backup/restore; the bounded current Salary/This Month Al Dar outcome with manual current-rate override; bounded current holdings and sufficient current valuation; current market FX/net-worth reporting; and supported-source documentation are required before Sprint 100 certification. Complete structured export remains optional. Historical conversions and the 2021 floor are superseded. Reporting output currencies/orientation and provider suitability remain Chat decisions.
+**Current scope:** verified backup/restore; adopted current Salary/This Month Al Dar with manual current-rate override; current holdings/valuation; current market FX/net worth; selected practical R1 UI; and a small private supported-source matrix remain personal-adoption requirements. Complete structured export is optional. Historical conversion/2021 requirements are superseded. Reporting orientation and provider suitability retain their real financial-evidence gates.
 
-**Personal-v1 adoption decision — 2026-09-10:** the user fixes **Sprint 100 — LedgerForge 1.0 Personal Adoption Validation & Certification** as a certification-only milestone. It freezes the candidate and fails closed on a defect or missing required boundary; corrective attribution returns to Chat and a corrected candidate must be recertified. Required pre-100 outcomes are Swift 6, selected R1 native work, verified backup/restore, accepted Qatar Airways Salary actuals/Salary History/current This Month planning, bounded current Al Dar, bounded current holdings/valuation, current market FX/net worth, supported-source documentation and the final Chat adoption matrix. Complete export remains optional; historical FX/Al Dar FX, investment history/performance, transfer/reconciliation, rules, merchant/recurrence and broad analytics remain unscheduled post-1.0 candidates. None is a prerequisite unless later promoted by explicit user decision or a higher-priority verified correctness dependency. This changes no architecture, ADR, migration, status or execution authority.
+**PERSONAL-V1: NOT YET ADOPTED.** The fixed future milestone is LedgerForge 1.0 Personal Adoption Verification. It checks the exact adopted owner outcome and implements no planned feature; financial/safety blockers require correction and fresh verification of the corrected candidate.
 
 | Decision | Exact user direction | Disposition |
 | --- | --- | --- |
 | UD-01 | Propose current holdings first; keep history and performance gated | CURRENT, subject to latest UD-09/10 scope |
 | UD-02 | Require backup/restore; keep complete export optional | CURRENT, subject to latest UD-09/10 scope |
-| UD-03 | Include appearance preferences when moving/restoring a workspace | CURRENT, subject to latest UD-09/10 scope |
+| UD-03 | Include appearance preferences when moving/restoring a workspace | SUPERSEDED by UD-12; historical decision only |
 | UD-04 | Require current and historical conversion together | SUPERSEDED by UD-10; chronological evidence only |
 | UD-05 | 1 January 2021 onward is sufficient | SUPERSEDED by UD-10; chronological evidence only |
 | UD-06 | Use reviewable suggestions first (Recommended) | CURRENT, subject to latest UD-09/10 scope |
@@ -88,85 +26,113 @@ The final publication delta checked 519 combined citations, 357 unique dependenc
 | UD-08 | Use a direct market INR→USD rate | CURRENT, subject to latest UD-09/10 scope |
 | UD-09 | i do not need qar to inr historical. its sole purpose is to estimate how much i will get in inr end of the month based on the monthly salary/budget calculator. if needed i can manually override my own fx rate on live/current rate | CURRENT, subject to latest UD-09/10 scope |
 | UD-10 | same with inr to usd. i just need current estimation of net worth in different currencies. not a basket of historical conversions | CURRENT, subject to latest UD-09/10 scope |
-| UD-11 | Fix Sprint 100 as certification only; require the settled pre-100 outcomes, including bounded current Al Dar, current holdings/valuation and current FX/net worth | CURRENT; planning only, no architecture or implementation accepted |
+| UD-11 | Fix Sprint 100 as certification only; require the settled pre-100 outcomes, including bounded current Al Dar, current holdings/valuation and current FX/net worth | Milestone and personal outcomes retained; terminology/program scope SUPERSEDED by UD-12 |
+| UD-12 | LedgerForge is private, personal, single-user and macOS-local. Exclude hypothetical commercial/platform work; reopen only by a new explicit owner decision naming a real need. Retain FW-P0-18 and FW-P1-30/34/35/38/39/39A only for single-user MacBook workflows; remove unselected source placeholders and app-level encryption (no current concern). Preserve design images and explicitly ignore rejected caption portions. | CURRENT — explicit scope reset and clarifications, 2026-09-11; simple local appearance, required backup/restore, Sprint-100 personal adoption verification; no architecture or product implementation accepted |
 
-## Second-round closure inventory
 
-| Research classification | Cards |
+<a id="rejected-private-personal-scope"></a>
+## Rejected private personal scope
+
+**NOT REQUIRED-DO NOT CONSIDER**. These 39 IDs are excluded from active cards, priority triage, dependencies and roadmap selection. A new explicit owner decision naming a real personal need is required to reopen the exact capability. This is the one canonical rejection register.
+
+| Former ID | Rejected scope | Disposition / retained boundary |
+| --- | --- | --- |
+| <a id="fw-p1-01"></a>`FW-P1-01` | Additional Axis Bank-Account Parser Families | **NOT REQUIRED-DO NOT CONSIDER** — no additional authentic owner source selected; actual supported-source facts/corpus gaps remain authoritative. |
+| <a id="fw-p1-02"></a>`FW-P1-02` | Additional HDFC Parser Families | **NOT REQUIRED-DO NOT CONSIDER** — no additional authentic owner source selected; actual supported-source facts/corpus gaps remain authoritative. |
+| <a id="fw-p1-03"></a>`FW-P1-03` | Additional CBQ Parser Families | **NOT REQUIRED-DO NOT CONSIDER** — no additional authentic owner source selected; actual supported-source facts/corpus gaps remain authoritative. |
+| <a id="fw-p1-04"></a>`FW-P1-04` | Additional Credit-Card Parser Families | **NOT REQUIRED-DO NOT CONSIDER** — no additional authentic owner source selected; actual supported-source facts/corpus gaps remain authoritative. |
+| <a id="fw-p1-05"></a>`FW-P1-05` | Additional Salary, Brokerage, Fund, Insurance, Tax and Government Document Families | **NOT REQUIRED-DO NOT CONSIDER** — no additional authentic owner source selected; actual supported-source facts/corpus gaps remain authoritative. |
+| <a id="fw-p1-06"></a>`FW-P1-06` | Parser Framework Expansion | **NOT REQUIRED-DO NOT CONSIDER** — minimum shared changes remain possible only when proven necessary by a real selected authentic source. |
+| <a id="fw-p1-07"></a>`FW-P1-07` | Statement Learning Mode and Profile Library | **NOT REQUIRED-DO NOT CONSIDER** |
+| <a id="fw-p1-08"></a>`FW-P1-08` | AI-Assisted Column Detection | **NOT REQUIRED-DO NOT CONSIDER** |
+| <a id="fw-p1-10"></a>`FW-P1-10` | Additional Native-Text PDF Statement Families | **NOT REQUIRED-DO NOT CONSIDER** — no additional authentic owner source selected; actual supported-source facts/corpus gaps remain authoritative. |
+| <a id="fw-p1-11"></a>`FW-P1-11` | Additional Password-Protected PDF Families | **NOT REQUIRED-DO NOT CONSIDER** — no additional authentic owner source selected; actual supported-source facts/corpus gaps remain authoritative. |
+| <a id="fw-p1-12"></a>`FW-P1-12` | Additional Credential Profile and Password-Storage Capabilities | **NOT REQUIRED-DO NOT CONSIDER** — existing exact Keychain-supported families remain. |
+| <a id="fw-p1-13"></a>`FW-P1-13` | Additional Per-File Credential Override Policy | **NOT REQUIRED-DO NOT CONSIDER** — existing exact Keychain-supported families remain. |
+| <a id="fw-p1-14"></a>`FW-P1-14` | Additional XLS/XLSX Source Families and Spreadsheet Capabilities | **NOT REQUIRED-DO NOT CONSIDER** — no additional authentic owner source selected; actual supported-source facts/corpus gaps remain authoritative. |
+| <a id="fw-p1-15"></a>`FW-P1-15` | TXT Statement Support | **NOT REQUIRED-DO NOT CONSIDER** — no additional authentic owner source selected; actual supported-source facts/corpus gaps remain authoritative. |
+| <a id="fw-p1-17"></a>`FW-P1-17` | OCR Fallback | **NOT REQUIRED-DO NOT CONSIDER** — no additional authentic owner source selected; actual supported-source facts/corpus gaps remain authoritative. |
+| <a id="fw-p1-29"></a>`FW-P1-29` | Better Validation Guidance | **NOT REQUIRED-DO NOT CONSIDER** — accepted useful diagnostics/guidance remain; owner-retained local workflows are separately narrowed. |
+| <a id="fw-p1-31"></a>`FW-P1-31` | Repository Inspector | **NOT REQUIRED-DO NOT CONSIDER** — accepted useful diagnostics/guidance remain; owner-retained local workflows are separately narrowed. |
+| <a id="fw-p1-32"></a>`FW-P1-32` | Development SQLite Browser | **NOT REQUIRED-DO NOT CONSIDER** — accepted useful diagnostics/guidance remain; owner-retained local workflows are separately narrowed. |
+| <a id="fw-p1-33"></a>`FW-P1-33` | Import-Session Inspector | **NOT REQUIRED-DO NOT CONSIDER** — accepted useful diagnostics/guidance remain; owner-retained local workflows are separately narrowed. |
+| <a id="fw-p1-36"></a>`FW-P1-36` | Diagnostic Export | **NOT REQUIRED-DO NOT CONSIDER** — accepted useful diagnostics/guidance remain; owner-retained local workflows are separately narrowed. |
+| <a id="fw-p1-37"></a>`FW-P1-37` | Better Developer Diagnostics and Failure Summaries | **NOT REQUIRED-DO NOT CONSIDER** — accepted useful diagnostics/guidance remain; owner-retained local workflows are separately narrowed. |
+| <a id="fw-p2-45"></a>`FW-P2-45` | Improved Global Search | **NOT REQUIRED-DO NOT CONSIDER** |
+| <a id="fw-p2-49"></a>`FW-P2-49` | R1 Native Accessibility Closure | **NOT REQUIRED-DO NOT CONSIDER** — ordinary readable, unclipped, usable native interaction and harmless existing semantics remain. |
+| <a id="fw-p2-51"></a>`FW-P2-51` | Startup, Runtime and Import Performance Optimization | **NOT REQUIRED-DO NOT CONSIDER** — a later actual measurable defect receives its own bounded cause/fix. |
+| <a id="fw-p2-56"></a>`FW-P2-56` | Development Performance Profiling | **NOT REQUIRED-DO NOT CONSIDER** — a later actual measurable defect receives its own bounded cause/fix. |
+| <a id="fw-p2-70"></a>`FW-P2-70` | Remaining macOS Target and Distribution Metadata Hardening | **NOT REQUIRED-DO NOT CONSIDER** — keep only local build/signing/sandbox requirements needed on the owner’s Mac. |
+| <a id="fw-p3-37"></a>`FW-P3-37` | Optional Encrypted Sync | **NOT REQUIRED-DO NOT CONSIDER** |
+| <a id="fw-p3-38"></a>`FW-P3-38` | Open API and External Integrations | **NOT REQUIRED-DO NOT CONSIDER** |
+| <a id="fw-p3-39"></a>`FW-P3-39` | External Import Plugin Architecture | **NOT REQUIRED-DO NOT CONSIDER** |
+| <a id="fw-p3-40"></a>`FW-P3-40` | Multiple Workspaces and Independent Ledgers | **NOT REQUIRED-DO NOT CONSIDER** |
+| <a id="fw-p3-41"></a>`FW-P3-41` | Portable Workspace Folder | **NOT REQUIRED-DO NOT CONSIDER** — verified backup packages may be saved/copied to an owner-chosen destination; no live workspace architecture. |
+| <a id="fw-p3-42"></a>`FW-P3-42` | Cross-Platform Desktop Strategy | **NOT REQUIRED-DO NOT CONSIDER** |
+| <a id="fw-p3-43"></a>`FW-P3-43` | Local-Data Encryption at Rest | **NOT REQUIRED-DO NOT CONSIDER** — owner states no current disclosure/encryption concern; no parked candidate or backup dependency. |
+| <a id="fw-p0-20"></a>`FW-P0-20` | Additional Transaction-Event Evidence Families | **NOT REQUIRED-DO NOT CONSIDER** — no selected new evidence or concrete owner workflow; accepted source facts, existing regression duties and financial-safety rules remain. |
+| <a id="fw-p1-09"></a>`FW-P1-09` | Remaining Credit-Card Financial Semantics | **NOT REQUIRED-DO NOT CONSIDER** — no selected new evidence or concrete owner workflow; accepted source facts, existing regression duties and financial-safety rules remain. |
+| <a id="fw-p1-16"></a>`FW-P1-16` | Additional Cross-Format Financial Relationships | **NOT REQUIRED-DO NOT CONSIDER** — no selected new evidence or concrete owner workflow; accepted source facts, existing regression duties and financial-safety rules remain. |
+| <a id="fw-p2-63"></a>`FW-P2-63` | Additional Cross-Format Authentic-Source Semantic-Parity Tests | **NOT REQUIRED-DO NOT CONSIDER** — no selected new evidence or concrete owner workflow; accepted source facts, existing regression duties and financial-safety rules remain. |
+| <a id="fw-p2-64"></a>`FW-P2-64` | Large-Statement and Long-Running Import Tests | **NOT REQUIRED-DO NOT CONSIDER** — no selected new evidence or concrete owner workflow; accepted source facts, existing regression duties and financial-safety rules remain. |
+| <a id="fw-p2-69"></a>`FW-P2-69` | Remaining macOS CI and UI Smoke Validation | **NOT REQUIRED-DO NOT CONSIDER** — no concrete CI/UI-smoke/distribution objective; accepted repository-owned local build/test/run validation remains intact. |
+
+## Appearance consolidation
+
+<a id="fw-p2-55"></a>`FW-P2-55` is retired as a separate active card; the retained simple device-local appearance work belongs solely to [FW-P2-52](#fw-p2-52). The rejected theme-engine machinery is removed, not deferred.
+
+<a id="discovery-reconciled-into-existing-subject-authorities--2026-09-10"></a>
+## Retained discovery evidence and current inventory
+
+The 2026-09-10 discovery rounds are source-pinned historical evidence inside the retained subject cards. Their findings remain proposals unless explicitly settled by the owner or accepted by Chat. Old coverage/classification/graph totals are retired; this reset removes rejected packets and retains useful financial/source/recovery evidence. No executable validation or new source reliability is claimed by documentation review.
+
+Current accepted implementation and source limits belong to PROJECT_STATE.md. Removing hypothetical event/card/relationship/parity/stress cards does not remove accepted Axis UPI evidence, the existing Amex/CBQ/Axis card-liability boundaries, HDFC equivalence (ADR-042), CBQ lineage (ADR-043), Axis-card equivalence (ADR-044), or regression duties for actual registered sources. Axis-bank engineering parity still does not authorize durable equivalence; missing genuine large-source cases stay untested, and generated financial statements remain prohibited. Native Swift 6 and V17 remain accepted; accepted migrations and ADR-046 remain unchanged. Every affected financial implementation still requires its complete authentic corpus and independent source projection; absent genuine cases remain source-uncertified.
+
+**Scope-reset inventory:** 146 baseline active cards → 106 active cards: 39 rejected, one separate appearance card consolidated. All seven owner-selected local MacBook cards remain; FW-P0-19 is limited to the existing Axis-bank groups. Accepted local build/test/run validation remains intact after the unspecified CI/UI-smoke candidate is removed. Active status and typed-edge counts are recomputed after final dependency review below.
+
+<!-- scope-reset-inventory:start -->
+| Active status | Count |
 | --- | ---: |
-| `DECISION_CLOSED_BY_EXISTING_AUTHORITY` | 1 |
-| `DECISION_CLOSED_BY_NEW_EVIDENCE` | 0 |
-| `DECISION_CLOSED_BY_EXPLICIT_USER_DECISION` | 2 |
-| `READY_FOR_CHAT_ARCHITECTURE_DECISION` | 22 |
-| `READY_FOR_IMPLEMENTATION_PLANNING` | 2 |
-| `READY_AFTER_NAMED_DEPENDENCY` | 53 |
-| `BLOCKED_ON_AUTHENTIC_SOURCE` | 17 |
-| `BLOCKED_ON_PRIVATE_EVIDENCE_NOT_AVAILABLE` | 1 |
-| `BLOCKED_ON_EXTERNAL_PROVIDER_OR_PERMISSION` | 2 |
-| `BLOCKED_ON_PRODUCT_DECISION` | 19 |
-| `WAIT_POST_SWIFT6` | 1 |
-| `WAIT_FOR_RUNTIME_ACCEPTANCE` | 6 |
-| `DEFERRED_WITH_REASON` | 19 |
-| `REJECTED_WITH_REASON` | 0 |
+| Ready for discovery | 11 |
+| Candidate | 18 |
+| Blocked | 47 |
+| Ready for planning | 5 |
+| Maintenance | 2 |
+| Research | 20 |
+| Idea | 3 |
+| **Total** | **106** |
 
-Total: **145** targets. A whole-card closure can remain blocked after one factual prerequisite closes. The graph contains 301 nodes and 296 typed edges, with no blocking cycles. 35 targets retain a required post-Sprint-87 refresh; source/provider facts do not become stale solely because Swift ownership changes.
+**Typed dependency entries:** 210 (one entry per explicit typed line; `SATISFIED` and `OPTIONAL_ENHANCEMENT` are recorded but are not blocking prerequisites).
 
-## Full Candidate Verification Audit
+| Type | Entries |
+| --- | ---: |
+| `OPTIONAL_ENHANCEMENT` | 11 |
+| `REQUIRES_ACCEPTED_ARCHITECTURE` | 107 |
+| `REQUIRES_AUTHENTIC_SOURCE` | 23 |
+| `REQUIRES_IMPLEMENTATION` | 14 |
+| `REQUIRES_POST_SWIFT6` | 33 |
+| `REQUIRES_PROVIDER_PERMISSION` | 3 |
+| `REQUIRES_RUNTIME_ACCEPTANCE` | 4 |
+| `REQUIRES_USER_DECISION` | 12 |
+| `SATISFIED` | 3 |
 
-**Audit date:** 2026-09-09
-**Original audit baseline:** `main@a560312db5900645779a499016e13f0c87e81435`
-**Sprint-81 queue-closure update:** 2026-09-10 at `main@13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`
-**Sprint-82 queue-closure update:** 2026-09-10 at `main@d239f939088b67e5a90c65117f08592891be17bb`
-**Sprint-83 queue-closure update:** 2026-09-10 at `main@ffddebc6e12405c812a36855ab6212e973cff5ba` (accepted implementation `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; implementation parent `057d70b6f39929735401d5211cd180db162c94cc`)
-**Sprint-84 queue-closure update:** 2026-09-10 at accepted implementation `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`
-**Sprint-85 queue-closure update:** 2026-09-10 at accepted implementation `b4e4e6ffb14deccef238352a6ef834514a2a37c2`
-**Sprint-87 queue-closure update:** 2026-09-10 at accepted implementation `93c068c23027a8cd59753ac4ac916e6cee75adbf`
-**Sprint-88 queue-closure update:** 2026-09-11 at accepted implementation `4f5eeb7b11c0f5879204a06ae9f08045304342b5`
-**Active queue count after Sprint-88 acceptance closure:** 146
-**Current migration:** V17
-**Current source/reliability architecture:** ADR-046 complete-authentic-corpus authority
-**Current design authority:** `LF-UI-2026-09-R1` for its bounded scope
-**Latest accepted numbered implementation:** Sprint 88 — App Shell and Workflow Decomposition at `4f5eeb7b11c0f5879204a06ae9f08045304342b5`
-**Latest accepted numbered discovery:** Sprint 80 — `SWIFT6_READINESS_COMPLETE`
-**Personal-v1:** UNDECLARED / NOT CERTIFIED
+No active card or typed dependency points to a rejected ID or the consolidated appearance card. Historical/retired anchors preserve provenance links only.
+<!-- scope-reset-inventory:end -->
 
-The Sprint-83 closure mechanically re-enumerated every active `FW-*` heading: 151 candidates, 151 unique IDs, no duplicate IDs and no malformed candidate headings. The original audit reconciled candidates against `PROJECT_STATE.md`, the current 80–89 roadmap, the Standing Harness, relevant accepted ADRs, Product Vision, R1 design authority and current repository evidence where documentation was insufficient.
+## Completed authority links
 
-Reconciliation outcomes:
+These stable anchors preserve links to accepted history, not active candidates:
 
-- <a id="fw-p2-67"></a>`FW-P2-67` — App Shell and Workflow Decomposition is completed and removed from the active queue because Chat accepted Sprint 88 at `4f5eeb7b11c0f5879204a06ae9f08045304342b5` under `SPRINT_88_APP_SHELL_DECOMPOSITION_ACCEPTED`. The shell/workflow ownership prerequisite is `SATISFIED`; no migration or ADR consequence. Other candidates retain their priorities/statuses and remaining gates; FW-P2-77 organization and FW-P2-51 bounded parallel preparation remain separately unscheduled. Sprint 89 is planned, not implementation-authorized. [PROJECT_STATE.md](PROJECT_STATE.md) records the accepted boundary and evidence.
+- <a id="fw-p2-67"></a>App Shell and Workflow Decomposition: accepted Sprint 88; shell/workflow ownership prerequisite satisfied. Sprint-89 WIP remains unaccepted and paused for the scope reset.
+- <a id="fw-p2-76"></a>Coordinated Swift-6 Migration: accepted Sprint 87.
+- <a id="fw-p2-75"></a>Strict-Concurrency Test Correction: accepted Sprint 86.
+- <a id="fw-p2-74"></a>Dependency Concurrency Boundary: accepted Sprint 85.
 
-- <a id="fw-p2-76"></a>`FW-P2-76` is removed from the active queue because Chat accepted Sprint 87 — Coordinated Swift-6 Migration at `93c068c23027a8cd59753ac4ac916e6cee75adbf`. All native targets are Swift 6; V17, ADR-046 and Personal-v1 UNDECLARED / NOT CERTIFIED remain unchanged. The formerly outstanding `FW-P2-67` shell prerequisite is now `SATISFIED` by accepted Sprint 88, recorded above.
-
-- `FW-P2-72` is removed from the active queue because Sprint 81 completed and Chat accepted the PR-1 staging/runtime-publication ownership seam at implementation commit `13552eaf8d22a8e6fcb56fb9a9d7a9dd0892bf91`.
-- `FW-P1-19` is removed from the active queue because Sprint 82 completed and Chat accepted the serial Unified Import Centre foundation at implementation commit `d239f939088b67e5a90c65117f08592891be17bb`. Its serial coordinator, per-item identity/state ownership, cancelled-task draining, explicit confirmation, shared production ownership, duplicate/recovery preservation and no-parallel-preparation evidence are recorded in `PROJECT_STATE.md` and the current roadmap.
-- `FW-P1-20` and `FW-P1-21` are removed from the active queue because Sprint 83 completed and Chat accepted serial batch import and multi-file picker/drag-and-drop at implementation commit `adcf83f52d309ddac18d95f0321d0c0f6120dd29`. Single and multi-file intake share the serial queue with independent review, explicit confirmation, failure isolation and truthful per-file outcomes. Parallel preparation remains unscheduled research under the existing `FW-P2-51`.
-- `FW-P2-73` is removed from the active queue because Sprint 84 completed and Chat accepted PR-2 SQLite/provider/migration ownership at implementation commit `a4dd6929a2282cc94c850eb1dccf350b1ee5c8a1`. The bounded ownership, strict closure and V1–V17 preservation evidence belongs in `PROJECT_STATE.md`. The subsequent Sprint-85 acceptance below closes PR-3; the current roadmap owns TEST-PR and the amended Sprint-85–87 validation policy.
-- <a id="fw-p2-74"></a>`FW-P2-74` is removed from the active queue because Sprint 85 completed and Chat accepted PR-3 Dependency Concurrency Boundary at implementation commit `b4e4e6ffb14deccef238352a6ef834514a2a37c2`: `LOCAL_CORRECTION` for ZIPFoundation and `SERIALIZED_PROCESS_LOCAL` for LegacyXLS/libxls. Evidence belongs in `PROJECT_STATE.md`; Sprint 86 subsequently accepted TEST-PR, and `FW-P2-76` retains its separate coordinated migration boundary.
-- <a id="fw-p2-75"></a>`FW-P2-75` is removed from the active queue because Sprint 86 completed and Chat accepted TEST-PR at implementation commit `022d436fc4563be9b0967ac2751e6114a31474c1`. Test/support ownership, independent assertions/oracles and proportional qualification are recorded in `PROJECT_STATE.md`. Sprint 87 (`FW-P2-76`) is now Chat-authorized; no production/runtime change, migration, ADR or native Swift-6 switch was accepted in Sprint 86.
-- `FW-P0-25` is removed from the active queue because the unnumbered 127-carrier authentic-corpus reset is technically accepted and complete; newly supplied recurring sources remain governed cumulatively by ADR-046.
-- Compound historical statuses are normalized to the defined planning vocabulary. Completed slices remain concise body notes while titles and statuses describe only remaining unscheduled work.
-- Exact source-family support remains exact. HDFC whole-statement PDF/XLS equivalence, Axis-card PDF/XLSX equivalence and CBQ current-account source lineage are separate accepted contracts; none is generalized to another institution, financial family or format.
-- The accepted reset establishes engineering format-neutral semantic parity for the registered Axis-bank carriers. It does not establish a durable Axis-bank cross-format duplicate/equivalence or supporting-source suppression contract.
-- The accepted 127-carrier campaign supplies the current engineering authentic-corpus regression matrix. `FW-P2-61` therefore retains only matrix maintenance/user-facing durability work rather than claiming that the matrix is absent.
-- R1 design approval is settled, while native Transactions, Dashboard, appearance and cross-screen conformance remain implementation work.
-- `FW-P0-26`, `FW-P2-78` and `FW-P2-79` were mechanically proven unused before being added.
-
-The former 2026-08-01 audit is historical context only. Its Sprint-65-era counts, fixture assumptions and support snapshots are not current planning authority.
-
-### Current statement-dependent acceptance rule
-
-For statement-dependent financial behavior, the complete registered authentic corpus is authority. No synthetic, generated, sanitized, reconstructed, representative, reduced, mutated or hand-authored financial statement may be used at any stage. Production parser output is never its own sole oracle. Private gates fail closed when required evidence is unavailable. A material source/parser/persistence/financial-semantic correction invalidates prior green evidence for the affected candidate boundary, which must be frozen and retested. Exact support never generalizes by institution name, file format, transaction count, page count or layout similarity.
-
-### Roadmap relationship
-
-`FUTURE_WORK.MD` remains the canonical queue. The current and prepared roadmaps may assign non-executable planning positions to recorded queue IDs, but roadmap placement does not remove the candidate, authorize implementation or override P0 → P1 → P2 → P3 triage. A candidate leaves this queue only when a Chat-approved execution selection consumes it or when accepted evidence proves its active boundary fully complete.
-
----
+Detailed accepted history remains in PROJECT_STATE.md, the current roadmap's historical sections and Git; it cannot reopen rejected future scope.
 
 ## Planning Principles
 
-Future work is ordered by:
+Only work passing the Private Personal App Scope Gate enters triage. Eligible future work is ordered by:
 
 1. priority;
 2. dependency readiness;
@@ -213,7 +179,7 @@ Important transaction, account, developer, usability and engineering-quality imp
 
 ### P3 — Later Product Expansion
 
-Analytics, investments, multi-currency and ecosystem capabilities that depend on a mature core platform.
+Owner-selected analytics, investments and multi-currency outcomes that depend on accepted financial foundations.
 
 ---
 
@@ -249,13 +215,15 @@ The problem is recorded, but architecture or product direction is not yet approv
 
 ### Idea
 
-A possible future direction without planning commitment.
+A concrete owner-requested personal workflow without planning commitment; hypothetical generalized ideas are excluded.
 
 ---
 
 ## Sprint Selection Procedure
 
 After a completed increment is verified and accepted:
+
+0. Apply PRIVATE PERSONAL APP ELIGIBILITY: name the real owner workflow or actual data/source/safety issue, explain why the smallest direct solution is insufficient, and exclude proposals justified only by generalized commercial practice.
 
 1. Read `PROJECT_STATE.md` and establish the verified repository baseline.
 
@@ -301,7 +269,7 @@ When reporting future work:
 - distinguish Ready for discovery, Candidate, Blocked, Ready for planning, Bug, Maintenance, Research and Idea;
 - do not assign sprint numbers inside this queue; planning positions belong only to the applicable roadmap and remain non-executable;
 - do not describe a candidate as approved implementation;
-- clearly label any new suggestion that has not yet been added to this document.
+- reject ineligible generalized suggestions without adding cards; route only concrete scope-eligible findings to durable authority.
 
 A valid statement is:
 
@@ -964,1509 +932,84 @@ Discovery completed against commit `fe1f109bb8a1b9d425187869e91eefe98f4e5bb8` wi
 
 <a id="fw-p0-18"></a>
 
-## FW-P0-18 — Workspace-Scoped Fingerprint Uniqueness
+## FW-P0-18 — Single-Ledger Fingerprint Integrity Review
 
 **Status:** Blocked
-**Discovery:** Complete
-**Depends on:** An approved `FW-P3-40` multiple-workspace architecture that explicitly decides fingerprint scope
 
-Define exact-statement fingerprint ownership when one LedgerForge database contains more than one independent workspace.
+**Owner-selected scope — 2026-09-11:** retain a bounded fingerprint-integrity review for the owner's one local ledger on the owner's MacBook. The former multiple-workspace proposal is withdrawn; existing `workspaceId` schema and accepted fingerprint identities remain unchanged.
 
-The design must determine:
+**Depends on:** one concrete single-ledger fingerprint/replay or restore question, authentic source evidence and the existing ADR-030/041/042/043/044 duplicate/equivalence contracts. No verified fingerprint defect is asserted by this scope correction.
 
-- whether exact-content uniqueness is workspace-scoped or database-wide;
-- schema and migration requirements;
-- treatment of identical source content imported into independent workspaces;
-- conflict and migration behavior for existing database-wide fingerprints;
-- privacy and diagnostic boundaries.
+Review whether exact source replay and an adopted backup/restore path preserve the accepted one-ledger duplicate guarantee. Preserve original-byte provenance, exact-content identity, source-family equivalence and zero accepted residue on rejection. Do not change fingerprint scope, schema, digest derivation or cross-format semantics to create a new feature.
 
-Fingerprint scope is a subdecision of the future multiple-workspace architecture. `FW-P0-18` must not be treated as an independent prerequisite that blocks discovery of `FW-P3-40`, because doing so creates a circular dependency.
-
-The source digest must remain derived from source evidence rather than being altered merely to encode workspace identity.
-
-No schema change is authorized until workspace identity, isolation and migration semantics are approved.
-
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** FW-P3-40 owns the single user choice about multiple independent workspaces. If adopted, Chat must approve workspace isolation and fingerprint lookup/uniqueness scope; this card has no separate user product choice.
-
-**Smallest proposed boundary:** Architecture record only.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: current duplicate authority is queried by algorithm/fingerprint without workspace in the visible confirmed-import check.
-
-**First-round scope and constraints:** Digest stays source-derived; fingerprint scope is a subdecision of FW-P3-40, avoiding circular blockage. No schema change or workspace implementation.
-
-**First-round question/options:** Should exact-source fingerprint uniqueness be workspace or database scoped? PROPOSED let workspace architecture select scope then design transition; do not salt digest.
-
-**First-round remainder and implications:** EXPLICIT_USER_DECISION multiple-workspace identity/isolation/migration semantics. Migration required only after scope decision; no number.
-
-**First-round proposed acceptance/falsifier:** Identical source in two isolated workspaces follows selected rule and privacy constraints; existing DB transition is explicit. Chosen workspace design cannot preserve source-derived digest.
-
-**Second-round new evidence/resolved direction:** None.
-
-**Exact next evidence or decision:** Selected FW-P3-40 product outcome and a Chat-approved workspace isolation/fingerprint scope contract, followed by source-backed cross-workspace duplicate/ownership acceptance.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Blocked **Roadmap:** No change
-
-**Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
-
-**Revalidation/falsifiers:** workspace selection.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=true, authentic source=false. **Blocker types:** IDENTITY, DURABLE_PERSISTENCE, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P3-40`: Workspace-scoped fingerprint uniqueness is an isolation subdecision of the selected multi-workspace product; the single user product choice lives only under FW-P3-40.
-- `REQUIRES_POST_SWIFT6` → `accepted-post-sprint-87-ownership`: Revalidate this card only against the accepted post-87 provider/migration/hydration/actor delta.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):493-513 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P0-18
-- [Database/SQLiteConfirmedImportRepository.swift](<../Database/SQLiteConfirmedImportRepository.swift>):175-180 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `94798b9f38227067b2973fdcce07d5d41d8636726849eaac6037aef7470cf8e2` — duplicate fingerprint check
-- [Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md](<Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md>):205-208 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — fingerprint scope is workspace-gated
-
-</details>
+**Acceptance if selected:** independently compare authentic source identity with ordinary duplicate/replay behavior and, where relevant, restored canonical state. Any proposed semantic or migration change returns to Chat. No multiple-workspace prerequisite or generic fingerprint architecture program remains.
 
 ---
 
 <a id="fw-p0-19"></a>
 
-## FW-P0-19 — Remaining Cross-Format Statement Duplicate Identity
+## FW-P0-19 — Existing Axis-Bank Cross-Format Duplicate Safety Review
 
 **Status:** Blocked
-**Depends on:** an independently source-proven representation pair and an accepted family-specific identity/equivalence contract beyond the completed HDFC, Axis-card and CBQ-lineage boundaries
 
-**Completed boundary:** ADR-042 establishes exact whole-statement HDFC PDF/XLS equivalence. ADR-044 establishes exact Axis credit-card representation-neutral financial equivalence for the accepted PDF/XLSX family. ADR-043 separately establishes exact reviewed CBQ current-account source lineage; it is not generic equivalence.
+**Owner-selected scope — 2026-09-11:** retain only a bounded read-only review of the three already supplied Axis-bank CSV/PDF/XLS source groups. No generic future institution/format family, same-format identity, source replacement or partial-overlap programme remains.
 
-**Remaining boundary:** The accepted 127-carrier reset proves format-neutral Axis-bank semantic parity as engineering regression evidence, but no accepted ADR establishes durable Axis-bank cross-format duplicate identity, equivalent-supporting-source suppression or authoritative-source replacement. Axis-bank relationship semantics, additional institution/format pairs, same-format byte-distinct semantic identity, source replacement and unapproved partial-overlap families remain separately source-gated.
+**Verified historical evidence:** the second discovery round identified three distinct-byte Axis-bank groups, but none satisfied its tested exact financial/reference projection. The accepted corpus reset establishes engineering semantic parity; it does not establish durable Axis-bank equivalence, supporting-source suppression or authoritative-source replacement. This is an unresolved source-comparison boundary, not a verified production duplicate defect.
 
-Any future relationship must distinguish exact-content duplicates, multiple representations of one statement, revised statements, overlapping statements and coincidentally similar transaction sets. It must use complete relevant authentic-source evidence and an independent architecture-aware source oracle. Filename, count, page or layout similarity is never authority.
+**Depends on:** complete authentic bytes and independent source facts for those existing groups, the exact tested mismatch dimensions and current provider/identity ownership. A missing or mismatched projection cannot be relabelled equivalent. The existing HDFC whole-statement equivalence (ADR-042), CBQ lineage (ADR-043) and Axis-card equivalence (ADR-044) remain separate accepted contracts.
 
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No new source-proven family-specific equivalence pair. The inspected Axis-bank three-format groups do not satisfy the tested financial/reference projection; accepted HDFC pairs remain limited to ADR-042.
+**Smallest boundary:** compare the existing groups' genuine account, period, currency, ordered events, multiplicity and source controls against an explicit architecture-aware semantic projection. Explain why each pair matches or differs. Filename, count, page, layout and similar-looking rows do not prove identity. No source suppression/replacement, algorithm or migration is authorized. Any proposed durable relation requires separately accepted source-family architecture.
 
-**Smallest proposed boundary:** Read-only pair/projection comparison, no source suppression or replacement.
-
-**Decision record:** [TRANSFER_FAMILY_DECISION_PACKET](#packet-transfer-family-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: exact content duplicates, accepted HDFC/Axis-card equivalence and CBQ lineage are distinct bounded paths; Axis-bank parity is not durable equivalence.
-
-**First-round scope and constraints:** Every new pair needs complete authentic evidence and independent architecture-aware oracle; layout/count/name similarity is never authority. No fuzzy/same-format semantic matching, source replacement, partial overlap or Axis-bank assumption.
-
-**First-round question/options:** Define remaining cross-format statement duplicate/equivalence identity. PROPOSED nominate one representation pair only after source/oracle availability.
-
-**First-round remainder and implications:** MISSING source-proven pair and accepted family-specific relation contract. Pair-specific relationship schema may be needed; none allocated.
-
-**First-round proposed acceptance/falsifier:** Different representations either establish exact approved projection relation or fail closed with no source residue. Missing complete corpus or any ambiguity between revised/overlap/equivalent sources.
-
-**Second-round new evidence/resolved direction:** Three logical Axis-bank groups have distinct-byte CSV/PDF/XLS carriers, but zero satisfy the tested exact financial/reference projection; HDFC's four exact pairs remain the accepted ADR-042 family.
-
-**Exact next evidence or decision:** A genuine new candidate family/pair with independent source facts, source currency/account/period/ordering and explicit architecture-aware semantic projection that establishes the proposed relation.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Preserve Blocked until authentic relationship evidence is complete; no promotion based on unmatched Axis-bank groups. **Roadmap:** No change
-
-**Publication delta:** `WAIT_POST_SWIFT6` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The accepted Sprint-84 delta does not establish the remaining post-87 ownership/runtime gate.
-
-**Revalidation/falsifiers:** any mismatch, revised source, account conflict, or same-format claim.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=true, authentic source=true. **Blocker types:** SOURCE_TRUTH, FINANCIAL_SEMANTICS, PROVENANCE, ARCHITECTURE_DECISION.
+**Acceptance if selected:** independent source/projection evidence resolves each recorded mismatch or leaves it explicitly unresolved; ordinary production stays fail-closed under its existing exact-content and family-specific rules, with zero accepted durable residue on rejection. Existing complete-corpus, provider/hydration/relaunch and source-privacy duties remain binding when their boundaries are exercised.
 
 **Typed dependencies:**
 
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `accepted-adr-042`: existing bounded equivalence model
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-new-equivalence-family`: Unmatched source groups do not establish a new equivalence contract.
-- `REQUIRES_POST_SWIFT6` → `accepted-post-sprint-87-ownership`: Revalidate this card only against the accepted post-87 provider/migration/hydration/actor delta.
+- `REQUIRES_ACCEPTED_ARCHITECTURE` → `accepted-adr-042`: existing bounded equivalence authority remains separate; no Axis-bank extension implied.
+- `REQUIRES_AUTHENTIC_SOURCE` → `source-existing-axis-bank-groups`: complete already supplied groups and independent facts for the recorded mismatches.
+- `REQUIRES_POST_SWIFT6` → `accepted-post-sprint-87-ownership`: use the actual current identity/provider/hydration ownership when checking production behavior.
 
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):517-526 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P0-19
-- [Services/ImportPersistenceCoordinator.swift](<../Services/ImportPersistenceCoordinator.swift>):1845-1856 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `052b8de5c2de61349a5151d676e1dade3ec005363fb82f4eed290822bea2cfae` — equivalentSourceRecorded
-- [Project documents/ADR.md](<ADR.md>):5032-5064 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — same-format byte-different and source replacement are excluded
-
-</details>
-
----
-
-<a id="fw-p0-20"></a>
-
-## FW-P0-20 — Additional Transaction-Event Evidence Families
-
-**Status:** Research
-**Depends on:** Authentic overlapping source evidence for each proposed family and family-specific deterministic reference, subtype, reuse, conflict and privacy semantics
-
-Investigate additional transaction-event evidence families without expanding the bounded Axis UPI authority prematurely. Possible families include:
-
-- IMPS;
-- NEFT;
-- e-commerce or card events;
-- unstructured references;
-- reversal;
-- refund.
-
-Each family may require a separate ADR and implementation increment. No family may reuse the Axis UPI algorithm identifier. Stable-looking tokens alone are insufficient; date, amount, narration, balance, filename and row position remain weak evidence. Missing evidence does not prove novelty, and no historical backfill is implied.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No independently established overlapping event family with deterministic reference/subtype/reuse/conflict semantics.
-
-**Smallest proposed boundary:** Evidence register only.
-
-**Decision record:** [TRANSFER_FAMILY_DECISION_PACKET](#packet-transfer-family-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: repeated/existing supported event evidence blocks imports; current algorithm is bounded Axis UPI.
-
-**First-round scope and constraints:** No reuse of Axis UPI identifier; tokens, date, amount, narration, balance, filename and row position are weak evidence. No IMPS/NEFT/card/refund/reversal implementation or historical backfill.
-
-**First-round question/options:** Which additional transaction-event evidence family can safely extend Axis UPI? PROPOSED defer every listed family until authentic overlap is registered; none has source evidence here.
-
-**First-round remainder and implications:** MISSING authentic overlapping sources plus deterministic reference/subtype/reuse/conflict/privacy semantics for each proposed family. Unknown, family-specific.
-
-**First-round proposed acceptance/falsifier:** Oracle proves same event/reuse/conflict; false-positive risk test rejects weak coincidence; zero residue when unsupported. Evidence depends on stable-looking token alone.
-
-**Second-round new evidence/resolved direction:** The two cross-account shapes have zero matching nonempty structured-reference or narration digests; they cannot seed an event algorithm.
-
-**Exact next evidence or decision:** One authenticated overlapping family and independent event oracle.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Research **Roadmap:** No change
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** stable token-only proof.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, FINANCIAL_SEMANTICS, PROVENANCE, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-new-event-family`: event truth
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p0-20`: No independently established overlapping event family with deterministic reference/subtype/reuse/conflict semantics.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):530-544 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P0-20
-- [Services/ImportPersistenceCoordinator.swift](<../Services/ImportPersistenceCoordinator.swift>):1864-1873 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `052b8de5c2de61349a5151d676e1dade3ec005363fb82f4eed290822bea2cfae` — transaction event blocking
-- [Project documents/LedgerForge_Standing_Execution_Harness_Guide.md](<LedgerForge_Standing_Execution_Harness_Guide.md>):192-205 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — parser output and weak similarity cannot be sole authority
-
-</details>
+**Pinned historical evidence:** the 2026-09-10 discovery comparison is preserved in Git at `23f216a3d9cb8d432d177916e13febde23516b4a`, former FW-P0-19; [accepted ADRs](ADR.md) and [PROJECT_STATE.md](PROJECT_STATE.md) own current financial/source authority. No new source or runtime verification is claimed by this documentation narrowing.
 
 ---
 
 <a id="fw-p0-26"></a>
 
-## FW-P0-26 — Personal-v1 Adoption Certification Gate
+## FW-P0-26 — Personal-v1 Adoption Verification Gate
 
 **Status:** Blocked
-**Depends on:** accepted pre-100 boundaries: Swift 6; selected R1 native work; verified backup/restore; accepted Qatar Airways Salary actuals, Salary History and current This Month planning; the bounded current Al Dar Salary/budget outcome with manual current-rate override; bounded current holdings and sufficient current valuation; current market FX/net-worth reporting; supported-source documentation; and the final Chat-frozen adoption matrix. Complete export remains optional; historical FX/Al Dar FX, investment history/performance, transfer/reconciliation, rules, merchant/recurrence and broad analytics remain unscheduled post-1.0 candidates. None is a prerequisite unless later promoted by explicit user decision or a higher-priority verified correctness dependency.
 
-Personal-v1 may not be declared merely because current automated tests are green. Certification fails closed and must freeze the exact adopted product candidate. Sprint 100 plans no feature implementation or defect repair: a product defect or missing required capability fails certification and returns to Chat for corrective attribution/scheduling, followed by recertification of the corrected candidate.
+**PERSONAL-V1: NOT YET ADOPTED.** The question is whether LedgerForge is safe, correct and complete enough for the owner to use as the personal system of record.
 
-Applicable evidence must include at minimum:
+**Depends on:** accepted owner-selected import/R1 workflows, verified backup/restore, adopted Salary/This Month/current Al Dar planning, current holdings/valuation, current market FX/net worth and the private supported-source matrix. Complete structured export remains optional unless separately adopted.
 
-- current complete authentic-source corpus certification;
-- exact supported-source documentation;
-- Release build and canonical TestPlan;
-- import workflow/manual acceptance;
-- password/credential-path acceptance where relevant;
-- single-file and batch intake as actually adopted;
-- duplicate and rejection semantics;
-- durable persistence and migration integrity;
-- SQLite/In-Memory parity where applicable;
-- close/reopen/relaunch/hydration;
-- user-owned backup creation, integrity verification and restore drill;
-- privacy/residue review;
-- structured/user data export only if adopted in the frozen Chat adoption matrix; complete export is optional under UD-02;
-- supported institution/source matrix;
-- manual period/account reconciliation;
-- defined parallel comparison against the existing Budget Analysis workbook or its agreed successor oracle for the applicable planning/analytics boundary;
-- documented limitations and source-uncertified cases.
+Freeze the exact candidate. Sprint 100 is personal adoption verification, with no planned feature implementation. A known correctness/safety blocker or missing required outcome fails the gate and returns to Chat for corrective attribution; verify the corrected frozen candidate before adoption.
 
-Absent authentic cases remain uncertified and must not be manufactured. Certification does not require every Product Vision feature; it requires every feature Chat explicitly classifies as pre-v1 before the certification attempt. Personal-v1 remains undeclared until Chat explicitly accepts this gate.
+Required core proof:
 
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** every named required pre-100 boundary, including backup/restoration ADR and independently accepted restore drill; bounded current Al Dar, holdings/valuation and current-FX/net-worth outcomes; supported-source documentation; and the frozen Chat adoption matrix.
+1. The owner's real supported statements pass the ordinary import path over the complete registered authentic corpus, including adopted single/batch and credential flows.
+2. Independent authentic-source truth agrees with exact Money, direction, dates, source order, identity, duplicate/equivalence and rejection outcomes; rejection leaves zero accepted durable residue.
+3. Accepted migration identities, SQLite integrity/foreign keys, provider parity where both matter, canonical hydration and same-database quit/relaunch remain safe.
+4. Owner backup creation, integrity/compatibility checks, isolated restore, nonempty-target protection, explicit confirmation, rollback and restored hydration/relaunch actually work under the approved recovery contract.
+5. Adopted Salary actuals/History/This Month and current Al Dar/manual-rate planning work with accepted fee, rounding, amount-binding and stale/unavailable semantics.
+6. Adopted current holdings and valuation agree with genuine ownership, exact quantities, typed cost evidence and independently qualified current price evidence.
+7. Adopted current FX/net-worth reporting preserves native facts, non-overlapping membership, rate orientation/provenance, deterministic rounding and explicit incomplete components.
+8. FW-P2-79 accurately records exact supported boundaries and source-uncertified gaps.
+9. The owner's actual UI is usable: complete readable Money, no clipping/overlap, useful resizing/keyboard/focus/selection and truthful workflow state.
+10. No known correctness/safety blocker remains; limitations and the actual workflow comparison are explicit. A legacy workbook is workflow context, never its own financial oracle.
 
-**Smallest proposed boundary:** Prepared Sprint 100 certifies only the frozen candidate after the named pre-100 boundaries are accepted. It implements no feature. Backup, authentic corpus, supported-source and manual rows are required; complete export is optional.
+Run the complete TestPlan and Debug/optimized local Release build where technically appropriate under the final integrated gate, with exact candidate identity, nonzero execution, zero unexplained failures/skips/expected failures, applicable full authentic provider/order evidence and privacy/resource containment. A green build/suite alone cannot establish adoption. Missing authentic cases remain source-uncertified and are never fabricated.
 
-**Decision record:** [USER_BACKUP_RESTORE_ARCHITECTURE_PACKET](#packet-user-backup-restore-architecture-packet), [PERSONAL_V1_CERTIFICATION_PACKET](#packet-personal-v1-certification-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY at research ref: committed PROJECT_STATE and roadmap record accepted Sprint82 and complete-corpus alignment. Native import/hydration and migration tests are foundations, while user-owned backup/restore and domain export remain queue items. Subsequent separately owned Sprint83 acceptance closure at ffddebc6e12405c812a36855ab6212e973cff5ba is incorporated as publication authority, not self-accepted by this campaign.
-
-**First-round scope and constraints:** The app remains private, local and explicit. Accepted financial history, native Money, order, multiplicity and provenance cannot be silently rewritten. ADR-046 authentic-input rules apply to financial cases; migration identities remain append-only. Discovery grants no implementation or acceptance. Exclude certification by this report, new full-suite/corpus runs, enterprise/cloud prerequisites, and treating workbook formulas as financial architecture.
-
-**First-round question/options:** What precise boundary must personal-v1 certification freeze? A scope-frozen personal adoption gate serves this owner; requiring every Product Vision item or treating one green suite as certification does not.
-
-**First-round remainder and implications:** Chat-owned adopted pre-v1 feature/deferral matrix; exact accepted candidate; user-owned backup/restore drill and export/support deliverables; independent period/account and applicable workbook comparison. This campaign did not execute certification. Certification record itself needs no migration; each adopted feature retains its own ADR/schema gate.
-
-**First-round proposed acceptance/falsifier:** Freeze the actual adopted bytes and supported corpus; prove Release/TestPlan, credentials/import/manual/batch where adopted, duplicate/rejection residue, provider parity, durable startup/relaunch, backup integrity and isolated restore, export privacy, support matrix and independent period/account comparison. Record absent authentic cases as uncertified. Candidate/code/corpus change, an unclosed adopted dependency, or a workbook comparison using retired assumptions invalidates the certification attempt.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY at research ref: committed PROJECT_STATE and roadmap record accepted Sprint82 and complete-corpus alignment. Native import/hydration and migration tests are foundations, while user-owned backup/restore and domain export remain queue items. Subsequent separately owned Sprint83 acceptance closure at ffddebc6e12405c812a36855ab6212e973cff5ba is incorporated as publication authority, not self-accepted by this campaign. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: the accepted named pre-100 boundaries, including backup/restoration ADR and restore drill; bounded current Al Dar, holdings/valuation and current-FX/net-worth outcomes; supported-source documentation; and the frozen Chat adoption matrix. Owning authority: USER_BACKUP_RESTORE_ARCHITECTURE_PACKET, PERSONAL_V1_CERTIFICATION_PACKET.
-
-**Personal-v1:** PRE_V1_REQUIRED
-
-**Recommendation after Chat:** READY_AFTER_NAMED_DEPENDENCY **Roadmap:** Prepared Sprint 100 is fixed for certification only; no feature is assigned there.
-
-**Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** DEPENDENCY, ARCHITECTURE_DECISION.
+No public-release, accessibility/compliance, support-organization, API/plugin, sync, multiworkspace or cross-platform readiness is required. Chat owns final technical acceptance and the owner controls adoption.
 
 **Typed dependencies:**
 
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P3-36`: The verified backup/restore boundary provides the user-owned package, isolated restore and nonempty-target protection required by Sprint 100. Remaining conditions include every named pre-100 outcome and the frozen Chat matrix.
-- `REQUIRES_RUNTIME_ACCEPTANCE` → `FW-P3-36`: The verified backup/restore drill provides the isolated restore, hydration and relaunch evidence required by Sprint 100. Remaining conditions include every named pre-100 outcome and the frozen Chat matrix.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-adoption-matrix`: Chat owns this financial/privacy/architecture decision; it is not a technical questionnaire for the user.
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-evidence-fw-p0-26`: The complete registered authentic corpus for every adopted source family, an independently checked adopted workspace snapshot and genuine backup/restore round-trip evidence; no certification from synthetic statements.
-
-**Pinned evidence references:**
-
-- [Database/Repository.swift](<../Database/Repository.swift>):201-340 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `0c4416fa22817a54dc776f3973cf0b0e92aee209e667decc12e62de182b4f92f` — WorkspaceRepository, TransactionRepository, CategoryRepository, AccountRepository, CardRepository, ImportSessionRepository and ConfirmedImportRepository; provider container
-- [Services/RepositoryStoreHydrator.swift](<../Services/RepositoryStoreHydrator.swift>):209-269;344-440 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `40cbd69a8a470748fcb637cb10ae5597855d5a03771e165d8f551162d2b94117` — RepositoryStoreHydrator.init(workspaceId:); stageHydration()
-- [LedgerForgeTests/MigrationChainIntegrityTests.swift](<../LedgerForgeTests/MigrationChainIntegrityTests.swift>):253-367 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `6ad68d2dd32d041fe1224e644c3d067d3539ecfb63dd53793560e22f3d854688` — empty historical prefixes and fail-closed history tests
-- [LedgerForgeTests/MigrationIdentityLockTests.swift](<../LedgerForgeTests/MigrationIdentityLockTests.swift>):1-52 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `722c49a26a6785be7c4d537973d0a2790fc84b162d310e04ed399e6fdd0fcae9` — independent identity lock and drift detection
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):1-90 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `7843854eee6c85888f41af52c52aba70f2d0138c5f6f21e518211c75aca62797` — current accepted state and authentic reset
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):530-580 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P0-26 gate
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):3061-3075 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — User backup/restore is a separate user-facing contract.
-- [Database/SQLiteDatabase.swift](<../Database/SQLiteDatabase.swift>):90-146 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — WAL, SQLite online backup and checked close exist.
-
-</details>
-
-<a id="packet-personal-v1-certification-packet"></a>
-
-<details>
-<summary>PERSONAL_V1_CERTIFICATION_PACKET — complete proposed decision packet</summary>
-
-## PERSONAL_V1_CERTIFICATION_PACKET
-
-| # | Required field | Decision |
-| --- | --- | --- |
-| 1 | Owning FW IDs | FW-P0-26; aggregates adopted support, recovery, export and validation boundaries. |
-| 2 | User problem | A falsifiable adoption declaration rather than a claim derived from green tests. |
-| 3 | Verified current state | Accepted Sprint 83 records corpus/provider/order/build/relaunch evidence and explicitly does not declare personal-v1. |
-| 4 | Accepted authorities | PROJECT_STATE; FUTURE_WORK gate; ADR-024; ADR-046; immutable migration identity lock. |
-| 5 | Exact missing decision | Chat must accept the exact pre-100 candidate/adoption matrix and the remaining planned architecture/evidence gates. Already accepted Salary, import, persistence and other foundations remain accepted. |
-| 6 | Evidence acquired | The latest decision makes bounded current Al Dar, holdings/valuation and current FX/net worth pre-100 outcomes; backup/restore remains required and complete export optional. |
-| 7 | Options considered | All vision features; frozen adopted-boundary matrix; green suite only. |
-| 8 | Recommended option | Candidate-frozen adoption matrix with each boundary, independent oracle, evidence, limitation and recertification trigger. |
-| 9 | Why competing options are rejected | Vision-wide is unbounded; a suite cannot prove source, native recovery, export, privacy or relaunch. |
-| 10 | Smallest coherent implementation boundary | Certification record and validations for adopted features; no new product feature. |
-| 11 | Included scope | Authentic corpus, candidate identity, supported-source docs, adopted import/credential/manual checks, duplicate/rejection, parity, migration/hydration/relaunch, required backup drill, period/account and agreed workbook-successor comparison. |
-| 12 | Explicit exclusions | Unadopted sync/API/plugins/multiworkspace/cross-platform/encryption/analytics; complete export unless user promotes it; appearance unless adopted. |
-| 13 | Durable model/persistence requirements | Privacy-safe matrix records candidate digests, evidence class and limitations only; no runtime data change. |
-| 14 | Migration impact | NONE; adopted feature changes retain own decision. |
-| 15 | ADR impact | ALIGN_EXISTING; backup ADR is separate prerequisite. |
-| 16 | Privacy/security boundary | Opaque digests/counts only; no source content, paths, names, financial values or credentials. |
-| 17 | SQLite/In-Memory implications | Matrix labels provider-parity checks; In-Memory cannot substitute for restore/relaunch. |
-| 18 | Hydration/relaunch implications | Canonical same-database relaunch plus restored-target hydration/relaunch are required rows. |
-| 19 | Independent acceptance oracle | Independent source projections, migration/package checks and native evidence where static inspection cannot establish behavior. |
-| 20 | Failure cases | Candidate/corpus/schema drift, missing oracle, unresolved limitation, failed restore, unsupported source, obsolete workbook comparison. |
-| 21 | Reversal/correction semantics | Failed certification is not repaired retroactively; freeze new candidate and rerun affected rows. |
-| 22 | Source evidence requirement | Required for every statement-dependent claim; absent cases remain uncertified. |
-| 23 | Runtime acceptance requirement | Required for adopted import/credential/backup and durable UI flows. |
-| 24 | Dependencies | Accepted Swift 6 and selected R1 work; backup ADR+drill; bounded current Al Dar, holdings/valuation and current FX/net-worth outcomes; exact candidate; corpus; support docs; Chat matrix; workbook-successor decision. History/performance, optional complete export and historical FX are not prerequisites. |
-| 25 | Evidence that falsifies the recommendation | Any missing matrix row, changed candidate/corpus/financial semantics, or claim lacking independent evidence. |
-| 26 | Personal-v1 relevance | PRE_V1_REQUIRED: declaration gate. |
-| 27 | Recommended FUTURE_WORK status after Chat review | READY_AFTER_NAMED_DEPENDENCY: all named pre-100 outcomes, backup contract/drill and Chat matrix remain required. |
-| 28 | Recommended roadmap effect after Chat review | Prepared Sprint 100 certification milestone only; do not declare personal-v1 or assign feature work there. |
-
-</details>
+- `REQUIRES_RUNTIME_ACCEPTANCE` → `FW-P3-36`: verified owner backup and restore drill.
+- `REQUIRES_IMPLEMENTATION` → `FW-P2-79`: accurate private supported-source matrix.
+- `REQUIRES_AUTHENTIC_SOURCE` → `source-evidence-fw-p0-26`: complete authentic corpus and independent source/restore comparison.
 
 ---
 
-<a id="fw-p1-01"></a>
-
-## FW-P1-01 — Additional Axis Bank-Account Parser Families
-
-**Status:** Candidate
-**Depends on:** complete registered authentic Axis corpora for each materially distinct new or changed bank-account source-family semantic contract
-
-**Completed boundary:** Current accepted Axis bank-account support already covers the source-proven CSV, PDF and legacy-XLS families recorded in `PROJECT_STATE.md`, with the accepted 127-carrier reset providing current ADR-046 reliability certification for the registered corpus. Sprint 78B separately owns the exact Axis credit-card PDF/XLSX family.
-
-**Remaining boundary:** Only additional or materially changed Axis bank-account families remain here, including new historical layouts, account products or source contracts not already covered by current accepted profiles. No new family inherits support from existing Axis profiles.
-
-Each future family requires complete authentic-corpus inventory, independently derived source truth, explicit semantic projection, deterministic routing/profile selection and complete affected-corpus regression. The prohibited synthetic/sanitized financial-fixture retirement is already complete and is not future work.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No selected additional Axis bank family or registered authentic corpus/oracle.
-
-**Smallest proposed boundary:** Register one family before assessing reuse.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: exact certified Axis CSV/PDF/legacy-XLS families exist; shared pipeline does not establish an unselected family.
-
-**First-round scope and constraints:** EXPLICIT_USER_DECISION/VERIFIED_REPOSITORY: ADR-046 requires complete authentic corpus, independent source oracle and deterministic semantic routing; profiles do not generalize. No parser change, certification, credentials, OCR, generic Axis support, migration or duplicate-policy change.
-
-**First-round question/options:** Which additional Axis bank-account family should be expanded? Baseline adcf83f52d309ddac18d95f0321d0c0f6120dd29; reviewed 2026-09-10. PROPOSED: select one supplied recurring family or defer; never infer from Axis name or historical labels.
-
-**First-round remainder and implications:** MISSING: selected product/layout/format, registered originals and independent source truth; no source location or choice is recorded. No migration presumed; ADR-046 governs. ADR only if new durable identity/equivalence contract.
-
-**First-round proposed acceptance/falsifier:** Complete affected corpus via ordinary production, independent projection, persistence/reopen/hydration and shared-corpus regression. Different financial roles, currency, identifier or representation relationship invalidates Axis reuse.
-
-**Second-round new evidence/resolved direction:** Current support is exact-profile only.
-
-**Exact next evidence or decision:** One selected recurring family, complete corpus, independent semantic projection.
-
-**Personal-v1:** PRE_V1_OPTIONAL: no declared adoption need.
-
-**Recommendation after Chat:** Candidate blocked on selected source **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** New family/source contract.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-selected-axis-family`: No family is selected.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-01`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. No selected additional Axis bank family or registered authentic corpus/oracle.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):581-592 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-01
-- [Project documents/ADR.md](<ADR.md>):5920-6085 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-046
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):85-95,964-972 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Exact corpus/profile boundary only.
-
-</details>
-
----
-
-<a id="fw-p1-02"></a>
-
-## FW-P1-02 — Additional HDFC Parser Families
-
-**Status:** Candidate
-**Depends on:** complete authentic HDFC evidence for one selected new or changed source-family contract
-
-**Completed boundary:** Exact `hdfc.bank-account.xls@1` and `hdfc.bank-account.pdf@1` bank-account support is accepted, including ADR-042 whole-statement PDF/XLS equivalence and current complete-corpus reliability certification under ADR-046.
-
-**Remaining boundary:** HDFC CSV, XLSX, credit-card families, changed bank layouts and any additional source-format relationship remain unsupported until independently source-proven. Existing HDFC PDF/XLS support does not generalize by institution name or structural similarity.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No selected HDFC CSV/XLSX/card/changed-layout family or corpus/oracle.
-
-**Smallest proposed boundary:** Inventory one family then assess exact reuse.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: only hdfc.bank-account.xls@1 and hdfc.bank-account.pdf@1 are accepted; ADR-042 is exact PDF/XLS equivalence, not generic HDFC.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: readers extract generically, parsers own finance/identifiers, ADR-046 forbids synthetic substitutes. No HDFC-wide support, generic XLSX, cards, OCR, password expansion or automatic equivalence.
-
-**First-round question/options:** What additional HDFC bank/card/format contract is worth supporting? PROPOSED: choose one real recurring family and assess reader output; otherwise defer.
-
-**First-round remainder and implications:** MISSING: chosen HDFC CSV/XLSX/card/changed layout and complete originals/source truth. No migration assumed; ADR-042 reuse requires exact proof.
-
-**First-round proposed acceptance/falsifier:** Complete family corpus, independent projection, ordinary import, zero-residue rejection, provider parity and durable hydration. Different card liability, source identifier or PDF/XLS relationship bars reuse.
-
-**Second-round new evidence/resolved direction:** ADR-042 does not generalize HDFC support.
-
-**Exact next evidence or decision:** Selected family and complete independent source projection.
-
-**Personal-v1:** PRE_V1_OPTIONAL: unselected expansion.
-
-**Recommendation after Chat:** Candidate blocked on authentic source **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Different liability/identity/format relationship.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-selected-hdfc-family`: No candidate supplied.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-02`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. No selected HDFC CSV/XLSX/card/changed-layout family or corpus/oracle.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):594-603 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-02
-- [Project documents/ADR.md](<ADR.md>):5011-5125 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-042
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):964-972 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — No generic HDFC family support.
-
-</details>
-
----
-
-<a id="fw-p1-03"></a>
-
-## FW-P1-03 — Additional CBQ Parser Families
-
-**Status:** Candidate
-**Depends on:** complete authentic CBQ evidence for one selected new or changed bank/card source-family contract
-
-**Completed boundary:** The exact current-account XLS/history-PDF/monthly-PDF family is accepted under ADR-043 source lineage, and exact `cbq.credit-card.pdf@1` v1/v2 is accepted as a separate card family. The accepted unnumbered reset recertified the complete registered CBQ corpora and closed the July compatibility defect for that corpus.
-
-**Remaining boundary:** Only new or materially changed CBQ bank/card layouts, formats or financial families remain. Bank and card domains stay independent. XLSX, OCR/image-only sources and any unapproved card equivalence or identity behavior require their own source and architecture authority.
-
-The prohibited historical synthetic financial-source artifacts were retired by the accepted reset and are not remaining work.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No materially new CBQ family; absent transaction-history XLS remains uncertified.
-
-**Smallest proposed boundary:** Register and project before credential/relationship decisions.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: exact current-account XLS/history/monthly PDFs and card PDF v1/v2 are distinct accepted domains.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: ADR-043 lineage is current-account-specific, ADR-044 is card-specific, ADR-046 requires semantic evidence/fail-closed ambiguity. No CBQ-wide support, generic XLSX/OCR or inferred cross-format suppression.
-
-**First-round question/options:** Which materially new CBQ family should be investigated apart from certified current-account and card profiles? PROPOSED: choose actual family or defer; format adjacency is not evidence.
-
-**First-round remainder and implications:** MISSING: selected format/layout/product, authentic corpus/oracle, account/card identity contract. Absent transaction-history XLS is uncertified, not fabricateable. No migration allocated; ADR-043/044 reuse needs relevance proof.
-
-**First-round proposed acceptance/falsifier:** Complete corpus production gate, independent projection, family persistence/reopen and affected shared-corpus gate. Different identity, liability, format relationship or unlock behavior invalidates reuse.
-
-**Second-round new evidence/resolved direction:** Current bank and card profiles are distinct.
-
-**Exact next evidence or decision:** Family selection, corpus, source oracle and bank/card identity decision.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Candidate blocked on authentic source **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Family/domain change.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, IDENTITY, FINANCIAL_SEMANTICS, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-selected-cbq-family`: No authentic candidate.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-03`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. No materially new CBQ family; absent transaction-history XLS remains uncertified.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):605-616 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-03
-- [Project documents/ADR.md](<ADR.md>):5126-5334 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-043
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):85-95,964-972 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Absent formats are uncertified.
-
-</details>
-
----
-
-<a id="fw-p1-04"></a>
-
-## FW-P1-04 — Additional Credit-Card Parser Families
-
-**Status:** Ready for discovery
-**Depends on:** a selected remaining authentic card source family plus its exact liability, identity, reconciliation and source-format contract
-
-**Completed boundary:** Exact Amex PDF, CBQ encrypted PDF v1/v2 and Axis PDF/XLSX families are accepted over the shared card-liability architecture, with current complete-corpus reliability certification under ADR-046. The shared domain does not create generic issuer support.
-
-**Remaining boundary:** HDFC card, materially changed Amex/CBQ/Axis card layouts and every other issuer/layout remain separate source-family work. Discovery may compare authentic-source-backed candidates, but each requires independent posted-amount/currency/order/summary/identity truth, deterministic account-versus-instrument semantics, persistence/relaunch evidence and exact exclusions.
-
-The accepted reset completed retirement of prohibited synthetic financial-source artifacts; no fixture-retirement task remains here.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No issuer/layout corpus or card account-versus-instrument decision.
-
-**Smallest proposed boundary:** One card family discovery, not generic issuer support.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: shared card domain serves only exact Amex/CBQ/Axis profiles; readers/registry are reusable seams, finance remains profile-owned.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: ADR-044 separates card liabilities from bank semantics; ADR-027 gives identifiers to parsers; ADR-046 needs full authentic family evidence. No issuer-wide support, rewards, payments, refunds, installments, FX or fee inference.
-
-**First-round question/options:** What is the smallest safe discovery shape for one new card family? PROPOSED: discover one supplied candidate or a known changed layout; generic card parser is unsupported.
-
-**First-round remainder and implications:** MISSING: issuer/layout, complete originals, independent posted amount/currency/order/summary/identity truth, account-versus-instrument choice. No migration presumed; ADR only for new durable card semantic/identity.
-
-**First-round proposed acceptance/falsifier:** Complete family, independent oracle, reconciliation, SQLite/In-Memory parity, zero-residue rejection, hydration/relaunch. Multiple instruments, changed liabilities, absent controls or incompatible identity reject shortcuts.
-
-**Second-round new evidence/resolved direction:** Shared card architecture only serves exact profiles.
-
-**Exact next evidence or decision:** Complete family with posted amount/currency/order/summary/identity oracle.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Ready only after authentic-family selection **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Liability/identity/reconciliation variance.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, IDENTITY, FINANCIAL_SEMANTICS, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-selected-card-family`: No family supplied.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-04`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. No issuer/layout corpus or card account-versus-instrument decision.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):618-629 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-04
-- [Project documents/ADR.md](<ADR.md>):5335-5619 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-044
-- [Parsers/StatementParserRegistry.swift](<../Parsers/StatementParserRegistry.swift>):1-47 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `05eef62bc9b7197975057a309d0b98922732e2cb9f5bb8df0b3c7e2986e53bdf` — StatementParserRegistry
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):974-990 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Exact card profiles only.
-
-</details>
-
----
-
-<a id="fw-p1-05"></a>
-
-## FW-P1-05 — Additional Salary, Brokerage, Fund, Insurance, Tax and Government Document Families
-
-**Status:** Research
-**Depends on:** domain-model and product-scope decisions plus authentic source evidence for the selected financial family
-
-**Completed boundary:** Sprint 79 accepted exact `qatar-airways.salary.pdf@1` salary actuals and the dedicated salary/funding-planner domain under ADR-045. That accepted employer/profile is no longer future work.
-
-**Remaining boundary:** Other employers/payroll layouts, brokerage statements, mutual-fund statements, insurance documents, tax documents and government financial records remain separate research/source domains. No family may inherit support from the Qatar Airways salary profile or be forced into the bank/card transaction model merely for implementation convenience.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_PRODUCT_DECISION`. **Exact remaining gate:** Omnibus salary/brokerage/fund/insurance/tax/government item has no selected domain or durable meaning.
-
-**Smallest proposed boundary:** Split to one selected domain and decide events/holdings/planner/document/no-state.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-**Bounded product choice for future selection:**
-
-| FW ID | Decision and owner | Why it matters | Option A | Option B | Option C | Recommendation | Consequence of deferring | What becomes unblocked |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FW-P1-05 | **User product choice:** choose one new document domain, if any. | Salary, brokerage, fund, insurance, tax, and government documents have incompatible facts/models. | Defer omnibus expansion. | Select one domain/family and state intended outcome. | — | A unless a real recurring source is selected. | No new document support. | A source/oracle and one-domain architecture packet. |
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: only qatar-airways.salary.pdf@1 and its separate planner domain are accepted; the pipeline does not establish a universal model for these domains.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: ADR-045 is salary-specific; ADR-046 forbids forcing sources into bank/card models. No generic document library, valuation, tax calculation, government integration or new support.
-
-**First-round question/options:** Can salary/brokerage/fund/insurance/tax/government documents be made one implementation-ready item? PROPOSED: split by one selected domain; defer omnibus campaign.
-
-**First-round remainder and implications:** MISSING: selected domain/family, product scope, domain model, ownership/valuation/tax meaning and authentic corpus/oracle. Likely ADR review; no migration before durable-domain selection.
-
-**First-round proposed acceptance/falsifier:** Independent source truth mapped to approved domain, complete corpus, parity/hydration and privacy-safe presentation. Units, benefits, tax or non-cash entitlement invalidate bank/card reuse.
-
-**Second-round new evidence/resolved direction:** Only exact salary profile/domain is accepted.
-
-**Exact next evidence or decision:** One selected domain, source corpus/oracle, and domain-state decision.
-
-**Personal-v1:** POST_V1: no declared adoption requirement.
-
-**Recommendation after Chat:** Split or defer **Roadmap:** No omnibus sprint
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Units/tax/benefit/ownership semantics.
-
-**Current gate flags:** user product choice=true, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, ARCHITECTURE_DECISION, USER_PRODUCT_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_USER_DECISION` → `decision-selected-document-domain`: Different domains have incompatible models.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-05`: Omnibus salary/brokerage/fund/insurance/tax/government item has no selected domain or durable meaning.
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-evidence-fw-p1-05`: One selected document domain with authentic originals, source-controlled values/dates/identifiers and an independent domain-specific semantic oracle.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):631-640 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-05
-- [Project documents/ADR.md](<ADR.md>):5700-5919 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-045
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):124-145,964-972 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Salary model is exact and separate.
-
-</details>
-
----
-
-<a id="fw-p1-06"></a>
-
-## FW-P1-06 — Parser Framework Expansion
-
-**Status:** Ready for planning
-**Depends on:** Existing reader, parser-selection and `FinancialDocument` boundaries
-
-**Narrow parser-authoritative profile-provenance slice completed 2026-07-23:** Sprint 53 makes the production persistence mapper consume exactly one nonempty profile ID/version pair produced by parser transaction provenance and fail before writes when it is missing, malformed or conflicting. Historical `axis.nre.csv` version `1` remains readable unchanged. Reusable profile architecture, broader CSV grammar, other layouts, formats and institutions remain open.
-
-Expand the internal parser framework so additional institutions, statement families and layout versions can be added without creating parallel import pipelines.
-
-The framework must implement the accepted Import Profile direction rather than scattering institution-specific assumptions across unrelated components.
-
-Candidate outcomes include:
-
-- reusable Import Profiles;
-- Import Profile versioning;
-- deterministic layout recognition that resolves mandatory semantic roles from unique, exact normalized headers rather than fixed column positions, and fails closed for missing, duplicate, ambiguous or unsupported roles;
-- explicit support for historical and changed layouts;
-- shared complete-authentic-corpus regression conventions plus separate non-source unit-test conventions, including independent source oracles that do not use the production parser as their sole authority;
-- bounded source-evidence contracts;
-- parser-family organization by institution and document type.
-
-Remaining CSV-grammar gap: targeted discovery must define deterministic handling for quoted delimiters, escaped quotes, embedded line breaks, line-ending variants, empty fields and malformed records while preserving source-row evidence. The current framework and historical fixtures do not establish broader CSV grammar or production support; the affected authentic corpus must do so.
-
-Readers remain responsible for source-format extraction.
-
-Parsers remain responsible for financial interpretation.
-
-This candidate concerns internal application architecture. External third-party plugins remain governed separately by `FW-P3-39`.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No selected source family or grammar defect proves existing registry/reader/parser seams insufficient.
-
-**Smallest proposed boundary:** Ready-but-not-needed; assess only after concrete family selection.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: format registry, immutable snapshots, deterministic detection/classification, selector/registry and parser-produced profile provenance already form one pipeline.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: ADR-016/027/041/046 retain one pipeline, parser-owned identity/profile and adaptive deterministic interpretation. No parallel pipeline, generic support, plugin, parser rewrite or certification.
-
-**First-round question/options:** Is new framework work required before another selected source family? PROPOSED: retain seams and extend narrowly for a proven gap; generic framework work requires deliberate architecture maintenance choice.
-
-**First-round remainder and implications:** MISSING: a candidate proving existing seams cannot express semantic roles or broader CSV grammar; no family selected. No migration expected; ADR only if ownership changes.
-
-**First-round proposed acceptance/falsifier:** Family proof plus full affected authentic corpora for shared changes; unit tests are supplementary. Materially different financial/identity semantics may justify another profile; shifted layout does not.
-
-**Second-round new evidence/resolved direction:** Pipeline already has deterministic routing and profile provenance.
-
-**Exact next evidence or decision:** Source-bounded case that cannot be expressed by existing seams.
-
-**Personal-v1:** POST_V1: no current certification effect.
-
-**Recommendation after Chat:** Ready for planning but not selected **Roadmap:** No standalone sprint
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Documented grammar limitation.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** NO_REAL_USE_CASE, DEPENDENCY.
-
-**Typed dependencies:**
-
-- `OPTIONAL_ENHANCEMENT` → `source-selected-new-family`: Future reopening condition only; this deferred boundary is not a current prerequisite. Framework work must be demand-led.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):642-671 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-06
-- [Import/Readers/DefaultReaderRegistry.swift](<../Import/Readers/DefaultReaderRegistry.swift>):7-29 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `987d6cee9a010d2d72ca73b047d743e45f1c36eef5e72f65b5d76d44cd51f051` — DefaultReaderRegistry
-- [Import/Coordinator/DefaultImportCoordinator.swift](<../Import/Coordinator/DefaultImportCoordinator.swift>):15-116 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `721387d0b8cde8125b30d58917cfd7047cf03213d55efb8a9fb8b043d5fe6e2e` — DefaultImportCoordinator
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):88-93 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Adaptive deterministic family parsers and shared pipeline are accepted.
-
-</details>
-
-<a id="packet-source-expansion-packet"></a>
-
-<details>
-<summary>SOURCE_EXPANSION_PACKET — complete proposed decision packet</summary>
-
-## SOURCE_EXPANSION_PACKET
-
-1. **Owning FW IDs:** FW-P1-01 through FW-P1-17, FW-P2-63, FW-P2-64, FW-P2-79,
-FW-P3-16. This closes all current source expansion candidates as either
-blocked by missing real source evidence or deliberately ready-but-not-needed.
-
-2. **User problem:** add only genuinely useful source support without
-   generalizing certified profiles.
-3. **Verified current state:** the 127-carrier recertification covers exact
-   registered Axis/HDFC/CBQ bank, specified card, and exact salary profiles;
-   it does not certify newly named institutions, formats, layouts, zero
-   activity, OCR, TXT, generic XLSX, or unselected relationships.
-4. **Accepted authorities:** ADR-046 and current alignment require complete
-   authentic corpus plus independent source oracle for family interpretation.
-5. **Exact missing decision:** for every P1 expansion: select one recurring
-   source family, its domain, and its intended product outcome.
-6. **Evidence acquired:** no additional family was selected in the approved
-   source inventory; framework seams already exist.
-7. **Options considered:** generic parser/framework advance; select a concrete
-   family; defer.
-8. **Recommended option:** defer all unselected families; when desired,
-   register exactly one family and its independent semantic projection first.
-9. **Why competing options are rejected:** format/institution adjacency is not
-   semantic source evidence, and shared architecture does not certify support.
-10. **Smallest coherent implementation boundary:** exact family inventory → independent oracle
-   projection → determine reader/profile reuse → implementation proposal.
-11. **Included scope:** source-family selection and static reuse assessment.
-12. **Explicit exclusions:** parser coding, corpus recertification, credential
-   storage changes, OCR/AI/learning escalation, generic format claims.
-13. **Durable model/persistence requirements:** none until family financial
-   meaning and identity/relation requirements are accepted.
-14. **Migration impact:** NONE presumed; a new durable card/document/identity
-   relation is REQUIRES_DECISION, with no migration number allocated.
-15. **ADR impact:** ALIGN_EXISTING with ADR-046; NEW_ADR_REQUIRED only for a
-   new durable semantic/identity/equivalence/credential contract.
-16. **Privacy/security boundary:** originals/oracles remain private/read-only;
-   credential scope stays exact-family and no paths/values/credentials appear.
-17. **SQLite/In-Memory implications:** future source import needs parity where
-   it persists; this discovery has none.
-18. **Hydration/relaunch implications:** future source truth must survive
-   ordinary persistence/open/hydration; not tested here.
-19. **Independent acceptance oracle:** pre-existing independently source-derived
-   projection, not production-parser output, per selected authentic family.
-20. **Failure cases:** missing/ambiguous source meaning, partial corpus,
-   unsupported encryption, no selected domain, or relationship uncertainty
-   fails closed with zero durable residue.
-21. **Reversal/correction semantics:** not applicable before persistence;
-   future durable relationship behavior requires separate review.
-22. **Source evidence requirement:** mandatory for all statement-dependent P1
-   candidates. FW-P2-64 separates nonfinancial resource mechanics from a real
-   large-statement semantic gate.
-23. **Runtime acceptance requirement:** only future normal import/unlock/UI
-   acceptance; none claimed now.
-24. **Dependencies:** concrete authentic family; independent oracle; identity
-   decision for cards/relationships; credential policy if encrypted; FW-P0-19
-   for durable cross-format effects.
-25. **Evidence that falsifies the recommendation:** a selected family that existing deterministic
-   seams cannot represent, or a complete oracle proving incompatibility.
-26. **Personal-v1 relevance:** unselected families are PRE_V1_OPTIONAL; the
-   support matrix is a PRE_V1_REQUIRED adoption input but not certification.
-27. **Recommended FUTURE_WORK status after Chat review:** exact P1/P2-63 source blockers remain;
-   FW-P1-06 becomes ready-but-not-needed; FW-P2-79 awaits doc writer window.
-28. **Recommended roadmap effect after Chat review:** no source-expansion sprint; no generic
-   framework sprint; source work must begin after a user selects a family.
-**Additional decision detail:** for each desired expansion, supply one exact
-   recurring family or defer it. Do not approve a generic family category.
-
-**Compact ADR candidate — source-profile expansion trigger.**
-
-- **Context:** current framework is already an adaptive deterministic pipeline,
-  but no new family exposes a seam deficiency.
-- **Decision:** no shared framework expansion before a selected authentic family
-  demonstrably needs it; each family has a source/oracle/durable-effect packet.
-- **Alternatives:** generic CSV/PDF/XLSX/OCR/AI expansion now; rejected as
-  unsupported and incapable of certification.
-- **Consequences:** prevents speculative migrations and credentials; shared
-  changes still trigger all affected authentic-family regressions.
-- **Acceptance:** a selected corpus, independent projection, deterministic
-  routing, normal import and persistence/hydration gate.
-- **Alignment:** ADR-046 exact-family and fail-closed requirements.
-
-### Credential scope notes (no new architecture selected)
-
-**Owning IDs:** FW-P1-11, FW-P1-12, FW-P1-13. Existing secure unlock and
-institution-scoped Keychain reuse are limited to exact accepted encrypted
-profiles. No actual new encrypted family, credential value, or user need was
-provided. Therefore there is no generic credential-profile expansion to plan.
-The irreducible order is: selected authentic encrypted family and independent
-semantic oracle; explicit scope (use once, replace, or remember); rotation,
-deletion and recovery policy; then a narrow family extension. A per-file
-override cannot silently replace stored family scope. No credential, path, or
-private source detail belongs in planning evidence. This is source/security
-blocked, not a parser-framework prerequisite.
-
-### Source relationship notes (no new equivalence accepted)
-
-**Owning IDs:** FW-P1-16 and FW-P2-63. Accepted HDFC/Axis-card equivalence and
-CBQ lineage, plus Axis-bank regression parity, are distinct contracts. The
-latter does not establish durable duplicate suppression, authority replacement,
-or a relationship for a new pair. Before any durable relationship proposal,
-one complete new authentic representation pair must establish an independent
-projection and declare whether its purpose is regression-only or durable. This
-lane did not repeat integrity’s source search; the accepted indexed private
-oracle/root chain may be reused later under its existing authority without
-publishing locator or source details. FW-P0-19 remains the architecture owner
-for duplicate/equivalence effects.
-
-</details>
-
----
-
-<a id="fw-p1-07"></a>
-
-## FW-P1-07 — Statement Learning Mode and Profile Library
-
-**Status:** Research
-**Depends on:** `FW-P1-06`, approved Import Profile semantics and privacy boundaries
-
-Investigate an offline-first workflow that helps LedgerForge recognize new or changed statement layouts while preserving deterministic parsing.
-
-Candidate outcomes include:
-
-- a versioned local Import Profile library;
-- explicit profile provenance and compatibility information;
-- user-reviewed profile creation or refinement;
-- registration of authentic source evidence and independent oracle/projection metadata; synthetic financial-source fixture generation is prohibited at every stage;
-- compatibility with historical layouts;
-- rollback to an earlier profile version;
-- clear separation between learned suggestions and production-approved parser behaviour.
-
-Learning must never silently promote an unreviewed profile into trusted financial parsing.
-
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Needs accepted profile semantics, source family, offline retention/reviewer/rollback policy.
-
-**Smallest proposed boundary:** Versioned reviewed proposal metadata only; no automatic promotion.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: parser provenance exists but no profile library, review workflow, compatibility/rollback store or source-registration workflow exists.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: ADR-046 requires deterministic parser and authentic input; ADR-017 makes AI non-authority. No autonomous learning, cloud collection, raw statement retention, automatic promotion or new support.
-
-**First-round question/options:** Can offline statement learning/profile library be safely specified now? PROPOSED: defer, or a local proposal record with no production routing.
-
-**First-round remainder and implications:** MISSING: FW-P1-06 approved profile semantics, ownership/privacy/retention, reviewer role and source family. Likely ADR; no migration presumed.
-
-**First-round proposed acceptance/falsifier:** Proposal/review/reject/rollback privacy proof, then independent full-corpus parser proof. Trusted finance from mapping alone, indefinite raw retention or bypassed validation is invalid.
-
-**Second-round new evidence/resolved direction:** No profile-library contract exists.
-
-**Exact next evidence or decision:** Accepted FW-P1-06 need plus selected authentic family.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Research blocked by framework need **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Any retained source/private mapping.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** DEPENDENCY, PRIVACY, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-selected-new-family`: Only a selected genuine family can establish need; current parser framework is not a generic prerequisite.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-source-privacy-review`: Any selected assistance/profile retention and review boundary needs its own direct privacy/source contract.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-07`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. Needs accepted profile semantics, source family, offline retention/reviewer/rollback policy.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):673-692 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-07
-- [Project documents/ADR.md](<ADR.md>):5960-6062 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-046
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):642-671 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Framework is source-bound.
-
-</details>
-
----
-
-<a id="fw-p1-08"></a>
-
-## FW-P1-08 — AI-Assisted Column Detection
-
-**Status:** Research
-**Depends on:** `FW-P1-06`, editable import provenance and deterministic validation boundaries
-
-Investigate AI-assisted suggestions for identifying dates, descriptions, debit, credit, amount, currency and balance columns in unsupported tabular statements.
-
-Any assistance must remain:
-
-- advisory;
-- reviewable;
-- explainable;
-- local or explicitly opt-in where external processing would be required;
-- validated before persistence;
-- unable to override approved deterministic parser behaviour.
-
-The original source structure and every user-approved mapping must remain inspectable.
-
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** No unsupported authentic table or approved local/opt-in/review contract.
-
-**Smallest proposed boundary:** Reviewable hypotheses only, validated or rejected deterministically.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: deterministic detector/classifier/parser stages exist; no Vision/CoreML/OCR/LLM implementation found.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: ADR-017 AI never replaces parsing/validation; ADR-046 model analysis is not financial authority and external source use needs approval. No automatic detection, upload, parser replacement, financial authority or silent persistence.
-
-**First-round question/options:** What safe role can AI-assisted column detection have? PROPOSED: no AI, local advisory, or separately consented external advisory.
-
-**First-round remainder and implications:** MISSING: local/opt-in boundary, editable provenance, review UX, unsupported authentic table and validation contract. ADR needed before durable mappings; migration unknown.
-
-**First-round proposed acceptance/falsifier:** Refusal of invalid mappings, provenance visibility, consent/no leakage, authentic-corpus proof for promoted parser. Suggestion confidence as financial evidence or default external processing conflicts with ADR-017/046.
-
-**Second-round new evidence/resolved direction:** AI cannot be financial authority.
-
-**Exact next evidence or decision:** Selected unsupported family and deterministic validation boundary.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Research **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Remote processing/retained mappings.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** DEPENDENCY, PRIVACY, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-selected-new-family`: Only a selected genuine family can establish need; current parser framework is not a generic prerequisite.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-source-privacy-review`: Any selected assistance/profile retention and review boundary needs its own direct privacy/source contract.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-08`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. No unsupported authentic table or approved local/opt-in/review contract.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):694-712 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-08
-- [Project documents/ADR.md](<ADR.md>):553-593 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-017
-- [Detectors/SignatureInstitutionDetector.swift](<../Detectors/SignatureInstitutionDetector.swift>):1-240 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `07b6a62efc1f2913f064f894d0b7731d9495aef70dd003f2a76561397097acf0` — SignatureInstitutionDetector
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):88-93 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Semantic parser remains authority.
-
-</details>
-
----
-
-<a id="fw-p1-09"></a>
-
-## FW-P1-09 — Remaining Credit-Card Financial Semantics
-
-**Status:** Candidate
-**Depends on:** exact authentic source evidence and accepted architecture for the selected additional card semantic
-
-**Completed boundary:** The accepted Amex, CBQ and Axis card profiles already preserve card-liability effects, account/instrument boundaries where source-proven, exact source observations, family reconciliation, provider-owned persistence and hydration. The July CBQ compatibility defect is closed for the registered corpus by the accepted reset. Axis representation equivalence remains governed by ADR-044.
-
-**Remaining boundary:** Rewards, payment allocation, bank-card payment matching, refund/reversal matching, installments/loans, calculated FX, fee/markup/tax contracts, manual merge/split and any new card semantic remain separate future work. Axis Active-Loans/EMI metadata remains excluded from historical card transactions unless later authentic evidence and architecture prove a dedicated model.
-
-Card-liability effects remain distinct from bank debit/credit semantics. Missing rates, taxes, fees or ownership evidence remain missing rather than inferred.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No chosen card semantic or authentic evidence establishes durable meaning.
-
-**Smallest proposed boundary:** Map one semantic before implementation.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: exact profiles preserve liabilities/observations/reconciliation; rewards, payments, refund matching, installments, FX, fee/tax inference and merge/split remain excluded.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: liability effects differ from bank direction; absent rates/fees/ownership remain missing. No rates/taxes/fees inference, generic payment matching, merge/split or backfill.
-
-**First-round question/options:** Which remaining card semantic deserves discovery? PROPOSED: select one semantic with direct source controls; retain others separately.
-
-**First-round remainder and implications:** MISSING: one semantic, authentic evidence and accepted durable meaning; no priority/source selects one. Likely ADR/migration review if durable semantic selected.
-
-**First-round proposed acceptance/falsifier:** Independent oracle, reconciliation, provider atomicity/zero residue, hydration/relaunch and corpus. Ambiguous allocation/absent ownership/incomplete controls block persistence.
-
-**Second-round new evidence/resolved direction:** Unimplemented card semantics remain explicitly excluded.
-
-**Exact next evidence or decision:** One selected semantic with source controls and unavailable-value policy.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Preserve queue priority/status; explicitly defer until a real selected source or product workflow demonstrates need. See bounded decision queue. **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Summary/identity/reversal variance.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** SOURCE_TRUTH, FINANCIAL_SEMANTICS, NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- `OPTIONAL_ENHANCEMENT` → `decision-card-semantic`: Future reopening condition only; this deferred boundary is not a current prerequisite. Unselected future scope only; no current user decision is pending for the deferred boundary.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):714-727 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-09
-- [Project documents/ADR.md](<ADR.md>):5480-5619 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-044
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):984-988 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — No inferred extra semantics.
-
-</details>
-
----
-
-<a id="fw-p1-10"></a>
-
-## FW-P1-10 — Additional Native-Text PDF Statement Families
-
-**Status:** Candidate
-**Depends on:** complete authentic evidence for one selected new or changed native-text PDF financial source family
-
-**Completed boundary:** Existing accepted PDF profiles across current Axis, HDFC, CBQ, Amex and Qatar salary families are recorded in `PROJECT_STATE.md` and currently certified against their registered authentic corpora under ADR-046.
-
-**Remaining boundary:** Only new or materially changed native-text PDF families not already covered by accepted source contracts remain here. Encrypted credential policy remains under `FW-P1-11` through `FW-P1-13`; OCR/image-only sources remain under `FW-P1-17`; cross-format identity/equivalence remains under `FW-P0-19` and `FW-P1-16`.
-
-No generic PDF support claim is authorized.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No exact new native-text PDF family/corpus/oracle.
-
-**Smallest proposed boundary:** Registration before parser choice.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: PDF reader preserves page/text/positioned/resource/tagged evidence; accepted families are exact-profile bounded.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: ADR-046 gives financial interpretation to parsers and forbids generic-PDF claims. No arbitrary PDF, OCR, generic encryption or automatic equivalence.
-
-**First-round question/options:** Which additional native-text PDF family should be supported? PROPOSED: select one source, compare reader evidence, then add family parser only if controls cohere.
-
-**First-round remainder and implications:** MISSING: exact recurring native-text PDF family, originals/oracle and proof existing extraction suffices. No migration assumed; ADR-046 governs reader reuse.
-
-**First-round proposed acceptance/falsifier:** Complete PDF intake, independent projection, validation/reconciliation, parity/hydration. Image-only, ambiguity or reader resource failure needs separate approved extraction.
-
-**Second-round new evidence/resolved direction:** Native text alone is not support evidence.
-
-**Exact next evidence or decision:** Family corpus and extraction sufficiency assessment.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Candidate blocked on authentic source **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Encrypted/image-only/semantic difference.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-selected-pdf-family`: No family.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-10`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. No exact new native-text PDF family/corpus/oracle.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):729-740 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-10
-- [Import/Readers/PDFDocumentReader.swift](<../Import/Readers/PDFDocumentReader.swift>):1-110 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `10a0b4760f54715879c2b5c6c6de85371f0fd18926e1c49f511bbecb8909d6a3` — PDFDocumentReader
-- [Import/Models/RawDocument.swift](<../Import/Models/RawDocument.swift>):152-205 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `50a482464188c8c07d7bbce51a0da1f35fd968ff6c9265b2f88dfe24f71df645` — RawDocument
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):964-972 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Generic PDF is unsupported.
-
-</details>
-
----
-
-<a id="fw-p1-11"></a>
-
-## FW-P1-11 — Additional Password-Protected PDF Families
-
-**Status:** Candidate
-**Depends on:** an authentic encrypted source family whose credential scope and supported profile can be proven exactly
-
-**Completed boundary:** The shared immutable-snapshot unlock flow is accepted for the exact encrypted Amex, CBQ and Axis credit-card PDF families, including separate Axis App/traditional credential scopes.
-
-**Remaining boundary:** Other institutions or materially changed encrypted layouts require separate exact source, credential-family and parser acceptance. Arbitrary encrypted PDFs, owner-password/permissions variants, OCR and generic encrypted-document support are not implied.
-
-Readers remain credential-policy agnostic and must not own UI, Keychain or institution semantics.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No authentic encrypted family or chosen credential scope.
-
-**Smallest proposed boundary:** Prove unlock/semantic path before adding one Keychain target.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: coordinator tries uncredentialed read, bounded candidates, then challenge; credential saves only after supported parse/validation target.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: reader credential-agnostic; no secret in SQLite/evidence/diagnostics; exact scopes only. No arbitrary encrypted PDFs, owner-password variants, generic scan or OCR.
-
-**First-round question/options:** Can secure unlock be reused for another encrypted family? PROPOSED: reuse orchestration after proof, add explicit scope, or defer.
-
-**First-round remainder and implications:** MISSING: authentic encrypted family, scope/persistence target and supported semantic proof. No migration; ADR-015 amendment only for new scope semantics.
-
-**First-round proposed acceptance/falsifier:** Complete corpus, wrong/cancel/unsupported paths, delayed persistence, zero residue, privacy inspection. Ambiguous reuse, path inference or save before supported parse violates boundary.
-
-**Second-round new evidence/resolved direction:** Existing Keychain scopes are exact-family only.
-
-**Exact next evidence or decision:** Encrypted corpus, independent oracle, unlock and lifecycle policy.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Candidate blocked on authentic source **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Credential persistence/sync changes.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, SECURITY, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-selected-encrypted-family`: No source.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-credential-scope`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. Scope and retention.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):742-753 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-11
-- [Import/Coordinator/DefaultImportCoordinator.swift](<../Import/Coordinator/DefaultImportCoordinator.swift>):85-116 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `721387d0b8cde8125b30d58917cfd7047cf03213d55efb8a9fb8b043d5fe6e2e` — readPasswordProtectedPDF
-- [Import/Password/DefaultPasswordProvider.swift](<../Import/Password/DefaultPasswordProvider.swift>):334-436 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `de4f93cdfc8c9fdf2d8cf23d4127f649ae05608be2806964812d00e567b43215` — DefaultPasswordProvider
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):968-971 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Arbitrary encrypted PDFs unsupported.
-
-</details>
-
----
-
-<a id="fw-p1-12"></a>
-
-## FW-P1-12 — Additional Credential Profile and Password-Storage Capabilities
-
-**Status:** Research
-**Depends on:** an approved product need beyond the accepted exact Keychain credential-family boundary
-
-**Completed boundary:** Namespaced macOS Keychain storage is accepted for the proven Amex, CBQ and separate Axis credit-card credential families, with persistence only after supported-profile unlock/parse/validation and no password material in SQLite, source evidence or diagnostics.
-
-**Remaining boundary:** Generic credential-profile lifecycle, password-pattern derivation or any broader credential product is not currently approved. Optional cloud/sync behavior, if ever selected, remains separately governed by the later encryption/sync architecture rather than being implied by current Keychain support.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No source requires a new credential profile or lifecycle policy.
-
-**Smallest proposed boundary:** One-family extension only; preserve no-sync deferred write.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: non-synchronizing namespaced Keychain scopes and bounded legacy Axis compatibility exist; no generic profile/pattern lifecycle.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: secrets never persist as finance/evidence/diagnostics; candidates bounded; scope follows exact proof. No pattern derivation, cloud/sync, bulk Keychain management or generic secrets product.
-
-**First-round question/options:** Is generic credential-profile lifecycle needed beyond exact Keychain scopes? PROPOSED: retain exact scopes; add one explicit scope if source proves need; generic profiles need product/security decision.
-
-**First-round remainder and implications:** MISSING: user need, rotation/deletion/recovery policy and a new source needing a scope. No DB migration; ADR-015 may need lifecycle amendment.
-
-**First-round proposed acceptance/falsifier:** Scope save/replace/delete/rejection privacy tests and family corpus proof. Unbounded scan, ambiguous scope, path inference or secret persistence invalidates proposal.
-
-**Second-round new evidence/resolved direction:** Exact institution-scoped Keychain reuse exists.
-
-**Exact next evidence or decision:** Concrete family plus rotation/deletion/recovery decision.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Preserve queue priority/status; explicitly defer until a real selected source or product workflow demonstrates need. See bounded decision queue. **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Cloud/sync or recovery request.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** SECURITY, NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- `OPTIONAL_ENHANCEMENT` → `FW-P1-11`: Future reopening condition only; this deferred boundary is not a current prerequisite. Real encrypted source is prerequisite.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):755-764 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-12
-- [Import/Password/DefaultPasswordProvider.swift](<../Import/Password/DefaultPasswordProvider.swift>):13-215 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `de4f93cdfc8c9fdf2d8cf23d4127f649ae05608be2806964812d00e567b43215` — KeychainStatementPasswordCredentialStore
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):968-971 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Exact scopes only.
-
-</details>
-
----
-
-<a id="fw-p1-13"></a>
-
-## FW-P1-13 — Additional Per-File Credential Override Policy
-
-**Status:** Candidate
-**Depends on:** an explicit user/product decision for a non-persistent or per-file override beyond the accepted remembered-family challenge flow
-
-**Completed boundary:** Exact supported encrypted PDF families already provide secure user challenge and safe replacement of the proven credential-family item only after successful unlock, supported parsing and validation.
-
-**Remaining boundary:** A use-once/non-persistent credential choice and any genuinely different per-file override semantics remain unimplemented. Cancellation, failed candidates and unsupported unlocked content must never persist a credential.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** Use-once, replace, remember and rotation semantics are not chosen.
-
-**Smallest proposed boundary:** Per-request persistence choice after supported-target selection.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: candidates are request-staged; after parse/validation, target scope persistence occurs; cancel/failed/unsupported discards staging.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: accepted remembered-family flow; bytes unlocking alone never persist secret. No persistence on cancel/fail/unsupported, per-file durable identity or generic credentials.
-
-**First-round question/options:** Should per-file passwords be remembered, use-once, or replace stored family scope? PROPOSED: preserve default, add explicit use-once, or add replace-scope choice.
-
-**First-round remainder and implications:** MISSING: user decision on use-once versus replace, and scope rotation semantics. No migration; ADR-015 alignment if semantics change.
-
-**First-round proposed acceptance/falsifier:** All save/discard choices, wrong/cancel rejection, no leakage, scope isolation. Pre-validation save or filename/path scope choice is invalid.
-
-**Second-round new evidence/resolved direction:** No generic override policy follows from current scopes.
-
-**Exact next evidence or decision:** Explicit choice for a supported target.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Preserve queue priority/status; explicitly defer until a real selected source or product workflow demonstrates need. See bounded decision queue. **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Retention/sync behavior.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** SECURITY, NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- `OPTIONAL_ENHANCEMENT` → `decision-credential-lifecycle`: Future reopening condition only; this deferred boundary is not a current prerequisite. Unselected future scope only; no current user decision is pending for the deferred boundary.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):766-775 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-13
-- [Import/Password/DefaultPasswordProvider.swift](<../Import/Password/DefaultPasswordProvider.swift>):318-332 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `de4f93cdfc8c9fdf2d8cf23d4127f649ae05608be2806964812d00e567b43215` — StatementPasswordSessionVault
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):968-971 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Existing reuse is bounded.
-
-</details>
-
----
-
-<a id="fw-p1-14"></a>
-
-## FW-P1-14 — Additional XLS/XLSX Source Families and Spreadsheet Capabilities
-
-**Status:** Candidate
-**Depends on:** complete authentic evidence for one selected additional spreadsheet family or an independently approved broader spreadsheet capability
-
-**Completed boundary:** Accepted spreadsheet support already covers the exact Axis bank XLS, HDFC bank XLS, CBQ current-account XLS and Axis-card XLSX source contracts through the ordinary import path. The accepted 127-carrier reset recertified the registered families under ADR-046.
-
-**Remaining boundary:** Other spreadsheet source families, new HDFC/CBQ/Axis layouts, generic OOXML mapping, formulas, macros, password workflows, unsupported worksheet structures and user-authored mappings remain separate work. Existing readers do not imply generic XLS or XLSX support.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No selected workbook/sheet/formula/macro/encryption contract or oracle.
-
-**Smallest proposed boundary:** One worksheet/family with explicit resource and role evidence.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: registry includes Legacy XLS/OOXML; OOXML has explicit resource limits. Accepted sources are exact Axis/HDFC/CBQ XLS and Axis-card XLSX.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: reader preserves extraction, parser owns finance; generic OOXML/formula/macro/password mapping remains unsupported. No generic OOXML, formula execution, macros, authoring, generic password or certification.
-
-**First-round question/options:** Does a new spreadsheet source require reader capability or profile/parser only? PROPOSED: select one workbook, assess reader output, add reader only for proven gap.
-
-**First-round remainder and implications:** MISSING: selected workbook, sheet/formula/macro/encryption characteristics, independent oracle and user-mapping decision. No migration; shared reader change triggers full affected corpora.
-
-**First-round proposed acceptance/falsifier:** Complete family, resource error behavior, parity/hydration and affected regression if reader changes. Formula finance, macros, ambiguous sheet or resource failure are not support evidence.
-
-**Second-round new evidence/resolved direction:** Generic XLSX is unsupported despite exact profiles.
-
-**Exact next evidence or decision:** One authentic workbook family and semantic role projection.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Candidate blocked on authentic source **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Reader shared change.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-selected-spreadsheet-family`: No workbook.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-14`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. No selected workbook/sheet/formula/macro/encryption contract or oracle.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):777-786 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-14
-- [Import/Readers/DefaultReaderRegistry.swift](<../Import/Readers/DefaultReaderRegistry.swift>):7-29 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `987d6cee9a010d2d72ca73b047d743e45f1c36eef5e72f65b5d76d44cd51f051` — DefaultReaderRegistry
-- [Import/Readers/OOXMLDocumentReader.swift](<../Import/Readers/OOXMLDocumentReader.swift>):58-69 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `1f3056f59ec351b4a8e9e2cbe4533cd405ac3dd37fc269a8587cf773d8e88ae5` — OOXMLReaderLimits
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):968-970 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Generic XLSX unsupported.
-
-</details>
-
----
-
-<a id="fw-p1-15"></a>
-
-## FW-P1-15 — TXT Statement Support
-
-**Status:** Idea
-**Depends on:** Supplied authentic TXT financial sources and an independently derived source-truth/semantic-projection boundary
-
-Support deterministic text statements through the existing pipeline.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No authentic TXT family, encoding/record contract or oracle.
-
-**Smallest proposed boundary:** Extraction/semantic discovery before code choice.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: ADR-016 names TXT as future convergence; registry has no TXT reader/profile/authentic source.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: text extraction alone does not establish finance; ADR-046 needs source controls/oracle/complete corpus. No generic text finance, copied CSV behavior, OCR or fabricated samples.
-
-**First-round question/options:** Can TXT statements use existing pipeline? PROPOSED: wait for source then add narrow reader/family parser if warranted.
-
-**First-round remainder and implications:** MISSING: authentic TXT source, encoding/record semantics, source truth/projection, institution/family. No migration; reader addition has ADR-046 regression effects.
-
-**First-round proposed acceptance/falsifier:** Complete corpus ordinary path and authentic source-based rejection cases. Ambiguous free text or absent controls/identity/direction blocks support.
-
-**Second-round new evidence/resolved direction:** TXT is not production-supported.
-
-**Exact next evidence or decision:** One family and independent projection.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Idea blocked on authentic source **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Encoding/record/financial roles.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-selected-txt-family`: No source.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-15`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. No authentic TXT family, encoding/record contract or oracle.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):788-795 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-15
-- [Import/Readers/DefaultReaderRegistry.swift](<../Import/Readers/DefaultReaderRegistry.swift>):7-29 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `987d6cee9a010d2d72ca73b047d743e45f1c36eef5e72f65b5d76d44cd51f051` — DefaultReaderRegistry
-- [Project documents/ADR.md](<ADR.md>):475-551 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-016
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):968-970 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — TXT unsupported.
-
-</details>
-
----
-
-<a id="fw-p1-16"></a>
-
-## FW-P1-16 — Additional Cross-Format Financial Relationships
-
-**Status:** Blocked
-**Depends on:** one exact unimplemented representation relationship with complete authentic source truth and an accepted family-specific equivalence/lineage contract
-
-**Completed boundary:** ADR-042 owns exact HDFC whole-statement PDF/XLS equivalence. ADR-043 owns the separate exact CBQ current-account lineage model. ADR-044 owns exact Axis credit-card PDF/XLSX representation equivalence. The accepted reset additionally establishes format-neutral semantic parity across the registered Axis-bank carriers as engineering evidence.
-
-**Remaining boundary:** Axis-bank durable cross-format duplicate/equivalence behavior is not accepted merely because semantic parity tests pass. Additional card/format families, same-format equivalence, generic partial overlap, source replacement and every other representation relationship require separate source and architecture approval.
-
-This item concerns source-family financial relationships, while `FW-P0-19` owns durable duplicate-identity consequences. Neither authorizes fuzzy matching.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No unimplemented paired relationship with authentic proof and accepted equivalence/lineage semantics.
-
-**Smallest proposed boundary:** One family relationship contract, separate from duplicate repair.
-
-**Decision record:** [TRANSFER_FAMILY_DECISION_PACKET](#packet-transfer-family-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: exact HDFC equivalence, CBQ lineage and Axis-card equivalence are accepted. Axis-bank parity is engineering evidence only.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: bytes identity differs from family-specific equivalence; no fuzzy matching; independent projection required. No generic matching, fuzzy same-format, partial overlap, replacement or Axis-bank suppression.
-
-**First-round question/options:** Does existing parity establish new durable source relationship? PROPOSED: keep blocked; select relationship then decide lineage/equivalence before durable effect.
-
-**First-round remainder and implications:** MISSING: one unimplemented relationship with authentic source truth and accepted equivalence/lineage contract. Likely ADR; migration unknown.
-
-**First-round proposed acceptance/falsifier:** Complete pairs, mismatch zero residue, authoritative/supporting persistence, parity/reopen. Missing semantic dimension, multiplicity/order ambiguity or engineering parity alone is insufficient.
-
-**Second-round new evidence/resolved direction:** Axis-bank engineering parity is not durable equivalence.
-
-**Exact next evidence or decision:** Complete pair, independent projection, declared test-only versus durable effect.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Blocked **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Partial/revised/overlap source.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, IDENTITY, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P0-19`: Durable relation semantics.
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-new-representation-pair`: No pair.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):797-808 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-16
-- [Project documents/ADR.md](<ADR.md>):4769-5619 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-041/042/043/044
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):570-580 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Parity and durable equivalence differ.
-
-</details>
-
----
-
-<a id="fw-p1-17"></a>
-
-## FW-P1-17 — OCR Fallback
-
-**Status:** Research
-**Depends on:** Production PDF support and approved human-review boundaries
-
-Investigate scanned or image-only statements.
-
-OCR output remains untrusted until deterministic parsing and validation succeed.
-
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No genuine image-only family or local/consented OCR/review contract.
-
-**Smallest proposed boundary:** Decide privacy and one family; parser validates all OCR output.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: no OCR engine; PDF reader preserves resource/page evidence, parser decides whether other extraction is needed.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: ADR-017 OCR/AI remains advisory; ADR-046 requires approved extraction, authentic corpus and fail-closed ambiguity. No automatic acceptance, AI authority, generic image-PDF support, default upload or invented scans.
-
-**First-round question/options:** Can OCR fallback support image-only statements? PROPOSED: defer, local reviewable OCR, or consented external OCR.
-
-**First-round remainder and implications:** MISSING: genuine image-only family, local/consented processing decision, review boundary, parser controls and oracle. Likely ADR; no migration presumed.
-
-**First-round proposed acceptance/falsifier:** Consent/provenance, reject ambiguity, no leakage, complete family acceptance. OCR text without controls, default external processing or automatic repair blocks proposal.
-
-**Second-round new evidence/resolved direction:** OCR is not production-supported.
-
-**Exact next evidence or decision:** Authentic corpus/oracle and approved untrusted OCR boundary.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Research blocked on source **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Remote processing or semantic ambiguity.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, PRIVACY, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-selected-image-only-family`: No source.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-17`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. No genuine image-only family or local/consented OCR/review contract.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):810-817 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-17
-- [Import/Readers/PDFDocumentReader.swift](<../Import/Readers/PDFDocumentReader.swift>):1-110 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `10a0b4760f54715879c2b5c6c6de85371f0fd18926e1c49f511bbecb8909d6a3` — PDFDocumentReader
-- [Project documents/ADR.md](<ADR.md>):5984-6014 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-046 reader responsibility
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):968-970 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — OCR unsupported.
-
-</details>
-
----
+# P1 — Owner Sources and Core Workflows
 
 <a id="fw-p1-22"></a>
 
@@ -2771,64 +1314,6 @@ Discovery does not authorize deletion, broad rollback or backup-based undo.
 
 ---
 
-<a id="fw-p1-29"></a>
-
-## FW-P1-29 — Better Validation Guidance
-
-**Status:** Ready for planning
-**Depends on:** Existing validation pipeline
-
-Provide broader validation education outside the confirmed-import immediate-result and recovery panel while preserving detailed developer diagnostics separately.
-
-Sprint 58 completed bounded privacy-safe preparation-failure summaries. Sprint 66 completed typed, privacy-safe confirmed-import recovery and review guidance for validation failure, exact duplicate, transaction-event block, account-choice review, stale account choice, identity ambiguity or conflict, identifier-ownership conflict and repository-integrity conflict; unknown, malformed, hostile and otherwise unavailable states fail closed.
-
-Retain only broader validation education and unsupported-result guidance outside those completed confirmed-import result surfaces. Do not duplicate Sprint 66 recovery actions, expose raw diagnostics or infer mutation authority from error text.
-
-**Current discovery disposition — 2026-09-10:** `READY_FOR_IMPLEMENTATION_PLANNING`. **Exact remaining gate:** One bounded ordinary-user education surface and fixed unsupported-result copy.
-
-**Smallest proposed boundary:** Read-only explanatory surface; no state/actions/raw diagnostics.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: typed preparation and confirmed-import guidance exists; hostile or unknown states are neutral/fail-closed.
-
-**First-round scope and constraints:** Do not duplicate recovery actions, expose raw diagnostics, or infer mutation authority from error text. No diagnostics history, raw error rendering, or import changes.
-
-**First-round question/options:** What validation guidance remains after accepted recovery guidance? Target an explicit help surface or leave existing recovery focused.
-
-**First-round remainder and implications:** MISSING: a selected ordinary-user education surface and exact unsupported-result copy. No impact.
-
-**First-round proposed acceptance/falsifier:** Copy tests show every known state stays bounded; unknown values do not echo unsafe text. Guidance duplicates or conflicts with accepted recovery actions.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: typed preparation and confirmed-import guidance exists; hostile or unknown states are neutral/fail-closed. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: One bounded ordinary-user education surface and fixed unsupported-result copy. Owning authority: FW-P1-29 pinned queue scope and the named dependency below.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** READY_FOR_IMPLEMENTATION_PLANNING **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** DEPENDENCY.
-
-**Typed dependencies:**
-
-- None; execution still requires a Chat-approved prompt.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):924-933 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-29
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):848-850 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `7843854eee6c85888f41af52c52aba70f2d0138c5f6f21e518211c75aca62797` — typed import-attempt presentation
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1069-1086 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Better Validation Guidance as Ready for planning and records this unresolved boundary: MISSING: a selected ordinary-user education surface and exact unsupported-result copy.
-
-</details>
-
----
-
 <a id="fw-p1-29a"></a>
 
 ## FW-P1-29A — Historical Backfill Import Workflow
@@ -2900,716 +1385,101 @@ Historical backfill must not assume that older statements are complete or that i
 
 <a id="fw-p1-30"></a>
 
-## FW-P1-30 — Granular Development Database Reset
+## FW-P1-30 — Selective Disposable Development-Data Reset
 
 **Status:** Blocked
-**Depends on:** Separate approved selective-mutation semantics built on ADR-035
 
-Candidate reset operations include:
+**Owner-selected scope — 2026-09-11:** retain local development reset choices useful when reproducing an issue in the owner's private MacBook app. Existing whole-database DEBUG lifecycle/reset remains the default sufficient mechanism.
 
-- transactions only;
-- import sessions only;
-- financial identity only;
-- repository financial data;
+**Depends on:** one selected selective-reset case and approved retained/removed-data and atomicity semantics under ADR-035/037. The local development database is disposable; there is no standing migration-preservation program without a task-specific need.
 
-Each operation must clearly state what is retained and removed.
+Only the smallest selected disposable-data boundary may be considered. Preserve DEBUG gating, lifecycle exclusivity, provider generation, coordinated close, explicit impact and canonical hydration. This is not a production financial repair or a generic database-administration product.
 
-ADR-035 and Sprint 45 Phase A provide the reusable canonical lifecycle, activity-gate, provider-generation, backup and recovery boundary. This candidate covers only selective data-domain mutations, which remain unapproved and must not be inferred from whole-database reset.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** User must choose per-domain selective reset semantics.
-
-**Smallest proposed boundary:** Deletion impact inventory only.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: whole non-current lifecycle/reset exists; selective data-domain mutation is absent.
-
-**First-round scope and constraints:** ADR-035/Sprint45 lifecycle does not imply selective reset; each operation must state retained/removed data. No product mutation, Current Database reset or financial repair.
-
-**First-round question/options:** Offer granular development reset safely. PROPOSED no change; developer whole-db profile remains the bounded mechanism.
-
-**First-round remainder and implications:** EXPLICIT_USER_DECISION per-domain selective mutation semantics. Unknown; no migration implied.
-
-**First-round proposed acceptance/falsifier:** Each reset exactly proves retained/deleted graph and generation/hydration behavior. Selective action leaves dangling provenance/identity.
-
-**Second-round new evidence/resolved direction:** None.
-
-**Exact next evidence or decision:** Explicit destructive-operation decision.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Preserve queue priority/status; explicitly defer until a real selected source or product workflow demonstrates need. See bounded decision queue. **Roadmap:** No change
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** reset scope.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** MUTATION_SEMANTICS, REVERSIBILITY, NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- `OPTIONAL_ENHANCEMENT` → `user-reset-decision`: Future reopening condition only; this deferred boundary is not a current prerequisite. Unselected future scope only; no current user decision is pending for the deferred boundary.
-- `OPTIONAL_ENHANCEMENT` → `accepted-post-sprint-87-ownership`: Future reopening condition only; this deferred boundary is not a current prerequisite. Revalidate this card only against the accepted post-87 provider/migration/hydration/actor delta.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):961-975 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-30
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):1012-1024 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — deletion is separate
-
-</details>
-
----
-
-<a id="fw-p1-31"></a>
-
-## FW-P1-31 — Repository Inspector
-
-**Status:** Candidate
-**Depends on:** Privacy-safe developer presentation
-
-**Current discovery disposition — 2026-09-10:** `READY_FOR_CHAT_ARCHITECTURE_DECISION`. **Exact remaining gate:** Chat must approve the shared DEBUG-only nonpersistent diagnostic projection field allowlist; native gating, export/cancel and safe provider-state acceptance remain future checks.
-
-**Smallest proposed boundary:** DEBUG read-only aggregate/status DTO only.
-
-**Decision record:** [DIAGNOSTICS_PROJECTION_DECISION_PACKET](#packet-diagnostics-projection-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: Settings/Developer Console show bounded provider/runtime information and deliberately hide paths, raw SQL and SQLite errors.
-
-**First-round scope and constraints:** Developer-only presentation cannot become a financial-repair surface or disclose sensitive records. No SQL console, query runner, mutations, source fragments, database paths, or export.
-
-**First-round question/options:** What smallest Repository Inspector is privacy-safe? Expose a typed aggregate snapshot; expose raw repository rows; defer. Raw rows conflict with current privacy boundary.
-
-**First-round remainder and implications:** MISSING: approved inspector data projection, enablement, retention, and action set. No migration; ADR-026 review if diagnostics are reused.
-
-**First-round proposed acceptance/falsifier:** Source tests prove omission of identifiers/paths and exact unavailable behavior; later runtime proof confirms developer gating. A desired field requires raw financial/source data.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: Settings/Developer Console show bounded provider/runtime information and deliberately hide paths, raw SQL and SQLite errors. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Chat must approve the shared DEBUG-only nonpersistent diagnostic projection field allowlist; native gating, export/cancel and safe provider-state acceptance remain future checks. Owning authority: DIAGNOSTICS_PROJECTION_DECISION_PACKET.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Keep decision-ready closure until Chat accepts allowlist; revalidate affected provider boundaries and retain runtime acceptance before any support claim. **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-diagnostic-projection`: The explicitly named gate decision-diagnostic-projection must be satisfied. This enables DEBUG read-only aggregate/status DTO only. Remaining condition: Chat must approve the shared DEBUG-only nonpersistent diagnostic projection field allowlist; native gating, export/cancel and safe provider-state acceptance remain future checks.
-
-**Pinned evidence references:**
-
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):852-869 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `7843854eee6c85888f41af52c52aba70f2d0138c5f6f21e518211c75aca62797` — Settings and repository status
-- [Views/DeveloperConsoleView.swift](<../Views/DeveloperConsoleView.swift>):11-109 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `d00ad0ad185deca7cd1a3a0f53e522aa6297f839d8552611b9b1d0de35591dd3` — DeveloperConsoleView
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1139-1150 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Repository Inspector as Candidate and records this unresolved boundary: MISSING: approved inspector data projection, enablement, retention, and action set.
-
-</details>
-
-<a id="packet-diagnostics-projection-decision-packet"></a>
-
-<details>
-<summary>DIAGNOSTICS_PROJECTION_DECISION_PACKET — complete proposed decision packet</summary>
-
-## DIAGNOSTICS_PROJECTION_DECISION_PACKET
-
-| # | Required field | Decision |
-| --- | --- | --- |
-| 1 | Owning FW IDs | FW-P1-31 Repository Inspector, FW-P1-33 Import-Session Inspector, and FW-P1-36 Diagnostic Export. |
-| 2 | User problem | A developer needs bounded status and import-attempt context and, only by explicit action, a shareable support artifact without exposing ledger rows, source content or credentials. |
-| 3 | Verified current state | DeveloperConsole already observes shared console, account and transaction stores; renders runtime/repository panels; filters diagnostics; and has Copy All. ADR-026 makes current diagnostics deterministic, privacy-safe, capped at 1,000 and ephemeral. |
-| 4 | Accepted authorities | ADR-026 is accepted and forbids persistent history, unrestricted export, SQL browser and financial-truth role. ADR-035 owns DEBUG lifecycle only. ADR-024 owns canonical hydration. ADR-046 prohibits source disclosure/financial-source substitution. |
-| 5 | Exact missing decision | Chat must approve one field-level allowlist and that these three surfaces share one explicit redacted DTO boundary. |
-| 6 | Evidence acquired | DeveloperConsole uses a runtime snapshot and filters; its existing UI is DEBUG-profile aware. FUTURE_WORK separately proposes aggregate inspector, redacted attempt summary and opt-in already-redacted export. |
-| 7 | Options considered | Raw repository/SQL browser; independent ad-hoc views; one shared typed redacted projection; persistent timeline/history; user-facing document/source browser. |
-| 8 | Recommended option | One DEBUG-only, read-only `DeveloperInspectionSnapshot` projection with three renderers: aggregate repository status, selected import-attempt summary, and opt-in single-file diagnostic export. |
-| 9 | Why competing options are rejected | Raw access conflicts with accepted privacy restrictions; separate views drift allowlists; timeline/history changes retention/storage; user source browser is a different product/privacy contract. |
-| 10 | Smallest coherent implementation boundary | A nonpersistent projection service reads existing typed state at one provider generation, returns closed enums, booleans and bounded counts; views/export consume exactly this DTO. |
-| 11 | Included scope | Repository: availability/provider kind/schema-migration compatibility state/hydration state/bounded domain counts. Attempt: outcome/phase/disposition/count summaries and causal code from accepted presentation mappings. Export: format-versioned JSON or plain text containing the same DTO and current already-redacted chronological diagnostic metadata. |
-| 12 | Explicit exclusions | No SQL, DB paths, raw rows, account/document/session IDs, filename, parser profile/digest, source fragment/bytes, passwords/Keychain, values/balances, unbounded errors, repository write, repair/reset, source reopen, persistent history, automatic upload, or Release inclusion. |
-| 13 | Durable model/persistence requirements | None. DTO, selection, filters, export staging and destination authorization are process-local. Export has no retained index/history; cancellation/failure removes temporary staged artifact and leaves no final artifact. |
-| 14 | Migration impact | NONE. |
-| 15 | ADR impact | ALIGN_EXISTING with ADR-026, ADR-024, ADR-035 and ADR-046. No new ADR is needed if the approved allowlist remains this bounded; a persistent store or raw access would be a different proposal. |
-| 16 | Privacy/security boundary | Compile DEBUG-only. Closed field allowlist and denylist tests; code/enum references instead of raw error/source text; fixed maximum records/metadata size; explicit Save panel; no automatic disclosure or network effect; developer gating must be observed natively. |
-| 17 | SQLite/In-Memory implications | Projection reads existing provider-safe interfaces and must state unavailable truthfully. It has no writes. Test same projection semantics across provider states where those interfaces promise parity; no raw SQLite inspection. |
-| 18 | Hydration/relaunch implications | Snapshot carries availability/hydration truth and never forces refresh or alters canonical stores. It disappears on relaunch except any separately user-saved exported artifact; no replay/import of artifact. |
-| 19 | Independent acceptance oracle | An independent fixture-free nonfinancial DTO oracle enumerates allowed/denied fields and ordering/count rules. Source-level tests attempt hostile/private-like content through typed diagnostics and prove exclusion. Runtime proof confirms DEBUG gating, Save/cancel and unavailable presentation. |
-| 20 | Failure cases | Unavailable/stale provider, hydration failure, unknown/future outcome, selection absent, malformed/hostile diagnostic metadata, active lifecycle/import, permission denial, cancel, write failure, partial staging, oversized collection and Release target attempt. Return neutral unavailable/omit unsafe data; no write. |
-| 21 | Reversal/correction semantics | Read-only. Closing/cancelling changes no repository state. Deleting a user-chosen exported file has no ledger effect. This is not backup, rollback, audit persistence or financial correction. |
-| 22 | Source evidence requirement | None. This is source-independent developer presentation; financial statements, source bytes and statement-shaped data remain excluded. |
-| 23 | Runtime acceptance requirement | Required for DEBUG-only visibility, native Save authorization/cancel/no-residue, accessibility labels, developer-mode gating and truthful unavailable state. |
-| 24 | Dependencies | Chat accepts the allowlist decision; existing ADR-026/024/035/046 continue unchanged. No FW-P1-38/39/39A dependency and no Swift-6/lifecycle redesign. |
-| 25 | Evidence that falsifies the recommendation | Any requested field requires prohibited record/source/credential content; parity cannot be stated from safe interfaces; DEBUG code reaches Release; a selected export cannot clean temporary residue; or persistent retention becomes required. |
-| 26 | Personal-v1 relevance | POST_V1 developer tooling; no adoption/certification role. |
-| 27 | Recommended FUTURE_WORK status after Chat review | FW-P1-31, FW-P1-33 and FW-P1-36: READY_FOR_CHAT_ARCHITECTURE_DECISION, strictly for this narrow allowlist decision. After approval, use READY_AFTER_NAMED_DEPENDENCY until the exact affected provider/ownership and native availability/gating conditions are settled; do not bypass runtime or post-87 gates. |
-| 28 | Recommended roadmap effect after Chat review | Do not select a sprint or merge with lifecycle maintenance. Record one optional bounded DEBUG projection slice and preserve unselected inspector/history candidates as deferred. |
-
-### Compact ADR context
-
-ADR-026 already accepts bounded, deterministic, in-memory, privacy-safe diagnostics and excludes persistent history, unrestricted export, SQL browser and financial-truth role (`ADR.md:1133-1148`). This packet deliberately stays inside that authority: it requires Chat approval of a field allowlist and does **not** propose an ADR. A durable timeline, raw browser, generalized maintenance operation, or automatic/log-history export would leave this packet and require a separately justified product use case and architecture decision.
-
-</details>
-
----
-
-<a id="fw-p1-32"></a>
-
-## FW-P1-32 — Development SQLite Browser
-
-**Status:** Research
-**Depends on:** Development-only access and privacy controls
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_PRODUCT_DECISION`. **Exact remaining gate:** Whether raw table browsing is ever allowed; alternatives are reject, redacted snapshot, or raw browser.
-
-**Smallest proposed boundary:** No SQL/raw rows unless separately authorized.
-
-**Bounded product choice for future selection:**
-
-| FW ID | Decision and owner | Why it matters | Option A | Option B | Option C | Recommendation | Consequence of deferring | What becomes unblocked |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FW-P1-32 | **User product choice:** whether raw table browsing is ever part of the product. | Raw rows increase privacy exposure and can be mistaken for financial authority. | Reject raw tables; use bounded views. | Redacted read-only snapshot for a named workflow. | Raw browser only with separate authorization. | A. | No raw-table surface. | B only with privacy-safe snapshot contract. |
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: developer profiles distinguish durable/non-durable stores but deny database paths, raw SQL and raw SQLite errors.
-
-**First-round scope and constraints:** The database is disposable for development but trusted financial history must not be silently altered. No SQL input, mutation, database path reveal, or automatic snapshot.
-
-**First-round question/options:** Can a Development SQLite Browser be made safe? Typed read-only inspection DTO; external developer database tool; raw in-app browser. Only the first matches current disclosure constraints.
-
-**First-round remainder and implications:** MISSING: whether Chat authorizes raw table viewing, a snapshot-only source, redaction policy, and active-import coordination. No migration; may require ADR if durable diagnostics/storage is added.
-
-**First-round proposed acceptance/falsifier:** Static privacy denylist plus isolated lifecycle/active-operation tests. Need for unrestricted table values or active database browsing.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: developer profiles distinguish durable/non-durable stores but deny database paths, raw SQL and raw SQLite errors. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Whether raw table browsing is ever allowed; alternatives are reject, redacted snapshot, or raw browser. Owning authority: FW-P1-32 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** BLOCKED_ON_PRODUCT_DECISION **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=true, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** USER_PRODUCT_DECISION, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-raw-browser-privacy-snapshot`: A selected raw-browser or redacted-snapshot workflow requires its own Chat privacy/authority contract. Deferred maintenance utilities are not a prerequisite.
-- `REQUIRES_USER_DECISION` → `decision-product-fw-p1-32`: Whether raw table browsing is ever allowed; alternatives are reject, redacted snapshot, or raw browser.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):986-989 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-32
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):852-860 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `7843854eee6c85888f41af52c52aba70f2d0138c5f6f21e518211c75aca62797` — Settings and repository status
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1151-1162 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Development SQLite Browser as Research and records this unresolved boundary: MISSING: whether Chat authorizes raw table viewing, a snapshot-only source, redaction policy, and active-import coordination.
-
-</details>
-
----
-
-<a id="fw-p1-33"></a>
-
-## FW-P1-33 — Import-Session Inspector
-
-**Status:** Candidate
-**Depends on:** Implemented durable import-attempt-history foundation and an approved developer-inspection privacy boundary
-
-**Current discovery disposition — 2026-09-10:** `READY_FOR_CHAT_ARCHITECTURE_DECISION`. **Exact remaining gate:** Chat must approve the shared DEBUG-only nonpersistent diagnostic projection field allowlist; native gating, export/cancel and safe provider-state acceptance remain future checks.
-
-**Smallest proposed boundary:** Read-only bounded projection, distinct from diagnostics history.
-
-**Decision record:** [DIAGNOSTICS_PROJECTION_DECISION_PACKET](#packet-diagnostics-projection-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: durable import attempts and imported-document links exist; the current user detail exposes only validated bounded provenance.
-
-**First-round scope and constraints:** No raw identifiers, documents, paths, source fragments, or substitution of a session label for durable document authority. No timeline, raw diagnostics, repair/reversal, or user-facing history redesign.
-
-**First-round question/options:** What can a developer Import-Session Inspector show? Read-only typed attempt summary; extend user history; raw session graphs. The first is smallest.
-
-**First-round remainder and implications:** MISSING: approved developer projection and its relation to the separate user durable-history contract. No migration; do not conflate with ADR-026 history.
-
-**First-round proposed acceptance/falsifier:** Provider parity projection and privacy exclusion tests; runtime gating later. Inspector needs a new durable timeline or unrestricted provenance.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: durable import attempts and imported-document links exist; the current user detail exposes only validated bounded provenance. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Chat must approve the shared DEBUG-only nonpersistent diagnostic projection field allowlist; native gating, export/cancel and safe provider-state acceptance remain future checks. Owning authority: DIAGNOSTICS_PROJECTION_DECISION_PACKET.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Keep decision-ready closure until Chat accepts allowlist; revalidate affected provider boundaries and retain runtime acceptance before any support claim. **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-attempt-projection`: The explicitly named gate decision-attempt-projection must be satisfied. This enables Read-only bounded projection, distinct from diagnostics history. Remaining condition: Chat must approve the shared DEBUG-only nonpersistent diagnostic projection field allowlist; native gating, export/cancel and safe provider-state acceptance remain future checks.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):993-996 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-33
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):1331-1335 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `7843854eee6c85888f41af52c52aba70f2d0138c5f6f21e518211c75aca62797` — transaction provenance boundary
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1163-1174 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Import-Session Inspector as Candidate and records this unresolved boundary: MISSING: approved developer projection and its relation to the separate user durable-history contract.
-
-</details>
+**Acceptance if selected:** prove the exact removal/retention set, failure behavior and reload, using authentic inputs for statement-dependent cases. No selective mutation or architecture is authorized by retaining this card.
 
 ---
 
 <a id="fw-p1-34"></a>
 
-## FW-P1-34 — Parser and Source-Evidence Inspector
+## FW-P1-34 — Local Parser and Source-Evidence Inspection
 
 **Status:** Research
-**Depends on:** Privacy-safe source-evidence redaction
 
-Source inspection must never expose passwords or unredacted financial identifiers.
+**Owner-selected scope — 2026-09-11:** explain a real preparation/parser failure for an authentic statement supplied by the owner, using the existing local Developer Console or development tools wherever sufficient.
 
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Approved parser-evidence redaction taxonomy.
+**Depends on:** one actual owner-source investigation and a bounded privacy-safe evidence projection. ADR-026 and ADR-046 remain authority.
 
-**Smallest proposed boundary:** No profile IDs/digests/paths/source fragments.
+Expose only the selected safe stage, outcome and evidence explanation needed to diagnose that case. Preserve exact source-family ownership; passwords, raw identifiers, paths and unrestricted source fragments remain excluded from ordinary diagnostics/presentation. Private originals stay read-only in their approved location.
 
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: current presentation explicitly excludes parser profile IDs, digests, paths and source fragments from visible/accessibility text.
-
-**First-round scope and constraints:** ADR-046 authentic sources remain private/read-only; passwords and identifiers never appear. No source text, document bytes, filenames, identifiers, passwords, or corpus access.
-
-**First-round question/options:** What source evidence may a Parser Inspector present? Aggregated parser outcome codes; redacted field-level evidence; raw source view. Only aggregate codes are supported now.
-
-**First-round remainder and implications:** MISSING: an approved redaction taxonomy and non-sensitive parser evidence projection. No migration; likely ADR-level privacy decision before expansion.
-
-**First-round proposed acceptance/falsifier:** Negative disclosure tests with hostile/private-like values and independent redaction review. Any required support evidence cannot be safely represented.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: current presentation explicitly excludes parser profile IDs, digests, paths and source fragments from visible/accessibility text. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Approved parser-evidence redaction taxonomy. Owning authority: FW-P1-34 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Preserve queue status; named Chat-owned source/privacy/financial family decision remains before implementation planning. **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `accepted-adr-046`: The explicitly named gate accepted-adr-046 must be satisfied. This enables No profile IDs/digests/paths/source fragments. Remaining condition: Approved parser-evidence redaction taxonomy.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-chat-family-fw-p1-34`: Approved parser-evidence redaction taxonomy.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1000-1005 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-34
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):1356-1360 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `7843854eee6c85888f41af52c52aba70f2d0138c5f6f21e518211c75aca62797` — transaction provenance privacy boundary
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1175-1188 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Parser and Source-Evidence Inspector as Research and records this unresolved boundary: MISSING: an approved redaction taxonomy and non-sensitive parser evidence projection.
-
-</details>
+**Acceptance if selected:** independently check displayed safe facts against the authentic source and typed outcome, and test disclosure exclusions. No public support tooling, learning/profile platform or generic raw-source inspector is implied.
 
 ---
 
 <a id="fw-p1-35"></a>
 
-## FW-P1-35 — Duplicate and Identity-Conflict Inspector
+## FW-P1-35 — Local Duplicate and Identity-Conflict Explanation
 
 **Status:** Blocked
-**Depends on:** Approved duplicate and conflict semantics
 
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Typed duplicate/conflict semantics and privacy policy are unaccepted.
+**Owner-selected scope — 2026-09-11:** help the owner understand an actual duplicate or account-identity conflict in the single local ledger.
 
-**Smallest proposed boundary:** Safe typed-outcome inspector.
+**Depends on:** the selected typed duplicate/identity outcome and its accepted source-family semantics and privacy projection. Existing immediate import guidance remains the starting point.
 
-**Decision record:** [TRANSFER_FAMILY_DECISION_PACKET](#packet-transfer-family-decision-packet).
+Provide the smallest read-only explanation of what was rejected, which safe relationship is known and what existing owner action is available. Incoming rejection is not evidence of historical corruption. Missing evidence remains unavailable; weak similarity cannot establish identity.
 
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: typed outcomes exist, but no approved inspector semantics or privacy presentation.
-
-**First-round scope and constraints:** Inspector must not turn candidates into proof or expose raw private identifiers. No repair/override/raw diagnostics.
-
-**First-round question/options:** Inspect duplicate and identity conflicts safely. A typed read-only inspector can explain existing exact rejection outcomes; a repair/conflict-resolution screen additionally needs one accepted mutation family.
-
-**First-round remainder and implications:** Approved duplicate/conflict semantics from P0/P1 work. None for triage.
-
-**First-round proposed acceptance/falsifier:** Independently compare the displayed classification with the exact typed outcome and provenance; distinguish incoming rejection from proof of historical corruption. Missing evidence must remain missing and no raw identifier or unapproved override may be reachable. Presentation needs undisclosed raw source data.
-
-**Second-round new evidence/resolved direction:** Source analysis distinguishes ambiguous candidate from transfer/duplicate.
-
-**Exact next evidence or decision:** Approved P0/P1 relationship outcome.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Blocked **Roadmap:** No change
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** privacy policy.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** PRIVACY, IDENTITY, DEPENDENCY, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P1-25`: duplicate outcomes
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P0-14`: Chat owns this financial/privacy/architecture decision; it is not a technical questionnaire for the user.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1009-1012 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-35
-- [Services/ImportPersistenceCoordinator.swift](<../Services/ImportPersistenceCoordinator.swift>):1909-1929 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `052b8de5c2de61349a5151d676e1dade3ec005363fb82f4eed290822bea2cfae` — rejectedAttempt
-- [Project documents/ADR.md](<ADR.md>):5079-5085 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — typed source relationship constraints exist
-
-</details>
-
----
-
-<a id="fw-p1-36"></a>
-
-## FW-P1-36 — Diagnostic Export
-
-**Status:** Candidate
-**Depends on:** Privacy filtering and explicit user action
-
-**Current discovery disposition — 2026-09-10:** `READY_FOR_CHAT_ARCHITECTURE_DECISION`. **Exact remaining gate:** Chat must approve the shared DEBUG-only nonpersistent diagnostic projection field allowlist; native gating, export/cancel and safe provider-state acceptance remain future checks.
-
-**Smallest proposed boundary:** DEBUG opt-in already-redacted metadata export only.
-
-**Decision record:** [DIAGNOSTICS_PROJECTION_DECISION_PACKET](#packet-diagnostics-projection-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: Copy All is bounded chronological metadata; runtime diagnostics pass through privacy filtering.
-
-**First-round scope and constraints:** Explicit user action, no credentials/source fragments/raw identifiers, no financial truth export masquerading as diagnostics. No automatic upload, raw logs, database/source export, or persistent history.
-
-**First-round question/options:** What diagnostic export boundary is safe? Export existing filtered text; introduce a structured redacted bundle; defer. Text reuse is smallest but needs explicit allowlist proof.
-
-**First-round remainder and implications:** MISSING: export format, destination authorization, retention, and a reviewed allowlist. No migration; ADR-026 bounds remain.
-
-**First-round proposed acceptance/falsifier:** Secret/identifier exclusion tests, cancellation/no-file residue, and manual destination confirmation. Any field is not demonstrably redacted before serialization.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: Copy All is bounded chronological metadata; runtime diagnostics pass through privacy filtering. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Chat must approve the shared DEBUG-only nonpersistent diagnostic projection field allowlist; native gating, export/cancel and safe provider-state acceptance remain future checks. Owning authority: DIAGNOSTICS_PROJECTION_DECISION_PACKET.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Keep decision-ready closure until Chat accepts allowlist; revalidate affected provider boundaries and retain runtime acceptance before any support claim. **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `accepted-adr-026`: The explicitly named gate accepted-adr-026 must be satisfied. This enables DEBUG opt-in already-redacted metadata export only. Remaining condition: Chat must approve the shared DEBUG-only nonpersistent diagnostic projection field allowlist; native gating, export/cancel and safe provider-state acceptance remain future checks.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p1-36`: Chat must approve the shared DEBUG-only nonpersistent diagnostic projection field allowlist; native gating, export/cancel and safe provider-state acceptance remain future checks.
-
-**Pinned evidence references:**
-
-- [Core/DeveloperConsole.swift](<../Core/DeveloperConsole.swift>):47-93 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `f496995df7f425b7f556036d697992aa7bafed3fa4bde39e16031dc7500efc34` — DeveloperConsole.appendEntry
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1016-1019 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-36
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1201-1212 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Diagnostic Export as Candidate and records this unresolved boundary: MISSING: export format, destination authorization, retention, and a reviewed allowlist.
-
-</details>
-
----
-
-<a id="fw-p1-37"></a>
-
-## FW-P1-37 — Better Developer Diagnostics and Failure Summaries
-
-**Status:** Ready for planning
-**Depends on:** Existing structured diagnostic system
-
-Sprint 58 completed bounded privacy-safe preparation-failure summaries and the Developer Console integration related to the approved fixture workflow. Retain only broader structured diagnostics work not completed by that slice.
-
-The Chat-accepted unnumbered startup/monthly-planner package on 2026-09-09 additionally completed typed migration/provider/hydration/save failure summaries, causal references, safe next actions, bounded chronological Copy All metadata and truthful unavailable/non-current presentation. See [PROJECT_STATE.md](PROJECT_STATE.md). These slices are no longer queued here; broader structured diagnostics remain future work. Persistent diagnostic history and an import timeline are not completed or authorized by this closure.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No verified uncovered diagnostic class or audience.
-
-**Smallest proposed boundary:** Do not begin broad diagnostic sweep.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: startup, provider, hydration, save and recovery summaries plus bounded Copy All are recorded as complete; persistent history/timeline are excluded.
-
-**First-round scope and constraints:** Keep diagnostics typed, privacy-safe, bounded and distinct from user import history. No persistent history, import timeline, raw data, or repair.
-
-**First-round question/options:** What broader diagnostics remain? Select one unrepresented failure class; extend history; defer. Selection is needed before work.
-
-**First-round remainder and implications:** MISSING: one concrete uncovered diagnostic class and user/developer audience. ADR-026 is unchanged.
-
-**First-round proposed acceptance/falsifier:** Exact failure classification, filtered rendering, no unsafe echo, and truthful unavailable state. No verified uncovered class exists.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: startup, provider, hydration, save and recovery summaries plus bounded Copy All are recorded as complete; persistent history/timeline are excluded. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: No verified uncovered diagnostic class or audience. Owning authority: FW-P1-37 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** DEFERRED_WITH_REASON **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- None; execution still requires a Chat-approved prompt.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1023-1030 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-37
-- [Core/DeveloperConsole.swift](<../Core/DeveloperConsole.swift>):47-100 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `f496995df7f425b7f556036d697992aa7bafed3fa4bde39e16031dc7500efc34` — DeveloperConsole
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1213-1228 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Better Developer Diagnostics and Failure Summaries as Ready for planning and records this unresolved boundary: MISSING: one concrete uncovered diagnostic class and user/developer audience.
-
-</details>
+**Acceptance if selected:** independently compare the explanation with the exact typed outcome and authentic provenance. Repair, override, detachment or financial mutation requires its own approved family/impact/reversal contract; retaining this card authorizes none.
 
 ---
 
 <a id="fw-p1-38"></a>
 
-## FW-P1-38 — Import Inspector and Validation Timeline
+## FW-P1-38 — Local Import Progress and Failure Timeline
 
 **Status:** Blocked
-**Depends on:** A separate approved diagnostic-history and timeline architecture
 
-Provide development-only inspection of an import’s progression through:
+**Owner-selected scope — 2026-09-11:** reconstruct the progression of an actual import failure while developing or diagnosing the owner's app on the owner's MacBook.
 
-- source reading;
-- institution detection;
-- statement classification;
-- parser selection;
-- financial parsing;
-- validation;
-- user confirmation;
-- duplicate evaluation;
-- account decision;
-- persistence;
-- hydration.
+**Depends on:** one selected missing diagnostic progression and the existing ADR-026 event/retention/privacy contract. Prefer the current in-memory events and durable import-attempt outcomes; a new persistent timeline is not a prerequisite.
 
-The inspector may include a validation timeline showing issues and outcomes in deterministic order.
+Show only useful local preparation, review, confirmation, persistence and hydration boundaries in deterministic order. Preserve distinctions between prepared, accepted, rejected and committed-but-refresh-failed outcomes. Do not create financial truth or expose credentials, raw identifiers, paths or unrestricted source fragments.
 
-It must not expose:
-
-- passwords;
-- raw financial identifiers;
-- unrestricted source fragments;
-- production-only sensitive information.
-
-This candidate remains separate from the user-facing durable import-attempt history and is not promoted by the approved sprint.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No selected developer use case requires new persistent history/timeline or a maintenance operation. ADR-026 ephemeral diagnostics and ADR-035 lifecycle are accepted scope, not missing prerequisites.
-
-**Smallest proposed boundary:** No persistent timeline before ADR.
-
-**Decision record:** [DIAGNOSTICS_PROJECTION_DECISION_PACKET](#packet-diagnostics-projection-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: current attempt outcomes are typed and bounded; there is no accepted persistent diagnostic history/timeline architecture.
-
-**First-round scope and constraints:** No passwords, identifiers, source fragments, or replacement of user durable history. No new persistence, UI timeline, or source event replay.
-
-**First-round question/options:** Can an Import Inspector and validation timeline proceed? In-memory current attempt only; durable developer timeline; user import history. They are distinct contracts.
-
-**First-round remainder and implications:** MISSING: approved timeline event model, retention, ordering, privacy projection, and ADR decision. Potential new storage only after architecture; no migration allocated.
-
-**First-round proposed acceptance/falsifier:** Deterministic event order, redaction, deletion/retention, and no cross-role data leakage. Timeline needs raw source evidence or muddles audit history.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: current attempt outcomes are typed and bounded; there is no accepted persistent diagnostic history/timeline architecture. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: No selected developer use case requires new persistent history/timeline or a maintenance operation. ADR-026 ephemeral diagnostics and ADR-035 lifecycle are accepted scope, not missing prerequisites. Owning authority: DIAGNOSTICS_PROJECTION_DECISION_PACKET.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Preserve queue status/priority; explicitly defer until a concrete consumer or operation is selected. **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** ARCHITECTURE_DECISION, NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- None; execution still requires a Chat-approved prompt.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1034-1062 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-38
-- [Project documents/ADR.md](<ADR.md>):1134-1184 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-026
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1229-1265 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Import Inspector and Validation Timeline as Blocked and records this unresolved boundary: MISSING: approved timeline event model, retention, ordering, privacy projection, and ADR decision.
-
-</details>
+**Acceptance if selected:** compare stage/order/effect with the actual typed import outcome and preserve ordinary confirmation/cancellation behavior. Any persisted extension is separately gated by FW-P1-39A and is optional, not a dependency of this local timeline.
 
 ---
 
 <a id="fw-p1-39"></a>
 
-## FW-P1-39 — Development Database Maintenance Utilities
+## FW-P1-39 — Local MacBook Database Maintenance
 
 **Status:** Research
-**Depends on:** Separate safety, mutation and validation contracts for each maintenance operation
 
-Investigate safe development-only utilities for:
+**Owner-selected scope — 2026-09-11:** retain the smallest local maintenance action required to inspect or recover the owner's LedgerForge installation. Use existing repository tooling, DEBUG lifecycle and verified backup/restore rather than an in-app administration platform.
 
-- opening the active database folder;
-- exporting a SQLite snapshot;
-- database vacuum or optimization;
-- repository rebuild;
-- balance recalculation;
-- search reindexing.
+**Depends on:** one actual maintenance need and the exact operation's safety/validation contract. ADR-035 owns the accepted development lifecycle; FW-P0-08 owns production repair, and FW-P3-36 owns owner backup/restore.
 
-Each operation requires an explicit safety contract, scope description and validation strategy.
+Start with read-only local integrity/status or existing tool access. Any selected write must specify its target, impact, activity exclusion, failure/rollback and canonical reload. Balance recalculation, repository rebuild, reindexing and standing vacuum/optimization are not bundled scope. A measurable performance defect must establish its own cause first.
 
-ADR-035 and Sprint 45 Phase A already own canonical Debug identity, exclusive lifecycle activity, provider generations, checked close, coordinated SQLite/WAL/SHM handling, verified lifecycle backup and automatic recovery. Those delivered lifecycle responsibilities are not part of this research item; no snapshot export, vacuum, optimization, repository rebuild, recalculation, reindexing or repair utility was implemented.
-
-No maintenance operation may silently alter trusted financial history or run against an active import without safe coordination.
-
-Production user-facing repair remains governed by `FW-P0-08`.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No selected developer use case requires new persistent history/timeline or a maintenance operation. ADR-026 ephemeral diagnostics and ADR-035 lifecycle are accepted scope, not missing prerequisites.
-
-**Smallest proposed boundary:** First candidate: read-only profile status/open-folder only.
-
-**Decision record:** [DIAGNOSTICS_PROJECTION_DECISION_PACKET](#packet-diagnostics-projection-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: DBP-01 already owns profile lifecycle, activity gate, coordinated SQLite files, recovery and generation protection; utilities are absent.
-
-**First-round scope and constraints:** Every operation needs distinct safety, scope, validation; none may mutate trusted history or run during active import. No reset, vacuum, rebuild, recalculation, reindexing, production repair, or active-import action.
-
-**First-round question/options:** How should developer maintenance utilities be selected? Read-only open-folder/status; export snapshot; vacuum; rebuild/recalculate/reindex. These are not one feature.
-
-**First-round remainder and implications:** MISSING: selected first operation and mutation/reversibility contract. No migration for read-only status; mutations may require ADR review.
-
-**First-round proposed acceptance/falsifier:** Active-import refusal, stale-generation refusal, target identity, and no data writes. Operation requires unapproved selective mutation.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: DBP-01 already owns profile lifecycle, activity gate, coordinated SQLite files, recovery and generation protection; utilities are absent. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: No selected developer use case requires new persistent history/timeline or a maintenance operation. ADR-026 ephemeral diagnostics and ADR-035 lifecycle are accepted scope, not missing prerequisites. Owning authority: DIAGNOSTICS_PROJECTION_DECISION_PACKET.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Preserve queue status/priority; explicitly defer until a concrete consumer or operation is selected. **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** ARCHITECTURE_DECISION, NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- None; execution still requires a Chat-approved prompt.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1066-1086 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-39
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):871-884 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `7843854eee6c85888f41af52c52aba70f2d0138c5f6f21e518211c75aca62797` — Development database lifecycle
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1266-1294 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Development Database Maintenance Utilities as Research and records this unresolved boundary: MISSING: selected first operation and mutation/reversibility contract.
-
-</details>
+**Acceptance if selected:** prove only the selected local operation and preservation of financial truth, migration identities and recoverability. No silent operation against an active import or unapproved production repair is permitted.
 
 ---
 
 <a id="fw-p1-39a"></a>
 
-## FW-P1-39A — Persistent Developer Diagnostic History
+## FW-P1-39A — Bounded Local Diagnostic History Across Relaunch
 
 **Status:** Research
-**Depends on:** A new ADR replacing or extending ADR-026’s in-memory-only diagnostic constraint
 
-Investigate an optional development-only diagnostic history that survives relaunch.
+**Owner-selected scope — 2026-09-11:** retain optional local diagnostic history to investigate an actual failure spanning restart of the owner's MacBook app.
 
-The design must define:
+**Depends on:** selection of that local investigation and an accepted narrow amendment to ADR-026 before its in-memory-only boundary changes. No ADR is allocated or accepted here.
 
-- explicit enablement and retention limits;
-- privacy filtering;
-- log rotation and deletion;
-- separation from repository financial truth;
-- protection from passwords, raw financial identifiers and unrestricted source fragments;
-- export compatibility;
-- deterministic ordering and schema evolution.
+If selected, define explicit enablement, bounded retention/deletion and a minimal deterministic safe event schema. Keep it device-local and separate from financial persistence/import audit truth. Exclude passwords, raw financial identifiers, source fragments, paths and arbitrary error text. No diagnostic export/support platform or remote telemetry is implied.
 
-Persistent diagnostics must not become an application persistence mechanism or a substitute for import-session audit history.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No selected developer use case requires new persistent history/timeline or a maintenance operation. ADR-026 ephemeral diagnostics and ADR-035 lifecycle are accepted scope, not missing prerequisites.
-
-**Smallest proposed boundary:** No durable diagnostic history now.
-
-**Decision record:** [DIAGNOSTICS_PROJECTION_DECISION_PACKET](#packet-diagnostics-projection-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: DeveloperConsole holds a capped in-memory chronological list and applies privacy filtering at append; ADR-026 is in-memory-only.
-
-**First-round scope and constraints:** Optional/debug-only, bounded retention/deletion, no financial repository role, no sensitive material. No automatic telemetry, import audit replacement, raw log persistence, or user data storage.
-
-**First-round question/options:** May diagnostics persist across relaunch? Remain in memory; opt-in file-backed DEBUG history; repository storage. The latter two require architecture approval.
-
-**First-round remainder and implications:** MISSING: new ADR, storage owner, enablement/retention/deletion/export contract and schema evolution plan. Architecture decision first; no migration allocation.
-
-**First-round proposed acceptance/falsifier:** Relaunch/rotation/deletion, explicit disabled default, privacy fuzzing, and Release absence. Cannot prove durable privacy filtering or deletion semantics.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: DeveloperConsole holds a capped in-memory chronological list and applies privacy filtering at append; ADR-026 is in-memory-only. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: No selected developer use case requires new persistent history/timeline or a maintenance operation. ADR-026 ephemeral diagnostics and ADR-035 lifecycle are accepted scope, not missing prerequisites. Owning authority: DIAGNOSTICS_PROJECTION_DECISION_PACKET.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** Preserve queue status/priority; explicitly defer until a concrete consumer or operation is selected. **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** ARCHITECTURE_DECISION, NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- None; execution still requires a Chat-approved prompt.
-
-**Pinned evidence references:**
-
-- [Core/DeveloperConsole.swift](<../Core/DeveloperConsole.swift>):47-93 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `f496995df7f425b7f556036d697992aa7bafed3fa4bde39e16031dc7500efc34` — DeveloperConsole
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1090-1107 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P1-39A
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1295-1322 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Persistent Developer Diagnostic History as Research and records this unresolved boundary: MISSING: new ADR, storage owner, enablement/retention/deletion/export contract and schema evolution plan.
-
-</details>
+**Acceptance if selected:** verify privacy filtering before persistence, retention, deletion and relaunch behavior without financial writes. Existing useful in-memory diagnostics remain accepted and sufficient unless the actual restart investigation proves a gap.
 
 ---
+
+# P2 — Owner Workflow and Usability
 
 <a id="fw-p2-01"></a>
 
@@ -3719,17 +1589,17 @@ The global Transactions store remains the authority; filtering is presentation s
 
 **Personal-v1:** PRE_V1_OPTIONAL
 
-**Recommendation after Chat:** Preserve current status; data-algebra proposal is prepared, native filter/selection/accessibility and INR-colour acceptance remains to be observed. **Roadmap:** Retain Sprint 89 boundary
+**Recommendation after Chat:** Preserve current status; data-algebra proposal is prepared, native filter/selection/readability and INR-colour acceptance remains to be observed. **Roadmap:** Retain Sprint 89 boundary
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
 **Revalidation/falsifiers:** New displayed field or INR semantic-colour change.
 
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** ACCESSIBILITY_ACCEPTANCE.
+**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** OWNER_USABILITY_ACCEPTANCE.
 
 **Typed dependencies:**
 
-- `REQUIRES_RUNTIME_ACCEPTANCE` → `decision-sprint89-ui-acceptance`: Native focus/accessibility owned elsewhere.
+- `REQUIRES_RUNTIME_ACCEPTANCE` → `decision-sprint89-ui-acceptance`: Useful native focus/selection/resize checks belong to the selected Transactions workflow.
 
 **Pinned evidence references:**
 
@@ -3779,7 +1649,7 @@ The global Transactions store remains the authority; filtering is presentation s
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
-**Revalidation/falsifiers:** Cross-workspace sharing or retention.
+**Revalidation/falsifiers:** Local saved-filter retention or preference-ownership change.
 
 **Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** DEPENDENCY, PREFERENCE_OWNERSHIP, PRIVACY, ARCHITECTURE_DECISION.
 
@@ -4157,7 +2027,7 @@ Weak similarity must never create a transfer relationship automatically.
 
 ## TRANSFER_FAMILY_DECISION_PACKET — `FW-P2-10`, with duplicate/reconciliation closure
 
-1. **Owning FW IDs:** `FW-P2-10`, `FW-P2-11`, `FW-P2-12`; informs `FW-P0-19`, `FW-P0-20`, `FW-P1-25`, and `FW-P1-35`.
+1. **Owning FW IDs:** `FW-P2-10`, `FW-P2-11`, `FW-P2-12`; informs `FW-P0-19`, `FW-P1-25`, and `FW-P1-35`.
 2. **User problem:** Explain genuine transfers between owned accounts without adding income/expense, suppressing real transactions, or converting coincidence into a financial fact.
 3. **Verified current state:** Distinct account identity and import duplicate/event blocks exist; no transfer relation is persisted.
 4. **Accepted authorities:** ADR-037, ADR-042/043/044 bounded source relationships, ADR-046, and the current/prepared roadmaps.
@@ -4819,7 +2689,7 @@ The original imported transaction description must remain preserved.
     nonfinancial data; real recurrence claims need existing canonical evidence,
     not fabricated financial graphs.
 23. **Runtime acceptance requirement:** later candidate/confirmation UI,
-    accessibility and notification behavior require native review.
+    ordinary interaction and notification behavior require native review.
 24. **Dependencies:** accepted first rule provenance, reliable duplicate
     relationship policy, and an explicit alias/confirmation decision.
 25. **Evidence that falsifies the recommendation:** any cadence-only alias, a duplicate counted
@@ -5140,7 +3010,7 @@ Field-specific product work remains separately tracked in `FW-P2-31`, `FW-P2-32`
 **Status:** Candidate
 **Depends on:** Stable account presentation model
 
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_PRODUCT_DECISION`. **Exact remaining gate:** Token/asset persistence and accessible fallback are not selected.
+**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_PRODUCT_DECISION`. **Exact remaining gate:** Local token/icon persistence and readable fallback are not selected.
 
 **Smallest proposed boundary:** Presentation-only mapping, no financial semantics.
 
@@ -5150,7 +3020,7 @@ Field-specific product work remains separately tracked in `FW-P2-31`, `FW-P2-32`
 
 | FW ID | Decision and owner | Why it matters | Option A | Option B | Option C | Recommendation | Consequence of deferring | What becomes unblocked |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FW-P2-32 | **User product choice:** account colour/icon customization. | Presentation preferences need persistence, accessible fallback, and portability alignment. | Defer; use existing semantics. | Presentation-only token/icon mapping. | — | A until a current visual workflow needs it. | No per-account appearance preference. | Bounded accessible preference design. |
+| FW-P2-32 | **User product choice:** account colour/icon customization. | The owner’s local presentation choice needs simple persistence, readable fallback and meaningful icon names. | Defer; use existing semantics. | Presentation-only token/icon mapping. | — | A until a current visual workflow needs it. | No per-account appearance preference. | Bounded local colour/icon choice. |
 
 <details>
 <summary>Discovery evidence, dependencies and acceptance boundary</summary>
@@ -5161,13 +3031,13 @@ Field-specific product work remains separately tracked in `FW-P2-31`, `FW-P2-32`
 
 **First-round question/options:** Account Colour and Icon Customization: establish the smallest truthful product boundary. PROPOSED: Presentation-only colour/icon mapping. Defer broader automation, mutation, history, and external-data assumptions.
 
-**First-round remainder and implications:** MISSING/EXPLICIT_USER_DECISION: Token/asset persistence and accessibility decisions. No migration or ADR is approved by discovery; any durable relation/derived-state schema requires a selected family and explicit architecture decision.
+**First-round remainder and implications:** MISSING/EXPLICIT_USER_DECISION: Token/asset persistence and actual owner readability decisions. No migration or ADR is approved by discovery; any durable relation/derived-state schema requires a selected family and explicit architecture decision.
 
 **First-round proposed acceptance/falsifier:** Falsifiable future acceptance: prove deterministic result from authoritative durable records, label every assumption/limitation, preserve original source values, demonstrate SQLite/In-Memory parity when persistence changes, and reject ambiguity with zero unauthorized financial writes. Missing provenance, mixed-currency total, weak identity/recurrence evidence, changed source contract, or a result that cannot distinguish fact from derived suggestion invalidates this recommendation.
 
 **Second-round new evidence/resolved direction:** No customization contract accepted.
 
-**Exact next evidence or decision:** Approved token palette/icon mapping and runtime accessibility acceptance.
+**Exact next evidence or decision:** Approved token palette/icon mapping and actual readable contrast, icon naming and focus/selection checks.
 
 **Personal-v1:** POST_V1
 
@@ -5175,9 +3045,9 @@ Field-specific product work remains separately tracked in `FW-P2-31`, `FW-P2-32`
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
-**Revalidation/falsifiers:** Colour-only meaning / accessibility.
+**Revalidation/falsifiers:** Colour-only meaning or unreadable controls.
 
-**Current gate flags:** user product choice=true, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** ACCESSIBILITY_ACCEPTANCE, PREFERENCE_OWNERSHIP, USER_PRODUCT_DECISION.
+**Current gate flags:** user product choice=true, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** OWNER_USABILITY_ACCEPTANCE, PREFERENCE_OWNERSHIP, USER_PRODUCT_DECISION.
 
 **Typed dependencies:**
 
@@ -5187,7 +3057,7 @@ Field-specific product work remains separately tracked in `FW-P2-31`, `FW-P2-32`
 
 - [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1320-1390 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-32
 - [Project documents/Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md](<Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md>):19-123 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `69a793857804133ce22907f72458b7d72322fc8af56c0bdfac86debd9126a894` — prepared roadmap
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1657-1664 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Accessibility decision missing.
+- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1657-1664 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Historical readability decision gap; current ordinary-usability scope governs.
 
 </details>
 
@@ -5371,7 +3241,7 @@ Archiving must not delete financial history.
     reversal and closure-date correction need an accepted policy first.
 22. **Source evidence requirement:** none; source facts remain immutable.
 23. **Runtime acceptance requirement:** later account-selection/navigation and
-    accessibility checks.
+    ordinary owner usability checks.
 24. **Dependencies:** FW-P2-30 lifecycle ownership; account presentation and
     preferences separately for hide/ordering/favourites/colour/icon.
 25. **Evidence that falsifies the recommendation:** a legacy account whose provider/hydration state
@@ -5524,9 +3394,9 @@ Support user-defined or deterministic grouping while preserving immutable accoun
 
 Sprint 68A removes an inert star only; it does not implement favourites or change this candidate.
 
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_PRODUCT_DECISION`. **Exact remaining gate:** Workspace scope, ordering/grouping/favourite semantics and complete-account visibility are unknown.
+**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_PRODUCT_DECISION`. **Exact remaining gate:** Single-ledger ordering/grouping/favourite semantics and complete-account visibility are unknown.
 
-**Smallest proposed boundary:** Per-workspace presentation ordering only.
+**Smallest proposed boundary:** Device-local single-ledger presentation ordering only.
 
 **Decision record:** [ACCOUNT_LIFECYCLE_PACKET](#packet-account-lifecycle-packet).
 
@@ -5534,7 +3404,7 @@ Sprint 68A removes an inert star only; it does not implement favourites or chang
 
 | FW ID | Decision and owner | Why it matters | Option A | Option B | Option C | Recommendation | Consequence of deferring | What becomes unblocked |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FW-P2-37 | **User product choice:** account grouping, ordering, favourites, and preference scope. | It changes navigation but must not change financial membership. | Default stable order. | Per-workspace presentation grouping/order/favourites. | — | A; defer absent current navigation pain. | Default collection order remains. | Bounded preference ownership if B selected. |
+| FW-P2-37 | **User product choice:** account grouping, ordering, favourites, and preference scope. | It changes navigation but must not change financial membership. | Default stable order. | Device-local single-ledger presentation grouping/order/favourites. | — | A; defer absent current navigation pain. | Default collection order remains. | Bounded preference ownership if B selected. |
 
 <details>
 <summary>Discovery evidence, dependencies and acceptance boundary</summary>
@@ -5543,7 +3413,7 @@ Sprint 68A removes an inert star only; it does not implement favourites or chang
 
 **First-round scope and constraints:** EXPLICIT_USER_DECISION: preserve immutable imported financial truth, durable provenance, native-currency meaning, privacy, deterministic behavior, and fail-closed ambiguity; a roadmap forecast grants no execution authority. No repair, parser/source claim, build/test/runtime validation, database mutation, fabricated statement, unbounded sync, or hidden financial inference.
 
-**First-round question/options:** Account Grouping, Ordering and Favourites: establish the smallest truthful product boundary. PROPOSED: Per-workspace presentation ordering/grouping only. Defer broader automation, mutation, history, and external-data assumptions.
+**First-round question/options:** Account Grouping, Ordering and Favourites: establish the smallest truthful product boundary. PROPOSED: Device-local single-ledger presentation ordering/grouping only. Defer broader automation, mutation, history, and external-data assumptions.
 
 **First-round remainder and implications:** MISSING/EXPLICIT_USER_DECISION: User preference scope/order and complete-account visibility rules. No migration or ADR is approved by discovery; any durable relation/derived-state schema requires a selected family and explicit architecture decision.
 
@@ -5559,14 +3429,14 @@ Sprint 68A removes an inert star only; it does not implement favourites or chang
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
-**Revalidation/falsifiers:** Cross-workspace/export behavior.
+**Revalidation/falsifiers:** Local ordering/visibility stability without changed financial membership.
 
 **Current gate flags:** user product choice=true, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** PREFERENCE_OWNERSHIP, USER_PRODUCT_DECISION, ARCHITECTURE_DECISION.
 
 **Typed dependencies:**
 
 - `REQUIRES_USER_DECISION` → `decision-account-preference-scope`: Ownership.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p2-37`: Workspace scope, ordering/grouping/favourite semantics and complete-account visibility are unknown.
+- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p2-37`: Single-ledger ordering/grouping/favourite semantics and complete-account visibility are unknown.
 
 **Pinned evidence references:**
 
@@ -5585,7 +3455,7 @@ Sprint 68A removes an inert star only; it does not implement favourites or chang
 **Status:** Ready for planning
 **Depends on:** Existing account-scoped activity foundation
 
-**Current discovery disposition — 2026-09-10:** `WAIT_FOR_RUNTIME_ACCEPTANCE`. **Exact remaining gate:** Data/navigation is existing; native R1 selection/focus/accessibility acceptance belongs to recovery-macos lane.
+**Current discovery disposition — 2026-09-10:** `WAIT_FOR_RUNTIME_ACCEPTANCE`. **Exact remaining gate:** Data/navigation is existing; native R1 selection/focus/readability checks remain part of the actual selected workflow.
 
 **Smallest proposed boundary:** Navigate canonical account-scoped transactions.
 
@@ -5606,7 +3476,7 @@ Sprint 68A removes an inert star only; it does not implement favourites or chang
 
 **Second-round new evidence/resolved direction:** No new query authority required.
 
-**Exact next evidence or decision:** Native keyboard/focus/VoiceOver acceptance.
+**Exact next evidence or decision:** Useful native keyboard/focus/selection and readable financial values.
 
 **Personal-v1:** PRE_V1_OPTIONAL
 
@@ -5614,9 +3484,9 @@ Sprint 68A removes an inert star only; it does not implement favourites or chang
 
 **Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
 
-**Revalidation/falsifiers:** Native focus/accessibility results.
+**Revalidation/falsifiers:** Native focus/selection/readability results.
 
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** ACCESSIBILITY_ACCEPTANCE, MACOS_PLATFORM.
+**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** OWNER_USABILITY_ACCEPTANCE, MACOS_PLATFORM.
 
 **Typed dependencies:**
 
@@ -5710,7 +3580,7 @@ Conform remaining destination toolbars to functional, page-specific controls wit
 
 **First-round question/options:** How should R1 toolbar conformance be implemented? Retain custom strip with scoped actions; move frequent actions to SwiftUI toolbar/commands; mixed. Apple documents toolbar and commands, but product placement remains unaccepted.
 
-**First-round remainder and implications:** MISSING: per-destination action inventory, command/shortcut collisions, native resizing and accessibility verification. None.
+**First-round remainder and implications:** MISSING: per-destination action inventory, command/shortcut collisions, native resizing and ordinary owner-usability verification. None.
 
 **First-round proposed acceptance/falsifier:** Keyboard/menu/toolbar action parity, disabled-state truth, no shortcut bypass of confirmations; runtime-required. A proposed control lacks a real active-domain action.
 
@@ -5737,7 +3607,7 @@ Conform remaining destination toolbars to functional, page-specific controls wit
 
 - [ContentView.swift](<../ContentView.swift>):1507-1540 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `c315381adf31633a27671b14499fc5dd12d7b794af047c82cfb2acf67990202b` — contextualToolbar
 - [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1408-1413 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-41
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1767-1780 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines R1 Contextual Toolbar Conformance as Candidate and records this unresolved boundary: MISSING: per-destination action inventory, command/shortcut collisions, native resizing and accessibility verification.
+- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1767-1780 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines R1 Contextual Toolbar Conformance as Candidate and records this unresolved boundary: MISSING: per-destination action inventory, command/shortcut collisions, native resizing and ordinary owner-usability verification.
 
 </details>
 
@@ -5752,11 +3622,11 @@ Conform remaining destination toolbars to functional, page-specific controls wit
 
 Improve default account iconography. User customization remains governed by `FW-P2-32`, while institution logos remain governed by `FW-P2-33`.
 
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Stable per-destination R1 action/shortcut inventory under FW-P2-41 and frozen shell scope, then an account-kind icon map with neutral accessible fallback.
+**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Stable per-destination R1 action/shortcut inventory under FW-P2-41 and frozen shell scope, then an account-kind icon map with neutral readable fallback.
 
 **Smallest proposed boundary:** No institution branding or identity inference.
 
-**Decision record:** [DIAGNOSTICS_PROJECTION_DECISION_PACKET](#packet-diagnostics-projection-decision-packet).
+**Decision record:** The frozen UI specification and FW-P2-41 own the bounded icon/readability context; no general diagnostics projection programme is required.
 
 <details>
 <summary>Discovery evidence, dependencies and acceptance boundary</summary>
@@ -5773,7 +3643,7 @@ Improve default account iconography. User customization remains governed by `FW-
 
 **Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: common icon components exist, but no accepted account presentation taxonomy is identified in this static lane. Second-level disposition is the exact decision/dependency/deferral stated here.
 
-**Exact next evidence or decision:** Exact next evidence/decision: Stable per-destination R1 action/shortcut inventory under FW-P2-41 and frozen shell scope, then an account-kind icon map with neutral accessible fallback. Owning authority: DIAGNOSTICS_PROJECTION_DECISION_PACKET.
+**Exact next evidence or decision:** Exact next evidence/decision: Stable per-destination R1 action/shortcut inventory under FW-P2-41 and frozen shell scope, then an account-kind icon map with neutral readable fallback. Owning authority: the frozen UI specification and FW-P2-41.
 
 **Personal-v1:** PRE_V1_OPTIONAL
 
@@ -5849,64 +3719,6 @@ Improve default account iconography. User customization remains governed by `FW-
 
 ---
 
-<a id="fw-p2-45"></a>
-
-## FW-P2-45 — Improved Global Search
-
-**Status:** Candidate
-**Depends on:** Stable searchable domains
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_PRODUCT_DECISION`. **Exact remaining gate:** Searchable domain list, privacy/ranking/navigation and workspace scope.
-
-**Smallest proposed boundary:** Keep accepted transactions search bounded.
-
-**Bounded product choice for future selection:**
-
-| FW ID | Decision and owner | Why it matters | Option A | Option B | Option C | Recommendation | Consequence of deferring | What becomes unblocked |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FW-P2-45 | **User product choice:** broaden global search beyond accepted Transactions search. | Domain/ranking/privacy/workspace scope changes what is discoverable. | Keep Transactions search bounded. | Curated named result types after R1 search acceptance. | Full global search later. | A; no selected workflow. | No cross-domain search. | B with explicit domain/privacy map. |
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: the R1 handoff defines a bounded Transactions search only; global searchable domains remain unsettled.
-
-**First-round scope and constraints:** No fuzzy financial inference or search of undisclosed raw identifiers. No raw source search, identifiers, indexing, or cross-workspace search.
-
-**First-round question/options:** What does global search safely cover? Keep domain-local search; add curated global result types; full text search. The second needs explicit authority.
-
-**First-round remainder and implications:** MISSING: domain list, privacy model, result ranking/navigation and cross-workspace decision. Potential index/storage is unapproved.
-
-**First-round proposed acceptance/falsifier:** Exact searchable fields and result navigation, privacy denial tests, no mutation. Search needs unhydrated/private data.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: the R1 handoff defines a bounded Transactions search only; global searchable domains remain unsettled. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Searchable domain list, privacy/ranking/navigation and workspace scope. Owning authority: FW-P2-45 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** BLOCKED_ON_PRODUCT_DECISION **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=true, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** USER_PRODUCT_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_USER_DECISION` → `decision-global-search`: The explicitly named gate decision-global-search must be satisfied. This enables Keep accepted transactions search bounded. Remaining condition: Searchable domain list, privacy/ranking/navigation and workspace scope.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1433-1436 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-45
-- [Project documents/UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md](<UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md>):79-104 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `628d2b4be1d6f4872c307a4608877e0261811a04dfc5c73a27506dfbcf36c1f2` — Transactions search
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1807-1818 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Improved Global Search as Candidate and records this unresolved boundary: MISSING: domain list, privacy model, result ranking/navigation and cross-workspace decision.
-
-</details>
-
----
-
 <a id="fw-p2-46"></a>
 
 ## FW-P2-46 — Interactive Dashboard Charts
@@ -5975,479 +3787,67 @@ Future charts must preserve native-currency safety, provenance, deterministic ca
 
 <a id="fw-p2-47"></a>
 
-## FW-P2-47 — R1 Empty, Loading, Failure and Import Guidance States
+## FW-P2-47 — Truthful Local UI States
 
 **Status:** Candidate
-**Depends on:** stable affected workflows
 
-Complete R1 state treatment that distinguishes loading, genuinely empty, unavailable, failed and no-match states. Completed imports must resolve to coherent result/completion presentation. Guidance must not duplicate navigation unnecessarily, fabricate zero financial values or imply unsupported recovery.
+**Owner need:** distinguish loading, empty, no matches, unavailable and failure in the actual financial workflows without fabricating zero data or successful persistence.
 
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Affected R1 workflows stabilize; state matrix then native evidence.
+**Depends on:** stable actual workflow outcomes and the R1 handoff. Each selected screen owns its own ordinary usability check; no separate formal acceptance program is a prerequisite.
 
-**Smallest proposed boundary:** Truthful loading/unavailable/import outcome states.
+Preserve prepared versus accepted import state, committed-but-refresh-failed distinctions, safe recovery actions, readable text and no clipping/overlap. Focus and selection remain distinct, and a decorative colour never supplies financial meaning.
 
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: availability distinguishes loading/unavailable and typed import outcomes map unknown states to neutral output; cross-screen native proof is unmeasured.
-
-**First-round scope and constraints:** Never fabricate zero values or unsupported recovery; completion must be coherent. No fake empty data, new import engine, or recovery authority.
-
-**First-round question/options:** What R1 feedback-state work remains? Per-screen ad hoc states; shared typed presentation mapping; defer. Shared mapping fits existing outcome approach.
-
-**First-round remainder and implications:** MISSING: state matrix for Accounts, Import, Settings and Developer Console after each stabilizes. No migration.
-
-**First-round proposed acceptance/falsifier:** Runtime state matrix includes empty/no-match/loading/unavailable/failure and valid action paths. A screen needs new domain state absent from accepted model.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: availability distinguishes loading/unavailable and typed import outcomes map unknown states to neutral output; cross-screen native proof is unmeasured. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Affected R1 workflows stabilize; state matrix then native evidence. Owning authority: FW-P2-47 pinned queue scope and the named dependency below.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** READY_AFTER_NAMED_DEPENDENCY **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** DEPENDENCY.
-
-**Typed dependencies:**
-
-- `REQUIRES_IMPLEMENTATION` → `FW-P2-78`: The LF-UI-2026-09-R1 Dashboard Implementation boundary must provide: Dashboard supports native values only.. This enables Truthful loading/unavailable/import outcome states. Remaining condition: Affected R1 workflows stabilize; state matrix then native evidence.
-- `REQUIRES_RUNTIME_ACCEPTANCE` → `FW-P2-49`: The R1 Native Accessibility Closure boundary must provide: Static labels do not certify accessibility.. This enables Truthful loading/unavailable/import outcome states. Remaining condition: Affected R1 workflows stabilize; state matrix then native evidence.
-
-**Pinned evidence references:**
-
-- [ContentView.swift](<../ContentView.swift>):1465-1473 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `c315381adf31633a27671b14499fc5dd12d7b794af047c82cfb2acf67990202b` — ContentView availability state
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1461-1466 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-47
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1845-1858 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines R1 Empty, Loading, Failure and Import Guidance States as Candidate and records this unresolved boundary: MISSING: state matrix for Accounts, Import, Settings and Developer Console after each stabilizes.
-
-</details>
+**Acceptance if selected:** compare the screen with its authoritative typed state, test the selected actual workflow and ordinary resizing/keyboard behavior, and ensure actions retain confirmation/mutation safety.
 
 ---
 
 <a id="fw-p2-48"></a>
 
-## FW-P2-48 — R1 Cross-Screen Visual Polish
+## FW-P2-48 — Bounded R1 Visual and Interaction Polish
 
 **Status:** Candidate
-**Depends on:** stable primary layouts and the applicable R1 implementation slices
 
-Remaining shared polish includes readable full native-currency summaries, safe account disambiguation, responsive/collapsible inspectors, settings hierarchy/density and Developer Console clarity between the active database and a selected target.
+**Owner need:** readable and usable actual LedgerForge screens, including full Money, no clipping/overlap, sensible resizing/reflow, visible actions and consistent financial terminology.
 
-The Transactions portions may be consumed only as needed by Sprint 89; broader cross-screen polish remains for the later shared conformance boundary. Further Salary visual refinement remains lower priority and must not reopen accepted natural input, Save/Command-S, fee validation or persistence behavior.
+**Depends on:** the specific adopted workflow and canonical R1 handoff, not a separate accessibility campaign. Sprint 89 may consume only necessary Transactions portions; broader actual screen polish remains separate.
 
-**Current discovery disposition — 2026-09-10:** `WAIT_FOR_RUNTIME_ACCEPTANCE`. **Exact remaining gate:** Compare the subjective wide right-column preview proposal with a responsive shared/full-width fallback, preserve accepted Import semantics, then independently verify native width/long-validation/scroll/focus/VoiceOver/footer behavior.
+**Retained owner feedback:** Import Preview has heavy scrolling at left and unused space below Validation Review at right. This is subjective layout feedback, not a financial defect. The [canonical proposal](<UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md#packet-import-preview-responsive-placement>) retains a sufficiently-wide right-column preview stack or a content-fit full-width fallback; neither is accepted implementation.
 
-**Smallest proposed boundary:** Rebalance existing read-only Import preview placement without changing source order, identity/validation/confirmation, selection or financial semantics; FW-P2-48 owns it.
-
-# Import Layout Feedback - Draft Discovery Appendix
-
-Lane: recovery_macos
-Observation date: 2026-09-10
-Evidence boundary: read-only archive declared as af2d1949c6e9a73af3bb004422b72882d28195e2. This external scratch file changes no UI authority, queue entry, frozen status, product source, or runtime claim.
-
-## Evidence classification
-
-- USER_REPORTED_SUBJECTIVE: The user finds the prepared Import screen transaction preview in the left region scroll-heavy while the right Validation Review region can be comparatively empty. The user suggests moving Transaction Preview under Validation Review. This is a preference and candidate layout direction, not a universal rule.
-- VERIFIED_USER_IMAGE_LAYOUT_ONLY: The supplied screenshot shows the described two-column geometry: long prepared-import material and preview occupy the left scrolling region while the right review region visibly has unused vertical capacity. Inspection was layout-only. No image is copied, embedded, named, transcribed, or used for a financial, source, validation, runtime, selection, or accessibility claim.
-- VERIFIED_PINNED_SOURCE: ContentView places prepared-import body in the left panel and a scrolling Validation Review panel at right (ContentView.swift:1843-1907); the prepared body places Transaction Preview after summary, identity, and equivalence content (:2924-2988). This proves static placement only.
-
-## Existing authority and correct owner
-
-| Question | Existing authority or owner | Disposition |
-| --- | --- | --- |
-| Preview meaning | Project documents/UI_UX_v1.0_Frozen.md:480-553, Import Workflow and Preview | Binding workflow authority. Preserve source/statement summary, identity review, transactions, validation/duplicate outcome and explicit confirmation distinctions. |
-| Responsive and scroll behavior | UI_UX_v1.0_Frozen.md:720-729 and UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md:27-45,204-212 | Subject authority. One obvious scroll owner, visible focus/selection, responsive hierarchy; not native certification. |
-| Existing FW owner | FW-P2-48 R1 Cross-Screen Visual Polish, FUTURE_WORK.MD:1859-1870 | Owns responsive/cross-screen presentation after stable layouts. FW-P2-49 owns native acceptance. |
-| Conditional structural coordination | Accepted Sprint 88 (completed FW-P2-67) | Optional structural coordination is SATISFIED by the accepted extraction; it is not a layout prerequisite or the design owner. |
-| Explicit non-owner: terminology | FW-P2-40, FUTURE_WORK.MD:1751-1762 | Wording/provenance only, not panel geometry. |
-| Explicit non-owner: editable preview | FW-P1-22, FUTURE_WORK.MD:975-991 | Correction/provenance only, not placement. |
-| Suggested FW-P2-02 | No active FW-P2-02 occurs in pinned FUTURE_WORK, discovery register, UI/UX authority, or target matrix. | Do not invent/revive ID. Attach the discovery to FW-P2-48 and FW-P2-49 dependency. |
-
-## Bounded alternatives
-
-### A - wide-window right-column stack - recommended candidate
-
-At a documented broad-width threshold, the right column becomes one vertically scrolling review region: Validation Review first, Transaction Preview immediately below. The left retains queue, prepared statement summary, identity/equivalence/partial-review explanation and other pre-confirmation context. Footer cancel, skip and confirmation controls remain persistently visible.
-
-The table remains read-only prepared evidence. It preserves source order and each existing prepared-import, validation, identity, duplicate, equivalence and confirmation distinction. Moving it creates no selection, edit, filter, source reopen or confirmation behavior.
-
-### B - responsive shared or main preview region
-
-If a right-column table cannot meet documented readable minimum width, or long validation material makes the stack difficult to scan, reflow the one Transaction Preview into a full-width region below the two-column summary/review area. Do not duplicate it. The breakpoint follows minimum table readability, text scaling and visible confirmation/cancel controls, never a screenshot ratio.
-
-### Recommendation
-
-Use A as the broad-layout candidate because it addresses the user-observed left-scroll imbalance while keeping validation and prepared transactions adjacent as pre-confirmation review. Use B as responsive fallback. This is not a rule that every validation view must display a table on the right.
-
-## Invariants and exclusions
-
-| Preserve | Do not add or change |
-| --- | --- |
-| Prepared source order/multiplicity and bounded prepared-evidence representation. | Financial values, parser/normalizer/source interpretation, identity resolution, validation, duplicate/equivalence, account choice or provider persistence. |
-| Separate identity/account, validation, duplicate/equivalence and explicit confirmation review. | Any implication that validation equals persistence, confirmation has succeeded, or equivalent source creates transactions. |
-| Safe pre-confirm cancellation, non-cancellable confirmed persistence, footer action visibility and disabled truth. | Edit/correction, new row selection semantics, filtering/sorting, source reopening, queue, provenance, diagnostics or workflow destination. |
-| One obvious scroll owner; keyboard/focus accessibility grouping. | Nested unbounded scroll views, duplicated preview, layout-derived financial conclusion, screenshot-derived INR color semantics. |
-
-## Future acceptance required, not performed
-
-Use a task-owned native run after FW-P2-48 implementation. Previewed statement behavior uses approved authentic inputs only; do not manufacture empty or zero-transaction statements.
-
-1. Wide window: validation plus preview appear in right review stack; left does not need disproportionate scroll merely to reach existing preview; review order/footer remain visible and accessible.
-2. Narrow window: B reflows before unreadable columns; one preview, no clipped controls or competing scroll owners.
-3. Long validation: blocking explanation, identity decision, duplicate/equivalence outcome and confirmation state remain readable and reachable.
-4. Keyboard and VoiceOver: coherent focus order through queue, identity/validation, preview and footer; headings/grouping announce purpose; focus and any existing selection remain visible.
-5. Scroll and selection: scrolling reaches intended region; reflow retains/clears any owner-defined selection explicitly and never substitutes another row.
-6. Confirm/cancel: pre-confirm cancel/skip and eligible confirmation discoverable at all widths; committing remains non-cancellable and shortcuts cannot bypass confirmation.
-7. Empty and genuine zero-transaction: truthful prepared/validation/confirmation state. Use real registered authentic zero-transaction case if available; otherwise mark untested, never manufacture.
-8. Privacy/color: no raw identifiers/source fragments/image contents in labels. Do not change INR financial color semantics from image; retain its independent source/runtime gate.
-
-## Recommended draft documentation route
-
-Root may append a clearly marked unaccepted appendix named DRAFT - Import Preview Responsive Placement to Project documents/UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md, after responsive hierarchy and before component guidance. It should link FW-P2-48, FW-P2-49, frozen Import Workflow/Preview authority, this discovery file and future acceptance. It must state A/B are draft, preserve workflow semantics, select no sprint and change no accepted R1/native status.
-
-## Matrix and revalidation
-
-This historical discovery adds a second-level row under FW-P2-48, with FW-P2-49 as REQUIRES_RUNTIME_ACCEPTANCE and conditional structural coordination from FW-P2-67 (now SATISFIED by accepted Sprint 88). It creates no new FW ID, replaces no campaign, affects no personal-v1 DAG, and is independent of FX/current-historical conversion scope. No verified P0, parser, financial, or privacy defect was found.
-
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: written R1 contract specifies readable currency, safe account disambiguation, inspector behavior, density, and Developer Console clarity; Transactions is separately bounded in Sprint 89.
-
-**First-round scope and constraints:** Do not reopen accepted Salary editor/save/fee/persistence or consume broader work in Sprint 89. No Dashboard analytics, Salary semantic change, or source-tree move.
-
-**First-round question/options:** What cross-screen R1 polish can be shared? Consume minimal Transactions slice; consolidated post-91 polish; per-screen styling. Prepared roadmap selects consolidated later boundary.
-
-**First-round remainder and implications:** MISSING: native resizing, color, accessibility and cross-screen comparison evidence. None.
-
-**First-round proposed acceptance/falsifier:** Matched-window/text-size checks and semantic presentation invariants. R1 slice alters a shared component contract.
-
-**Second-round new evidence/resolved direction:** USER_REPORTED_SUBJECTIVE and VERIFIED_USER_IMAGE_LAYOUT_ONLY: Import preview causes disproportionate left scrolling while right Validation Review has spare vertical space. User suggests right-side preview below validation as a candidate, not a forced rule. Pinned ContentView placement corroborates broad geometry only.
-
-**Exact next evidence or decision:** Pinned ContentView.swift:1843-1907,2924-2988 and frozen UI workflow plus private supplied-image layout observation; future native acceptance required, no screenshot financial claim.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** WAIT_FOR_RUNTIME_ACCEPTANCE **Roadmap:** Attach subjective Import rebalancing to existing FW-P2-48/cross-screen R1 gate; no sprint selected and no frozen placement approved.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** MACOS_PLATFORM, ACCESSIBILITY_ACCEPTANCE.
-
-**Typed dependencies:**
-
-- `REQUIRES_IMPLEMENTATION` → `FW-P2-78`: The LF-UI-2026-09-R1 Dashboard Implementation boundary must provide: Dashboard supports native values only.. This enables Rebalance existing read-only Import preview placement without changing source order, identity/validation/confirmation, selection or financial semantics; FW-P2-48 owns it. Remaining condition: Compare the subjective wide right-column preview proposal with a responsive shared/full-width fallback, preserve accepted Import semantics, then independently verify native width/long-validation/scroll/focus/VoiceOver/footer behavior.
-- `REQUIRES_RUNTIME_ACCEPTANCE` → `FW-P2-49`: Independent native resize/keyboard/VoiceOver and action-visibility acceptance; user feedback is subjective.
-- `OPTIONAL_ENHANCEMENT` → accepted Sprint 88 (`FW-P2-67`): optional structural coordination is `SATISFIED`; it remains optional, is not a prerequisite for layout discovery and does not establish layout/native acceptance.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1470-1477 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-48
-- [Project documents/UI Assets/LF-UI-2026-09-R1/ACCEPTANCE.md](<UI Assets/LF-UI-2026-09-R1/ACCEPTANCE.md>):32-37 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `e22c6acfe8e63a124f5f032dd9fb7e09a7102a3f25137e4acbb7a119845c03ab` — UI-01 to UI-06
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1859-1874 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines R1 Cross-Screen Visual Polish as Candidate and records this unresolved boundary: MISSING: native resizing, color, accessibility and cross-screen comparison evidence.
-- [ContentView.swift](<../ContentView.swift>):1843-1907;2924-2988 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Static placement only: prepared body left, validation right, transaction preview later in prepared body.
-
-</details>
-
----
-
-<a id="fw-p2-49"></a>
-
-## FW-P2-49 — R1 Native Accessibility Closure
-
-**Status:** Candidate
-**Depends on:** stable R1 implementation surfaces
-
-Native/runtime acceptance must cover complete keyboard paths, useful VoiceOver grouping, visible focus distinct from selection, non-colour status meaning, applicable 4.5:1 text and 3:1 meaningful-boundary targets, reduced motion/transparency and readable fallback for user appearance choices.
-
-Static design approval is not accessibility acceptance. The bounded Transactions portion may be exercised with Sprint 89; cross-screen closure remains later.
-
-**Current discovery disposition — 2026-09-10:** `WAIT_FOR_RUNTIME_ACCEPTANCE`. **Exact remaining gate:** VoiceOver, Full Keyboard Access, focus, contrast, resize and reduced-preference observations.
-
-**Smallest proposed boundary:** Static labels do not certify accessibility.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: many labels exist, but custom shell applies a fixed dark color scheme and static design documents explicitly deny native certification.
-
-**First-round scope and constraints:** Keyboard paths, VoiceOver grouping, visible focus, non-color meaning, contrast, reduced motion/transparency, and readable fallbacks are required. No redesign, accessibility claim from token checks, or financial state alteration.
-
-**First-round question/options:** What distinguishes R1 design approval from native accessibility closure? Static labels only; native acceptance matrix; defer. Static labels are insufficient.
-
-**First-round remainder and implications:** MISSING: actual VoiceOver, Full Keyboard Access, focus, composited contrast, resize and reduced-preference observations. No migration.
-
-**First-round proposed acceptance/falsifier:** Runtime VoiceOver/keyboard/focus/reduced-settings and measured contrast results. Fixed palette or custom material prevents readable fallback.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: many labels exist, but custom shell applies a fixed dark color scheme and static design documents explicitly deny native certification. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Task-owned native runtime evidence
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** WAIT_FOR_RUNTIME_ACCEPTANCE **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** MACOS_PLATFORM, ACCESSIBILITY_ACCEPTANCE.
-
-**Typed dependencies:**
-
-- `REQUIRES_IMPLEMENTATION` → `FW-P2-55`: The Adaptive Appearance Native Implementation boundary must provide: System/Light/Dark; no financial mutation.. This enables Static labels do not certify accessibility. Remaining condition: VoiceOver, Full Keyboard Access, focus, contrast, resize and reduced-preference observations.
-- `REQUIRES_RUNTIME_ACCEPTANCE` → `runtime-acceptance-fw-p2-49`: VoiceOver, Full Keyboard Access, focus, contrast, resize and reduced-preference observations.
-
-**Pinned evidence references:**
-
-- [ContentView.swift](<../ContentView.swift>):1443-1480 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `c315381adf31633a27671b14499fc5dd12d7b794af047c82cfb2acf67990202b` — ContentView root
-- [Project documents/UI Assets/LF-UI-2026-09-R1/ACCEPTANCE.md](<UI Assets/LF-UI-2026-09-R1/ACCEPTANCE.md>):34-37 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `e22c6acfe8e63a124f5f032dd9fb7e09a7102a3f25137e4acbb7a119845c03ab` — UI-04 to UI-06
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1875-1890 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines R1 Native Accessibility Closure as Candidate and records this unresolved boundary: MISSING: actual VoiceOver, Full Keyboard Access, focus, composited contrast, resize and reduced-preference observations.
-
-</details>
+**Acceptance if selected:** broad/narrow width, long validation, scrolling, focus/selection, action/footer visibility, actual cancellation/confirmation and truthful empty states. Preserve source order, multiplicity, identity, validation and duplicate/equivalence semantics. A zero-transaction case requires genuine authentic evidence or remains untested. No financial-colour change may follow from a screenshot alone.
 
 ---
 
 <a id="fw-p2-50"></a>
 
-## FW-P2-50 — R1 Keyboard Navigation and Shortcuts
+## FW-P2-50 — Useful Native Keyboard Interaction
 
 **Status:** Candidate
-**Depends on:** stable R1 primary workflows
 
-Complete keyboard reachability for search, filters, sortable headings, table/row selection, inspector interactions, collapse/expand behavior and other R1 primary actions. Focus remains visible and distinct from selection, and shortcuts never bypass confirmation or mutation safety.
+**Owner need:** ordinary keyboard use for the actual R1 workflows, including Transactions search, filters, supported sorting, row selection, inspector and navigation controls.
 
-The bounded Transactions portion may be included in Sprint 89; cross-screen closure remains later.
+**Depends on:** the selected screen's stable workflow and actual native command/focus behavior. Retain only useful interactions; do not create a cross-screen certification campaign or shortcut framework without a concrete need.
 
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Toolbar inventory and stable workflows; then runtime shortcut/focus proof.
+Focus stays visible and distinct from selection. Ambiguous icon controls need useful names/tooltips. Shortcuts do not bypass explicit import confirmation or financial-mutation safety. Necessary Transactions interactions may be included in Sprint 89; actual remaining polish may be selected later.
 
-**Smallest proposed boundary:** Command/focused-value routing without mutation shortcuts.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: only isolated Command-S is found in Salary; app entry has no commands block and the custom shell uses sidebar buttons.
-
-**First-round scope and constraints:** Shortcuts must never bypass confirmation or mutation safety; focus differs from selection. No command that directly persists/imports/reverses without existing gates.
-
-**First-round question/options:** How should keyboard reachability be planned? Per-view shortcuts; shared App commands/focused routing; no new shortcuts. Apple documents command menu integration, but product choices require planning.
-
-**First-round remainder and implications:** MISSING: conflict-free shortcut table, focused-value routing, and runtime keyboard traversal. None.
-
-**First-round proposed acceptance/falsifier:** Keyboard traversal/search/filter/sort/selection/inspector tests with visible focus and confirmation checks. Collision with system or app command, or unsafe mutation bypass.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: only isolated Command-S is found in Salary; app entry has no commands block and the custom shell uses sidebar buttons. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Toolbar inventory and stable workflows; then runtime shortcut/focus proof. Owning authority: FW-P2-50 pinned queue scope and the named dependency below.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** READY_AFTER_NAMED_DEPENDENCY **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** DEPENDENCY.
-
-**Typed dependencies:**
-
-- `REQUIRES_IMPLEMENTATION` → `FW-P2-41`: The R1 Contextual Toolbar Conformance boundary must provide: Page-specific native toolbar/commands.. This enables Command/focused-value routing without mutation shortcuts. Remaining condition: Toolbar inventory and stable workflows; then runtime shortcut/focus proof.
-
-**Pinned evidence references:**
-
-- [LedgerForgeApp.swift](<../LedgerForgeApp.swift>):20-40 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `325b5d3cc8d7f32dbb11efb815cd7d82be3b9a79f069fb8434aa4b83fde47185` — LedgerForgeApp.body
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1492-1499 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-50
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1891-1906 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines R1 Keyboard Navigation and Shortcuts as Candidate and records this unresolved boundary: MISSING: conflict-free shortcut table, focused-value routing, and runtime keyboard traversal.
-
-</details>
-
----
-
-<a id="fw-p2-51"></a>
-
-## FW-P2-51 — Startup, Runtime and Import Performance Optimization
-
-**Status:** Research
-**Depends on:** Measured performance evidence plus authentic large sources where source-path performance is under test, or clearly non-source synthetic stress data that makes no parser-support claim
-
-Measure and improve:
-
-- application startup;
-- repository hydration;
-- large account and transaction presentation;
-- import preparation and confirmation;
-- large-statement parsing;
-- search and filtering.
-
-Sprint 83 completes the serial batch Import Centre. Any future bounded parallel preparation remains unscheduled Research under this existing performance candidate, requiring measured need, transferable `PreparedImport`/source-snapshot ownership and proven dependency thread safety, including the `FW-P2-74` boundary. It must preserve deterministic queue order and per-file review/confirmation and cannot parallelize confirmation or provider commit. This note does not approve implementation.
-
-A splash or launch-progress experience may be considered only when measured startup delay justifies one.
-
-Do not optimize without benchmarks.
-
-**Current discovery disposition — 2026-09-10:** `WAIT_FOR_RUNTIME_ACCEPTANCE`. **Exact remaining gate:** Measured baseline, scenarios, thresholds and profiler captures.
-
-**Smallest proposed boundary:** No optimization from static theory.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: startup triggers persistence and hydration through the root app/shell; no measurement exists in this lane.
-
-**First-round scope and constraints:** Do not optimize without benchmarks; source-path tests require authentic large sources, while non-source stress data may only test mechanics. No splash, benchmark claim, parser corpus substitute, or optimization patch.
-
-**First-round question/options:** What performance work can be recommended without runtime probes? Measure startup/hydration; add launch UI; tune static code. Only measurement is authorized next.
-
-**First-round remainder and implications:** MISSING: baseline measurements, representative scenarios, thresholds, and profiler captures. None inferred.
-
-**First-round proposed acceptance/falsifier:** Pinned build identity, scenario definition, metrics, flame/sample evidence, and repeatability; authentic corpus where source path is tested. Measurement changes due to an uncontrolled database/source or overlaps validation.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: startup triggers persistence and hydration through the root app/shell; no measurement exists in this lane. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Task-owned native runtime evidence
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** WAIT_FOR_RUNTIME_ACCEPTANCE **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** MACOS_PLATFORM, ACCESSIBILITY_ACCEPTANCE.
-
-**Typed dependencies:**
-
-- `REQUIRES_RUNTIME_ACCEPTANCE` → `runtime-acceptance-fw-p2-51`: Measured baseline, scenarios, thresholds and profiler captures.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1503-1519 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-51
-- [LedgerForgeApp.swift](<../LedgerForgeApp.swift>):28-63 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `325b5d3cc8d7f32dbb11efb815cd7d82be3b9a79f069fb8434aa4b83fde47185` — configurePersistence
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1907-1933 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Startup, Runtime and Import Performance Optimization as Research and records this unresolved boundary: MISSING: baseline measurements, representative scenarios, thresholds, and profiler captures.
-
-</details>
+**Acceptance if selected:** exercise useful native key paths, focus movement, selection, action availability and collisions on the adopted screen. A missing useful interaction is recorded as that bounded owner usability issue.
 
 ---
 
 <a id="fw-p2-52"></a>
 
-## FW-P2-52 — User and Workspace Preferences
+## FW-P2-52 — Simple Local Appearance Preferences
 
-**Status:** Ready for discovery
-**Depends on:** Existing settings presentation and `WorkspaceSettings` domain direction
+**Status:** Candidate
 
-Define durable, privacy-safe preferences for existing regional/display behavior and the **user-approved `LF-UI-2026-09-R1` appearance direction**:
+**Owner-selected scope — 2026-09-11:** one bounded appearance item for Follow System, Light and Dark, with optional already-approved Deep Indigo/accent direction and simple device-local persistence.
 
-- Follow System / Light / Dark;
-- System Neutral / optional Deep Indigo preset concept;
-- accent;
-- app-wide text size;
-- a small supported font-style set;
-- comfortable/compact density;
-- bounded foreground/background customization;
-- bounded eligible-surface translucency;
-- Preview / Apply / Cancel / Restore defaults;
-- automatic readable fallback; and
-- reduced-transparency compliance.
+**Depends on:** the actual R1 screen/setting implementation selected by a later prompt. Ordinary nonfinancial local preferences do not require a new ADR by default; return to Chat only if implementation proves a real architectural decision is necessary.
 
-Also retain candidate scope for date/time formatting, regional number formatting, base/secondary display currencies, default import behavior, dashboard/account/transaction presentation and developer-mode separation.
+Preserve readable text/full Money, native control behavior and financial-state independence. The appearance choice survives relaunch; malformed nonfinancial values fall back to readable defaults without blocking financial hydration. No font-family/text-scale/density framework, custom foreground/background, per-surface theme/translucency editor, Preview/Apply/Cancel architecture, portability/backup preference snapshot or formal qualification program remains.
 
-**Unresolved architecture:** preference persistence/storage ownership remains discovery work. R1 approval does not choose UserDefaults, SQLite or another store. Preference mutation must never rewrite imported financial truth. Reporting-currency preferences remain dependent on `FW-P3-33`.
+**Consolidation:** the separate adaptive-rendering card is retired into this one item. Its implementation boundary has no accessibility, portability or new-ADR prerequisite.
 
-**Current discovery disposition — 2026-09-10:** `READY_FOR_CHAT_ARCHITECTURE_DECISION`. **Exact remaining gate:** Preference-owner ADR: versioned device UserDefaults plus package preference snapshot.
-
-**Smallest proposed boundary:** Display only; reporting currency stays FX-owned.
-
-**Decision record:** [PREFERENCES_ARCHITECTURE_DECISION_PACKET](#packet-preferences-architecture-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: only DEBUG database-profile remembrance uses UserDefaults; no general WorkspaceSettings type or R1 preference owner was found. R1 specifies draft Apply/Cancel/Restore and relaunch behavior but does not choose storage.
-
-**First-round scope and constraints:** Preferences cannot rewrite imported financial truth; reporting currency remains FW-P3-33; light/dark overrides remain separate; malformed values must fall back safely. No preference UI, financial-data write, migration, reporting FX, or developer-profile reuse as general policy.
-
-**First-round question/options:** Who owns and stores user/workspace preferences? UserDefaults for nonfinancial app preferences; workspace repository storage; hybrid. Apple says AppStorage is UserDefaults-backed, not an architecture choice.
-
-**First-round remainder and implications:** MISSING: owner split (app/user/workspace/session), persistence backend, schema/versioning, migration/reset behavior, and separation of display from financial preferences. Likely ADR; migration only if accepted backend requires durable schema.
-
-**First-round proposed acceptance/falsifier:** Draft atomicity, Apply/Cancel/Restore, relaunch, malformed fallback, light/dark separation, and proof imported values never change. A requested setting is workspace-scoped, financial, or multi-workspace dependent.
-
-**Second-round new evidence/resolved direction:** Exact user requirement that appearance preferences travel with move/restore.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Preference-owner ADR: versioned device UserDefaults plus package preference snapshot. Owning authority: PREFERENCES_ARCHITECTURE_DECISION_PACKET.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** READY_FOR_CHAT_ARCHITECTURE_DECISION **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-preferences-adr`: The explicitly named gate decision-preferences-adr must be satisfied. This enables Display only; reporting currency stays FX-owned. Remaining condition: Preference-owner ADR: versioned device UserDefaults plus package preference snapshot.
-
-**Pinned evidence references:**
-
-- [Services/DevelopmentDatabaseProfilePreferences.swift](<../Services/DevelopmentDatabaseProfilePreferences.swift>):7-51 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `f080eb8aadab1fcdff11afb007fc9a3f439c6f36e54a798d3eafc4d10adb98cb` — DevelopmentDatabaseProfilePreferences
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1523-1544 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-52
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1934-1959 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Preference ownership/storage remains unresolved.
-- [Services/DevelopmentDatabaseProfilePreferences.swift](<../Services/DevelopmentDatabaseProfilePreferences.swift>):12-49 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — DEBUG UserDefaults validates unsafe values to defaults.
-
-</details>
-
-<a id="packet-preferences-architecture-decision-packet"></a>
-
-<details>
-<summary>PREFERENCES_ARCHITECTURE_DECISION_PACKET — complete proposed decision packet</summary>
-
-## PREFERENCES_ARCHITECTURE_DECISION_PACKET
-
-| # | Required field | Decision |
-| --- | --- | --- |
-| 1 | Owning FW IDs | FW-P2-52, FW-P2-55; informs FW-P2-50 and prepared Sprint 91. |
-| 2 | User problem | Accessible appearance across windows/relaunch and move/restore without rewriting financial truth. |
-| 3 | Verified current state | Only DEBUG profile remembrance uses UserDefaults with safe defaults; WindowGroup hosts fixed-dark custom ContentView shell. |
-| 4 | Accepted authorities | R1 direction; ADR-024 separation; ADR-026; reporting currency remains FW-P3-33. |
-| 5 | Exact missing decision | Chat acceptance of typed ownership/storage and portable restore rule. |
-| 6 | Evidence acquired | UserDefaults code validates invalid enum/int to defaults; no general WorkspaceSettings exists. |
-| 7 | Options considered | Device-local UserDefaults; SQLite workspace settings; view state; portable preference snapshot. |
-| 8 | Recommended option | Typed versioned UserDefaults as live device-local authority plus validated appearance-preference snapshot in backup/portable package. |
-| 9 | Why competing options are rejected | SQLite adds financial workspace/migration/hydration scope; view state fails relaunch; raw defaults copy unsafe. Snapshot meets explicit user choice. |
-| 10 | Smallest coherent implementation boundary | System/Light/Dark, Neutral/Indigo, bounded accent/density/text scale/font, system reduced transparency; draft Apply/Cancel/Restore; backup snapshot after database success. |
-| 11 | Included scope | All windows one authority; atomic Apply; Cancel no write; Restore Defaults known keys; System tracks OS; restore preview defaults to applying the backed-up appearance after database validation; retaining current device appearance is an explicit user override. |
-| 12 | Explicit exclusions | Reporting/base/secondary currency/FX, import defaults, financial/account semantics, credentials, arbitrary styling, cloud/multiwriter. |
-| 13 | Durable model/persistence requirements | Namespaced keys plus schema; package has preference snapshot version/hash; invalid fields default. No draft/history. Unsupported package preferences do not block database recovery. |
-| 14 | Migration impact | NONE for UserDefaults; later SQLite store REQUIRES_DECISION. |
-| 15 | ADR impact | NEW_ADR_REQUIRED for ownership, snapshot precedence and backup interaction. |
-| 16 | Privacy/security boundary | Nonfinancial settings only; no account/record/source/credential/diagnostic values. |
-| 17 | SQLite/In-Memory implications | No DB persistence/parity; isolated defaults tests only. |
-| 18 | Hydration/relaunch implications | Independent of hydrator. On restore apply snapshot only after candidate DB hydration; failure leaves current prefs intact. |
-| 19 | Independent acceptance oracle | Decode/default/reset/draft/restore-precedence matrix, zero repo/migration writes, native OS appearance/transparency/VoiceOver/multiwindow. |
-| 20 | Failure cases | Missing/old/new schema, malformed value, failed write, OS change during draft, multiple windows, restore cancel, unsupported snapshot, unavailable ledger. |
-| 21 | Reversal/correction semantics | Cancel no write; Restore Defaults/later Apply reverses display choice; backup application confirmable and never financial compensation. |
-| 22 | Source evidence requirement | None: source-independent nonfinancial UI. |
-| 23 | Runtime acceptance requirement | Required system scheme, contrast, text, transparency, keyboard/VoiceOver, multiwindow. |
-| 24 | Dependencies | User decision satisfied; NEW ADR; post-87 recheck if shared shell touched. Financial reporting settings remain separately owned by FW-P3-33 and do not block nonfinancial appearance preferences. |
-| 25 | Evidence that falsifies the recommendation | User requires settings as financial workspace truth; required option financial; snapshot cannot safely validate/apply. |
-| 26 | Personal-v1 relevance | PRE_V1_OPTIONAL unless explicitly adopted. |
-| 27 | Recommended FUTURE_WORK status after Chat review | FW-P2-52 READY_FOR_CHAT_ARCHITECTURE_DECISION; FW-P2-55 READY_AFTER_NAMED_DEPENDENCY. |
-| 28 | Recommended roadmap effect after Chat review | Record Sprint-91 ownership gate only; do not activate/select. |
-
-</details>
+**Acceptance if selected:** verify System/Light/Dark selection, ordinary readable rendering, simple local remembrance and no financial/repository mutation. This is planning, not implemented appearance.
 
 ---
 
@@ -6662,130 +4062,6 @@ The library must not expose raw source content by default and must not treat a d
 
 ---
 
-<a id="fw-p2-55"></a>
-
-## FW-P2-55 — Adaptive Appearance Native Implementation
-
-**Status:** Blocked
-**Depends on:** accepted `LF-UI-2026-09-R1` design authority and the bounded preference-storage/ownership decision under `FW-P2-52`
-
-**Completed boundary:** The design revision itself is complete. R1 approves Follow System as default, explicit Light/Dark choices and optional Deep Indigo/System Neutral preset direction.
-
-**Remaining boundary:** Native adaptive rendering and runtime/accessibility acceptance remain unimplemented. This candidate owns implementation of the accepted appearance behavior, not another design campaign. Preference persistence ownership stays under `FW-P2-52`; implementation must not mutate financial data.
-
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** FW-P2-52 owner/ADR and native system-accessibility proof.
-
-**Smallest proposed boundary:** System/Light/Dark; no financial mutation.
-
-**Decision record:** [PREFERENCES_ARCHITECTURE_DECISION_PACKET](#packet-preferences-architecture-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: ContentView forces dark scheme and custom gradient; R1 approves Follow System/Light/Dark and optional preset direction but has no native implementation.
-
-**First-round scope and constraints:** Preference ownership remains FW-P2-52; reduced transparency/readable fallback and no financial mutation are mandatory. No new visual design, financial settings, downloads, or per-widget themes.
-
-**First-round question/options:** What native appearance boundary is ready after R1 design approval? Hardcoded dark; app appearance preference; per-surface theme editor. R1 approves the second only after FW-P2-52.
-
-**First-round remainder and implications:** MISSING: accepted storage owner, native behavior under system changes, contrast/compositing and runtime accessibility evidence. Architecture/storage decision first; no migration implied.
-
-**First-round proposed acceptance/falsifier:** AP-01 through AP-06 plus UI-01/UI-05 runtime evidence. Preference model cannot preserve separate Light/Dark overrides or readable fallback.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: ContentView forces dark scheme and custom gradient; R1 approves Follow System/Light/Dark and optional preset direction but has no native implementation. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: FW-P2-52 owner/ADR and native system-accessibility proof. Owning authority: PREFERENCES_ARCHITECTURE_DECISION_PACKET.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** READY_AFTER_NAMED_DEPENDENCY **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** DEPENDENCY, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P2-52`: The User and Workspace Preferences boundary must provide: Display only; reporting currency stays FX-owned.. This enables System/Light/Dark; no financial mutation. Remaining condition: FW-P2-52 owner/ADR and native system-accessibility proof.
-- `REQUIRES_IMPLEMENTATION` → `FW-P2-52`: The User and Workspace Preferences boundary must provide: Display only; reporting currency stays FX-owned.. This enables System/Light/Dark; no financial mutation. Remaining condition: FW-P2-52 owner/ADR and native system-accessibility proof.
-
-**Pinned evidence references:**
-
-- [ContentView.swift](<../ContentView.swift>):1475-1480 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `c315381adf31633a27671b14499fc5dd12d7b794af047c82cfb2acf67990202b` — ContentView root appearance
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1590-1597 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-55
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1934-1959 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Preference ownership/storage remains unresolved.
-- [Services/DevelopmentDatabaseProfilePreferences.swift](<../Services/DevelopmentDatabaseProfilePreferences.swift>):12-49 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — DEBUG UserDefaults validates unsafe values to defaults.
-
-</details>
-
----
-
-<a id="fw-p2-56"></a>
-
-## FW-P2-56 — Development Performance Profiling
-
-**Status:** Research
-**Depends on:** Privacy-safe developer tooling and measured performance questions
-
-Provide development-only profiling for:
-
-- startup;
-- repository hydration;
-- parser and validation stages;
-- persistence;
-- import completion;
-- large-view rendering;
-- search and filtering.
-
-Profiling output must remain separate from financial truth and must not retain sensitive source content.
-
-**Current discovery disposition — 2026-09-10:** `WAIT_FOR_RUNTIME_ACCEPTANCE`. **Exact remaining gate:** Measured question and privacy-safe metric/retention owner.
-
-**Smallest proposed boundary:** No profiling surface without use case.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: no profiling surface was found; developer console is bounded diagnostics rather than performance telemetry.
-
-**First-round scope and constraints:** Profiling output must be separate from financial truth and retain no sensitive source content. No persistent telemetry, source payloads, automatic uploads, or production behavior.
-
-**First-round question/options:** What development profiling is justified? External Instruments/task evidence; minimal DEBUG metric sink; persistent telemetry. The first has least product/privacy scope.
-
-**First-round remainder and implications:** MISSING: named decision question, metric schema, collection owner, retention and privacy policy. No migration for external evidence; product storage would require architecture.
-
-**First-round proposed acceptance/falsifier:** A metric is tied to a decision, excludes source data, and is reproducible on pinned build/scenario. Metric collection stores a source fragment or affects import behavior.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: no profiling surface was found; developer console is bounded diagnostics rather than performance telemetry. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Task-owned native runtime evidence
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** WAIT_FOR_RUNTIME_ACCEPTANCE **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** MACOS_PLATFORM, ACCESSIBILITY_ACCEPTANCE.
-
-**Typed dependencies:**
-
-- `REQUIRES_RUNTIME_ACCEPTANCE` → `FW-P2-51`: The Startup, Runtime and Import Performance Optimization boundary must provide: No optimization from static theory.. This enables No profiling surface without use case. Remaining condition: Measured question and privacy-safe metric/retention owner.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1601-1613 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-56
-- [Core/DeveloperConsole.swift](<../Core/DeveloperConsole.swift>):47-93 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `f496995df7f425b7f556036d697992aa7bafed3fa4bde39e16031dc7500efc34` — DeveloperConsole
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):2030-2055 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Development Performance Profiling as Research and records this unresolved boundary: MISSING: named decision question, metric schema, collection owner, retention and privacy policy.
-
-</details>
-
----
-
 <a id="fw-p2-61"></a>
 
 ## FW-P2-61 — Authentic-Corpus Regression Matrix Maintenance
@@ -6837,123 +4113,6 @@ This item must not describe LedgerForge as lacking an engineering corpus matrix,
 
 - [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1622-1633 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-61
 - [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):46-69 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `7843854eee6c85888f41af52c52aba70f2d0138c5f6f21e518211c75aca62797` — ADR-046 current alignment
-
-</details>
-
----
-
-<a id="fw-p2-63"></a>
-
-## FW-P2-63 — Additional Cross-Format Authentic-Source Semantic-Parity Tests
-
-**Status:** Candidate
-**Depends on:** a newly selected exact source relationship or materially changed recurring carrier family with complete authentic evidence
-
-**Completed boundary:** HDFC PDF/XLS semantic parity is accepted under ADR-042; CBQ current-account multi-source lineage/parity is covered under ADR-043; Axis-card PDF/XLSX parity is accepted under ADR-044; and the accepted 127-carrier reset establishes format-neutral semantic-parity regression for the registered Axis-bank carriers.
-
-**Remaining boundary:** Only future/new carrier pairs, materially changed recurring families, same-format semantic relationships or newly approved partial-overlap semantics remain. Axis-bank engineering semantic parity does **not** by itself establish durable cross-format duplicate/equivalence/suppression semantics; those remain governed separately by `FW-P0-19` and `FW-P1-16`.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_AUTHENTIC_SOURCE`. **Exact remaining gate:** No new pair/changed family or declared regression-only versus durable purpose.
-
-**Smallest proposed boundary:** Register pair and purpose first.
-
-**Decision record:** [TRANSFER_FAMILY_DECISION_PACKET](#packet-transfer-family-decision-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: HDFC/CBQ/Axis-card relationships accepted; Axis-bank parity is not durable equivalence; no new pair selected.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: parity needs paired authentic truth/projection; durable effects separately governed. No generic parity/fuzzy matching/suppression/broader support.
-
-**First-round question/options:** What new cross-format parity is justified? PROPOSED: regression-only pair or durable relationship architecture; defer.
-
-**First-round remainder and implications:** MISSING: exact pair/changed family, full relationship evidence and test-only versus durable purpose. No migration test-only; durable may need ADR/migration.
-
-**First-round proposed acceptance/falsifier:** Complete pairs, source projection, authentic mismatch evidence, parity/hydration for durable behavior. Incomplete projection or similar-looking rows insufficient.
-
-**Second-round new evidence/resolved direction:** Accepted pairs do not establish new durable relationships.
-
-**Exact next evidence or decision:** Complete paired authentic source/oracle and relationship classification.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Candidate blocked on source **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Partial/changed pair.
-
-**Current gate flags:** user product choice=false, Chat architecture=true, post-87 refresh=false, authentic source=true. **Blocker types:** SOURCE_TRUTH, IDENTITY, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P1-16`: Durable relationship only.
-- `REQUIRES_AUTHENTIC_SOURCE` → `source-new-representation-pair`: No pair.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-architecture-fw-p2-63`: This required source/financial/workflow boundary is Chat-owned; no user technical choice is requested. No new pair/changed family or declared regression-only versus durable purpose.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1635-1644 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-63
-- [Project documents/ADR.md](<ADR.md>):5011-5619 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `163d4d8f814bfd43a43b04e98f0396f9d6ac30d643871f1bc2568a49f493ed2c` — ADR-042/043/044
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):570-580 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Semantic parity is not equivalence.
-
-</details>
-
----
-
-<a id="fw-p2-64"></a>
-
-## FW-P2-64 — Large-Statement and Long-Running Import Tests
-
-**Status:** Candidate
-**Depends on:** Authentic large statements for source-path acceptance and/or explicitly non-source generated stress data for resource-limit testing; generated financial-source fixtures cannot certify parser support
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No genuine large carrier, resource target, or approved nonfinancial stress shape.
-
-**Smallest proposed boundary:** Nonfinancial resource/cancel mechanics first; authentic large carrier separately.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: progress type exists; OOXML has explicit source/row/cell limits; queue distinguishes authentic source-path tests from nonfinancial stress mechanics.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: ADR-046 technical ceilings are explicit resources, not finance profiles; generated financial fixtures prohibited. No financial fixture, benchmark archaeology/runtime probe here or recertification.
-
-**First-round question/options:** How split large-statement/source and long-running resource tests without fabricated statements? PROPOSED: authentic large-source gate, nonfinancial mechanics gate, or defer budget.
-
-**First-round remainder and implications:** MISSING: genuine large carrier, performance/resource targets and approved nonfinancial stress shape. No migration; changed limits may need architecture review.
-
-**First-round proposed acceptance/falsifier:** Stated limit/latency/cancel, fail-closed resource error, genuine semantics separately. Resource failure as semantic rejection or synthetic load as support invalid.
-
-**Second-round new evidence/resolved direction:** Resource mechanics and financial semantics must remain separate.
-
-**Exact next evidence or decision:** Chosen ceiling/cancel target and, separately, genuine large source for semantic path.
-
-**Personal-v1:** PRE_V1_OPTIONAL
-
-**Recommendation after Chat:** Preserve queue priority/status; explicitly defer until a real selected source or product workflow demonstrates need. See bounded decision queue. **Roadmap:** Do not schedule
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Synthetic source as support claim.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** SOURCE_TRUTH, PERFORMANCE_EVIDENCE, NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- `OPTIONAL_ENHANCEMENT` → `decision-resource-target`: Future reopening condition only; this deferred boundary is not a current prerequisite. Unselected future scope only; no current user decision is pending for the deferred boundary.
-- `OPTIONAL_ENHANCEMENT` → `source-large-authentic-carrier`: Future reopening condition only; this deferred boundary is not a current prerequisite. No semantic source.
-- `OPTIONAL_ENHANCEMENT` → `post-swift6-performance`: Future reopening condition only; this deferred boundary is not a current prerequisite. Dynamic evidence.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1646-1651 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-64
-- [Import/Readers/OOXMLDocumentReader.swift](<../Import/Readers/OOXMLDocumentReader.swift>):58-69 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `1f3056f59ec351b4a8e9e2cbe4533cd405ac3dd37fc269a8587cf773d8e88ae5` — OOXMLReaderLimits
-- [Import/Models/ImportProgress.swift](<../Import/Models/ImportProgress.swift>):1-65 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `4b1647261e0d998bcde55622b2694475a293b44284f79bfabe980369108186a6` — ImportProgress
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):85-95 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — No fabricated statement cases.
 
 </details>
 
@@ -7032,136 +4191,6 @@ Production repair remains governed by `FW-P0-08`. Sprint 47 completed focused fa
 - [Database/SQLiteDatabase.swift](<../Database/SQLiteDatabase.swift>):109-146 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `5945852ad75513a1fcbd15c692512ab35786523da9defd889b9d4f7f710b474a` — createBackup; checkpointAndClose
 - [Database/SQLiteRepositoryProvider.swift](<../Database/SQLiteRepositoryProvider.swift>):1381-1450;1540-1591 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `29166a1e985c9c4f5b43e6d13243a82fa5ff5e94382747b3fb406ae0dc98b454` — createAndVerifyBackup; restorePersistentDebugBackup
 - [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):2102-2136 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Repository Corruption and Recovery Tests as Research and records this unresolved boundary: Approved broader failure matrix; genuine trusted historical data for any financial upgrade/recovery case; precise interrupted lifecycle and relationship classes not already owned by focused work.
-
-</details>
-
----
-
-<a id="fw-p2-69"></a>
-
-## FW-P2-69 — Remaining macOS CI and UI Smoke Validation
-
-**Status:** Maintenance
-**Depends on:** an approved CI/UI-smoke or distribution objective
-
-**Completed boundary:** Repository-owned local build/test entry points, exact-singleton build/run verification, deterministic local cycle-close validation, Debug/Release build foundations and current local runtime/build-identity mechanics are accepted and must not be reopened by this candidate.
-
-**Remaining boundary:** CI-provider setup, commit-status protection, generic UI smoke automation or an approved replacement/enabling of UI-test coverage, plus later distribution/notarization/deployment work where separately selected.
-
-No alternate build configuration may diverge from Xcode project truth.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_PRODUCT_DECISION`. **Exact remaining gate:** Exact CI/UI-smoke/distribution objective: provider, protected branch, selectors or channel.
-
-**Smallest proposed boundary:** Local foundations already accepted.
-
-**Bounded product choice for future selection:**
-
-| FW ID | Decision and owner | Why it matters | Option A | Option B | Option C | Recommendation | Consequence of deferring | What becomes unblocked |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FW-P2-69 | **User product choice:** desired CI/UI-smoke/distribution outcome. | Provider, protected-branch, selector, and smoke goal depend on delivery workflow. | Local-only validation. | One CI test gate. | Focused UI smoke or distribution objective. | A until delivery objective exists. | No hosted CI/UI smoke claim. | Selected platform qualification only. |
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: local build/test/run foundations are accepted; scripts explicitly exclude UI smoke, CI and distribution changes.
-
-**First-round scope and constraints:** No alternate configuration divergent from project truth; do not infer UI coverage from local static evidence. No CI config, UI test enablement, signing/distribution work, or runtime probe.
-
-**First-round question/options:** What CI/UI-smoke/distribution outcome is wanted? Remain local-only; approve CI test gate; approve focused UI smoke; approve distribution. Product context does not select one.
-
-**First-round remainder and implications:** MISSING: provider, protected-branch, smoke objective, enabled UI-test strategy, or distribution decision. No impact until objective.
-
-**First-round proposed acceptance/falsifier:** Future plan names exact Xcode truth, platform, test selectors and failure handling. Objective requires secrets, remote services, or unsupported UI test environment.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: local build/test/run foundations are accepted; scripts explicitly exclude UI smoke, CI and distribution changes. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Exact CI/UI-smoke/distribution objective: provider, protected branch, selectors or channel. Owning authority: FW-P2-69 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** BLOCKED_ON_PRODUCT_DECISION **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=true, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** USER_PRODUCT_DECISION, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-distribution`: Chat owns this financial/privacy/architecture decision; it is not a technical questionnaire for the user.
-- `REQUIRES_USER_DECISION` → `decision-product-fw-p2-69`: Exact CI/UI-smoke/distribution objective: provider, protected branch, selectors or channel.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1711-1721 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-69
-- [script/README.md](<../script/README.md>):156-161 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `a997edab741f740f6367756bb7a451ed7d708dee7ec4d5b9f08f1460a2eb4377` — Explicit exclusions
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):2170-2187 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Remaining macOS CI and UI Smoke Validation as Maintenance and records this unresolved boundary: MISSING: provider, protected-branch, smoke objective, enabled UI-test strategy, or distribution decision.
-
-</details>
-
----
-
-<a id="fw-p2-70"></a>
-
-## FW-P2-70 — Remaining macOS Target and Distribution Metadata Hardening
-
-**Status:** Maintenance
-**Depends on:** an approved macOS target/distribution metadata decision for each remaining surface
-
-**Completed boundary:** Bundle-derived version/build presentation, local startup/build identity and R1 resource-containment verification are accepted and are not future work here.
-
-**Remaining boundary:** stale non-macOS platform/device metadata, irrelevant generated plist keys, unexpected governance/development resources in built products, minimum-version and entitlement/capability decisions, hardened-runtime/distribution policy and eventual Developer ID/notarization/packaging if external distribution is approved.
-
-No bundle-inclusion defect may be inferred from navigator visibility; target/build-phase or inspected-product evidence is required.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_PRODUCT_DECISION`. **Exact remaining gate:** Supported target/distribution, entitlement, minimum OS, hardened-runtime/notarization matrix.
-
-**Smallest proposed boundary:** Do not audit unselected shipping surfaces.
-
-**Bounded product choice for future selection:**
-
-| FW ID | Decision and owner | Why it matters | Option A | Option B | Option C | Recommendation | Consequence of deferring | What becomes unblocked |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FW-P2-70 | **User product choice:** supported target and distribution intent. | Entitlements, minimum OS, hardened runtime, and notarization should follow actual shipping scope. | Keep current local target metadata. | Define Mac distribution matrix then audit selected surfaces. | — | A until product ships beyond local use. | No distribution hardening project. | Bounded target/metadata audit. |
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: project declares multiple supported platforms and platform-specific generated plist keys; release target permits several capabilities. Current authority says stale metadata/distribution policy remain unselected.
-
-**First-round scope and constraints:** No bundle inclusion conclusion from navigator visibility; no distribution/entitlement change without per-surface decision. No project settings change, signing, notarization, or bundle probe now.
-
-**First-round question/options:** Which target/distribution metadata requires hardening? Mac-only cleanup; retain multi-platform metadata; distribution hardening. Each needs product authorization.
-
-**First-round remainder and implications:** MISSING: supported-platform product decision, entitlement/capability rationale, minimum-version target, hardened-runtime/notarization objective. No migration; entitlement architecture may need accepted decision.
-
-**First-round proposed acceptance/falsifier:** Target-build and inspected-product evidence, entitlement review, and signed product proof. A capability is needed by an accepted product surface.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: project declares multiple supported platforms and platform-specific generated plist keys; release target permits several capabilities. Current authority says stale metadata/distribution policy remain unselected. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Supported target/distribution, entitlement, minimum OS, hardened-runtime/notarization matrix. Owning authority: FW-P2-70 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** BLOCKED_ON_PRODUCT_DECISION **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=true, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** USER_PRODUCT_DECISION, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-distribution`: Chat owns this financial/privacy/architecture decision; it is not a technical questionnaire for the user.
-- `REQUIRES_USER_DECISION` → `decision-product-fw-p2-70`: Supported target/distribution, entitlement, minimum OS, hardened-runtime/notarization matrix.
-
-**Pinned evidence references:**
-
-- [LedgerForge.xcodeproj/project.pbxproj](<../LedgerForge.xcodeproj/project.pbxproj>):1368-1461 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `08dbe3df432f0dd1a78fe123eca04cb7d806a2809f599b30034c95eab7212d34` — LedgerForge target build settings
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1724-1735 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-70
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):2188-2205 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Remaining macOS Target and Distribution Metadata Hardening as Maintenance and records this unresolved boundary: MISSING: supported-platform product decision, entitlement/capability rationale, minimum-version target, hardened-runtime/notarization objective.
 
 </details>
 
@@ -7341,7 +4370,7 @@ The layout must adapt responsively without losing currency or liability meaning.
 
 **First-round remainder and implications:** MISSING: Sprint 89 shared patterns acceptance and future runtime/source-oracle proof for displayed aggregates. No migration.
 
-**First-round proposed acceptance/falsifier:** Native-currency/card-bank/context/oracle checks plus runtime layout/accessibility evidence. Any summary needs unaccepted cross-currency or analytical mapping.
+**First-round proposed acceptance/falsifier:** Native-currency/card-bank/context/oracle checks plus runtime layout/readability evidence. Any summary needs unaccepted cross-currency or analytical mapping.
 
 **Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: the prepared Sprint 90 contract requires native-currency position, bank/card distinction, full values and authoritative context; unsupported analytics stay omitted. Second-level disposition is the exact decision/dependency/deferral stated here.
 
@@ -7373,62 +4402,21 @@ The layout must adapt responsively without losing currency or liability meaning.
 
 <a id="fw-p2-79"></a>
 
-## FW-P2-79 — Supported Institution / Source Coverage Documentation
+## FW-P2-79 — Private Supported-Source Matrix
 
 **Status:** Ready for planning
-**Depends on:** current accepted source/profile registry and ADR-046 current certification boundary
 
-Maintain a user-readable and engineering-readable support matrix that distinguishes institution, financial family, source format, profile/parser identity/version where appropriate, credential requirement, active authentic-corpus certification status, known exclusions, historical implementation acceptance, current ADR-046 reliability certification and source-uncertified cases.
+Maintain one small internal truth table for the owner and engineering: actual institution/product, accepted format/family, exact supported boundary and relevant known limitation. Use current PROJECT_STATE, accepted source/profile authority and the complete registered corpus under ADR-046.
 
-Support must never be inferred from institution name, fixture presence, filename, format or structural similarity. The matrix is a required input to `FW-P0-26` personal-v1 certification but does not itself certify personal-v1.
+**Depends on:** exact current accepted source/limitation review. No new source support is established by writing the matrix.
 
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** Needs exclusive documentation writer window and accepted registry review.
+Distinguish historical implementation from current authentic-corpus reliability and preserve source-uncertified gaps. Never infer support from institution name, file extension, filenames or structural similarity. Publish no private corpus paths, originals, credentials or raw source values.
 
-**Smallest proposed boundary:** Matrix distinguishes profile/credential/certification/exclusion; no private details.
-
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: state names exact profiles/encrypted limits/exclusions; ADR-046 separates historical acceptance from current certification; roadmap makes matrix v1 input only.
-
-**First-round scope and constraints:** VERIFIED_REPOSITORY: document institution/family/format/profile/credential/certification/exclusions/uncertified cases; publish no private details. No support expansion, v1 declaration, recertification, private corpus inventory or code.
-
-**First-round question/options:** What support documentation can be prepared without overclaim? PROPOSED: one matrix plus engineering profile appendix; wait only for writer window.
-
-**First-round remainder and implications:** MISSING: user/engineering matrix presentation design and exclusive documentation window; no new support evidence needed. No migration/ADR; documentation transcribes accepted boundaries.
-
-**First-round proposed acceptance/falsifier:** Accuracy/privacy/certification-label review and no generic coverage inference. Generic implication, private disclosure or historical=current certification is invalid.
-
-**Second-round new evidence/resolved direction:** No new support evidence is needed for documentation.
-
-**Exact next evidence or decision:** Current exact profile/exclusion/certification matrix review.
-
-**Personal-v1:** PRE_V1_REQUIRED: matrix is an adoption input, not certification.
-
-**Recommendation after Chat:** Ready for documentation planning **Roadmap:** Required Sprint-100 certification input; no stand-alone sprint is assigned.
-
-**Publication delta:** `STILL_VALID` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. The cited evidence or relevant source hunk remains valid; no source/provider research was rerun merely because Swift ownership changed.
-
-**Revalidation/falsifiers:** Generic support claim/private disclosure.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** DEPENDENCY, PRIVACY.
-
-**Typed dependencies:**
-
-- `REQUIRES_IMPLEMENTATION` → `documentation-writer-window`: Read-only campaign cannot edit product docs.
-
-**Pinned evidence references:**
-
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):1859-1870 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `80e40cc09e11ccb91e37089c21c4e28e75033d18046c5d8cc350f0ce5a78ad2c` — FW-P2-79
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):946-972 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `7843854eee6c85888f41af52c52aba70f2d0138c5f6f21e518211c75aca62797` — Current source/profile limits
-- [Project documents/Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md](<Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md>):120-123 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `69a793857804133ce22907f72458b7d72322fc8af56c0bdfac86debd9126a894` — P2 queue
-- [Project documents/PROJECT_STATE.md](<PROJECT_STATE.md>):964-972 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — Exact support and exclusions.
-
-</details>
+This is a required input to FW-P0-26 personal adoption verification. It is not a public user guide, onboarding campaign, marketing compatibility matrix or support site. Keep it small; no separate documentation product or speculative source catalogue is required.
 
 ---
+
+# P3 — Selected Personal Financial Outcomes
 
 <a id="fw-p3-01"></a>
 
@@ -7853,7 +4841,7 @@ Internal transfers must never be presented as new income or expense.
 
 **Completed boundary:** Sprint 79 and the later accepted startup/monthly-planner package completed exact Qatar Airways salary actuals, Salary History/This Month, coherent natural-input editing, Save/Command-S, contextual provenance, compact layout and configured-fee validation. Those slices are not future work.
 
-**Remaining boundary:** Broader cross-employer planning integration, historical planner analytics/variance explanation and other planning outcomes that genuinely extend the accepted current-month workspace. Generic employer source support stays under `FW-P1-05`; recurring obligations under `FW-P3-09`; transfer/reconciliation under `FW-P2-10`/`FW-P2-11`/`FW-P3-19`; investments and general reporting FX remain in their dedicated candidates.
+**Remaining boundary:** Broader cross-employer planning integration, historical planner analytics/variance explanation and other planning outcomes that genuinely extend the accepted current-month workspace. A new employer source is considered only when actually supplied/selected by the owner; recurring obligations under `FW-P3-09`; transfer/reconciliation under `FW-P2-10`/`FW-P2-11`/`FW-P3-19`; investments and general reporting FX remain in their dedicated candidates.
 
 **Latest user scope — 2026-09-10 (UD-09/10):** Al Dar QAR→INR has the sole purpose of estimating the month-end INR receive amount in the monthly Salary/budget calculator from a current/live amount-bound quote. The user may explicitly override the rate with a manually entered current planning rate. No historical QAR→INR or general reporting Al Dar outcome is required. Current market INR→USD/QAR→USD net-worth estimation is separately owned by `FW-P3-31`/`FW-P3-33`. This supersedes the earlier broad Al Dar reporting/history interpretation while preserving accepted ADR-045 calculations, fee separation and explicit manual provenance.
 
@@ -8402,7 +5390,7 @@ Includes:
 
 **Smallest proposed boundary:** Evidence-labelled tax view/export only.
 
-**Decision record:** [SOURCE_EXPANSION_PACKET](#packet-source-expansion-packet).
+**Decision record:** [ADR-046 authentic-source authority](ADR.md).
 
 **Bounded product choice for future selection:**
 
@@ -9572,9 +6560,9 @@ Any later reporting conversion is separately derived with its own FX provenance.
 **Status:** Blocked
 **Depends on:** accepted native Money and a current derived-reporting contract only where converted values are displayed
 
-**Completed boundary:** native QAR/INR Money and per-native-currency grouping remain accepted. **Remaining boundary:** native locale formatting/accessibility and separately governed current net-worth estimates. UD-09/10 exclude historical FX; Al Dar is solely the current Salary/budget receive estimate with manual override. Current reporting uses market observations and preserves original amounts.
+**Completed boundary:** native QAR/INR Money and per-native-currency grouping remain accepted. **Remaining boundary:** native locale formatting/readability and separately governed current net-worth estimates. UD-09/10 exclude historical FX; Al Dar is solely the current Salary/budget receive estimate with manual override. Current reporting uses market observations and preserves original amounts.
 
-**Current discovery disposition — 2026-09-10:** `READY_FOR_CHAT_ARCHITECTURE_DECISION`. **Exact remaining gate:** Separate pure native locale display from current derived estimates; choose locale/accessibility expectations and approved current reporting orientation, without historical scope.
+**Current discovery disposition — 2026-09-10:** `READY_FOR_CHAT_ARCHITECTURE_DECISION`. **Exact remaining gate:** Separate pure native locale display from current derived estimates; choose locale/readability expectations and approved current reporting orientation, without historical scope.
 
 **Smallest proposed boundary:** Native currency/scale and accessible currency identity remain explicit; locale grouping never triggers conversion. Converted values follow only the directed source contract.
 
@@ -9593,13 +6581,13 @@ Any later reporting conversion is separately derived with its own FX provenance.
 
 **First-round remainder and implications:** Specific locale/Indian grouping requirements and a separate decision on derived secondary values. Formatting-only likely no migration; converted presentation requires derived-FX ADR.
 
-**First-round proposed acceptance/falsifier:** Independent locale render expectations for accepted native amounts, no changed stored decimal/minor values, keyboard/accessibility currency clarity. Preserve native Money exactly. Preserve rate/valuation observations at their independently evidenced Decimal scale; apply only the approved final derived-Money rounding/version rule. Future checks use the exact locale, as-of, membership and conversion boundary above; prove provider persistence/reopen parity only where that boundary persists state. Missing genuine financial evidence remains uncertified, never manufactured. Any view silently aggregates currencies or changes numeric value under locale formatting invalidates the boundary.
+**First-round proposed acceptance/falsifier:** Independent locale render expectations for accepted native amounts, no changed stored decimal/minor values, keyboard and visible currency clarity. Preserve native Money exactly. Preserve rate/valuation observations at their independently evidenced Decimal scale; apply only the approved final derived-Money rounding/version rule. Future checks use the exact locale, as-of, membership and conversion boundary above; prove provider persistence/reopen parity only where that boundary persists state. Missing genuine financial evidence remains uncertified, never manufactured. Any view silently aggregates currencies or changes numeric value under locale formatting invalidates the boundary.
 
 **Supersession:** any earlier route, broad Al Dar use, combined historical scope or 2021 requirement in this dated first-round evidence is historical only. UD-08/09/10 and the current boundary above govern.
 
 **Second-round new evidence/resolved direction:** UD-10 selects current net-worth estimates only and supersedes historical/2021 requirements. Current direct market INR→USD and QAR→USD observations are acquired; Al Dar remains solely current Salary/budget under UD-09.
 
-**Exact next evidence or decision:** Separate pure native locale display from current derived estimates; choose locale/accessibility expectations and approved current reporting orientation, without historical scope.
+**Exact next evidence or decision:** Separate pure native locale display from current derived estimates; choose locale/readability expectations and approved current reporting orientation, without historical scope.
 
 **Personal-v1:** PRE_V1_REQUIRED only for the selected current reporting/net-worth slice; historical FX remains excluded.
 
@@ -9613,8 +6601,8 @@ Any later reporting conversion is separately derived with its own FX provenance.
 
 **Typed dependencies:**
 
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-locale-presentation`: Separate pure native locale formatting from the combined converted-value contract; selected locale/accessibility expectations and derived display basis need review.
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P3-31`: Separate pure native locale formatting from the combined converted-value contract; selected locale/accessibility expectations and derived display basis need review.
+- `REQUIRES_ACCEPTED_ARCHITECTURE` → `decision-locale-presentation`: Separate pure native locale formatting from the combined converted-value contract; selected locale/readability expectations and derived display basis need review.
+- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P3-31`: Separate pure native locale formatting from the combined converted-value contract; selected locale/readability expectations and derived display basis need review.
 - `REQUIRES_POST_SWIFT6` → `accepted-post-sprint-87-ownership`: Refresh only affected provider/migration/hydration/actor interfaces before planning or implementation; public source facts stay valid independently.
 
 **Pinned evidence references:**
@@ -9825,7 +6813,7 @@ Provide a current net-worth estimate in the selected reporting currency without 
 
 **Current discovery disposition — 2026-09-10:** `READY_FOR_CHAT_ARCHITECTURE_DECISION`. **Exact remaining gate:** Chat must accept current net-worth membership/rounding, selected reporting-currency set and explicit direction/inverse rule over current market observations, plus financial setting ownership.
 
-**Smallest proposed boundary:** A workspace financial reporting setting chooses a derived projection over unchanged native facts and immutable observations; it is separate from portable appearance preferences.
+**Smallest proposed boundary:** A workspace financial reporting setting chooses a derived projection over unchanged native facts and immutable observations; it is separate from simple device-local appearance preferences.
 
 **Decision record:** [GENERAL_FX_ARCHITECTURE_PACKET](#packet-general-fx-architecture-packet), [ROADMAP_REPLANNING_PACKET_99](<Sprint roadmap/Upcoming/LedgerForge_Roadmap_Sprints_90-99_Planned.md#packet-roadmap-replanning-packet-99>).
 
@@ -9971,17 +6959,17 @@ Provide a machine-readable export of supported LedgerForge domain data. User-fac
 <details>
 <summary>Discovery evidence, dependencies and acceptance boundary</summary>
 
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: repositories/hydration cover accounts, transactions, categories, import attempts and sessions, card and salary/funding domains. A single transactions CSV omits supported relationships and provenance; a SQLite file exposes internal schema rather than a stable public domain contract.
+**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: repositories/hydration cover accounts, transactions, categories, import attempts and sessions, card and salary/funding domains. A single transactions CSV omits supported relationships and provenance; a SQLite file exposes internal schema rather than a stable private owner export/domain contract.
 
 **First-round scope and constraints:** The app remains private, local and explicit. Accepted financial history, native Money, order, multiplicity and provenance cannot be silently rewritten. ADR-046 authentic-input rules apply to financial cases; migration identities remain append-only. Discovery grants no implementation or acceptance. No raw original financial documents, credentials or runtime caches by implication; no promise to reimport or expose internal mutable DTOs as public API.
 
 **First-round question/options:** What is a loss-aware machine-readable domain export? A versioned logical package can describe omissions and preserve domain meaning; database backup is a separate whole-storage recovery mechanism.
 
-**First-round remainder and implications:** Explicit exported entity/relationship scope, redacted vs complete private export policy, format/version contract and whether future round-trip import is promised. Public export schema decision required; exporting accepted records should not require database migration unless a missing durable relationship is independently found.
+**First-round remainder and implications:** Explicit exported entity/relationship scope, redacted vs complete private export policy, format/version contract and whether future round-trip import is promised. Private owner export schema decision required; exporting accepted records should not require database migration unless a missing durable relationship is independently found.
 
 **First-round proposed acceptance/falsifier:** Independent counts and relationship closure for every adopted domain; exact Money/Decimal/date round-trip decoding and reproducible ordering; detect omission, orphaned identity or unsupported export version; privacy review of artifact, destination and temporary residue. New accepted domain/mutation/provenance fields invalidate completeness until export schema is reconciled.
 
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: repositories/hydration cover accounts, transactions, categories, import attempts and sessions, card and salary/funding domains. A single transactions CSV omits supported relationships and provenance; a SQLite file exposes internal schema rather than a stable public domain contract. Second-level disposition is the exact decision/dependency/deferral stated here.
+**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: repositories/hydration cover accounts, transactions, categories, import attempts and sessions, card and salary/funding domains. A single transactions CSV omits supported relationships and provenance; a SQLite file exposes internal schema rather than a stable private owner export/domain contract. Second-level disposition is the exact decision/dependency/deferral stated here.
 
 **Exact next evidence or decision:** Exact next evidence/decision: Exact user says complete export optional; retain optional schema packet. Owning authority: EXPORT_BOUNDARY_PACKET.
 
@@ -10017,14 +7005,14 @@ Provide a machine-readable export of supported LedgerForge domain data. User-fac
 | # | Required field | Decision |
 | --- | --- | --- |
 | 1 | Owning FW IDs | FW-P3-35; FW-P3-17 is separate optional selected-view report. |
-| 2 | User problem | Portability without presenting a backup or authentic institution statement. |
-| 3 | Verified current state | Hydrated domains exist; CSV is relationally lossy and raw SQLite is not public contract. |
+| 2 | User problem | Owner-controlled access to a private logical export without presenting it as a backup or authentic institution statement. |
+| 3 | Verified current state | Hydrated domains exist; CSV is relationally lossy and raw SQLite is not a stable owner export contract. |
 | 4 | Accepted authorities | ADR-024 and ADR-046; current private-data restrictions. |
-| 5 | Exact missing decision | Full public schema/privacy policy; user marks complete export optional for v1. |
+| 5 | Exact missing decision | Full private owner schema/privacy policy; user marks complete export optional for v1. |
 | 6 | Evidence acquired | Repositories/hydration span accounts, transactions, categories, attempts/sessions, card and salary/funding. |
-| 7 | Options considered | Selected report; raw SQLite; versioned full-domain projection; round-trip workspace. |
+| 7 | Options considered | Selected report; raw SQLite; versioned full-domain projection; round-trip reimport. |
 | 8 | Recommended option | Keep versioned one-way full-domain export optional; if selected, user destination plus deterministic manifest/entity projection. |
-| 9 | Why competing options are rejected | Report loses relations; SQLite couples internal schema; round-trip is workspace/restore architecture. |
+| 9 | Why competing options are rejected | Report loses relations; SQLite couples internal schema; round-trip reimport requires separately approved financial/recovery semantics. |
 | 10 | Smallest coherent implementation boundary | Explicit entity/relations, stable exported IDs, exact native Money/decimal/currency, dates, order/multiplicity, bounded provenance and omissions manifest. |
 | 11 | Included scope | Schema version, compatible-reader rule, entity counts/closure, deterministic order, atomic output, private user projection. |
 | 12 | Explicit exclusions | Credentials, Keychain, original bytes/attachments, parser artifacts, DB paths, diagnostics, auto reimport, source authority, backup/restore. |
@@ -10059,7 +7047,7 @@ Provide a machine-readable export of supported LedgerForge domain data. User-fac
 
 **Roadmap disposition — 2026-09-10:** Prepared Sprint 93. This full recoverability boundary is `PRE_V1_REQUIRED`; its status remains `Ready for discovery` until the existing architecture and runtime gates close.
 
-This is a serious required recoverability input to `FW-P0-26` personal-v1 certification, but importance does not itself promote implementation priority.
+This is a serious required recoverability input to `FW-P0-26` personal-v1 adoption verification, but importance does not itself promote implementation priority.
 
 Provide explicit user-owned local backup creation, integrity verification, documented contents/exclusions, restore preview/confirmation, safe-target restoration, version/schema compatibility checks, failure-safe recovery and disaster-recovery guidance.
 
@@ -10069,9 +7057,9 @@ Discovery must distinguish the existing DEBUG lifecycle backup from a production
 
 **Smallest proposed boundary:** User-owned verified package; isolated restore; nonempty target protection.
 
-**External authority distinction:** [SQLite online backup](https://www.sqlite.org/backup.html) and [WAL documentation](https://www.sqlite.org/wal.html) distinguish a consistent snapshot from copying a live database into arbitrary sync software. A backup, portable package, synchronization protocol and restored workspace each require their own accepted boundary.
+**External authority distinction:** [SQLite online backup](https://www.sqlite.org/backup.html) and [WAL documentation](https://www.sqlite.org/wal.html) distinguish a consistent snapshot from copying a live database into arbitrary sync software. Only a verified backup package and isolated restore are selected here. The owner may save/copy that package to a personally chosen destination; this creates no live/shared workspace or sync architecture.
 
-**Decision record:** [USER_BACKUP_RESTORE_ARCHITECTURE_PACKET](#packet-user-backup-restore-architecture-packet), [PERSONAL_V1_CERTIFICATION_PACKET](#packet-personal-v1-certification-packet).
+**Decision record:** [USER_BACKUP_RESTORE_ARCHITECTURE_PACKET](#packet-user-backup-restore-architecture-packet), [personal adoption verification](#fw-p0-26).
 
 <details>
 <summary>Discovery evidence, dependencies and acceptance boundary</summary>
@@ -10088,7 +7076,7 @@ Discovery must distinguish the existing DEBUG lifecycle backup from a production
 
 **Second-round new evidence/resolved direction:** Static distinction between DEBUG lifecycle snapshot and user recovery; exact user requirement.
 
-**Exact next evidence or decision:** Exact next evidence/decision: User requires recovery; accept package/restore/rollback ADR. Owning authority: USER_BACKUP_RESTORE_ARCHITECTURE_PACKET, PERSONAL_V1_CERTIFICATION_PACKET.
+**Exact next evidence or decision:** Exact next evidence/decision: User requires recovery; accept package/restore/rollback ADR. Owning authority: USER_BACKUP_RESTORE_ARCHITECTURE_PACKET, FW-P0-26 personal adoption verification.
 
 **Personal-v1:** PRE_V1_REQUIRED
 
@@ -10126,22 +7114,22 @@ Discovery must distinguish the existing DEBUG lifecycle backup from a production
 
 | # | Required field | Decision |
 | --- | --- | --- |
-| 1 | Owning FW IDs | FW-P3-36; required predecessor of FW-P0-26; constrains FW-P3-41. |
+| 1 | Owning FW IDs | FW-P3-36; required predecessor of FW-P0-26. |
 | 2 | User problem | Recover one local workspace without silently overwriting newer/nonempty current data. |
 | 3 | Verified current state | SQLite is WAL-mode and provides online backup plus checked checkpoint/close. DEBUG lifecycle backup/recovery is fixed-identity and Release-absent. |
 | 4 | Accepted authorities | ADR-024 hydration, ADR-035 DEBUG lifecycle and Release/arbitrary-restore exclusion, ADR-037 backup is not mutation reversal, ADR-046 provenance. |
 | 5 | Exact missing decision | Chat architecture acceptance for a distinct user/Release backup and restore contract; product requirement is now explicit. |
 | 6 | Evidence acquired | Online backup API copies the open main DB; checked close truncates WAL; DEBUG verification checks migration history and required tables. |
-| 7 | Options considered | Live sqlite/sidecar copy; DEBUG snapshot; immutable user package; portable live folder; export only. |
+| 7 | Options considered | Live sqlite/sidecar copy; DEBUG snapshot; immutable owner backup package; export only. |
 | 8 | Recommended option | Immutable user backup package at explicit user destination, created with SQLite backup API, verified and restored into an isolated candidate before activation. |
-| 9 | Why competing options are rejected | Live copies can miss WAL; DEBUG is not a user product; live portable folders need external locking/conflict rules; exports cannot restore repositories. |
+| 9 | Why competing options are rejected | Live copies can miss WAL; DEBUG is not a user product; exports cannot restore repositories. |
 | 10 | Smallest coherent implementation boundary | One workspace, ledger.sqlite, manifest.json, Verify, Restore-to-Isolated-Copy, explicit Activate Restored Copy. |
-| 11 | Included scope | Snapshot, versioned manifest, hash/size, migration/schema compatibility, isolated verification, preservation/rollback and recovery guidance; validated appearance-preference snapshot. |
+| 11 | Included scope | Snapshot, versioned manifest, hash/size, migration/schema compatibility, isolated verification, preservation/rollback and recovery guidance. |
 | 12 | Explicit exclusions | Credentials/Keychain, passwords, original attachments/source bytes, DEBUG backup UI, sync, multiworkspace, automatic overwrite, reports/exports and financial undo. |
-| 13 | Durable model/persistence requirements | Manifest: package major/minor, build identity, migration identity/checksum inputs, schema state, opaque workspace identity, timestamp, file size/SHA-256, content/exclusion list and preference-schema/version/hash. No paths, financial values, source digests, credentials, names or diagnostics. Atomic final publication after verification only. |
+| 13 | Durable model/persistence requirements | Manifest: package major/minor, build identity, migration identity/checksum inputs, schema state, opaque workspace identity, timestamp, file size/SHA-256, content/exclusion list. Appearance preferences remain device-local and are not included solely for theming. No paths, financial values, source digests, credentials, names or diagnostics. Atomic final publication after verification only. |
 | 14 | Migration impact | REQUIRES_DECISION for package reader compatibility only; no database migration allocated. Unknown/future/incomplete identities reject before activation. |
 | 15 | ADR impact | NEW_ADR_REQUIRED; align ADR-035 without widening its DEBUG-only decision. |
-| 16 | Privacy/security boundary | Explicit file authorization; no secrets/originals/paths/raw identifiers in metadata or diagnostics. Encryption is FW-P3-43, not implied. |
+| 16 | Privacy/security boundary | Explicit file authorization; no secrets/originals/paths/raw identifiers in metadata or diagnostics. No additional app-level encryption is selected or required for this backup boundary. |
 | 17 | SQLite/In-Memory implications | SQLite-only recovery. In-Memory may test manifest mechanics but cannot prove durable restore. |
 | 18 | Hydration/relaunch implications | Candidate runs registered migrations and RepositoryStoreHydrator stage hydration; publish only after success. Activation quiesces work, invalidates generation, checked-closes, preserves canonical set, swaps atomically, hydrates, then same-target relaunches. |
 | 19 | Independent acceptance oracle | Manifest hash/size, registered migration identity, SQLite integrity/foreign keys/required schema, plus independent canonical IDs, counts, Money scale/currency, relationships, order/multiplicity and permitted provenance comparison. Genuine source-backed records for financial comparisons. |
@@ -10149,7 +7137,7 @@ Discovery must distinguish the existing DEBUG lifecycle backup from a production
 | 21 | Reversal/correction semantics | Before activation cancel safely. Database restore is whole-workspace recovery, never selective undo. Keep original database set and last verified backup until candidate close/reopen succeeds; activation failure restores preserved original and enters unavailable state if rollback fails. |
 | 22 | Source evidence requirement | None for package mechanics; authentic source authority required for financial-projection comparison in restore drill. |
 | 23 | Runtime acceptance requirement | Required: native destination selection, cancel/access failure, isolated restore, nonempty-current confirmation, activation/rollback, hydration and same-database relaunch. |
-| 24 | Dependencies | User decision satisfied; NEW ADR; exact post-Sprint-87 lifecycle/provider/hydrator review. FW-P0-26 consumes backup acceptance; it is not a backup prerequisite. FW-P3-41 is a later consumer only if portable folders are selected. |
+| 24 | Dependencies | User decision satisfied; NEW ADR; exact post-Sprint-87 lifecycle/provider/hydrator review. FW-P0-26 consumes backup acceptance; it is not a backup prerequisite. |
 | 25 | Evidence that falsifies the recommendation | No coherent online snapshot; relation/value/provenance cannot survive; metadata exposes prohibited data; nonempty current target cannot be protected/rolled back; or migration cannot be isolated-verified. |
 | 26 | Personal-v1 relevance | PRE_V1_REQUIRED by exact user decision on 2026-09-10. |
 | 27 | Recommended FUTURE_WORK status after Chat review | READY_FOR_CHAT_ARCHITECTURE_DECISION. |
@@ -10158,529 +7146,3 @@ Discovery must distinguish the existing DEBUG lifecycle backup from a production
 </details>
 
 ---
-
-<a id="fw-p3-37"></a>
-
-## FW-P3-37 — Optional Encrypted Sync
-
-**Status:** Research
-**Depends on:** Backup, encryption, conflict resolution and explicit opt-in architecture
-
-LedgerForge must remain fully functional without synchronization.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No concrete multi-device/second-writer need.
-
-**Smallest proposed boundary:** Manual verified backup transfer precedes sync.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: provider/hydration are local and workspace-scoped; Keychain source-password storage is non-synchronizing and device-bound. There is no adopted remote replication, conflict or key-recovery contract in these interfaces.
-
-**First-round scope and constraints:** The app remains private, local and explicit. Accepted financial history, native Money, order, multiplicity and provenance cannot be silently rewritten. ADR-046 authentic-input rules apply to financial cases; migration identities remain append-only. Discovery grants no implementation or acceptance. No cloud-account prerequisite, background upload, credential sync, automatic last-writer-wins or reduced offline functionality.
-
-**First-round question/options:** Does optional encrypted sync serve the current single-owner product? User-owned verified backup transfer addresses disaster recovery with less architecture; encrypted multi-writer replication requires domain conflict semantics despite transport encryption.
-
-**First-round remainder and implications:** User need for a second writer/device, sync unit/protocol, authenticated peer trust, conflict authority and portable encryption-key recovery. New sync/trust/key-lifecycle ADRs and likely durable replication metadata; no design selected now.
-
-**First-round proposed acceptance/falsifier:** Future qualification must prove offline operation, replay/idempotence, divergent histories, explicit conflicts, interruption recovery and independent key-loss restore; no silent record merge. A genuine required multi-device workflow or accepted portable workspace boundary warrants reopening this deferral.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: provider/hydration are local and workspace-scoped; Keychain source-password storage is non-synchronizing and device-bound. There is no adopted remote replication, conflict or key-recovery contract in these interfaces. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: No concrete multi-device/second-writer need. Owning authority: FW-P3-37 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** DEFERRED_WITH_REASON **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- `OPTIONAL_ENHANCEMENT` → `FW-P3-36`: Future reopening condition only; this deferred boundary is not a current prerequisite. The Verified Backup, Restore and Disaster Recovery boundary must provide: User-owned verified package; isolated restore; nonempty target protection.. This enables Manual verified backup transfer precedes sync. Remaining condition: No concrete multi-device/second-writer need.
-- `OPTIONAL_ENHANCEMENT` → `FW-P3-43`: Future reopening condition only; this deferred boundary is not a current prerequisite. The Local-Data Encryption at Rest boundary must provide: FileVault fact is not exported-backup encryption.. This enables Manual verified backup transfer precedes sync. Remaining condition: No concrete multi-device/second-writer need.
-
-**Pinned evidence references:**
-
-- [Database/Repository.swift](<../Database/Repository.swift>):201-340 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `0c4416fa22817a54dc776f3973cf0b0e92aee209e667decc12e62de182b4f92f` — WorkspaceRepository, TransactionRepository, CategoryRepository, AccountRepository, CardRepository, ImportSessionRepository and ConfirmedImportRepository; provider container
-- [Services/RepositoryStoreHydrator.swift](<../Services/RepositoryStoreHydrator.swift>):209-269;344-440 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `40cbd69a8a470748fcb637cb10ae5597855d5a03771e165d8f551162d2b94117` — RepositoryStoreHydrator.init(workspaceId:); stageHydration()
-- [Import/Password/DefaultPasswordProvider.swift](<../Import/Password/DefaultPasswordProvider.swift>):37-50;178-214 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `de4f93cdfc8c9fdf2d8cf23d4127f649ae05608be2806964812d00e567b43215` — KeychainCredentialStore attributes
-- [Database/SQLiteDatabase.swift](<../Database/SQLiteDatabase.swift>):1-100 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `5945852ad75513a1fcbd15c692512ab35786523da9defd889b9d4f7f710b474a` — SQLite open and WAL configuration
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):3080-3093 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Optional Encrypted Sync as Research and records this unresolved boundary: User need for a second writer/device, sync unit/protocol, authenticated peer trust, conflict authority and portable encryption-key recovery.
-
-</details>
-
----
-
-<a id="fw-p3-38"></a>
-
-## FW-P3-38 — Open API and External Integrations
-
-**Status:** Research
-**Depends on:** Stable public data contracts and security policy
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No named external consumer/use case.
-
-**Smallest proposed boundary:** One-way export before API.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: DatabaseProvider and repository interfaces are app-internal read/write contracts; financial import requires staged validation/confirmation. They do not constitute a versioned public authorization boundary.
-
-**First-round scope and constraints:** The app remains private, local and explicit. Accepted financial history, native Money, order, multiplicity and provenance cannot be silently rewritten. ADR-046 authentic-input rules apply to financial cases; migration identities remain append-only. Discovery grants no implementation or acceptance. No remote server, repository handles, credential access, arbitrary SQL, unattended financial writes or implementation framework.
-
-**First-round question/options:** What external integration can avoid exposing internal repository authority? Versioned user-exported files keep explicit control for occasional consumers; a continuously available service adds authorization, lifecycle and attack surface.
-
-**First-round remainder and implications:** Concrete consumer/use case, minimum read/write scope, privacy consent, authentication and compatibility policy. Public API capability/versioning ADR required; no current database migration justified.
-
-**First-round proposed acceptance/falsifier:** Future consumer contract must reject unknown versions/unauthorized operations, expose only selected data, and leave ledger untouched on any rejection. A named repeated workflow needing unavailable incremental semantics may justify a distinct service contract.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: DatabaseProvider and repository interfaces are app-internal read/write contracts; financial import requires staged validation/confirmation. They do not constitute a versioned public authorization boundary. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: No named external consumer/use case. Owning authority: FW-P3-38 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** DEFERRED_WITH_REASON **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- `OPTIONAL_ENHANCEMENT` → `FW-P3-35`: Future reopening condition only; this deferred boundary is not a current prerequisite. The Structured Data Export boundary must provide: Not a personal-v1 blocker.. This enables One-way export before API. Remaining condition: No named external consumer/use case.
-
-**Pinned evidence references:**
-
-- [Database/Repository.swift](<../Database/Repository.swift>):201-340 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `0c4416fa22817a54dc776f3973cf0b0e92aee209e667decc12e62de182b4f92f` — WorkspaceRepository, TransactionRepository, CategoryRepository, AccountRepository, CardRepository, ImportSessionRepository and ConfirmedImportRepository; provider container
-- [Services/RepositoryStoreHydrator.swift](<../Services/RepositoryStoreHydrator.swift>):209-269;344-440 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `40cbd69a8a470748fcb637cb10ae5597855d5a03771e165d8f551162d2b94117` — RepositoryStoreHydrator.init(workspaceId:); stageHydration()
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):3094-3105 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Open API and External Integrations as Research and records this unresolved boundary: Concrete consumer/use case, minimum read/write scope, privacy consent, authentication and compatibility policy.
-
-</details>
-
----
-
-<a id="fw-p3-39"></a>
-
-## FW-P3-39 — External Import Plugin Architecture
-
-**Status:** Research
-**Depends on:** Stable parser/reader, ADR-046 authentic-corpus acceptance, non-source test-data, security and public extension contracts
-
-Investigate an optional plugin architecture for adding financial institutions, document families or import adapters without modifying LedgerForge’s core application.
-
-The design must preserve:
-
-- offline-first operation;
-- privacy by default;
-- deterministic parsing;
-- validation before persistence;
-- explicit plugin trust and installation controls;
-- compatibility and versioning rules;
-- isolation from repository and credential internals.
-
-Internal parser-framework expansion remains governed separately by `FW-P1-06`.
-
-No external plugin system is approved until its security, signing, compatibility and data-access boundaries are defined.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No external adapter producer/use case/trust contract.
-
-**Smallest proposed boundary:** Internal parser framework only.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: internal reader and confirmed-import repository seams are reviewed application code. ADR-046 authentic corpus and ordinary production path govern support; externally supplied executable code would introduce a separate trust boundary.
-
-**First-round scope and constraints:** The app remains private, local and explicit. Accepted financial history, native Money, order, multiplicity and provenance cannot be silently rewritten. ADR-046 authentic-input rules apply to financial cases; migration identities remain append-only. Discovery grants no implementation or acceptance. No repository or Keychain internals, arbitrary plugin-driven persistence, implicit source certification, or synthetic statement/domain graphs under the queue phrase non-source test-data.
-
-**First-round question/options:** Can third-party import plugins inherit internal parser trust? Internal source adapters remain the smaller reviewable route for this single developer; an external protocol might accept bounded immutable evidence but still needs host-side deterministic validation.
-
-**First-round remainder and implications:** Actual external adapter producer/use case; plugin identity/signing/version compatibility; process isolation/resource limits and minimal source/credential capabilities. New plugin trust, compatibility and credential ownership ADRs; migration needs unknown, not allocated.
-
-**First-round proposed acceptance/falsifier:** Future adversarial proof must bound file/network/credential effects, reject incompatible or ambiguous evidence before persistence and rerun each affected complete authentic corpus through ordinary host validation. Untrusted code requiring broad file access or irreversible effects invalidates a minimal in-process plugin assumption.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: internal reader and confirmed-import repository seams are reviewed application code. ADR-046 authentic corpus and ordinary production path govern support; externally supplied executable code would introduce a separate trust boundary. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: No external adapter producer/use case/trust contract. Owning authority: FW-P3-39 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** DEFERRED_WITH_REASON **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- `OPTIONAL_ENHANCEMENT` → `accepted-adr-046`: Future reopening condition only; this deferred boundary is not a current prerequisite. The explicitly named gate accepted-adr-046 must be satisfied. This enables Internal parser framework only. Remaining condition: No external adapter producer/use case/trust contract.
-
-**Pinned evidence references:**
-
-- [Database/Repository.swift](<../Database/Repository.swift>):201-340 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `0c4416fa22817a54dc776f3973cf0b0e92aee209e667decc12e62de182b4f92f` — WorkspaceRepository, TransactionRepository, CategoryRepository, AccountRepository, CardRepository, ImportSessionRepository and ConfirmedImportRepository; provider container
-- [Services/RepositoryStoreHydrator.swift](<../Services/RepositoryStoreHydrator.swift>):209-269;344-440 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `40cbd69a8a470748fcb637cb10ae5597855d5a03771e165d8f551162d2b94117` — RepositoryStoreHydrator.init(workspaceId:); stageHydration()
-- [Import/Readers/DefaultReaderRegistry.swift](<../Import/Readers/DefaultReaderRegistry.swift>):1-31 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `987d6cee9a010d2d72ca73b047d743e45f1c36eef5e72f65b5d76d44cd51f051` — default reader composition
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):3106-3133 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines External Import Plugin Architecture as Research and records this unresolved boundary: Actual external adapter producer/use case; plugin identity/signing/version compatibility; process isolation/resource limits and minimal source/credential capabilities.
-
-</details>
-
----
-
-<a id="fw-p3-40"></a>
-
-## FW-P3-40 — Multiple Workspaces and Independent Ledgers
-
-**Status:** Research
-**Depends on:** Workspace-scoped identity, fingerprint, settings and repository-isolation decisions
-
-Investigate support for more than one independent local financial workspace.
-
-The design must define:
-
-- strict data isolation;
-- workspace-scoped account identity;
-- workspace-scoped preferences;
-- workspace selection and creation;
-- import routing;
-- fingerprint uniqueness;
-- backup and restore boundaries;
-- deletion and archival;
-- migration from the current single-workspace product model.
-
-No cross-workspace matching or aggregation may occur implicitly.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_PRODUCT_DECISION`. **Exact remaining gate:** Whether multiple workspaces are a product need; storage/isolation options remain unselected.
-
-**Smallest proposed boundary:** Do not infer from workspaceId.
-
-**Bounded product choice for future selection:**
-
-| FW ID | Decision and owner | Why it matters | Option A | Option B | Option C | Recommendation | Consequence of deferring | What becomes unblocked |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FW-P3-40 | **User product choice:** whether multiple independent ledgers are needed. | It determines workspace isolation, routing, duplicates, credentials, preferences, backups, and migration. | Keep single workspace. | Adopt multi-workspace then choose database-per-workspace/shared architecture in Chat. | — | A; no stated second-ledger workflow. | Single workspace remains. | Isolation map and architecture if B selected. |
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: hydrator accepts workspaceId but defaults to default-workspace. V9 drops the initial global fingerprint unique indexes in favor of per-document authority and nonunique lookup; application import routing remains part of scope. These mechanisms do not prove complete workspace isolation.
-
-**First-round scope and constraints:** The app remains private, local and explicit. Accepted financial history, native Money, order, multiplicity and provenance cannot be silently rewritten. ADR-046 authentic-input rules apply to financial cases; migration identities remain append-only. Discovery grants no implementation or acceptance. No implicit cross-workspace merge/aggregation, hidden copied credentials or editing accepted migrations.
-
-**First-round question/options:** Does workspace_id establish multiple independent ledgers? Database-per-workspace simplifies physical backup isolation but still needs secure lifecycle/credential routing; shared tables require every query, relationship and uniqueness boundary to enforce workspace scope.
-
-**First-round remainder and implications:** Single database vs database-per-workspace, explicit selection/routing, credential/settings scope, duplicate policy and migration from the current single workspace. Workspace ownership/isolation ADR and likely additive migration if shared schema changes; no option selected.
-
-**First-round proposed acceptance/falsifier:** Independent two-workspace audit must show no cross-returned data, wrong-target import, duplicate leakage, preference bleed or backup/restore crossover; use genuine financial inputs only for statement-dependent checks. A global query/key/cache or active-task switch not scoped to the selected workspace invalidates isolation.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: hydrator accepts workspaceId but defaults to default-workspace. V9 drops the initial global fingerprint unique indexes in favor of per-document authority and nonunique lookup; application import routing remains part of scope. These mechanisms do not prove complete workspace isolation. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Whether multiple workspaces are a product need; storage/isolation options remain unselected. Owning authority: FW-P3-40 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** BLOCKED_ON_PRODUCT_DECISION **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=true, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** USER_PRODUCT_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_USER_DECISION` → `decision-multiworkspace`: The explicitly named gate decision-multiworkspace must be satisfied. This enables Do not infer from workspaceId. Remaining condition: Whether multiple workspaces are a product need; storage/isolation options remain unselected.
-
-**Pinned evidence references:**
-
-- [Database/Repository.swift](<../Database/Repository.swift>):201-340 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `0c4416fa22817a54dc776f3973cf0b0e92aee209e667decc12e62de182b4f92f` — WorkspaceRepository, TransactionRepository, CategoryRepository, AccountRepository, CardRepository, ImportSessionRepository and ConfirmedImportRepository; provider container
-- [Services/RepositoryStoreHydrator.swift](<../Services/RepositoryStoreHydrator.swift>):209-269;344-440 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `40cbd69a8a470748fcb637cb10ae5597855d5a03771e165d8f551162d2b94117` — RepositoryStoreHydrator.init(workspaceId:); stageHydration()
-- [Database/Migrations.swift](<../Database/Migrations.swift>):556-576;661-674 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `ff0e02b72b66486b89255907ce12aa73aaf1919c677c608e9b12c79ed78de6b5` — V9 fingerprint indexes; workspace-scoped tables
-- [Services/ImportPersistenceCoordinator.swift](<../Services/ImportPersistenceCoordinator.swift>):1377-1480;1850-1875 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `052b8de5c2de61349a5151d676e1dade3ec005363fb82f4eed290822bea2cfae` — workspace-scoped import ownership
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):3134-3161 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Multiple Workspaces and Independent Ledgers as Research and records this unresolved boundary: Single database vs database-per-workspace, explicit selection/routing, credential/settings scope, duplicate policy and migration from the current single workspace.
-
-</details>
-
----
-
-<a id="fw-p3-41"></a>
-
-## FW-P3-41 — Portable Workspace Folder
-
-**Status:** Research
-**Depends on:** `FW-P3-36`, workspace isolation and safe coordination of external file changes
-
-Investigate storing or exporting a complete LedgerForge workspace in a user-selected local folder that may itself be synchronized by services such as iCloud Drive, OneDrive, Dropbox or Synology tools.
-
-LedgerForge must remain offline-first and must not depend on any cloud provider.
-
-The design must address:
-
-- atomic local writes;
-- conflict detection;
-- concurrent external modifications;
-- locking;
-- backup and recovery;
-- file permissions;
-- sandbox access;
-- explicit user control.
-
-**Current discovery disposition — 2026-09-10:** `READY_AFTER_NAMED_DEPENDENCY`. **Exact remaining gate:** User backup ADR and later explicit external-folder/open policy.
-
-**Smallest proposed boundary:** Immutable verified package first, no live cloud database.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: SQLite opens with WAL and lifecycle-coordinated backup/close. VERIFIED_EXTERNAL: SQLite documents WAL as part of persistent state and shared-memory WAL coordination on one host. A cloud-synchronized folder is not an accepted multi-device locking protocol.
-
-**First-round scope and constraints:** The app remains private, local and explicit. Accepted financial history, native Money, order, multiplicity and provenance cannot be silently rewritten. ADR-046 authentic-input rules apply to financial cases; migration identities remain append-only. Discovery grants no implementation or acceptance. No live WAL/SHM copying assumptions, silent conflict-copy selection, generic cloud-provider support or cross-device file-lock claims.
-
-**First-round question/options:** Can a portable folder safely carry a LedgerForge workspace? A closed verified backup package transferred by the owner has a smaller boundary; an actively opened DB inside arbitrary sync tooling needs a proven external-writer protocol.
-
-**First-round remainder and implications:** Package format, closed-vs-live workspace policy, external-change detection, access/bookmark lifecycle and conflict/restore behavior. Portable package/access/lifecycle ADR after backup contract; no migration simply to package bytes.
-
-**First-round proposed acceptance/falsifier:** Verify complete contents and digest after transfer, independently restore/relaunch, and fail closed on partial/conflicting/external modifications without losing either copy. Accepted requirement for live external editing or simultaneous devices invalidates the immutable-transfer proposal.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: SQLite opens with WAL and lifecycle-coordinated backup/close. VERIFIED_EXTERNAL: SQLite documents WAL as part of persistent state and shared-memory WAL coordination on one host. A cloud-synchronized folder is not an accepted multi-device locking protocol. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: User backup ADR and later explicit external-folder/open policy. Owning authority: FW-P3-41 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** READY_AFTER_NAMED_DEPENDENCY **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** DEPENDENCY.
-
-**Typed dependencies:**
-
-- `REQUIRES_IMPLEMENTATION` → `FW-P3-36`: The Verified Backup, Restore and Disaster Recovery boundary must provide: User-owned verified package; isolated restore; nonempty target protection.. This enables Immutable verified package first, no live cloud database. Remaining condition: User backup ADR and later explicit external-folder/open policy.
-- `OPTIONAL_ENHANCEMENT` → `FW-P3-40`: The Multiple Workspaces and Independent Ledgers boundary must provide: Do not infer from workspaceId.. This enables Immutable verified package first, no live cloud database. Remaining condition: User backup ADR and later explicit external-folder/open policy.
-
-**Pinned evidence references:**
-
-- [Database/SQLiteDatabase.swift](<../Database/SQLiteDatabase.swift>):109-146 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `5945852ad75513a1fcbd15c692512ab35786523da9defd889b9d4f7f710b474a` — createBackup; checkpointAndClose
-- [Database/SQLiteRepositoryProvider.swift](<../Database/SQLiteRepositoryProvider.swift>):1381-1450;1540-1591 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `29166a1e985c9c4f5b43e6d13243a82fa5ff5e94382747b3fb406ae0dc98b454` — createAndVerifyBackup; restorePersistentDebugBackup
-- [Import/Password/DefaultPasswordProvider.swift](<../Import/Password/DefaultPasswordProvider.swift>):37-50;178-214 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `de4f93cdfc8c9fdf2d8cf23d4127f649ae05608be2806964812d00e567b43215` — KeychainCredentialStore attributes
-- [Database/SQLiteDatabase.swift](<../Database/SQLiteDatabase.swift>):1-100 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `5945852ad75513a1fcbd15c692512ab35786523da9defd889b9d4f7f710b474a` — SQLite open and WAL configuration
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):3162-3188 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Portable Workspace Folder as Research and records this unresolved boundary: Package format, closed-vs-live workspace policy, external-change detection, access/bookmark lifecycle and conflict/restore behavior.
-
-</details>
-
----
-
-<a id="fw-p3-42"></a>
-
-## FW-P3-42 — Cross-Platform Desktop Strategy
-
-**Status:** Research
-**Depends on:** Stable public domain, persistence and presentation boundaries
-
-Evaluate whether LedgerForge should eventually support Windows or Linux while preserving macOS as the primary product.
-
-The research must distinguish:
-
-- reusable domain and repository layers;
-- Swift and SwiftUI platform constraints;
-- storage and Keychain equivalents;
-- native desktop interaction expectations;
-- testing and release cost;
-- whether a separate client or shared core is justified.
-
-No portability claim may be made without an approved architecture and working evidence.
-
-**Current discovery disposition — 2026-09-10:** `DEFERRED_WITH_REASON`. **Exact remaining gate:** No target-user/platform need or support/release capacity.
-
-**Smallest proposed boundary:** No shared-core redesign.
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: SwiftUI owns app/root presentation; source password storage imports Security; repository/domain layers are separated but intertwined with native lifecycle. This is evidence for assessing seams, not proof that a shared core builds elsewhere.
-
-**First-round scope and constraints:** The app remains private, local and explicit. Accepted financial history, native Money, order, multiplicity and provenance cannot be silently rewritten. ADR-046 authentic-input rules apply to financial cases; migration identities remain append-only. Discovery grants no implementation or acceptance. No framework replacement, portability claim from target metadata, cross-platform DB copy promise or distraction from personal-v1.
-
-**First-round question/options:** Is a Windows/Linux port justified by the current product boundary? Retain native macOS delivery for the current owner; later compare a shared domain core with independent native clients against the cost of a rewrite after requirements exist.
-
-**First-round remainder and implications:** An actual target-user/platform need, native UI and credential equivalents, toolchain/support matrix and release/validation capacity. Platform/credential/distribution ADRs required; migrations should remain portable only if future evidence proves it.
-
-**First-round proposed acceptance/falsifier:** Future working evidence must cover equivalent native-money semantics, durable upgrade/hydration, credential isolation and native keyboard/accessibility expectations on each adopted platform. A real required second-platform user or platform-independent core evidence reopens the cost comparison.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: SwiftUI owns app/root presentation; source password storage imports Security; repository/domain layers are separated but intertwined with native lifecycle. This is evidence for assessing seams, not proof that a shared core builds elsewhere. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: No target-user/platform need or support/release capacity. Owning authority: FW-P3-42 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** DEFERRED_WITH_REASON **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=false, Chat architecture=false, post-87 refresh=false, authentic source=false. **Blocker types:** NO_REAL_USE_CASE.
-
-**Typed dependencies:**
-
-- `OPTIONAL_ENHANCEMENT` → `decision-platform`: Future reopening condition only; this deferred boundary is not a current prerequisite. Unselected future scope only; no current user decision is pending for the deferred boundary.
-
-**Pinned evidence references:**
-
-- [Database/Repository.swift](<../Database/Repository.swift>):201-340 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `0c4416fa22817a54dc776f3973cf0b0e92aee209e667decc12e62de182b4f92f` — WorkspaceRepository, TransactionRepository, CategoryRepository, AccountRepository, CardRepository, ImportSessionRepository and ConfirmedImportRepository; provider container
-- [Services/RepositoryStoreHydrator.swift](<../Services/RepositoryStoreHydrator.swift>):209-269;344-440 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `40cbd69a8a470748fcb637cb10ae5597855d5a03771e165d8f551162d2b94117` — RepositoryStoreHydrator.init(workspaceId:); stageHydration()
-- [LedgerForgeApp.swift](<../LedgerForgeApp.swift>):1-40 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `325b5d3cc8d7f32dbb11efb815cd7d82be3b9a79f069fb8434aa4b83fde47185` — SwiftUI app entry
-- [Import/Password/DefaultPasswordProvider.swift](<../Import/Password/DefaultPasswordProvider.swift>):37-50;178-214 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `de4f93cdfc8c9fdf2d8cf23d4127f649ae05608be2806964812d00e567b43215` — KeychainCredentialStore attributes
-- [Database/SQLiteDatabase.swift](<../Database/SQLiteDatabase.swift>):1-100 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `5945852ad75513a1fcbd15c692512ab35786523da9defd889b9d4f7f710b474a` — SQLite open and WAL configuration
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):3189-3213 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Cross-Platform Desktop Strategy as Research and records this unresolved boundary: An actual target-user/platform need, native UI and credential equivalents, toolchain/support matrix and release/validation capacity.
-
-</details>
-
----
-
-<a id="fw-p3-43"></a>
-
-## FW-P3-43 — Local-Data Encryption at Rest
-
-**Status:** Research
-**Depends on:** Database lifecycle, backup, credential and recovery architecture
-
-Investigate encryption of LedgerForge financial data at rest.
-
-The design must address:
-
-- key ownership and storage;
-- unlock and recovery;
-- backup encryption;
-- migration of existing databases;
-- performance;
-- development and testing workflows;
-- loss-of-key consequences;
-- interaction with portable workspaces and optional sync;
-- explicit user understanding.
-
-Encryption must not create a false promise of security while leaving exported backups or diagnostics unprotected.
-
-**Current discovery disposition — 2026-09-10:** `BLOCKED_ON_PRODUCT_DECISION`. **Exact remaining gate:** Threat model, unlock/recovery ownership and encrypted-backup policy.
-
-**Smallest proposed boundary:** FileVault fact is not exported-backup encryption.
-
-**External authority distinction:** [Apple FileVault](https://support.apple.com/en-euro/guide/security/sec4c6dc1b6e/web) protects a volume, which differs from app-managed database/package encryption and key recovery. No local FileVault setting was inspected or certified.
-
-**Bounded product choice for future selection:**
-
-| FW ID | Decision and owner | Why it matters | Option A | Option B | Option C | Recommendation | Consequence of deferring | What becomes unblocked |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| FW-P3-43 | **User product choice:** which concrete disclosure threat must be covered beyond existing device protection; Chat owns encryption, keys and recovery architecture if selected. | Device loss/theft and exposure of a separately exported backup require different protection outcomes. | No additional app-level protection outcome selected. | Protect a backup/package when it leaves this Mac. | Protect local app data beyond the device/volume boundary. | A until a concrete concern is identified; B is the narrower outcome if exported-package disclosure is the concern. | No app-level encryption claim; local FileVault state is not assumed. | A selected outcome permits a Chat-owned threat, key/recovery and artifact-lifecycle packet; no user technical key-policy choice. |
-
-<details>
-<summary>Discovery evidence, dependencies and acceptance boundary</summary>
-
-**First-round evidence, read at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`:** VERIFIED_REPOSITORY: SQLite open/configuration does not show application database encryption; Keychain protects source credentials separately. VERIFIED_EXTERNAL: Apple describes FileVault volume encryption. Local FileVault state was not inspected, and volume encryption does not establish encrypted exported artifacts on arbitrary destinations.
-
-**First-round scope and constraints:** The app remains private, local and explicit. Accepted financial history, native Money, order, multiplicity and provenance cannot be silently rewritten. ADR-046 authentic-input rules apply to financial cases; migration identities remain append-only. Discovery grants no implementation or acceptance. No invented FileVault-enabled claim, cryptography implementation, statement-password key reuse, hidden key escrow or encryption promise while plaintext artifacts remain unexplained.
-
-**First-round question/options:** Which at-rest threat boundary is actually required? OS volume protection may meet some device-loss needs; app-managed DB/package encryption introduces independent key loss, unlock and migration obligations. Select only after the owner chooses the actual threats.
-
-**First-round remainder and implications:** Threat model, unattended unlock policy, key/recovery ownership, encrypted-backup format and destination policy, and handling of existing copies/diagnostics. Encryption/key lifecycle ADR and explicit existing-data conversion/rollback policy; no migration or dependency chosen.
-
-**First-round proposed acceptance/falsifier:** Future qualification must inspect all approved artifacts/residue, test wrong/missing keys and interrupted conversion, restore after device loss using approved recovery evidence, and prove plaintext exposure matches the declared threat model. New artifact destinations, background unlock needs or required cross-device recovery change the threat model.
-
-**Second-round new evidence/resolved direction:** No additional source sample is claimed. Reused immutable first-level fact: VERIFIED_REPOSITORY: SQLite open/configuration does not show application database encryption; Keychain protects source credentials separately. VERIFIED_EXTERNAL: Apple describes FileVault volume encryption. Local FileVault state was not inspected, and volume encryption does not establish encrypted exported artifacts on arbitrary destinations. Second-level disposition is the exact decision/dependency/deferral stated here.
-
-**Exact next evidence or decision:** Exact next evidence/decision: Threat model, unlock/recovery ownership and encrypted-backup policy. Owning authority: FW-P3-43 pinned queue scope and the named dependency below.
-
-**Personal-v1:** POST_V1
-
-**Recommendation after Chat:** BLOCKED_ON_PRODUCT_DECISION **Roadmap:** Preserve priority/numbering; record only the stated gate or deferral. No sprint selected.
-
-**Publication delta:** `REVALIDATED_AFTER_CHANGE` against accepted `f44c2b2469f7cc98c0e6b7fd0cd86ba7796db8a6`. Changed referenced ownership/schema/hydration declarations were reread; the cited feature/absence boundary remains a static fact, not newly executed acceptance.
-
-**Revalidation/falsifiers:** exact post-Sprint-87 provider/lifecycle/hydrator ownership where touched; candidate/ref or authority document change; runtime-only interaction must be freshly observed when required.
-
-**Current gate flags:** user product choice=true, Chat architecture=true, post-87 refresh=false, authentic source=false. **Blocker types:** USER_PRODUCT_DECISION, ARCHITECTURE_DECISION.
-
-**Typed dependencies:**
-
-- `REQUIRES_ACCEPTED_ARCHITECTURE` → `FW-P3-36`: The Verified Backup, Restore and Disaster Recovery boundary must provide: User-owned verified package; isolated restore; nonempty target protection.. This enables FileVault fact is not exported-backup encryption. Remaining condition: Threat model, unlock/recovery ownership and encrypted-backup policy.
-- `REQUIRES_USER_DECISION` → `decision-encryption`: The explicitly named gate decision-encryption must be satisfied. This enables FileVault fact is not exported-backup encryption. Remaining condition: Threat model, unlock/recovery ownership and encrypted-backup policy.
-
-**Pinned evidence references:**
-
-- [Import/Password/DefaultPasswordProvider.swift](<../Import/Password/DefaultPasswordProvider.swift>):37-50;178-214 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `de4f93cdfc8c9fdf2d8cf23d4127f649ae05608be2806964812d00e567b43215` — KeychainCredentialStore attributes
-- [Database/SQLiteDatabase.swift](<../Database/SQLiteDatabase.swift>):1-100 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `5945852ad75513a1fcbd15c692512ab35786523da9defd889b9d4f7f710b474a` — SQLite open and WAL configuration
-- [Database/SQLiteDatabase.swift](<../Database/SQLiteDatabase.swift>):109-146 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `5945852ad75513a1fcbd15c692512ab35786523da9defd889b9d4f7f710b474a` — createBackup; checkpointAndClose
-- [Database/SQLiteRepositoryProvider.swift](<../Database/SQLiteRepositoryProvider.swift>):1381-1450;1540-1591 at `adcf83f52d309ddac18d95f0321d0c0f6120dd29`; SHA-256 `29166a1e985c9c4f5b43e6d13243a82fa5ff5e94382747b3fb406ae0dc98b454` — createAndVerifyBackup; restorePersistentDebugBackup
-- [Project documents/FUTURE_WORK.MD](<FUTURE_WORK.MD>):3214-3293 at `af2d1949c6e9a73af3bb004422b72882d28195e2` — The pinned queue defines Local-Data Encryption at Rest as Research and records this unresolved boundary: Threat model, unattended unlock policy, key/recovery ownership, encrypted-backup format and destination policy, and handling of existing copies/diagnostics.
-
-</details>
-
----
-
-# Research Queue
-
-Items in this section are not implementation candidates until promoted into a priority section. Research already promoted into a numbered candidate is not repeated here.
-
-The first-round routing remains: parser assistance and cross-format evidence → FW-P1-06/07/08/17; mutation-history compaction → FW-P0-16 after a real mutation family; explainable recommendations → FW-P3-06; anomaly work → FW-P2-28; tax/regulatory assistance → FW-P3-16. These are research, not new IDs or selected sprints.
-
-## Import and Parsing Research
-
-- semi-automated parser-assistance research from authentic source semantics, with generated artifacts explicitly ineligible as parser/source acceptance evidence;
-- AI-assisted recovery for unsupported or ambiguous layouts beyond column detection;
-- shared parser evidence across CSV, PDF, XLS, XLSX and TXT.
-
-## Persistence Research
-
-- long-term mutation-history compaction and archival after `FW-P0-16` and a concrete durable mutation history exist; compaction cannot precede family-specific retention, privacy and reversibility policy.
-
-## Financial Intelligence Research
-
-- explainable recommendations;
-- anomaly detection;
-- tax and regulatory assistance.
-
-Research findings must not be reported as planned product work until they are promoted into the prioritized queue.
-
----
-
-## Maintenance Rules
-
-When editing this document:
-
-- preserve existing candidate IDs;
-- add candidates in priority and dependency order;
-- update status when dependencies change;
-- use only the defined status labels and record unmet conditions under `Depends on` rather than inventing compound status labels;
-- record verified bugs explicitly;
-- remove completed work;
-- remove work selected for execution;
-- do not record implementation progress;
-- do not duplicate completed sprint history;
-- do not place architectural decisions here;
-- do not include raw financial identifiers, passwords or source fragments;
-- keep candidates implementation-agnostic until repository discovery;
-- distinguish candidate work from research and ideas;
-- record every approved but unimplemented idea, verified bug, accepted architectural follow-up and deferred sprint exclusion;
-- do not remove a candidate merely because its priority is low or its dependency is distant;
-- preserve LedgerForge principles:
-  - offline first;
-  - privacy by default;
-  - deterministic before intelligent;
-  - single source of truth;
-  - resilient parsing;
-  - explicit user control;
-  - explainable financial decisions;
-  - explicit and reversible destructive actions.

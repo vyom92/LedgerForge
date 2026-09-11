@@ -27,7 +27,7 @@ The complete Chat-approved execution prompt remains the execution contract. This
 | Task type | Jump to | Terminal state |
 |---|---|---|
 | Prepare roadmap / select next sprint | `PG-10` | `PLAN_READY` |
-| Targeted discovery / diagnosis | `PG-20` | `DISCOVERY_RESOLVED` |
+| Targeted discovery / diagnosis | `PG-20` | `DISCOVERY_RESOLVED` or `REJECTED_BY_PRIVATE_PERSONAL_SCOPE` |
 | Implement an approved sprint | `PG-30` | `IMPLEMENTATION_CANDIDATE` |
 | Corrective sprint / bounded repair | `PG-35` | `IMPLEMENTATION_CANDIDATE` |
 | Technical acceptance / report review | `PG-40` | `TECHNICALLY_ACCEPTED`, `REJECTED_WITH_BOUNDARY`, or `BLOCKED_BY_NAMED_EVIDENCE` |
@@ -62,7 +62,9 @@ Read an authority only when the selected playbook requires it.
 
 Memory, old conversations, uploads and reports are context, not repository authority. Reports are claims until independently verified.
 
-**Material-finding routing:** A material new finding or requirement must be durably dispositioned in its owning subject authority or `FUTURE_WORK.MD` before sprint selection or implementation. A recorded proposal remains a proposal until separately accepted.
+**Private Personal App Scope Gate:** apply [AGENTS.md](../AGENTS.md#private-personal-app-scope-gate) before planning, discovery, implementation or acceptance. LedgerForge serves the owner's own finances on the owner's Mac. Require a real requested owner workflow, actual data correctness/persistence/privacy/recovery need, supplied/selected authentic source or concrete day-to-day usability benefit. Otherwise: **NOT REQUIRED-DO NOT CONSIDER**. Exclude rejected work from priority triage and dependency chains; discovery cannot reopen it without a new explicit owner decision naming the personal need. <!-- user-specified -->
+
+**Material-finding routing:** Only scope-eligible material findings require a durable disposition in their subject authority or `FUTURE_WORK.MD`. Generalized commercial/platform speculation may return `REJECTED_BY_PRIVATE_PERSONAL_SCOPE` without a new card or packet. A recorded eligible proposal remains a proposal until separately accepted.
 
 The user-settled all-stages authentic-input rule in ADR-046 and the Standing Harness applies before development or debugging as well as during acceptance: no generated, reconstructed, sanitized, representative, reduced, mutated or hand-authored financial statement may be created or used. Only authentic corpus inputs (including operational exact/decrypted copies or actual attachments) may exercise statement-dependent behaviour. Nonfinancial mechanics remain permitted; absent authentic cases remain source-uncertified. <!-- user-specified -->
 
@@ -145,6 +147,7 @@ Chat / Coordinator. Default reasoning: **Sol High**.
 GitHub exact pushed ref; `PROJECT_STATE.md`; `FUTURE_WORK.MD`; relevant ADR/code/tests only for serious contenders; MCP only when local/unpushed evidence materially affects selection.
 
 ## Method
+0. **STEP 0 — PRIVATE PERSONAL APP ELIGIBILITY.** Before P0 → P3 triage, answer all four AGENTS.md eligibility questions: the real owner workflow; the actual owner data/source/safety issue; why the smallest direct solution is insufficient; and whether generalized commercial convention is the only justification. If either of the first two has no concrete answer, mark **NOT REQUIRED-DO NOT CONSIDER** and exclude it from candidate comparison. Rejected work cannot block eligible work.
 1. Establish exact inspected ref.
 2. Read current state and canonical queue in P0 → P1 → P2 → P3 order.
 3. Separate priority from readiness.
@@ -175,7 +178,7 @@ Chat defines the question and decision boundary. Use Luna High for bounded diagn
 Use the least invasive proving source: GitHub for pushed truth; MCP/direct local evidence for current local/unstaged truth; specialist macOS tooling for Xcode/SwiftUI/runtime questions; Browser only for current official external documentation.
 
 ## Method
-1. State the exact unknown and why it affects a decision.
+1. Apply the Private Personal App Scope Gate; state the exact eligible unknown and why it affects the owner's actual outcome. Do not widen a real problem into a generalized product program.
 2. Inspect the smallest plausible causal boundary; widen only when evidence requires it.
 3. Separate verified fact, reported fact, inference, and unresolved gap.
 4. Identify the first causal ownership layer.
@@ -184,7 +187,7 @@ Use the least invasive proving source: GitHub for pushed truth; MCP/direct local
 Read-only parallel Luna High agents are allowed only for independent causal boundaries. No parallel writers.
 
 ## Required end state: `DISCOVERY_RESOLVED`
-The unknown is resolved sufficiently for Chat to decide, or one named blocker and its required evidence are established. No opportunistic implementation. Any material out-of-scope finding is durably dispositioned before close as an existing entry update, new candidate, completed/duplicate item, explicit deferral or explicit rejection.
+The unknown is resolved sufficiently for Chat to decide, or one named blocker and its required evidence are established. Ineligible discovery returns `REJECTED_BY_PRIVATE_PERSONAL_SCOPE` without creating a future-work card. No opportunistic implementation. Scope-eligible material out-of-scope findings receive a durable disposition; generalized speculation does not enter the queue.
 
 **END PG-20**
 
@@ -205,12 +208,12 @@ Narrow work: Luna High parent, High reasoning, no subagents or bounded read-only
 1. Consume the approved execution contract and verify live-state evidence. For any financial-source ingestion/support work, read ADR-046, the Standing Harness parser/authentic-corpus policy and the current `PROJECT_STATE.md` parser-reliability alignment before implementation.
 2. Stop on material contradiction.
 3. Acquire mutation authority only immediately before mutation.
-4. Edit only approved scope.
+4. Edit only approved scope; reject speculative scope expansion under the Private Personal App Scope Gate.
 5. Run the smallest meaningful validation first, then widen only as acceptance/risk requires.
 6. Test falsification paths, not only success paths.
 7. Leave the candidate unstaged unless publication is explicitly included.
 8. Return exact MCP candidate-state evidence.
-9. Durably disposition every material out-of-scope finding before task close; do not leave it only in the implementation report or chat.
+9. Durably disposition scope-eligible material out-of-scope findings before close. Reject hypothetical generalized work without adding cards or packets.
 
 ## Required end state: `IMPLEMENTATION_CANDIDATE`
 A bounded local candidate appears to satisfy acceptance. It remains pending Chat acceptance.
@@ -256,7 +259,9 @@ Verify candidate identity, branch/worktree handling, changed files, scope/exclus
 
 Treat execution reports as claims. Classify material claims as verified, reported only, contradicted, or missing.
 
-Before acceptance closes, every material out-of-scope finding in the reviewed report must have a durable disposition in the owning authority or `FUTURE_WORK.MD`; acceptance does not turn a proposal into approved scope.
+Judge the actual approved private-app outcome and its financial/safety proof, not hypothetical commercial completeness. Formal accessibility, public distribution or platform readiness is not an acceptance requirement unless a new explicit owner decision establishes the exact personal need.
+
+Before acceptance closes, scope-eligible material out-of-scope findings need a durable disposition; generalized speculation returns `REJECTED_BY_PRIVATE_PERSONAL_SCOPE`. Acceptance does not turn a proposal into approved scope.
 
 Optional Luna High subagents are read-only evidence audits. No writers.
 
@@ -307,10 +312,10 @@ Chat semantic reasoning
 9. Documentation-only work does not trigger application-wide tests unless executable material changed.
 10. The current repository-owned roadmap and Standing Execution Harness are durable repository authorities. Older dated copies remain historical/context only and do not override the repository-owned current copies.
 11. When parser/source-support documentation changes, reconcile it against ADR-046, the Standing Harness parser/authentic-corpus policy and the current `PROJECT_STATE.md` parser-reliability alignment; preserve historical records but remove contradictory current authority.
-12. A documentation sync may not close with a material out-of-scope finding stranded only in chat/report text; give it one durable disposition in the owning authority or canonical queue.
+12. Give scope-eligible material out-of-scope findings a durable disposition. Reject generalized speculation without creating queue cards or packets, and remove stale dependencies on rejected work from retained cards, roadmaps and design acceptance.
 
 ## Required end state: `DOCS_RECONCILED`
-Current authorities agree; obsolete current-state claims are removed or narrowed; historical claims remain historically accurate; policy has one durable home where practical; routing points to subject authorities instead of duplicating them; all material findings have durable dispositions; no private originals or unsanitized private-source material leaked into published artifacts; only approved sanitized, clean-room or privacy-safe derived artifacts are eligible for publication; final diff is ready for publication review.
+Current authorities agree; obsolete current-state claims are removed or narrowed; historical claims remain historically accurate; policy has one durable home where practical; routing points to subject authorities instead of duplicating them; scope-eligible material findings have durable dispositions and rejected work is absent from active candidates/dependencies; no private originals or unsanitized private-source material leaked into published artifacts; only approved sanitized, clean-room or privacy-safe derived artifacts are eligible for publication; final diff is ready for publication review.
 
 **END PG-50**
 

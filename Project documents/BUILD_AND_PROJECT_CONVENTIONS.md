@@ -768,7 +768,7 @@ Required:
 - approved asset/specification review;
 - Debug build;
 - focused tests;
-- accessibility review;
+- practical owner-usability review (readability, no clipping, useful keyboard actions, focus, selection and resizing);
 - runtime verification where appearance or interaction matters;
 - repository-backed truth review;
 - unavailable and empty-state review.
@@ -816,7 +816,7 @@ Examples:
 - reset and recovery;
 - hydration after relaunch;
 - multiple-process contention;
-- accessibility behavior;
+- ordinary keyboard and readability behavior;
 - approved visual fidelity.
 
 Before runtime verification:

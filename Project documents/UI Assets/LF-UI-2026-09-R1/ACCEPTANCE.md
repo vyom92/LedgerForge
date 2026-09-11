@@ -5,7 +5,7 @@
 
 > **Publication alignment — 2026-09-10:** The checklist below was authored for the original docs-only handoff. The user subsequently authorized the reversible asset archive/move, Xcode synchronized-folder update and sprint-roadmap publication; those actions are documented in the surrounding handoff and do not turn this checklist into native test evidence.
 
-## A. Documentation-and-assets registration: this packet
+## A. Historical original registration checklist
 
 | ID | Required evidence |
 |---|---|
@@ -23,17 +23,19 @@
 
 No Swift build, financial import, fixture generation, TestPlan run, app launch or database reset is needed for this docs-only task. An unexpected resource/build impact is a stop condition, not permission to broaden validation and edit Xcode. Existing production results are historical baseline evidence only.
 
+The table above records the original registration contract, including its original no-publication boundary. It is historical. The 2026-09-11 approved scope-reset prompt controls the current documentation correction and its authorized commit/push; current requirements below exclude the rejected formal accessibility and advanced appearance programmes.
+
 ## B. Future native-app implementation acceptance
 
 Select only the rows applicable to each separately approved implementation packet. Use authentic, read-only source-backed data where statement-dependent values are exercised. Never extract the collage's sample values into a financial fixture or DTO graph.
 
 | ID | Requirement and falsification test |
 |---|---|
-| UI-01 | Compare matched logical window sizes at 1440 × 900 and 1024 × 768; repeat at largest supported text size. No amount wraps, truncates or loses its currency context. |
+| UI-01 | Compare matched logical window sizes at 1440 × 900 and 1024 × 768; inspect actual content fit and ordinary readability. No amount wraps, truncates or loses its currency context. |
 | UI-02 | Light, Dark and Follow System render coherently. System mode changes do not alter explicit Light/Dark selection. |
 | UI-03 | Sidebar and inspector collapse without losing access to navigation, active filters, selection or details. |
 | UI-04 | Keyboard reaches search, filters, sort headings, rows and inspector; focus is visible and distinct from selection. |
-| UI-05 | VoiceOver receives useful labels, complete amounts, currency and current control states. Colour is not the only status cue. |
+| UI-05 | Controls retain meaningful names and useful icon tooltips; full amounts, currency and current states are readable. Colour is not the only status cue. |
 | UI-06 | Empty repository, no matches, loading, unavailable and failure have distinct text and valid actions; none fabricates zero data. |
 | TX-01 | Each filter matches independently checked canonical records. Combined groups use AND; within-group selections use OR. |
 | TX-02 | Search respects the documented field/term scope; clearing it restores matching rows without changing data. |
@@ -48,15 +50,12 @@ Select only the rows applicable to each separately approved implementation packe
 | DB-01 | Currency groups separate bank position and card liability; omitted unsupported analytics do not reappear as decorative truths. |
 | DB-02 | Flow period and balance-as-of information are not confused; unavailable dates remain unavailable. |
 | DB-03 | Funding summary reads the existing accepted calculation without changed FX, fee, balance or investment semantics. |
-| AP-01 | Colour, font, size, density and translucency edits affect the preview until Apply; Cancel discards all draft changes. |
-| AP-02 | Invalid custom contrast cannot be applied; the message identifies the setting to correct. |
-| AP-03 | Restore defaults affects appearance only and remains a draft until Apply. Imported data and financial settings are unchanged. |
-| AP-04 | Applied preferences survive relaunch. Missing fonts/malformed stored preferences fall back without blocking financial hydration. |
-| AP-05 | Reduced transparency yields opaque surfaces and fully opaque text; reduced motion suppresses nonessential transitions. |
-| AP-06 | Tabular amounts remain aligned across every supported font style and size. Rows grow rather than crop text. |
+| AP-01 | Follow System/Light/Dark and any selected existing accent choice render readable controls and complete tabular Money. |
+| AP-02 | The local appearance choice survives relaunch; malformed values fall back without blocking financial hydration. |
+| AP-03 | Appearance changes leave imported data and financial settings unchanged. No advanced preference or portable-workspace matrix is required. |
 | SAFE-01 | No renamed “Cleared/Reconciled/Income/Spending/Net worth” label overstates the underlying accepted authority. |
 | SAFE-02 | The final report distinguishes static token checks, screenshot inspection, user interaction, build/test evidence and financial oracle evidence. |
 
 ## C. Evidence record per implementation packet
 
-Report the exact code ref, runtime build identity, logical window dimensions, appearance/font/density settings, tested actions, named assertions, actual results and remaining gaps. Keep private originals isolated as read-only source evidence in their approved source location; they are never included in published repository artifacts. Only approved sanitized, clean-room or privacy-safe derived evidence may be published. Record independent-oracle use for financial aggregates, and provider/hydration/relaunch evidence when those boundaries are changed. A passing build or visually plausible screenshot alone is insufficient.
+Report the exact code ref, runtime build identity, logical window dimensions, appearance choice, tested actions, named assertions, actual results and remaining gaps. Keep private originals isolated as read-only source evidence in their approved source location; they are never included in published repository artifacts. Only approved sanitized, clean-room or privacy-safe derived evidence may be published. Record independent-oracle use for financial aggregates, and provider/hydration/relaunch evidence when those boundaries are changed. A passing build or visually plausible screenshot alone is insufficient.
