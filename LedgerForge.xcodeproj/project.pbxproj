@@ -48,6 +48,10 @@
 		2872790F2FFD287300468973 /* StatementParserSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790E2FFD287300468973 /* StatementParserSelector.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
 		288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B22FF7955200F09BC9 /* ContentView.swift */; };
+		C88000023088000000000001 /* AppShellPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000013088000000000001 /* AppShellPresentation.swift */; };
+		C88000043088000000000001 /* AppDestinationContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000033088000000000001 /* AppDestinationContainer.swift */; };
+		C88000063088000000000001 /* ImportCentreFooterRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000053088000000000001 /* ImportCentreFooterRenderer.swift */; };
+		C88000083088000000000001 /* ApplicationHydrationWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000073088000000000001 /* ApplicationHydrationWorkflow.swift */; };
 		288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0B42FF7955300F09BC9 /* Assets.xcassets */; };
 		288EB0E62FF7A84F00F09BC9 /* Services/ImportEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0E52FF7A6C000F09BC9 /* Services/ImportEngine.swift */; };
 		288EB0ED2FF7AE2500F09BC9 /* DocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0EB2FF7AD7100F09BC9 /* DocumentReader.swift */; };
@@ -252,6 +256,10 @@
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerForgeApp.swift; sourceTree = "<group>"; };
 		288EB0B22FF7955200F09BC9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		C88000013088000000000001 /* AppShellPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellPresentation.swift; sourceTree = "<group>"; };
+		C88000033088000000000001 /* AppDestinationContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDestinationContainer.swift; sourceTree = "<group>"; };
+		C88000053088000000000001 /* ImportCentreFooterRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCentreFooterRenderer.swift; sourceTree = "<group>"; };
+		C88000073088000000000001 /* ApplicationHydrationWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationHydrationWorkflow.swift; sourceTree = "<group>"; };
 		288EB0B42FF7955300F09BC9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		288EB0BA2FF7955300F09BC9 /* LedgerForgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LedgerForgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LedgerForgeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -570,6 +578,9 @@
 				288EB0E42FF7A3D500F09BC9 /* Database */,
 				288EB0B42FF7955300F09BC9 /* Assets.xcassets */,
 				288EB0B22FF7955200F09BC9 /* ContentView.swift */,
+				C88000013088000000000001 /* AppShellPresentation.swift */,
+				C88000033088000000000001 /* AppDestinationContainer.swift */,
+				C88000053088000000000001 /* ImportCentreFooterRenderer.swift */,
 				288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */,
 				288EB0E72FF7AC7100F09BC9 /* Readers */,
 				288EB0EF2FF7B12000F09BC9 /* Analyzers */,
@@ -643,6 +654,7 @@
 				C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */,
 				A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */,
 				28D11EA92FFDA6CB00C12A68 /* RepositoryStoreHydrator.swift */,
+				C88000073088000000000001 /* ApplicationHydrationWorkflow.swift */,
 				37A100102FFDA6CB00C12A68 /* AccountMetadataCoordinator.swift */,
 			);
 			path = Services;
@@ -1092,6 +1104,10 @@
 				28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */,
 				281BB17E2FFC4D26006E7424 /* ImportRequest.swift in Sources */,
 				288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */,
+				C88000023088000000000001 /* AppShellPresentation.swift in Sources */,
+				C88000043088000000000001 /* AppDestinationContainer.swift in Sources */,
+				C88000063088000000000001 /* ImportCentreFooterRenderer.swift in Sources */,
+				C88000083088000000000001 /* ApplicationHydrationWorkflow.swift in Sources */,
 				281BB1612FFC4A84006E7424 /* InMemoryRepositoryProvider.swift in Sources */,
 				28E945472FFD673000FB69E4 /* ImportPersistenceCoordinator.swift in Sources */,
 				C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */,

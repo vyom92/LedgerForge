@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import SwiftUI
 @testable import LedgerForge
 
 @MainActor
@@ -86,51 +87,42 @@ struct LedgerForgeTests {
     }
 
     @Test func residualContentViewAffordancesAreAbsentFromTheirLocalPresentationSections() throws {
-        let source = try String(
-            contentsOf: URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .appendingPathComponent("ContentView.swift"),
-            encoding: .utf8
-        )
+        let contentViewSource = try workspaceSource("ContentView.swift")
+        let shellSource = try workspaceSource("AppShellPresentation.swift")
 
-        let sidebar = try sprint68AContentViewSection(
-            source,
-            startingAt: "private var sidebar: some View",
-            endingBefore: "private var contextualToolbar: some View"
+        let sidebar = try sourceSection(
+            shellSource,
+            startingAt: "struct AppShellSidebar: View",
+            endingBefore: "struct AppShellToolbar: View"
         )
         #expect(!sidebar.contains("chevron.down"))
         #expect(!sidebar.contains("Menu("))
 
-        let dashboardAccounts = try sprint68AContentViewSection(
-            source,
+        let dashboardAccounts = try sourceSection(
+            contentViewSource,
             startingAt: "private var dashboardAccountsCard: some View",
             endingBefore: "private var importActivityCard: some View"
         )
         #expect(!dashboardAccounts.contains("Image(systemName: \"chevron.right\")"))
         #expect(dashboardAccounts.contains("linkButton(\"View all\")"))
 
-        let accountDetail = try sprint68AContentViewSection(
-            source,
+        let accountDetail = try sourceSection(
+            contentViewSource,
             startingAt: "private var accountDetailPanel: some View",
             endingBefore: "private var importStepper: some View"
         )
         #expect(!accountDetail.contains("Image(systemName: \"star\")"))
         #expect(accountDetail.contains("Edit display name"))
 
-        let footer = try sprint68AContentViewSection(
-            source,
-            startingAt: "private var importFooterAction: some View",
-            endingBefore: "private var validationReviewPanel: some View"
-        )
+        let footer = try workspaceSource("ImportCentreFooterRenderer.swift")
         #expect(footer.contains("ImportFooterPresentation.presentation(for: importState)"))
         #expect(footer.contains("Retry Preparation"))
         #expect(footer.contains("View Transactions"))
         #expect(!footer.contains("Awaiting confirmation"))
         #expect(!footer.contains("importFooterPendingAction"))
 
-        let validationReview = try sprint68AContentViewSection(
-            source,
+        let validationReview = try sourceSection(
+            contentViewSource,
             startingAt: "private var validationReviewPanel: some View",
             endingBefore: "private func settingsToggleRow"
         )
@@ -138,6 +130,64 @@ struct LedgerForgeTests {
         #expect(validationReview.contains("Choose a statement file to see validation results."))
         for removedRow in ["File Password", "Date Format", "Duplicate Handling", "Create / Link Accounts", "Pending"] {
             #expect(!validationReview.contains(removedRow))
+        }
+
+        #expect(contentViewSource.components(separatedBy: "@State private var importCentrePresentationOwnerID = UUID()").count == 2)
+        #expect(contentViewSource.components(separatedBy: "importCentre.attachPresentationOwner(importCentrePresentationOwnerID)").count == 2)
+        #expect(contentViewSource.components(separatedBy: "importCentre.detachPresentationOwner(importCentrePresentationOwnerID)").count == 2)
+    }
+
+    @Test func destinationContainerConstructsOnlyTheSelectedDestination() {
+        let sections: [AppShellSection] = [
+            .dashboard, .accounts, .transactions, .imports, .salary, .settings, .developer
+        ]
+
+        for selected in sections {
+            let probe = ViewConstructionProbe()
+            let container = emptyDestinationContainer(selected: selected, probe: probe)
+
+            #expect(probe.total == 0)
+
+            let body = container.body
+            _ = body
+
+            #expect(probe.count(for: selected.rawValue) == 1)
+            for section in sections where section.rawValue != selected.rawValue {
+                #expect(probe.count(for: section.rawValue) == 0)
+            }
+        }
+    }
+
+    @Test func shellDestinationConstructionFollowsAvailabilityAndSafeDestinationGates() {
+        let scenarios: [(ApplicationDataState, AppShellSection, Bool, Bool)] = [
+            (.loading, .accounts, false, false),
+            (.unavailable, .accounts, false, false),
+            (.empty, .accounts, true, true),
+            (.current, .accounts, true, true),
+            (.retainedNonCurrent, .accounts, false, true),
+            (.unavailable, .settings, false, true),
+            (.unavailable, .developer, false, true)
+        ]
+
+        for (state, selectedSection, permitsMutation, shouldConstructDestination) in scenarios {
+            let probe = ViewConstructionProbe()
+            let shell = AppShellView(
+                selectedSection: selectedSection,
+                availabilityState: state,
+                permitsMutation: permitsMutation,
+                sidebar: { probe.make("sidebar") },
+                toolbar: { probe.make("toolbar") },
+                profileWarning: { probe.make("profile-warning") },
+                availabilityBanner: { probe.make("availability-banner") },
+                destination: { probe.make("destination") }
+            )
+
+            #expect(probe.total == 0)
+
+            let body = shell.body
+            _ = body
+
+            #expect(probe.count(for: "destination") == (shouldConstructDestination ? 1 : 0))
         }
     }
 
@@ -208,9 +258,17 @@ struct LedgerForgeTests {
         let plan = try await seedSprint30Repository(DatabaseProvider.shared)
 
         let result = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: true)
-
         #expect(result.accountCount == 1)
         #expect(result.transactionCount == plan.transactionTemplates.count)
+
+        let dashboardViewModel = DashboardViewModel()
+        ApplicationHydrationWorkflow(
+            dashboardViewModel: dashboardViewModel,
+            availability: ApplicationAvailability.shared
+        ).hydrateDashboard(force: true)
+
+        #expect(dashboardViewModel.presentationState == .loaded("Loaded 1 account(s), \(plan.transactionTemplates.count) transaction(s)"))
+        #expect(ApplicationAvailability.shared.state == .current)
         #expect(AccountStore.shared.accounts.count == 1)
         #expect(TransactionStore.shared.transactions.count == plan.transactionTemplates.count)
     }
@@ -291,7 +349,14 @@ struct LedgerForgeTests {
     }
 }
 
-private func sprint68AContentViewSection(
+private func workspaceSource(_ relativePath: String) throws -> String {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    return try String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8)
+}
+
+private func sourceSection(
     _ source: String,
     startingAt startMarker: String,
     endingBefore endMarker: String
@@ -300,6 +365,49 @@ private func sprint68AContentViewSection(
     let trailing = source[start.lowerBound...]
     let end = try #require(trailing.range(of: endMarker))
     return String(trailing[..<end.lowerBound])
+}
+
+@MainActor
+private final class ViewConstructionProbe {
+    private(set) var counts: [String: Int] = [:]
+
+    var total: Int { counts.values.reduce(0, +) }
+
+    func make(_ key: String) -> EmptyView {
+        counts[key, default: 0] += 1
+        return EmptyView()
+    }
+
+    func count(for key: String) -> Int {
+        counts[key, default: 0]
+    }
+}
+
+private typealias EmptyDestinationContainer = AppDestinationContainer<
+    EmptyView,
+    EmptyView,
+    EmptyView,
+    EmptyView,
+    EmptyView,
+    EmptyView,
+    EmptyView
+>
+
+@MainActor
+private func emptyDestinationContainer(
+    selected: AppShellSection,
+    probe: ViewConstructionProbe
+) -> EmptyDestinationContainer {
+    AppDestinationContainer(
+        selectedSection: selected,
+        dashboard: { probe.make(AppShellSection.dashboard.rawValue) },
+        accounts: { probe.make(AppShellSection.accounts.rawValue) },
+        transactions: { probe.make(AppShellSection.transactions.rawValue) },
+        imports: { probe.make(AppShellSection.imports.rawValue) },
+        salary: { probe.make(AppShellSection.salary.rawValue) },
+        settings: { probe.make(AppShellSection.settings.rawValue) },
+        developer: { probe.make(AppShellSection.developer.rawValue) }
+    )
 }
 
 private let sprint30WorkspaceId = "default-workspace"

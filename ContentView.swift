@@ -1441,43 +1441,30 @@ struct ContentView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-
-            Rectangle()
-                .fill(LFTheme.divider)
-                .frame(width: 1)
-
-            VStack(spacing: 0) {
-                contextualToolbar
-
-                Rectangle()
-                    .fill(LFTheme.divider)
-                    .frame(height: 1)
-
-#if DEBUG
-                if let activeProfile = developerDatabaseProfileViewModel.activeProfile,
-                   let warning = DeveloperDatabaseProfileWarningView(profile: activeProfile) {
-                    warning
-                }
-#endif
-
-                if !availability.permitsMutation { availabilityBanner }
-                if selectedSection == .settings || selectedSection == .developer || availability.state == .current || availability.state == .empty || availability.state == .retainedNonCurrent {
-                    content.disabled(!availability.permitsMutation && selectedSection != .settings && selectedSection != .developer)
-                } else {
-                    Spacer()
-                    Text(availability.state == .loading ? "Loading canonical data…" : "Data is unavailable")
-                        .font(.title2).foregroundStyle(LFTheme.textSecondary)
-                    Spacer()
-                }
-            }
-            .frame(minWidth: 900, maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .frame(minWidth: 1180, minHeight: 760)
-        .background(LFTheme.backgroundGradient)
-        .foregroundStyle(LFTheme.text)
-        .preferredColorScheme(.dark)
+        AppShellView(
+            selectedSection: selectedSection,
+            availabilityState: availability.state,
+            permitsMutation: availability.permitsMutation,
+            sidebar: {
+                AppShellSidebar(
+                    selectedSection: selectedSection,
+                    developerConsoleVisible: developerConsoleVisible,
+                    latestImportActivity: importActivityPresentation,
+                    selectSection: { selectedSection = $0 }
+                )
+            },
+            toolbar: {
+                AppShellToolbar(
+                    section: selectedSection,
+                    subtitle: toolbarSubtitle,
+                    importActionIsDisabled: !availability.permitsMutation || !importCentre.permitsSourceSelection,
+                    requestImport: requestFileSelection
+                )
+            },
+            profileWarning: { profileWarning },
+            availabilityBanner: { availabilityBanner },
+            destination: { destinationContent }
+        )
         .fileImporter(
             isPresented: $showingImporter,
             allowedContentTypes: StatementImportFileTypes.allowed,
@@ -1552,99 +1539,45 @@ struct ContentView: View {
 #endif
     }
 
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 12) {
-                appMark
-
-                Text("LedgerForge")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-            }
-            .padding(.bottom, 24)
-
-            sidebarGroup(AppShellSection.ordinaryNavigation)
-
-#if DEBUG
-            if AppShellSection.developerConsoleVisible(
-                developerModeEnabled: developerDatabaseProfileViewModel.developerModeEnabled
-            ) {
-                sidebarSeparator
-                sidebarButton(.developer)
-            }
-#endif
-
-            Spacer()
-
-            sidebarFooter
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 18)
-        .frame(width: 242)
-        .frame(maxHeight: .infinity)
-        .background(
-            LinearGradient(
-                colors: [Color(hex: 0x070B15), Color(hex: 0x091427)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-    }
-
-    private var contextualToolbar: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(selectedSection.rawValue)
-                    .font(.system(size: 27, weight: .semibold))
-                Text(toolbarSubtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(LFTheme.textSecondary)
-            }
-
-            Spacer(minLength: 24)
-
-            Button {
-                requestFileSelection()
-            } label: {
-                Label("Import Statement", systemImage: "square.and.arrow.down")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .frame(minWidth: 176)
-                    .background(LFTheme.primaryGradient)
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white)
-            .disabled(!availability.permitsMutation || !importCentre.permitsSourceSelection)
-        }
-        .padding(.horizontal, 28)
-        .padding(.vertical, 24)
-        .background(LFTheme.backgroundDeep.opacity(0.72))
-    }
-
     @ViewBuilder
-    private var content: some View {
-        switch selectedSection {
-        case .dashboard:
-            dashboardContent
-        case .accounts:
-            accountsContent
-        case .transactions:
-            TransactionListView()
-        case .imports:
-            importWizardContent
-        case .salary:
-            SalaryView(viewModel: salaryViewModel)
-        case .settings:
-            settingsContent
-        case .developer:
+    private var profileWarning: some View {
 #if DEBUG
-            DeveloperConsoleView(profileViewModel: developerDatabaseProfileViewModel)
-#else
-            DeveloperConsoleView()
-#endif
+        if let activeProfile = developerDatabaseProfileViewModel.activeProfile,
+           let warning = DeveloperDatabaseProfileWarningView(profile: activeProfile) {
+            warning
         }
+#else
+        EmptyView()
+#endif
+    }
+
+    private var developerConsoleVisible: Bool {
+#if DEBUG
+        AppShellSection.developerConsoleVisible(
+            developerModeEnabled: developerDatabaseProfileViewModel.developerModeEnabled
+        )
+#else
+        false
+#endif
+    }
+
+    private var destinationContent: some View {
+        AppDestinationContainer(
+            selectedSection: selectedSection,
+            dashboard: { dashboardContent },
+            accounts: { accountsContent },
+            transactions: { TransactionListView() },
+            imports: { importWizardContent },
+            salary: { SalaryView(viewModel: salaryViewModel) },
+            settings: { settingsContent },
+            developer: {
+#if DEBUG
+                DeveloperConsoleView(profileViewModel: developerDatabaseProfileViewModel)
+#else
+                DeveloperConsoleView()
+#endif
+            }
+        )
     }
 
     private var dashboardContent: some View {
@@ -2369,87 +2302,6 @@ struct ContentView: View {
         .foregroundStyle(LFTheme.textSecondary)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-    }
-
-    private var appMark: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(LFTheme.primaryGradient)
-                .frame(width: 34, height: 34)
-            Image(systemName: "hexagon.fill")
-                .font(.title3)
-                .foregroundStyle(.white.opacity(0.92))
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(LFTheme.backgroundDeep)
-        }
-    }
-
-    private var sidebarFooter: some View {
-        let activity = importActivityPresentation
-        return VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Last import")
-                    .font(.caption)
-                    .foregroundStyle(LFTheme.textSecondary)
-                Text(activity.title)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(2)
-                Label(activity.status, systemImage: activity.iconName)
-                    .font(.caption2)
-                    .foregroundStyle(activity.tone.color)
-                    .lineLimit(2)
-            }
-
-            Divider().overlay(LFTheme.divider)
-
-            Label("Collapse", systemImage: "chevron.left")
-                .font(.subheadline)
-                .foregroundStyle(LFTheme.textSecondary)
-        }
-        .padding(.bottom, 4)
-    }
-
-    private var sidebarSeparator: some View {
-        Rectangle()
-            .fill(LFTheme.divider)
-            .frame(height: 1)
-            .padding(.vertical, 14)
-    }
-
-    private func sidebarGroup(_ sections: [AppShellSection]) -> some View {
-        VStack(spacing: 5) {
-            ForEach(sections, id: \.self) { section in
-                sidebarButton(section)
-            }
-        }
-    }
-
-    private func sidebarButton(_ section: AppShellSection) -> some View {
-        Button {
-            selectedSection = section
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: section.systemImage)
-                    .font(.system(size: 15, weight: .medium))
-                    .frame(width: 22)
-                Text(section.rawValue)
-                    .font(.system(size: 14, weight: selectedSection == section ? .semibold : .regular))
-                    .lineLimit(1)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                selectedSection == section ? AnyShapeStyle(LFTheme.primaryGradient) : AnyShapeStyle(Color.clear)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 7))
-            .clipShape(RoundedRectangle(cornerRadius: 7))
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(selectedSection == section ? .white : LFTheme.text)
-        .accessibilityLabel(section.rawValue)
     }
 
     private func metricCard(title: String, value: String, trend: String, trendColor: Color, systemImage: String) -> some View {
@@ -3429,87 +3281,36 @@ struct ContentView: View {
     }
 
     private var importFooterAction: some View {
-        Group {
-            switch ImportFooterPresentation.presentation(for: importState) {
-            case .confirmation(let preparedImport):
-                Button {
-#if DEBUG
-                    requestProtectedImportAction(.confirm(preparedImport))
-#else
-                    Task {
-                        await confirmPreparedImport(preparedImport)
-                    }
-#endif
-                } label: {
-                    Label(importConfirmationLabel, systemImage: "checkmark.circle")
-                        .labelStyle(.titleAndIcon)
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 13)
-                        .frame(minWidth: 180)
-                        .background(LFTheme.primaryGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .contentShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .disabled(
-                    (preparedImport.financialDocument.salaryStatementEvidence == nil &&
-                     !ImportAccountConfirmationPolicy.allowsConfirmation(
-                         review: importIdentityReview,
-                         choice: importAccountChoice
-                     )) ||
+        ImportCentreFooterRenderer(
+            importState: importState,
+            confirmationLabel: importConfirmationLabel,
+            confirmationIsDisabled: { preparedImport in
+                (preparedImport.financialDocument.salaryStatementEvidence == nil &&
+                    !ImportAccountConfirmationPolicy.allowsConfirmation(
+                        review: importIdentityReview,
+                        choice: importAccountChoice
+                    )) ||
                     partialReviewBlocksConfirmation ||
                     statementEquivalenceBlocksConfirmation(preparedImport)
-                )
-            case .importing:
-                Label("Importing", systemImage: "hourglass")
-                    .labelStyle(.titleAndIcon)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(LFTheme.textSecondary)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 13)
-                    .background(LFTheme.surface.opacity(0.65))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            case .retryPreparation:
-                Button {
+            },
+            confirm: { preparedImport in
 #if DEBUG
-                    requestProtectedImportAction(.retryPreparation)
+                requestProtectedImportAction(.confirm(preparedImport))
 #else
-                    retryCurrentPreparation()
+                Task {
+                    await confirmPreparedImport(preparedImport)
+                }
 #endif
-                } label: {
-                    Label("Retry Preparation", systemImage: "arrow.clockwise")
-                        .labelStyle(.titleAndIcon)
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 13)
-                        .frame(minWidth: 180)
-                        .background(LFTheme.primaryGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-            case .viewTransactions:
-                Button {
-                    selectedSection = .transactions
-                } label: {
-                    Label("View Transactions", systemImage: "arrow.right")
-                        .labelStyle(.titleAndIcon)
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 13)
-                        .frame(minWidth: 180)
-                        .background(LFTheme.primaryGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .contentShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-            case .none:
-                EmptyView()
-            }
-        }
+            },
+            retryPreparation: {
+#if DEBUG
+                requestProtectedImportAction(.retryPreparation)
+#else
+                retryCurrentPreparation()
+#endif
+            },
+            viewTransactions: { selectedSection = .transactions }
+        )
     }
 
     private var validationReviewPanel: some View {
@@ -3770,20 +3571,11 @@ struct ContentView: View {
     }
 
     private func hydrateDashboard(force: Bool) {
-        dashboardViewModel.markHydrationStarted()
-        do {
-            let result = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: force)
-            dashboardViewModel.markHydrationCompleted(result)
-            DurableStartupEvidence.checkpoint()
-        } catch {
-            dashboardViewModel.markHydrationFailed(error)
-            if !DatabaseProvider.shared.persistenceState.isUsable {
-                let root = DatabaseProvider.shared.failureContext
-                let failure = RuntimeDiagnostic.failure(error, operation: "startup hydration", stage: "provider availability", effect: "canonical data not loaded", relatedRoot: root)
-                if root == nil { availability.didFail(failure, generation: nil) }
-                RuntimeDiagnostic.record(failure, category: .runtime)
-            }
-        }
+        ApplicationHydrationWorkflow(
+            dashboardViewModel: dashboardViewModel,
+            availability: availability
+        )
+        .hydrateDashboard(force: force)
     }
 
     private func requestFileSelection() {
