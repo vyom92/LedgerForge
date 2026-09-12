@@ -1,4 +1,35 @@
 import SwiftUI
+#if DEBUG
+import OSLog
+#endif
+
+/// Destination-specific constraints preserve the accepted Transactions and
+/// other-screen minima while allowing Dashboard's single-column composition.
+enum AppShellSizing {
+    static func minimumSize(for section: AppShellSection) -> CGSize {
+        switch section {
+        case .dashboard: CGSize(width: 640, height: 608)
+        case .transactions: CGSize(width: 1024, height: 736)
+        default: CGSize(width: 1180, height: 760)
+        }
+    }
+
+    static func dashboardUsesRail(at width: CGFloat) -> Bool { width < 1000 }
+
+#if DEBUG
+    /// Nonfinancial dimensions make selected-destination window constraints
+    /// inspectable during native validation without changing window behavior.
+    @MainActor
+    static func recordWindowGeometry(for section: AppShellSection) {
+        guard let window = NSApp.keyWindow
+            ?? NSApp.mainWindow
+            ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }) else { return }
+        let size = window.frame.size
+        Logger(subsystem: Bundle.main.bundleIdentifier ?? "LedgerForge", category: "WindowLayout")
+            .debug("Destination=\(section.rawValue, privacy: .public) window=\(size.width, privacy: .public)x\(size.height, privacy: .public)")
+    }
+#endif
+}
 
 /// Structural presentation only. ContentView retains every workflow owner and root lifecycle modifier.
 struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, AvailabilityBanner: View, Destination: View>: View {
@@ -52,6 +83,7 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
                 if permitsDestinationPresentation {
                     destination().disabled(
                         !permitsMutation
+                            && selectedSection != .dashboard
                             && selectedSection != .settings
                             && selectedSection != .developer
                     )
@@ -67,11 +99,11 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
                     Spacer()
                 }
             }
-            .frame(minWidth: selectedSection == .transactions ? 0 : 900, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: selectedSection == .transactions || selectedSection == .dashboard ? 0 : 900, maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(
-            minWidth: selectedSection == .transactions ? 1024 : 1180,
-            minHeight: selectedSection == .transactions ? 736 : 760
+            minWidth: AppShellSizing.minimumSize(for: selectedSection).width,
+            minHeight: AppShellSizing.minimumSize(for: selectedSection).height
         )
         .background(LFTheme.backgroundGradient)
         .foregroundStyle(LFTheme.text)
@@ -79,7 +111,8 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
     }
 
     private var permitsDestinationPresentation: Bool {
-        selectedSection == .transactions
+        selectedSection == .dashboard
+            || selectedSection == .transactions
             || selectedSection == .settings
             || selectedSection == .developer
             || availabilityState == .current
@@ -180,7 +213,7 @@ struct AppShellSidebar: View {
                 .buttonStyle(.bordered)
                 .help(isCollapsed ? "Expand sidebar" : "Collapse sidebar")
                 .accessibilityLabel(isCollapsed ? "Expand sidebar" : "Collapse sidebar")
-            } else {
+            } else if !isCollapsed {
                 Label("Collapse", systemImage: "chevron.left")
                     .font(.subheadline)
                     .foregroundStyle(LFTheme.textSecondary)

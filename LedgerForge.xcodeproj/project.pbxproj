@@ -47,10 +47,6 @@
 		2872790F2FFD287300468973 /* StatementParserSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2872790E2FFD287300468973 /* StatementParserSelector.swift */; };
 		288EB0B12FF7955200F09BC9 /* LedgerForgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */; };
 		288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0B22FF7955200F09BC9 /* ContentView.swift */; };
-		C88000023088000000000001 /* AppShellPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000013088000000000001 /* AppShellPresentation.swift */; };
-		C88000043088000000000001 /* AppDestinationContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000033088000000000001 /* AppDestinationContainer.swift */; };
-		C88000063088000000000001 /* ImportCentreFooterRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000053088000000000001 /* ImportCentreFooterRenderer.swift */; };
-		C88000083088000000000001 /* ApplicationHydrationWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000073088000000000001 /* ApplicationHydrationWorkflow.swift */; };
 		288EB0B52FF7955300F09BC9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 288EB0B42FF7955300F09BC9 /* Assets.xcassets */; };
 		288EB0E62FF7A84F00F09BC9 /* Services/ImportEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0E52FF7A6C000F09BC9 /* Services/ImportEngine.swift */; };
 		288EB0ED2FF7AE2500F09BC9 /* DocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 288EB0EB2FF7AD7100F09BC9 /* DocumentReader.swift */; };
@@ -157,6 +153,10 @@
 		B83000023083000000000001 /* StatementDropIntakeAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B83000013083000000000001 /* StatementDropIntakeAdapter.swift */; };
 		B83000043083000000000001 /* ImportCentreBatchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B83000033083000000000001 /* ImportCentreBatchViews.swift */; };
 		C50000013050000000000001 /* ConfirmedImportReconciliationGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */; };
+		C88000023088000000000001 /* AppShellPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000013088000000000001 /* AppShellPresentation.swift */; };
+		C88000043088000000000001 /* AppDestinationContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000033088000000000001 /* AppDestinationContainer.swift */; };
+		C88000063088000000000001 /* ImportCentreFooterRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000053088000000000001 /* ImportCentreFooterRenderer.swift */; };
+		C88000083088000000000001 /* ApplicationHydrationWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88000073088000000000001 /* ApplicationHydrationWorkflow.swift */; };
 		D57000113057000000000001 /* Category.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000013057000000000001 /* Category.swift */; };
 		D57000123057000000000001 /* CategoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000023057000000000001 /* CategoryStore.swift */; };
 		D57000133057000000000001 /* CategoryManagementCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D57000033057000000000001 /* CategoryManagementCoordinator.swift */; };
@@ -255,10 +255,6 @@
 		288EB0AD2FF7955200F09BC9 /* LedgerForge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LedgerForge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0B02FF7955200F09BC9 /* LedgerForgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerForgeApp.swift; sourceTree = "<group>"; };
 		288EB0B22FF7955200F09BC9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		C88000013088000000000001 /* AppShellPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellPresentation.swift; sourceTree = "<group>"; };
-		C88000033088000000000001 /* AppDestinationContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDestinationContainer.swift; sourceTree = "<group>"; };
-		C88000053088000000000001 /* ImportCentreFooterRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCentreFooterRenderer.swift; sourceTree = "<group>"; };
-		C88000073088000000000001 /* ApplicationHydrationWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationHydrationWorkflow.swift; sourceTree = "<group>"; };
 		288EB0B42FF7955300F09BC9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		288EB0BA2FF7955300F09BC9 /* LedgerForgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LedgerForgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		288EB0C42FF7955300F09BC9 /* LedgerForgeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LedgerForgeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -356,6 +352,10 @@
 		B83000013083000000000001 /* StatementDropIntakeAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementDropIntakeAdapter.swift; sourceTree = "<group>"; };
 		B83000033083000000000001 /* ImportCentreBatchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCentreBatchViews.swift; sourceTree = "<group>"; };
 		C50000003050000000000001 /* ConfirmedImportReconciliationGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfirmedImportReconciliationGate.swift; sourceTree = "<group>"; };
+		C88000013088000000000001 /* AppShellPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellPresentation.swift; sourceTree = "<group>"; };
+		C88000033088000000000001 /* AppDestinationContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDestinationContainer.swift; sourceTree = "<group>"; };
+		C88000053088000000000001 /* ImportCentreFooterRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCentreFooterRenderer.swift; sourceTree = "<group>"; };
+		C88000073088000000000001 /* ApplicationHydrationWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationHydrationWorkflow.swift; sourceTree = "<group>"; };
 		D57000013057000000000001 /* Category.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Category.swift; sourceTree = "<group>"; };
 		D57000023057000000000001 /* CategoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryStore.swift; sourceTree = "<group>"; };
 		D57000033057000000000001 /* CategoryManagementCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManagementCoordinator.swift; sourceTree = "<group>"; };
@@ -368,48 +368,6 @@
 		F58000020000000000000001 /* ImportFailureSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFailureSummary.swift; sourceTree = "<group>"; };
 		F63000010000000000000001 /* SourceContentSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceContentSnapshot.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A90900013090000000000001 /* Exceptions for "UI Assets" folder in "LedgerForge" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				"Archived/Accounts_v1.0.png",
-				"Archived/AppIcon_v1.0.png",
-				"Archived/ComponentLibrary_v1.0.png",
-				"Archived/Dashboard_v1.0.png",
-				"Archived/DesignBoard_v2.0.png",
-				"Archived/DesignSystem_v1.0.png",
-				"Archived/DeveloperConsole_v1.0.png",
-				"Archived/ImportWizard_v1.0.png",
-				"Archived/Settings_v1.0.png",
-				"Archived/Transactions_v1.0.png",
-				"Archived/UserJourney_v1.0.png",
-				"LF-UI-2026-09-R1/ACCEPTANCE.md",
-				"LF-UI-2026-09-R1/ASSET_MANIFEST.json",
-				"LF-UI-2026-09-R1/DESIGN_HANDOFF.md",
-				"LF-UI-2026-09-R1/DESIGN_TOKENS.json",
-				"LF-UI-2026-09-R1/Inherited_Screens.md",
-				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-01_App_Shell_Supporting_Reference.png",
-				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md",
-				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.png",
-				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-02A_Transactions_Wide_Reference.png",
-				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-02B_Transactions_Narrow_Responsive_Reference.png",
-				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-02C_Transactions_State_Component_Contract.png",
-				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md",
-				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-03A_Dashboard_Wide_Reference.png",
-				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-03B_Dashboard_Narrow_Responsive_Reference.png",
-				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-03C_Dashboard_State_Component_Contract.png",
-				"LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-04A_Appearance_Settings_Reference.png",
-				"LF-UI-2026-09-R1/MasterBoard_LF-UI-2026-09-R1.png",
-				"LF-UI-2026-09-R1/README.md",
-				"LF-UI-2026-09-R1/SC-01_App_Shell.md",
-				"LF-UI-2026-09-R1/SC-02_Transactions.md",
-				"LF-UI-2026-09-R1/SC-03_Dashboard.md",
-				"LF-UI-2026-09-R1/SOURCES.md",
-			);
-			target = 288EB0AC2FF7955200F09BC9 /* LedgerForge */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		283E97932FFE3A470034CA98 /* Branding */ = {

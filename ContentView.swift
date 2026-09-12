@@ -1448,8 +1448,10 @@ struct ContentView: View {
             availabilityState: availability.state,
             permitsMutation: availability.permitsMutation,
             sidebar: {
-                let usesRail = selectedSection == .transactions
-                    && (transactionSidebarRailOverride ?? (shellPresentationWidth < 1280))
+                let usesRail = selectedSection == .dashboard
+                    ? AppShellSizing.dashboardUsesRail(at: shellPresentationWidth)
+                    : selectedSection == .transactions
+                        && (transactionSidebarRailOverride ?? (shellPresentationWidth < 1280))
                 AppShellSidebar(
                     selectedSection: selectedSection,
                     developerConsoleVisible: developerConsoleVisible,
@@ -1472,7 +1474,17 @@ struct ContentView: View {
             availabilityBanner: { availabilityBanner },
             destination: { destinationContent }
         )
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { shellPresentationWidth = $0 }
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            shellPresentationWidth = size.width
+#if DEBUG
+            AppShellSizing.recordWindowGeometry(for: selectedSection)
+#endif
+        }
+#if DEBUG
+        .onChange(of: selectedSection) { _, section in
+            AppShellSizing.recordWindowGeometry(for: section)
+        }
+#endif
         .fileImporter(
             isPresented: $showingImporter,
             allowedContentTypes: StatementImportFileTypes.allowed,
@@ -1593,76 +1605,197 @@ struct ContentView: View {
     private var dashboardContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: 14) {
-                    ForEach(dashboardViewModel.nativeCurrencySummaries) { summary in
-                        metricCard(title: "\(summary.currency.code) Balance", value: MoneyFormatting.display(summary.balance), trend: "Repository-backed native balance", trendColor: LFTheme.success, systemImage: "chart.line.uptrend.xyaxis")
-                        metricCard(title: "\(summary.currency.code) Inflow", value: MoneyFormatting.display(summary.income), trend: "Credited transactions", trendColor: LFTheme.success, systemImage: "arrow.down.circle")
-                        metricCard(title: "\(summary.currency.code) Outflow", value: MoneyFormatting.display(summary.expenses), trend: "Debited transactions", trendColor: LFTheme.danger, systemImage: "arrow.up.circle")
-                        metricCard(title: "\(summary.currency.code) Net Transaction Flow", value: MoneyFormatting.display(summary.cashFlow), trend: "Credits minus debits", trendColor: LFTheme.info, systemImage: "arrow.left.arrow.right")
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 18) {
+                        dashboardPositionPanel.frame(minWidth: 660, maxWidth: .infinity)
+                        salaryDashboardSummary.frame(width: 390)
+                    }
+                    VStack(alignment: .leading, spacing: 18) {
+                        dashboardPositionPanel
+                        salaryDashboardSummary
                     }
                 }
-
-                HStack(alignment: .top, spacing: 14) {
-                    dashboardAccountsCard
-                        .frame(maxWidth: .infinity)
-
-                    VStack(spacing: 14) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 18) {
+                        recentTransactionsCard.frame(minWidth: 620, maxWidth: .infinity)
+                        importActivityCard.frame(width: 350)
+                    }
+                    VStack(alignment: .leading, spacing: 18) {
+                        recentTransactionsCard
                         importActivityCard
-                        quickActionsCard
                     }
-                    .frame(width: 324)
                 }
-
-                salaryDashboardSummary
-
-                recentTransactionsCard
-                    .frame(maxWidth: .infinity)
+                if let attention = dashboardAttention {
+                    LFPanel(title: "Attention") {
+                        Label(attention.title, systemImage: attention.iconName)
+                            .foregroundStyle(attention.tone.color)
+                        Text(attention.explanation)
+                            .font(.system(size: 14)).foregroundStyle(LFTheme.textSecondary)
+                    }
+                }
             }
-            .padding(28)
+            .padding(shellPresentationWidth < 1000 ? 18 : 24)
+            .font(.system(size: 16))
         }
         .background(LFTheme.backgroundGradient)
+        .onAppear { dashboardViewModel.refreshPresentation() }
+    }
+
+    private var dashboardAttention: ConfirmedImportRecoveryPresentation? {
+        guard case .completed(let outcome) = importState else { return nil }
+        return DashboardAttentionProjection.presentation(for: outcome.recoveryRoute)
+    }
+
+    private var dashboardPositionPanel: some View {
+        LFPanel(title: "Position by native currency") {
+            switch dashboardViewModel.positionState {
+            case .loading:
+                dashboardState("Loading financial position…", loading: true)
+            case .empty:
+                dashboardState("No bank or card accounts available.")
+            case .unavailable:
+                dashboardState("Data unavailable", detail: "Current bank and card positions are unavailable.")
+            case .populated:
+                ViewThatFits(in: .horizontal) {
+                    if dashboardViewModel.positions.count <= 2 {
+                        HStack(alignment: .top, spacing: 14) {
+                            ForEach(dashboardViewModel.positions) { group in
+                                dashboardCurrencyGroup(group).frame(minWidth: 304, maxWidth: .infinity)
+                            }
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 14) {
+                        ForEach(dashboardViewModel.positions) { dashboardCurrencyGroup($0) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func dashboardCurrencyGroup(_ group: DashboardCurrencyPosition) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(group.currency.code).font(.title3.weight(.semibold))
+            dashboardDomain("Bank balances", icon: "building.columns", positions: group.banks, total: group.bankTotal)
+            Divider().overlay(LFTheme.divider)
+            dashboardDomain("Card liabilities", icon: "creditcard", positions: group.cards, total: group.cardTotal)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(LFTheme.surfaceRaised, in: RoundedRectangle(cornerRadius: 7))
+    }
+
+    private func dashboardDomain(
+        _ title: String,
+        icon: String,
+        positions: [DashboardAccountPosition],
+        total: Money?
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(LFTheme.textSecondary)
+            if positions.isEmpty {
+                Text(title == "Bank balances" ? "No bank accounts" : "No card accounts")
+                    .font(.system(size: 14)).foregroundStyle(LFTheme.textSecondary)
+            } else {
+                if positions.count > 1 {
+                    dashboardMoney(total)
+                    if total == nil {
+                        Text("Incomplete: a member position is unavailable.")
+                            .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                    }
+                }
+                ForEach(positions) { position in
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(position.displayName)
+                            .font(.system(size: 14, weight: .medium))
+                            .fixedSize(horizontal: false, vertical: true)
+                        if positions.count == 1 { dashboardMoney(position.amount) }
+                        else {
+                            Text(position.amount.map { MoneyFormatting.display($0) } ?? "Data unavailable")
+                                .monospacedDigit().fixedSize(horizontal: true, vertical: false)
+                        }
+                        if position.amount != nil {
+                            Text(DashboardAccountPosition.asOfLabel(for: position.asOf))
+                                .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                            if let context = position.sourceContext {
+                                Text(context).font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                            }
+                        }
+                        if title == "Card liabilities", let money = position.amount, money.amount < .zero {
+                            Text("Card credit balance").font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func dashboardMoney(_ money: Money?) -> some View {
+        Text(money.map { MoneyFormatting.display($0) } ?? "Data unavailable")
+            .font(.system(size: 18, weight: .semibold))
+            .monospacedDigit()
+            .fixedSize(horizontal: true, vertical: false)
     }
 
     private var salaryDashboardSummary: some View {
-        LFPanel(title: "Salary funding summary", trailing: AnyView(linkButton("Open Salary") { selectedSection = .salary })) {
-            if let plan = currentDashboardFundingPlan {
-                let calculation = FundingPlanCalculator.calculate(plan)
-                HStack(spacing: 28) {
-                    dashboardSalaryValue("Expected this month", calculation.expectedNet)
-                    dashboardSalaryValue("India funding shortfall", calculation.indiaFundingShortfall)
-                    dashboardSalaryValue("QAR funding principal", calculation.requiredQARPrincipal)
-                    dashboardSalaryValue("Available for investment", calculation.availableForInvestment)
+        LFPanel(title: "Current-month Salary & Funding") {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Planning estimates · saved current-month plan")
+                    .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                if dashboardViewModel.fundingState == .loading {
+                    dashboardState("Loading Salary / Funding…", loading: true)
+                } else {
+                    ForEach(DashboardFundingMetric.allCases) { metric in
+                        HStack(alignment: .firstTextBaseline, spacing: 16) {
+                            Text(metric.rawValue).font(.system(size: 14))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                            Text(metric.money(in: dashboardViewModel.fundingCalculation).map { MoneyFormatting.display($0) }
+                                 ?? "\(metric.currencyCode) Unavailable")
+                                .font(.system(size: 14, weight: .medium))
+                                .monospacedDigit().fixedSize(horizontal: true, vertical: false)
+                        }
+                    }
+                    if dashboardViewModel.fundingState == .empty {
+                        Text("Data unavailable. No saved current-month plan.")
+                            .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                    } else if dashboardViewModel.fundingState == .unavailable {
+                        Text("Data unavailable").font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                    } else if let calculation = dashboardViewModel.fundingCalculation,
+                              !calculation.incompleteReasons.isEmpty {
+                        Text("Missing required input. Affected outputs are unavailable.")
+                            .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                    }
+                    if let context = dashboardViewModel.fundingRateContext {
+                        Text(context).font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                if let fx = plan.planningFX, calculation.requiredQARPrincipal != nil {
-                    Text("India QAR equivalent uses the plan-local rate 1 QAR = \(NSDecimalNumber(decimal: fx.inrPerQAR).stringValue) INR, observed \(fx.observationDate.canonical).")
-                        .font(.caption)
-                        .foregroundStyle(LFTheme.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 8)
-                }
-            } else {
-                Text("No current-month funding plan. Open Salary to enter user-owned planning values.")
-                    .foregroundStyle(LFTheme.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                dashboardRouteButton(.salary)
             }
         }
     }
 
-    private var currentDashboardFundingPlan: FundingPlan? {
-        let components = Calendar(identifier: .gregorian).dateComponents([.year, .month], from: Date())
-        guard let year = components.year, let month = components.month,
-              let current = try? SelectedStatementMonth(year: year, month: month) else { return nil }
-        return fundingPlanStore.plans.first { $0.workspaceID == "default-workspace" && $0.month == current }
+    private func dashboardState(_ title: String, detail: String? = nil, loading: Bool = false) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            if loading { ProgressView().controlSize(.small) }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                if let detail { Text(detail).font(.system(size: 12)) }
+            }
+            .foregroundStyle(LFTheme.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 8)
     }
 
-    private func dashboardSalaryValue(_ label: String, _ money: Money?) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.caption).foregroundStyle(LFTheme.textSecondary)
-            Text(money.map { MoneyFormatting.display($0) } ?? "Incomplete / unavailable")
-                .font(.headline)
-                .foregroundStyle(money == nil ? LFTheme.warning : LFTheme.text)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func dashboardRouteButton(_ route: DashboardRoute) -> some View {
+        Button(route.rawValue) { selectedSection = route.destination }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
     }
 
     private var accountsContent: some View {
@@ -1974,110 +2107,79 @@ struct ContentView: View {
         .background(LFTheme.backgroundGradient)
     }
 
-    private var dashboardAccountsCard: some View {
-        LFPanel(title: "Accounts", trailing: AnyView(linkButton("View all") { selectedSection = .accounts })) {
-            VStack(spacing: 0) {
-                if dashboardViewModel.accountSummaries.isEmpty {
-                    LFCompactEmptyState(message: "No repository-backed accounts")
-                } else {
-                    ForEach(dashboardViewModel.accountSummaries) { account in
-                        HStack(spacing: 12) {
-                            accountIcon(account.institution)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(account.displayName)
-                                    .font(.subheadline.weight(.semibold))
-                                    .lineLimit(1)
-                                Text("\(account.institution) · \(account.currencyCode)")
-                                    .font(.caption)
-                                    .foregroundStyle(LFTheme.textSecondary)
-                            }
-
-                            Spacer()
-
-                            Text(formatCurrency(account.currentBalance, currencyCode: account.currencyCode))
-                                .font(.subheadline.weight(.medium))
-                                .monospacedDigit()
-                        }
-                        .padding(.vertical, 10)
-
-                        if account.id != dashboardViewModel.accountSummaries.last?.id {
-                            Divider().overlay(LFTheme.divider)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     private var importActivityCard: some View {
-        let activity = importActivityPresentation
-        return LFPanel(title: "Import Activity", trailing: AnyView(linkButton("View all imports") { selectedSection = .imports })) {
-            VStack(spacing: 12) {
-                importActivityRow(
-                    title: activity.title,
-                    subtitle: activity.subtitle,
-                    status: activity.status,
-                    iconName: activity.iconName,
-                    tone: activity.tone
-                )
-                importActivityRow(title: "Repository Hydration", subtitle: dashboardViewModel.presentationState.message, status: dashboardHydrationStatus)
-            }
-        }
-    }
-
-    private var quickActionsCard: some View {
-        LFPanel(title: "Quick Actions") {
-            VStack(spacing: 4) {
-                LFActionRow(title: "Import Statement", systemImage: "square.and.arrow.down") {
-                    requestFileSelection()
+        LFPanel(title: "Import Activity") {
+            VStack(alignment: .leading, spacing: 14) {
+                if availability.state == .loading {
+                    dashboardState("Loading import activity…", loading: true)
+                } else if availability.state == .unavailable || availability.state == .retainedNonCurrent {
+                    dashboardState("Data unavailable", detail: "Current import activity is unavailable.")
+                } else {
+                    let activity = importActivityPresentation
+                    importActivityRow(
+                        title: activity.title,
+                        subtitle: activity.subtitle,
+                        status: activity.status,
+                        iconName: activity.iconName,
+                        tone: activity.tone
+                    )
                 }
-                LFActionRow(title: "View All Transactions", systemImage: "list.bullet") {
-                    selectedSection = .transactions
-                }
-                LFActionRow(title: "Open Settings", systemImage: "gearshape") {
-                    selectedSection = .settings
-                }
+                dashboardRouteButton(.imports)
             }
         }
     }
 
     private var recentTransactionsCard: some View {
-        LFPanel(title: "Recent Transactions", trailing: AnyView(linkButton("View all transactions") { selectedSection = .transactions })) {
-            VStack(spacing: 0) {
-                tableHeader(["Date", "Description", "Account", "Type", "Amount", "Balance"])
-
-                if dashboardViewModel.recentTransactionSummaries.isEmpty {
-                    LFCompactEmptyState(message: "No repository-backed transactions")
-                } else {
-                    ForEach(dashboardViewModel.recentTransactionSummaries) { transaction in
-                        HStack(spacing: 14) {
-                            Text(formatDate(transaction.statementDate))
-                                .frame(width: 84, alignment: .leading)
-                            Text(transaction.description)
-                                .lineLimit(1)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            Text(transaction.currency)
-                                .foregroundStyle(LFTheme.textSecondary)
-                                .frame(width: 92, alignment: .leading)
-                            Text(transaction.isCredit ? "Credit" : "Debit")
-                                .foregroundStyle(transaction.isCredit ? LFTheme.success : LFTheme.danger)
-                                .frame(width: 68, alignment: .leading)
-                            Text(MoneyFormatting.signedDisplay(transaction.amount, isCredit: transaction.isCredit))
-                                .foregroundStyle(transaction.isCredit ? LFTheme.success : LFTheme.danger)
-                                .monospacedDigit()
-                                .frame(width: 112, alignment: .trailing)
-                            Text("—")
-                                .foregroundStyle(LFTheme.textSecondary)
-                                .frame(width: 86, alignment: .trailing)
-                        }
-                        .font(.caption)
-                        .padding(.vertical, 12)
-
+        LFPanel(title: "Recent Activity") {
+            VStack(alignment: .leading, spacing: 14) {
+                switch dashboardViewModel.recentActivityState {
+                case .loading:
+                    dashboardState("Loading recent activity…", loading: true)
+                case .empty:
+                    dashboardState("No recent activity", detail: "Transactions appear here once imported.")
+                case .unavailable:
+                    dashboardState("Data unavailable", detail: "Current transaction activity is unavailable.")
+                case .populated:
+                    ForEach(dashboardViewModel.recentActivity) { row in
+                        dashboardRecentRow(row)
                         Divider().overlay(LFTheme.divider)
                     }
+                    Text("Showing \(dashboardViewModel.recentActivity.count) of \(dashboardViewModel.transactionCount) transactions")
+                        .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
                 }
+                dashboardRouteButton(.transactions)
             }
+        }
+    }
+
+    private func dashboardRecentRow(_ row: TransactionPresentationRow) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(row.sourceCivilDate?.presentation ?? "Date unavailable")
+                    .font(.system(size: 12))
+                    .frame(width: 78, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(row.transaction.description)
+                    .font(.system(size: 14))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(MoneyFormatting.display(row.transaction.money))
+                    .font(.system(size: 14, weight: .medium))
+                    .monospacedDigit().fixedSize(horizontal: true, vertical: false)
+            }
+            Text("\(row.accountDisplayName) · \(row.currentCategoryDisplayName) · \(dashboardEffect(row.effect))")
+                .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func dashboardEffect(_ effect: TransactionPresentationEffect) -> String {
+        switch effect {
+        case .credit: "Bank credit"
+        case .debit: "Bank debit"
+        case .increasesAmountOwed: "Card increase owed"
+        case .decreasesAmountOwed: "Card decrease owed"
+        case .unknown: "Effect unavailable"
         }
     }
 
@@ -3540,19 +3642,6 @@ struct ContentView: View {
             return "Configure LedgerForge to work the way you do"
         case .developer:
             return "Advanced diagnostics and inspection"
-        }
-    }
-
-    private var dashboardHydrationStatus: String {
-        switch dashboardViewModel.presentationState {
-        case .loaded:
-            return "Loaded"
-        case .loading:
-            return "Loading"
-        case .empty:
-            return "Idle"
-        case .failed:
-            return "Review"
         }
     }
 
