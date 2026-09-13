@@ -1,8 +1,10 @@
 # Sources and decision provenance
 
-## Current private-personal scope alignment — 2026-09-11
+## Current private-personal scope alignment — 2026-09-12
 
-**Sprint-89 reference publication and acceptance:** The owner’s final instruction published every current UI Assets file as-is at the Sprint-89 candidate, including all current SC images. Chat subsequently accepted Sprint 89 at `038af8d9ebebe66b3f17925416821941cfa33d3d`. ASSET_MANIFEST.json records the exact current R1 package inventory, sizes and SHA-256 hashes. The files are design references; canonical written authorities remain semantic control, and publication does not implement future SC-03/SC-04 screens.
+**Sprint-90 implementation acceptance:** SC-03 A/B/C remain **OWNER-CURATED / CHAT-APPROVED / PUBLISHED**, and are **NOW IMPLEMENTED BY ACCEPTED SPRINT 90** at `619c39ec07402a63c90b646cbba9ced806f5e99d`, under `SPRINT_90_DASHBOARD_NATIVE_CURRENCY_HIERARCHY_ACCEPTED`. The [accepted outcome](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-90) records scope, evidence and limitations. SC-04 A/B/C remain **OWNER-CURATED / CHAT-APPROVED / PUBLISHED / NOT YET IMPLEMENTED**; Sprint 91 is PREPARED / NOT YET CHAT-AUTHORIZED. SC-05A remains the accepted audit to refresh after Sprint 91 before Sprint-92 implementation; its findings are unchanged.
+
+**Sprint-89 reference publication and acceptance:** The owner’s final instruction published every current UI Assets file as-is at the Sprint-89 candidate, including all current SC images. Chat subsequently accepted Sprint 89 at `038af8d9ebebe66b3f17925416821941cfa33d3d`. ASSET_MANIFEST.json records the exact current R1 package inventory, sizes and SHA-256 hashes. The image bytes remain unchanged design references, and canonical written authorities remain semantic control; publication itself does not establish native implementation.
 
 The owner has superseded the advanced appearance, formal accessibility and generalized product-completeness portions above. Current authority is the private-personal gate, the canonical rejection register, and DESIGN_HANDOFF.md: simple local System/Light/Dark with an optional existing accent choice; readable Money, ordinary keyboard use, resizing, focus and selection. The explicit icon-rail preference is folded into the canonical responsive hierarchy. The three specifically annotated PNGs remain byte-for-byte design references with only their rejected caption portions ignored. Historical provenance above is retained, not renewed as active requirements.
 
@@ -14,7 +16,7 @@ The owner’s latest [source-processing decision](../../SCOPE_DECISIONS.md#sourc
 
 **Publication alignment — 2026-09-10:** The links below remain pinned historical provenance at the inspected baseline. The user subsequently authorized the roadmap relocation and UI-asset archive/publication recorded by the surrounding handoff.
 
-Current published roadmap path: `Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md`. The pinned URL in the table records the pre-relocation source revision.
+Current published roadmap path: `Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_90-99_Current.md`. The pinned URL in the table records the historical 80–89 source revision and is unchanged.
 
 ## Historical repository sources inspected in the original handoff
 

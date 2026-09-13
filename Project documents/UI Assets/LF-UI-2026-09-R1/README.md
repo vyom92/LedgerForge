@@ -1,6 +1,6 @@
 # LF-UI-2026-09-R1
 
-Approved visual direction and canonical written contracts for the private personal app. This package does not select a sprint or claim native implementation/acceptance. Order inherits [Guide rule H](../../Project_Guide.md#documentation-order): revision, then natural screen ID/suffix; machine payload paths are deterministic. [Current product state](../../PROJECT_STATE.md) and [scope decisions](../../SCOPE_DECISIONS.md) control applicability.
+Approved visual direction and canonical written contracts for the private personal app. Publication does not select a sprint or establish native acceptance; implementation status below links to separately accepted outcomes. Order inherits [Guide rule H](../../Project_Guide.md#documentation-order): revision, then natural screen ID/suffix; machine payload paths are deterministic. [Current product state](../../PROJECT_STATE.md) and [scope decisions](../../SCOPE_DECISIONS.md) control applicability.
 
 ## Canonical inputs
 
@@ -26,7 +26,7 @@ The tracked `LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md` and `LF-UI-202
 
 All current SC images in this R1 folder are **owner-curated / Chat-approved / published design references**. Their exact current bytes are listed in ASSET_MANIFEST.json. Publication does not itself implement a screen or create a competing written authority: canonical written contracts continue to control semantics.
 
-SC-01/SC-02 informed accepted Sprint 89. SC-03 A/B/C are design authority for a future Sprint 90, and SC-04 A/B/C are design authority for a future Sprint 91; neither future sprint is activated or implemented by publication. SC-05A is the coordinator-accepted audit to refresh against accepted Sprints 89–91 before any Sprint-92 implementation.
+SC-01/SC-02 informed accepted Sprint 89. **SC-03 A/B/C: OWNER-CURATED / CHAT-APPROVED / PUBLISHED / NOW IMPLEMENTED BY ACCEPTED SPRINT 90**, at `619c39ec07402a63c90b646cbba9ced806f5e99d`; the [accepted outcome](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-90) owns the verified implementation boundary and limitations. **SC-04 A/B/C: OWNER-CURATED / CHAT-APPROVED / PUBLISHED / NOT YET IMPLEMENTED**; Sprint 91 remains PREPARED / NOT YET CHAT-AUTHORIZED. SC-05A remains the coordinator-accepted audit to refresh after Sprint 91 against accepted Sprints 89–91 before any Sprint-92 implementation; this closure does not change its findings.
 
 The current reference inventory, in natural screen order:
 

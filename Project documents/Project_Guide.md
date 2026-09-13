@@ -43,7 +43,7 @@ Each fact has one primary home. Short safety reminders may link to it; do not re
 | [Architecture](Architecture_v1.0_Frozen.md) / [Database](Database_v1_Architecture.md) | Cross-layer / persistence boundaries; historical baseline separated from later accepted alignments |
 | [ADR](ADR.md) | Accepted architecture, numeric index, original decision bodies and applicability updates |
 | [UI/UX](UI_UX_v1.0_Frozen.md) | Shared UI architecture and routing to canonical contracts |
-| [Current cycle](Sprint%20roadmap/LedgerForge_Roadmap_Sprints_80-89_Current.md) | Current sprint numbering, outcome, entry/exclusions and status |
+| [Current cycle](Sprint%20roadmap/LedgerForge_Roadmap_Sprints_90-99_Current.md) | Current sprint numbering, outcome, entry/exclusions and status |
 | [Upcoming cycles](Sprint%20roadmap/Upcoming) | Prepared sequence only, activated explicitly by Chat |
 | [R1 README](UI%20Assets/LF-UI-2026-09-R1/README.md) | Package map and canonical/supporting/draft distinction |
 | R1 DESIGN_HANDOFF / screen contracts | Shared design requirements / canonical screen-specific requirements |

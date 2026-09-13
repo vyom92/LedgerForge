@@ -88,19 +88,19 @@
       "path": "LF-UI-2026-09-R1_SC-03A_Dashboard_Wide_Reference.png",
       "bytes": 1426346,
       "sha256": "16b667024e840182f0de7b7d6ed5f3b1a292d68645d977bc2b220e290cce395f",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; implemented by accepted Sprint 90"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-03B_Dashboard_Narrow_Responsive_Reference.png",
       "bytes": 185430,
       "sha256": "5cd2e113277cc3debc1c7702a73975842686d6c72816354d7d8e51488896c9ec",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; implemented by accepted Sprint 90"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-03C_Dashboard_State_Component_Contract.png",
       "bytes": 1918344,
       "sha256": "4a3a19e2be777ba3de02d10b9eaddd75f0a8b85ef3ae881cf62bd3c0c798b526",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; implemented by accepted Sprint 90"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-04A_Appearance_Settings_Reference.png",
@@ -128,8 +128,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 4139,
-      "sha256": "7ecd27fc2480f10d2e49b3acc94656a1b916cc6f82957d6b2adb2b9c1cc0d018",
+      "bytes": 4501,
+      "sha256": "c4133e3b124c2a41cf8808795da53f83fffdbc7b9901228cd82c7bdee182e293",
       "role": "package map and current publication status"
     },
     {
@@ -152,8 +152,8 @@
     },
     {
       "path": "SOURCES.md",
-      "bytes": 7402,
-      "sha256": "777d6a3435140c1240ffc750dc1d4f7d20bc944142835eed9bc1b15853d4f43b",
+      "bytes": 8098,
+      "sha256": "984702efc052bdfa9cadddd0453e684e7f22afac29af7baa4d0afcb71eb9aa01",
       "role": "historical provenance and current publication truth"
     }
   ],

@@ -5,7 +5,7 @@
 <a id="packet-sprint89-native-acceptance-procedure"></a>
 <a id="packet-import-preview-responsive-placement"></a>
 
-**Owners:** [FW-P2-04](../FUTURE_WORK.MD#fw-p2-04), [FW-P2-05](../FUTURE_WORK.MD#fw-p2-05), [FW-P2-06](../FUTURE_WORK.MD#fw-p2-06), [FW-P2-07](../FUTURE_WORK.MD#fw-p2-07), [FW-P2-08](../FUTURE_WORK.MD#fw-p2-08), [FW-P2-09](../FUTURE_WORK.MD#fw-p2-09), [FW-P2-12](../FUTURE_WORK.MD#fw-p2-12), [FW-P2-40](../FUTURE_WORK.MD#fw-p2-40), [FW-P2-41](../FUTURE_WORK.MD#fw-p2-41), [FW-P2-43](../FUTURE_WORK.MD#fw-p2-43), [FW-P2-44](../FUTURE_WORK.MD#fw-p2-44), [FW-P2-46](../FUTURE_WORK.MD#fw-p2-46), [FW-P2-47](../FUTURE_WORK.MD#fw-p2-47), [FW-P2-48](../FUTURE_WORK.MD#fw-p2-48), [FW-P2-50](../FUTURE_WORK.MD#fw-p2-50), [FW-P2-52](../FUTURE_WORK.MD#fw-p2-52), [FW-P2-78](../FUTURE_WORK.MD#fw-p2-78), [FW-P2-79](../FUTURE_WORK.MD#fw-p2-79).
+**Owners:** [FW-P2-04](../FUTURE_WORK.MD#fw-p2-04), [FW-P2-05](../FUTURE_WORK.MD#fw-p2-05), [FW-P2-06](../FUTURE_WORK.MD#fw-p2-06), [FW-P2-07](../FUTURE_WORK.MD#fw-p2-07), [FW-P2-08](../FUTURE_WORK.MD#fw-p2-08), [FW-P2-09](../FUTURE_WORK.MD#fw-p2-09), [FW-P2-12](../FUTURE_WORK.MD#fw-p2-12), [FW-P2-40](../FUTURE_WORK.MD#fw-p2-40), [FW-P2-41](../FUTURE_WORK.MD#fw-p2-41), [FW-P2-43](../FUTURE_WORK.MD#fw-p2-43), [FW-P2-44](../FUTURE_WORK.MD#fw-p2-44), [FW-P2-46](../FUTURE_WORK.MD#fw-p2-46), [FW-P2-47](../FUTURE_WORK.MD#fw-p2-47), [FW-P2-48](../FUTURE_WORK.MD#fw-p2-48), [FW-P2-50](../FUTURE_WORK.MD#fw-p2-50), [FW-P2-52](../FUTURE_WORK.MD#fw-p2-52), [FW-P2-79](../FUTURE_WORK.MD#fw-p2-79).
 
 Substantive unresolved evidence, not accepted architecture or execution authority. Topic/owner order inherits [Guide rule I](../Project_Guide.md#documentation-order); dated observations follow the current conclusion, newest first. Original evidence interiors preserve their semantic order.
 
@@ -15,9 +15,11 @@ Substantive unresolved evidence, not accepted architecture or execution authorit
 
 Saved filters remain separate work: their preference scope and persistence contract are not implied by transient Sprint-89 filters. Sprint 89 does not select transfer matching, analytics, hidden FX, spending/income inference, parser/source-family work, persistence/schema changes or a formal accessibility programme.
 
+[Sprint 90](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-90) is accepted at `619c39ec07402a63c90b646cbba9ced806f5e99d` under `SPRINT_90_DASHBOARD_NATIVE_CURRENCY_HIERARCHY_ACCEPTED`, completing FW-P2-78. Its native-currency bank/card hierarchy, saved-plan reuse, read-only activity, responsive layouts and three ordinary keyboard actions are settled; detailed acceptance and the bounded calendar-day crash correction belong in that outcome record.
+
 ## Remaining R1 and interaction boundary
 
-FW-P2-48 and FW-P2-50 retain only genuine cross-screen polish and ordinary interaction needs. Review them after Sprint 90/91 stable surfaces using a refreshed [SC-05A audit](../UI%20Assets/LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-05A_Cross_Screen_Conformance_Matrix.md); neither row is selected or an accessibility programme. [FW-P2-78](../FUTURE_WORK.MD#fw-p2-78) is ready for bounded Sprint-90 planning against accepted SC-03 and repository-backed native-currency evidence, but Sprint 90 remains **PREPARED / NOT YET CHAT-AUTHORIZED**.
+FW-P2-48 and FW-P2-50 retain genuine cross-screen polish and ordinary interaction needs beyond the accepted Transactions/Dashboard portions. After Sprint 91, refresh the [SC-05A audit](../UI%20Assets/LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-05A_Cross_Screen_Conformance_Matrix.md) before selecting Sprint-92 residue, including any still-applicable P1–P6 findings; this closure consumes none of those polish findings. Neither row is completed or a formal accessibility programme. [FW-P2-52](../FUTURE_WORK.MD#fw-p2-52) remains the next prepared Appearance candidate: the Dashboard prerequisite is satisfied, while bounded preference behavior and malformed-value fallback still require entry review. Sprint 91 remains **PREPARED / NOT YET CHAT-AUTHORIZED** and unimplemented.
 
 ### DRAFT — Import Preview Responsive Placement (user feedback, 2026-09-10)
 
@@ -43,7 +45,7 @@ The complete accepted Sprint-89 evidence is preserved in the [accepted outcome](
 
 ## Unresolved decision or blocker
 
-Import Preview alternatives remain proposals and require owner/design acceptance before selection. Remaining cross-screen R1 polish and ordinary interaction work need stable Sprint 90/91 surfaces and a refreshed SC-05A audit. Missing genuine zero-activity cases remain untested; no financial substitute may be manufactured.
+Import Preview alternatives remain proposals and require owner/design acceptance before selection. Remaining cross-screen R1 polish and ordinary interaction work need accepted Sprint-91 Appearance and a refreshed SC-05A audit; accepted Sprint 90 satisfies only the Dashboard portion. Missing genuine zero-activity cases remain untested; no financial substitute may be manufactured.
 
 ## What would invalidate this conclusion
 

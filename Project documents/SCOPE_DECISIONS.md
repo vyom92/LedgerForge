@@ -102,3 +102,4 @@ Order inherits Guide rule D: former ID in natural ascending order. IDs are never
 | <a id="fw-p2-74"></a>FW-P2-74 | Completed by [accepted Sprint 85](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-85). |
 | <a id="fw-p2-75"></a>FW-P2-75 | Completed by [accepted Sprint 86](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-86). |
 | <a id="fw-p2-76"></a>FW-P2-76 | Completed by [accepted Sprint 87](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-87). |
+| <a id="fw-p2-78"></a>FW-P2-78 | Completed by [accepted Sprint 90](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-90), R1 Dashboard Native-Currency Hierarchy. |

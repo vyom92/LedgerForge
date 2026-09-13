@@ -2,7 +2,7 @@
 
 **Status:** PREPARED FUTURE ROADMAP / NOT CURRENT AUTHORITY.
 **Prepared:** 2026-09-10; scope reset by explicit owner decision, 2026-09-11.
-**Current authority remains:** [Sprints 80–89](../LedgerForge_Roadmap_Sprints_80-89_Current.md). [Sprints 90–99](LedgerForge_Roadmap_Sprints_90-99_Planned.md) are prepared and require separate Chat activation.
+**Current authority:** [Sprints 90–99](../LedgerForge_Roadmap_Sprints_90-99_Current.md), explicitly activated through accepted Sprint 90. Sprint 91 remains PREPARED / NOT YET CHAT-AUTHORIZED; the 100–109 cycle remains non-current.
 **PERSONAL-V1: NOT YET ADOPTED.**
 
 Only Sprint 100 is fixed. This document authorizes no implementation, verification run, architecture, migration or cycle activation. Apply the [Private Personal App Scope Gate](../../../AGENTS.md#private-personal-app-scope-gate) before priority triage. Rejected categories are **NOT REQUIRED-DO NOT CONSIDER** and cannot become dependencies or future sprint candidates.
