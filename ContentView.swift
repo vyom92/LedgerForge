@@ -201,10 +201,12 @@ enum ValidationReviewPresentation {
     enum Kind: Equatable {
         case noStatementPrepared
         case validationResults
+        case completedOutcome
     }
 
     case noStatementPrepared
     case validationResults(PreparedImport)
+    case completedOutcome(ImportOutcomePresentation)
 
     static func presentation(for state: ImportPresentationState) -> Self {
         switch state {
@@ -212,6 +214,8 @@ enum ValidationReviewPresentation {
              .validationFailed(let preparedImport),
              .committing(let preparedImport):
             return .validationResults(preparedImport)
+        case .completed(let outcome):
+            return .completedOutcome(outcome)
         default:
             return .noStatementPrepared
         }
@@ -223,6 +227,8 @@ enum ValidationReviewPresentation {
             return .noStatementPrepared
         case .validationResults:
             return .validationResults
+        case .completedOutcome:
+            return .completedOutcome
         }
     }
 }
@@ -995,6 +1001,7 @@ struct ImportOutcomePresentation: Equatable {
     var tone: ImportOutcomeTone
     let accountId: String?
     let importSessionId: String?
+    let importAttemptID: String?
     let redactedIdentifier: String?
     let previousImportCompletedAtISO: String?
     let previousAccountDisplayName: String?
@@ -1021,6 +1028,7 @@ struct ImportOutcomePresentation: Equatable {
             && (result.recoveryRoute == .none || result.recoveryRoute == .unavailable)
         accountId = result.accountId
         importSessionId = result.importSessionId
+        importAttemptID = result.importAttemptId
         redactedIdentifier = result.redactedIdentifier
         previousImportCompletedAtISO = result.previousImport?.completedAtISO
         previousAccountDisplayName = result.previousImport?.accountDisplayName
@@ -1189,22 +1197,25 @@ struct ImportActivityPresentation: Equatable {
     let status: String
     let iconName: String
     let tone: ImportOutcomeTone
+    let recordedAtText: String?
 
     private init(
         title: String,
         subtitle: String,
         status: String,
         iconName: String,
-        tone: ImportOutcomeTone
+        tone: ImportOutcomeTone,
+        recordedAtText: String? = nil
     ) {
         self.title = title
         self.subtitle = subtitle
         self.status = status
         self.iconName = iconName
         self.tone = tone
+        self.recordedAtText = recordedAtText
     }
 
-    init(importState: ImportPresentationState, latestDurableAttempt: RepositoryImportAttempt?) {
+    init(importState: ImportPresentationState, latestDurableAttempt: RepositoryImportAttempt?, completedAttempt: RepositoryImportAttempt? = nil) {
         switch importState {
         case .idle:
             if let latestDurableAttempt {
@@ -1256,7 +1267,8 @@ struct ImportActivityPresentation: Equatable {
                 subtitle: outcome.fileSubtitle,
                 status: outcome.persistenceStatus,
                 iconName: outcome.iconName,
-                tone: outcome.tone
+                tone: outcome.tone,
+                recordedAtText: ImportInstantFormatting.display(completedAttempt?.createdAtISO)
             )
         case .skipped(let fileName):
             self.init(
@@ -1315,7 +1327,8 @@ struct ImportActivityPresentation: Equatable {
             subtitle: presentation.outcome.explanation,
             status: presentation.outcome.label,
             iconName: presentation.outcome.iconName,
-            tone: presentation.outcome.tone
+            tone: presentation.outcome.tone,
+            recordedAtText: ImportInstantFormatting.display(durableAttempt.createdAtISO)
         )
     }
 }
@@ -1614,20 +1627,16 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
                 dashboardPositionHeading
                 ViewThatFits(in: .horizontal) {
-                    VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
-                        HStack(alignment: .top, spacing: theme.spacing.majorModuleGap) {
-                            dashboardPositionPanel.frame(minWidth: 640, maxWidth: .infinity)
-                            salaryDashboardSummary.frame(width: dashboardSupportingColumnWidth, alignment: .leading)
-                        }
-                        HStack(alignment: .top, spacing: theme.spacing.majorModuleGap) {
-                            recentTransactionsCard.frame(minWidth: 640, maxWidth: .infinity, alignment: .leading)
-                            importActivityCard.frame(width: dashboardSupportingColumnWidth, alignment: .leading)
-                        }
+                    HStack(alignment: .top, spacing: theme.spacing.majorModuleGap) {
+                        dashboardPrimaryContent.frame(minWidth: 640, maxWidth: .infinity, alignment: .leading)
+                        VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
+                            salaryDashboardSummary
+                            importActivityCard
+                        }.frame(width: dashboardSupportingColumnWidth, alignment: .leading)
                     }
                     VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
-                        dashboardPositionPanel
+                        dashboardPrimaryContent
                         salaryDashboardSummary
-                        recentTransactionsCard
                         importActivityCard
                     }
                 }
@@ -1646,6 +1655,17 @@ struct ContentView: View {
             .font(theme.typography.body)
         }
         .onAppear { dashboardViewModel.refreshPresentation() }
+    }
+
+    private var dashboardPrimaryContent: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
+            dashboardPositionPanel
+            DashboardActivityComparisonView(
+                comparison: dashboardViewModel.activityComparison,
+                state: dashboardViewModel.recentActivityState
+            )
+            recentTransactionsCard
+        }
     }
 
     private var dashboardAttention: ConfirmedImportRecoveryPresentation? {
@@ -2084,17 +2104,6 @@ struct ContentView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
 
-                            HStack(spacing: 12) {
-                                Image(systemName: "shield.checkered")
-                                    .foregroundStyle(theme.palette.accentHover)
-                                Text("Files are processed locally. Repository persistence still requires successful validation.")
-                                    .font(theme.typography.formCaption)
-                                    .foregroundStyle(theme.palette.secondaryText)
-                                Spacer()
-                            }
-                            .padding(12)
-                            .background(theme.palette.accent.opacity(0.08))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                     }
                     .frame(maxHeight: .infinity)
@@ -2269,6 +2278,9 @@ struct ContentView: View {
                             .font(theme.typography.secondary)
                             .foregroundStyle(theme.palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
+                        if let recordedAtText = activity.recordedAtText {
+                            Text(recordedAtText).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                        }
                     }
                 }
                 dashboardRouteButton(.imports)
@@ -2293,6 +2305,7 @@ struct ContentView: View {
                     } value: { row in
                         Text(MoneyFormatting.display(row.transaction.money))
                             .font(theme.typography.font(.rowTitle, tabularDigits: true))
+                            .foregroundStyle(theme.financialEffectColor(row.effect))
                     } context: { row in
                         dashboardRecentContext(row)
                     }
@@ -2305,19 +2318,9 @@ struct ContentView: View {
     }
 
     private func dashboardRecentContext(_ row: TransactionPresentationRow) -> some View {
-        Text("\(row.sourceCivilDate?.presentation ?? "Date unavailable") · \(row.accountDisplayName) · \(row.currentCategoryDisplayName) · \(dashboardEffect(row.effect))")
+        Text("\(row.sourceCivilDate?.presentation ?? "Date unavailable") · \(row.accountDisplayName) · \(row.currentCategoryDisplayName)")
             .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private func dashboardEffect(_ effect: TransactionPresentationEffect) -> String {
-        switch effect {
-        case .credit: "Bank credit"
-        case .debit: "Bank debit"
-        case .increasesAmountOwed: "Card increase owed"
-        case .decreasesAmountOwed: "Card decrease owed"
-        case .unknown: "Effect unavailable"
-        }
     }
 
     private var accountDetailPanel: some View {
@@ -2372,7 +2375,7 @@ struct ContentView: View {
                             .foregroundStyle(theme.palette.secondaryText)
                         Text(formatCurrency(account.currentBalance, currencyCode: account.currencyCode))
                             .font(theme.typography.formTitle.weight(.semibold))
-                            .foregroundStyle(account.currentBalance >= .zero ? LFTheme.success : LFTheme.danger)
+                            .foregroundStyle(account.currentBalance >= .zero ? theme.financialPositive : theme.financialNegative)
                             .monospacedDigit()
                     }
 
@@ -2402,15 +2405,15 @@ struct ContentView: View {
                     ForEach(accountsViewModel.recentActivity) { transaction in
                         HStack {
                             Image(systemName: transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? "arrow.down" : "arrow.up")
-                                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? LFTheme.success : LFTheme.danger)
+                                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? theme.financialPositive : theme.financialNegative)
                                 .frame(width: 28, height: 28)
-                                .background((transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? LFTheme.success : LFTheme.danger).opacity(0.12))
+                                .background((transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? theme.financialPositive : theme.financialNegative).opacity(0.12))
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                             Text(transaction.description)
                                 .lineLimit(1)
                             Spacer()
                             Text(transaction.signedAmountDisplay)
-                                .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
+                                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? theme.financialPositive : theme.financialNegative)
                                 .monospacedDigit()
                         }
                         .font(theme.typography.formCaption)
@@ -2628,7 +2631,7 @@ struct ContentView: View {
                     .frame(width: 100, alignment: .leading)
 
                 Text(formatCurrency(account.currentBalance, currencyCode: account.currencyCode))
-                    .foregroundStyle(account.currentBalance >= .zero ? LFTheme.success : LFTheme.danger)
+                    .foregroundStyle(account.currentBalance >= .zero ? theme.financialPositive : theme.financialNegative)
                     .monospacedDigit()
                     .frame(width: 140, alignment: .trailing)
             }
@@ -2828,7 +2831,7 @@ struct ContentView: View {
 
                     if outcome.isPreviouslyImported {
                         if let completedAtISO = outcome.previousImportCompletedAtISO {
-                            LFInfoRow(title: "Prior Import", value: completedAtISO)
+                            LFInfoRow(title: "Prior Import", value: ImportInstantFormatting.display(completedAtISO))
                         }
                         if let accountName = outcome.previousAccountDisplayName {
                             LFInfoRow(title: "Account", value: accountName)
@@ -2950,7 +2953,7 @@ struct ContentView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(presentation.outcome.label).font(theme.typography.formBody.weight(.semibold))
-                                Text(attempt.createdAtISO).font(theme.typography.finePrint).foregroundStyle(theme.palette.secondaryText)
+                                Text(ImportInstantFormatting.display(attempt.createdAtISO)).font(theme.typography.finePrint).foregroundStyle(theme.palette.secondaryText)
                             }
                             Spacer()
                             Text(attempt.outcomeCode == ImportAttemptOutcome.partialImportCommitted.rawValue
@@ -3287,7 +3290,7 @@ struct ContentView: View {
             }
             Text("Signed section total: \(formatCurrency(section.signedNetTotal.amount, currencyCode: section.signedNetTotal.currency.code))")
                 .font(theme.typography.finePrint)
-                .foregroundStyle(section.signedNetTotal.amount < .zero ? LFTheme.success : theme.palette.secondaryText)
+                .foregroundStyle(section.signedNetTotal.amount < .zero ? theme.financialPositive : theme.palette.secondaryText)
             ForEach(instruments) { instrument in
                 cardSectionChoiceButton(
                     title: "Reuse confirmed instrument \(instrument.id.suffix(8))",
@@ -3503,10 +3506,10 @@ struct ContentView: View {
                 .foregroundStyle(theme.palette.secondaryText)
                 .frame(width: 92, alignment: .leading)
             Text(transaction.cardLiabilityEffect == .increasesAmountOwed ? "Charge" : transaction.cardLiabilityEffect == .decreasesAmountOwed ? "Payment/Credit" : transaction.credit != nil ? "Credit" : "Debit")
-                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? LFTheme.success : LFTheme.danger)
+                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? theme.financialPositive : theme.financialNegative)
                 .frame(width: 68, alignment: .leading)
             Text(transaction.signedAmountDisplay)
-                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? LFTheme.success : LFTheme.danger)
+                .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? theme.financialPositive : theme.financialNegative)
                 .monospacedDigit()
                 .frame(width: 112, alignment: .trailing)
             Text(balanceText(transaction.balance, currency: transaction.currency))
@@ -3629,6 +3632,18 @@ struct ContentView: View {
                         }
                     }
                 }
+            case .completedOutcome(let outcome):
+                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                    Label(outcome.persistenceStatus, systemImage: outcome.iconName)
+                        .font(theme.typography.formHeading)
+                        .foregroundStyle(outcome.tone.color)
+                    Text(outcome.fileSubtitle)
+                        .font(theme.typography.formBody)
+                        .foregroundStyle(theme.palette.secondaryText)
+                    Text("See the import outcome for this statement’s result and any available recovery action.")
+                        .font(theme.typography.formCaption)
+                        .foregroundStyle(theme.palette.secondaryText)
+                }
             case .noStatementPrepared:
                 LFEmptyState(
                     title: "No statement prepared",
@@ -3695,9 +3710,16 @@ struct ContentView: View {
     }
 
     private var importActivityPresentation: ImportActivityPresentation {
-        ImportActivityPresentation(
+        let completedAttempt: RepositoryImportAttempt?
+        if case .completed(let outcome) = importState, let attemptID = outcome.importAttemptID {
+            completedAttempt = importHistoryViewModel.attempts.first { $0.id == attemptID }
+        } else {
+            completedAttempt = nil
+        }
+        return ImportActivityPresentation(
             importState: importState,
-            latestDurableAttempt: ImportActivityPresentation.latestDurableAttempt(from: importHistoryViewModel.attempts)
+            latestDurableAttempt: ImportActivityPresentation.latestDurableAttempt(from: importHistoryViewModel.attempts),
+            completedAttempt: completedAttempt
         )
     }
 

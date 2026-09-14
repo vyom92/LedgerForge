@@ -54,7 +54,7 @@ struct LFLabelValueGroup<Rows: RandomAccessCollection, Label: View, Value: View,
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: max(540, theme.typography.size(.body) * 44), alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .leading, spacing: rowSpacing ?? theme.spacing.rowGap) {
                 ForEach(rows) { row in
                     VStack(alignment: .leading, spacing: theme.spacing.micro) {

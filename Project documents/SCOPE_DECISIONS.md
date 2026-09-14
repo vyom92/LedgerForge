@@ -8,12 +8,26 @@ The adopted personal outcome includes supported authentic imports, practical R1 
 
 ## Settled product decisions
 
+<a id="sprint-92-presentation-decision"></a>
+### Sprint 92 information presentation and R1 polish — owner acceptance, 2026-09-14
+
+**ACCEPTED** under `SPRINT_92_INFORMATION_PRESENTATION_AND_R1_POLISH_ACCEPTED`; [the accepted outcome](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-92) owns exact scope and evidence. The accepted Sprint-91A theme, saved local appearance overrides, current Dashboard hierarchy and supporting modules, shared financial red/green roles, Transactions/Accounts presentation and exact financial semantics are preserved. No further visual tuning or preference reset is part of closure.
+
+FW-P2-46's accepted slice presents all recorded Bank inflow/outflow and Card increase/decrease owed, with each native currency separate. Bank and Card bar lengths normalize independently inside their own section; physical lengths across domains are not comparable. Count, source-date extent and currency metadata derive from genuine current presentation state. Exact Money remains authoritative; no income/spending/expense/cash-flow/net-worth/transfer/category/trend/forecast inference is approved. Broader FW-P2-46 remains open. FW-P2-48 retains only the unselected Import Preview A/B placement proposal, awaiting a genuine prepared state and later owner selection/native review.
+
+Import-event timestamps use **this Mac's local time with an explicit time-zone offset**, preserving the underlying instant. Missing or invalid instants display **Time unavailable**. Statement civil dates and transaction financial dates remain separate. The selected terminology, contextual-action, truthful-completion and useful native keyboard needs are complete under FW-P2-40/41/47/50; no speculative keyboard work or formal accessibility programme is created.
+
+The surviving archived v1 family remains presentation/information-architecture evidence for density, hierarchy, compact tables, proportions, rhythm, Money alignment, width, contextual actions and useful inspector relationships. The old palette, illustrative financial values and unsupported old modules/actions/navigation are not authority. UserJourney remains intentionally deleted. Regression tests remain **SUSPENDED / 0 new executions**. Publication is explicitly authorized; Sprint 93 is **NEXT / NOT STARTED**, and Personal-v1 remains **NOT YET ADOPTED**.
+
+
 <a id="dark-appearance-decision"></a>
 ### Dark appearance — explicit owner continuation, 2026-09-14 (current)
 
 **ACCEPTED — Dark-only, adjustable shared colours/tints, font family and hierarchy sizes, background/card opacity, responsive Settings.** The owner accepts this accumulated **Sprint 91A** outcome under completed FW-P2-52 and bounded FW-P2-48. This specifically reopens native colour wells, an installed-family selector, typography sliders and two surface-opacity sliders. One app-owned local preference store resolves the existing shared theme; live changes persist on this Mac. Initial/reset defaults remain distinct from the owner's newer saved local overrides. Restore clears appearance overrides only. It does not change financial data, other preferences, active import or Salary draft/Save ownership. Closure must not run Restore or rewrite preference storage.
 
 Earlier SC-04 Follow System/Light planning and the corresponding customization prohibitions are **superseded history**, not another feature to build. Dark mode stays fixed. Weight/tracking/density editors, theme import/export, sync, portable themes, a theme framework and formal accessibility work remain excluded. Accepted shared finishing includes related-colour card edges, distinct fill, seamless title-bar/sidebar tint behind the native traffic lights, and consistent width plus Collapse/Expand on all six destinations. The prior Settings-only minimum adjustment and temporary LedgerForge-only AppleScript resizing permission were specific to 91A verification; they are not standing system-control authority. No macOS setting changes are authorized.
+
+**Historical Sprint-91A closure record:** the following paragraph preserves its then-current sequence and verification restrictions. The [Sprint-92 acceptance above](#sprint-92-presentation-decision) owns current status; Sprint 93 is now NEXT / NOT STARTED.
 
 **Owner closure decision — 2026-09-14:** accept the current Dashboard and overall 91A visual result, and publish the intended product/docs/icon changes. Regression tests remain **SUSPENDED / 0 new executions**. The owner accepts **FINAL_BYTE_SMALL_WINDOW_NATIVE_RECHECK_NOT_COMPLETED**: final post-HIG/icon bytes were observed at 1440 × 900 but not reverified at 1024 × 768 or 760 × 640 after the AppleScript window path failed. Earlier r34 observations remain separate evidence; no PASS is inferred and the resize campaign must not restart. Preserve the intentional deletion of `Project documents/UI Assets/Archived/UserJourney_v1.0.png` and the owner-supplied AppIcon application/sidebar identity. [Accepted outcome](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a) owns exact evidence and other limitations; [working history](Work%20notes/Transaction_and_R1_workflows.md#sprint-91a-dark-appearance) preserves the evolution. Sprint 92 is **NEXT / NOT STARTED**, V17 is unchanged, and FW-P2-49 remains **NOT REQUIRED-DO NOT CONSIDER**.
 
@@ -105,6 +119,10 @@ Order inherits Guide rule D: former ID in natural ascending order. IDs are never
 | Former ID | Destination / meaning |
 | --- | --- |
 | <a id="fw-p2-03"></a>FW-P2-03 | Completed by [accepted Sprint 89](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-89). |
+| <a id="fw-p2-40"></a>FW-P2-40 | Completed by [accepted Sprint 92](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-92): selected ordinary-screen terminology and redundant-copy cleanup. Precise financial/provenance terminology remains. |
+| <a id="fw-p2-41"></a>FW-P2-41 | Completed by [accepted Sprint 92](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-92): six-destination contextual-action conformance, genuine availability and preserved removal of repeated global Import. No new toolbar programme. |
+| <a id="fw-p2-47"></a>FW-P2-47 | Completed by [accepted Sprint 92](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-92): actual Import completion/recovery presentation replaces the preparation-empty review. Unobserved state combinations remain recorded evidence limits. |
+| <a id="fw-p2-50"></a>FW-P2-50 | Completed by [accepted Sprint 92](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-92): useful existing R1 keyboard selection/inspector movement and retained selection under Search focus, building on accepted 89/90 behavior. No invented shortcut, full-coverage campaign or formal accessibility remainder. |
 | <a id="fw-p2-52"></a>FW-P2-52 | Completed by [accepted Sprint 91A](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a): dark-only local customizable appearance and responsive Settings, with the accepted final-byte small-window verification limitation. Original System/Light planning is superseded history. |
 | <a id="fw-p2-53"></a>FW-P2-53 | Completed by [accepted Sprint 89](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-89). |
 | <a id="fw-p2-55"></a>FW-P2-55 | Consolidated into completed [FW-P2-52](#fw-p2-52), dark-only device-local appearance. Theme-engine machinery is removed, not deferred. |

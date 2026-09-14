@@ -2,6 +2,8 @@
 
 Canonical approved **written** R1 contract relocated from DESIGN_HANDOFF; no new visual direction or native acceptance is claimed. Read [shared design requirements](DESIGN_HANDOFF.md), [numeric tokens](DESIGN_TOKENS.json) and [required checks](ACCEPTANCE.md). Supporting local SC drafts/PNGs are identified in [README](README.md); they do not override this text.
 
+**Accepted Sprint-92 presentation extension — 2026-09-14:** existing typed bank/card effects now select the shared clearer financial positive/negative colours for table and matching-total Money. Exact amount strings, neutral unknown effects, filters, sort, selection and inspector behavior are unchanged. The owner removed the repeated unrestricted-scope caption; real active-criteria feedback remains. Card effect choices use “Increase owed” / “Decrease owed” under “Card liabilities”, preserving the same selection values. Final native table selection, Down Arrow movement and retained selection under Search focus were inspected; [the accepted outcome](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-92) records the exact native evidence and unobserved coverage. No new keyboard or formal accessibility remainder is inferred.
+
 ## 3. Transactions reference
 
 ### 3.1 Standard composition

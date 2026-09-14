@@ -10,6 +10,8 @@ SC-01's visual contract controls shell/navigation direction; its supporting artw
 
 [Scope decisions](../../SCOPE_DECISIONS.md) owns rejected formal accessibility work and the exact [2026-09-14 owner decision](../../SCOPE_DECISIONS.md#dark-appearance-decision) reopening bounded local appearance controls. Keep practical readability, full Money/currency, keyboard interaction, focus distinct from selection, names/tooltips, native rendering and responsive content fit. Preserve image bytes and apply only the exact written caption exceptions below. Legitimate local/ChatGPT inspection is allowed; no private original/credential/financial source content enters Git or becomes a manufactured statement input.
 
+**Accepted Sprint 92 — presentation direction:** [the accepted outcome](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-92) adds the bounded all-recorded effect comparison, domain-local Bank/Card scales, compact metadata/caveats and current shared financial colours, preserving the Sprint-91A appearance system and the owner's overrides. The surviving archived v1 family is useful for density, hierarchy, compact tables, module proportions, spacing/rhythm, Money alignment, horizontal-space use, contextual actions and inspector relationships. Its old palette, illustrative financial values and unsupported modules/actions/navigation are not authority. Current financial semantics remain authoritative; UserJourney remains intentionally deleted. Broader FW-P2-46 charts and the unselected FW-P2-48 Preview proposal stay open.
+
 ## Canonical screen routing
 
 | Screen | Written owner |

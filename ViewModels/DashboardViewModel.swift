@@ -270,11 +270,64 @@ enum DashboardAttentionProjection {
     }
 }
 
+/// Read-only composition of the unrestricted Transactions presentation. Money
+/// comes directly from its accepted partitions; this adapter does not sum it.
+struct DashboardActivityComparison {
+    struct Series: Identifiable {
+        let effect: TransactionPresentationEffect
+        let amount: Money?
+        var id: TransactionPresentationEffect { effect }
+    }
+
+    struct Domain: Identifiable {
+        let domain: TransactionPresentationDomain
+        let series: [Series]
+        var id: TransactionPresentationDomain { domain }
+    }
+
+    struct Currency: Identifiable {
+        let currency: CurrencyCode
+        let domains: [Domain]
+        var id: String { currency.code }
+    }
+
+    let currencies: [Currency]
+    let recordCount: Int
+    let firstSourceDate: StatementDate?
+    let lastSourceDate: StatementDate?
+    let undatedRecordCount: Int
+    let withheldRecordCount: Int
+
+    init(result: TransactionPresentationResult) {
+        recordCount = result.rows.count
+        let dates = result.rows.compactMap(\.sourceCivilDate)
+        firstSourceDate = dates.min()
+        lastSourceDate = dates.max()
+        undatedRecordCount = recordCount - dates.count
+        withheldRecordCount = result.totals.withheldUnknownDomainCount + result.totals.withheldUnknownEffectCount
+        currencies = Set(result.rows.map { $0.transaction.money.currency })
+            .sorted { $0.code < $1.code }
+            .map { currency in
+                let recordedDomains = Set(result.rows.filter { $0.transaction.money.currency == currency }.map(\.domain))
+                let domains: [Domain] = [TransactionPresentationDomain.bank, .card].compactMap { domain in
+                    guard recordedDomains.contains(domain) else { return nil }
+                    let effects: [TransactionPresentationEffect] = domain == .bank
+                        ? [.credit, .debit] : [.increasesAmountOwed, .decreasesAmountOwed]
+                    return Domain(domain: domain, series: effects.map { effect in
+                        Series(effect: effect, amount: result.totals.partitions[.init(currency: currency, domain: domain, effect: effect)])
+                    })
+                }
+                return Currency(currency: currency, domains: domains)
+            }
+    }
+}
+
 @MainActor
 final class DashboardViewModel: ObservableObject {
     @Published private(set) var presentationState: DashboardPresentationState = .loading("Loading persisted dashboard...")
     @Published private(set) var positions: [DashboardCurrencyPosition] = []
     @Published private(set) var recentActivity: [TransactionPresentationRow] = []
+    @Published private(set) var activityComparison: DashboardActivityComparison?
     @Published private(set) var accounts: [Account] = []
     @Published private(set) var transactionCount = 0
     @Published private(set) var positionState: DashboardContentState = .loading
@@ -337,6 +390,7 @@ final class DashboardViewModel: ObservableObject {
         presentationState = .loading("Loading persisted dashboard...")
         positionState = .loading
         recentActivityState = .loading
+        activityComparison = nil
         fundingState = .loading
     }
 
@@ -353,6 +407,7 @@ final class DashboardViewModel: ObservableObject {
         presentationState = .failed("Dashboard load failed")
         positions = []
         recentActivity = []
+        activityComparison = nil
         fundingCalculation = nil
         fundingRateContext = nil
         positionState = .unavailable
@@ -384,14 +439,17 @@ final class DashboardViewModel: ObservableObject {
         positionState = .resolve(availability: state, isEmpty: positions.isEmpty)
 
         let category = categoryStore.snapshot
-        let rows = isCurrent ? TransactionPresentationEngine.rows(
+        let activity = TransactionPresentationEngine.evaluate(
             transactions: transactionStore.transactions,
             accounts: accountStore.accounts,
             categories: category.categories,
-            assignments: category.assignments
-        ).sorted {
-            TransactionPresentationEngine.comparison($0, $1, sort: .init()) == .orderedAscending
-        } : []
+            assignments: category.assignments,
+            filter: .empty,
+            sort: .init(),
+            availability: isCurrent ? .available : .unavailable
+        )
+        let rows = activity.rows
+        activityComparison = isCurrent ? DashboardActivityComparison(result: activity) : nil
         transactionCount = transactionStore.transactions.count
         recentActivity = Array(rows.prefix(recentActivityLimit))
         recentActivityState = .resolve(availability: state, isEmpty: rows.isEmpty)

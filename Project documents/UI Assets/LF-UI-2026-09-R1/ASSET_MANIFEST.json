@@ -22,14 +22,14 @@
     },
     {
       "path": "ACCEPTANCE.md",
-      "bytes": 8228,
-      "sha256": "949227beae64f908b09830d6a3ac413b5677ff94ea4acbae7e9423d2f9a8b0b5",
+      "bytes": 9177,
+      "sha256": "1f6602f38eddb2f759ce175fe14d618ef40699bdf8fbec4ec2212a5eeb06cdcd",
       "role": "required checks; not native pass evidence"
     },
     {
       "path": "DESIGN_HANDOFF.md",
-      "bytes": 13824,
-      "sha256": "24705be9e4e9fb47a566598b84f702feab046967fc9af259c840419f6bd4ebec",
+      "bytes": 14663,
+      "sha256": "63fa95471bee3656d6d8fb51583403df14c8b4b36387a86c9253839de4cdaf59",
       "role": "shared design requirements and exact caption exceptions"
     },
     {
@@ -40,8 +40,8 @@
     },
     {
       "path": "Inherited_Screens.md",
-      "bytes": 11526,
-      "sha256": "3e290a1fe130de7a8558bd0164f34f59b82c720752c4c57878b1235afeef9f4a",
+      "bytes": 13000,
+      "sha256": "405e60ba51745d576ff1bd9121538bb836a32981196355b999b52b67ef1f38c4",
       "role": "canonical written contract; accepted native boundaries and limits tracked in accepted outcome records"
     },
     {
@@ -116,9 +116,9 @@
     },
     {
       "path": "LF-UI-2026-09-R1_SC-05A_Cross_Screen_Conformance_Matrix.md",
-      "bytes": 25225,
-      "sha256": "0144170d6f409ffa94ff2ea127692a98a6344c5e96848b20783eb6f507bc590c",
-      "role": "historical Sprint-88 audit; current 91A acceptance linked; refresh required for Sprint 92; closure does not re-audit or resolve findings"
+      "bytes": 30452,
+      "sha256": "cec795d45da923b17e94f20832cb626496ee8f6e09ef3ad8721ad1b2bd5cb1bd",
+      "role": "historical Sprint-88 audit body preserved; dated owner-accepted Sprint-92 refresh with corrected findings and explicit source/native limits"
     },
     {
       "path": "MasterBoard_LF-UI-2026-09-R1.png",
@@ -128,8 +128,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 5369,
-      "sha256": "60cdd6232f72d3164dea48bec76e9689f36a8aaeca09114b0a344fea110eb76e",
+      "bytes": 5806,
+      "sha256": "5ce721eb2ad0da1e610553ee66738b80c10a3914d490a8e53de5fec4474f5d36",
       "role": "package map and current publication status"
     },
     {
@@ -140,20 +140,20 @@
     },
     {
       "path": "SC-02_Transactions.md",
-      "bytes": 6149,
-      "sha256": "8a667fb9409c7005991547e87c7577eadfa8f2606305f16ced34498b3c5a54f5",
+      "bytes": 7004,
+      "sha256": "e506590a855976cb2557a894398f0c86d47f0e709cee34bb8683b8ecb4770a5e",
       "role": "canonical written contract; accepted native boundaries and limits tracked in accepted outcome records"
     },
     {
       "path": "SC-03_Dashboard.md",
-      "bytes": 5057,
-      "sha256": "625e8ab7faf609e271fc2366459d30407089a7f30f5932c1d1417fcf255529c8",
+      "bytes": 7385,
+      "sha256": "68f477e5c3443770ec96f58d402783f4ab7a8d89c3bdbbcfa5fd8dabacba5dc6",
       "role": "canonical written contract; accepted native boundaries and limits tracked in accepted outcome records"
     },
     {
       "path": "SOURCES.md",
-      "bytes": 9075,
-      "sha256": "3f7dee39c1e99009503b9c125c859a592427b0a36eb03166fce8437f4bf2e604",
+      "bytes": 9489,
+      "sha256": "089cbe2a5a28818337d1f8bde7894394659b0ef89eb1c9f6161d4dcaddde5bb7",
       "role": "historical provenance and current publication truth"
     }
   ],
@@ -233,10 +233,10 @@
     "LedgerForge_Design_v3_Draft/reference/contact_sheet.png",
     "LedgerForge_Design_v3_Draft/reference/appearance_playground_check.png"
   ],
-  "native_implementation_status": "Sprint 91A owner-accepted on 2026-09-14: shared visual foundation/current Dashboard, dark-only local colours/font/opacity preferences and responsive Settings, with FINAL_BYTE_SMALL_WINDOW_NATIVE_RECHECK_NOT_COMPLETED. Sprints 89/90 accepted meanings remain intact. Original System/Light planning is superseded history. Sprint 92 is NEXT / NOT STARTED.",
-  "documentation_integration_status": "Current authorities reconciled for owner-accepted Sprint 91A; original outcome/audit history preserved. The commit containing this manifest publishes the accumulated product and documentation closure.",
-  "git_publication_status": "Owner-authorized Sprint-91A product/docs/icon publication, including intentional archived UserJourney deletion. Exact published ref is the commit containing this closure; local/remote convergence is checked at publication.",
+  "native_implementation_status": "Sprint 92 owner/coordinator-accepted on 2026-09-14 under SPRINT_92_INFORMATION_PRESENTATION_AND_R1_POLISH_ACCEPTED, from main@3f1e7e97d5cac0ba9f1c3010ae8c30a79d106c96. Accepted current Dashboard/R1 composition, shared financial colours, all-recorded comparison with domain-local Bank/Card scales and compact dynamic metadata/caveats preserve Sprint-91A appearance and owner overrides. Final Recorded Activity was inspected at 1323 x 826 and 1024 x 768; earlier 760 x 640 evidence precedes the final micro-pass. Original 91A acceptance and limitations remain history.",
+  "documentation_integration_status": "Current state, queue/completed-ID decisions, roadmap, accepted-outcome collection and necessary R1 owners reconciled for Sprint-92 acceptance. Earlier execution/audit/provenance records remain historical. The commit containing this closure publishes the accepted product and documentation together.",
+  "git_publication_status": "Owner explicitly authorizes allowlisted Sprint-92 product/documentation commit and normal main push. The published commit containing this closure is the ending ref; final local/remote equality and clean divergence/residue are checked at publication. Sprint 93 remains NEXT / NOT STARTED.",
   "scope_alignment_date": "2026-09-14",
-  "scope_alignment": "Private personal app; dark-only customizable appearance and current visual foundation accepted. Saved local overrides remain user state, distinct from factory defaults. Regression tests remain SUSPENDED / 0 new executions; no repeated resize campaign. Product/docs/icon publication expressly authorized. Sprint 92 NEXT / NOT STARTED; source, financial and migration boundaries preserved.",
-  "local_sc_png_status": "All 12 current R1 PNG payloads, including the extensionless state sheet, remain byte-identical approved references. Accepted 91A includes current visual foundation and dark-only appearance with recorded native verification limits; SC-04 System/Light controls are historical. SC-05A is a historical audit requiring refresh, not a blanket native pass. The separate archived UserJourney image was intentionally deleted."
+  "scope_alignment": "Private personal app; accepted Sprint-91A dark appearance and saved local choices preserved. Sprint 92 completes FW-P2-40/41/47/50 and only the selected FW-P2-46/48 slices. Broader charts and unselected Import Preview A/B remain open; FW-P2-49 remains NOT REQUIRED-DO NOT CONSIDER. The bounded read-only comparison passed for the current genuine single-currency bank/card snapshot; missing, undated and mixed-currency shapes were unobserved. Regression tests SUSPENDED / 0 new executions. No new build/native/financial/source campaign for closure. Personal-v1 NOT YET ADOPTED.",
+  "local_sc_png_status": "All 12 current R1 PNG payloads, including the extensionless state sheet, remain byte-identical approved references. SC-04 System/Light controls are historical. SC-05A preserves its original audit and records the separately accepted Sprint-92 refresh without blanket native certification. All ten surviving archived references inform presentation only; old palette/sample financial values/unsupported actions are not authority. UserJourney remains intentionally deleted; no Salary_v1.0 asset exists."
 }

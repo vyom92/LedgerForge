@@ -198,6 +198,21 @@ struct LFTheme: Sendable {
     static let danger = Color(hex: 0xEF4444)
     static let warning = Color(hex: 0xF59E0B)
     static let info = Color(hex: 0x38BDF8)
+
+    // Owner-requested quieter financial ink. Workflow/validation status colours
+    // remain separate from account and liability movement presentation.
+    var financialPositive: Color { Color(hex: 0x429975) }
+    var financialNegative: Color { Color(hex: 0xBA5861) }
+
+    /// The typed account/liability effect owns this meaning, independently of
+    /// the decorative accent or the sign of the source amount.
+    func financialEffectColor(_ effect: TransactionPresentationEffect) -> Color {
+        switch effect {
+        case .credit, .decreasesAmountOwed: financialPositive
+        case .debit, .increasesAmountOwed: financialNegative
+        case .unknown: palette.secondaryText
+        }
+    }
 }
 
 private struct LFThemeKey: EnvironmentKey {

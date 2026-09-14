@@ -75,7 +75,7 @@ struct SalaryView: View {
                     moneyInput("Deductions", .deductions, viewModel.plan.expectedDeductionsProvenance)
                     Divider()
                     valueRow("Expected net", viewModel.calculation.expectedNet, truth: "Calculated")
-                    textValueRow("Salary received", viewModel.currentMonthActual.map { MoneyFormatting.display($0) } ?? "No payslip for this month", truth: "Total from payslips")
+                    textValueRow("Salary actuals", viewModel.currentMonthActual.map { MoneyFormatting.display($0) } ?? "No payslip for this month", truth: "Total from payslips")
                 }
             }
             balances(currency: "QAR")
@@ -90,7 +90,7 @@ struct SalaryView: View {
             commitments(title: "India commitments", region: "india", values: viewModel.plan.indiaCommitments)
             LFPanel(title: "Transfer planning") {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("1 QAR = INR per QAR").font(theme.typography.formBody)
+                    Text("Planning rate (INR per QAR)").font(theme.typography.formBody)
                     input("INR per QAR", key: "fx.rate", binding: Binding(get: { viewModel.rawText["fx.rate"] ?? "" }, set: { viewModel.setFX(rateText: $0, dateText: viewModel.rawText["fx.date"] ?? "") }))
                     input("Observed YYYY-MM-DD", key: "fx.date", binding: Binding(get: { viewModel.rawText["fx.date"] ?? "" }, set: { viewModel.setFX(rateText: viewModel.rawText["fx.rate"] ?? "", dateText: $0) }))
                     Text("Your planning rate · used only for this month’s transfer").font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
@@ -145,7 +145,7 @@ struct SalaryView: View {
                 }
                 ForEach(viewModel.plan.balances.filter { balance in balance.nativeCurrency.code == currency && !accounts.contains(where: { $0.repositoryAccountId == balance.accountID }) }) { balance in
                     Text("Saved account is no longer eligible · \(balance.included ? "included" : "excluded") · \(balance.money.map { MoneyFormatting.display($0) } ?? "Balance unavailable")")
-                        .font(theme.typography.formCaption).foregroundStyle(LFTheme.warning)
+                        .font(theme.typography.font(.formCaption, tabularDigits: true)).foregroundStyle(LFTheme.warning)
                 }
             }
         }
@@ -159,7 +159,7 @@ struct SalaryView: View {
                         HStack {
                             Toggle("Include", isOn: Binding(get: { value.included }, set: { update(value, region: region, included: $0) })).labelsHidden().accessibilityLabel("Include commitment")
                             input("Commitment", key: "label.\(value.id)", binding: Binding(get: { viewModel.rawText["label.\(value.id)"] ?? value.label }, set: { update(value, region: region, label: $0) }))
-                            Button(role: .destructive) { viewModel.removeCommitment(region: region, id: value.id) } label: { Image(systemName: "trash") }.buttonStyle(.borderless).accessibilityLabel("Remove commitment")
+                            Button(role: .destructive) { viewModel.removeCommitment(region: region, id: value.id) } label: { Image(systemName: "trash") }.buttonStyle(.borderless).accessibilityLabel("Remove commitment").help("Remove commitment")
                         }
                         HStack {
                             Text(region == "qatar" ? "QAR" : "INR")
@@ -215,7 +215,8 @@ struct SalaryView: View {
                 }
             }
             ForEach(viewModel.historyGroups, id: \.month) { group in
-                LFPanel(title: "\(group.month.canonical) · Total from payslips \(MoneyFormatting.display(group.actual))") {
+                LFPanel(title: group.month.canonical) {
+                    textValueRow("Salary actuals", MoneyFormatting.display(group.actual), truth: "Total from payslips")
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(group.statements) { statement in
                             DisclosureGroup {
@@ -228,7 +229,7 @@ struct SalaryView: View {
                                             .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                                     }
                                     Spacer()
-                                    Text(MoneyFormatting.display(statement.evidence.printedPaymentTotal)).font(theme.typography.formHeading)
+                                    Text(MoneyFormatting.display(statement.evidence.printedPaymentTotal)).font(theme.typography.font(.formHeading, tabularDigits: true))
                                 }
                             }
                             Divider()
@@ -246,14 +247,16 @@ struct SalaryView: View {
                 .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
             Text("Earnings").font(theme.typography.formBody.weight(.semibold))
             ForEach(statement.evidence.earnings, id: \.sourceOrdinal) { component in
-                HStack { Text("\(component.sourceOrdinal). \(component.sourceLabel)"); Spacer(); Text(MoneyFormatting.display(component.money)) }
+                LFInfoRow(title: "\(component.sourceOrdinal). \(component.sourceLabel)", value: MoneyFormatting.display(component.money), textRole: .formBody)
+                    .monospacedDigit()
             }
             Text("Deductions").font(theme.typography.formBody.weight(.semibold))
             if statement.evidence.printedDeductionsTotal == nil {
                 Text("No deduction section or total printed in source").foregroundStyle(theme.palette.secondaryText)
             } else {
                 ForEach(statement.evidence.deductions, id: \.sourceOrdinal) { component in
-                    HStack { Text("\(component.sourceOrdinal). \(component.sourceLabel)"); Spacer(); Text(MoneyFormatting.display(component.money)) }
+                    LFInfoRow(title: "\(component.sourceOrdinal). \(component.sourceLabel)", value: MoneyFormatting.display(component.money), textRole: .formBody)
+                        .monospacedDigit()
                 }
             }
             Divider()
@@ -269,9 +272,20 @@ struct SalaryView: View {
     }
 
     private func textValueRow(_ label: String, _ value: String, truth: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) { Text(label); Text(truth).font(theme.typography.finePrint).foregroundStyle(theme.palette.secondaryText) }
-            Spacer(); Text(value).font(theme.typography.formBody.weight(.semibold)).foregroundStyle(value == "Incomplete" ? LFTheme.warning : theme.palette.primaryText)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: theme.spacing.valueGutter) {
+                VStack(alignment: .leading, spacing: 2) { Text(label); Text(truth).font(theme.typography.finePrint).foregroundStyle(theme.palette.secondaryText) }
+                Spacer(minLength: 0)
+                Text(value).font(theme.typography.font(.formBody, tabularDigits: true).weight(.semibold)).fixedSize()
+            }
+            VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                Text(label)
+                LFCompleteValue(lineHeight: theme.typography.lineHeight(.formBody)) {
+                    Text(value).font(theme.typography.font(.formBody, tabularDigits: true).weight(.semibold))
+                }
+                Text(truth).font(theme.typography.finePrint).foregroundStyle(theme.palette.secondaryText)
+            }
         }
+        .foregroundStyle(value == "Incomplete" ? LFTheme.warning : theme.palette.primaryText)
     }
 }

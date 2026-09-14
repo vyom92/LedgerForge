@@ -28,6 +28,8 @@
 		281BB1902FFC4D6A006E7424 /* StatementClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB18F2FFC4D6A006E7424 /* StatementClassifier.swift */; };
 		281BB1922FFC4D6A006E7424 /* ImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1912FFC4D6A006E7424 /* ImportCoordinator.swift */; };
 		281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */; };
+		285D459D3057E29F00A83ED8 /* DashboardActivityComparisonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 285D459C3057E29F00A83ED8 /* DashboardActivityComparisonView.swift */; };
+		285D459F3057E43F00A83ED8 /* ImportInstantFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 285D459E3057E43F00A83ED8 /* ImportInstantFormatting.swift */; };
 		286242592FFCE80D00B8AA66 /* DefaultReaderRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242542FFCE80D00B8AA66 /* DefaultReaderRegistry.swift */; };
 		2862425F2FFCE80D00B8AA66 /* PDFDocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242552FFCE80D00B8AA66 /* PDFDocumentReader.swift */; };
 		286242612FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */; };
@@ -234,6 +236,8 @@
 		281BB18F2FFC4D6A006E7424 /* StatementClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatementClassifier.swift; sourceTree = "<group>"; };
 		281BB1912FFC4D6A006E7424 /* ImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportCoordinator.swift; sourceTree = "<group>"; };
 		281BB1932FFC4D6B006E7424 /* DefaultImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultImportCoordinator.swift; sourceTree = "<group>"; };
+		285D459C3057E29F00A83ED8 /* DashboardActivityComparisonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardActivityComparisonView.swift; sourceTree = "<group>"; };
+		285D459E3057E43F00A83ED8 /* ImportInstantFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportInstantFormatting.swift; sourceTree = "<group>"; };
 		286242342FFCDE7000B8AA66 /* Architecture_v1.0_Frozen.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Architecture_v1.0_Frozen.md; sourceTree = "<group>"; };
 		2862424A2FFCE80D00B8AA66 /* DefaultPasswordProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultPasswordProvider.swift; sourceTree = "<group>"; };
 		286242532FFCE80D00B8AA66 /* CSVDocumentReaderAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVDocumentReaderAdapter.swift; sourceTree = "<group>"; };
@@ -670,6 +674,7 @@
 			isa = PBXGroup;
 			children = (
 				3A4400033004000000000001 /* MoneyFormatting.swift */,
+				285D459E3057E43F00A83ED8 /* ImportInstantFormatting.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -698,6 +703,7 @@
 				288EB1262FF7D96A00F09BC9 /* DocumentPreviewView.swift */,
 				288EB0FC2FF7B84C00F09BC9 /* DeveloperConsoleView.swift */,
 				286D68F12FFFF60E0078AAC5 /* Common */,
+				285D459C3057E29F00A83ED8 /* DashboardActivityComparisonView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -1078,6 +1084,7 @@
 				28B87B4C2FFBD95D009BEE8C /* AccountStore.swift in Sources */,
 				28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */,
 				281BB17E2FFC4D26006E7424 /* ImportRequest.swift in Sources */,
+				285D459F3057E43F00A83ED8 /* ImportInstantFormatting.swift in Sources */,
 				288EB0B32FF7955200F09BC9 /* ContentView.swift in Sources */,
 				C88000023088000000000001 /* AppShellPresentation.swift in Sources */,
 				C88000043088000000000001 /* AppDestinationContainer.swift in Sources */,
@@ -1109,6 +1116,7 @@
 				28B5217D3003E9D30007B840 /* IdentityResolver.swift in Sources */,
 				281BB1842FFC4D40006E7424 /* ImportProgress.swift in Sources */,
 				F58000010000000000000001 /* ImportFailureSummary.swift in Sources */,
+				285D459D3057E29F00A83ED8 /* DashboardActivityComparisonView.swift in Sources */,
 				286D68FB2FFFF6A60078AAC5 /* LFFilterChip.swift in Sources */,
 				281BB1942FFC4D6B006E7424 /* DefaultImportCoordinator.swift in Sources */,
 				B82000023082000000000001 /* ImportCentreCoordinator.swift in Sources */,

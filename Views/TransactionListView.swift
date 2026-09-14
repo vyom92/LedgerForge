@@ -381,9 +381,11 @@ struct TransactionListView: View {
                 }
             }
             HStack(spacing: 12) {
-                Text(activeCriteriaCount == 0 ? "All transactions · source dates · native currencies" : "\(activeCriteriaCount) active criteria · all matching transactions")
-                    .font(theme.typography.caption)
-                    .foregroundStyle(secondary)
+                if activeCriteriaCount > 0 {
+                    Text("\(activeCriteriaCount) active criteria · all matching transactions")
+                        .font(theme.typography.caption)
+                        .foregroundStyle(secondary)
+                }
                 Spacer(minLength: 0)
                 Button("Clear filters", action: clearFilters)
                     .lfSecondaryAction()
@@ -468,8 +470,10 @@ struct TransactionListView: View {
             Divider()
             Toggle("Bank credit", isOn: membership(\.effects, .credit))
             Toggle("Bank debit", isOn: membership(\.effects, .debit))
-            Toggle("Card increase owed", isOn: membership(\.effects, .increasesAmountOwed))
-            Toggle("Card decrease owed", isOn: membership(\.effects, .decreasesAmountOwed))
+            Section("Card liabilities") {
+                Toggle("Increase owed", isOn: membership(\.effects, .increasesAmountOwed))
+                Toggle("Decrease owed", isOn: membership(\.effects, .decreasesAmountOwed))
+            }
         } label: { filterLabel("Effect", count: viewModel.presentationFilter.effects.count) }
     }
     private var institutionMenu: some View {
@@ -644,6 +648,7 @@ struct TransactionListView: View {
                                         .font(theme.typography.caption).foregroundStyle(secondary)
                                     Text(MoneyFormatting.display(money))
                                         .font(theme.typography.tableSummary)
+                                        .foregroundStyle(theme.financialEffectColor(key.effect))
                                         .fixedSize(horizontal: true, vertical: false)
                                 }
                                 .padding(12)
@@ -746,6 +751,7 @@ struct TransactionListView: View {
                 TableColumn(sortHeader(.nativeAmount), sortUsing: TransactionTableComparator(key: .nativeAmount)) { row in
                     Text(MoneyFormatting.display(row.transaction.money))
                         .font(theme.typography.tableMoney)
+                        .foregroundStyle(theme.financialEffectColor(row.effect))
                         .fixedSize(horizontal: true, vertical: false)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }

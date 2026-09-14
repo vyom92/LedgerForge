@@ -4,10 +4,129 @@ Accepted evidence by cycle, not execution authority. [Current state](../../PROJE
 
 ## Index
 
+- [Accepted Sprint 92 — Information Presentation and R1 Polish — 2026-09-14](#sprint-92)
 - [Accepted Sprint 91A — Dark Appearance and Visual Foundation — 2026-09-14](#sprint-91a)
 - [Accepted Sprint 90 — R1 Dashboard Native-Currency Hierarchy — 2026-09-12](#sprint-90)
 
-**Current alignment — 2026-09-14:** the owner accepts Sprint 91A's accumulated visual foundation and dark-only local customizable appearance, including the current Dashboard composition, with the bounded final-byte small-window limitation below. Original Sprint-91 System/Light planning is superseded history. The 2026-09-13 visual qualification and earlier 91A checkpoints remain in the [working history](../../Work%20notes/Transaction_and_R1_workflows.md#sprint-91a-visual-conformance). The original Sprint-90 record below is preserved, including its then-current forward planning; those historical future-status statements do not override this acceptance.
+**Current alignment — 2026-09-14:** the owner accepts Sprint 92 after `SPRINT_92_FINAL_VISUAL_REVIEW_READY` and explicitly authorizes documentation closure and publication. The original accepted Sprint-90 and Sprint-91A records below are preserved, including their then-current forward planning and bounded limitations. Sprint 93 is **NEXT / NOT STARTED**; **PERSONAL-V1: NOT YET ADOPTED**. Earlier native-review/stop tokens remain historical, not current acceptance restrictions.
+
+---
+
+<a id="sprint-92"></a>
+## Accepted Sprint 92 — Information Presentation and R1 Polish — 2026-09-14
+
+**OWNER/COORDINATOR-ACCEPTED** under `SPRINT_92_INFORMATION_PRESENTATION_AND_R1_POLISH_ACCEPTED`, following `SPRINT_92_FINAL_VISUAL_REVIEW_READY`. Authoritative entry baseline: published `main@3f1e7e97d5cac0ba9f1c3010ae8c30a79d106c96`. The owner explicitly authorizes the unchanged accepted product bytes, documentation closure, allowlisted commit and normal push to main. The commit containing this record publishes that outcome. Closure performs no additional visual tuning, appearance reset, implementation, build, native/financial campaign or regression run.
+
+### Accepted outcome and financial boundary
+
+The accepted Sprint-91A theme/local-preference architecture, saved owner overrides, Dashboard position hierarchy, distinct Bank balances/Card liabilities, compact account/source context, Salary/Funding and Import supporting modules, Recent Activity, responsive structure and existing routes remain. Shared financial positive/negative roles are `#429975` / `#BA5861`; they reinforce established meaning in Dashboard, Transactions, Accounts and existing amount/effect consumers. Workflow success/error roles remain separate. Exact Money formatting, sign, currency and date meanings are unchanged.
+
+**Recorded Activity** is one bounded read-only FW-P2-46 slice over **all recorded activity**, using the existing unrestricted Transactions presenter. Bank movements show Inflow/Outflow; Card liability movements show Increase owed/Decrease owed. Each actual currency remains separate. The largest magnitude inside each Bank section defines that Bank scale, and the largest magnitude inside each Card section defines that Card scale. **Physical bar lengths across Bank and Card sections are not comparable.** Exact signed Money labels remain authoritative and fully visible. No log scale or minimum fake magnitude is introduced; zero-only coordinates retain zero-length bars.
+
+Count, source-date extent and native-currency metadata are derived from genuine presentation state, never hardcoded to the review snapshot. The compact footer is **“Coverage may have gaps · Transfers and settlements may be included”** with subordinate **“Bars scaled within each section”**. Missing source-date/undated context and withheld effects retain explicit presentation. No income, spending, expense, cash-flow, net-worth, transfer, category, historical-trend, forecast or hidden-FX semantics are accepted.
+
+Cross-screen corrections include the owner-requested redundant-caption/banner removal; wider aligned Dashboard recent values; accurate Import completed outcome/recovery presentation; display-only Salary Money digits, actuals/planning-rate terminology and Remove commitment help; and preserved genuine contextual controls and Transactions selection/focus. Import-event timestamps use **this Mac's local time with an explicit time-zone offset**, preserving the underlying instant. Missing/invalid instants display **Time unavailable**. This policy does not convert statement civil dates or transaction financial dates.
+
+The new Dashboard adapter is read-only and copies exact accepted partition Money. Financial-domain models/calculations, parser/source handling, identities, repositories/providers/persistence, migration history **V1–V17**, Swift 6, signing/entitlements, deployment configuration and the accepted day-change correction are unchanged. No ADR or migration is added. Appearance settings are not rewritten or reset during closure.
+
+### Original queue reconciliation
+
+| Owner | Accepted disposition |
+| --- | --- |
+| FW-P2-40 | **Complete** for the selected ordinary-screen terminology and redundant-copy need. Precise financial/provenance terms remain intentional. Completed-ID reference retained in SCOPE_DECISIONS. |
+| FW-P2-41 | **Complete** for current six-destination contextual-action conformance and genuine availability. Repeated global Import remains absent; no filler toolbar or new workflow was needed. |
+| FW-P2-46 | **OPEN beyond the accepted slice.** Only the all-recorded native-currency bank/card effect comparison is accepted. Broader interactive-chart work needs later owner selection and financial qualification. |
+| FW-P2-47 | **Complete** for the selected truthful Import completion/recovery presentation. Unobserved combinations remain evidence limits, not a claim of universal state certification. |
+| FW-P2-48 | Selected R1 layout, complete-Money, copy and colour corrections are **accepted**. The concrete **open remainder** is Import Preview Candidate A/B placement, never selected because a genuine prepared preview was unavailable. Later genuine-state comparison and owner selection are required. |
+| FW-P2-50 | **Complete** for useful existing R1 keyboard interaction, including row selection/inspector movement and retained selection under Search focus, building on accepted 89/90 behavior. No hypothetical shortcut/full-tab/hover programme is retained to keep the ID open. |
+
+FW-P2-49 remains **NOT REQUIRED-DO NOT CONSIDER**. A formal accessibility programme is not claimed or created. The current queue retains broader charts and the precise Import Preview proposal; completed IDs are not reused. Sprint 93 is **NEXT / NOT STARTED**, with the existing Sprint 93–100 sequence unchanged.
+
+### Refreshed SC-05A outcome
+
+The original Sprint-88 audit body is preserved byte-for-byte. [The dated Sprint-92 refresh](../../UI%20Assets/LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-05A_Cross_Screen_Conformance_Matrix.md#sprint-92-refresh) rechecks applicability against accepted 89–91A; it does not pretend the historical audit inspected Sprint 92.
+
+| ID | Refreshed outcome | Verification boundary |
+| --- | --- | --- |
+| P1 · Outer insets | **RESOLVED_BY_PRIOR_WORK** | Already uses the shared page-padding role; no new inset patch. |
+| P2 · Salary display digits | **STILL_APPLICABLE → corrected** | Current editor inspected; populated/long authentic Salary history was not available. |
+| P3 · Import terminal review | **STILL_APPLICABLE → corrected in source/compiled** | Genuine idle/history inspected; the new completed/refresh-needed/failure branches were not all natively observed. |
+| P4 · Salary terminology | **STILL_APPLICABLE → corrected and observed** | Actuals and INR-per-QAR planning-rate labels observed with unchanged existing inputs/calculation. |
+| P5 · Import timestamps | **STILL_APPLICABLE → corrected** | Owner-selected Mac-local instant plus explicit offset observed in Dashboard/Import History; missing/invalid/historical-zone cases were not separately exercised. |
+| P6 · Remove commitment help | **STILL_APPLICABLE → corrected/compiled** | Hover with a genuine existing commitment remained unobserved. |
+
+N1–N3 remain bounded observations. Different action roles are not automatically defects; unobserved native states stay unobserved. Native Down Arrow selection and retained selection with Search focus are verified, while a complete tab/hover/accessibility matrix is not claimed.
+
+### Accepted correctness and native evidence
+
+This closure reuses the already completed evidence and explicit owner acceptance. It does not rerun those checks or convert older tests into Sprint-92 proof.
+
+| Evidence | Result and exact limit |
+| --- | --- |
+| Independent current-store comparison | **PASS** on **337 transaction records, one observed native currency, four accepted effect partitions**. Membership, multiplicity, effect classification, domain, currency, exact Money totals, chart handoff and date/coverage context agreed with the accepted unrestricted Transactions presentation. |
+| Independent Decimal summation | **PASS** over the eligible reference rows, separately from production Money aggregation. Current-generation readiness, exact adapter partitions and nil preservation also agreed. |
+| Comparison method and unchanged boundary | Read-only evaluation in the actual Debug app using already hydrated current stores; no database mutation, financial fixture, private source extraction or derived financial evidence file. Dashboard adapter SHA-256 `60513f8af52f75a99edcb661be3502c485c35b825a4a1b1c472c4ee560348d25` remained unchanged through final render-only normalization/copy/colour corrections. |
+| Final Debug | **BUILD SUCCEEDED**, 3.937 seconds, `BuildProject-Log-20260914-143809.txt` under Xcode ActionArtifacts; zero source warnings/errors and zero Issue Navigator issues. Existing App Intents metadata notice only. No closure build. |
+| Final executable SHA-256 | `26920d7d71acb154207a80edd08f40ca51f5a72e2548e2d1f1a6faf35722edf4` |
+| Final debug dylib SHA-256 | `c8d150855ee2d9e88b45ad0c230716434466b1f2ea85b68284e8c8527939257b` |
+| Final Recorded Activity | **1323 × 826** normal window and **1024 × 768**, with exact labels, both section scales, compact metadata/caveat/scale note and responsive placement inspected. |
+| Earlier Sprint-92 Dashboard | Wide **1710 × 1073**, intermediate **1024 × 768**, constrained **760 × 640**, with complete observed Money and reachable content. These precede the final Recorded Activity/financial-colour micro-pass; **760 × 640 is not a final-byte pass**. |
+| Other ordinary destinations | Transactions normal/selected/Search-focus; Accounts selected card and inspector; genuine Import idle/history (including supported **1180 × 792** minimum); current Salary editor; Settings wide and **760 × 640**. All six received Sprint-92 native inspection, without claiming another six-screen campaign after the final micro-pass. |
+| Developer Console | Inspected while already owner-enabled. No profile/log/financial mutation or re-enabling solely for evidence. |
+| Saved appearance | Normal quit/relaunch preserved the owner's then-current saved appearance values. Newer owner changes between checkpoints were preserved; no earlier palette/default snapshot was restored. |
+| Window restoration | Final window restored to **1323 × 826 at (113, 78)**, verified by native window read and saved frame. Intermittent `-1719` readback failures were resolved with the owner-authorized retry; no new resize campaign during closure. |
+| Git/reference hygiene | `git diff --check`, manifest payload size/SHA checks, unchanged reference/branding image bytes and exact scope review passed. Product files are frozen during closure. |
+| Regression tests | **SUSPENDED / 0 new regression-test executions** throughout Sprint 92 and closure. The independent presentation comparison was not a regression suite. |
+
+**Genuine unobserved financial shapes:** mixed-currency activity, undated activity and unclassified/missing-effect activity were not observed or manufactured. The actual comparison population had no withheld records or absent expected partitions, so these branches remain unqualified. The check is not a parser/corpus qualification or a substitute for future FW-P2-46 financial qualification.
+
+**Additional native/non-run limits:** no genuine prepared Preview A/B comparison, populated Salary history/long history amounts, genuine commitment hover or complete new Import terminal-state matrix. No regression suite, full TestPlan, Release build, statement corpus, authentic-source campaign, final-byte 760 recheck or whole-app instrumented no-write campaign was run merely for closure. Earlier native captures remain in memory/Chat, outside Git; no private screenshots or financial evidence artifacts are published.
+
+### Presentation reference lesson
+
+All ten surviving archived references were inspected as pixels: Accounts_v1.0, ComponentLibrary_v1.0, Dashboard_v1.0, DesignBoard_v2.0, DesignSystem_v1.0, DeveloperConsole_v1.0, ImportWizard_v1.0, Settings_v1.0, Transactions_v1.0 and AppIcon_v1.0. They remain useful for information density, hierarchy, compact financial tables, module proportions, spacing/rhythm, Money alignment, horizontal-space use, contextual actions, semantic financial colour and useful inspector/detail relationships. The old palette, illustrative financial values and unsupported old modules/actions/navigation are not authority. Current financial meaning and the accepted Sprint-91A appearance system remain authoritative. `UserJourney_v1.0.png` remains intentionally deleted; no Salary_v1.0 asset exists. External HIG/Impeccable installations, detector output or generated design artifacts are not repository payloads.
+
+### Publication scope and ownership
+
+One writer retained the primary worktree; the existing read-only reviewer checked bounded queue closure and residual scope without editing or running validation. The final product diff is confined to nine presentation/project paths. Product path/hash inventory digest (sorted repository-relative path, NUL, SHA-256 and newline): **`a84aa403669e7b430c2e30ed32d390eb8e838a6a73a85d78fd1f63ee778a769d`**. Both new Swift files have application-only Sources membership. No signing, entitlement, configuration, resource or deployment-setting change is included.
+
+<details>
+<summary>Exact published product/project paths (9)</summary>
+
+- `ContentView.swift`
+- `LedgerForge.xcodeproj/project.pbxproj`
+- `Utilities/ImportInstantFormatting.swift`
+- `ViewModels/DashboardViewModel.swift`
+- `Views/Common/LFInfoRow.swift`
+- `Views/Common/LFTheme.swift`
+- `Views/DashboardActivityComparisonView.swift`
+- `Views/SalaryView.swift`
+- `Views/TransactionListView.swift`
+
+</details>
+
+<details>
+<summary>Exact documentation/manifest closure paths (15)</summary>
+
+- `Project documents/Archive/Accepted outcomes/Sprints_90-99.md`
+- `Project documents/FUTURE_WORK.MD`
+- `Project documents/PROJECT_STATE.md`
+- `Project documents/SCOPE_DECISIONS.md`
+- `Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_90-99_Current.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/ACCEPTANCE.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/ASSET_MANIFEST.json`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/Inherited_Screens.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-05A_Cross_Screen_Conformance_Matrix.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/README.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/SC-02_Transactions.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/SC-03_Dashboard.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/SOURCES.md`
+- `Project documents/Work notes/Transaction_and_R1_workflows.md`
+
+</details>
+
+The owner authorizes only the intended Sprint-92 product/documentation commit and normal main push. Local/remote equality, zero ahead/behind and an intended clean worktree are verified after publication; writer ownership is released then. No tag or Sprint-93 execution is included. The published commit containing this record is the ending ref, avoiding a self-referential embedded commit hash.
 
 ---
 
