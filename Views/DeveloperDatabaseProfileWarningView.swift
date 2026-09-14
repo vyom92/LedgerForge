@@ -23,6 +23,7 @@ struct DeveloperDatabaseProfileWarningPresentation: Equatable {
 }
 
 struct DeveloperDatabaseProfileWarningView: View {
+    @Environment(\.lfTheme) private var theme
     let presentation: DeveloperDatabaseProfileWarningPresentation
 
     init?(profile: DevelopmentDatabaseProfileDescriptor) {
@@ -39,20 +40,20 @@ struct DeveloperDatabaseProfileWarningView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(presentation.title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(theme.typography.formBody.weight(.semibold))
                 Text(presentation.detail)
-                    .font(.caption)
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.formCaption)
+                    .foregroundStyle(theme.palette.secondaryText)
             }
 
             Spacer()
 
             if let sourceSchema = presentation.sourceSchema {
                 Text(sourceSchema)
-                    .font(.caption.weight(.medium))
+                    .font(theme.typography.formCaption.weight(.medium))
             }
             Text(presentation.currentSchema)
-                .font(.caption.weight(.medium))
+                .font(theme.typography.formCaption.weight(.medium))
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 10)

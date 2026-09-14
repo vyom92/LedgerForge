@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct LFEmptyState: View {
+    @Environment(\.lfTheme) private var theme
     let title: String
     let message: String
     let actionTitle: String?
@@ -29,21 +30,21 @@ struct LFEmptyState: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: systemImage)
-                .font(.system(size: 34))
-                .foregroundStyle(LFTheme.primaryHover)
+                .font(theme.typography.emptyStateIcon)
+                .foregroundStyle(theme.palette.accentHover)
             Text(title)
-                .font(.headline)
+                .font(theme.typography.formHeading)
             Text(message)
-                .font(.subheadline)
-                .foregroundStyle(LFTheme.textSecondary)
+                .font(theme.typography.formBody)
+                .foregroundStyle(theme.palette.secondaryText)
                 .multilineTextAlignment(.center)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .buttonStyle(.plain)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 9)
-                    .background(LFTheme.primaryGradient)
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                    .background(theme.palette.primaryAction)
+                    .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
             }
         }
         .frame(maxWidth: .infinity, minHeight: 220)
@@ -51,13 +52,14 @@ struct LFEmptyState: View {
 }
 
 struct LFCompactEmptyState: View {
+    @Environment(\.lfTheme) private var theme
     let message: String
     var minHeight: CGFloat = 80
 
     var body: some View {
         Text(message)
-            .font(.caption)
-            .foregroundStyle(LFTheme.textSecondary)
+            .font(theme.typography.formCaption)
+            .foregroundStyle(theme.palette.secondaryText)
             .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .center)
     }
 }

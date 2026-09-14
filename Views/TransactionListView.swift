@@ -28,6 +28,113 @@ private struct TransactionTableComparator: SortComparator {
     }
 }
 
+/// Paints existing AppKit rows without replacing SwiftUI's Table or its input,
+/// selection, sorting and reuse ownership. The row index is used only for stripes.
+private struct TransactionRowBackdrop: NSViewRepresentable {
+    @Environment(\.lfTheme) private var theme
+    let isSelected: Bool
+    let isEmphasized: Bool
+
+    func makeNSView(context: Context) -> RowAppearanceView {
+        let view = RowAppearanceView()
+        view.setAccessibilityElement(false)
+        return view
+    }
+
+    func updateNSView(_ view: RowAppearanceView, context: Context) {
+        view.theme = theme
+        view.isSelected = isSelected
+        view.isEmphasized = isEmphasized
+        view.applyAppearance()
+    }
+
+    static func dismantleNSView(_ view: RowAppearanceView, coordinator: ()) {
+        view.removeBackdrop()
+    }
+
+    final class RowAppearanceView: NSView {
+        var theme = LFTheme.dark
+        var isSelected = false
+        var isEmphasized = false
+        private let backdrop = CALayer()
+
+        override init(frame frameRect: NSRect) {
+            super.init(frame: frameRect)
+            backdrop.cornerRadius = theme.radius.control
+            backdrop.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
+            backdrop.actions = ["backgroundColor": NSNull(), "bounds": NSNull(), "position": NSNull()]
+        }
+
+        required init?(coder: NSCoder) { nil }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            if superview == nil { removeBackdrop() }
+            else { applyAppearance() }
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if window == nil { removeBackdrop() }
+            else { applyAppearance() }
+        }
+
+        override func layout() {
+            super.layout()
+            applyAppearance()
+        }
+
+        func removeBackdrop() { backdrop.removeFromSuperlayer() }
+
+        func applyAppearance() {
+            var ancestor = superview
+            var rowView: NSTableRowView?
+            while let view = ancestor {
+                if let row = view as? NSTableRowView { rowView = row }
+                if let table = view as? NSTableView, let rowView {
+                    // Public AppKit surfaces share the same viewport/scroll-gutter tint.
+                    table.backgroundColor = NSColor(theme.palette.controlSurface)
+                    if let scroll = table.enclosingScrollView {
+                        scroll.drawsBackground = false
+                        scroll.contentView.drawsBackground = false
+                    }
+                    let index = table.row(for: rowView)
+                    guard index >= 0 else { return }
+                    // Suppress only AppKit's system-colored selection drawing.
+                    // Native selection state and the existing checkmark remain.
+                    if table.selectionHighlightStyle != .none {
+                        table.selectionHighlightStyle = .none
+                    }
+                    if rowView.selectionHighlightStyle != .none {
+                        rowView.selectionHighlightStyle = .none
+                    }
+                    let color = theme.interaction.dataRow(
+                        selected: isSelected,
+                        active: isEmphasized,
+                        alternate: !index.isMultiple(of: 2)
+                    )
+                    backdrop.cornerRadius = theme.radius.control
+                    // AppKit refreshes backgroundColor during selection changes.
+                    // Keep this noninteractive wash above that background and
+                    // below native cell content so stripes survive the refresh.
+                    rowView.wantsLayer = true
+                    guard let rowLayer = rowView.layer else { return }
+                    if backdrop.superlayer !== rowLayer {
+                        backdrop.removeFromSuperlayer()
+                        rowLayer.insertSublayer(backdrop, at: 0)
+                    }
+                    backdrop.frame = rowView.bounds
+                    backdrop.backgroundColor = NSColor(color).cgColor
+                    return
+                }
+                ancestor = view.superview
+            }
+        }
+    }
+}
+
 enum TransactionPeriodChoice: String, CaseIterable {
     case all = "All dates"
     case thisMonth = "This month"
@@ -61,6 +168,8 @@ enum TransactionPeriodChoice: String, CaseIterable {
 }
 
 struct TransactionListView: View {
+    @Environment(\.lfTheme) private var theme
+    @Environment(\.appearsActive) private var appearsActive
     @StateObject private var viewModel = TransactionListViewModel()
     @ObservedObject private var categoryStore: CategoryStore
     private let categoryCoordinator: CategoryManaging
@@ -88,10 +197,10 @@ struct TransactionListView: View {
     @State private var acknowledgementChallenge: DevelopmentProfileAcknowledgementChallenge?
 #endif
 
-    private let secondary = Color(hex: 0xABB7C9)
-    private let panelColor = Color(hex: 0x111827)
-    private let controlBorder = Color(hex: 0x77869C)
-    private let focusColor = Color(hex: 0xB2A3FF)
+    private var secondary: Color { theme.palette.secondaryText }
+    private var panelColor: Color { theme.palette.contentSurface }
+    private var controlBorder: Color { theme.palette.fieldBorder }
+    private var focusColor: Color { theme.interaction.focusRing }
 
 #if DEBUG
     @MainActor
@@ -159,7 +268,7 @@ struct TransactionListView: View {
                         .frame(width: 320)
                 }
             }
-            .padding(24)
+            .padding(theme.spacing.pagePadding)
             .onChange(of: narrow, initial: true) { _, constrained in
                 if constrained { detailsVisible = false }
             }
@@ -170,9 +279,8 @@ struct TransactionListView: View {
                     .background(panelColor)
             }
         }
-        .background(LFTheme.backgroundGradient)
-        .foregroundStyle(LFTheme.text)
-        .font(.system(size: 14))
+        .foregroundStyle(theme.palette.primaryText)
+        .font(theme.typography.tableBody)
         .onAppear(perform: synchronizePresentation)
         .onChange(of: generation) { _, _ in synchronizePresentation() }
         .onChange(of: availabilityState) { _, _ in synchronizePresentation() }
@@ -227,8 +335,8 @@ struct TransactionListView: View {
                 }
             }
             .padding(10)
-            .background(panelColor, in: RoundedRectangle(cornerRadius: 6))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(searchFocused ? focusColor : controlBorder, lineWidth: searchFocused ? 2 : 1))
+            .background(panelColor, in: RoundedRectangle(cornerRadius: theme.radius.control))
+            .overlay(RoundedRectangle(cornerRadius: theme.radius.control).stroke(searchFocused ? focusColor : controlBorder, lineWidth: searchFocused ? 2 : 1))
 
             Picker("Period", selection: $period) {
                 ForEach(TransactionPeriodChoice.allCases, id: \.self) { choice in
@@ -245,7 +353,7 @@ struct TransactionListView: View {
             } label: {
                 Label(!narrow && detailsVisible ? "Hide details" : "Show details", systemImage: "sidebar.right")
             }
-            .buttonStyle(.bordered)
+            .lfSecondaryAction()
             .accessibilityLabel(!narrow && detailsVisible ? "Hide details" : "Show details")
             .help("Open or close details without changing the selected transaction.")
         }
@@ -274,11 +382,11 @@ struct TransactionListView: View {
             }
             HStack(spacing: 12) {
                 Text(activeCriteriaCount == 0 ? "All transactions · source dates · native currencies" : "\(activeCriteriaCount) active criteria · all matching transactions")
-                    .font(.system(size: 12))
+                    .font(theme.typography.caption)
                     .foregroundStyle(secondary)
                 Spacer(minLength: 0)
                 Button("Clear filters", action: clearFilters)
-                    .buttonStyle(.borderless)
+                    .lfSecondaryAction()
                     .disabled(activeCriteriaCount == 0)
             }
         }
@@ -377,27 +485,28 @@ struct TransactionListView: View {
         Button {
             moreFiltersVisible.toggle()
         } label: { Label("More filters", systemImage: "line.3.horizontal.decrease") }
-            .buttonStyle(.bordered)
+            .lfSecondaryAction()
             .accessibilityLabel("More filters")
             .popover(isPresented: $moreFiltersVisible, arrowEdge: .bottom) {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("More filters").font(.headline)
+                    Text("More filters").font(theme.typography.formHeading)
                     HStack { familyMenu; effectMenu }
                     institutionMenu
                     Divider()
-                    Text("Amount range").font(.headline)
+                    Text("Amount range").font(theme.typography.formHeading)
                     Text("Choose one native currency. Bounds include the entered amounts.")
-                        .font(.system(size: 12)).foregroundStyle(secondary)
+                        .font(theme.typography.caption).foregroundStyle(secondary)
                     currencyMenu
                     HStack {
                         TextField("Minimum", text: $minimumAmount)
+                            .lfTextField()
                             .accessibilityLabel("Minimum native amount")
                         TextField("Maximum", text: $maximumAmount)
+                            .lfTextField()
                             .accessibilityLabel("Maximum native amount")
                     }
-                    .textFieldStyle(.roundedBorder)
                     Text("Use a decimal point; leave a bound empty for no limit.")
-                        .font(.system(size: 12)).foregroundStyle(secondary)
+                        .font(theme.typography.caption).foregroundStyle(secondary)
                     if let message = amountInputError {
                         Label(message, systemImage: "exclamationmark.triangle")
                             .foregroundStyle(LFTheme.warning)
@@ -419,7 +528,7 @@ struct TransactionListView: View {
 
     private func filterLabel(_ title: String, count: Int) -> some View {
         Text(count == 0 ? "\(title): All" : "\(title): \(count)")
-            .font(.system(size: 13))
+            .font(theme.typography.secondary)
             .padding(.vertical, 3)
     }
 
@@ -452,13 +561,14 @@ struct TransactionListView: View {
         HStack(spacing: 12) {
             Text("Source date").foregroundStyle(secondary)
             TextField("From YYYY-MM-DD", text: $customStart)
+                .lfTextField()
                 .accessibilityLabel("Source date from, year month day")
             Text("to").foregroundStyle(secondary)
             TextField("Through YYYY-MM-DD", text: $customEnd)
+                .lfTextField()
                 .accessibilityLabel("Source date through, year month day")
-            Text("Inclusive").font(.system(size: 12)).foregroundStyle(secondary)
+            Text("Inclusive").font(theme.typography.caption).foregroundStyle(secondary)
         }
-        .textFieldStyle(.roundedBorder)
     }
 
     private func updatePeriod() {
@@ -531,13 +641,13 @@ struct TransactionListView: View {
                             if let money = result.totals.partitions[key] {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(totalTitle(key))
-                                        .font(.system(size: 12)).foregroundStyle(secondary)
+                                        .font(theme.typography.caption).foregroundStyle(secondary)
                                     Text(MoneyFormatting.display(money))
-                                        .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                                        .font(theme.typography.tableSummary)
                                         .fixedSize(horizontal: true, vertical: false)
                                 }
                                 .padding(12)
-                                .background(panelColor, in: RoundedRectangle(cornerRadius: 7))
+                                .background(theme.palette.raisedSurface, in: RoundedRectangle(cornerRadius: theme.radius.control))
                             }
                         }
                     }
@@ -545,12 +655,12 @@ struct TransactionListView: View {
                 if result.totals.withheldUnknownDomainCount + result.totals.withheldUnknownEffectCount > 0 {
                     Label("\(result.totals.withheldUnknownDomainCount + result.totals.withheldUnknownEffectCount) matching transactions have unestablished effects; their totals are withheld.",
                           systemImage: "info.circle")
-                        .font(.system(size: 12)).foregroundStyle(secondary)
+                        .font(theme.typography.caption).foregroundStyle(secondary)
                 }
             }
             if viewModel.presentationFilter.statementDateRange != nil && result.exclusions.period > 0 && inputError == nil {
                 Text("\(result.exclusions.period) excluded by the period. Transactions without a source date are excluded.")
-                    .font(.system(size: 12)).foregroundStyle(secondary)
+                    .font(theme.typography.caption).foregroundStyle(secondary)
             }
         }
     }
@@ -575,10 +685,10 @@ struct TransactionListView: View {
         return "\(key.currency.code) · \(effect)"
     }
 
-    /// Match the actual monospaced display font, including sign and currency.
+    /// Match the system display font with tabular digits, including sign and currency.
     /// This measurement owns no AppKit view, window, or application lifecycle.
     private var amountColumnWidth: CGFloat {
-        let font = NSFont.monospacedSystemFont(ofSize: 14, weight: .medium)
+        let font = theme.typography.nativeFont(.tableMoney)
         return max(160, viewModel.allPresentationRows.reduce(CGFloat.zero) { width, row in
             max(width, (MoneyFormatting.display(row.transaction.money) as NSString).size(withAttributes: [.font: font]).width + 24)
         })
@@ -587,89 +697,97 @@ struct TransactionListView: View {
     private var transactionTable: some View {
         VStack(spacing: 10) {
             Table(hasUsableResults ? result.rows : [], selection: selection, sortOrder: tableSort) {
-                TableColumn("Date", sortUsing: TransactionTableComparator(key: .statementDate, order: .reverse)) { row in
+                TableColumn(sortHeader(.statementDate), sortUsing: TransactionTableComparator(key: .statementDate, order: .reverse)) { row in
                     HStack(spacing: 5) {
                         Image(systemName: row.id == viewModel.selectedPresentationRowID ? "checkmark" : "minus")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(theme.typography.tableSelectionMark)
                             .opacity(row.id == viewModel.selectedPresentationRowID ? 1 : 0)
                             .accessibilityHidden(true)
                         Text(row.sourceCivilDate?.presentation ?? "Unavailable")
-                            .font(.system(size: 13))
+                            .font(theme.typography.secondary)
                     }
-                    .padding(.vertical, 8)
+                    .padding(.vertical, theme.spacing.small)
+                    .frame(minHeight: theme.typography.tableRowMinimum)
+                    .background {
+                        TransactionRowBackdrop(
+                            isSelected: row.id == viewModel.selectedPresentationRowID,
+                            isEmphasized: tableFocused && appearsActive
+                        )
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                    }
                 }
                 .width(min: 96, ideal: 112)
-                TableColumn("Description", sortUsing: TransactionTableComparator(key: .description)) { row in
+                TableColumn(sortHeader(.description), sortUsing: TransactionTableComparator(key: .description)) { row in
                     Text(row.transaction.description)
                         .lineLimit(2)
                         .help(row.transaction.description)
                         .padding(.vertical, 6)
                 }
                 .width(min: 220, ideal: 280)
-                TableColumn("Account", sortUsing: TransactionTableComparator(key: .account)) { row in
+                TableColumn(sortHeader(.account), sortUsing: TransactionTableComparator(key: .account)) { row in
                     VStack(alignment: .leading, spacing: 3) {
                         Text(row.accountDisplayName).lineLimit(1)
                         Text(row.institutionDisplayName)
-                            .font(.system(size: 12)).foregroundStyle(secondary).lineLimit(1)
+                            .font(theme.typography.caption).foregroundStyle(secondary).lineLimit(1)
                     }
                     .help("\(row.accountDisplayName) · \(row.institutionDisplayName)")
                 }
                 .width(min: 136, ideal: 160)
-                TableColumn("Category", sortUsing: TransactionTableComparator(key: .category)) { row in
+                TableColumn(sortHeader(.category), sortUsing: TransactionTableComparator(key: .category)) { row in
                     Text(row.currentCategoryDisplayName)
-                        .font(.system(size: 12))
+                        .font(theme.typography.caption)
                         .lineLimit(1)
                         .padding(.horizontal, 7).padding(.vertical, 4)
-                        .background(Color(hex: 0x292344), in: Capsule())
+                        .background(theme.interaction.dataBadge, in: Capsule())
                         .help(row.currentCategoryDisplayName)
                 }
                 .width(min: 120, ideal: 144)
-                TableColumn("Amount", sortUsing: TransactionTableComparator(key: .nativeAmount)) { row in
+                TableColumn(sortHeader(.nativeAmount), sortUsing: TransactionTableComparator(key: .nativeAmount)) { row in
                     Text(MoneyFormatting.display(row.transaction.money))
-                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                        .font(theme.typography.tableMoney)
                         .fixedSize(horizontal: true, vertical: false)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
                 .width(min: amountColumnWidth, ideal: amountColumnWidth)
             }
-            .tableStyle(.inset(alternatesRowBackgrounds: true))
+            .tableStyle(.inset(alternatesRowBackgrounds: false))
+            .tint(theme.palette.dataSelection)
             .scrollContentBackground(.hidden)
             .background(panelColor)
             .focused($tableFocused)
+            .focusEffectDisabled()
             .overlay {
                 if !hasUsableResults {
                     outcomeState
-                        .padding(24)
+                        .padding(theme.spacing.pagePadding)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(panelColor)
                         .padding(.top, 28)
                 }
             }
-            .overlay(RoundedRectangle(cornerRadius: 7).stroke(tableFocused ? focusColor : Color(hex: 0x38445A), lineWidth: tableFocused ? 2 : 1))
-            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .overlay(RoundedRectangle(cornerRadius: theme.radius.panel).strokeBorder(theme.palette.tableBorder, lineWidth: 1).allowsHitTesting(false))
+            .clipShape(RoundedRectangle(cornerRadius: theme.radius.panel))
 
             HStack(spacing: 12) {
                 Text(inputError == nil && (result.state == .ready || result.state == .validEmpty)
                      ? "\(result.rows.count) matching · \(viewModel.allPresentationRows.count) total"
                      : "Results unavailable")
-                    .font(.system(size: 12)).foregroundStyle(secondary)
+                    .font(theme.typography.caption).foregroundStyle(secondary)
                 Spacer()
-                Menu {
-                    ForEach(TransactionPresentationSortKey.allCases, id: \.self) { key in
-                        Button(sortTitle(key)) { viewModel.presentationSort.key = key }
-                    }
-                    Divider()
-                    Button("Reverse direction") {
-                        viewModel.presentationSort.direction = viewModel.presentationSort.direction == .ascending ? .descending : .ascending
-                    }
-                } label: {
-                    Label("\(sortTitle(viewModel.presentationSort.key)) · \(viewModel.presentationSort.direction == .ascending ? "ascending" : "descending")",
-                          systemImage: "arrow.up.arrow.down")
-                }
-                .fixedSize()
-                .help("Sort all matching transactions. Currency groups remain separate.")
             }
         }
+    }
+
+    private func sortHeader(_ key: TransactionPresentationSortKey) -> Text {
+        let title = sortTitle(key)
+        // The active column keeps AppKit's native direction indicator. Other
+        // headers show a quiet sorting hint without adding another control.
+        if viewModel.presentationSort.key == key { return Text(title) }
+        let hint = Text(Image(systemName: "arrow.up.arrow.down"))
+            .font(theme.typography.tableSortIcon)
+            .foregroundColor(theme.palette.secondaryText.opacity(0.6))
+        return Text("\(title)  \(hint)")
     }
 
     private func sortTitle(_ key: TransactionPresentationSortKey) -> String {
@@ -706,7 +824,7 @@ struct TransactionListView: View {
                         systemImage: "tray"
                     )
                     if !viewModel.allPresentationRows.isEmpty {
-                        Button("Clear filters", action: clearFilters).buttonStyle(.bordered)
+                        Button("Clear filters", action: clearFilters).lfSecondaryAction()
                     }
                 }
             case .unavailable:
@@ -724,13 +842,13 @@ struct TransactionListView: View {
     private var inspector: some View {
         VStack(spacing: 12) {
             HStack {
-                Text("Transaction details").font(.headline)
+                Text("Transaction details").font(theme.typography.formHeading)
                 Spacer()
                 Button {
                     detailsVisible = false
                     narrowDetailsVisible = false
                 } label: { Image(systemName: "xmark") }
-                .buttonStyle(.bordered)
+                .lfSecondaryAction()
                 .help("Close transaction details")
                 .accessibilityLabel("Close transaction details")
             }
@@ -739,25 +857,25 @@ struct TransactionListView: View {
         .frame(maxHeight: .infinity, alignment: .top)
     }
     private var transactionDetailPanel: some View {
-        LFPanel {
+        LFPanel(variant: .inspector) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     if let selected = selectedTransaction {
                         let presentation = viewModel.detailPresentation(for: selected)
                         HStack(spacing: 12) {
                             Image(systemName: "doc.text.magnifyingglass")
-                                .foregroundStyle(LFTheme.text)
+                                .foregroundStyle(theme.palette.primaryText)
                                 .frame(width: 46, height: 46)
-                                .background(Color(hex: 0x292344))
+                                .background(theme.interaction.dataIcon)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(presentation.description)
-                                    .font(.headline)
+                                    .font(theme.typography.formHeading)
                                     .lineLimit(2)
                                 Text(presentation.signedAmount)
-                                    .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                                    .font(theme.typography.body.weight(.semibold))
                                     .fixedSize(horizontal: true, vertical: false)
-                                    .foregroundStyle(LFTheme.text)
+                                    .foregroundStyle(theme.palette.primaryText)
                                     .monospacedDigit()
                             }
                             Spacer()
@@ -792,41 +910,41 @@ struct TransactionListView: View {
                                     color: validation.isPassed ? LFTheme.success : LFTheme.warning
                                 )
                                 Text(validation.detail)
-                                    .font(.caption)
-                                    .foregroundStyle(LFTheme.textSecondary)
+                                    .font(theme.typography.formCaption)
+                                    .foregroundStyle(theme.palette.secondaryText)
                             } else {
                                 LFInfoRow(title: "Outcome", value: "Unavailable", titleWidth: 100, verticalPadding: 0)
                                 Text("Validation is unavailable for this imported transaction.")
-                                    .font(.caption)
-                                    .foregroundStyle(LFTheme.textSecondary)
+                                    .font(theme.typography.formCaption)
+                                    .foregroundStyle(theme.palette.secondaryText)
                             }
                         }
 
                         if let categoryMessage {
                             Text(categoryMessage)
-                                .font(.caption)
+                                .font(theme.typography.formCaption)
                                 .foregroundStyle(LFTheme.warning)
                         }
 
                         if categoryReconciliationRequired {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Your category change was saved, but the app could not refresh. Further category changes are temporarily blocked until the repository is refreshed.")
-                                    .font(.caption)
+                                    .font(theme.typography.formCaption)
                                     .foregroundStyle(LFTheme.warning)
                                 Button("Retry refresh", action: retryCanonicalHydration)
-                                    .buttonStyle(.bordered)
+                                    .lfSecondaryAction()
                             }
                         }
                     } else {
                         VStack(spacing: 12) {
                             Image(systemName: "cursorarrow.click")
-                                .font(.system(size: 34))
-                                .foregroundStyle(LFTheme.primaryHover)
+                                .font(theme.typography.emptyStateIcon)
+                                .foregroundStyle(theme.palette.accentHover)
                             Text("Select a transaction")
-                                .font(.headline)
+                                .font(theme.typography.formHeading)
                             Text("Details appear here without leaving the transaction table.")
-                                .font(.caption)
-                                .foregroundStyle(LFTheme.textSecondary)
+                                .font(theme.typography.formCaption)
+                                .foregroundStyle(theme.palette.secondaryText)
                                 .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity, minHeight: 260)
@@ -842,23 +960,18 @@ struct TransactionListView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.headline)
+                .font(theme.typography.formHeading)
             content()
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LFTheme.surfaceRaised.opacity(0.7))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(LFTheme.border, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .lfSurface(.subtle)
     }
 
     private func categoryPicker(for transaction: Transaction, titleWidth: CGFloat = 86) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text("Category")
-                .foregroundStyle(LFTheme.textSecondary)
+                .foregroundStyle(theme.palette.secondaryText)
                 .frame(width: titleWidth, alignment: .leading)
             Picker(
                 "Category",
@@ -881,7 +994,7 @@ struct TransactionListView: View {
             .disabled(transaction.repositoryTransactionId == nil)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .font(.caption)
+        .font(theme.typography.formCaption)
     }
 
     private func categoryName(for transaction: Transaction) -> String {

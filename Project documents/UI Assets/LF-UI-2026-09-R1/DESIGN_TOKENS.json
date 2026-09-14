@@ -3,24 +3,21 @@
   "status": "Designer-specified implementation targets under the approved visual direction; not measured pixel values or native-app acceptance evidence.",
   "units": {
     "layout": "macOS logical points",
-    "font": "reference points; no user text-scale system required",
+    "font": "Reference default points; owner-authorized hierarchy sliders may override in the dark-only Sprint-91A app.",
     "colors": "sRGB hex, opaque unless otherwise specified"
   },
   "appearance": {
-    "default_mode": "system",
+    "default_mode": "dark",
     "modes": [
-      "system",
-      "light",
       "dark"
     ],
-    "default_preset": "system-neutral",
+    "default_preset": "approved-current-candidate",
     "presets": [
-      "system-neutral",
-      "deep-indigo"
+      "approved-current-candidate"
     ],
-    "default_accent": "system",
+    "default_accent": "approved-current-candidate",
     "money_tabular_digits": "mandatory",
-    "scope": "Simple local appearance; optional existing system/Deep Indigo accent choice. No advanced editor or portable preference contract."
+    "scope": "2026-09-14 owner decision: dark-only shared colours/tints, installed font family and hierarchy sizes, background/card opacity, responsive Settings. Earlier System/Light planning is superseded history in Inherited_Screens.md; numeric and palette references are unchanged. Preserve the current approved implementation defaults; this file is not loaded at runtime."
   },
   "typography": {
     "body": 16,

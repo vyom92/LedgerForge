@@ -4,7 +4,135 @@ Accepted evidence by cycle, not execution authority. [Current state](../../PROJE
 
 ## Index
 
+- [Accepted Sprint 91A — Dark Appearance and Visual Foundation — 2026-09-14](#sprint-91a)
 - [Accepted Sprint 90 — R1 Dashboard Native-Currency Hierarchy — 2026-09-12](#sprint-90)
+
+**Current alignment — 2026-09-14:** the owner accepts Sprint 91A's accumulated visual foundation and dark-only local customizable appearance, including the current Dashboard composition, with the bounded final-byte small-window limitation below. Original Sprint-91 System/Light planning is superseded history. The 2026-09-13 visual qualification and earlier 91A checkpoints remain in the [working history](../../Work%20notes/Transaction_and_R1_workflows.md#sprint-91a-visual-conformance). The original Sprint-90 record below is preserved, including its then-current forward planning; those historical future-status statements do not override this acceptance.
+
+---
+
+<a id="sprint-91a"></a>
+## Accepted Sprint 91A — Dark Appearance and Visual Foundation — 2026-09-14
+
+**OWNER-ACCEPTED** under `SPRINT_91A_DARK_APPEARANCE_AND_VISUAL_FOUNDATION_ACCEPTED`. The owner supplied the coordinator's explicit acceptance/closure/publication instruction and authorized the current task to complete it. Starting published ref: `ee547a46a126426275f5ecddadf13f769f6b1651` on `main`. The commit containing this closure record publishes the accumulated accepted product, icon assets and reconciled documentation together; its Git identity is the Sprint-92 execution baseline. No further visual redesign, runtime campaign or Sprint-92 implementation is included.
+
+### Accepted outcome and preserved state
+
+- Shared modular `LFTheme` roles and reusable panel/control/input/action components own colours, materials, typography, spacing, corners and interaction states. The existing root/theme injection and window/scene identity remain.
+- Dark-only local appearance offers 11 shared colour/tint wells, installed font family and semantic hierarchy-size controls, and background/card tint opacity. Changes apply immediately and persist through the existing single UI preference owner. Responsive Settings keeps the existing destination and data/category/developer controls.
+- Restore Defaults affects appearance overrides only. The owner's newer live colours, typography and opacity are local user state; they must not be reset, rewritten, or copied into factory defaults during closure. Earlier successful reset demonstrations are evidence, not an instruction to repeat them.
+- All six ordinary destinations share Collapse/Expand and consistent sidebar/canvas/header presentation. The accepted title bar retains native traffic lights and sidebar tint. Shared card edges, secondary controls including Clear filters, local focus cues, and coordinated table/scroller corners remain.
+- Transactions retains the existing Table, comparator-backed header sorting, selection and focus treatment, exact Money and effect meanings. No filtering, identity, category, source-order or financial aggregation semantics change.
+- The owner accepts the current Dashboard visual foundation and truthful compact composition: native-currency bank/card domains and source dates, compact missing-plan treatment, existing funding outputs, three display-only recent rows, genuine import context and the three established routes. No chart or broader analytics is included in 91A.
+- Fresh untouched Salary default-zero inputs appear blank; calculated zeroes, entered/saved values and fee behavior remain. The accepted 11-line read-only `isInitialZeroInput` query leaves raw draft, parsing, calculation, update and Save ownership unchanged.
+- The repeated shared-header Import Statement action is removed; Import's local chooser/empty-state actions and Dashboard Open Import remain. Import preparation/confirmation/recovery and durable semantics are unchanged.
+- The supplied archived `AppIcon_v1.0.png` provides all ten macOS app-icon renditions; the sidebar reads the same application identity. The archived original remains byte-identical, SHA-256 `5593e9ce6ebeed8d564a6a671a4c4bdcf7cd79bcecf9903561fffccf74783aac`.
+- The owner intentionally deleted `Project documents/UI Assets/Archived/UserJourney_v1.0.png`. Its deletion is included in publication; it is not an accidental implementation change and must not be restored.
+
+Financial/model, Money/date/effect, Salary calculation/draft/Save, parser/source, repository/provider/hydration, identity and database/migration semantics remain unchanged. **V17**, Swift 6, deployment target, signing/entitlements and the accepted day-change crash correction/regression source are preserved. Appearance preferences are the only newly accepted persistence. **No new ADR or migration.**
+
+### Accepted evidence boundary
+
+This closure reuses the preceding final Debug/native handoff and the coordinator's explicit acceptance. It does not claim fresh execution of those checks.
+
+| Evidence | Accepted result and exact boundary |
+| --- | --- |
+| Final post-HIG/icon Debug build | BUILD SUCCEEDED; zero source warnings; existing App Intents metadata-extraction notice only. No fresh closure build. |
+| Final executable SHA-256 | `734c2423fad9e7253fd0aeb86718930edaa78868baed265c10ea84eca284420a` |
+| Compiled Settings source SHA-256 | `8195dad5d3f3f32be0c89d78373e7921c342d707e8e51f92aaf918c611390f8d` |
+| Compiled shell source SHA-256 | `5aedc00c96154370eac9e3dcc2e1eec6783b0422a9d4b008960d37f07d1b46f0` |
+| Xcode diagnostics | Earlier r34 cleared Issue Navigator and affected source-editor diagnostics to zero; final targeted build had zero source warnings. No fresh editor scan claimed. |
+| Appearance persistence | Normal quit/process exit and same-product relaunch restored the complete saved appearance snapshot. Later owner changes were left intact; no reset during closure. |
+| Icon identity | Final bundle signature and ten rendition dimensions verified; native sidebar identity observed. Direct Dock pixels are a separate unobserved case. |
+| Final native views | Settings and Dashboard at 1440 × 900; Transactions selected record with table focus versus Search focus. |
+| Earlier r34 responsive Settings | 1440 × 900, 1024 × 768 and 760 × 640 observed; earlier intermediate 1200 × 850 reflow observation belongs to its own bytes. |
+| Financial mutation boundary during review | No financial Save, import confirmation or category mutation used for visual inspection. No final-byte instrumented no-write campaign is claimed. |
+| Regression tests | **SUSPENDED / 0 new executions** in the appearance continuation and this closure; no inferred new pass/fail/skip result. Earlier pre-suspension evidence remains historical. |
+| Other non-runs | No final-byte optimized Release, full TestPlan, parser/corpus, financial-oracle or crash-negative-control campaign. |
+
+**FINAL_BYTE_SMALL_WINDOW_NATIVE_RECHECK_NOT_COMPLETED — accepted bounded verification limitation.** Exact final post-HIG/icon bytes were not reverified at 1024 × 768 or 760 × 640 after AppleScript repeatedly returned zero LedgerForge windows / invalid index `-1719`. The final targeted 1140 × 800 intermediate check also remains unverified. Earlier r34 responsive observations are not converted into PASS on the final bytes. The owner explicitly accepts moving forward; no repeat resize campaign is authorized by this closure. Final saved frame was 1710 × 1073 after normal quit/relaunch, matching starting size; final AppleScript position readback was unavailable.
+
+Hover and direct Dock pixels remain **NOT_OBSERVED**. Developer Console was not observed in the final build because Developer Mode remained off; the Transactions filter-popover pixels were not visually verified in the earlier shared-theme pass. Additional currencies, populated/partial saved funding, active imports, malformed preference payloads, all installed families/font extremes and the extreme-value horizontal-scroll branch remain unobserved. No records or states were manufactured. These limitations do not become passes through owner acceptance.
+
+### Closure review and publication scope
+
+A fresh read-only Terra/high review found no publication blocker in the accumulated product diff: one UI preference store, accepted Salary presentation query, preserved financial/source/migration/day-change boundaries, exact new source membership and ten icon slots. This is source review, not fresh native or financial qualification. Closure edits are confined to current documentation owners and manifest alignment; accepted product/project/icon bytes are retained unchanged.
+
+The candidate has **52 paths**: **35 product/project/icon paths**, **16 documentation/manifest paths**, and the **one intentional archived image deletion**. The two new Swift sources have application Sources membership; design-reference payloads remain outside the app's resource membership. Private captures, source financial content, external skill installations and temporary design-tool artifacts are excluded.
+
+Product path/hash inventory digest (SHA-256 over sorted repository-relative path, NUL, file SHA-256 and newline): `91105c5aa0224e7efff5b353d3e1eb37f15dac62599600ac6e95d4c4f802a3eb`.
+
+<details>
+<summary>Exact published product/project/icon paths (35)</summary>
+
+- `AppShellPresentation.swift`
+- `Assets.xcassets/AppIcon.appiconset/AppIcon_128x128@1x.png`
+- `Assets.xcassets/AppIcon.appiconset/AppIcon_128x128@2x.png`
+- `Assets.xcassets/AppIcon.appiconset/AppIcon_16x16@1x.png`
+- `Assets.xcassets/AppIcon.appiconset/AppIcon_16x16@2x.png`
+- `Assets.xcassets/AppIcon.appiconset/AppIcon_256x256@1x.png`
+- `Assets.xcassets/AppIcon.appiconset/AppIcon_256x256@2x.png`
+- `Assets.xcassets/AppIcon.appiconset/AppIcon_32x32@1x.png`
+- `Assets.xcassets/AppIcon.appiconset/AppIcon_32x32@2x.png`
+- `Assets.xcassets/AppIcon.appiconset/AppIcon_512x512@1x.png`
+- `Assets.xcassets/AppIcon.appiconset/AppIcon_512x512@2x.png`
+- `Assets.xcassets/AppIcon.appiconset/Contents.json`
+- `ContentView.swift`
+- `Core/LFConsoleButton.swift`
+- `ImportCentreFooterRenderer.swift`
+- `LedgerForge.xcodeproj/project.pbxproj`
+- `LedgerForgeApp.swift`
+- `ViewModels/SalaryWorkspaceViewModel.swift`
+- `Views/AppearanceSettingsView.swift`
+- `Views/CategoryManagementView.swift`
+- `Views/Common/LFActionRow.swift`
+- `Views/Common/LFAppearancePreferences.swift`
+- `Views/Common/LFEmptyState.swift`
+- `Views/Common/LFFilterChip.swift`
+- `Views/Common/LFIconTile.swift`
+- `Views/Common/LFInfoRow.swift`
+- `Views/Common/LFInlineBadge.swift`
+- `Views/Common/LFPanel.swift`
+- `Views/Common/LFStatusBadge.swift`
+- `Views/Common/LFTheme.swift`
+- `Views/DeveloperConsoleView.swift`
+- `Views/DeveloperDatabaseProfileWarningView.swift`
+- `Views/ImportCentreBatchViews.swift`
+- `Views/SalaryView.swift`
+- `Views/TransactionListView.swift`
+
+</details>
+
+<details>
+<summary>Reconciled/published documentation and intentional deletion (17)</summary>
+
+- `Project documents/Archive/Accepted outcomes/Sprints_90-99.md`
+- `Project documents/FUTURE_WORK.MD`
+- `Project documents/PROJECT_STATE.md`
+- `Project documents/SCOPE_DECISIONS.md`
+- `Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_90-99_Current.md`
+- `Project documents/UI Assets/Archived/UserJourney_v1.0.png` — intentional owner deletion
+- `Project documents/UI Assets/LF-UI-2026-09-R1/ACCEPTANCE.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/ASSET_MANIFEST.json`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/DESIGN_HANDOFF.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/DESIGN_TOKENS.json`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/Inherited_Screens.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/LF-UI-2026-09-R1_SC-05A_Cross_Screen_Conformance_Matrix.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/README.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/SC-01_App_Shell.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/SC-03_Dashboard.md`
+- `Project documents/UI Assets/LF-UI-2026-09-R1/SOURCES.md`
+- `Project documents/Work notes/Transaction_and_R1_workflows.md`
+
+</details>
+
+`apple-hig` and Impeccable remain external tools, not product dependencies. The accepted handoff records 156 HIG references and a user-wide Impeccable install/smoke verification whose temporary artifacts were rolled back to the pre-smoke repository state. No launcher/detector/browser output is native SwiftUI acceptance evidence, and no external skill payload or parallel PRODUCT.md/DESIGN.md authority is added here.
+
+### Disposition and Sprint 92 handoff
+
+**FW-P2-52 is completed**, with FW-P2-55's consolidation retained in [SCOPE_DECISIONS](../../SCOPE_DECISIONS.md#fw-p2-52). **FW-P2-48 and FW-P2-50 remain open** for actual cross-screen residue; no broad item is closed by a partial slice. Original Sprint-91 System/Light appearance is **SUPERSEDED HISTORY**. **FW-P2-49: NOT REQUIRED-DO NOT CONSIDER. PERSONAL-V1: NOT YET ADOPTED.**
+
+**Sprint 92: NEXT / NOT STARTED.** Its exact baseline is the published commit containing this closure, not `ee547a46…`. Refresh SC-05A and consume the [forward handoff](../../Work%20notes/Transaction_and_R1_workflows.md#sprint-92-handoff). The original five-item queue and owner-requested v1 information-presentation direction remain; FW-P2-46 chart work stays a separately selected bounded slice with independent genuine-data verification required. No broad analytics, inferred spending/income/expenses, hidden FX, invented net worth, financial fixtures or Sprint-93 work is authorized here. The 93–100 sequence is unchanged.
 
 ---
 

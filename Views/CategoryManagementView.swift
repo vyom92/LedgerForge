@@ -22,6 +22,7 @@ private enum CategoryMutationIntent {
 }
 
 struct CategoryManagementView: View {
+    @Environment(\.lfTheme) private var theme
     @ObservedObject private var categoryStore: CategoryStore
     private let coordinator: CategoryManaging
 #if DEBUG
@@ -68,7 +69,7 @@ struct CategoryManagementView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
                     TextField("New category name", text: $newName)
-                        .textFieldStyle(.roundedBorder)
+                        .lfTextField()
                         .onSubmit(create)
                     Button("Create", action: create)
                         .buttonStyle(.borderedProminent)
@@ -85,24 +86,24 @@ struct CategoryManagementView: View {
                 } else {
                     categorySection(title: "Active", categories: categoryStore.activeCategories)
                     if !categoryStore.archivedCategories.isEmpty {
-                        Divider().overlay(LFTheme.divider)
+                        Divider().overlay(theme.palette.divider)
                         categorySection(title: "Archived", categories: categoryStore.archivedCategories)
                     }
                 }
 
                 if let message {
                     Text(message)
-                        .font(.caption)
+                        .font(theme.typography.formCaption)
                         .foregroundStyle(LFTheme.warning)
                 }
 
                 if categoryReconciliationRequired {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Your category change was saved, but the app could not refresh. Further category changes are temporarily blocked until the repository is refreshed.")
-                            .font(.caption)
+                            .font(theme.typography.formCaption)
                             .foregroundStyle(LFTheme.warning)
                         Button("Retry refresh", action: retryCanonicalHydration)
-                            .buttonStyle(.bordered)
+                            .lfSecondaryAction()
                     }
                 }
             }
@@ -152,13 +153,13 @@ struct CategoryManagementView: View {
         if !categories.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.formCaption.weight(.semibold))
+                    .foregroundStyle(theme.palette.secondaryText)
 
                 ForEach(categories) { category in
                     categoryRow(category)
                     if category.id != categories.last?.id {
-                        Divider().overlay(LFTheme.divider)
+                        Divider().overlay(theme.palette.divider)
                     }
                 }
             }
@@ -168,15 +169,15 @@ struct CategoryManagementView: View {
     private func categoryRow(_ category: Category) -> some View {
         HStack(spacing: 10) {
             Image(systemName: category.isArchived ? "archivebox" : "tag")
-                .foregroundStyle(category.isArchived ? LFTheme.textSecondary : LFTheme.primaryHover)
+                .foregroundStyle(category.isArchived ? theme.palette.secondaryText : theme.palette.accentHover)
                 .frame(width: 22)
 
             if editingCategoryID == category.id {
                 TextField("Category name", text: $editedName)
-                    .textFieldStyle(.roundedBorder)
+                    .lfTextField()
                     .onSubmit { saveRename(category) }
                 Button("Save") { saveRename(category) }
-                    .buttonStyle(.bordered)
+                    .lfSecondaryAction()
                 Button("Cancel") { editingCategoryID = nil }
                     .buttonStyle(.plain)
             } else {
@@ -184,8 +185,8 @@ struct CategoryManagementView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if isInUse(category) {
                     Text("Assigned")
-                        .font(.caption2)
-                        .foregroundStyle(LFTheme.textSecondary)
+                        .font(theme.typography.finePrint)
+                        .foregroundStyle(theme.palette.secondaryText)
                 }
                 Button {
                     editingCategoryID = category.id
@@ -213,7 +214,7 @@ struct CategoryManagementView: View {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(isInUse(category) ? LFTheme.textSecondary : LFTheme.danger)
+                .foregroundStyle(isInUse(category) ? theme.palette.secondaryText : LFTheme.danger)
                 .disabled(isInUse(category))
                 .help(isInUse(category) ? "Assigned categories cannot be deleted." : "Delete")
             }

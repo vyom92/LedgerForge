@@ -116,6 +116,7 @@ struct ImportBatchSummaryPresentation: Equatable {
 }
 
 struct ImportBatchProgressView: View {
+    @Environment(\.lfTheme) private var theme
     let activePosition: Int?
     let total: Int
     let terminalCount: Int
@@ -125,15 +126,15 @@ struct ImportBatchProgressView: View {
             HStack {
                 if let activePosition {
                     Text("Statement \(activePosition) of \(total)")
-                        .font(.subheadline.weight(.semibold))
+                        .font(theme.typography.formBody.weight(.semibold))
                 } else {
                     Text("Batch complete")
-                        .font(.subheadline.weight(.semibold))
+                        .font(theme.typography.formBody.weight(.semibold))
                 }
                 Spacer()
                 Text("\(terminalCount) of \(total) resolved")
-                    .font(.caption)
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.formCaption)
+                    .foregroundStyle(theme.palette.secondaryText)
             }
             ProgressView(value: Double(terminalCount), total: Double(max(total, 1)))
                 .controlSize(.small)
@@ -143,46 +144,48 @@ struct ImportBatchProgressView: View {
 }
 
 struct ImportBatchQueueView: View {
+    @Environment(\.lfTheme) private var theme
+    @Environment(\.appearsActive) private var appearsActive
     let items: [ImportBatchQueueItemPresentation]
     let onSelectOutcome: (UUID) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Ordered Queue")
-                .font(.headline)
+                .font(theme.typography.formHeading)
             ForEach(items) { item in
                 Button {
                     onSelectOutcome(item.id)
                 } label: {
                     HStack(spacing: 10) {
                         Text("\(item.position)")
-                            .font(.caption.weight(.semibold))
+                            .font(theme.typography.formCaption.weight(.semibold))
                             .frame(width: 24, height: 24)
-                            .background(item.isActive ? LFTheme.primary.opacity(0.25) : LFTheme.surface)
+                            .background(item.isActive ? theme.interaction.dataBadge : theme.palette.controlSurface)
                             .clipShape(Circle())
                         Image(systemName: item.iconName)
                             .foregroundStyle(item.tone.color)
                             .frame(width: 18)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.fileName)
-                                .font(.caption.weight(.semibold))
+                                .font(theme.typography.formCaption.weight(.semibold))
                                 .lineLimit(1)
                             Text(item.status)
-                                .font(.caption2)
-                                .foregroundStyle(LFTheme.textSecondary)
+                                .font(theme.typography.finePrint)
+                                .foregroundStyle(theme.palette.secondaryText)
                         }
                         Spacer(minLength: 0)
                         if item.isPresented && item.isOutcomeNavigable {
                             Image(systemName: "eye.fill")
-                                .foregroundStyle(LFTheme.primaryHover)
+                                .foregroundStyle(theme.palette.accentHover)
                         }
                     }
                     .padding(9)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(item.isActive ? LFTheme.primary.opacity(0.10) : LFTheme.surface.opacity(0.55))
+                    .background(theme.interaction.dataRow(selected: item.isActive, active: appearsActive))
                     .overlay {
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(item.isActive ? LFTheme.primary.opacity(0.65) : LFTheme.divider, lineWidth: 1)
+                            .stroke(item.isActive ? theme.palette.tableBorder : theme.palette.divider, lineWidth: 1)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
@@ -196,12 +199,13 @@ struct ImportBatchQueueView: View {
 }
 
 struct ImportBatchSummaryView: View {
+    @Environment(\.lfTheme) private var theme
     let summary: ImportBatchSummaryPresentation
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Batch Summary")
-                .font(.headline)
+                .font(theme.typography.formHeading)
             summaryRow("Selected", value: summary.totalSelected)
             summaryRow("Imported", value: summary.committedCount)
             summaryRow("Previously imported", value: summary.exactDuplicateCount)
@@ -214,11 +218,11 @@ struct ImportBatchSummaryView: View {
                 summaryRow("Reconciliation required", value: summary.reconciliationRequiredCount)
             }
             Text("Counts describe batch outcomes. They do not total or reinterpret financial data.")
-                .font(.caption2)
-                .foregroundStyle(LFTheme.textSecondary)
+                .font(theme.typography.finePrint)
+                .foregroundStyle(theme.palette.secondaryText)
         }
         .padding(12)
-        .background(LFTheme.surface.opacity(0.65))
+        .background(theme.palette.controlSurface)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .contain)
     }
@@ -226,10 +230,10 @@ struct ImportBatchSummaryView: View {
     private func summaryRow(_ title: String, value: Int) -> some View {
         HStack {
             Text(title)
-                .font(.caption)
+                .font(theme.typography.formCaption)
             Spacer()
             Text("\(value)")
-                .font(.caption.weight(.semibold))
+                .font(theme.typography.formCaption.weight(.semibold))
                 .monospacedDigit()
         }
     }

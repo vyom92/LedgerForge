@@ -6,9 +6,10 @@
 import SwiftUI
 
 struct LFActionRow: View {
+    @Environment(\.lfTheme) private var theme
     let title: String
     let systemImage: String
-    var color: Color = LFTheme.text
+    var color: Color? = nil
     let action: () -> Void
 
     var body: some View {
@@ -19,11 +20,11 @@ struct LFActionRow: View {
                 Text(title)
                 Spacer()
                 Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.finePrint)
+                    .foregroundStyle(theme.palette.secondaryText)
             }
-            .font(.subheadline)
-            .foregroundStyle(color)
+            .font(theme.typography.formBody)
+            .foregroundStyle(color ?? theme.palette.primaryText)
             .padding(.vertical, 9)
         }
         .buttonStyle(.plain)

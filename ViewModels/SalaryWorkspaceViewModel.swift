@@ -124,6 +124,17 @@ final class SalaryWorkspaceViewModel: ObservableObject {
         return (try? money.canonicalDecimalString()) ?? ""
     }
 
+    /// A fresh plan's untouched zero may be visually blank without replacing
+    /// its valid draft text. Saved, copied and explicitly edited values retain
+    /// their existing display and validation behavior.
+    func isInitialZeroInput(_ field: MoneyField) -> Bool {
+        field != .fee
+            && baseCanonical == nil
+            && plan.rolloverSourcePlanID == nil
+            && baseRawText[field.rawValue] == "0"
+            && rawText[field.rawValue] == "0"
+    }
+
     @discardableResult
     func updateMoney(_ field: MoneyField, text: String) -> Bool {
         guard canEdit else { return false }

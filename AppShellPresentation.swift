@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 #if DEBUG
 import OSLog
 #endif
@@ -10,6 +11,7 @@ enum AppShellSizing {
         switch section {
         case .dashboard: CGSize(width: 640, height: 608)
         case .transactions: CGSize(width: 1024, height: 736)
+        case .settings: CGSize(width: 760, height: 608)
         default: CGSize(width: 1180, height: 760)
         }
     }
@@ -33,6 +35,7 @@ enum AppShellSizing {
 
 /// Structural presentation only. ContentView retains every workflow owner and root lifecycle modifier.
 struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, AvailabilityBanner: View, Destination: View>: View {
+    @Environment(\.lfTheme) private var theme
     let selectedSection: AppShellSection
     let availabilityState: ApplicationDataState
     let permitsMutation: Bool
@@ -67,15 +70,16 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
             sidebar()
 
             Rectangle()
-                .fill(LFTheme.divider)
+                .fill(theme.palette.divider)
                 .frame(width: 1)
 
             VStack(spacing: 0) {
                 toolbar()
 
                 Rectangle()
-                    .fill(LFTheme.divider)
+                    .fill(theme.palette.divider)
                     .frame(height: 1)
+                    .opacity(0)
 
                 profileWarning()
 
@@ -94,19 +98,22 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
                             ? "Loading canonical data…"
                             : "Data is unavailable"
                     )
-                    .font(.title2)
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.formTitle)
+                    .foregroundStyle(theme.palette.secondaryText)
                     Spacer()
                 }
             }
-            .frame(minWidth: selectedSection == .transactions || selectedSection == .dashboard ? 0 : 900, maxWidth: .infinity, maxHeight: .infinity)
+            .frame(minWidth: selectedSection == .transactions || selectedSection == .dashboard || selectedSection == .settings ? 0 : 900, maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(
             minWidth: AppShellSizing.minimumSize(for: selectedSection).width,
             minHeight: AppShellSizing.minimumSize(for: selectedSection).height
         )
-        .background(LFTheme.backgroundGradient)
-        .foregroundStyle(LFTheme.text)
+        .background {
+            LFChromeBackdrop()
+                .ignoresSafeArea()
+        }
+        .foregroundStyle(theme.palette.primaryText)
         .preferredColorScheme(.dark)
     }
 
@@ -122,6 +129,7 @@ struct AppShellView<Sidebar: View, Toolbar: View, ProfileWarning: View, Availabi
 }
 
 struct AppShellSidebar: View {
+    @Environment(\.lfTheme) private var theme
     let selectedSection: AppShellSection
     let developerConsoleVisible: Bool
     let latestImportActivity: ImportActivityPresentation
@@ -139,7 +147,7 @@ struct AppShellSidebar: View {
 
                 if !isCollapsed {
                     Text("LedgerForge")
-                        .font(.title3.weight(.semibold))
+                        .font(theme.typography.formSection.weight(.semibold))
                         .foregroundStyle(.white)
                 }
             }
@@ -156,31 +164,27 @@ struct AppShellSidebar: View {
 
             sidebarFooter
         }
-        .padding(.horizontal, isCollapsed ? 10 : (allowsCollapse ? 12 : 18))
+        .padding(.horizontal, isCollapsed ? theme.spacing.railPadding : theme.spacing.expandedSidebarPadding)
         .padding(.vertical, 18)
-        .frame(width: isCollapsed ? 64 : (allowsCollapse ? 208 : 242))
+        .frame(width: isCollapsed ? theme.spacing.railWidth : theme.spacing.expandedSidebarWidth)
         .frame(maxHeight: .infinity)
-        .background(
-            LinearGradient(
-                colors: [Color(hex: 0x070B15), Color(hex: 0x091427)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .background {
+            ZStack {
+                LFMaterialBackdrop(material: .sidebar)
+                theme.materials.sidebarTint
+            }
+            .ignoresSafeArea(.container, edges: .top)
+            .allowsHitTesting(false)
+        }
     }
 
     private var appMark: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(LFTheme.primaryGradient)
-                .frame(width: 34, height: 34)
-            Image(systemName: "hexagon.fill")
-                .font(.title3)
-                .foregroundStyle(.white.opacity(0.92))
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(LFTheme.backgroundDeep)
-        }
+        Image(nsImage: NSApplication.shared.applicationIconImage)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: 34, height: 34)
+            .accessibilityHidden(true)
     }
 
     private var sidebarFooter: some View {
@@ -188,35 +192,36 @@ struct AppShellSidebar: View {
             if !isCollapsed {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Last import")
-                        .font(.caption)
-                        .foregroundStyle(LFTheme.textSecondary)
+                        .font(theme.typography.caption)
+                        .foregroundStyle(theme.palette.secondaryText)
                     Text(latestImportActivity.title)
-                        .font(.caption.weight(.semibold))
+                        .font(theme.typography.caption.weight(.semibold))
                         .lineLimit(2)
                     Label(latestImportActivity.status, systemImage: latestImportActivity.iconName)
-                        .font(.caption2)
+                        .font(theme.typography.caption)
                         .foregroundStyle(latestImportActivity.tone.color)
                         .lineLimit(2)
                 }
             }
-            Divider().overlay(LFTheme.divider)
+            Divider().overlay(theme.palette.divider)
             if allowsCollapse {
                 Button(action: toggleCollapsed) {
                     if isCollapsed {
                         Image(systemName: "sidebar.left")
-                            .frame(maxWidth: .infinity, minHeight: 32)
+                            .frame(maxWidth: .infinity, minHeight: theme.typography.compactControlMinimum)
                     } else {
                         Label("Collapse sidebar", systemImage: "sidebar.left")
-                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: theme.typography.compactControlMinimum, alignment: .leading)
                     }
                 }
-                .buttonStyle(.bordered)
+                .lfSecondaryAction()
+                .font(theme.typography.secondary)
                 .help(isCollapsed ? "Expand sidebar" : "Collapse sidebar")
                 .accessibilityLabel(isCollapsed ? "Expand sidebar" : "Collapse sidebar")
             } else if !isCollapsed {
                 Label("Collapse", systemImage: "chevron.left")
-                    .font(.subheadline)
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(theme.palette.secondaryText)
             }
         }
         .padding(.bottom, 4)
@@ -224,7 +229,7 @@ struct AppShellSidebar: View {
 
     private var sidebarSeparator: some View {
         Rectangle()
-            .fill(LFTheme.divider)
+            .fill(theme.palette.divider)
             .frame(height: 1)
             .padding(.vertical, 14)
     }
@@ -243,26 +248,33 @@ struct AppShellSidebar: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: section.systemImage)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(theme.typography.sectionIcon.weight(.medium))
                     .frame(width: 22)
                 if !isCollapsed {
                     Text(section.rawValue)
-                        .font(.system(size: 14, weight: selectedSection == section ? .semibold : .regular))
-                        .lineLimit(1)
-                    Spacer()
+                        .font(theme.typography.body.weight(selectedSection == section ? .semibold : .regular))
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
                 }
             }
-            .padding(.horizontal, isCollapsed ? 10 : 12)
+            .padding(.horizontal, isCollapsed ? theme.spacing.railPadding : theme.spacing.expandedSidebarPadding)
             .padding(.vertical, 11)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                selectedSection == section ? AnyShapeStyle(LFTheme.primaryGradient) : AnyShapeStyle(hoveredSection == section ? Color.white.opacity(0.08) : Color.clear)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 7))
-            .clipShape(RoundedRectangle(cornerRadius: 7))
+            .background {
+                RoundedRectangle(cornerRadius: theme.radius.control)
+                    .fill(selectedSection == section ? theme.interaction.navigationSelected : (hoveredSection == section ? theme.interaction.navigationHover : Color.clear))
+            }
+            .overlay {
+                if selectedSection == section {
+                    RoundedRectangle(cornerRadius: theme.radius.control)
+                        .strokeBorder(theme.interaction.navigationEdge, lineWidth: 1)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: theme.radius.control))
         }
         .buttonStyle(.plain)
-        .foregroundStyle(selectedSection == section ? .white : LFTheme.text)
+        .foregroundStyle(theme.palette.primaryText)
         .accessibilityLabel(section.rawValue)
         .accessibilityAddTraits(selectedSection == section ? .isSelected : [])
         .help(section.rawValue)
@@ -270,45 +282,30 @@ struct AppShellSidebar: View {
         .onHover { hoveredSection = $0 ? section : nil }
         .overlay {
             if focusedSection == section {
-                RoundedRectangle(cornerRadius: 7).stroke(Color(hex: 0xB2A3FF), lineWidth: 2).padding(-2)
+                RoundedRectangle(cornerRadius: theme.radius.control).stroke(theme.interaction.focusRing, lineWidth: 2).padding(-2)
             }
         }
     }
 }
 
 struct AppShellToolbar: View {
+    @Environment(\.lfTheme) private var theme
     let section: AppShellSection
     let subtitle: String
-    let importActionIsDisabled: Bool
-    let requestImport: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(section.rawValue)
-                    .font(.system(size: 27, weight: .semibold))
+                    .font(theme.typography.pageTitle)
                 Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.secondary)
+                    .foregroundStyle(theme.palette.secondaryText)
             }
 
             Spacer(minLength: 24)
-
-            Button(action: requestImport) {
-                Label("Import Statement", systemImage: "square.and.arrow.down")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .frame(minWidth: 176)
-                    .background(LFTheme.primaryGradient)
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white)
-            .disabled(importActionIsDisabled)
         }
-        .padding(.horizontal, 28)
-        .padding(.vertical, 24)
-        .background(LFTheme.backgroundDeep.opacity(0.72))
+        .padding(.horizontal, theme.spacing.pagePadding)
+        .padding(.vertical, theme.spacing.pagePadding)
     }
 }

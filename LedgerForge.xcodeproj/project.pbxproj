@@ -124,6 +124,8 @@
 		7A79000B307A000000000001 /* SalaryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A79000A307A000000000001 /* SalaryStore.swift */; };
 		7A79000D307A000000000001 /* SalaryWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A79000C307A000000000001 /* SalaryWorkspaceViewModel.swift */; };
 		7A79000F307A000000000001 /* SalaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A79000E307A000000000001 /* SalaryView.swift */; };
+		91AA00022026091400000001 /* LFAppearancePreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91AA00012026091400000001 /* LFAppearancePreferences.swift */; };
+		91AA00042026091400000001 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91AA00032026091400000001 /* AppearanceSettingsView.swift */; };
 		A17000013000000000000002 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
 		A17000023000000000000001 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
@@ -336,6 +338,8 @@
 		7A79000A307A000000000001 /* SalaryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryStore.swift; sourceTree = "<group>"; };
 		7A79000C307A000000000001 /* SalaryWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryWorkspaceViewModel.swift; sourceTree = "<group>"; };
 		7A79000E307A000000000001 /* SalaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalaryView.swift; sourceTree = "<group>"; };
+		91AA00012026091400000001 /* LFAppearancePreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFAppearancePreferences.swift; sourceTree = "<group>"; };
+		91AA00032026091400000001 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
 		A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZeroActivityStatementEvidence.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
 		AB1700010000000000000001 /* RuntimeDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnostics.swift; sourceTree = "<group>"; };
@@ -512,6 +516,7 @@
 		286D68F12FFFF60E0078AAC5 /* Common */ = {
 			isa = PBXGroup;
 			children = (
+				91AA00012026091400000001 /* LFAppearancePreferences.swift */,
 				286D68F22FFFF60E0078AAC5 /* LFTheme.swift */,
 				286D68F42FFFF6300078AAC5 /* LFPanel.swift */,
 				286D68F82FFFF67D0078AAC5 /* LFStatusBadge.swift */,
@@ -684,6 +689,7 @@
 		288EB0E32FF7A3D500F09BC9 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				91AA00032026091400000001 /* AppearanceSettingsView.swift */,
 				B83000033083000000000001 /* ImportCentreBatchViews.swift */,
 				7A79000E307A000000000001 /* SalaryView.swift */,
 				DBB00003305E000000000001 /* DeveloperDatabaseProfileWarningView.swift */,
@@ -1012,6 +1018,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				91AA00042026091400000001 /* AppearanceSettingsView.swift in Sources */,
+				91AA00022026091400000001 /* LFAppearancePreferences.swift in Sources */,
 				B83000023083000000000001 /* StatementDropIntakeAdapter.swift in Sources */,
 				B83000043083000000000001 /* ImportCentreBatchViews.swift in Sources */,
 				AB1700020000000000000003 /* DurableStartupEvidence.swift in Sources */,

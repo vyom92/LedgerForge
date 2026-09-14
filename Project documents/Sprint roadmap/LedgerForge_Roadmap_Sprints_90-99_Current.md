@@ -1,12 +1,12 @@
 # LedgerForge Roadmap: Sprints 90–99
 
-**Status:** CURRENT CYCLE / NUMBERING AUTHORITY. Chat explicitly activated Sprint 90 and accepted it on 2026-09-12; Sprints 80–89 remain complete history. Sprint 91 remains **PREPARED / NOT YET CHAT-AUTHORIZED**, unimplemented and unaccepted.
+**Status:** CURRENT CYCLE / NUMBERING AUTHORITY. Sprint 90 remains accepted; the owner accepted **Sprint 91A — R1 Visual Foundation + Dashboard Visual Conformance**, including dark-only local customizable appearance, on 2026-09-14. Sprints 80–89 remain complete history. Original Sprint-91 System/Light planning is **SUPERSEDED HISTORY**. Sprint 92 is **NEXT / NOT STARTED**; this closure starts no later sprint.
 **Prepared:** 2026-09-09; realigned by explicit user decisions through 2026-09-11; current-cycle transition recorded after Sprint-90 acceptance on 2026-09-12.
 **Accepted product baseline:** see [PROJECT_STATE](../PROJECT_STATE.md); documentation publication is not product acceptance.
 **Prior completed cycle:** [Sprints 80–89](LedgerForge_Roadmap_Sprints_80-89_Current.md).
 **PERSONAL-V1: NOT YET ADOPTED.**
 
-This current roadmap records accepted Sprint 90 and the prepared remaining sequence. It authorizes no Sprint 91–100 implementation, accepts no proposed architecture and allocates no ADR or migration number. Before selecting each future sprint, Chat must apply the Private Personal App Scope Gate, then rerun P0 → P1 → P2 → P3 triage only for eligible owner needs, enforce exact entry gates and revalidate the implementation split against accepted post-Swift-6 ownership. A verified higher-priority correctness defect preempts a lower-priority outcome unless explicitly deferred; unmet dependencies do not silently cascade sprint numbers.
+This roadmap records accepted Sprints 90 and 91A and the prepared remaining sequence. Sprint 91A includes the subsequently accepted dark-only appearance/Settings work under the owner's explicit identifier; numbering remains unchanged. The roadmap itself authorizes no prepared implementation, accepts no proposed architecture and allocates no ADR or migration number. Before selecting each future sprint, Chat must apply the Private Personal App Scope Gate, then rerun P0 → P1 → P2 → P3 triage only for eligible owner needs, enforce exact entry gates and revalidate the implementation split against accepted post-Swift-6 ownership. A verified higher-priority correctness defect preempts a lower-priority outcome unless explicitly deferred; unmet dependencies do not silently cascade sprint numbers.
 
 ## Governing source and financial rules
 
@@ -27,8 +27,9 @@ Order inherits [Guide rule E](../Project_Guide.md#documentation-order): sprint n
 | Sprint | Outcome | Queue | Entry / planning boundary |
 |---|---|---|---|
 | 90 | R1 Dashboard Native-Currency Hierarchy | Completed `FW-P2-78` | **ACCEPTED**, `619c39ec07402a63c90b646cbba9ced806f5e99d`; [accepted outcome](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-90) |
-| 91 | R1 Simple Appearance Choice | `FW-P2-52` | **PREPARED / NOT YET CHAT-AUTHORIZED**; unimplemented; simple device-local System/Light/Dark and optional approved Deep Indigo/accent direction |
-| 92 | R1 Cross-Screen Visual and Interaction Polish | bounded `FW-P2-40` + `FW-P2-41` + `FW-P2-47` + `FW-P2-48` + `FW-P2-50` | Only actual owner usability after 89–91; terminology, truthful states, readable layout and useful native interaction |
+| 91 | R1 Simple Appearance Choice | `FW-P2-52` | **SUPERSEDED PLANNING**; historical System/Light/Dark direction replaced by the explicit dark-only continuation in 91A |
+| 91A | R1 Visual Foundation + Dashboard Visual Conformance | completed `FW-P2-52` + bounded `FW-P2-48` | **ACCEPTED**, 2026-09-14; [accepted outcome](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a), including final-byte small-window verification limitation |
+| 92 | R1 Cross-Screen Visual and Interaction Polish | bounded `FW-P2-40` + `FW-P2-41` + `FW-P2-47` + `FW-P2-48` + `FW-P2-50` | **NEXT / NOT STARTED**; refresh SC-05A against published 91A; residual terminology, truthful states, information presentation and native interaction |
 | 93 | Verified Backup, Restore and Disaster Recovery | `FW-P3-36` | PRE_V1_REQUIRED; accepted user-owned backup/restore architecture and independent restore drill |
 | 94 | Salary / This Month Current Al Dar Planning Completion | bounded `FW-P3-08` | PRE_V1_REQUIRED current planning slice; explicit ADR-045 alignment or successor architecture, access/permission/freshness/amount binding |
 | 95 | Current Investment Domain and Identity Foundation | bounded `FW-P3-20`, `FW-P3-21`, `FW-P3-23` | Container/instrument identity, scoped identifiers, native currency, exact Decimal quantities and current ownership/revision architecture |
@@ -54,17 +55,27 @@ Mixed-native-currency Current Database shape, a populated saved current-month pl
 
 ### Sprint 91 — R1 Simple Appearance Choice
 
-**PREPARED / NOT YET CHAT-AUTHORIZED. NOT YET IMPLEMENTED / NOT YET ACCEPTED.** Accepted Sprint 90 satisfies the Dashboard prerequisite; FW-P2-52 retains its bounded preference/fallback entry review.
+**SUPERSEDED PLANNING — 2026-09-14.** The following original plan is retained as history. The owner replaced its System/Light choices with the [dark-only scope](../SCOPE_DECISIONS.md#dark-appearance-decision) in Sprint 91A; it is not a separate feature still to build.
 
-Queue: narrowed [FW-P2-52](../FUTURE_WORK.MD#fw-p2-52) only.
+Queue: narrowed [FW-P2-52](../SCOPE_DECISIONS.md#fw-p2-52) only.
 
 Implement Follow System, Light and Dark with optional already-approved Deep Indigo/accent direction and simple device-local persistence. Verify ordinary readable rendering and remembrance after relaunch without financial writes. No theme engine, preference portability, formal qualification or automatic new-ADR gate. If implementation exposes a real architecture decision, return to Chat before widening scope.
 
+### Sprint 91A — R1 Visual Foundation + Dashboard Visual Conformance
+
+**ACCEPTED on 2026-09-14** under `SPRINT_91A_DARK_APPEARANCE_AND_VISUAL_FOUNDATION_ACCEPTED`. Starting baseline: `ee547a46a126426275f5ecddadf13f769f6b1651`; the commit containing the [accepted outcome](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a) publishes the final candidate and this closure. Completed [FW-P2-52](../SCOPE_DECISIONS.md#fw-p2-52) and the bounded shared-foundation/Dashboard slice of [FW-P2-48](../FUTURE_WORK.MD#fw-p2-48). Numbering is unchanged.
+
+Accepted shared theme/panel/shell materials and current Dashboard composition preserve financial/source semantics, complete native Money, membership/source dates, Salary calculations and the day-change crash correction. The accumulated outcome includes dark-only colour/tint, family/hierarchy-size and background/card-opacity preferences, immediate local persistence and responsive Settings; all-six Collapse/Expand; seamless title-bar/sidebar tint and shared card/control/table finishing; Transactions selection/focus/header sorting; blank untouched-default-zero Salary inputs; removal of the repeated shared-header Import Statement action; and the supplied application/sidebar icon. Current saved overrides remain user state and do not redefine factory defaults. No financial persistence, parser, migration, new ADR or deployment-target change is included.
+
+The [working history](../Work%20notes/Transaction_and_R1_workflows.md#sprint-91a-visual-conformance) retains the earlier checkpoints and Sprint-90 qualification. Final Debug succeeded with zero source warnings and only the existing App Intents notice; final Settings/Dashboard 1440 × 900, Transactions focus/selection, preference relaunch and icon evidence are accepted. **FINAL_BYTE_SMALL_WINDOW_NATIVE_RECHECK_NOT_COMPLETED** is an owner-accepted limitation: earlier r34 small-window evidence is not a pass on final post-HIG/icon bytes. Do not restart resizing. Regression tests remain **SUSPENDED / 0 new executions**. The owner explicitly authorizes intended product/docs/icon publication and the intentional UserJourney deletion; no further implementation is selected by closure.
+
 ### Sprint 92 — R1 Cross-Screen Visual and Interaction Polish
 
-Queue: bounded `FW-P2-40`, `FW-P2-41`, `FW-P2-47`, `FW-P2-48`, `FW-P2-50` only.
+Original queue: bounded `FW-P2-40`, `FW-P2-41`, `FW-P2-47`, `FW-P2-48`, `FW-P2-50`.
 
-Sprint 92 remains unimplemented. After Sprint 91, refresh the accepted SC-05A audit against accepted 89–91 before selecting residual P1–P6 or other actual owner usability needs across the existing screens: terminology, truthful states, clipping/overlap, responsive layout, readable complete Money, useful ordinary keyboard interaction, focus distinct from selection, icon names/tooltips and visual consistency. Acceptance is the owner's actual workflow. No formal accessibility campaign is scheduled. Salary remains lower priority and accepted editor, fee, source and persistence semantics remain unchanged.
+**NEXT / NOT STARTED.** Use the exact published Sprint-91A ending ref, not its preparation baseline. Refresh SC-05A against accepted 89–91A before resolving P1–P6 or actual residual terminology, truthful-state, fit, complete-Money, focus/selection, tooltip and ordinary keyboard needs. The original Sprint-88 audit is history; closure consumes none of its findings. Salary remains lower priority and its editor, fee, source and persistence semantics stay unchanged.
+
+The owner also requests useful information presentation informed by the complete archived v1 visual family: density, hierarchy, compact tables, module proportions, alignment, window-width use and contextual actions. The old palette is not authority; current accepted appearance and saved preferences remain. `UserJourney_v1.0.png` was intentionally deleted and must not be restored. [The forward handoff](../Work%20notes/Transaction_and_R1_workflows.md#sprint-92-handoff) retains reference/scope boundaries. FW-P2-46 owns interactive Dashboard charts; the separately supplied Sprint-92 brief specifies the bounded all-recorded native-currency bank/card effect comparison. Its independent genuine-data verification remains pending under test suspension; the broader chart backlog is not complete. This 91A closure implements no chart, broad analytics or Sprint-92 work and changes none of the 93–100 sequence.
 
 ### Sprint 93 — Verified Backup, Restore and Disaster Recovery
 
@@ -146,7 +157,7 @@ Existing P0 integrity/identity/reversal candidates and P1 source/duplicate/recov
 
 [Sprints 100–109](Upcoming/LedgerForge_Roadmap_Sprints_100-109_Planned.md) own the fixed future Sprint-100 personal adoption verification milestone. No feature is deliberately deferred into adoption verification. A product defect or missing required capability fails adoption verification and returns to Chat for separate corrective attribution/scheduling; LedgerForge 1.0 remains undeclared until the corrected candidate passes verification. Sprints 101–109 remain unassigned for fresh selection after LedgerForge 1.0.
 
-The 90–99 cycle is current numbering authority following explicit Sprint-90 activation and acceptance. The [completed 80–89 roadmap](LedgerForge_Roadmap_Sprints_80-89_Current.md) retains its historical numbering and accepted outcomes. Current-cycle status does not authorize Sprint 91 or any later prepared sprint.
+The 90–99 cycle is current numbering authority following explicit Sprint-90 activation and acceptance. The owner accepted the accumulated Sprint-91A correction and authorized its closure/publication on 2026-09-14. The [completed 80–89 roadmap](LedgerForge_Roadmap_Sprints_80-89_Current.md) retains its historical numbering and accepted outcomes. The original System/Light Appearance plan is superseded by the explicit dark-only 91A continuation. Current-cycle status authorizes no later prepared sprint.
 
 <a id="roadmap-replanning-packets-97-99"></a>
 ## Earlier replanning evidence — positions superseded, architecture still gated

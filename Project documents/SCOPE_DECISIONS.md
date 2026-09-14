@@ -8,6 +8,15 @@ The adopted personal outcome includes supported authentic imports, practical R1 
 
 ## Settled product decisions
 
+<a id="dark-appearance-decision"></a>
+### Dark appearance — explicit owner continuation, 2026-09-14 (current)
+
+**ACCEPTED — Dark-only, adjustable shared colours/tints, font family and hierarchy sizes, background/card opacity, responsive Settings.** The owner accepts this accumulated **Sprint 91A** outcome under completed FW-P2-52 and bounded FW-P2-48. This specifically reopens native colour wells, an installed-family selector, typography sliders and two surface-opacity sliders. One app-owned local preference store resolves the existing shared theme; live changes persist on this Mac. Initial/reset defaults remain distinct from the owner's newer saved local overrides. Restore clears appearance overrides only. It does not change financial data, other preferences, active import or Salary draft/Save ownership. Closure must not run Restore or rewrite preference storage.
+
+Earlier SC-04 Follow System/Light planning and the corresponding customization prohibitions are **superseded history**, not another feature to build. Dark mode stays fixed. Weight/tracking/density editors, theme import/export, sync, portable themes, a theme framework and formal accessibility work remain excluded. Accepted shared finishing includes related-colour card edges, distinct fill, seamless title-bar/sidebar tint behind the native traffic lights, and consistent width plus Collapse/Expand on all six destinations. The prior Settings-only minimum adjustment and temporary LedgerForge-only AppleScript resizing permission were specific to 91A verification; they are not standing system-control authority. No macOS setting changes are authorized.
+
+**Owner closure decision — 2026-09-14:** accept the current Dashboard and overall 91A visual result, and publish the intended product/docs/icon changes. Regression tests remain **SUSPENDED / 0 new executions**. The owner accepts **FINAL_BYTE_SMALL_WINDOW_NATIVE_RECHECK_NOT_COMPLETED**: final post-HIG/icon bytes were observed at 1440 × 900 but not reverified at 1024 × 768 or 760 × 640 after the AppleScript window path failed. Earlier r34 observations remain separate evidence; no PASS is inferred and the resize campaign must not restart. Preserve the intentional deletion of `Project documents/UI Assets/Archived/UserJourney_v1.0.png` and the owner-supplied AppIcon application/sidebar identity. [Accepted outcome](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a) owns exact evidence and other limitations; [working history](Work%20notes/Transaction_and_R1_workflows.md#sprint-91a-dark-appearance) preserves the evolution. Sprint 92 is **NEXT / NOT STARTED**, V17 is unchanged, and FW-P2-49 remains **NOT REQUIRED-DO NOT CONSIDER**.
+
 <a id="source-processing-decision"></a>
 ### Source processing — owner clarification, 2026-09-11 (current)
 
@@ -22,7 +31,7 @@ Order follows [Guide rule C](Project_Guide.md#documentation-order): known decisi
 
 | ID | Owner direction | Status / authority | Decision date |
 | --- | --- | --- | --- |
-| <a id="ud-12"></a>UD-12 | LedgerForge is private, personal, single-user and macOS-local. Exclude hypothetical commercial/platform work; reopen only by a new explicit owner decision naming a real need. Retain FW-P0-18 and FW-P1-30/34/35/38/39/39A only for single-user MacBook workflows; remove unselected source placeholders and app-level encryption (no current concern). Preserve design images and explicitly ignore rejected caption portions. | CURRENT — explicit scope reset and clarifications, 2026-09-11; simple local appearance, required backup/restore, Sprint-100 personal adoption verification; no architecture or product implementation accepted; explicit owner direction retained from scope reset | 2026-09-11 |
+| <a id="ud-12"></a>UD-12 | LedgerForge is private, personal, single-user and macOS-local. Exclude hypothetical commercial/platform work; reopen only by a new explicit owner decision naming a real need. Retain FW-P0-18 and FW-P1-30/34/35/38/39/39A only for single-user MacBook workflows; remove unselected source placeholders and app-level encryption (no current concern). Preserve design images and explicitly ignore rejected caption portions. | CURRENT — explicit scope reset and clarifications, 2026-09-11; local appearance subject to the [2026-09-14 extension](#dark-appearance-decision), required backup/restore, Sprint-100 personal adoption verification; no architecture or product implementation accepted; explicit owner direction retained from scope reset | 2026-09-11 |
 | <a id="ud-02"></a>UD-02 | Require backup/restore; keep complete export optional | CURRENT, subject to latest UD-09/10 scope; explicit owner direction retained from scope reset | 2026-09-10 |
 | <a id="ud-06"></a>UD-06 | Use reviewable suggestions first (Recommended) | CURRENT, subject to latest UD-09/10 scope; explicit owner direction retained from scope reset | 2026-09-10 |
 | <a id="ud-09"></a>UD-09 | i do not need qar to inr historical. its sole purpose is to estimate how much i will get in inr end of the month based on the monthly salary/budget calculator. if needed i can manually override my own fx rate on live/current rate | CURRENT, subject to latest UD-09/10 scope; explicit owner direction retained from scope reset | 2026-09-10 |
@@ -96,8 +105,9 @@ Order inherits Guide rule D: former ID in natural ascending order. IDs are never
 | Former ID | Destination / meaning |
 | --- | --- |
 | <a id="fw-p2-03"></a>FW-P2-03 | Completed by [accepted Sprint 89](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-89). |
+| <a id="fw-p2-52"></a>FW-P2-52 | Completed by [accepted Sprint 91A](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a): dark-only local customizable appearance and responsive Settings, with the accepted final-byte small-window verification limitation. Original System/Light planning is superseded history. |
 | <a id="fw-p2-53"></a>FW-P2-53 | Completed by [accepted Sprint 89](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-89). |
-| <a id="fw-p2-55"></a>FW-P2-55 | Consolidated into [FW-P2-52](FUTURE_WORK.MD#fw-p2-52), simple device-local appearance. Theme-engine machinery is removed, not deferred. |
+| <a id="fw-p2-55"></a>FW-P2-55 | Consolidated into completed [FW-P2-52](#fw-p2-52), dark-only device-local appearance. Theme-engine machinery is removed, not deferred. |
 | <a id="fw-p2-67"></a>FW-P2-67 | Completed by [accepted Sprint 88](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-88). |
 | <a id="fw-p2-74"></a>FW-P2-74 | Completed by [accepted Sprint 85](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-85). |
 | <a id="fw-p2-75"></a>FW-P2-75 | Completed by [accepted Sprint 86](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-86). |

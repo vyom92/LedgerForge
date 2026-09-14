@@ -37,6 +37,7 @@ struct LedgerForgeApp: App {
         WindowGroup {
             ContentView()
         }
+        .windowStyle(.hiddenTitleBar)
     }
 
     @discardableResult

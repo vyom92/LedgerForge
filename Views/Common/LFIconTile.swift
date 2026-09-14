@@ -6,10 +6,11 @@
 import SwiftUI
 
 struct LFIconTile: View {
+    @Environment(\.lfTheme) private var theme
     let systemImage: String
     let color: Color
     var size: CGFloat = 34
-    var cornerRadius: CGFloat = 7
+    var cornerRadius: CGFloat? = nil
     var foregroundColor: Color = .white
     var opacity: Double = 0.85
 
@@ -18,6 +19,6 @@ struct LFIconTile: View {
             .foregroundStyle(foregroundColor)
             .frame(width: size, height: size)
             .background(color.opacity(opacity))
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius ?? theme.radius.control))
     }
 }

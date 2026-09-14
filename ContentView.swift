@@ -557,6 +557,7 @@ extension ImportAccountOutcomePresentation {
 }
 
 struct ImportAccountOutcomeView: View {
+    @Environment(\.lfTheme) private var theme
     let presentation: ImportAccountOutcomePresentation
     let iconName: String
     let tone: ImportOutcomeTone
@@ -568,10 +569,10 @@ struct ImportAccountOutcomeView: View {
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 3) {
                 Text(presentation.label)
-                    .font(.subheadline.weight(.semibold))
+                    .font(theme.typography.formBody.weight(.semibold))
                 Text(presentation.explanation)
-                    .font(.caption)
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.formCaption)
+                    .foregroundStyle(theme.palette.secondaryText)
             }
             Spacer(minLength: 0)
         }
@@ -1320,6 +1321,10 @@ struct ImportActivityPresentation: Equatable {
 }
 
 struct ContentView: View {
+    // Inject inside the established root so WindowGroup keeps its saved identity.
+    @StateObject private var appearance = LFAppearanceStore.shared
+    private var theme: LFTheme { appearance.theme }
+    @Environment(\.appearsActive) private var appearsActive
 
     @State private var showingImporter = false
     @State private var statementPassword = ""
@@ -1338,7 +1343,7 @@ struct ContentView: View {
     @ObservedObject private var cardStore: CardStore = .shared
     @ObservedObject private var fundingPlanStore: FundingPlanStore = .shared
     @State private var selectedSection: AppShellSection = .dashboard
-    @State private var transactionSidebarRailOverride: Bool?
+    @State private var sidebarRailOverride: Bool?
     @State private var shellPresentationWidth: CGFloat = 1440
     @State private var didStartRepositoryHydration = false
 #if DEBUG
@@ -1448,32 +1453,34 @@ struct ContentView: View {
             availabilityState: availability.state,
             permitsMutation: availability.permitsMutation,
             sidebar: {
-                let usesRail = selectedSection == .dashboard
-                    ? AppShellSizing.dashboardUsesRail(at: shellPresentationWidth)
-                    : selectedSection == .transactions
-                        && (transactionSidebarRailOverride ?? (shellPresentationWidth < 1280))
+                let usesRail = sidebarRailOverride ?? (
+                    selectedSection == .dashboard
+                        ? AppShellSizing.dashboardUsesRail(at: shellPresentationWidth)
+                        : shellPresentationWidth < 1280
+                )
                 AppShellSidebar(
                     selectedSection: selectedSection,
                     developerConsoleVisible: developerConsoleVisible,
                     latestImportActivity: importActivityPresentation,
                     selectSection: { selectedSection = $0 },
                     isCollapsed: usesRail,
-                    allowsCollapse: selectedSection == .transactions,
-                    toggleCollapsed: { transactionSidebarRailOverride = !usesRail }
+                    allowsCollapse: true,
+                    toggleCollapsed: { sidebarRailOverride = !usesRail }
                 )
             },
             toolbar: {
                 AppShellToolbar(
                     section: selectedSection,
-                    subtitle: toolbarSubtitle,
-                    importActionIsDisabled: !availability.permitsMutation || !importCentre.permitsSourceSelection,
-                    requestImport: requestFileSelection
+                    subtitle: toolbarSubtitle
                 )
             },
             profileWarning: { profileWarning },
             availabilityBanner: { availabilityBanner },
             destination: { destinationContent }
         )
+        .environment(\.lfTheme, theme)
+        .font(theme.typography.secondary)
+        .tint(theme.palette.accent)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
             shellPresentationWidth = size.width
 #if DEBUG
@@ -1604,23 +1611,22 @@ struct ContentView: View {
 
     private var dashboardContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                dashboardPositionHeading
                 ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 18) {
-                        dashboardPositionPanel.frame(minWidth: 660, maxWidth: .infinity)
-                        salaryDashboardSummary.frame(width: 390)
+                    VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
+                        HStack(alignment: .top, spacing: theme.spacing.majorModuleGap) {
+                            dashboardPositionPanel.frame(minWidth: 640, maxWidth: .infinity)
+                            salaryDashboardSummary.frame(width: dashboardSupportingColumnWidth, alignment: .leading)
+                        }
+                        HStack(alignment: .top, spacing: theme.spacing.majorModuleGap) {
+                            recentTransactionsCard.frame(minWidth: 640, maxWidth: .infinity, alignment: .leading)
+                            importActivityCard.frame(width: dashboardSupportingColumnWidth, alignment: .leading)
+                        }
                     }
-                    VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: theme.spacing.majorModuleGap) {
                         dashboardPositionPanel
                         salaryDashboardSummary
-                    }
-                }
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 18) {
-                        recentTransactionsCard.frame(minWidth: 620, maxWidth: .infinity)
-                        importActivityCard.frame(width: 350)
-                    }
-                    VStack(alignment: .leading, spacing: 18) {
                         recentTransactionsCard
                         importActivityCard
                     }
@@ -1630,14 +1636,15 @@ struct ContentView: View {
                         Label(attention.title, systemImage: attention.iconName)
                             .foregroundStyle(attention.tone.color)
                         Text(attention.explanation)
-                            .font(.system(size: 14)).foregroundStyle(LFTheme.textSecondary)
+                            .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     }
                 }
             }
-            .padding(shellPresentationWidth < 1000 ? 18 : 24)
-            .font(.system(size: 16))
+            .frame(maxWidth: 1320, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(theme.spacing.pagePadding)
+            .font(theme.typography.body)
         }
-        .background(LFTheme.backgroundGradient)
         .onAppear { dashboardViewModel.refreshPresentation() }
     }
 
@@ -1646,8 +1653,20 @@ struct ContentView: View {
         return DashboardAttentionProjection.presentation(for: outcome.recoveryRoute)
     }
 
+    private var dashboardPositionHeading: some View {
+        HStack(spacing: theme.spacing.small) {
+            Text("Position by native currency")
+                .font(theme.typography.secondary)
+                .foregroundStyle(theme.palette.secondaryText)
+            if dashboardViewModel.positions.count == 1, let group = dashboardViewModel.positions.first {
+                Text(group.currency.code)
+                    .font(theme.typography.secondary.weight(.medium))
+            }
+        }
+    }
+
     private var dashboardPositionPanel: some View {
-        LFPanel(title: "Position by native currency") {
+        VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
             switch dashboardViewModel.positionState {
             case .loading:
                 dashboardState("Loading financial position…", loading: true)
@@ -1656,32 +1675,48 @@ struct ContentView: View {
             case .unavailable:
                 dashboardState("Data unavailable", detail: "Current bank and card positions are unavailable.")
             case .populated:
-                ViewThatFits(in: .horizontal) {
-                    if dashboardViewModel.positions.count <= 2 {
-                        HStack(alignment: .top, spacing: 14) {
-                            ForEach(dashboardViewModel.positions) { group in
-                                dashboardCurrencyGroup(group).frame(minWidth: 304, maxWidth: .infinity)
+                if dashboardViewModel.positions.count == 1, let group = dashboardViewModel.positions.first {
+                    dashboardCurrencyGroup(group, allowsHorizontalDomains: true)
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        if dashboardViewModel.positions.count <= 2 {
+                            HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                                ForEach(dashboardViewModel.positions) { group in
+                                    dashboardCurrencyGroup(group).frame(minWidth: 304, maxWidth: .infinity)
+                                }
                             }
                         }
-                    }
-                    VStack(alignment: .leading, spacing: 14) {
-                        ForEach(dashboardViewModel.positions) { dashboardCurrencyGroup($0) }
+                        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                            ForEach(dashboardViewModel.positions) { dashboardCurrencyGroup($0) }
+                        }
                     }
                 }
             }
         }
     }
 
-    private func dashboardCurrencyGroup(_ group: DashboardCurrencyPosition) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(group.currency.code).font(.title3.weight(.semibold))
-            dashboardDomain("Bank balances", icon: "building.columns", positions: group.banks, total: group.bankTotal)
-            Divider().overlay(LFTheme.divider)
-            dashboardDomain("Card liabilities", icon: "creditcard", positions: group.cards, total: group.cardTotal)
+    private func dashboardCurrencyGroup(_ group: DashboardCurrencyPosition, allowsHorizontalDomains: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+            if !allowsHorizontalDomains {
+                Text(group.currency.code)
+                    .font(theme.typography.secondary.weight(.medium))
+            }
+            ViewThatFits(in: .horizontal) {
+                if allowsHorizontalDomains {
+                    HStack(alignment: .top, spacing: theme.spacing.sectionGap) {
+                        dashboardDomain("Bank balances", icon: "building.columns", positions: group.banks, total: group.bankTotal)
+                            .frame(minWidth: dashboardDomainMinimumWidth("Bank balances", total: group.bankTotal), maxWidth: .infinity)
+                        dashboardDomain("Card liabilities", icon: "creditcard", positions: group.cards, total: group.cardTotal)
+                            .frame(minWidth: dashboardDomainMinimumWidth("Card liabilities", total: group.cardTotal), maxWidth: .infinity)
+                    }
+                }
+                VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                    dashboardDomain("Bank balances", icon: "building.columns", positions: group.banks, total: group.bankTotal)
+                    dashboardDomain("Card liabilities", icon: "creditcard", positions: group.cards, total: group.cardTotal)
+                }
+            }
         }
-        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LFTheme.surfaceRaised, in: RoundedRectangle(cornerRadius: 7))
     }
 
     private func dashboardDomain(
@@ -1690,87 +1725,156 @@ struct ContentView: View {
         positions: [DashboardAccountPosition],
         total: Money?
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(title, systemImage: icon)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(LFTheme.textSecondary)
+        LFPanel(contentSpacing: theme.spacing.controlGap) {
+            HStack(spacing: theme.spacing.controlGap) {
+                Image(systemName: icon)
+                    .font(theme.typography.domainIcon)
+                    .frame(width: 36, height: 36)
+                    .foregroundStyle(theme.palette.secondaryText)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                    Text(title)
+                        .font(theme.typography.secondary)
+                        .foregroundStyle(theme.palette.secondaryText)
+                    if !positions.isEmpty { dashboardMoney(total) }
+                }
+            }
             if positions.isEmpty {
                 Text(title == "Bank balances" ? "No bank accounts" : "No card accounts")
-                    .font(.system(size: 14)).foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
             } else {
-                if positions.count > 1 {
-                    dashboardMoney(total)
-                    if total == nil {
-                        Text("Incomplete: a member position is unavailable.")
-                            .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
-                    }
+                if positions.count > 1, total == nil {
+                    Text("Incomplete: a member position is unavailable.")
+                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                 }
-                ForEach(positions) { position in
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(position.displayName)
-                            .font(.system(size: 14, weight: .medium))
-                            .fixedSize(horizontal: false, vertical: true)
-                        if positions.count == 1 { dashboardMoney(position.amount) }
-                        else {
-                            Text(position.amount.map { MoneyFormatting.display($0) } ?? "Data unavailable")
-                                .monospacedDigit().fixedSize(horizontal: true, vertical: false)
-                        }
-                        if position.amount != nil {
-                            Text(DashboardAccountPosition.asOfLabel(for: position.asOf))
-                                .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
-                            if let context = position.sourceContext {
-                                Text(context).font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                Group {
+                    if positions.count == 1 {
+                        ForEach(positions) { position in
+                            VStack(alignment: .leading, spacing: theme.spacing.micro) {
+                                // The sole account's full amount is the domain headline.
+                                dashboardAccountName(position)
+                                dashboardAccountContext(position, domain: title)
                             }
                         }
-                        if title == "Card liabilities", let money = position.amount, money.amount < .zero {
-                            Text("Card credit balance").font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                    } else {
+                        LFLabelValueGroup(rows: positions, rowSpacing: theme.spacing.micro, valueRole: .secondary) { position in
+                            dashboardAccountName(position)
+                        } value: { position in
+                            dashboardAccountAmount(position)
+                        } context: { position in
+                            dashboardAccountContext(position, domain: title)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .padding(.leading, 36 + theme.spacing.controlGap)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func dashboardMoney(_ money: Money?) -> some View {
-        Text(money.map { MoneyFormatting.display($0) } ?? "Data unavailable")
-            .font(.system(size: 18, weight: .semibold))
-            .monospacedDigit()
+    private func dashboardAccountName(_ position: DashboardAccountPosition) -> some View {
+        Text(position.displayName)
+            .font(theme.typography.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func dashboardAccountAmount(_ position: DashboardAccountPosition) -> some View {
+        Text(position.amount.map { MoneyFormatting.display($0) } ?? "Data unavailable")
+            .font(theme.typography.font(.secondary, tabularDigits: true))
             .fixedSize(horizontal: true, vertical: false)
     }
 
+    private func dashboardAccountContext(_ position: DashboardAccountPosition, domain: String) -> some View {
+        VStack(alignment: .leading, spacing: theme.spacing.micro) {
+            if position.amount != nil { dashboardSourceContext(position) }
+            if domain == "Card liabilities", let money = position.amount, money.amount < .zero {
+                Text("Card credit balance").font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            }
+        }
+    }
+
+    private func dashboardSourceContext(_ position: DashboardAccountPosition) -> some View {
+        Text(DashboardAccountPosition.asOfLabel(for: position.asOf)
+             + (position.sourceContext.map { " · \($0)" } ?? ""))
+        .font(theme.typography.caption)
+        .foregroundStyle(theme.palette.secondaryText)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func dashboardMoneyText(_ money: Money?) -> String {
+        money.map { MoneyFormatting.display($0) } ?? "Data unavailable"
+    }
+
+    private func dashboardTextWidth(_ text: String, role: LFFontRole, tabular: Bool = false) -> CGFloat {
+        ceil((text as NSString).size(withAttributes: [.font: theme.typography.nativeFont(role, tabularDigits: tabular)]).width)
+    }
+
+    private func dashboardDomainMinimumWidth(_ title: String, total: Money?) -> CGFloat {
+        let valueWidth = dashboardTextWidth(dashboardMoneyText(total), role: total == nil ? .body : .headlineMoney, tabular: true)
+        let labelWidth = dashboardTextWidth(title, role: .secondary)
+        return max(304, max(valueWidth, labelWidth) + 36 + theme.spacing.controlGap + 2 * theme.spacing.panelPadding)
+    }
+
+    private func dashboardMoney(_ money: Money?) -> some View {
+        let role: LFFontRole = money == nil ? .body : .headlineMoney
+        return LFCompleteValue(lineHeight: theme.typography.lineHeight(role)) {
+            Text(dashboardMoneyText(money))
+                .font(theme.typography.font(role, tabularDigits: true))
+        }
+    }
+
+    private func dashboardFundingText(_ metric: DashboardFundingMetric) -> String {
+        metric.money(in: dashboardViewModel.fundingCalculation).map { MoneyFormatting.display($0) }
+            ?? "\(metric.currencyCode) Unavailable"
+    }
+
+    private var dashboardSupportingColumnWidth: CGFloat {
+        guard dashboardViewModel.fundingState != .empty else { return 336 }
+        let valueWidth = DashboardFundingMetric.allCases.map {
+            dashboardTextWidth(dashboardFundingText($0), role: .rowTitle, tabular: true)
+        }.max() ?? 0
+        return max(336, valueWidth + 2 * theme.spacing.panelPadding)
+    }
+
     private var salaryDashboardSummary: some View {
-        LFPanel(title: "Current-month Salary & Funding") {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Planning estimates · saved current-month plan")
-                    .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+        LFPanel(contentSpacing: theme.spacing.controlGap) {
+            if dashboardViewModel.fundingState == .empty {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: theme.spacing.sectionGap) {
+                        dashboardMissingPlanMessage
+                        Spacer(minLength: theme.spacing.sectionGap)
+                        dashboardRouteButton(.salary)
+                    }
+                    VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                        dashboardMissingPlanMessage
+                        dashboardRouteButton(.salary)
+                    }
+                }
+            } else {
+                dashboardSupportingHeading("Current-month Salary & Funding", icon: "calendar", font: theme.typography.secondary.weight(.medium))
                 if dashboardViewModel.fundingState == .loading {
                     dashboardState("Loading Salary / Funding…", loading: true)
                 } else {
-                    ForEach(DashboardFundingMetric.allCases) { metric in
-                        HStack(alignment: .firstTextBaseline, spacing: 16) {
-                            Text(metric.rawValue).font(.system(size: 14))
-                                .fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: 0)
-                            Text(metric.money(in: dashboardViewModel.fundingCalculation).map { MoneyFormatting.display($0) }
-                                 ?? "\(metric.currencyCode) Unavailable")
-                                .font(.system(size: 14, weight: .medium))
-                                .monospacedDigit().fixedSize(horizontal: true, vertical: false)
-                        }
+                    Text("Planning estimates · saved current-month plan")
+                        .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+                    LFLabelValueGroup(rows: DashboardFundingMetric.allCases) { metric in
+                        Text(metric.rawValue).font(theme.typography.body)
+                    } value: { metric in
+                        Text(dashboardFundingText(metric))
+                            .font(theme.typography.font(.rowTitle, tabularDigits: true))
+                            .foregroundStyle(theme.palette.primaryText)
+                    } context: { _ in
+                        EmptyView()
                     }
-                    if dashboardViewModel.fundingState == .empty {
-                        Text("Data unavailable. No saved current-month plan.")
-                            .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
-                    } else if dashboardViewModel.fundingState == .unavailable {
-                        Text("Data unavailable").font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                    if dashboardViewModel.fundingState == .unavailable {
+                        Text("Data unavailable").font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     } else if let calculation = dashboardViewModel.fundingCalculation,
                               !calculation.incompleteReasons.isEmpty {
                         Text("Missing required input. Affected outputs are unavailable.")
-                            .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                            .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
                     }
                     if let context = dashboardViewModel.fundingRateContext {
-                        Text(context).font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                        Text(context).font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -1779,23 +1883,54 @@ struct ContentView: View {
         }
     }
 
+    private var dashboardMissingPlanMessage: some View {
+        VStack(alignment: .leading, spacing: theme.spacing.small) {
+            dashboardSupportingHeading("Current-month Salary & Funding", icon: "calendar", font: theme.typography.secondary.weight(.medium))
+            Text("No saved plan for the current month.")
+                .font(theme.typography.secondary)
+                .foregroundStyle(theme.palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func dashboardSupportingHeading(_ title: String, icon: String, font: Font? = nil) -> some View {
+        HStack(spacing: theme.spacing.small) {
+            Image(systemName: icon)
+                .font(theme.typography.sectionIcon)
+                .foregroundStyle(theme.palette.secondaryText)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(font ?? theme.typography.rowTitle)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private func dashboardState(_ title: String, detail: String? = nil, loading: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 10) {
             if loading { ProgressView().controlSize(.small) }
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
-                if let detail { Text(detail).font(.system(size: 12)) }
+                if let detail { Text(detail).font(theme.typography.secondary) }
             }
-            .foregroundStyle(LFTheme.textSecondary)
+            .foregroundStyle(theme.palette.secondaryText)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 8)
     }
 
     private func dashboardRouteButton(_ route: DashboardRoute) -> some View {
-        Button(route.rawValue) { selectedSection = route.destination }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
+        Button { selectedSection = route.destination } label: {
+            HStack(spacing: theme.spacing.controlGap) {
+                Text(route.rawValue)
+                Image(systemName: "chevron.right").accessibilityHidden(true)
+            }
+            .font(theme.typography.secondary.weight(.medium))
+            .padding(.vertical, theme.spacing.micro)
+        }
+        .lfSecondaryAction()
+        .controlSize(.regular)
+        .accessibilityLabel(route.rawValue)
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var accountsContent: some View {
@@ -1834,9 +1969,8 @@ struct ContentView: View {
                         .frame(width: 344)
                 }
             }
-            .padding(28)
+            .padding(theme.spacing.pagePadding)
         }
-        .background(LFTheme.backgroundGradient)
     }
 
     private var importWizardContent: some View {
@@ -1846,7 +1980,7 @@ struct ContentView: View {
 #if DEBUG
             if let developmentActionMessage {
                 Text(developmentActionMessage)
-                    .font(.caption)
+                    .font(theme.typography.formCaption)
                     .foregroundStyle(LFTheme.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
@@ -1861,10 +1995,10 @@ struct ContentView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Import Statements")
-                                .font(.title3.weight(.semibold))
+                                .font(theme.typography.formSection.weight(.semibold))
                             Text("Choose or drop statement files, then review and confirm each item before LedgerForge writes its financial data.")
-                                .font(.subheadline)
-                                .foregroundStyle(LFTheme.textSecondary)
+                                .font(theme.typography.formBody)
+                                .foregroundStyle(theme.palette.secondaryText)
 
                             if !importCentre.items.isEmpty {
                                 ImportBatchProgressView(
@@ -1879,29 +2013,29 @@ struct ContentView: View {
                             } label: {
                                 VStack(spacing: 14) {
                                     Image(systemName: "folder")
-                                        .font(.system(size: 42, weight: .light))
-                                        .foregroundStyle(LFTheme.primaryHover)
+                                        .font(theme.typography.dropTargetIcon)
+                                        .foregroundStyle(theme.palette.accentHover)
                                     Text("Choose or drop statements")
-                                        .font(.headline)
+                                        .font(theme.typography.formHeading)
                                     Text("Browse Files")
-                                        .font(.subheadline.weight(.semibold))
+                                        .font(theme.typography.formBody.weight(.semibold))
                                         .padding(.horizontal, 20)
                                         .padding(.vertical, 9)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 8)
-                                                .stroke(LFTheme.primary, lineWidth: 1)
+                                                .stroke(theme.palette.accent, lineWidth: 1)
                                         )
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 210)
                                 .background(
-                                    LFTheme.primary.opacity(statementDropIsTargeted ? 0.15 : 0.05)
+                                    theme.palette.accent.opacity(statementDropIsTargeted ? 0.15 : 0.05)
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
                                         .stroke(
                                             statementDropIsTargeted
-                                                ? LFTheme.primaryHover
-                                                : LFTheme.primary.opacity(0.75),
+                                                ? theme.palette.accentHover
+                                                : theme.palette.accent.opacity(0.75),
                                             lineWidth: statementDropIsTargeted ? 2 : 1
                                         )
                                 )
@@ -1937,8 +2071,8 @@ struct ContentView: View {
                                     Image(systemName: "info.circle")
                                         .foregroundStyle(LFTheme.info)
                                     Text("No data is written until Confirm Import is selected.")
-                                        .font(.caption)
-                                        .foregroundStyle(LFTheme.textSecondary)
+                                        .font(theme.typography.formCaption)
+                                        .foregroundStyle(theme.palette.secondaryText)
                                     Spacer()
                                 }
                                 .padding(12)
@@ -1952,14 +2086,14 @@ struct ContentView: View {
 
                             HStack(spacing: 12) {
                                 Image(systemName: "shield.checkered")
-                                    .foregroundStyle(LFTheme.primaryHover)
+                                    .foregroundStyle(theme.palette.accentHover)
                                 Text("Files are processed locally. Repository persistence still requires successful validation.")
-                                    .font(.caption)
-                                    .foregroundStyle(LFTheme.textSecondary)
+                                    .font(theme.typography.formCaption)
+                                    .foregroundStyle(theme.palette.secondaryText)
                                 Spacer()
                             }
                             .padding(12)
-                            .background(LFTheme.primary.opacity(0.08))
+                            .background(theme.palette.accent.opacity(0.08))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                     }
@@ -1971,7 +2105,7 @@ struct ContentView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 18) {
                             Text("Validation Review")
-                                .font(.title3.weight(.semibold))
+                                .font(theme.typography.formSection.weight(.semibold))
 
                             validationReviewPanel
                         }
@@ -1985,17 +2119,17 @@ struct ContentView: View {
             HStack {
                 if case .committing = importState {
                     Label("Current commit cannot be cancelled", systemImage: "lock.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(LFTheme.textSecondary)
+                        .font(theme.typography.formCaption.weight(.semibold))
+                        .foregroundStyle(theme.palette.secondaryText)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 13)
-                        .background(LFTheme.surface.opacity(0.65))
+                        .background(theme.palette.controlSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
 
                 if canCancelPreparation {
                     Button("Cancel Current", action: cancelPreparedImport)
-                        .buttonStyle(.bordered)
+                        .lfSecondaryAction()
                 }
 
                 if importCentre.permitsSkip {
@@ -2003,14 +2137,14 @@ struct ContentView: View {
                         statementPassword = ""
                         importCentre.skipCurrent()
                     }
-                    .buttonStyle(.bordered)
+                    .lfSecondaryAction()
                 }
 
                 if importCentre.permitsContinue {
                     Button("Continue") {
                         importCentre.continueAfterCurrent()
                     }
-                    .buttonStyle(.bordered)
+                    .lfSecondaryAction()
                 }
 
                 if importCentre.permitsBatchCancellation {
@@ -2022,13 +2156,13 @@ struct ContentView: View {
                         statementPassword = ""
                         importCentre.cancelBatch()
                     }
-                    .buttonStyle(.bordered)
+                    .lfSecondaryAction()
                     .disabled(importCentre.batchCancellationRequested)
                 }
 
                 if importCentre.batchSummary.isComplete {
                     Button("Start New Batch", action: startNewImportBatch)
-                        .buttonStyle(.bordered)
+                        .lfSecondaryAction()
                 }
 
                 Spacer()
@@ -2036,9 +2170,8 @@ struct ContentView: View {
                 importFooterAction
             }
         }
-        .padding(28)
+        .padding(theme.spacing.pagePadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(LFTheme.backgroundGradient)
     }
 
     private var settingsContent: some View {
@@ -2047,82 +2180,96 @@ struct ContentView: View {
             persistenceState: DatabaseProvider.shared.persistenceState
         )
 
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top, spacing: 18) {
+        return GeometryReader { geometry in
+            let width = min(1320, max(0, geometry.size.width - theme.spacing.pagePadding * 2))
+            let informationLayout = width >= max(900, theme.typography.size(.secondary) * 60)
+                ? AnyLayout(HStackLayout(alignment: .top, spacing: theme.spacing.sectionGap))
+                : AnyLayout(VStackLayout(alignment: .leading, spacing: theme.spacing.sectionGap))
+            VStack(alignment: .leading, spacing: 0) {
+                LFAppearanceIntroduction(appearance: appearance)
+                    .frame(maxWidth: 1320, alignment: .leading)
+                    .padding(.horizontal, theme.spacing.pagePadding)
+                    .padding(.vertical, theme.spacing.sectionGap)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
+                        LFAppearanceControls(appearance: appearance, availableWidth: width)
+                        LFPanel(title: "Application & data") {
+                            informationLayout {
 #if DEBUG
-                    VStack(spacing: 18) {
-                        LFPanel(title: "Application") {
-                            VStack(spacing: 0) {
-                                settingsToggleRow(
-                                    "Developer Mode",
-                                    icon: "chevron.left.forwardslash.chevron.right",
-                                    isOn: Binding(
+                                VStack(alignment: .leading, spacing: theme.spacing.controlGap) {
+                                    Text("Application").font(theme.typography.rowTitle)
+                                    Toggle("Developer Mode", isOn: Binding(
                                         get: { developerDatabaseProfileViewModel.developerModeEnabled },
                                         set: { updateDeveloperMode($0) }
-                                    )
-                                )
-                                if let message = developerDatabaseProfileViewModel.operationState.message {
-                                    Text(message)
-                                        .font(.caption)
-                                        .foregroundStyle(LFTheme.warning)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.horizontal, 12)
-                                        .padding(.bottom, 10)
+                                    ))
+                                    .toggleStyle(.switch)
+                                    .font(theme.typography.secondary)
+                                    if let message = developerDatabaseProfileViewModel.operationState.message {
+                                        Text(message)
+                                            .font(theme.typography.caption)
+                                            .foregroundStyle(LFTheme.warning)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
                                 }
-                            }
-                        }
-                    }
-                    .frame(width: 330)
+                                .frame(maxWidth: .infinity, alignment: .leading)
 #endif
-
-                    VStack(spacing: 18) {
-                        LFPanel(title: "System Information") {
-                            LFInfoRow(title: "Version", value: SettingsPresentation.applicationVersion(infoDictionary: Bundle.main.infoDictionary))
-                            LFInfoRow(title: "Persistence", value: DatabaseProvider.shared.persistenceState.displayName)
-                            LFInfoRow(title: "Persistence Status", value: DatabaseProvider.shared.persistenceState.statusMessage)
-                            if let guidance = DatabaseProvider.shared.persistenceState.recoveryGuidance {
-                                LFInfoRow(title: "Recovery", value: guidance)
+                                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                                    Text("System information").font(theme.typography.rowTitle)
+                                    LFInfoRow(title: "Version", value: SettingsPresentation.applicationVersion(infoDictionary: Bundle.main.infoDictionary), textRole: .secondary)
+                                    LFInfoRow(title: "Persistence", value: DatabaseProvider.shared.persistenceState.displayName, textRole: .secondary)
+                                    Text(DatabaseProvider.shared.persistenceState.statusMessage)
+                                        .font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                                    if let guidance = DatabaseProvider.shared.persistenceState.recoveryGuidance {
+                                        Text(guidance).font(theme.typography.secondary).foregroundStyle(theme.palette.secondaryText)
+                                    }
+                                    LFInfoRow(title: "Runtime state", value: dashboardViewModel.presentationState.message, textRole: .secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                VStack(alignment: .leading, spacing: theme.spacing.small) {
+                                    Text("Data summary").font(theme.typography.rowTitle)
+                                    LFInfoRow(title: "Accounts", value: "\(dashboardViewModel.accounts.count)", textRole: .secondary)
+                                    LFInfoRow(title: "Transactions", value: "\(dashboardViewModel.transactionCount)", textRole: .secondary)
+                                    LFInfoRow(title: "Completed imports", value: completedImports.displayValue, textRole: .secondary)
+                                    if let partialValue = completedImports.secondaryValue {
+                                        LFInfoRow(title: "Partial imports", value: partialValue, textRole: .secondary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            LFInfoRow(title: "Runtime State", value: dashboardViewModel.presentationState.message)
                         }
 
-                        LFPanel(title: "Data Summary") {
-                            LFInfoRow(title: "Accounts", value: "\(dashboardViewModel.accounts.count)")
-                            LFInfoRow(title: "Transactions", value: "\(dashboardViewModel.transactionCount)")
-                            LFInfoRow(title: "Completed Imports", value: completedImports.displayValue)
-                            if let partialValue = completedImports.secondaryValue {
-                                LFInfoRow(title: "Partial Imports", value: partialValue)
-                            }
-                        }
+                        CategoryManagementView()
                     }
-                    .frame(width: 330)
+                    .frame(maxWidth: 1320, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, theme.spacing.pagePadding)
+                    .padding(.bottom, theme.spacing.pagePadding)
                 }
-
-                CategoryManagementView()
-                    .frame(width: 678)
             }
-            .padding(28)
         }
-        .background(LFTheme.backgroundGradient)
     }
 
     private var importActivityCard: some View {
-        LFPanel(title: "Import Activity") {
-            VStack(alignment: .leading, spacing: 14) {
+        LFPanel(contentSpacing: theme.spacing.controlGap) {
+            dashboardSupportingHeading("Import Activity", icon: "square.and.arrow.down")
+            VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
                 if availability.state == .loading {
                     dashboardState("Loading import activity…", loading: true)
                 } else if availability.state == .unavailable || availability.state == .retainedNonCurrent {
                     dashboardState("Data unavailable", detail: "Current import activity is unavailable.")
                 } else {
                     let activity = importActivityPresentation
-                    importActivityRow(
-                        title: activity.title,
-                        subtitle: activity.subtitle,
-                        status: activity.status,
-                        iconName: activity.iconName,
-                        tone: activity.tone
-                    )
+                    VStack(alignment: .leading, spacing: theme.spacing.small) {
+                        Text(activity.title)
+                            .font(theme.typography.secondary.weight(.medium))
+                        Label(activity.status, systemImage: activity.iconName)
+                            .font(theme.typography.secondary)
+                            .foregroundStyle(activity.tone.color)
+                        Text(activity.subtitle)
+                            .font(theme.typography.secondary)
+                            .foregroundStyle(theme.palette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 dashboardRouteButton(.imports)
             }
@@ -2130,8 +2277,9 @@ struct ContentView: View {
     }
 
     private var recentTransactionsCard: some View {
-        LFPanel(title: "Recent Activity") {
-            VStack(alignment: .leading, spacing: 14) {
+        LFPanel(contentSpacing: theme.spacing.controlGap) {
+            dashboardSupportingHeading("Recent Activity", icon: "clock")
+            VStack(alignment: .leading, spacing: theme.spacing.sectionGap) {
                 switch dashboardViewModel.recentActivityState {
                 case .loading:
                     dashboardState("Loading recent activity…", loading: true)
@@ -2140,37 +2288,26 @@ struct ContentView: View {
                 case .unavailable:
                     dashboardState("Data unavailable", detail: "Current transaction activity is unavailable.")
                 case .populated:
-                    ForEach(dashboardViewModel.recentActivity) { row in
-                        dashboardRecentRow(row)
-                        Divider().overlay(LFTheme.divider)
+                    LFLabelValueGroup(rows: dashboardViewModel.recentActivity, rowSpacing: theme.spacing.controlGap) { row in
+                        Text(row.transaction.description).font(theme.typography.body)
+                    } value: { row in
+                        Text(MoneyFormatting.display(row.transaction.money))
+                            .font(theme.typography.font(.rowTitle, tabularDigits: true))
+                    } context: { row in
+                        dashboardRecentContext(row)
                     }
                     Text("Showing \(dashboardViewModel.recentActivity.count) of \(dashboardViewModel.transactionCount) transactions")
-                        .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
+                        .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
                 }
                 dashboardRouteButton(.transactions)
             }
         }
     }
 
-    private func dashboardRecentRow(_ row: TransactionPresentationRow) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(row.sourceCivilDate?.presentation ?? "Date unavailable")
-                    .font(.system(size: 12))
-                    .frame(width: 78, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(row.transaction.description)
-                    .font(.system(size: 14))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(MoneyFormatting.display(row.transaction.money))
-                    .font(.system(size: 14, weight: .medium))
-                    .monospacedDigit().fixedSize(horizontal: true, vertical: false)
-            }
-            Text("\(row.accountDisplayName) · \(row.currentCategoryDisplayName) · \(dashboardEffect(row.effect))")
-                .font(.system(size: 12)).foregroundStyle(LFTheme.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+    private func dashboardRecentContext(_ row: TransactionPresentationRow) -> some View {
+        Text("\(row.sourceCivilDate?.presentation ?? "Date unavailable") · \(row.accountDisplayName) · \(row.currentCategoryDisplayName) · \(dashboardEffect(row.effect))")
+            .font(theme.typography.caption).foregroundStyle(theme.palette.secondaryText)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func dashboardEffect(_ effect: TransactionPresentationEffect) -> String {
@@ -2184,7 +2321,7 @@ struct ContentView: View {
     }
 
     private var accountDetailPanel: some View {
-        LFPanel {
+        LFPanel(variant: .inspector) {
             VStack(alignment: .leading, spacing: 18) {
                 if let account = accountsViewModel.selectedAccount {
                     HStack(spacing: 12) {
@@ -2193,14 +2330,14 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             if accountsViewModel.isEditingDisplayName {
                                 TextField("Display name", text: $accountsViewModel.displayNameDraft)
-                                    .textFieldStyle(.roundedBorder)
+                                    .lfTextField()
                             } else {
                                 Text(account.displayName)
-                                    .font(.headline)
+                                    .font(theme.typography.formHeading)
                             }
                             Text(account.institution)
-                                .font(.caption)
-                                .foregroundStyle(LFTheme.textSecondary)
+                                .font(theme.typography.formCaption)
+                                .foregroundStyle(theme.palette.secondaryText)
                         }
                         Spacer()
                     }
@@ -2214,27 +2351,27 @@ struct ContentView: View {
                             Button("Cancel") {
                                 accountsViewModel.cancelDisplayNameEdit()
                             }
-                            .buttonStyle(.bordered)
+                            .lfSecondaryAction()
                         }
                     } else {
                         Button("Edit display name") {
                             accountsViewModel.beginDisplayNameEdit()
                         }
-                        .buttonStyle(.bordered)
+                        .lfSecondaryAction()
                     }
 
                     if let message = accountsViewModel.presentationState.message {
                         Text(message)
-                            .font(.caption)
+                            .font(theme.typography.formCaption)
                             .foregroundStyle(LFTheme.warning)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
                         Text(account.currentBalanceLabel)
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
+                            .font(theme.typography.formCaption)
+                            .foregroundStyle(theme.palette.secondaryText)
                         Text(formatCurrency(account.currentBalance, currencyCode: account.currencyCode))
-                            .font(.title2.weight(.semibold))
+                            .font(theme.typography.formTitle.weight(.semibold))
                             .foregroundStyle(account.currentBalance >= .zero ? LFTheme.success : LFTheme.danger)
                             .monospacedDigit()
                     }
@@ -2253,10 +2390,10 @@ struct ContentView: View {
                         LFInfoRow(title: "Card Instruments", value: "\(count)")
                     }
 
-                    Divider().overlay(LFTheme.divider)
+                    Divider().overlay(theme.palette.divider)
 
                     Text("Recent Activity")
-                        .font(.headline)
+                        .font(theme.typography.formHeading)
 
                     if accountsViewModel.recentActivity.isEmpty {
                         LFCompactEmptyState(message: "No trusted activity for this account")
@@ -2276,31 +2413,31 @@ struct ContentView: View {
                                 .foregroundStyle(transaction.credit != nil ? LFTheme.success : LFTheme.danger)
                                 .monospacedDigit()
                         }
-                        .font(.caption)
+                        .font(theme.typography.formCaption)
                     }
 
-                    Divider().overlay(LFTheme.divider)
+                    Divider().overlay(theme.palette.divider)
 
                     Text("Verified Financial Identity")
-                        .font(.headline)
+                        .font(theme.typography.formHeading)
                     if account.identitySummaries.isEmpty {
                         LFCompactEmptyState(message: "No verified strong identifiers")
                     } else {
                         ForEach(account.identitySummaries) { identifier in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(identifier.kind) · \(identifier.redactedValue)")
-                                    .font(.caption.weight(.semibold))
+                                    .font(theme.typography.formCaption.weight(.semibold))
                                 Text("\(identifier.strength) · \(identifier.verificationState) · \(identifier.provenance)")
-                                    .font(.caption2)
-                                    .foregroundStyle(LFTheme.textSecondary)
+                                    .font(theme.typography.finePrint)
+                                    .foregroundStyle(theme.palette.secondaryText)
                             }
                         }
                     }
 
-                    Divider().overlay(LFTheme.divider)
+                    Divider().overlay(theme.palette.divider)
 
                     Text("Import History")
-                        .font(.headline)
+                        .font(theme.typography.formHeading)
                     if accountsViewModel.importHistory.isEmpty {
                         LFCompactEmptyState(message: "No trusted import history for this account")
                     } else {
@@ -2310,12 +2447,12 @@ struct ContentView: View {
                             } label: {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(session.sourceDocumentName ?? "Imported statement")
-                                        .font(.caption.weight(.semibold))
+                                        .font(theme.typography.formCaption.weight(.semibold))
                                     Text(session.isPartialImport
                                          ? "\(session.validationStatus) · Partial: \(session.transactionCount) new, \(session.recognizedExistingRowCount ?? 0) represented"
                                          : "\(session.validationStatus) · \(session.transactionCount) transaction(s)")
-                                        .font(.caption2)
-                                        .foregroundStyle(LFTheme.textSecondary)
+                                        .font(theme.typography.finePrint)
+                                        .foregroundStyle(theme.palette.secondaryText)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
@@ -2324,15 +2461,15 @@ struct ContentView: View {
                     }
 
                     if let session = accountsViewModel.selectedImportSession {
-                        Divider().overlay(LFTheme.divider)
+                        Divider().overlay(theme.palette.divider)
                         HStack {
                             Text("Import Detail")
-                                .font(.headline)
+                                .font(theme.typography.formHeading)
                             Spacer()
                             Button("Close") {
                                 accountsViewModel.clearSelectedImportSession()
                             }
-                            .buttonStyle(.bordered)
+                            .lfSecondaryAction()
                         }
                         LFInfoRow(title: "Source", value: session.sourceDocumentName ?? "Imported statement")
                         LFInfoRow(title: "Status", value: session.validationStatus)
@@ -2410,8 +2547,8 @@ struct ContentView: View {
             Text("Balance")
                 .frame(width: 140, alignment: .trailing)
         }
-        .font(.caption)
-        .foregroundStyle(LFTheme.textSecondary)
+        .font(theme.typography.formCaption)
+        .foregroundStyle(theme.palette.secondaryText)
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
     }
@@ -2421,41 +2558,42 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(title)
-                        .font(.subheadline.weight(.medium))
+                        .font(theme.typography.formBody.weight(.medium))
                     Spacer()
                     Image(systemName: systemImage)
-                        .foregroundStyle(LFTheme.primaryHover)
+                        .foregroundStyle(theme.palette.accentHover)
                 }
                 Text(value)
                     .font(.system(size: 25, weight: .semibold))
                     .monospacedDigit()
                 Text(trend)
-                    .font(.caption)
+                    .font(theme.typography.formCaption)
                     .foregroundStyle(trendColor)
             }
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func accountMetric(_ title: String, value: String, detail: String, icon: String, tint: Color = LFTheme.primary) -> some View {
-        LFPanel {
+    private func accountMetric(_ title: String, value: String, detail: String, icon: String, tint: Color? = nil) -> some View {
+        let tint = tint ?? theme.palette.accent
+        return LFPanel {
             HStack(spacing: 16) {
                 Image(systemName: icon)
-                    .font(.title3)
+                    .font(theme.typography.formSection)
                     .foregroundStyle(tint)
                     .frame(width: 48, height: 48)
                     .background(tint.opacity(0.14))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 VStack(alignment: .leading, spacing: 8) {
                     Text(title)
-                        .font(.subheadline.weight(.medium))
+                        .font(theme.typography.formBody.weight(.medium))
                     Text(value)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(tint == LFTheme.danger ? LFTheme.danger : LFTheme.text)
+                        .font(theme.typography.formTitle.weight(.semibold))
+                        .foregroundStyle(tint == LFTheme.danger ? LFTheme.danger : theme.palette.primaryText)
                         .monospacedDigit()
                     Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(LFTheme.textSecondary)
+                        .font(theme.typography.formCaption)
+                        .foregroundStyle(theme.palette.secondaryText)
                 }
                 Spacer()
             }
@@ -2471,17 +2609,22 @@ struct ContentView: View {
                 accountIcon(account.institution)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(account.displayName)
-                        .font(.subheadline.weight(.semibold))
+                        .font(theme.typography.formBody.weight(.semibold))
                     Text(account.currencyCode)
-                        .font(.caption)
-                        .foregroundStyle(LFTheme.textSecondary)
+                        .font(theme.typography.formCaption)
+                        .foregroundStyle(theme.palette.secondaryText)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(account.institution)
                     .frame(width: 160, alignment: .leading)
 
-                LFStatusBadge(title: account.accountTypeLabel, color: LFTheme.primary)
+                Text(account.accountTypeLabel)
+                    .font(theme.typography.formCaption)
+                    .foregroundStyle(theme.palette.primaryText)
+                    .padding(.horizontal, theme.spacing.small)
+                    .padding(.vertical, theme.spacing.micro)
+                    .background(theme.interaction.dataBadge, in: RoundedRectangle(cornerRadius: theme.radius.control))
                     .frame(width: 100, alignment: .leading)
 
                 Text(formatCurrency(account.currentBalance, currencyCode: account.currencyCode))
@@ -2489,13 +2632,13 @@ struct ContentView: View {
                     .monospacedDigit()
                     .frame(width: 140, alignment: .trailing)
             }
-            .font(.caption)
+            .font(theme.typography.formCaption)
             .padding(.horizontal, 10)
             .padding(.vertical, 14)
             .background(
                 accountsViewModel.selectedRepositoryAccountID == account.id
-                    ? LFTheme.primary.opacity(0.16)
-                    : LFTheme.surface.opacity(0.45)
+                    ? theme.interaction.dataRow(selected: true, active: appearsActive)
+                    : theme.palette.contentSurface
             )
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
@@ -2504,7 +2647,7 @@ struct ContentView: View {
 
     private func accountIcon(_ institution: String) -> some View {
         RoundedRectangle(cornerRadius: 8)
-            .fill(institution.localizedCaseInsensitiveContains("axis") ? Color(hex: 0xB0165B) : LFTheme.primary.opacity(0.55))
+            .fill(institution.localizedCaseInsensitiveContains("axis") ? theme.palette.institutionMark : theme.palette.accent.opacity(0.55))
             .frame(width: 38, height: 38)
             .overlay {
                 Image(systemName: institution.localizedCaseInsensitiveContains("axis") ? "a.square.fill" : "building.columns.fill")
@@ -2521,17 +2664,17 @@ struct ContentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 7))
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
-                    .font(.subheadline.weight(.semibold))
+                    .font(theme.typography.formBody.weight(.semibold))
                 Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.formCaption)
+                    .foregroundStyle(theme.palette.secondaryText)
             }
             Spacer()
             Image(systemName: name == "No statement imported" ? "circle" : "checkmark.circle.fill")
-                .foregroundStyle(name == "No statement imported" ? LFTheme.textSecondary : LFTheme.success)
+                .foregroundStyle(name == "No statement imported" ? theme.palette.secondaryText : LFTheme.success)
         }
         .padding(14)
-        .background(LFTheme.surface)
+        .background(theme.palette.controlSurface)
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
@@ -2556,21 +2699,21 @@ struct ContentView: View {
                     ProgressView()
                         .controlSize(.small)
                     Text("Preparing a read-only preview. You can cancel before confirmation.")
-                        .font(.caption)
-                        .foregroundStyle(LFTheme.textSecondary)
+                        .font(theme.typography.formCaption)
+                        .foregroundStyle(theme.palette.secondaryText)
                     if let challenge = activeStatementPasswordChallenge {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Password required")
-                                .font(.subheadline.weight(.semibold))
+                                .font(theme.typography.formBody.weight(.semibold))
                             if let item = importCentre.currentItem {
                                 Text("Statement \(item.queuePosition + 1) of \(importCentre.items.count): \(challenge.fileName)")
-                                    .font(.caption.weight(.semibold))
+                                    .font(theme.typography.formCaption.weight(.semibold))
                             }
                             Text("Enter the statement password to unlock this PDF. It will be remembered in macOS Keychain only after the institution is verified.")
-                                .font(.caption)
-                                .foregroundStyle(LFTheme.textSecondary)
+                                .font(theme.typography.formCaption)
+                                .foregroundStyle(theme.palette.secondaryText)
                             SecureField("Statement password", text: $statementPassword)
-                                .textFieldStyle(.roundedBorder)
+                                .lfTextField()
                                 .onSubmit {
                                     submitStatementPassword(challenge)
                                 }
@@ -2588,7 +2731,7 @@ struct ContentView: View {
                             }
                         }
                         .padding(12)
-                        .background(LFTheme.surface.opacity(0.7))
+                        .background(theme.palette.contentSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }
@@ -2597,7 +2740,7 @@ struct ContentView: View {
                     preparedImportPreview(preparedImport, displayName: selectedFile)
                     if case .committing = importState {
                         Text("Importing confirmed financial data. This write cannot be cancelled safely.")
-                            .font(.caption.weight(.semibold))
+                            .font(theme.typography.formCaption.weight(.semibold))
                             .foregroundStyle(LFTheme.warning)
                     }
                 }
@@ -2626,10 +2769,10 @@ struct ContentView: View {
                                     .frame(width: 20)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(recovery.title)
-                                        .font(.subheadline.weight(.semibold))
+                                        .font(theme.typography.formBody.weight(.semibold))
                                     Text(recovery.explanation)
-                                        .font(.caption)
-                                        .foregroundStyle(LFTheme.textSecondary)
+                                        .font(theme.typography.formCaption)
+                                        .foregroundStyle(theme.palette.secondaryText)
                                 }
                                 Spacer(minLength: 0)
                             }
@@ -2641,15 +2784,15 @@ struct ContentView: View {
                                     performConfirmedImportRecoveryAction(action, for: outcome)
                                 } label: {
                                     Label(action.label, systemImage: "arrow.clockwise")
-                                        .font(.subheadline.weight(.semibold))
+                                        .font(theme.typography.formBody.weight(.semibold))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 10)
                                         .frame(maxWidth: .infinity)
-                                        .background(LFTheme.surface)
+                                        .background(theme.palette.controlSurface)
                                         .clipShape(RoundedRectangle(cornerRadius: 8))
                                 }
                                 .buttonStyle(.plain)
-                                .foregroundStyle(LFTheme.text)
+                                .foregroundStyle(theme.palette.primaryText)
                                 .disabled(
                                     confirmedImportRecoveryActionRequestID != nil
                                         || importCentre.isPreparationDraining
@@ -2675,8 +2818,8 @@ struct ContentView: View {
 
                     if outcome.isEquivalentSupportingSource {
                         Text("LedgerForge recorded this document as a supporting equivalent source. The previously accepted source remains authoritative and no additional financial history was written.")
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
+                            .font(theme.typography.formCaption)
+                            .foregroundStyle(theme.palette.secondaryText)
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(LFTheme.success.opacity(0.08))
@@ -2691,8 +2834,8 @@ struct ContentView: View {
                             LFInfoRow(title: "Account", value: accountName)
                         }
                         Text("This exact statement was imported previously. LedgerForge did not write another document, import session, transaction, account, or identifier.")
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
+                            .font(theme.typography.formCaption)
+                            .foregroundStyle(theme.palette.secondaryText)
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(LFTheme.warning.opacity(0.08))
@@ -2701,11 +2844,11 @@ struct ContentView: View {
 
                     if let message = outcome.message {
                         Text(message)
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
+                            .font(theme.typography.formCaption)
+                            .foregroundStyle(theme.palette.secondaryText)
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(LFTheme.surface)
+                            .background(theme.palette.controlSurface)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
 
@@ -2730,26 +2873,26 @@ struct ContentView: View {
                                 selectedSection = .accounts
                             } label: {
                                 Label("View Account", systemImage: "person.crop.circle")
-                                    .font(.subheadline.weight(.semibold))
+                                    .font(theme.typography.formBody.weight(.semibold))
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 10)
                                     .frame(maxWidth: .infinity)
-                                    .background(LFTheme.surface)
+                                    .background(theme.palette.controlSurface)
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                             .buttonStyle(.plain)
-                            .foregroundStyle(LFTheme.text)
+                            .foregroundStyle(theme.palette.primaryText)
                         }
                         if outcome.allowsViewingTransactions {
                             Button {
                                 selectedSection = .transactions
                             } label: {
                                 Label("View Transactions", systemImage: "list.bullet")
-                                    .font(.subheadline.weight(.semibold))
+                                    .font(theme.typography.formBody.weight(.semibold))
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 10)
                                     .frame(maxWidth: .infinity)
-                                    .background(LFTheme.primaryGradient)
+                                    .background(theme.palette.primaryAction)
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                             .buttonStyle(.plain)
@@ -2770,7 +2913,7 @@ struct ContentView: View {
                     name: fileName,
                     subtitle: "Preparation cancelled. No data was written.",
                     icon: "xmark.circle.fill",
-                    color: LFTheme.textSecondary
+                    color: theme.palette.secondaryText
                 )
             case .failed(let fileName, let message, let retrySourceURL):
                 VStack(alignment: .leading, spacing: 10) {
@@ -2782,8 +2925,8 @@ struct ContentView: View {
                     )
                     if retrySourceURL != nil {
                         Text("The source could not be read. You can retry from the beginning.")
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
+                            .font(theme.typography.formCaption)
+                            .foregroundStyle(theme.palette.secondaryText)
                     }
                 }
             }
@@ -2793,29 +2936,29 @@ struct ContentView: View {
     private var importAttemptHistoryPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Import History").font(.headline)
+                Text("Import History").font(theme.typography.formHeading)
                 Spacer()
-                Text("\(importHistoryViewModel.attempts.count)").font(.caption).foregroundStyle(LFTheme.textSecondary)
+                Text("\(importHistoryViewModel.attempts.count)").font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
             }
             if importHistoryViewModel.attempts.isEmpty {
                 Text("Supported import outcomes appear here after processing.")
-                    .font(.caption).foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
             } else {
                 ForEach(importHistoryViewModel.attempts.prefix(8)) { attempt in
                     let presentation = DurableImportAttemptPresentation(attempt: attempt)
                     Button { importHistoryViewModel.select(id: attempt.id) } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(presentation.outcome.label).font(.subheadline.weight(.semibold))
-                                Text(attempt.createdAtISO).font(.caption2).foregroundStyle(LFTheme.textSecondary)
+                                Text(presentation.outcome.label).font(theme.typography.formBody.weight(.semibold))
+                                Text(attempt.createdAtISO).font(theme.typography.finePrint).foregroundStyle(theme.palette.secondaryText)
                             }
                             Spacer()
                             Text(attempt.outcomeCode == ImportAttemptOutcome.partialImportCommitted.rawValue
                                  ? "\(attempt.importedTransactionCount ?? attempt.transactionCount) new · partial"
                                  : "\(attempt.transactionCount) transactions")
-                                .font(.caption).foregroundStyle(LFTheme.textSecondary)
+                                .font(theme.typography.formCaption).foregroundStyle(theme.palette.secondaryText)
                         }
-                        .padding(9).background(LFTheme.surface.opacity(0.7)).clipShape(RoundedRectangle(cornerRadius: 7))
+                        .padding(9).background(theme.palette.contentSurface).clipShape(RoundedRectangle(cornerRadius: 7))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(presentation.outcome.label). \(presentation.outcome.explanation)")
@@ -2824,15 +2967,15 @@ struct ContentView: View {
             if let attempt = importHistoryViewModel.selectedAttempt {
                 let presentation = DurableImportAttemptPresentation(attempt: attempt)
                 Divider()
-                HStack { Text("Attempt Detail").font(.subheadline.weight(.semibold)); Spacer(); Button("Close") { importHistoryViewModel.clearSelection() }.font(.caption) }
+                HStack { Text("Attempt Detail").font(theme.typography.formBody.weight(.semibold)); Spacer(); Button("Close") { importHistoryViewModel.clearSelection() }.font(theme.typography.formCaption) }
                 LFInfoRow(title: "Outcome", value: presentation.outcome.label)
                 LFInfoRow(title: "Coverage", value: presentation.coverage)
                 LFInfoRow(title: "Guidance", value: presentation.guidance)
                 if let accountPresentation = DurableImportAccountOutcomeSection.presentation(for: attempt) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Account Outcome")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(LFTheme.textSecondary)
+                            .font(theme.typography.formCaption.weight(.semibold))
+                            .foregroundStyle(theme.palette.secondaryText)
                         ImportAccountOutcomeView(
                             presentation: accountPresentation,
                             iconName: durableAccountOutcomeIcon(outcomeCode: attempt.outcomeCode),
@@ -2848,11 +2991,11 @@ struct ContentView: View {
                 }
                 if let accountID = attempt.accountId, accountsViewModel.accounts.contains(where: { $0.id == accountID }) {
                     Button("View Account") { accountsViewModel.selectAccount(repositoryAccountID: accountID); selectedSection = .accounts }
-                        .font(.caption.weight(.semibold)).buttonStyle(.plain).foregroundStyle(LFTheme.primaryHover)
+                        .font(theme.typography.formCaption.weight(.semibold)).buttonStyle(.plain).foregroundStyle(theme.palette.accentHover)
                 }
             }
         }
-        .padding(12).background(LFTheme.surface.opacity(0.45)).clipShape(RoundedRectangle(cornerRadius: 9))
+        .padding(12).background(theme.palette.contentSurface).clipShape(RoundedRectangle(cornerRadius: 9))
     }
 
     private func durableAccountOutcomeTone(outcomeCode: String) -> ImportOutcomeTone {
@@ -2880,9 +3023,9 @@ struct ContentView: View {
             )
 
             HStack(spacing: 8) {
-                LFStatusBadge(title: preparedImport.detectedInstitution.rawValue, color: LFTheme.primary)
+                LFStatusBadge(title: preparedImport.detectedInstitution.rawValue, color: theme.palette.accent)
                 LFStatusBadge(title: preparedImport.detectedDocumentType.rawValue, color: LFTheme.info)
-                LFStatusBadge(title: preparedImport.parserName, color: LFTheme.textSecondary)
+                LFStatusBadge(title: preparedImport.parserName, color: theme.palette.secondaryText)
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
@@ -2900,11 +3043,11 @@ struct ContentView: View {
             case .equivalent:
                 VStack(alignment: .leading, spacing: 6) {
                     Label("Equivalent statement source", systemImage: "checkmark.seal.fill")
-                        .font(.subheadline.weight(.semibold))
+                        .font(theme.typography.formBody.weight(.semibold))
                         .foregroundStyle(LFTheme.success)
                     Text("This PDF/XLS statement is financially identical to an accepted source. Confirmation records durable supporting evidence, preserves the existing source as authoritative, and writes 0 additional transactions.")
-                        .font(.caption)
-                        .foregroundStyle(LFTheme.textSecondary)
+                        .font(theme.typography.formCaption)
+                        .foregroundStyle(theme.palette.secondaryText)
                 }
                 .padding(12)
                 .background(LFTheme.success.opacity(0.08))
@@ -2937,7 +3080,7 @@ struct ContentView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Transaction Preview")
-                    .font(.subheadline.weight(.semibold))
+                    .font(theme.typography.formBody.weight(.semibold))
                 tableHeader(["Date", "Description", "Currency", "Type", "Amount", "Balance"])
                 ForEach(preparedImport.financialDocument.transactions.prefix(12)) { transaction in
                     previewTransactionRow(
@@ -2947,7 +3090,7 @@ struct ContentView: View {
                 }
             }
             .padding(12)
-            .background(LFTheme.surface.opacity(0.55))
+            .background(theme.palette.contentSurface)
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
@@ -2981,18 +3124,18 @@ struct ContentView: View {
                                 VStack(alignment: .leading) {
                                     Text(account.displayName)
                                     Text(account.institution)
-                                        .font(.caption)
-                                        .foregroundStyle(LFTheme.textSecondary)
+                                        .font(theme.typography.formCaption)
+                                        .foregroundStyle(theme.palette.secondaryText)
                                 }
                                 Spacer()
                                 Image(systemName: importAccountChoice == .useExistingAccount(accountId: account.id) ? "checkmark.circle.fill" : "circle")
                             }
                             .padding(10)
-                            .background(LFTheme.surface)
+                            .background(theme.palette.controlSurface)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                         .buttonStyle(.plain)
-                        .foregroundStyle(LFTheme.text)
+                        .foregroundStyle(theme.palette.primaryText)
                     }
                     Button {
                         importCentre.updateAccountChoice(.createNewAccount)
@@ -3003,11 +3146,11 @@ struct ContentView: View {
                             Image(systemName: importAccountChoice == .createNewAccount ? "checkmark.circle.fill" : "circle")
                         }
                         .padding(10)
-                        .background(LFTheme.surface)
+                        .background(theme.palette.controlSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(LFTheme.text)
+                    .foregroundStyle(theme.palette.primaryText)
                 }
                 if case .liabilityAccountChoiceRequired = importIdentityReview {
                     ForEach(accountsViewModel.accounts.filter { projection.eligibleAccountIDs.contains($0.id) }) { account in
@@ -3017,21 +3160,21 @@ struct ContentView: View {
                             HStack {
                                 VStack(alignment: .leading) {
                                     Text("Use existing liability account")
-                                        .font(.subheadline.weight(.semibold))
+                                        .font(theme.typography.formBody.weight(.semibold))
                                     Text(account.displayName)
                                     Text(account.institution)
-                                        .font(.caption)
-                                        .foregroundStyle(LFTheme.textSecondary)
+                                        .font(theme.typography.formCaption)
+                                        .foregroundStyle(theme.palette.secondaryText)
                                 }
                                 Spacer()
                                 Image(systemName: importAccountChoice == .useExistingAccount(accountId: account.id) ? "checkmark.circle.fill" : "circle")
                             }
                             .padding(10)
-                            .background(LFTheme.surface)
+                            .background(theme.palette.controlSurface)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
                         .buttonStyle(.plain)
-                        .foregroundStyle(LFTheme.text)
+                        .foregroundStyle(theme.palette.primaryText)
                     }
                     Button {
                         importCentre.updateAccountChoice(.createNewAccount)
@@ -3042,18 +3185,18 @@ struct ContentView: View {
                             Image(systemName: importAccountChoice == .createNewAccount ? "checkmark.circle.fill" : "circle")
                         }
                         .padding(10)
-                        .background(LFTheme.surface)
+                        .background(theme.palette.controlSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(LFTheme.text)
+                    .foregroundStyle(theme.palette.primaryText)
                 }
                 if case .cardChoiceRequired = importIdentityReview {
                     let statementSections = preparedImport.financialDocument.cardStatementEvidence?.instrumentSections ?? []
                     ForEach(accountsViewModel.accounts.filter { projection.eligibleAccountIDs.contains($0.id) }) { account in
                         let instruments = cardStore.snapshot.instruments.filter { $0.liabilityAccountID == account.id }
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(account.displayName).font(.subheadline.weight(.semibold))
+                            Text(account.displayName).font(theme.typography.formBody.weight(.semibold))
                             if statementSections.count > 1 {
                                 ForEach(statementSections, id: \.documentScopedSectionID) { section in
                                     multiInstrumentSectionChoices(
@@ -3096,7 +3239,7 @@ struct ContentView: View {
                             }
                         }
                         .padding(10)
-                        .background(LFTheme.surface)
+                        .background(theme.palette.controlSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     cardChoiceButton(
@@ -3107,7 +3250,7 @@ struct ContentView: View {
                 }
             }
             .padding(12)
-            .background(LFTheme.primary.opacity(0.06))
+            .background(theme.palette.accent.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
@@ -3124,7 +3267,7 @@ struct ContentView: View {
             .padding(8)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(LFTheme.text)
+        .foregroundStyle(theme.palette.primaryText)
     }
 
     private func multiInstrumentSectionChoices(
@@ -3136,15 +3279,15 @@ struct ContentView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(section.holderLabel ?? "Card section \(section.sourceOrdinal)")
-                .font(.caption.weight(.semibold))
+                .font(theme.typography.formCaption.weight(.semibold))
             if let observed = section.sourceIdentityObservations.first?.value {
                 Text(observed)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.finePrint.monospaced())
+                    .foregroundStyle(theme.palette.secondaryText)
             }
             Text("Signed section total: \(formatCurrency(section.signedNetTotal.amount, currencyCode: section.signedNetTotal.currency.code))")
-                .font(.caption2)
-                .foregroundStyle(section.signedNetTotal.amount < .zero ? LFTheme.success : LFTheme.textSecondary)
+                .font(theme.typography.finePrint)
+                .foregroundStyle(section.signedNetTotal.amount < .zero ? LFTheme.success : theme.palette.secondaryText)
             ForEach(instruments) { instrument in
                 cardSectionChoiceButton(
                     title: "Reuse confirmed instrument \(instrument.id.suffix(8))",
@@ -3178,7 +3321,7 @@ struct ContentView: View {
             )
         }
         .padding(8)
-        .background(LFTheme.background.opacity(0.65))
+        .background(theme.palette.contentSurface)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -3208,7 +3351,7 @@ struct ContentView: View {
             .padding(8)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(LFTheme.text)
+        .foregroundStyle(theme.palette.primaryText)
     }
 
     private func cardRelationshipTitle(_ relationship: CardInstrumentRelationshipKind) -> String {
@@ -3239,11 +3382,11 @@ struct ContentView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(title, systemImage: "exclamationmark.triangle.fill")
-                .font(.subheadline.weight(.semibold))
+                .font(theme.typography.formBody.weight(.semibold))
                 .foregroundStyle(tone.color)
             Text(explanation)
-                .font(.caption)
-                .foregroundStyle(LFTheme.textSecondary)
+                .font(theme.typography.formCaption)
+                .foregroundStyle(theme.palette.secondaryText)
         }
         .padding(12)
         .background(tone.color.opacity(0.08))
@@ -3292,10 +3435,10 @@ struct ContentView: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             Text("Reviewed Partial Import")
-                .font(.headline)
+                .font(theme.typography.formHeading)
             Text("Parser-verified, account-scoped Axis UPI evidence recognizes the earlier rows. LedgerForge will preserve the complete statement and import only the reviewed later rows.")
-                .font(.caption)
-                .foregroundStyle(LFTheme.textSecondary)
+                .font(theme.typography.formCaption)
+                .foregroundStyle(theme.palette.secondaryText)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 LFInfoRow(title: "Declared Period", value: "\(plan.basePlan.declaredStatementStartISO ?? "Unknown") – \(plan.basePlan.declaredStatementEndISO ?? "Unknown")")
                 LFInfoRow(title: "Selected Account", value: selectedAccount?.displayName ?? "Existing account")
@@ -3314,13 +3457,13 @@ struct ContentView: View {
                             Text(transactionsByOrdinal[row.sourceOrdinal]?.description ?? "Statement transaction")
                                 .lineLimit(1)
                             Text("\(row.statementDateISO) · \(row.nativeCurrency) \(row.amountDecimal)")
-                                .font(.caption2)
-                                .foregroundStyle(LFTheme.textSecondary)
+                                .font(theme.typography.finePrint)
+                                .foregroundStyle(theme.palette.secondaryText)
                         }
                         Spacer()
                         Text(row.disposition == .recognizedExisting ? "Already represented" : "Will import")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(row.disposition == .recognizedExisting ? LFTheme.textSecondary : LFTheme.success)
+                            .font(theme.typography.formCaption.weight(.semibold))
+                            .foregroundStyle(row.disposition == .recognizedExisting ? theme.palette.secondaryText : LFTheme.success)
                     }
                     .padding(.vertical, 7)
                     .accessibilityElement(children: .combine)
@@ -3329,11 +3472,11 @@ struct ContentView: View {
                 }
             }
             Text("Repository truth is rechecked atomically at confirmation. If it changes, no part of this reviewed plan will be imported.")
-                .font(.caption)
+                .font(theme.typography.formCaption)
                 .foregroundStyle(LFTheme.warning)
         }
         .padding(12)
-        .background(LFTheme.primary.opacity(0.06))
+        .background(theme.palette.accent.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Reviewed partial import. \(plan.recognizedCount) already represented. \(plan.importedCount) will import. Zero blocked.")
@@ -3351,13 +3494,13 @@ struct ContentView: View {
                     .lineLimit(1)
                 if let scope = cardTransactionScopeLabel(transaction, evidence: cardEvidence) {
                     Text(scope)
-                        .font(.caption2)
-                        .foregroundStyle(LFTheme.textSecondary)
+                        .font(theme.typography.finePrint)
+                        .foregroundStyle(theme.palette.secondaryText)
                 }
             }
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(transaction.currency)
-                .foregroundStyle(LFTheme.textSecondary)
+                .foregroundStyle(theme.palette.secondaryText)
                 .frame(width: 92, alignment: .leading)
             Text(transaction.cardLiabilityEffect == .increasesAmountOwed ? "Charge" : transaction.cardLiabilityEffect == .decreasesAmountOwed ? "Payment/Credit" : transaction.credit != nil ? "Credit" : "Debit")
                 .foregroundStyle(transaction.cardLiabilityEffect == .decreasesAmountOwed || transaction.credit != nil ? LFTheme.success : LFTheme.danger)
@@ -3367,11 +3510,11 @@ struct ContentView: View {
                 .monospacedDigit()
                 .frame(width: 112, alignment: .trailing)
             Text(balanceText(transaction.balance, currency: transaction.currency))
-                .foregroundStyle(LFTheme.textSecondary)
+                .foregroundStyle(theme.palette.secondaryText)
                 .monospacedDigit()
                 .frame(width: 86, alignment: .trailing)
         }
-        .font(.caption)
+        .font(theme.typography.formCaption)
         .padding(.vertical, 8)
     }
 
@@ -3450,8 +3593,8 @@ struct ContentView: View {
                         LFInfoRow(title: "Deductions", value: salary.printedDeductionsTotal.map { formatCurrency($0.amount, currencyCode: "QAR") } ?? "Not printed")
                         LFInfoRow(title: "Payment Total", value: formatCurrency(salary.printedPaymentTotal.amount, currencyCode: "QAR"))
                         Text("\(salary.earnings.count) earning line(s) and \(salary.deductions.count) deduction line(s), preserved in source order.")
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
+                            .font(theme.typography.formCaption)
+                            .foregroundStyle(theme.palette.secondaryText)
                     } else {
                         LFInfoRow(title: "Rows Read", value: "\(preparedImport.validation.rowsRead)")
                         LFInfoRow(title: "Transactions Parsed", value: "\(preparedImport.validation.transactionsParsed)")
@@ -3460,7 +3603,7 @@ struct ContentView: View {
                     }
 
                     Text("No data has been written.")
-                        .font(.caption.weight(.semibold))
+                        .font(theme.typography.formCaption.weight(.semibold))
                         .foregroundStyle(LFTheme.info)
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -3472,15 +3615,15 @@ struct ContentView: View {
                     } else {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Validation Issues")
-                                .font(.subheadline.weight(.semibold))
+                                .font(theme.typography.formBody.weight(.semibold))
                             ForEach(preparedImport.validation.issues) { issue in
                                 HStack(alignment: .top, spacing: 8) {
                                     Image(systemName: validationIssueIcon(issue.severity))
                                         .foregroundStyle(validationIssueColor(issue.severity))
                                         .frame(width: 18)
                                     Text(issue.message)
-                                        .font(.caption)
-                                        .foregroundStyle(LFTheme.textSecondary)
+                                        .font(theme.typography.formCaption)
+                                        .foregroundStyle(theme.palette.secondaryText)
                                 }
                             }
                         }
@@ -3499,10 +3642,10 @@ struct ContentView: View {
     private func settingsToggleRow(_ title: String, icon: String, isOn: Binding<Bool>) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundStyle(LFTheme.textSecondary)
+                .foregroundStyle(theme.palette.secondaryText)
                 .frame(width: 22)
             Text(title)
-                .font(.subheadline)
+                .font(theme.typography.formBody)
             Spacer()
             Toggle("", isOn: isOn)
                 .labelsHidden()
@@ -3522,8 +3665,8 @@ struct ContentView: View {
                     .frame(width: fixedHeaderWidth(index), alignment: index >= 4 ? .trailing : .leading)
             }
         }
-        .font(.caption)
-        .foregroundStyle(LFTheme.textSecondary)
+        .font(theme.typography.formCaption)
+        .foregroundStyle(theme.palette.secondaryText)
         .padding(.vertical, 10)
     }
 
@@ -3547,8 +3690,8 @@ struct ContentView: View {
     private func linkButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
             .buttonStyle(.plain)
-            .font(.caption)
-            .foregroundStyle(LFTheme.primaryHover)
+            .font(theme.typography.formCaption)
+            .foregroundStyle(theme.palette.accentHover)
     }
 
     private var importActivityPresentation: ImportActivityPresentation {
@@ -3573,11 +3716,11 @@ struct ContentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 7))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .font(theme.typography.formCaption.weight(.semibold))
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.finePrint)
+                    .foregroundStyle(theme.palette.secondaryText)
                     .lineLimit(1)
             }
             Spacer()
@@ -3591,12 +3734,12 @@ struct ContentView: View {
                 .fill(color)
                 .frame(width: 9, height: 9)
             Text(title)
-                .font(.caption)
+                .font(theme.typography.formCaption)
             Spacer()
             if !value.isEmpty {
                 Text(value)
-                    .font(.caption)
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.formCaption)
+                    .foregroundStyle(theme.palette.secondaryText)
             }
         }
     }
@@ -3604,25 +3747,25 @@ struct ContentView: View {
     private func wizardStep(_ number: Int, title: String, subtitle: String, active: Bool) -> some View {
         HStack(spacing: 10) {
             Text("\(number)")
-                .font(.headline.weight(.semibold))
+                .font(theme.typography.formHeading.weight(.semibold))
                 .frame(width: 34, height: 34)
-                .background(active ? AnyShapeStyle(LFTheme.primaryGradient) : AnyShapeStyle(LFTheme.surface))
-                .overlay(Circle().stroke(active ? LFTheme.primaryHover : LFTheme.border, lineWidth: 1))
+                .background(active ? AnyShapeStyle(theme.palette.primaryAction) : AnyShapeStyle(theme.palette.controlSurface))
+                .overlay(Circle().stroke(active ? theme.palette.accentHover : theme.palette.border, lineWidth: 1))
                 .clipShape(Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(active ? LFTheme.primaryHover : LFTheme.text)
+                    .font(theme.typography.formBody.weight(.medium))
+                    .foregroundStyle(active ? theme.palette.accentHover : theme.palette.primaryText)
                 Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.formCaption)
+                    .foregroundStyle(theme.palette.secondaryText)
             }
         }
     }
 
     private func stepLine(active: Bool) -> some View {
         Rectangle()
-            .fill(active ? LFTheme.primary : LFTheme.border)
+            .fill(active ? theme.palette.accent : theme.palette.border)
             .frame(maxWidth: .infinity, maxHeight: 2)
     }
 
@@ -3648,9 +3791,9 @@ struct ContentView: View {
     private var availabilityBanner: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(availability.state == .retainedNonCurrent ? "Retained data is not current" : availability.state == .loading ? "Loading data" : "Persistence unavailable").font(.headline)
+                Text(availability.state == .retainedNonCurrent ? "Retained data is not current" : availability.state == .loading ? "Loading data" : "Persistence unavailable").font(theme.typography.formHeading)
                 if let failure = availability.failure {
-                    Text(failure.summary + ". " + failure.nextAction).font(.caption)
+                    Text(failure.summary + ". " + failure.nextAction).font(theme.typography.formCaption)
                 }
             }
             Spacer()

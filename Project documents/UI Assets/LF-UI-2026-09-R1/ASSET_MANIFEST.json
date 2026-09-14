@@ -18,31 +18,31 @@
       "path": "04C_Appearance_State_Component_Contract",
       "bytes": 378793,
       "sha256": "714067ded658e6b81ef33c901792f98c9641b00c6c97dd523a3d789efde753c7",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; dark-only appearance accepted in Sprint 91A with recorded native verification limits; original System/Light controls superseded"
     },
     {
       "path": "ACCEPTANCE.md",
-      "bytes": 5280,
-      "sha256": "8b71600fd29744b97df07d903a94109bc2719bc5ec458246e23124b306a8e902",
+      "bytes": 8228,
+      "sha256": "949227beae64f908b09830d6a3ac413b5677ff94ea4acbae7e9423d2f9a8b0b5",
       "role": "required checks; not native pass evidence"
     },
     {
       "path": "DESIGN_HANDOFF.md",
-      "bytes": 10696,
-      "sha256": "e64405952ca9b22462aadfe84719b8d9fb14cf674171b96ffb79deab64d5788b",
+      "bytes": 13824,
+      "sha256": "24705be9e4e9fb47a566598b84f702feab046967fc9af259c840419f6bd4ebec",
       "role": "shared design requirements and exact caption exceptions"
     },
     {
       "path": "DESIGN_TOKENS.json",
-      "bytes": 4781,
-      "sha256": "744337069754556197573d3a6e16019645bb406c8844a1445a645c64f885a2e3",
+      "bytes": 5058,
+      "sha256": "a274080b0e9cf5eda54988fc82aa544115a66ffc39a6d973beb083e9d0bb49d5",
       "role": "existing numeric roles; semantic arrays unchanged"
     },
     {
       "path": "Inherited_Screens.md",
-      "bytes": 10556,
-      "sha256": "4691f574f1ac21aa94ea30ebada6fbb6427ba3961448acc03e555b0dcadcca65",
-      "role": "canonical written contract relocated from existing approved text; no new native acceptance"
+      "bytes": 11526,
+      "sha256": "3e290a1fe130de7a8558bd0164f34f59b82c720752c4c57878b1235afeef9f4a",
+      "role": "canonical written contract; accepted native boundaries and limits tracked in accepted outcome records"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-01_App_Shell_Supporting_Reference.png",
@@ -64,19 +64,19 @@
       "path": "LF-UI-2026-09-R1_SC-02A_Transactions_Wide_Reference.png",
       "bytes": 394957,
       "sha256": "08075e2f8c3456c5a568f85cd4c4295c200f9a11ac7add18e4554dc0457766dc",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; bounded Transactions implementation accepted in Sprint 89"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-02B_Transactions_Narrow_Responsive_Reference.png",
       "bytes": 1477959,
       "sha256": "b6c7e894a7809cb954a204e7b13a0d78b8b3e36aae418b644e8b22037d1c9d26",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; bounded Transactions implementation accepted in Sprint 89"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-02C_Transactions_State_Component_Contract.png",
       "bytes": 497217,
       "sha256": "4d60a657c1e9cec801b69f692bad0101cbe0b0173ba57be240ad61909947ae7b",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; bounded Transactions implementation accepted in Sprint 89"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md",
@@ -88,72 +88,72 @@
       "path": "LF-UI-2026-09-R1_SC-03A_Dashboard_Wide_Reference.png",
       "bytes": 1426346,
       "sha256": "16b667024e840182f0de7b7d6ed5f3b1a292d68645d977bc2b220e290cce395f",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; implemented by accepted Sprint 90"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; Sprint-90 data/behavior and Sprint-91A current visual foundation accepted with recorded native verification limits"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-03B_Dashboard_Narrow_Responsive_Reference.png",
       "bytes": 185430,
       "sha256": "5cd2e113277cc3debc1c7702a73975842686d6c72816354d7d8e51488896c9ec",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; implemented by accepted Sprint 90"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; Sprint-90 data/behavior and Sprint-91A current visual foundation accepted with recorded native verification limits"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-03C_Dashboard_State_Component_Contract.png",
       "bytes": 1918344,
       "sha256": "4a3a19e2be777ba3de02d10b9eaddd75f0a8b85ef3ae881cf62bd3c0c798b526",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; implemented by accepted Sprint 90"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; Sprint-90 data/behavior and Sprint-91A current visual foundation accepted with recorded native verification limits"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-04A_Appearance_Settings_Reference.png",
       "bytes": 1379526,
       "sha256": "da18ff990d3914ae0f74962168c367bcd3bccf4b4d3ee05a4b92ada0fa83a5d2",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; dark-only appearance accepted in Sprint 91A with recorded native verification limits; original System/Light controls superseded"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-04B_Appearance_Light_Dark_Surface_Comparison.png",
       "bytes": 208972,
       "sha256": "939d3ce133b7f2448feddf6471c914aa9c2b89baaf5337882ce6f83a06d93c0f",
-      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; no native implementation"
+      "role": "owner-curated / Chat-approved / published design reference; unchanged bytes; dark-only appearance accepted in Sprint 91A with recorded native verification limits; original System/Light controls superseded"
     },
     {
       "path": "LF-UI-2026-09-R1_SC-05A_Cross_Screen_Conformance_Matrix.md",
-      "bytes": 23842,
-      "sha256": "cc6d22d5bac270f84c2f6dbc208017f3049cd7eff6dc92cb9912b51fd1d785df",
-      "role": "coordinator-accepted cross-screen audit; historical Sprint-88 evidence boundary; no implementation"
+      "bytes": 25225,
+      "sha256": "0144170d6f409ffa94ff2ea127692a98a6344c5e96848b20783eb6f507bc590c",
+      "role": "historical Sprint-88 audit; current 91A acceptance linked; refresh required for Sprint 92; closure does not re-audit or resolve findings"
     },
     {
       "path": "MasterBoard_LF-UI-2026-09-R1.png",
       "bytes": 1857582,
       "sha256": "da0a6f07c6faaef90c6de2cd33f3ad250399a73ff9f214ef86640b487ed55ca4",
-      "role": "owner-curated / Chat-approved / published visual reference; no native implementation"
+      "role": "owner-curated / Chat-approved / published visual reference; native implementation acceptance remains outcome-specific"
     },
     {
       "path": "README.md",
-      "bytes": 4501,
-      "sha256": "c4133e3b124c2a41cf8808795da53f83fffdbc7b9901228cd82c7bdee182e293",
+      "bytes": 5369,
+      "sha256": "60cdd6232f72d3164dea48bec76e9689f36a8aaeca09114b0a344fea110eb76e",
       "role": "package map and current publication status"
     },
     {
       "path": "SC-01_App_Shell.md",
-      "bytes": 2817,
-      "sha256": "0e7e7bc22747e551cb877b629d1a8f81cfc2d5b2e362e3647461f9b6c0de520d",
-      "role": "canonical written contract relocated from existing approved text; no new native acceptance"
+      "bytes": 4443,
+      "sha256": "009b8258ee7046b578f5630986cf2d7e02b305caffec2828071d051eca9ace7a",
+      "role": "canonical written contract; accepted native boundaries and limits tracked in accepted outcome records"
     },
     {
       "path": "SC-02_Transactions.md",
       "bytes": 6149,
       "sha256": "8a667fb9409c7005991547e87c7577eadfa8f2606305f16ced34498b3c5a54f5",
-      "role": "canonical written contract relocated from existing approved text; no new native acceptance"
+      "role": "canonical written contract; accepted native boundaries and limits tracked in accepted outcome records"
     },
     {
       "path": "SC-03_Dashboard.md",
-      "bytes": 2499,
-      "sha256": "65f51e35045bf2a4d2ccda469d75566eb97ac2a9298551190529220c6469abb1",
-      "role": "canonical written contract relocated from existing approved text; no new native acceptance"
+      "bytes": 5057,
+      "sha256": "625e8ab7faf609e271fc2366459d30407089a7f30f5932c1d1417fcf255529c8",
+      "role": "canonical written contract; accepted native boundaries and limits tracked in accepted outcome records"
     },
     {
       "path": "SOURCES.md",
-      "bytes": 8098,
-      "sha256": "984702efc052bdfa9cadddd0453e684e7f22afac29af7baa4d0afcb71eb9aa01",
+      "bytes": 9075,
+      "sha256": "3f7dee39c1e99009503b9c125c859a592427b0a36eb03166fce8437f4bf2e604",
       "role": "historical provenance and current publication truth"
     }
   ],
@@ -169,7 +169,8 @@
       "path": "Project documents/UI Assets/Archived/AppIcon_v1.0.png",
       "git_blob_sha1": "c7c43756db8405c180980ed28e4d6774a5c33a89",
       "intended_status_after_registration": "retained; no app-icon replacement",
-      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
+      "operation": "archive unchanged under Project documents/UI Assets/Archived/",
+      "current_status": "Archived original retained byte-identically; owner-selected source for accepted Sprint-91A application and sidebar icon"
     },
     {
       "path": "Project documents/UI Assets/Archived/ComponentLibrary_v1.0.png",
@@ -223,7 +224,8 @@
       "path": "Project documents/UI Assets/Archived/UserJourney_v1.0.png",
       "git_blob_sha1": "1ded77dc012686636f0b598f6a00c46d924c2e7c",
       "intended_status_after_registration": "historical/context only; no new feature authority",
-      "operation": "archive unchanged under Project documents/UI Assets/Archived/"
+      "operation": "preserve intentional owner deletion in Sprint-91A publication",
+      "current_status": "OWNER-DELETED on 2026-09-14; not present; historical Git blob identity retained; do not restore"
     }
   ],
   "unapproved_alternatives_excluded": [
@@ -231,10 +233,10 @@
     "LedgerForge_Design_v3_Draft/reference/contact_sheet.png",
     "LedgerForge_Design_v3_Draft/reference/appearance_playground_check.png"
   ],
-  "native_implementation_status": "R1 package is design/reference material. Sprint 89 is accepted for its SC-01/SC-02 Transactions boundary; SC-03 and SC-04 native implementation remain future work.",
-  "documentation_integration_status": "all current UI Assets files published as-is at Sprint-89 candidate 038af8d9ebebe66b3f17925416821941cfa33d3d; Sprint 89 later Chat-accepted",
-  "git_publication_status": "all current UI Assets files published as-is by owner instruction in Sprint-89 candidate 038af8d9ebebe66b3f17925416821941cfa33d3d",
-  "scope_alignment_date": "2026-09-11",
-  "scope_alignment": "Private personal app: simple local appearance and ordinary owner usability. All current R1 payload files are owner-curated / Chat-approved / published design references where applicable; publication remains separate from native implementation. DESIGN_HANDOFF.md records exact rejected caption exceptions; canonical written authorities retain semantic control.",
-  "local_sc_png_status": "All current owner-placed SC images in the R1 folder are approved and published design references. Publication does not constitute product implementation: SC-01/SC-02 informed accepted Sprint 89, SC-03 is future Sprint-90 design authority, SC-04 is future Sprint-91 design authority, and SC-05A is the coordinator-accepted audit for a future Sprint-92 refresh. Exact caption exceptions remain in DESIGN_HANDOFF.md."
+  "native_implementation_status": "Sprint 91A owner-accepted on 2026-09-14: shared visual foundation/current Dashboard, dark-only local colours/font/opacity preferences and responsive Settings, with FINAL_BYTE_SMALL_WINDOW_NATIVE_RECHECK_NOT_COMPLETED. Sprints 89/90 accepted meanings remain intact. Original System/Light planning is superseded history. Sprint 92 is NEXT / NOT STARTED.",
+  "documentation_integration_status": "Current authorities reconciled for owner-accepted Sprint 91A; original outcome/audit history preserved. The commit containing this manifest publishes the accumulated product and documentation closure.",
+  "git_publication_status": "Owner-authorized Sprint-91A product/docs/icon publication, including intentional archived UserJourney deletion. Exact published ref is the commit containing this closure; local/remote convergence is checked at publication.",
+  "scope_alignment_date": "2026-09-14",
+  "scope_alignment": "Private personal app; dark-only customizable appearance and current visual foundation accepted. Saved local overrides remain user state, distinct from factory defaults. Regression tests remain SUSPENDED / 0 new executions; no repeated resize campaign. Product/docs/icon publication expressly authorized. Sprint 92 NEXT / NOT STARTED; source, financial and migration boundaries preserved.",
+  "local_sc_png_status": "All 12 current R1 PNG payloads, including the extensionless state sheet, remain byte-identical approved references. Accepted 91A includes current visual foundation and dark-only appearance with recorded native verification limits; SC-04 System/Light controls are historical. SC-05A is a historical audit requiring refresh, not a blanket native pass. The separate archived UserJourney image was intentionally deleted."
 }

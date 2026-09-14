@@ -9,6 +9,7 @@ import AppKit
 #endif
 
 struct DeveloperConsoleView: View {
+    @Environment(\.lfTheme) private var theme
 
     @ObservedObject var console = DeveloperConsole.shared
     @ObservedObject private var accountStore = AccountStore.shared
@@ -43,7 +44,7 @@ struct DeveloperConsoleView: View {
 
                 Spacer()
 
-                LFInlineBadge(title: Self.timeFormatter.string(from: Date()), color: LFTheme.textSecondary)
+                LFInlineBadge(title: Self.timeFormatter.string(from: Date()), color: theme.palette.secondaryText)
             }
 
             HStack(alignment: .top, spacing: 14) {
@@ -68,8 +69,7 @@ struct DeveloperConsoleView: View {
             }
 
         }
-        .padding(28)
-        .background(LFTheme.backgroundGradient)
+        .padding(theme.spacing.pagePadding)
 #if DEBUG
         .confirmationDialog(
             profileViewModel.resetActionLabel.map { "\($0)?" } ?? "Reset Development Profile?",
@@ -113,9 +113,9 @@ struct DeveloperConsoleView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 10) {
                 Text("Developer Diagnostics")
-                    .font(.headline)
+                    .font(theme.typography.formHeading)
                 Spacer()
-                LFInlineBadge(title: "\(displayedEntries.count) shown", color: LFTheme.textSecondary)
+                LFInlineBadge(title: "\(displayedEntries.count) shown", color: theme.palette.secondaryText)
             }
 
             HStack(spacing: 10) {
@@ -146,13 +146,13 @@ struct DeveloperConsoleView: View {
                 // Search
                 TextField("Search diagnostics (message, metadata)", text: $filters.searchText)
                     .textFieldStyle(.plain)
-                    .font(.caption)
+                    .font(theme.typography.formCaption)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(LFTheme.surfaceRaised.opacity(0.65))
+                    .background(theme.palette.controlSurface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 7)
-                            .stroke(LFTheme.border, lineWidth: 1)
+                            .stroke(theme.palette.border, lineWidth: 1)
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 7))
             }
@@ -165,32 +165,32 @@ struct DeveloperConsoleView: View {
                 if console.entries.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "terminal")
-                            .font(.system(size: 34))
-                            .foregroundStyle(LFTheme.primaryHover)
+                            .font(theme.typography.emptyStateIcon)
+                            .foregroundStyle(theme.palette.accentHover)
                         Text("No console messages")
-                            .font(.headline)
+                            .font(theme.typography.formHeading)
                         Text("Runtime diagnostics appear here when import, validation or hydration emits messages.")
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
+                            .font(theme.typography.formCaption)
+                            .foregroundStyle(theme.palette.secondaryText)
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity, minHeight: 260)
                 } else if displayedEntries.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "magnifyingglass")
-                            .font(.system(size: 34))
-                            .foregroundStyle(LFTheme.primaryHover)
+                            .font(theme.typography.emptyStateIcon)
+                            .foregroundStyle(theme.palette.accentHover)
                         Text("No matching console messages")
-                            .font(.headline)
+                            .font(theme.typography.formHeading)
                         Text("Search filters the visible messages only.")
-                            .font(.caption)
-                            .foregroundStyle(LFTheme.textSecondary)
+                            .font(theme.typography.formCaption)
+                            .foregroundStyle(theme.palette.secondaryText)
                     }
                     .frame(maxWidth: .infinity, minHeight: 260)
                 } else {
                     ForEach(displayedEntries) { entry in
                         logRow(entry)
-                        Divider().overlay(LFTheme.divider)
+                        Divider().overlay(theme.palette.divider)
                     }
                 }
             }
@@ -202,29 +202,29 @@ struct DeveloperConsoleView: View {
     private func logRow(_ entry: DeveloperLogEntry) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text("#\(entry.sequence)")
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(LFTheme.textSecondary)
+                .font(theme.typography.diagnosticText)
+                .foregroundStyle(theme.palette.secondaryText)
                 .frame(width: 86, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     Text(Self.rowTimeFormatter.string(from: entry.timestamp))
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(LFTheme.textSecondary)
+                        .font(theme.typography.diagnosticText)
+                        .foregroundStyle(theme.palette.secondaryText)
 
                     levelBadge(entry.level)
                     categoryBadge(entry.category)
                 }
 
                 Text(DiagnosticPrivacy.text(entry.message))
-                    .font(.system(.caption, design: .monospaced))
+                    .font(theme.typography.diagnosticText)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let metadataText = DeveloperConsole.metadataText(for: entry) {
                     DisclosureGroup("Details") { Text(metadataText)
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(LFTheme.textSecondary)
+                        .font(theme.typography.diagnosticDetail)
+                        .foregroundStyle(theme.palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
@@ -240,14 +240,14 @@ struct DeveloperConsoleView: View {
     private func levelBadge(_ level: DeveloperLogLevel) -> some View {
         let color: Color = {
             switch level {
-            case .debug: return LFTheme.textSecondary
+            case .debug: return theme.palette.secondaryText
             case .info: return LFTheme.info
             case .warning: return LFTheme.warning
             case .error: return LFTheme.danger
             }
         }()
         return Text(level.rawValue)
-            .font(.caption2.weight(.semibold))
+            .font(theme.typography.finePrint.weight(.semibold))
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .background(color.opacity(0.15))
@@ -257,11 +257,11 @@ struct DeveloperConsoleView: View {
 
     private func categoryBadge(_ category: DeveloperLogCategory) -> some View {
         Text(category.rawValue)
-            .font(.caption2.weight(.semibold))
+            .font(theme.typography.finePrint.weight(.semibold))
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(LFTheme.surfaceRaised.opacity(0.65))
-            .foregroundStyle(LFTheme.textSecondary)
+            .background(theme.palette.controlSurface)
+            .foregroundStyle(theme.palette.secondaryText)
             .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
@@ -273,7 +273,7 @@ struct DeveloperConsoleView: View {
                 title: "Copy All",
                 systemImage: "doc.on.doc",
                 minWidth: 104,
-                fill: LFTheme.surfaceRaised.opacity(0.65)
+                fill: theme.palette.controlSurface
             ) {
                 copyAllLogs()
             }
@@ -282,7 +282,7 @@ struct DeveloperConsoleView: View {
                 title: "Clear",
                 systemImage: "trash",
                 minWidth: 88,
-                fill: LFTheme.surfaceRaised.opacity(0.65),
+                fill: theme.palette.controlSurface,
                 foreground: LFTheme.danger
             ) {
                 console.clear()
@@ -293,8 +293,8 @@ struct DeveloperConsoleView: View {
             }
         }
         .padding(12)
-        .background(LFTheme.backgroundDeep.opacity(0.65))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(LFTheme.border, lineWidth: 1))
+        .background(theme.palette.contentSurface)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.palette.border, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -329,7 +329,7 @@ struct DeveloperConsoleView: View {
                 LFConsoleButton(
                     title: "Reload Data",
                     systemImage: "arrow.clockwise",
-                    fill: LFTheme.surfaceRaised.opacity(0.65),
+                    fill: theme.palette.controlSurface,
                     isFullWidth: true,
                     isDisabled: isRunningRepositoryAction
                 ) {
@@ -338,7 +338,7 @@ struct DeveloperConsoleView: View {
 
                 if let actionError {
                     Text(actionError)
-                        .font(.caption)
+                        .font(theme.typography.formCaption)
                         .foregroundStyle(LFTheme.danger)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -387,7 +387,7 @@ struct DeveloperConsoleView: View {
                 LFConsoleButton(
                     title: "Activate",
                     systemImage: "arrow.triangle.2.circlepath",
-                    fill: LFTheme.primary,
+                    fill: theme.palette.accent,
                     foreground: .white,
                     isFullWidth: true,
                     showsBorder: false,
@@ -412,7 +412,7 @@ struct DeveloperConsoleView: View {
 
                 if let message = profileViewModel.operationState.message {
                     Text(message)
-                        .font(.caption)
+                        .font(theme.typography.formCaption)
                         .foregroundStyle(LFTheme.warning)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }

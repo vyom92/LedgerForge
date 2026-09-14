@@ -2,10 +2,14 @@
 
 **Revision:** LF-UI-2026-09-R1 / SC-05A  
 **Review date:** 11 September 2026  
-**Status:** Coordinator-accepted cross-screen audit. Recheck against accepted Sprints 89–91 before Sprint-92 implementation. Source/reference comparison, not native-screen acceptance.
+**Status:** Coordinator-accepted historical cross-screen audit. Sprint 91A's accumulated visual foundation, current Dashboard and dark-only appearance are now owner-accepted with the [recorded verification limitation](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a). Refresh this audit against the exact published 91A ending ref and accepted 89–90 before Sprint-92 execution. This documentation closure does not re-audit the app or consume P1–P6/N1–N3; Sprint 92 is NEXT / NOT STARTED.
 **Destinations:** Dashboard · Accounts · Transactions · Import · Salary · Settings
 
+**Current disposition — 2026-09-14:** accepted 91A settles the shared modular theme, dark-only local preferences/responsive Settings, all-six Collapse/Expand, Transactions selection/focus/header sorting and current Dashboard visual foundation. The original System/Light appearance expectation below is superseded history. Historical Keep/P1–P6 classifications remain intact and are not native passes on 91A. The [Sprint-92 handoff](../../Work%20notes/Transaction_and_R1_workflows.md#sprint-92-handoff) carries the owner’s v1 information-presentation direction; no further implementation or chart qualification is performed here.
+
 ## 1. Result and evidence boundary
+
+**2026-09-13 qualification:** the original structural **Keep** findings below are not a native material PASS. The owner authorized [Sprint 91A's shared visual foundation and Dashboard correction](../../Work%20notes/Transaction_and_R1_workflows.md#sprint-91a-visual-conformance); this does not move the missing foundation into Sprint 92 or select P1–P6 opportunistically. Original audit findings and evidence remain intact.
 
 **The shared shell and panel foundation should be kept. The small cleanup candidates are inconsistent page insets, Salary display/copy details, and Import terminal/history presentation.** Narrow-width fit, composed materials and focus behavior still need observations in the actual app before they become defects or edits.
 

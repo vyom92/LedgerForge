@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Import footer presentation. The root still owns all coordinator commands and task lifetimes.
 struct ImportCentreFooterRenderer: View {
+    @Environment(\.lfTheme) private var theme
     let importState: ImportPresentationState
     let confirmationLabel: String
     let confirmationIsDisabled: (PreparedImport) -> Bool
@@ -18,13 +19,13 @@ struct ImportCentreFooterRenderer: View {
                 } label: {
                     Label(confirmationLabel, systemImage: "checkmark.circle")
                         .labelStyle(.titleAndIcon)
-                        .font(.subheadline.weight(.semibold))
+                        .font(theme.typography.formBody.weight(.semibold))
                         .padding(.horizontal, 32)
                         .padding(.vertical, 13)
                         .frame(minWidth: 180)
-                        .background(LFTheme.primaryGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                        .background(theme.palette.primaryAction)
+                        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
+                        .contentShape(RoundedRectangle(cornerRadius: theme.radius.control))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
@@ -32,22 +33,22 @@ struct ImportCentreFooterRenderer: View {
             case .importing:
                 Label("Importing", systemImage: "hourglass")
                     .labelStyle(.titleAndIcon)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(LFTheme.textSecondary)
+                    .font(theme.typography.formBody.weight(.semibold))
+                    .foregroundStyle(theme.palette.secondaryText)
                     .padding(.horizontal, 32)
                     .padding(.vertical, 13)
-                    .background(LFTheme.surface.opacity(0.65))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(theme.palette.controlSurface)
+                    .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
             case .retryPreparation:
                 Button(action: retryPreparation) {
                     Label("Retry Preparation", systemImage: "arrow.clockwise")
                         .labelStyle(.titleAndIcon)
-                        .font(.subheadline.weight(.semibold))
+                        .font(theme.typography.formBody.weight(.semibold))
                         .padding(.horizontal, 32)
                         .padding(.vertical, 13)
                         .frame(minWidth: 180)
-                        .background(LFTheme.primaryGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .background(theme.palette.primaryAction)
+                        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
@@ -55,13 +56,13 @@ struct ImportCentreFooterRenderer: View {
                 Button(action: viewTransactions) {
                     Label("View Transactions", systemImage: "arrow.right")
                         .labelStyle(.titleAndIcon)
-                        .font(.subheadline.weight(.semibold))
+                        .font(theme.typography.formBody.weight(.semibold))
                         .padding(.horizontal, 32)
                         .padding(.vertical, 13)
                         .frame(minWidth: 180)
-                        .background(LFTheme.primaryGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                        .background(theme.palette.primaryAction)
+                        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
+                        .contentShape(RoundedRectangle(cornerRadius: theme.radius.control))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)

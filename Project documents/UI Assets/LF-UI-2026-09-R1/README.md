@@ -7,7 +7,7 @@ Approved visual direction and canonical written contracts for the private person
 | Input | Responsibility / status |
 | --- | --- |
 | [DESIGN_HANDOFF](DESIGN_HANDOFF.md) | Shared design and component requirements, artwork/caption exceptions |
-| [DESIGN_TOKENS](DESIGN_TOKENS.json) | Existing numeric roles; numeric values and semantic arrays unchanged |
+| [DESIGN_TOKENS](DESIGN_TOKENS.json) | Named reference roles; numeric and palette values unchanged; appearance applicability updated by the 2026-09-14 owner decision |
 | [SC-01_App_Shell](SC-01_App_Shell.md) | Canonical shell/navigation text relocated from approved handoff |
 | [SC-02_Transactions](SC-02_Transactions.md) | Canonical Transactions text relocated from approved handoff |
 | [SC-03_Dashboard](SC-03_Dashboard.md) | Canonical Dashboard text relocated from approved handoff |
@@ -24,9 +24,9 @@ These new screen files reorganize already approved written text; they are not ne
 
 The tracked `LF-UI-2026-09-R1_SC-01_App_Shell_Visual_Contract.md` and `LF-UI-2026-09-R1_SC-02_Transactions_Visual_Spec.md` remain **draft/supporting specifications**, not competing canonical owners. Their status is unchanged by this restructure.
 
-All current SC images in this R1 folder are **owner-curated / Chat-approved / published design references**. Their exact current bytes are listed in ASSET_MANIFEST.json. Publication does not itself implement a screen or create a competing written authority: canonical written contracts continue to control semantics.
+All current SC images in this R1 folder are **owner-curated / Chat-approved / published design references**. Their exact current bytes are listed in ASSET_MANIFEST.json. Apply the [responsibility-based authority](DESIGN_HANDOFF.md#authority): approved references control appearance/composition, written financial/workflow rules control meaning, state/responsive sheets control their conditions, and numeric tokens control named roles. Publication does not itself implement or accept a native screen.
 
-SC-01/SC-02 informed accepted Sprint 89. **SC-03 A/B/C: OWNER-CURATED / CHAT-APPROVED / PUBLISHED / NOW IMPLEMENTED BY ACCEPTED SPRINT 90**, at `619c39ec07402a63c90b646cbba9ced806f5e99d`; the [accepted outcome](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-90) owns the verified implementation boundary and limitations. **SC-04 A/B/C: OWNER-CURATED / CHAT-APPROVED / PUBLISHED / NOT YET IMPLEMENTED**; Sprint 91 remains PREPARED / NOT YET CHAT-AUTHORIZED. SC-05A remains the coordinator-accepted audit to refresh after Sprint 91 against accepted Sprints 89–91 before any Sprint-92 implementation; this closure does not change its findings.
+SC-01/SC-02 informed accepted Sprint 89. **SC-03 A/B/C: OWNER-CURATED / CHAT-APPROVED / PUBLISHED; SPRINT-90 DATA/BEHAVIOR AND SPRINT-91A CURRENT VISUAL FOUNDATION ACCEPTED.** The [Sprint-90 outcome](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-90) remains intact. The owner accepts the accumulated [Sprint-91A outcome](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a), including current Dashboard composition and dark-only local customizable appearance with responsive Settings. **SC-04 A/B/C: OWNER-CURATED / CHAT-APPROVED / PUBLISHED, BYTES UNCHANGED.** Their System/Light plan is superseded history under the [owner decision](../../SCOPE_DECISIONS.md#dark-appearance-decision). Final-byte small-window rechecking remains explicitly incomplete and accepted as a limitation; earlier r34 evidence is not a final-byte PASS. SC-05A must be refreshed against published 91A before Sprint-92 execution; its original Keep classifications are historical, not blanket native evidence. Sprint 92 is NEXT / NOT STARTED.
 
 The current reference inventory, in natural screen order:
 
@@ -42,6 +42,6 @@ The current reference inventory, in natural screen order:
 - SC-04B Appearance Light/Dark Surface Comparison;
 - 04C Appearance State Component Contract.
 
-The named SC images retain their existing filenames; the extensionless `04C_Appearance_State_Component_Contract` remains published as-is. Their presence is not a native pass. Keep every PNG intact; [exact ignored caption portions](DESIGN_HANDOFF.md#ignored-caption-portions) apply to SC-02A/02C/03B only. Do not regenerate/delete images to remove superseded text. [Archived visuals](../Archived) remain historical references with unchanged bytes.
+The named SC images retain their existing filenames; the extensionless `04C_Appearance_State_Component_Contract` remains published as-is. Their presence is not a native pass. Keep every PNG intact; [exact ignored caption portions](DESIGN_HANDOFF.md#ignored-caption-portions) apply to SC-02A/02C/03B only. Do not regenerate/delete images to remove superseded text. [Archived visuals](../Archived) remain historical references. The owner intentionally deleted `UserJourney_v1.0.png`; preserve its deletion. All retained archived images and approved R1 PNG payloads remain unchanged. `AppIcon_v1.0.png` supplies the accepted application/sidebar identity; the archived original remains intact.
 
 The [Import Preview alternatives and remaining R1 questions](../../Work%20notes/Transaction_and_R1_workflows.md) are unaccepted work notes, not approved screen replacements. ASSET_MANIFEST.json inventories every current non-metadata R1 payload file; private originals and Finder metadata are not package payloads.

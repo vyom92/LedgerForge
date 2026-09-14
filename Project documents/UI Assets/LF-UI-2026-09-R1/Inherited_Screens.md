@@ -4,9 +4,13 @@ Canonical inherited written behavior for Accounts, Import/Preview, Salary, Setti
 
 ## 5. Simple local appearance
 
+**Accepted implementation — 2026-09-14:** [2026-09-14 owner decision](../../SCOPE_DECISIONS.md#dark-appearance-decision) replaces the earlier plan below with **dark-only shared colours/tints, font family and hierarchy-size sliders, background/card opacity and responsive Settings** in Sprint 91A. The approved SC-04 card differentiation (background, thin related-colour edge and readable fill) remains a visual reference. One local UI preference owner resolves the existing theme; changes are live and persisted on this Mac, and reset removes appearance overrides only. The [accepted Sprint-91A outcome](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a) owns native evidence and the accepted final-byte small-window recheck limitation. The owner’s saved local choices remain distinct from factory defaults and must not be reset. Financial data/workflows and unrelated exclusions stay intact.
+
+**Superseded original planning, retained as history:**
+
 Offer **Follow System**, **Light** and **Dark** using native controls. An optional choice using the existing system/Deep Indigo accent direction may remain. Keep the chosen local preference across relaunch; missing or malformed values fall back to a readable default without blocking financial hydration. Monetary columns retain tabular digits and complete amounts.
 
-[FW-P2-52](../../FUTURE_WORK.MD#fw-p2-52) owns this bounded work. It does not require an advanced theme editor, custom foreground/background controls, font-style or text-scale system, density preferences, translucency controls, Preview/Apply/Cancel transaction, appearance portability or a new preference architecture/ADR by default. Appearance changes do not mutate financial data. Implementation and storage choices require the separately approved bounded task.
+[FW-P2-52](../../SCOPE_DECISIONS.md#fw-p2-52) owns this bounded work. It does not require an advanced theme editor, custom foreground/background controls, font-style or text-scale system, density preferences, translucency controls, Preview/Apply/Cancel transaction, appearance portability or a new preference architecture/ADR by default. Appearance changes do not mutate financial data. Implementation and storage choices require the separately approved bounded task.
 
 
 # Accounts

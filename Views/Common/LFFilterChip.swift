@@ -6,10 +6,11 @@
 import SwiftUI
 
 struct LFFilterChip: View {
+    @Environment(\.lfTheme) private var theme
     let title: String
     var value: String? = nil
     var width: CGFloat? = nil
-    var surface: Color = LFTheme.surface
+    var surface: Color? = nil
     var showsChevron: Bool = true
 
     var body: some View {
@@ -17,20 +18,20 @@ struct LFFilterChip: View {
             Text(title)
             if let value {
                 Text(value)
-                    .foregroundStyle(LFTheme.text)
+                    .foregroundStyle(theme.palette.primaryText)
             }
             Spacer(minLength: value == nil ? 0 : 8)
             if showsChevron {
                 Image(systemName: "chevron.down")
-                    .font(.caption2)
+                    .font(theme.typography.finePrint)
             }
         }
-        .font(.caption)
+        .font(theme.typography.formCaption)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(width: width)
-        .background(surface)
-        .overlay(RoundedRectangle(cornerRadius: 7).stroke(LFTheme.border, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .background(surface ?? theme.palette.controlSurface)
+        .overlay(RoundedRectangle(cornerRadius: theme.radius.control).stroke(theme.palette.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: theme.radius.control))
     }
 }

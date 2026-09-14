@@ -4,9 +4,11 @@
 
 ## Authority
 
-Explicit owner decisions and accepted financial/architecture contracts control, then canonical written screen/shared requirements and exceptions, numeric tokens, the approved collage for appearance, and inherited untouched behavior. The collage's “v2.0” is a design label, not an app release or the older DesignBoard. Numeric roles are the supplied written specification, not individually measured/approved collage pixels. No new image, action, financial model or source support is implied by this text relocation.
+Authority is resolved by responsibility. Explicit owner decisions and accepted financial/workflow/architecture rules control meaning. Approved visual references control appearance and composition. Responsive and state sheets control their specific reflow, data-state and interaction conditions. Numeric tokens control named size, spacing and typography roles. Written screen contracts supply semantic detail and the explicit exceptions below; they do not demote approved visual references to optional decoration. Record a concrete conflict instead of choosing whichever source best matches existing code.
 
-[Scope decisions](../../SCOPE_DECISIONS.md) owns rejected formal accessibility/advanced appearance requirements. Keep practical readability, full Money/currency, keyboard interaction, focus distinct from selection, names/tooltips, native rendering and responsive content fit. Preserve image bytes and apply only the exact written caption exceptions below. Legitimate local/ChatGPT inspection is allowed; no private original/credential/financial source content enters Git or becomes a manufactured statement input.
+SC-01's visual contract controls shell/navigation direction; its supporting artwork is supplementary. SC-03A controls Dashboard composition, emphasis and material direction; SC-03B controls constrained reflow; SC-03C controls truthful states and interactive versus display-only components. A schematic state sheet does not replace the glossy wide reference's aesthetic, and a PNG cannot authorize invented financial values or new actions. The collage's “v2.0” is a design label, not an app release. Numeric roles are specified targets, not measurements of illustrative collage pixels. The [accepted Sprint-91A outcome](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a) now includes the current Dashboard visual foundation and dark appearance, with the explicit final-byte small-window limitation. The [earlier qualification](../../Work%20notes/Transaction_and_R1_workflows.md#sprint-91a-visual-conformance) remains history.
+
+[Scope decisions](../../SCOPE_DECISIONS.md) owns rejected formal accessibility work and the exact [2026-09-14 owner decision](../../SCOPE_DECISIONS.md#dark-appearance-decision) reopening bounded local appearance controls. Keep practical readability, full Money/currency, keyboard interaction, focus distinct from selection, names/tooltips, native rendering and responsive content fit. Preserve image bytes and apply only the exact written caption exceptions below. Legitimate local/ChatGPT inspection is allowed; no private original/credential/financial source content enters Git or becomes a manufactured statement input.
 
 ## Canonical screen routing
 
@@ -19,7 +21,7 @@ Explicit owner decisions and accepted financial/architecture contracts control, 
 
 ## Readable text and layout
 
-Use the shared token values rather than local per-view substitutions. Body text defaults to 16 points and captions have a 12-point floor. Compact layout references describe composition and spacing; they do not require a user-facing density or text-scaling system. Rows grow when their actual content needs room.
+Use shared roles rather than local per-view substitutions. Reference defaults include 16-point body text and a 12-point caption target; existing compact native form roles retain their approved defaults. The owner-authorized hierarchy sliders may override those defaults. Rendered fonts and AppKit measurements must share the same family, size, weight and tabular-digit features. Rows grow/reflow for the chosen role; window width never changes saved typography. No density, tracking or weight editor is authorized.
 
 Full amounts, minus signs, currency context and fractional digits must remain readable. Never wrap an amount, truncate it, display an unexplained abbreviation, or shrink it until it fits. Reallocate width, reflow the group or allow scrolling instead.
 
@@ -27,11 +29,15 @@ Full amounts, minus signs, currency context and fractional digits must remain re
 
 ### 2.1 Appearance system
 
-Default to **Follow System** with a neutral system-oriented preset. **Light** and **Dark** are explicit overrides. **Deep Indigo** is an optional preset, not the only valid appearance. The JSON palettes are deterministic fallback/reference values for the handoff, not permission to make native controls unreadable.
+**Accepted implementation boundary — 2026-09-14:** [2026-09-14 owner decision](../../SCOPE_DECISIONS.md#dark-appearance-decision) authorizes dark-only shared colour/tint wells, one installed-font family selector, hierarchy-size sliders and background/card tint opacity in the existing responsive Settings destination. Changes apply immediately through one local appearance store and the existing LFTheme environment. Initial/reset values preserve the accepted factory defaults; reset clears only appearance overrides. The owner’s newer saved choices are separate local user state and must not be reset or promoted into defaults during closure. Financial/status meanings remain unchanged.
+
+The former Follow System/Light/Dark and optional-preset plan is superseded history, preserved in [Inherited Screens](Inherited_Screens.md#5-simple-local-appearance). It is not a second feature still to build. Reference palettes are design inputs, not a runtime loader or a reason to replace current approved colours. See the [accepted Sprint-91A outcome](../../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a) for native evidence and accepted limitations; the [work note](../../Work%20notes/Transaction_and_R1_workflows.md#sprint-91a-dark-appearance) preserves earlier checkpoints.
 
 Use semantic roles: background, surface, raised surface, primary/secondary text, control border, separator, accent, focus, selected surface and semantic status text. Do not scatter arbitrary colours through screens. Accent is not a substitute for success/error semantics. A negative number is not automatically a problem and a credit is not automatically income.
 
 The token file records a small consistent spacing/radius scale, typography, minimum control sizes, row minima, column widths and responsive policies. Sizes are minima or defaults where labelled, not rigid constraints that can crop larger text.
+
+Use restrained native material depth in navigation, toolbar and appropriate controls. Liquid Glass belongs to appropriate navigation/control surfaces; standard material or substantially opaque surfaces keep financial content readable. Text and Money stay crisp and opaque. An alpha-tinted colour alone does not satisfy the material role. Inspect the complete layer stack and remove fills that conceal native effects; the result must work on the owner's real desktop without a staged wallpaper or changed system preference. Do not apply glass to every balance card, layer competing bordered boxes, or recolour financial values with the Indigo accent.
 
 ### 2.2 Components and states
 
@@ -70,14 +76,14 @@ The approved PNG remains intact as the visual reference. These limitations are e
 | Raw identifiers and source filenames | Retain applicable privacy rules; the disposable screenshot decision does not override repository policy. |
 | Always-visible Developer Console | Retain current developer/build gating. |
 | Tight mobile-looking narrow table | Treat as compact composition guidance; native macOS keyboard, account and currency context remain required. |
-| Advanced appearance controls, font/text-scale/density options and preview/Apply UI | Superseded by §5; retain the artwork while ignoring those controls as requirements. |
+| Appearance controls in SC-04 | The 2026-09-14 owner scope authorizes dark shared colour/tint wells, family/size sliders and surface-opacity controls. System/Light, density, weight/tracking, Preview/Apply/Cancel, sync and portable themes remain outside this implementation. Preserve artwork bytes and use the current written scope for controls. |
 | Optional numeric alignment | Tabular amount alignment is mandatory. |
 | Multiple visible logos | No icon or branding replacement is authorized; retain the existing app asset until separately selected. |
 
 <a id="ignored-caption-portions"></a>
 ### Retained local references: caption exceptions — 2026-09-11
 
-The user explicitly requires preserving the design while ignoring the rejected acceptance portions. The following local PNGs remain unchanged visual references. Their VoiceOver/formal-accessibility captions do not create work, dependencies or acceptance gates. Ordinary keyboard use, readable full Money/currency, resizing, selection and focus remain subject to the bounded native checks above. These local working references are not a claim of published assets or passed app tests.
+The user explicitly requires preserving the design while ignoring the rejected acceptance portions. The following PNGs remain unchanged, owner-curated, Chat-approved and published visual references. Their VoiceOver/formal-accessibility captions do not create work, dependencies or acceptance gates. Ordinary keyboard use, readable full Money/currency, resizing, selection and focus remain subject to the bounded native checks above. Publication is not a passed native-app test.
 
 | Local filename | Specific caption portion to ignore |
 |---|---|
