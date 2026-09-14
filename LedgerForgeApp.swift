@@ -7,21 +7,30 @@
 
 import SwiftUI
 
-#if DEBUG
-private final class DevelopmentDatabaseTerminationDelegate: NSObject, NSApplicationDelegate {
+private final class LedgerForgeTerminationDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MainActor.assumeIsolated {
+            if BackupRestoreCoordinator.shared.isBusy || DatabaseActivityGate.shared.hasActiveOperations || DatabaseActivityGate.shared.hasExclusiveOperation {
+                return .terminateCancel
+            }
+            return .terminateNow
+        }
+    }
     func applicationWillTerminate(_ notification: Notification) {
         MainActor.assumeIsolated {
+#if DEBUG
             DevelopmentDatabaseLifecycleCoordinator.shared.closeOwnedProvider()
+#else
+            LedgerForgeApp.closeProductionProvider()
+#endif
         }
     }
 }
-#endif
 
 @main
 struct LedgerForgeApp: App {
-#if DEBUG
-    @NSApplicationDelegateAdaptor(DevelopmentDatabaseTerminationDelegate.self) private var terminationDelegate
-#else
+    @NSApplicationDelegateAdaptor(LedgerForgeTerminationDelegate.self) private var terminationDelegate
+#if !DEBUG
     private static var sqliteProvider: SQLiteRepositoryProvider?
 #endif
 
@@ -61,6 +70,7 @@ struct LedgerForgeApp: App {
             DatabaseProvider.shared = .unavailable(reason: reason, context: failure)
             ApplicationAvailability.shared.didFail(failure, generation: nil)
             RuntimeDiagnostic.record(failure, category: .database)
+            BackupRestoreCoordinator.shared.startupDidFail()
             return false
         }
     }
@@ -127,7 +137,21 @@ struct LedgerForgeApp: App {
             throw DevelopmentDatabaseProfileIdentityError.invalidProfile
         }
 #endif
-        let provider = try SQLiteRepositoryProvider(path: path)
+        let target = try path.map { URL(fileURLWithPath: $0) } ?? SQLiteRepositoryProvider.canonicalDBURL()
+        let parentExisted = FileManager.default.fileExists(atPath: target.deletingLastPathComponent().path)
+        let recovery = BackupRestoreCoordinator.shared
+        recovery.configureTarget(target)
+        if parentExisted { try recovery.recoverBeforeStartup() }
+        let exists = FileManager.default.fileExists(atPath: target.path)
+        // Parent absence cannot distinguish first use from a lost ledger.
+        // Production creation requires the explicit first-use Settings action.
+        guard exists || (path != nil && usesIsolatedTestPersistence()) else { throw BackupError.recoveryUnavailable }
+        if !parentExisted { try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true) }
+        // Ordinary legacy startup keeps its registered migration behavior.
+        // Receipt-owned recovery always opens the already-verified chain strictly.
+        let isRecoveryOpen = try recovery.layout?.readReceipt() != nil
+        let provider = try SQLiteRepositoryProvider(path: target.path, migrations: allMigrations,
+            access: exists ? .existing : .createIfMissing, migrateExisting: !isRecoveryOpen)
 #if DEBUG
         let coordinator = DevelopmentDatabaseLifecycleCoordinator.shared
         coordinator.loadRememberedSelection(from: DevelopmentDatabaseProfilePreferences())
@@ -140,4 +164,31 @@ struct LedgerForgeApp: App {
         DatabaseProvider.shared = .verifiedSQLite(provider)
 #endif
     }
+
+    static func currentSQLiteProviderForRecovery() throws -> SQLiteRepositoryProvider? {
+#if DEBUG
+        return try DevelopmentDatabaseLifecycleCoordinator.shared.currentProviderForRecovery()
+#else
+        return sqliteProvider
+#endif
+    }
+
+    static func publishRecoveredCurrent(_ provider: SQLiteRepositoryProvider, runtime: DatabaseProvider,
+                                        hydrator: RepositoryStoreHydrator, snapshot: RepositoryRuntimeSnapshot) {
+#if DEBUG
+        DevelopmentDatabaseLifecycleCoordinator.shared.publishRecoveredCurrent(provider, runtime: runtime, hydrator: hydrator, snapshot: snapshot)
+#else
+        DatabaseProvider.shared.invalidateGeneration()
+        DatabaseProvider.shared = runtime
+        hydrator.installSnapshotWithoutObservation(snapshot)
+        sqliteProvider = provider
+        hydrator.notifyObserversOfInstalledSnapshot()
+#endif
+    }
+#if !DEBUG
+    static func closeProductionProvider() {
+        do { try sqliteProvider?.database.checkpointAndClose() }
+        catch { RuntimeDiagnostic.record(RuntimeDiagnostic.failure(error, operation: "termination", stage: "checked close"), category: .database) }
+    }
+#endif
 }

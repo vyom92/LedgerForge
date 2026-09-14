@@ -345,7 +345,7 @@ public final class SQLiteRepositoryProvider {
         try self.init(path: path, migrations: allMigrations)
     }
 
-    init(path: String?, migrations: [Migration]) throws {
+    init(path: String?, migrations: [Migration], access: SQLiteDatabase.Access = .createIfMissing, migrateExisting: Bool = false) throws {
         do {
             try MigrationChainValidator.validateRegistered(migrations)
         } catch let error as MigrationIntegrityError {
@@ -360,13 +360,17 @@ public final class SQLiteRepositoryProvider {
         self.databasePath = dbPath
         let database = SQLiteDatabase(path: dbPath)
         do {
-            try database.open()
+            try database.open(access: access)
         } catch {
             database.close()
             throw SQLiteRepositoryProviderError.databaseOpenFailed(Self.executionCause(error))
         }
         do {
-            try database.runMigrations(migrations)
+            if access == .createIfMissing || (access == .existing && migrateExisting) {
+                try database.runMigrations(migrations)
+            } else {
+                _ = try database.validatedMigrationHistory(against: migrations, requiresCompleteChain: true)
+            }
         } catch let error as MigrationIntegrityError {
             database.close()
             throw SQLiteRepositoryProviderError.migrationIntegrityFailed(error)
@@ -414,31 +418,25 @@ public final class SQLiteRepositoryProvider {
     }
 
     public static func defaultDBPath() throws -> String {
+        let url = try canonicalDBURL()
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        return url.path
+    }
+
+    static func canonicalDBURL() throws -> URL {
         let fm = FileManager.default
-        let appSupport = try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        let appSupport = try fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
 #if DEBUG
-        if let appSupport {
             let identity = try DevelopmentDatabaseIdentity.resolve(
                 applicationSupportDirectory: appSupport,
                 environment: ProcessInfo.processInfo.environment
             )
-            try? fm.createDirectory(
-                at: identity.canonicalDevelopmentURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
             guard identity.authorizesCurrentDatabaseIdentity(at: identity.canonicalDevelopmentURL) else {
                 throw SQLiteRepositoryProviderError.databaseInitializationFailed()
             }
-            return identity.canonicalDevelopmentURL.path
-        }
-        return "ledgerforge-development.sqlite"
+            return identity.canonicalDevelopmentURL
 #else
-        let folder = appSupport?.appendingPathComponent("LedgerForge")
-        if let folder = folder {
-            try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
-            return folder.appendingPathComponent("ledgerforge.sqlite").path
-        }
-        return "ledgerforge.sqlite"
+        return appSupport.appendingPathComponent("LedgerForge").appendingPathComponent("ledgerforge.sqlite")
 #endif
     }
 }
@@ -602,159 +600,6 @@ private final class SQLiteCardRepo: CardRepository {
 }
 
 #if DEBUG
-enum DevelopmentDatabaseActivity: String, Equatable {
-    case importPreparation
-    case preparedAwaitingConfirmation
-    case confirmedPersistence
-    case hydration
-    case repositoryWrite
-    case developerReload
-}
-
-enum DevelopmentDatabaseActivityError: Error, LocalizedError {
-    case lifecycleOperationInProgress
-    case lifecycleUnavailable
-
-    var errorDescription: String? {
-        "Database activity is unavailable while the development database lifecycle is changing."
-    }
-}
-
-@MainActor
-final class DevelopmentDatabaseActivityLease {
-    private weak var gate: DevelopmentDatabaseActivityGate?
-    fileprivate let id: UUID
-    fileprivate(set) var activity: DevelopmentDatabaseActivity
-    private(set) var generation: Int
-    private var isFinished = false
-
-    fileprivate init(gate: DevelopmentDatabaseActivityGate, activity: DevelopmentDatabaseActivity, generation: Int) {
-        self.gate = gate
-        self.id = UUID()
-        self.activity = activity
-        self.generation = generation
-    }
-
-    func transition(to activity: DevelopmentDatabaseActivity) async {
-        guard !isFinished else { return }
-        self.activity = activity
-        gate?.update(self)
-        await gate?.observeTransitionForTesting(activity)
-    }
-
-    func finish() {
-        guard !isFinished else { return }
-        isFinished = true
-        gate?.finish(self)
-    }
-}
-
-struct DevelopmentDatabasePreparedImportDrainPermit {
-    fileprivate init() {}
-}
-
-enum DevelopmentDatabaseProfileSwitchBarrierResult: Equatable {
-    case acquired(DevelopmentPreparedImportInvalidationResult)
-    case activityBlocked
-    case lifecycleUnavailable
-}
-
-@MainActor
-final class DevelopmentDatabaseActivityGate {
-    static let shared = DevelopmentDatabaseActivityGate()
-
-    private var leases: [UUID: DevelopmentDatabaseActivity] = [:]
-    private(set) var generation = 1
-    private(set) var hasExclusiveOperation = false
-    private(set) var isProfileSwitchPending = false
-    private(set) var isUnavailable = false
-    private var transitionObserverForTesting: (@MainActor (DevelopmentDatabaseActivity) async -> Void)?
-
-    var hasActiveOperations: Bool { !leases.isEmpty }
-
-    func begin(_ activity: DevelopmentDatabaseActivity) throws -> DevelopmentDatabaseActivityLease {
-        guard !isUnavailable else { throw DevelopmentDatabaseActivityError.lifecycleUnavailable }
-        guard !hasExclusiveOperation, !isProfileSwitchPending else {
-            throw DevelopmentDatabaseActivityError.lifecycleOperationInProgress
-        }
-        let lease = DevelopmentDatabaseActivityLease(gate: self, activity: activity, generation: generation)
-        leases[lease.id] = activity
-        return lease
-    }
-
-    func beginExclusive() -> Bool {
-        guard !isUnavailable, !hasExclusiveOperation, !isProfileSwitchPending, leases.isEmpty else { return false }
-        hasExclusiveOperation = true
-        return true
-    }
-
-    /// Creates one synchronous barrier: new work is blocked before prepared
-    /// previews are drained, and exclusive ownership is granted only after all
-    /// corresponding leases have been released.
-    func beginProfileSwitch(
-        drainPreparedImports: (DevelopmentDatabasePreparedImportDrainPermit) -> DevelopmentPreparedImportInvalidationResult
-    ) -> DevelopmentDatabaseProfileSwitchBarrierResult {
-        guard !isUnavailable else { return .lifecycleUnavailable }
-        guard !hasExclusiveOperation, !isProfileSwitchPending else { return .activityBlocked }
-
-        isProfileSwitchPending = true
-        let hasNonDrainableActivity = leases.values.contains { $0 != .preparedAwaitingConfirmation }
-        guard !hasNonDrainableActivity else {
-            isProfileSwitchPending = false
-            return .activityBlocked
-        }
-
-        let invalidation = drainPreparedImports(DevelopmentDatabasePreparedImportDrainPermit())
-        guard leases.isEmpty else {
-            isProfileSwitchPending = false
-            return .activityBlocked
-        }
-
-        hasExclusiveOperation = true
-        return .acquired(invalidation)
-    }
-
-    func finishExclusive(providerChanged: Bool) {
-        if providerChanged { generation += 1 }
-        hasExclusiveOperation = false
-        isProfileSwitchPending = false
-    }
-
-    func enterUnavailable() {
-        isUnavailable = true
-        hasExclusiveOperation = false
-        isProfileSwitchPending = false
-    }
-
-    fileprivate func update(_ lease: DevelopmentDatabaseActivityLease) {
-        guard leases[lease.id] != nil else { return }
-        leases[lease.id] = lease.activity
-    }
-
-    fileprivate func observeTransitionForTesting(_ activity: DevelopmentDatabaseActivity) async {
-        await transitionObserverForTesting?(activity)
-    }
-
-    func setTransitionObserverForTesting(
-        _ observer: (@MainActor (DevelopmentDatabaseActivity) async -> Void)?
-    ) {
-        transitionObserverForTesting = observer
-    }
-
-    fileprivate func finish(_ lease: DevelopmentDatabaseActivityLease) {
-        leases.removeValue(forKey: lease.id)
-    }
-
-    func resetForTesting() {
-        leases.removeAll()
-        hasExclusiveOperation = false
-        isProfileSwitchPending = false
-        isUnavailable = false
-        generation = 1
-        transitionObserverForTesting = nil
-    }
-}
-
 enum DevelopmentDatabaseLifecycleResult: Equatable, CustomStringConvertible {
     case temporarySessionStarted(RepositoryStoreHydrationResult)
     case permanentResetCompleted(RepositoryStoreHydrationResult)
@@ -838,6 +683,21 @@ final class DevelopmentDatabaseLifecycleCoordinator: ObservableObject {
 
     private var sqliteProvider: SQLiteRepositoryProvider?
     private var activeTarget: DevelopmentDatabaseProfileTarget?
+
+    func currentProviderForRecovery() throws -> SQLiteRepositoryProvider? {
+        guard activeTarget == nil || activeTarget?.profile.kind == .current else { throw BackupError.unavailableCurrent }
+        return sqliteProvider
+    }
+
+    func publishRecoveredCurrent(_ provider: SQLiteRepositoryProvider, runtime: DatabaseProvider,
+                                 hydrator: RepositoryStoreHydrator, snapshot: RepositoryRuntimeSnapshot) {
+        let profile = DevelopmentDatabaseProfile(kind: .current, migrationSourceVersion: nil, ownershipID: nil)
+        let target = DevelopmentDatabaseProfileTarget(profile: profile, databaseURL: URL(fileURLWithPath: provider.databasePath))
+        _ = installCommittedRuntime(sqliteProvider: provider, runtimeProvider: runtime, target: target,
+                                    hydrator: hydrator, snapshot: snapshot,
+                                    verifiedSchemaVersion: BackupCompatibility.supportedSchemaVersion)
+        isUnavailable = false
+    }
     private var retainedInactiveProviders: [(SQLiteRepositoryProvider, DevelopmentDatabaseProfileTarget?)] = []
     private let activityGate: DevelopmentDatabaseActivityGate
     private let injectedFailures: Set<DevelopmentDatabaseLifecycleFailurePoint>

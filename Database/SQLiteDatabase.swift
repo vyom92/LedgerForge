@@ -3,6 +3,7 @@
 
 import Foundation
 import SQLite3
+import Darwin
 
 nonisolated private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
@@ -98,6 +99,7 @@ nonisolated public struct SQLiteRow: Sendable {
 /// values. No SQLite pointer leaves this type. These invariants, rather than
 /// SQLITE_OPEN_FULLMUTEX alone, justify the unchecked Sendable conformance.
 nonisolated public final class SQLiteDatabase: @unchecked Sendable {
+    public enum Access: Sendable { case createIfMissing, existing, readOnlySnapshot }
     private let path: String
     private let ownershipLock = NSRecursiveLock()
     private var db: OpaquePointer?
@@ -118,12 +120,26 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
         return try operation()
     }
 
-    public func open() throws {
+    public func open(access: Access = .createIfMissing) throws {
         ownershipLock.lock()
         defer { ownershipLock.unlock() }
         if db != nil { return }
-        let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
-        if sqlite3_open_v2(path, &db, flags, nil) != SQLITE_OK {
+        let flags: Int32
+        let filename: String
+        switch access {
+        case .createIfMissing:
+            flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+            filename = path
+        case .existing:
+            flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+            filename = path
+        case .readOnlySnapshot:
+            // Only closed, operation-owned immutable snapshots may use this mode.
+            // It ignores WAL and never creates a database or sidecars.
+            flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX | SQLITE_OPEN_URI
+            filename = URL(fileURLWithPath: path).absoluteString + "?mode=ro&immutable=1"
+        }
+        if sqlite3_open_v2(filename, &db, flags, nil) != SQLITE_OK {
             let extended = sqlite3_extended_errcode(db)
             close()
             throw SQLiteDatabaseError.execution(SQLiteExecutionError(primaryCode: extended & 0xff, extendedCode: extended, operation: .open))
@@ -131,6 +147,10 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
         // Protect every startup statement from concurrent openers, including
         // the first WAL-mode pragma used by independent providers.
         sqlite3_busy_timeout(db, 5000)
+        if access == .readOnlySnapshot {
+            try execute(sql: "PRAGMA query_only = ON;")
+            return
+        }
         // Configure recommended PRAGMAs for production-safe defaults
         // Enable write-ahead logging for concurrency
         do {
@@ -159,13 +179,18 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
         ownershipLock.lock()
         defer { ownershipLock.unlock() }
         guard let db else { throw SQLiteDatabaseError.databaseNotOpen }
+        let file = Darwin.open(destinationPath, O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+        guard file >= 0 else { throw SQLiteDatabaseError.backupFailed("destination-exists-or-unavailable") }
+        guard Darwin.close(file) == 0 else { throw SQLiteDatabaseError.backupFailed("destination-file-close") }
         var destination: OpaquePointer?
-        guard sqlite3_open_v2(destinationPath, &destination, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK,
+        guard sqlite3_open_v2(destinationPath, &destination, SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK,
               let destination else {
             if let destination { sqlite3_close(destination) }
             throw SQLiteDatabaseError.backupFailed("destination-open")
         }
-        defer { sqlite3_close(destination) }
+        var destinationClosed = false
+        defer { if !destinationClosed { sqlite3_close(destination) } }
+        sqlite3_busy_timeout(destination, 5000)
         guard let backup = sqlite3_backup_init(destination, "main", db, "main") else {
             throw SQLiteDatabaseError.backupFailed("initialization")
         }
@@ -174,6 +199,28 @@ nonisolated public final class SQLiteDatabase: @unchecked Sendable {
         guard stepResult == SQLITE_DONE, finishResult == SQLITE_OK else {
             throw SQLiteDatabaseError.backupFailed("copy")
         }
+        guard sqlite3_close(destination) == SQLITE_OK else {
+            throw SQLiteDatabaseError.backupFailed("destination-close")
+        }
+        destinationClosed = true
+    }
+
+    public func closeChecked() throws {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
+        guard let db else { return }
+        let result = sqlite3_close(db)
+        guard result == SQLITE_OK else { throw SQLiteDatabaseError.closeFailed(result) }
+        self.db = nil
+    }
+
+    func totalChangeCounter() throws -> Int64 {
+        ownershipLock.lock()
+        defer { ownershipLock.unlock() }
+        guard let db else { throw SQLiteDatabaseError.databaseNotOpen }
+        // Includes this provider's writes. External connection changes are
+        // separately revalidated by the product's generation/operation boundary.
+        return sqlite3_total_changes64(db)
     }
 
     public func checkpointAndClose() throws {

@@ -211,9 +211,7 @@ final class RepositoryStoreHydrator {
     private let providerGeneration: ProviderGenerationToken?
     private let categoryReconciliationGate: CategoryReconciliationGate?
     private var hasHydrated = false
-#if DEBUG
     private let participatesInLifecycleGate: Bool
-#endif
 
     convenience init(
         databaseProvider: DatabaseProvider? = nil,
@@ -292,9 +290,7 @@ final class RepositoryStoreHydrator {
         self.persistenceState = persistenceState
         self.providerGeneration = providerGeneration
         self.categoryReconciliationGate = categoryReconciliationGate
-#if DEBUG
         self.participatesInLifecycleGate = participatesInLifecycleGate
-#endif
     }
 
     @discardableResult
@@ -302,15 +298,13 @@ final class RepositoryStoreHydrator {
         guard persistenceState.isUsable else {
             throw RepositoryStoreHydrationError.persistenceUnavailable
         }
-#if DEBUG
-        let lifecycleLease: DevelopmentDatabaseActivityLease?
+        let lifecycleLease: DatabaseActivityLease?
         if participatesInLifecycleGate {
-            lifecycleLease = try DevelopmentDatabaseActivityGate.shared.begin(.hydration)
+            lifecycleLease = try DatabaseActivityGate.shared.begin(.hydration)
         } else {
             lifecycleLease = nil
         }
         defer { lifecycleLease?.finish() }
-#endif
         guard forceRefresh || !hasHydrated else {
             return RepositoryStoreHydrationResult(
                 didHydrate: false,

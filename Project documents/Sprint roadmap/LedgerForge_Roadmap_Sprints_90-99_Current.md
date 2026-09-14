@@ -1,12 +1,12 @@
 # LedgerForge Roadmap: Sprints 90–99
 
-**Status:** CURRENT CYCLE / NUMBERING AUTHORITY. Sprint 90 remains accepted; the owner accepted **Sprint 91A — R1 Visual Foundation + Dashboard Visual Conformance**, including dark-only local customizable appearance, on 2026-09-14. Sprints 80–89 remain complete history. Original Sprint-91 System/Light planning is **SUPERSEDED HISTORY**. Sprint 92 is **ACCEPTED**, 2026-09-14; Sprint 93 is **NEXT / NOT STARTED**.
+**Status:** CURRENT CYCLE / NUMBERING AUTHORITY. Sprint 90 remains accepted; the owner accepted **Sprint 91A — R1 Visual Foundation + Dashboard Visual Conformance**, including dark-only local customizable appearance, on 2026-09-14. Sprints 80–89 remain complete history. Original Sprint-91 System/Light planning is **SUPERSEDED HISTORY**. Sprint 92 is **ACCEPTED**, 2026-09-14; Sprint 93 is **ACCEPTED**, 2026-09-15. Sprint 94 is **NEXT / NOT STARTED**.
 **Prepared:** 2026-09-09; realigned by explicit user decisions through 2026-09-11; current-cycle transition recorded after Sprint-90 acceptance on 2026-09-12.
 **Accepted product baseline:** see [PROJECT_STATE](../PROJECT_STATE.md); documentation publication is not product acceptance.
 **Prior completed cycle:** [Sprints 80–89](LedgerForge_Roadmap_Sprints_80-89_Current.md).
 **PERSONAL-V1: NOT YET ADOPTED.**
 
-This roadmap records accepted Sprints 90, 91A and 92 and the prepared remaining sequence. Sprint 91A includes the subsequently accepted dark-only appearance/Settings work under the owner's explicit identifier; numbering remains unchanged. The roadmap itself authorizes no prepared implementation, accepts no proposed architecture and allocates no ADR or migration number. Before selecting each future sprint, Chat must apply the Private Personal App Scope Gate, then rerun P0 → P1 → P2 → P3 triage only for eligible owner needs, enforce exact entry gates and revalidate the implementation split against accepted post-Swift-6 ownership. A verified higher-priority correctness defect preempts a lower-priority outcome unless explicitly deferred; unmet dependencies do not silently cascade sprint numbers.
+This roadmap records accepted Sprints 90, 91A, 92 and 93 and the prepared remaining sequence. Sprint 91A includes the subsequently accepted dark-only appearance/Settings work under the owner's explicit identifier; numbering remains unchanged. The roadmap itself authorizes no prepared implementation, accepts no proposed architecture and allocates no ADR or migration number. Before selecting each future sprint, Chat must apply the Private Personal App Scope Gate, then rerun P0 → P1 → P2 → P3 triage only for eligible owner needs, enforce exact entry gates and revalidate the implementation split against accepted post-Swift-6 ownership. A verified higher-priority correctness defect preempts a lower-priority outcome unless explicitly deferred; unmet dependencies do not silently cascade sprint numbers.
 
 ## Governing source and financial rules
 
@@ -30,8 +30,8 @@ Order inherits [Guide rule E](../Project_Guide.md#documentation-order): sprint n
 | 91 | R1 Simple Appearance Choice | `FW-P2-52` | **SUPERSEDED PLANNING**; historical System/Light/Dark direction replaced by the explicit dark-only continuation in 91A |
 | 91A | R1 Visual Foundation + Dashboard Visual Conformance | completed `FW-P2-52` + bounded `FW-P2-48` | **ACCEPTED**, 2026-09-14; [accepted outcome](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a), including final-byte small-window verification limitation |
 | 92 | Information Presentation and R1 Cross-Screen Polish | Completed `FW-P2-40/41/47/50`; bounded `FW-P2-46/48` | **ACCEPTED**, 2026-09-14; [accepted outcome](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-92), with genuine-state and final-byte width limits preserved |
-| 93 | Verified Backup, Restore and Disaster Recovery | `FW-P3-36` | **NEXT / NOT STARTED**; PRE_V1_REQUIRED; accepted user-owned backup/restore architecture and independent restore drill |
-| 94 | Salary / This Month Current Al Dar Planning Completion | bounded `FW-P3-08` | PRE_V1_REQUIRED current planning slice; explicit ADR-045 alignment or successor architecture, access/permission/freshness/amount binding |
+| 93 | Verified Backup, Restore and Disaster Recovery | Completed [FW-P3-36](../SCOPE_DECISIONS.md#fw-p3-36) | **ACCEPTED**, 2026-09-15; [accepted outcome](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-93), with bounded recovery limits preserved |
+| 94 | Salary / This Month Current Al Dar Planning Completion | bounded `FW-P3-08` | **NEXT / NOT STARTED**; PRE_V1_REQUIRED current planning slice; explicit ADR-045 alignment or successor architecture, access/permission/freshness/amount binding |
 | 95 | Current Investment Domain and Identity Foundation | bounded `FW-P3-20`, `FW-P3-21`, `FW-P3-23` | Container/instrument identity, scoped identifiers, native currency, exact Decimal quantities and current ownership/revision architecture |
 | 96 | Current Holdings, Cost-Evidence and ISP Positions | bounded `FW-P3-20`, `FW-P3-21`, `FW-P3-29`, selected fallback `FW-P3-28` | Accepted identity, genuine current owned units/dates/provenance and typed cost evidence; no lots/performance inference |
 | 97 | Current Investment Valuation Providers | bounded `FW-P3-27`, selected fallback `FW-P3-28` | Exact provider/instrument/currency/date qualification and automation/cache permission; valuation never establishes ownership |
@@ -83,15 +83,17 @@ Final Recorded Activity was inspected at **1323 × 826** and **1024 × 768**, th
 
 ### Sprint 93 — Verified Backup, Restore and Disaster Recovery
 
-Primary queue: [FW-P3-36](../FUTURE_WORK.MD#fw-p3-36). **NEXT / NOT STARTED. PRE_V1_REQUIRED.**
+Completed owner: [FW-P3-36](../SCOPE_DECISIONS.md#fw-p3-36). **ACCEPTED — 2026-09-15. PRE_V1_REQUIRED outcome complete.**
 
-Implement only the subsequently approved user-owned backup/restore contract. Architecture must settle backup contents, integrity manifest, SQLite/WAL/SHM-consistent snapshot, compatibility/version policy, isolated restore verification, non-empty-current-data protection, explicit confirmation, rollback if activation fails, canonical hydration and same-database relaunch. The owner may save/copy a verified package to a personally chosen destination. This does not create sync, live portable workspace or cloud integration. Appearance stays device-local; no theme preference snapshot is required. Reporting currency remains separate financial configuration.
+The owner/coordinator accepts Sprint 93 under `SPRINT_93_VERIFIED_BACKUP_RESTORE_AND_DISASTER_RECOVERY_ACCEPTED` and accepted [ADR-047](../ADR.md#adr-047), from published `main@7218f536eee5c871243d1170e8db0f4c150728bb`. Closure publishes the unchanged accepted candidate and reconciled documentation; it reruns no product verification. [The accepted outcome](../Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-93) owns exact executed evidence and unobserved limits.
 
-The [backup/restore packet](../Work%20notes/Backup_and_export.md#packet-user-backup-restore-architecture-packet) retains the unresolved architecture and genuine restore-drill requirements. Complete structured export is optional and separate. A roadmap position does not establish recoverability.
+The approved contract uses a two-member Finder package, SQLite online snapshot, small integrity manifest, strict current migration-chain compatibility, isolated verification, explicit replacement confirmation, preserved-current rollback and receipt-owned activation/relaunch. Debug/Release builds, the genuine native restore drill and selected failure/interruption checks are complete under the bounded authorization. The owner may save/copy a verified package to a personally chosen destination. This does not create sync, live portable workspace or cloud integration. Appearance stays device-local; no theme preference snapshot is required. Reporting currency remains separate financial configuration.
+
+The [backup/restore note](../Work%20notes/Backup_and_export.md#packet-user-backup-restore-architecture-packet) links the accepted architecture and evidence. Complete structured export remains OPTIONAL / NOT SELECTED; backup encryption remains NOT REQUIRED / NOT SELECTED. Appearance stays DEVICE-LOCAL / EXCLUDED FROM BACKUP. V17 is unchanged; no permanent ledger UUID or V18. PERSONAL-V1 remains NOT YET ADOPTED.
 
 ### Sprint 94 — Salary / This Month Current Al Dar Planning Completion
 
-Primary queue: bounded [FW-P3-08](../FUTURE_WORK.MD#fw-p3-08). **PRE_V1_REQUIRED for this current Salary/budget slice only.**
+Primary queue: bounded [FW-P3-08](../FUTURE_WORK.MD#fw-p3-08). **NEXT / NOT STARTED. PRE_V1_REQUIRED for this current Salary/budget slice only.**
 
 Complete the existing personal planning workflow with current/live Al Dar QAR→INR reference evidence and an explicit manual current-rate override. Do not rebuild Salary: accepted Qatar Airways actuals, Salary History, current-month plan, commitments, selected balances, separate fee behavior, underfunding/rounding safety and calculations remain authoritative.
 

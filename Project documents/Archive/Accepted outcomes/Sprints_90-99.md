@@ -4,11 +4,98 @@ Accepted evidence by cycle, not execution authority. [Current state](../../PROJE
 
 ## Index
 
+- [Accepted Sprint 93 — Verified Backup, Restore and Disaster Recovery — 2026-09-15](#sprint-93)
 - [Accepted Sprint 92 — Information Presentation and R1 Polish — 2026-09-14](#sprint-92)
 - [Accepted Sprint 91A — Dark Appearance and Visual Foundation — 2026-09-14](#sprint-91a)
 - [Accepted Sprint 90 — R1 Dashboard Native-Currency Hierarchy — 2026-09-12](#sprint-90)
 
-**Current alignment — 2026-09-14:** the owner accepts Sprint 92 after `SPRINT_92_FINAL_VISUAL_REVIEW_READY` and explicitly authorizes documentation closure and publication. The original accepted Sprint-90 and Sprint-91A records below are preserved, including their then-current forward planning and bounded limitations. Sprint 93 is **NEXT / NOT STARTED**; **PERSONAL-V1: NOT YET ADOPTED**. Earlier native-review/stop tokens remain historical, not current acceptance restrictions.
+**Current alignment — 2026-09-15:** the owner/coordinator accepts Sprint 93 and authorizes documentation closure/publication of the unchanged verified candidate. The original accepted Sprint-90, Sprint-91A and Sprint-92 records below retain their then-current planning, evidence and limitations. Sprint 94 is **NEXT / NOT STARTED**; **PERSONAL-V1: NOT YET ADOPTED**.
+
+---
+
+<a id="sprint-93"></a>
+## Accepted Sprint 93 — Verified Backup, Restore and Disaster Recovery — 2026-09-15
+
+**OWNER/COORDINATOR-ACCEPTED** under `SPRINT_93_VERIFIED_BACKUP_RESTORE_AND_DISASTER_RECOVERY_ACCEPTED`, following `SPRINT_93_BACKUP_RESTORE_CANDIDATE_READY_FOR_CHAT_REVIEW`. Required published entry baseline: `main@7218f536eee5c871243d1170e8db0f4c150728bb`; accepted predecessor: Sprint 92. The owner authorizes documentation closure, exact-path commit and normal push of the unchanged product candidate. The commit containing this record publishes that accepted outcome. Closure performs no further product changes, build/test run, genuine restore drill or failure campaign.
+
+### Accepted product and architecture
+
+[ADR-047](../../ADR.md#adr-047) is **ACCEPTED**; [FW-P3-36](../../SCOPE_DECISIONS.md#fw-p3-36) is **COMPLETE** for the selected verified backup/restore outcome. Settings → Application & data → Backup & Restore provides Create Backup… and Restore Backup… through native selection. One Finder `.ledgerforgebackup` package contains exactly `ledger.sqlite` and `manifest.json`, with no archive wrapper and no overwrite of an existing package.
+
+Format 1 uses bounded typed metadata: backup UUID, UTC creation instant, producing app identity/version/build, payload member name/byte size/SHA-256, schema and complete ordered migration versions/names/checksums, contents and exclusions. It does not duplicate financial rows. Strict initial compatibility requires the exact current V1–V17 chain and expected actual schema. Unsupported format, older/future/incomplete/unknown history, identity/checksum mismatch, corruption and missing/extra/symlinked package members are rejected. Future schema changes require an explicit compatibility decision. **V17 is unchanged; no V18, new closure ADR or permanent ledger-lineage UUID.**
+
+SQLite online backup captures the canonical provider under production operation ownership. Checked completion/close, isolated content/history/schema/integrity/foreign-key verification and staged canonical hydration precede hashing and verified destination-local publication. Restore verifies a copied candidate before Cancel-default explicit replacement confirmation. The selected package remains untouched. Unresolved operations/drafts are not silently discarded; replacement owns the gate and invalidates stale generations. A durable receipt precedes preservation of the previous database set. Before committed activation, failure recovers prior valid state or reports unavailable; after durable commit, startup reopens the new ledger rather than discarding later accepted writes. Canonical relaunch confirmation permits operation cleanup. Missing storage never silently creates an empty recovery ledger.
+
+The complete durable SQLite graph, including normalized/source/provenance and import/validation records, remains included. External originals, credentials/Keychain, runtime logs, appearance/window/profile preferences, private screenshots and development artifacts remain excluded. The observed genuine source and closed snapshot contained zero attachment rows and zero nonempty attachment BLOB payloads; arbitrary future databases are not certified by this observation. Conflicting embedded payloads stop for an explicit content decision, without stripping ledger rows.
+
+### Original implementation evidence — 2026-09-14
+
+The following checkpoint was recorded before acceptance and is accepted on 2026-09-15 without rerunning it. Its then-uncommitted status remains historical.
+
+The candidate starts from clean `main@7218f536eee5c871243d1170e8db0f4c150728bb`; HEAD remains there, with candidate changes unstaged and uncommitted. Architecture approval is distinct from product acceptance. No V18 or permanent ledger UUID was introduced.
+
+| Evidence | Executed result and boundary |
+| --- | --- |
+| Build and membership | Final Debug build 12 and optimized Release build 6 succeeded. Both products identify as `com.vyom.LedgerForge`, version 1.0, build 1, with the package type and native Settings controls present. Release contains no Sprint-93 failure probes or DEBUG profile/reset owner. No recovery databases, verifier scripts or private captures entered app resources. |
+| Focused mechanics | `BackupPackageTests` has 19 definitions; the final focused execution passed 19, failed 0, skipped 0. Five focused runs during implementation executed 82 cases in total (12 + 16 + 17 + 18 + 19), all passing. Checks cover format/chain/schema identity, actual history mismatch, missing/extra/symlinked members, checksum mismatch, no-overwrite publication, non-creating open, cancellation, activity/draft refusal, stale generation, and explicit first-use guards. One repeated result-directory setup attempt executed no tests and was rerun with a fresh location. |
+| Content contract | The genuine source and closed published snapshot passed the exclusion check: no attachment rows or nonempty BLOB payloads were present. The current complete durable schema was retained; the independent verifier inspected all actual tables, including SQLite-managed state. Unknown future attachment payloads still stop backup for a content decision; this is not proof of arbitrary embedded-file exclusion. No original statements were opened. |
+| Genuine native drill | A product backup was created, one existing account display name received the approved temporary suffix through the native editor, and the independent RAM verifier found only that one field changed. Native verified restore returned complete typed logical state P1 = P0. Clean termination and ordinary canonical relaunch produced P2 = P0, with the same restore-operation/backup receipt and successful canonical hydration. The suffix was removed by restore. |
+| Release startup and restore | The separate pre-existing Release ledger used its unchanged registered normal-startup migration path, then completed its own native product backup/restore and clean relaunch with exact P0/P1/P2 equality. This Release ledger had no financial rows; it proves the Release path without substituting for the populated genuine Debug drill. Strict recovery never upgrades an older backup. |
+| Activation failures | Isolated genuine recovery copies exercised failure after preservation, before candidate open, after candidate hydration, and before activation-record publication. Each reopened/hydrated the exact previous state and reported successful rollback. An injected rollback-open failure retained recovery assets, entered explicit unavailability and left Restore reachable; a subsequent native controlled restore recovered the exact verified backup and relaunched successfully. |
+| Process interruption | Real process exit before commit recovered the exact previous state; real process exit after durable commit reopened the restored state. A second restart of each case was idempotent. The same receipt remained authoritative, and committed restore was not reverted to old state. These are process-interruption checks, not hardware power-loss tests. |
+| Missing target and first use | Missing canonical storage remained unavailable. Native Cancel created no directory/database; explicit Create New Ledger created only the accepted empty schema on an isolated first-use target. A separate missing target restored the genuine backup, removed the first-use action and passed canonical relaunch. A stale creation choice preserved an already valid provider in the focused check. |
+| Native usability and preservation | Folder/package pickers, repeated picker cancellation, Cancel-default replacement confirmation, success, rollback, unavailable recovery and relaunch-confirmed states were inspected in the actual app. Debug and Release kept distinct canonical targets. Selected packages and saved appearance/profile preferences remained unchanged. |
+
+The standalone [acceptance verifier](../../../script/verify_backup_restore.py) compares complete typed logical records, NULLs, exact stored values, BLOBs, multiplicity, schema and SQLite-managed metadata independently of the coordinator/hydrator. Private comparison state was held only in RAM; no financial evidence dump was written. Two verified product packages and a pre-startup Release safety snapshot are retained outside Git and the original-statement directory. All nine verified disposable isolated recovery namespaces and their seed copy were removed after exact comparison and closed-handle checks. Both real restore receipts are relaunch-confirmed and their owned rollback directories are removed. The final Debug product is on ordinary Current Database with no temporary suffix or selected test namespace; Release was cleanly terminated after its verified relaunch.
+
+Unobserved boundaries remain explicit: hardware power loss; real disk-full, permission or durability-call failure; interruption inside a per-member preservation/rollback loop; real rollback-asset cleanup failure; and cancellation during a long genuine copy. Native picker/confirmation cancellation and pre-cancelled operation cleanup passed. Broad TestPlan, unrelated unit/integration/financial regression, parser corpus and source-oracle campaigns remain **SUSPENDED / NOT RUN**. These limits do not represent executed passes.
+
+### Acceptance of limits and retained state
+
+The owner explicitly accepts the recorded limits as **NOT_OBSERVED / NOT_TESTED**: real hardware power loss; real disk-full failure; real filesystem permission failure; real durability/fsync-family failure; interruption inside an individual preservation/rollback file loop; real rollback-asset cleanup failure; and cancellation during a long genuine copy. They remain limitations, not passes, and do not block the selected Sprint-93 outcome.
+
+The independent genuine comparison covered all 53 actual observed tables, including SQLite-managed state, with exact values, NULL distinction, BLOB values, multiplicity, schema and relevant SQLite metadata. P0/P1/P2 were held only in RAM; no financial comparison dump was written. All verifier processes exited and released handles/RAM before closure. The separate optimized Release ledger was empty and followed ordinary startup V4→V17 before its own backup; this does not qualify populated historical migration. Populated restore proof came from the genuine Debug drill.
+
+Native controls/pickers, safe cancellation, explicit confirmation, successful completion, rollback, unavailable recovery and relaunch states were inspected during implementation. Accepted final runtime: ordinary Debug Current Database, no temporary suffix or selected test namespace, canonical Debug handles only, both real receipts relaunchConfirmed, completed operation directories removed and saved appearance/preferences unchanged. Closure does not disturb that runtime.
+
+Two verified product-format packages and the pre-startup Release raw safety snapshot remain outside Git and the authentic-statement directory. The raw snapshot is not a format-1 package. Publication must not modify/delete these artifacts or turn them into app-managed backup history. All nine disposable isolated recovery namespaces and their seed were cleaned during implementation. Build/test results and inline native captures remain outside Git/app resources.
+
+### Publication scope and disposition
+
+The accepted candidate contained 29 paths. Closure adds only this existing accepted-outcomes collection, for **30 intended published paths**. The 23 non-documentation files remain byte-for-byte unchanged during closure. The final staged diff and Git hygiene are checked separately; prior build, containment and 19/19 focused evidence are reused. Five evolving focused runs account for 82 executions, not 82 distinct tests. A result-directory setup attempt executed zero tests before retry. Broad TestPlan, unrelated regression suites, parser corpus and source-oracle campaigns remain **SUSPENDED / NOT RUN**; closure runs none of them.
+
+- [.gitignore](../../../.gitignore)
+- [ContentView.swift](../../../ContentView.swift)
+- [Core/RuntimeDiagnostics.swift](../../../Core/RuntimeDiagnostics.swift)
+- [Database/BackupPackage.swift](../../../Database/BackupPackage.swift)
+- [Database/RestoreOperation.swift](../../../Database/RestoreOperation.swift)
+- [Database/SQLiteDatabase.swift](../../../Database/SQLiteDatabase.swift)
+- [Database/SQLiteRepositoryProvider.swift](../../../Database/SQLiteRepositoryProvider.swift)
+- [LedgerForge-Info.plist](../../../LedgerForge-Info.plist)
+- [LedgerForge.xcodeproj/project.pbxproj](../../../LedgerForge.xcodeproj/project.pbxproj)
+- [LedgerForgeApp.swift](../../../LedgerForgeApp.swift)
+- [LedgerForgeTests/BackupPackageTests.swift](../../../LedgerForgeTests/BackupPackageTests.swift)
+- [LedgerForgeTests/LedgerForgeTests.swift](../../../LedgerForgeTests/LedgerForgeTests.swift)
+- [Project documents/ADR.md](../../../Project%20documents/ADR.md)
+- [Project documents/Archive/Accepted outcomes/Sprints_90-99.md](../../../Project%20documents/Archive/Accepted%20outcomes/Sprints_90-99.md)
+- [Project documents/FUTURE_WORK.MD](../../../Project%20documents/FUTURE_WORK.MD)
+- [Project documents/PROJECT_STATE.md](../../../Project%20documents/PROJECT_STATE.md)
+- [Project documents/SCOPE_DECISIONS.md](../../../Project%20documents/SCOPE_DECISIONS.md)
+- [Project documents/Sprint roadmap/LedgerForge_Roadmap_Sprints_90-99_Current.md](../../../Project%20documents/Sprint%20roadmap/LedgerForge_Roadmap_Sprints_90-99_Current.md)
+- [Project documents/Work notes/Backup_and_export.md](../../../Project%20documents/Work%20notes/Backup_and_export.md)
+- [Services/AccountMetadataCoordinator.swift](../../../Services/AccountMetadataCoordinator.swift)
+- [Services/ApplicationHydrationWorkflow.swift](../../../Services/ApplicationHydrationWorkflow.swift)
+- [Services/BackupRestoreCoordinator.swift](../../../Services/BackupRestoreCoordinator.swift)
+- [Services/CategoryManagementCoordinator.swift](../../../Services/CategoryManagementCoordinator.swift)
+- [Services/DatabaseActivityGate.swift](../../../Services/DatabaseActivityGate.swift)
+- [Services/ImportEngine.swift](../../../Services/ImportEngine.swift)
+- [Services/RepositoryStoreHydrator.swift](../../../Services/RepositoryStoreHydrator.swift)
+- [ViewModels/SalaryWorkspaceViewModel.swift](../../../ViewModels/SalaryWorkspaceViewModel.swift)
+- [Views/BackupRestoreSettingsSection.swift](../../../Views/BackupRestoreSettingsSection.swift)
+- [Views/CategoryManagementView.swift](../../../Views/CategoryManagementView.swift)
+- [script/verify_backup_restore.py](../../../script/verify_backup_restore.py)
+
+**Sprint 94: NEXT / NOT STARTED. PERSONAL-V1: NOT YET ADOPTED.** Sprint 94–100 order and entry boundaries are unchanged. Complete structured export remains **OPTIONAL / NOT SELECTED**; backup encryption remains **NOT REQUIRED / NOT SELECTED**. Appearance preferences remain **DEVICE-LOCAL / EXCLUDED FROM BACKUP**. Existing rejected NOT REQUIRED-DO NOT CONSIDER decisions and Sprint 90/91A/92 accepted histories remain intact.
 
 ---
 

@@ -289,14 +289,12 @@ final class ImportEngine {
 #endif
     private let committedPreparedImportLock = NSLock()
     private var committedPreparedImportIDs: Set<UUID> = []
-#if DEBUG
     private struct LivePreparedImport {
         let sourceSnapshot: SourceContentSnapshot
-        let lifecycleLease: DevelopmentDatabaseActivityLease
+        let lifecycleLease: DatabaseActivityLease
     }
 
     private var livePreparedImports: [UUID: LivePreparedImport] = [:]
-#endif
 
 #if DEBUG
     init(
@@ -451,13 +449,11 @@ final class ImportEngine {
         guard persistenceStateProvider().isUsable else {
             throw PersistenceWorkflowError.unavailable
         }
-#if DEBUG
-        let lifecycleLease = try DevelopmentDatabaseActivityGate.shared.begin(.importPreparation)
+        let lifecycleLease = try DatabaseActivityGate.shared.begin(.importPreparation)
         var transfersLifecycleLease = false
         defer {
             if !transfersLifecycleLease { lifecycleLease.finish() }
         }
-#endif
         try publishPreparationProgress(.openingSource, requestId: requestId, progress: progress)
         let snapshot: SourceContentSnapshot
         do {
@@ -547,14 +543,12 @@ final class ImportEngine {
                     statementEquivalenceReview: .notApplicable,
                     providerGeneration: preparationGeneration
                 )
-#if DEBUG
                 await lifecycleLease.transition(to: .preparedAwaitingConfirmation)
                 livePreparedImports[preparedImport.id] = LivePreparedImport(
                     sourceSnapshot: snapshot,
                     lifecycleLease: lifecycleLease
                 )
                 transfersLifecycleLease = true
-#endif
                 transfersSnapshot = true
                 return preparedImport
             }
@@ -829,14 +823,12 @@ final class ImportEngine {
             providerGeneration: preparationGeneration,
             axisCreditCardPDFPresentation: axisCreditCardPDFPresentation
         )
-#if DEBUG
         await lifecycleLease.transition(to: .preparedAwaitingConfirmation)
         livePreparedImports[preparedImport.id] = LivePreparedImport(
             sourceSnapshot: snapshot,
             lifecycleLease: lifecycleLease
         )
         transfersLifecycleLease = true
-#endif
         transfersSnapshot = true
         return preparedImport
     }
@@ -930,14 +922,12 @@ final class ImportEngine {
             )
         }
         defer { preparedImport.sourceSnapshot.invalidate() }
-#if DEBUG
         let lifecycleLease = livePreparedImports[preparedImport.id]?.lifecycleLease
         await lifecycleLease?.transition(to: .confirmedPersistence)
         defer {
             lifecycleLease?.finish()
             livePreparedImports.removeValue(forKey: preparedImport.id)
         }
-#endif
         guard !reconciliationGate.isBlocked else {
             return ImportEngineResult(
                 fileName: preparedImport.fileName,
@@ -1345,9 +1335,7 @@ final class ImportEngine {
     func cancelPreparedImport(_ preparedImport: PreparedImport) {
         guard markPreparedImportCommitted(preparedImport.id) else { return }
         preparedImport.sourceSnapshot.invalidate()
-#if DEBUG
         livePreparedImports.removeValue(forKey: preparedImport.id)?.lifecycleLease.finish()
-#endif
     }
 
 #if DEBUG

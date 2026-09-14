@@ -64,6 +64,7 @@ Order inherits [Guide rule G](Project_Guide.md#documentation-order): ADR number 
 | [ADR-044](#adr-044) | Durable Credit-Card Liability Accounts, Card Instruments, and Source-Proven Card Statement Evidence |
 | [ADR-045](#adr-045) | Qatar Airways Salary Actuals and Current-Month Funding Planner |
 | [ADR-046](#adr-046) | Authentic-Corpus-Only Parser Authority and Adaptive Financial Source Interpretation |
+| [ADR-047](#adr-047) | Verified User Backup and Receipt-Owned Restore |
 
 <a id="adr-001"></a>
 
@@ -6274,6 +6275,42 @@ No parser/profile is considered personal-v1 reliability-certified solely because
 
 ADR-046 does **not** implement or authorize parser fixes, reader changes, batch-import UI, migrations, source mutation, fixture creation, test edits, new supported institutions, AI parsing authority, OCR support, new duplicate semantics or any other product feature. It records current architecture and acceptance authority only.
 
+
+<a id="adr-047"></a>
+
+# ADR-047 — Verified User Backup and Receipt-Owned Restore
+
+## Status — 2026-09-15
+
+**ACCEPTED** with Sprint 93 under `SPRINT_93_VERIFIED_BACKUP_RESTORE_AND_DISASTER_RECOVERY_ACCEPTED`. The owner/coordinator accepts the implemented production backup/restore/recovery contract and its bounded evidence, and authorizes documentation closure and publication. [The accepted outcome](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-93) owns executed proof and explicitly unobserved limits. V17 is unchanged; no new ADR or migration is allocated during closure.
+
+## Original implementation checkpoint — 2026-09-14
+
+Architecture approved by the owner's Sprint-93 implementation authorization. The implemented candidate and targeted verification are ready for owner/coordinator review; product acceptance and publication remain pending. This adds the narrow production recovery boundary; ADR-035's older DEBUG-only reset/profile restrictions remain historical and otherwise unchanged.
+
+## Decision
+
+Settings → Application & data provides Create Backup and Restore Backup through native folder/package selection. A Finder `.ledgerforgebackup` package contains exactly `ledger.sqlite` and `manifest.json`. SQLite online backup captures the authoritative Current Database under a generation-bound activity lease; checked completion and destination close precede isolated verification. The lease ends before hashing/copying. Destination-local staging, checked durability and a same-filesystem no-overwrite rename publish the complete package.
+
+The complete durable SQLite graph is retained, including import/validation history and normalized provenance. External originals, Keychain secrets, runtime logs, screenshots, development artifacts and device-local appearance/window/profile preferences are excluded. Unknown or conflicting embedded attachment payloads stop backup for a content decision; no rows are removed to proceed. Both source and closed snapshot undergo the content check.
+
+Format 1 uses ordinary Codable metadata: backup UUID, UTC creation instant, actual app version/build (unknown stays unknown), payload name/size/SHA-256, complete ordered migration identities and concise contents/exclusions. There is no permanent ledger UUID. SHA-256 detects mismatch and does not authenticate authorship. Strict compatibility initially requires the current immutable V1–V17 chain and registered schema inventory. Future schema changes require an explicit backup-compatibility decision; no historical upgrade or V18 is introduced here.
+
+Restore copies the package to isolated app-owned staging. Existing-file read-only verification checks member structure, manifest/hash, exact migration/schema identity, integrity, foreign keys, contents and canonical staged hydration without publishing stores or modifying the original. Confirmation always names replacement: Cancel is the safe default; Replace Ledger and Restore is the consequential action.
+
+A shared production activity gate covers import preparation/confirmation, saves and hydration. Restore refuses unresolved work or drafts. Before moves, a durably written operation receipt identifies the snapshot and fixed UUID-owned locations. Checked close precedes preservation of a healthy previous database set. Sidecars stay with that set. Candidate placement and reopening never create an empty database. Complete hydration and a durable activation decision precede observer-atomic provider/store publication and release of ordinary work.
+
+Startup interprets the receipt before normal open. Pending replacement recovers the preserved old set under exclusive ownership, or remains unavailable. Committed replacement always reopens the new canonical ledger; it never silently reverts subsequent accepted writes. Full migration/schema, integrity, foreign-key and content verification plus canonical hydration precede relaunch confirmation and cleanup of that operation's rollback assets. Cleanup failure does not undo activation. An unresolved prior receipt is retained with its owned recovery assets before another explicitly confirmed recovery replaces the current receipt. Ambiguous files or failed durability preserve assets and block financial actions.
+
+The receipt and backup UUID/checksum identify this restoration, not permanent ledger lineage. Live file checksums may change after legitimate writes. Existing valid ledgers do not require new identity metadata. Without a recovery receipt, ordinary existing-ledger startup retains its registered migration behavior; receipt-owned recovery remains strict and does not upgrade backups. Missing storage cannot silently initialize empty. Explicit first-use creation requires owner confirmation and a fresh check that no current database set, receipt or recovery assets exist; Restore remains available instead. Debug and Release retain their distinct canonical paths.
+
+## Verification and non-goals
+
+Routine product verification is separate from the independent acceptance verifier. The authorized genuine drill compares complete typed logical SQLite state in RAM before backup, after an approved existing-account display-name differentiation/restore, and after clean relaunch. Targeted package, ownership, rollback and interruption checks are authorized; broad regression, parser and source-oracle campaigns remain suspended. Genuine backup/staging/rollback files are recovery artifacts; financial comparison dumps remain prohibited.
+
+No sync, scheduling, workspace switching, archive dependency, retention UI, encryption, appearance export or structured financial export is added. Source meaning, Money and migrations are unchanged. The [accepted outcome](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-93) owns completed verification and limitations; the [backup work note](Work%20notes/Backup_and_export.md) retains the separate optional-export boundary.
+
+---
 
 # ADR Status Alignment Log
 

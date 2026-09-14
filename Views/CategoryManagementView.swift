@@ -3,6 +3,9 @@
 
 import SwiftUI
 
+@MainActor
+private final class CategoryRestoreDraft { var hasDraft = false }
+
 private enum CategoryMutationIntent {
     case create(name: String)
     case rename(categoryID: String, name: String)
@@ -30,6 +33,7 @@ struct CategoryManagementView: View {
 #endif
 
     @State private var newName = ""
+    @State private var restoreDraft = CategoryRestoreDraft()
     @State private var editingCategoryID: String?
     @State private var editedName = ""
     @State private var categoryPendingDeletion: Category?
@@ -108,6 +112,11 @@ struct CategoryManagementView: View {
                 }
             }
         }
+        .onAppear {
+            DatabaseActivityGate.shared.registerDraftOwner(restoreDraft) { [weak draft = restoreDraft] in draft?.hasDraft == true }
+        }
+        .onChange(of: newName) { _, _ in restoreDraft.hasDraft = !newName.isEmpty || editingCategoryID != nil }
+        .onChange(of: editingCategoryID) { _, _ in restoreDraft.hasDraft = !newName.isEmpty || editingCategoryID != nil }
         .confirmationDialog(
             "Delete category?",
             isPresented: Binding(

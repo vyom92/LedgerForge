@@ -272,15 +272,13 @@ final class CategoryManagementCoordinator: CategoryManaging {
     }
 
     func retryCanonicalHydration() throws -> CategoryReconciliationRetryResult {
-#if DEBUG
-        let lease: DevelopmentDatabaseActivityLease
+        let lease: DatabaseActivityLease
         do {
-            lease = try DevelopmentDatabaseActivityGate.shared.begin(.repositoryWrite)
+            lease = try DatabaseActivityGate.shared.begin(.repositoryWrite)
         } catch {
             throw CategoryManagementCoordinatorError.lifecycleUnavailable
         }
         defer { lease.finish() }
-#endif
 
         let currentProvider = provider()
         guard currentProvider.persistenceState.isUsable else {
@@ -329,7 +327,9 @@ final class CategoryManagementCoordinator: CategoryManaging {
     private func mutate(
         _ operation: (DatabaseProvider, String) throws -> Bool
     ) throws -> Bool {
-        try performMutation(using: provider(), operation)
+        let lease = try DatabaseActivityGate.shared.begin(.repositoryWrite)
+        defer { lease.finish() }
+        return try performMutation(using: provider(), operation)
     }
 #endif
 

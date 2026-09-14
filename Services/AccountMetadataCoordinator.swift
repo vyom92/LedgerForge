@@ -99,16 +99,14 @@ final class AccountMetadataCoordinator: AccountMetadataCoordinating {
 #endif
 
     func updateDisplayName(accountId: String, workspaceId: String, displayName: String) throws -> Bool {
-#if DEBUG
-        let lifecycleLease: DevelopmentDatabaseActivityLease
+        let lifecycleLease: DatabaseActivityLease
         do {
-            lifecycleLease = try DevelopmentDatabaseActivityGate.shared.begin(.repositoryWrite)
+            lifecycleLease = try DatabaseActivityGate.shared.begin(.repositoryWrite)
         } catch {
             developerConsole?.error(.runtime, "Account display-name update blocked by database lifecycle")
             throw AccountMetadataCoordinatorError.saveFailed
         }
         defer { lifecycleLease.finish() }
-#endif
 
         let currentProvider = provider()
 #if DEBUG

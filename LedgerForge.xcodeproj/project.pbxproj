@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		009F33FAAF444AB6A8AF668D /* BackupRestoreSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26B1EB7ECB294322A116A42E /* BackupRestoreSettingsSection.swift */; };
 		28171EE02FFBE2BE006115B7 /* TransactionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */; };
 		28171EE22FFBE2F0006115B7 /* TransactionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */; };
 		281BB15A2FFC486C006E7424 /* Repository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1362FFC4160006E7424 /* Repository.swift */; };
@@ -93,6 +94,7 @@
 		650000013065000000000001 /* AxisBankAccountPDFNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650000043065000000000001 /* AxisBankAccountPDFNormalizer.swift */; };
 		650000023065000000000001 /* AxisBankAccountPDFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650000053065000000000001 /* AxisBankAccountPDFParser.swift */; };
 		650000033065000000000001 /* AxisBankAccountSourceEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 650000063065000000000001 /* AxisBankAccountSourceEvidence.swift */; };
+		656EE4F70E86495BBBC96038 /* DatabaseActivityGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C12603929AE4251B5B549B9 /* DatabaseActivityGate.swift */; };
 		710000013071000000000001 /* LegacyXLSDocumentReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 710000113071000000000001 /* LegacyXLSDocumentReader.swift */; };
 		710000023071000000000001 /* AxisBankAccountXLSNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 710000123071000000000001 /* AxisBankAccountXLSNormalizer.swift */; };
 		710000033071000000000001 /* AxisBankAccountXLSParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 710000133071000000000001 /* AxisBankAccountXLSParser.swift */; };
@@ -130,13 +132,16 @@
 		91AA00042026091400000001 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91AA00032026091400000001 /* AppearanceSettingsView.swift */; };
 		A17000013000000000000002 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
 		A17000023000000000000001 /* ZeroActivityStatementEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */; };
+		A69C100189964B7F80F52710 /* BackupPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 685D016F85D34981A5D36C74 /* BackupPackage.swift */; };
 		A94100012FFD673000FB69E4 /* TransactionEventIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */; };
 		AB1700020000000000000001 /* RuntimeDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000001 /* RuntimeDiagnostics.swift */; };
 		AB1700020000000000000002 /* PlannerInputCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000002 /* PlannerInputCodec.swift */; };
 		AB1700020000000000000003 /* DurableStartupEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1700010000000000000003 /* DurableStartupEvidence.swift */; };
+		ACD0D3B3FCCB4B909B807A5C /* BackupRestoreCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA805D4E3F1F49E683A51F3D /* BackupRestoreCoordinator.swift */; };
 		B50000013050000000000001 /* ConfirmedImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000003050000000000001 /* ConfirmedImport.swift */; };
 		B50000033050000000000001 /* IdentifierOwnershipMigrationV5.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000023050000000000001 /* IdentifierOwnershipMigrationV5.swift */; };
 		B50000053050000000000001 /* SQLiteConfirmedImportRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000043050000000000001 /* SQLiteConfirmedImportRepository.swift */; };
+		B547E5BD0F5240849B20BDCB /* RestoreOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39AE51D2A25A4B9EB73CCFF6 /* RestoreOperation.swift */; };
 		B60000013050000000000001 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000003050000000000001 /* main.swift */; };
 		B60000023050000000000001 /* Repository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1362FFC4160006E7424 /* Repository.swift */; };
 		B60000033050000000000001 /* SQLiteDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 281BB1372FFC4184006E7424 /* SQLiteDatabase.swift */; };
@@ -213,6 +218,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		26B1EB7ECB294322A116A42E /* BackupRestoreSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreSettingsSection.swift; sourceTree = "<group>"; };
 		28171EDF2FFBE2BE006115B7 /* TransactionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionStore.swift; sourceTree = "<group>"; };
 		28171EE12FFBE2F0006115B7 /* TransactionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionListViewModel.swift; sourceTree = "<group>"; };
 		28171F672FFC1718006115B7 /* Database_v1_Architecture.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Database_v1_Architecture.md; sourceTree = "<group>"; };
@@ -308,11 +314,14 @@
 		37A100002FFDA6CB00C12A68 /* ImportSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportSessionStore.swift; sourceTree = "<group>"; };
 		37A100102FFDA6CB00C12A68 /* AccountMetadataCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountMetadataCoordinator.swift; sourceTree = "<group>"; };
 		37A100202FFDA6CB00C12A68 /* AccountsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsViewModel.swift; sourceTree = "<group>"; };
+		39AE51D2A25A4B9EB73CCFF6 /* RestoreOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestoreOperation.swift; sourceTree = "<group>"; };
 		3A4400013004000000000001 /* Money.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Money.swift; sourceTree = "<group>"; };
 		3A4400033004000000000001 /* MoneyFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyFormatting.swift; sourceTree = "<group>"; };
+		3C12603929AE4251B5B549B9 /* DatabaseActivityGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseActivityGate.swift; sourceTree = "<group>"; };
 		650000043065000000000001 /* AxisBankAccountPDFNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountPDFNormalizer.swift; sourceTree = "<group>"; };
 		650000053065000000000001 /* AxisBankAccountPDFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountPDFParser.swift; sourceTree = "<group>"; };
 		650000063065000000000001 /* AxisBankAccountSourceEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountSourceEvidence.swift; sourceTree = "<group>"; };
+		685D016F85D34981A5D36C74 /* BackupPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupPackage.swift; sourceTree = "<group>"; };
 		710000113071000000000001 /* LegacyXLSDocumentReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyXLSDocumentReader.swift; sourceTree = "<group>"; };
 		710000123071000000000001 /* AxisBankAccountXLSNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountXLSNormalizer.swift; sourceTree = "<group>"; };
 		710000133071000000000001 /* AxisBankAccountXLSParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AxisBankAccountXLSParser.swift; sourceTree = "<group>"; };
@@ -346,6 +355,7 @@
 		91AA00032026091400000001 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
 		A17000013000000000000001 /* ZeroActivityStatementEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZeroActivityStatementEvidence.swift; sourceTree = "<group>"; };
 		A94100002FFD673000FB69E4 /* TransactionEventIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEventIdentity.swift; sourceTree = "<group>"; };
+		AA805D4E3F1F49E683A51F3D /* BackupRestoreCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreCoordinator.swift; sourceTree = "<group>"; };
 		AB1700010000000000000001 /* RuntimeDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnostics.swift; sourceTree = "<group>"; };
 		AB1700010000000000000002 /* PlannerInputCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerInputCodec.swift; sourceTree = "<group>"; };
 		AB1700010000000000000003 /* DurableStartupEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DurableStartupEvidence.swift; sourceTree = "<group>"; };
@@ -620,6 +630,8 @@
 		288EB0DE2FF7A3D100F09BC9 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				AA805D4E3F1F49E683A51F3D /* BackupRestoreCoordinator.swift */,
+				3C12603929AE4251B5B549B9 /* DatabaseActivityGate.swift */,
 				DBB00005305E000000000001 /* DevelopmentProfileAcknowledgementGate.swift */,
 				DBA00004305D000000000001 /* DevelopmentDatabaseProfilePreferences.swift */,
 				D57000033057000000000001 /* CategoryManagementCoordinator.swift */,
@@ -694,6 +706,7 @@
 		288EB0E32FF7A3D500F09BC9 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				26B1EB7ECB294322A116A42E /* BackupRestoreSettingsSection.swift */,
 				91AA00032026091400000001 /* AppearanceSettingsView.swift */,
 				B83000033083000000000001 /* ImportCentreBatchViews.swift */,
 				7A79000E307A000000000001 /* SalaryView.swift */,
@@ -711,6 +724,8 @@
 		288EB0E42FF7A3D500F09BC9 /* Database */ = {
 			isa = PBXGroup;
 			children = (
+				39AE51D2A25A4B9EB73CCFF6 /* RestoreOperation.swift */,
+				685D016F85D34981A5D36C74 /* BackupPackage.swift */,
 				7A790004307A000000000001 /* SalaryPersistence.swift */,
 				7A790006307A000000000001 /* SQLiteSalaryRepository.swift */,
 				DBA00001305D000000000001 /* DevelopmentDatabaseProfiles.swift */,
@@ -1104,6 +1119,11 @@
 				28B87B3D2FFBBFCC009BEE8C /* Account.swift in Sources */,
 				286D69012FFFF7030078AAC5 /* LFIconTile.swift in Sources */,
 				28D11EAA2FFDA6CB00C12A68 /* RepositoryStoreHydrator.swift in Sources */,
+				009F33FAAF444AB6A8AF668D /* BackupRestoreSettingsSection.swift in Sources */,
+				ACD0D3B3FCCB4B909B807A5C /* BackupRestoreCoordinator.swift in Sources */,
+				656EE4F70E86495BBBC96038 /* DatabaseActivityGate.swift in Sources */,
+				B547E5BD0F5240849B20BDCB /* RestoreOperation.swift in Sources */,
+				A69C100189964B7F80F52710 /* BackupPackage.swift in Sources */,
 				37A100012FFDA6CB00C12A68 /* ImportSessionStore.swift in Sources */,
 				37A100112FFDA6CB00C12A68 /* AccountMetadataCoordinator.swift in Sources */,
 				37A100212FFDA6CB00C12A68 /* AccountsViewModel.swift in Sources */,
@@ -1371,6 +1391,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "LedgerForge-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -1429,6 +1450,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "LedgerForge-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;

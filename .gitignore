@@ -39,3 +39,12 @@ Roadmap.md
 
 # Finder metadata
 **/.DS_Store
+
+# Local recovery artifacts (never app resources or repository evidence)
+*.ledgerforgebackup/
+.ledgerforge-recovery/
+restore-operation.json
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.LedgerForge-*.partial/

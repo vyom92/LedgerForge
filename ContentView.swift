@@ -1336,6 +1336,7 @@ struct ImportActivityPresentation: Equatable {
 struct ContentView: View {
     // Inject inside the established root so WindowGroup keeps its saved identity.
     @StateObject private var appearance = LFAppearanceStore.shared
+    @ObservedObject private var backupRecovery = BackupRestoreCoordinator.shared
     private var theme: LFTheme { appearance.theme }
     @Environment(\.appearsActive) private var appearsActive
 
@@ -1523,11 +1524,21 @@ struct ContentView: View {
                 selectedSection = .imports
             }
         }
+        .disabled(backupRecovery.isReplacing)
         .task {
-            hydrateDashboardOnce()
+            await hydrateDashboardOnce()
+#if DEBUG
+            await BackupRestoreCoordinator.shared.runProcessProbeIfRequested()
+#endif
         }
         .onAppear {
             importCentre.attachPresentationOwner(importCentrePresentationOwnerID)
+            DatabaseActivityGate.shared.registerDraftOwner(salaryViewModel) { [weak model = salaryViewModel] in
+                model?.isDirty == true
+            }
+            DatabaseActivityGate.shared.registerDraftOwner(accountsViewModel) { [weak model = accountsViewModel] in
+                model?.isEditingDisplayName == true
+            }
         }
         .onDisappear {
             statementPassword = ""
@@ -2245,6 +2256,8 @@ struct ContentView: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
+                            Divider().overlay(theme.palette.divider)
+                            BackupRestoreSettingsSection()
                         }
 
                         CategoryManagementView()
@@ -3822,20 +3835,20 @@ struct ContentView: View {
             if availability.state != .loading {
                 Button("Diagnostics") { selectedSection = .developer }
                 if DatabaseProvider.shared.persistenceState.isUsable {
-                    Button("Reload data") { hydrateDashboard(force: true) }
+                    Button("Reload data") { Task { await hydrateDashboard(force: true) } }
                 }
             }
         }.padding().background(LFTheme.warning.opacity(0.12))
     }
 
-    private func hydrateDashboardOnce() {
+    private func hydrateDashboardOnce() async {
         guard !didStartRepositoryHydration else { return }
         didStartRepositoryHydration = true
-        hydrateDashboard(force: false)
+        await hydrateDashboard(force: false)
     }
 
-    private func hydrateDashboard(force: Bool) {
-        ApplicationHydrationWorkflow(
+    private func hydrateDashboard(force: Bool) async {
+        await ApplicationHydrationWorkflow(
             dashboardViewModel: dashboardViewModel,
             availability: availability
         )

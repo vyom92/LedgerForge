@@ -6,13 +6,15 @@ struct ApplicationHydrationWorkflow {
     let dashboardViewModel: DashboardViewModel
     let availability: ApplicationAvailability
 
-    func hydrateDashboard(force: Bool) {
+    func hydrateDashboard(force: Bool) async {
         dashboardViewModel.markHydrationStarted()
         do {
-            let result = try RepositoryStoreHydrator().hydrateIfNeeded(forceRefresh: force)
+            let result = try RepositoryStoreHydrator(participatesInLifecycleGate: !BackupRestoreCoordinator.shared.ownsStartupGate).hydrateIfNeeded(forceRefresh: force)
             dashboardViewModel.markHydrationCompleted(result)
+            await BackupRestoreCoordinator.shared.startupDidHydrate()
             DurableStartupEvidence.checkpoint()
         } catch {
+            BackupRestoreCoordinator.shared.startupDidFail()
             dashboardViewModel.markHydrationFailed(error)
             if !DatabaseProvider.shared.persistenceState.isUsable {
                 let root = DatabaseProvider.shared.failureContext

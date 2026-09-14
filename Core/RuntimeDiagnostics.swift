@@ -242,5 +242,9 @@ final class ApplicationAvailability: ObservableObject {
         self.failure = failure
         state = retained ? .retainedNonCurrent : .unavailable
     }
-    var permitsMutation: Bool { state.permitsMutation && DatabaseProvider.shared.persistenceState.isUsable && generation == DatabaseProvider.shared.generationToken }
+    var permitsMutation: Bool {
+        state.permitsMutation && DatabaseProvider.shared.persistenceState.isUsable &&
+        generation == DatabaseProvider.shared.generationToken &&
+        !DatabaseActivityGate.shared.hasExclusiveOperation && !DatabaseActivityGate.shared.isUnavailable
+    }
 }

@@ -302,6 +302,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
     }
 
     func save() {
+        let lease: DatabaseActivityLease
+        do { lease = try DatabaseActivityGate.shared.begin(.repositoryWrite) }
+        catch { errorMessage = "Wait for database recovery to finish before saving."; return }
+        defer { lease.finish() }
         canonicalDidPublish()
         guard canSave else { errorMessage = fieldErrors.isEmpty ? statusText : "Correct the marked fields before saving."; return }
         // All visible strings are already owned here, including the currently focused field.
@@ -328,6 +332,10 @@ final class SalaryWorkspaceViewModel: ObservableObject {
 
     func retryCanonicalRefresh() {
         guard saveState == .committedNeedsRefresh else { return }
+        let lease: DatabaseActivityLease
+        do { lease = try DatabaseActivityGate.shared.begin(.hydration) }
+        catch { errorMessage = "Wait for database recovery to finish before reloading."; return }
+        defer { lease.finish() }
         let active = provider()
         guard active.generationToken == baseGeneration else { saveState = .committedToPreviousProvider; return }
         do {

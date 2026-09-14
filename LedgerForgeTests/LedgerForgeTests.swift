@@ -262,7 +262,7 @@ struct LedgerForgeTests {
         #expect(result.transactionCount == plan.transactionTemplates.count)
 
         let dashboardViewModel = DashboardViewModel()
-        ApplicationHydrationWorkflow(
+        await ApplicationHydrationWorkflow(
             dashboardViewModel: dashboardViewModel,
             availability: ApplicationAvailability.shared
         ).hydrateDashboard(force: true)

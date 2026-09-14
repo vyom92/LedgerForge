@@ -8,6 +8,17 @@ The adopted personal outcome includes supported authentic imports, practical R1 
 
 ## Settled product decisions
 
+<a id="sprint-93-backup-restore-acceptance"></a>
+### Sprint 93 verified backup and restore — owner/coordinator acceptance, 2026-09-15
+
+**ACCEPTED** under `SPRINT_93_VERIFIED_BACKUP_RESTORE_AND_DISASTER_RECOVERY_ACCEPTED`; [the accepted outcome](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-93) owns the already-executed evidence and limits. [ADR-047](ADR.md#adr-047) is accepted and [FW-P3-36](#fw-p3-36) is complete for the selected outcome. The owner authorizes documentation closure, exact-path commit and normal push of the unchanged product candidate. No further product changes, restore drill, failure campaign or broad regression restart is authorized. All recorded unobserved recovery cases remain NOT_OBSERVED / NOT_TESTED and do not block this bounded acceptance. V17 is unchanged; no V18 or permanent ledger-lineage UUID. Appearance preferences remain DEVICE-LOCAL / EXCLUDED FROM BACKUP; complete structured export remains OPTIONAL / NOT SELECTED; backup encryption remains NOT REQUIRED / NOT SELECTED. Retained recovery packages/raw snapshot stay outside Git and are not changed or deleted during publication. Sprint 94 is NEXT / NOT STARTED; PERSONAL-V1 remains NOT YET ADOPTED.
+
+<a id="sprint-93-backup-restore-decision"></a>
+### Sprint 93 backup and restore — implementation authorization, 2026-09-14
+
+The owner authorized [ADR-047](ADR.md#adr-047)'s small two-member Finder package, strict current migration-chain compatibility, snapshot/receipt identity (no permanent ledger UUID), isolated verification and interruption-safe replacement. The Sprint-93-specific exception permits bounded Debug/Release builds, content checks, genuine recovery artifacts, the existing-account display-name suffix drill, targeted gate/package checks and selected rollback/interruption verification. Comparison evidence stays in memory; authentic originals and financial semantics remain unchanged. Appearance/window/profile preferences remain device-local and excluded. No V18, broad regression restart, product acceptance, publication or Sprint-94 work is authorized by this decision.
+
+
 <a id="sprint-92-presentation-decision"></a>
 ### Sprint 92 information presentation and R1 polish — owner acceptance, 2026-09-14
 
@@ -27,7 +38,7 @@ The surviving archived v1 family remains presentation/information-architecture e
 
 Earlier SC-04 Follow System/Light planning and the corresponding customization prohibitions are **superseded history**, not another feature to build. Dark mode stays fixed. Weight/tracking/density editors, theme import/export, sync, portable themes, a theme framework and formal accessibility work remain excluded. Accepted shared finishing includes related-colour card edges, distinct fill, seamless title-bar/sidebar tint behind the native traffic lights, and consistent width plus Collapse/Expand on all six destinations. The prior Settings-only minimum adjustment and temporary LedgerForge-only AppleScript resizing permission were specific to 91A verification; they are not standing system-control authority. No macOS setting changes are authorized.
 
-**Historical Sprint-91A closure record:** the following paragraph preserves its then-current sequence and verification restrictions. The [Sprint-92 acceptance above](#sprint-92-presentation-decision) owns current status; Sprint 93 is now NEXT / NOT STARTED.
+**Historical Sprint-91A closure record:** the following paragraph preserves its then-current sequence and verification restrictions. The [Sprint-93 acceptance above](#sprint-93-backup-restore-acceptance) owns current status; Sprint 94 is now NEXT / NOT STARTED.
 
 **Owner closure decision — 2026-09-14:** accept the current Dashboard and overall 91A visual result, and publish the intended product/docs/icon changes. Regression tests remain **SUSPENDED / 0 new executions**. The owner accepts **FINAL_BYTE_SMALL_WINDOW_NATIVE_RECHECK_NOT_COMPLETED**: final post-HIG/icon bytes were observed at 1440 × 900 but not reverified at 1024 × 768 or 760 × 640 after the AppleScript window path failed. Earlier r34 observations remain separate evidence; no PASS is inferred and the resize campaign must not restart. Preserve the intentional deletion of `Project documents/UI Assets/Archived/UserJourney_v1.0.png` and the owner-supplied AppIcon application/sidebar identity. [Accepted outcome](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-91a) owns exact evidence and other limitations; [working history](Work%20notes/Transaction_and_R1_workflows.md#sprint-91a-dark-appearance) preserves the evolution. Sprint 92 is **NEXT / NOT STARTED**, V17 is unchanged, and FW-P2-49 remains **NOT REQUIRED-DO NOT CONSIDER**.
 
@@ -131,3 +142,4 @@ Order inherits Guide rule D: former ID in natural ascending order. IDs are never
 | <a id="fw-p2-75"></a>FW-P2-75 | Completed by [accepted Sprint 86](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-86). |
 | <a id="fw-p2-76"></a>FW-P2-76 | Completed by [accepted Sprint 87](Archive/Accepted%20outcomes/Sprints_80-89.md#sprint-87). |
 | <a id="fw-p2-78"></a>FW-P2-78 | Completed by [accepted Sprint 90](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-90), R1 Dashboard Native-Currency Hierarchy. |
+| <a id="fw-p3-36"></a>FW-P3-36 | **COMPLETE** for the selected verified backup, restore and disaster-recovery outcome under [accepted Sprint 93](Archive/Accepted%20outcomes/Sprints_90-99.md#sprint-93) and ADR-047. Strict format-1/current V1–V17 compatibility and the recorded recovery limits apply; no historical-backup upgrade, encryption or optional-export scope is implied. |
